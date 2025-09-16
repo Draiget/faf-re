@@ -1,0 +1,1139 @@
+const charTypeInfo::`vftable'	00D41940	
+const CP_CharSet::`vftable'	00D52DFC	
+const CFSTR_SHELLURLDataObject::`vftable'	00D6CC84	
+const charNode::`vftable'	00D7CED4	
+const CScApp::`vftable'	00E4F6C0	
+const charTypeInfo::`RTTI Complete Object Locator'	00E4FEB4	
+const CP_CharSet::`RTTI Complete Object Locator'	00E55730	
+const CFSTR_SHELLURLDataObject::`RTTI Complete Object Locator'	00E5A4C8	
+const charNode::`RTTI Complete Object Locator'	00E5C150	
+const CScApp::`RTTI Complete Object Locator'	00E9F8A0	
+
+const DNameNode::`vftable'	00D7CEC4	
+const DNameStatusNode::`vftable'	00D7CEF4	
+const DNameNode::`RTTI Complete Object Locator'	00E5C108	
+const DNameStatusNode::`RTTI Complete Object Locator'	00E5C1E8	
+
+const EC_CharSet::`vftable'	00D52E10	
+const EC_CharSet::`RTTI Complete Object Locator'	00E5577C	
+
+const floatTypeInfo::`RTTI Complete Object Locator'	00E501FC	
+const floatTypeInfo::`vftable'	00D41B90	
+
+const HistoryLogTarget::`vftable'	00D41DC4	
+const HistoryLogTarget::`RTTI Complete Object Locator'	00E50344	
+
+const intTypeInfo::`vftable'	00D419B0	
+const ID_CharSet::`vftable'	00D52DE8	
+const intTypeInfo::`RTTI Complete Object Locator'	00E4FF5C	
+const ID_CharSet::`RTTI Complete Object Locator'	00E556E4	
+
+const longTypeInfo::`vftable'	00D419E4	
+const LuaPlus::LuaAssertion::`vftable'	00D44C28	
+const LuaPlus::LuaStateConstruct::`vftable'	00D44EE0	
+const LuaPlus::LuaObjectTypeInfo::`vftable'	00D44F10	
+const LuaPlus::LuaStateSaveConstruct::`vftable'	00D44F4C	
+const LuaPlus::LuaStateSerializer::`vftable'	00D44F54	
+const LuaPlus::LuaObjectSerializer::`vftable'	00D44F5C	
+const LuaPlus::LuaStateTypeInfo::`vftable'	00D44F74	
+const lua_Error::`vftable'	00D44FC0	
+const lua_RuntimeError::`vftable'	00D45958	
+const lua_ErrorError::`vftable'	00D45AF0	
+const lua_SyntaxError::`vftable'	00D4609C	
+const lua_MemError::`vftable'	00D46398	
+const LClosureSaveConstruct::`vftable'	00D46A68	
+const LClosureConstruct::`vftable'	00D46A90	
+const lua_StateConstruct::`vftable'	00D46AA8	
+const LClosureTypeInfo::`vftable'	00D46CB8	
+const lua_StateTypeInfo::`vftable'	00D46D64	
+const LClosureSerializer::`vftable'	00D47038	
+const lua_StateSaveConstruct::`vftable'	00D47048	
+const lua_StateSerializer::`vftable'	00D47050	
+const longTypeInfo::`RTTI Complete Object Locator'	00E4FFB0	
+const LuaPlus::LuaStateConstruct::`RTTI Complete Object Locator'	00E517F4	
+const LuaPlus::LuaObjectTypeInfo::`RTTI Complete Object Locator'	00E5184C	
+const LuaPlus::LuaStateSaveConstruct::`RTTI Complete Object Locator'	00E5189C	
+const LuaPlus::LuaStateSerializer::`RTTI Complete Object Locator'	00E518F4	
+const LuaPlus::LuaObjectSerializer::`RTTI Complete Object Locator'	00E5194C	
+const LuaPlus::LuaStateTypeInfo::`RTTI Complete Object Locator'	00E519A4	
+const lua_Error::`RTTI Complete Object Locator'	00E519F4	
+const lua_RuntimeError::`RTTI Complete Object Locator'	00E51A44	
+const lua_ErrorError::`RTTI Complete Object Locator'	00E51A98	
+const lua_SyntaxError::`RTTI Complete Object Locator'	00E51B3C	
+const lua_MemError::`RTTI Complete Object Locator'	00E51B90	
+const LClosureSaveConstruct::`RTTI Complete Object Locator'	00E52374	
+const LClosureConstruct::`RTTI Complete Object Locator'	00E5252C	
+const lua_StateConstruct::`RTTI Complete Object Locator'	00E52634	
+const LClosureTypeInfo::`RTTI Complete Object Locator'	00E5282C	
+const lua_StateTypeInfo::`RTTI Complete Object Locator'	00E5291C	
+const LClosureSerializer::`RTTI Complete Object Locator'	00E52B74	
+const lua_StateSaveConstruct::`RTTI Complete Object Locator'	00E52C24	
+const lua_StateSerializer::`RTTI Complete Object Locator'	00E52C7C	
+const LuaPlus::LuaAssertion::`RTTI Complete Object Locator'	00E5FF5C	
+
+const MemBufferCharTypeInfo::`vftable'	00D48A14	
+const MemBufferCharConstTypeInfo::`vftable'	00D48A5C	
+
+const ProtoSaveConstruct::`vftable'	00D46A80	
+const ProtoConstruct::`vftable'	00D46AA0	
+const ProtoTypeInfo::`vftable'	00D46D2C	
+const ProtoSerializer::`vftable'	00D47040	
+const pDNameNode::`vftable'	00D7CEE4	
+const pcharNode::`vftable'	00D7CF04	
+const ProtoSaveConstruct::`RTTI Complete Object Locator'	00E5247C	
+const ProtoConstruct::`RTTI Complete Object Locator'	00E525DC	
+const ProtoTypeInfo::`RTTI Complete Object Locator'	00E528CC	
+const ProtoSerializer::`RTTI Complete Object Locator'	00E52BCC	
+const pDNameNode::`RTTI Complete Object Locator'	00E5C19C	
+const pcharNode::`RTTI Complete Object Locator'	00E5C234	
+
+const RIntType<char>::`vftable'	00D416C4	
+const RIntType<short>::`vftable'	00D416F4	
+const RIntType<int>::`vftable'	00D41724	
+const RIntType<long>::`vftable'	00D41754	
+const RIntType<signed char>::`vftable'	00D41784	
+const RIntType<uchar>::`vftable'	00D417B4	
+const RIntType<ushort>::`vftable'	00D417E4	
+const RIntType<uint>::`vftable'	00D41814	
+const RIntType<ulong>::`vftable'	00D41844	
+const RBoolType::`vftable'	00D41874	
+const RFloatType::`vftable'	00D418A8	
+const RStringType::`vftable'	00D418D8	
+const Resolution::`vftable'	00E4F428	
+const RIntType<char>::`RTTI Complete Object Locator'	00E4FAA4	
+const RIntType<short>::`RTTI Complete Object Locator'	00E4FAF4	
+const RIntType<int>::`RTTI Complete Object Locator'	00E4FB44	
+const RIntType<long>::`RTTI Complete Object Locator'	00E4FB94	
+const RIntType<signed char>::`RTTI Complete Object Locator'	00E4FBE4	
+const RIntType<uchar>::`RTTI Complete Object Locator'	00E4FC34	
+const RIntType<ushort>::`RTTI Complete Object Locator'	00E4FC84	
+const RIntType<uint>::`RTTI Complete Object Locator'	00E4FCD4	
+const RIntType<ulong>::`RTTI Complete Object Locator'	00E4FD24	
+const RBoolType::`RTTI Complete Object Locator'	00E4FD74	
+const RFloatType::`RTTI Complete Object Locator'	00E4FDC4	
+const RStringType::`RTTI Complete Object Locator'	00E4FE14	
+const Resolution::`RTTI Complete Object Locator'	00E9F958	
+
+const shortTypeInfo::`vftable'	00D41978	
+const signedcharTypeInfo::`vftable'	00D41A1C	
+const stringTypeInfo::`vftable'	00D41BC8	
+const shortTypeInfo::`RTTI Complete Object Locator'	00E4FF08	
+const signedcharTypeInfo::`RTTI Complete Object Locator'	00E50004	
+const stringTypeInfo::`RTTI Complete Object Locator'	00E50250	
+
+const TStringSerializer::`vftable'	00D46A60	
+const TStringConstruct::`vftable'	00D46AB8	
+const TObjectTypeInfo::`vftable'	00D46BB4	
+const TStringTypeInfo::`vftable'	00D46BEC	
+const TableTypeInfo::`vftable'	00D46C24	
+const TObjectSerializer::`vftable'	00D47010	
+const TStringSaveConstruct::`vftable'	00D47018	
+const TableSaveConstruct::`vftable'	00D47020	
+const TableConstruct::`vftable'	00D47028	
+const TableSerializer::`vftable'	00D47030	
+const TextWriteArchive::`vftable'	00D479C4	
+const TextReadArchive::`vftable'	00D47A14	
+const TraverseSelections::`vftable'	00D6622C	
+const TraverseCounter::`vftable'	00D66234	
+const type_info::`vftable'	00D72A88	
+const TStringSerializer::`RTTI Complete Object Locator'	00E5231C	
+const TStringConstruct::`RTTI Complete Object Locator'	00E526E4	
+const TObjectTypeInfo::`RTTI Complete Object Locator'	00E5273C	
+const TStringTypeInfo::`RTTI Complete Object Locator'	00E5278C	
+const TableTypeInfo::`RTTI Complete Object Locator'	00E527DC	
+const TObjectSerializer::`RTTI Complete Object Locator'	00E529BC	
+const TStringSaveConstruct::`RTTI Complete Object Locator'	00E52A14	
+const TableSaveConstruct::`RTTI Complete Object Locator'	00E52A6C	
+const TableConstruct::`RTTI Complete Object Locator'	00E52AC4	
+const TableSerializer::`RTTI Complete Object Locator'	00E52B1C	
+const TextWriteArchive::`RTTI Complete Object Locator'	00E52F04	
+const TextReadArchive::`RTTI Complete Object Locator'	00E52F54	
+const TraverseSelections::`RTTI Complete Object Locator'	00E58C18	
+const TraverseCounter::`RTTI Complete Object Locator'	00E58C64	
+const type_info::`RTTI Complete Object Locator'	00E5C074	
+
+const unsignedcharTypeInfo::`vftable'	00D41A58	
+const unsignedshortTypeInfo::`vftable'	00D41A98	
+const unsignedintTypeInfo::`vftable'	00D41AD8	
+const unsignedlongTypeInfo::`vftable'	00D41B18	
+const UpValSaveConstruct::`vftable'	00D46A70	
+const UpValSerializer::`vftable'	00D46A78	
+const UdataSaveConstruct::`vftable'	00D46A88	
+const UpValConstruct::`vftable'	00D46A98	
+const UdataConstruct::`vftable'	00D46AB0	
+const UpValTypeInfo::`vftable'	00D46CF4	
+const UdataTypeInfo::`vftable'	00D46DA0	
+const UdataSerializer::`vftable'	00D47058	
+const unsignedcharTypeInfo::`RTTI Complete Object Locator'	00E50058	
+const unsignedshortTypeInfo::`RTTI Complete Object Locator'	00E500AC	
+const unsignedintTypeInfo::`RTTI Complete Object Locator'	00E50100	
+const unsignedlongTypeInfo::`RTTI Complete Object Locator'	00E50154	
+const UpValSaveConstruct::`RTTI Complete Object Locator'	00E523CC	
+const UpValSerializer::`RTTI Complete Object Locator'	00E52424	
+const UdataSaveConstruct::`RTTI Complete Object Locator'	00E524D4	
+const UpValConstruct::`RTTI Complete Object Locator'	00E52584	
+const UdataConstruct::`RTTI Complete Object Locator'	00E5268C	
+const UpValTypeInfo::`RTTI Complete Object Locator'	00E5287C	
+const UdataTypeInfo::`RTTI Complete Object Locator'	00E5296C	
+const UdataSerializer::`RTTI Complete Object Locator'	00E52CD4	
+
+const voidTypeInfo::`vftable'	00D41908	
+const voidTypeInfo::`RTTI Complete Object Locator'	00E4FE64	
+
+const WrapFileTypeInfo::`vftable'	00D45F30	
+const wxObject::`vftable'	00D4D0F8	
+const wxListBase::`vftable'	00D4D10C	
+const wxGDIObject::`vftable'	00D4D124	
+const wxInitDialogEvent::`vftable'	00D4D150	
+const wxCloseEvent::`vftable'	00D4D168	
+const wxUpdateUIEvent::`vftable'	00D4D180	
+const wxSysColourChangedEvent::`vftable'	00D4D198	
+const wxRegion::`vftable'	00D4D1B0	
+const wxWindowList::`vftable'	00D4D1DC	
+const wxWindowListNode::`vftable'	00D4D1F8	
+const wxCommandEvent::`vftable'	00D4D52C	
+const wxWindowBase::`vftable'	00D4D544	
+const wxFontBase::`vftable'	00D4D74C	
+const wxSetCursorEvent::`vftable'	00D4D7C4	
+const wxSizeEvent::`vftable'	00D4D7DC	
+const wxMoveEvent::`vftable'	00D4D7F4	
+const wxPaintEvent::`vftable'	00D4D80C	
+const wxNcPaintEvent::`vftable'	00D4D824	
+const wxEraseEvent::`vftable'	00D4D83C	
+const wxFocusEvent::`vftable'	00D4D854	
+const wxActivateEvent::`vftable'	00D4D86C	
+const wxShowEvent::`vftable'	00D4D884	
+const wxIconizeEvent::`vftable'	00D4D89C	
+const wxMaximizeEvent::`vftable'	00D4D8B4	
+const wxJoystickEvent::`vftable'	00D4D8CC	
+const wxDropFilesEvent::`vftable'	00D4D8E4	
+const wxMouseCaptureChangedEvent::`vftable'	00D4D8FC	
+const wxDisplayChangedEvent::`vftable'	00D4D914	
+const wxPaletteChangedEvent::`vftable'	00D4D92C	
+const wxQueryNewPaletteEvent::`vftable'	00D4D944	
+const wxNavigationKeyEvent::`vftable'	00D4D95C	
+const wxHelpEvent::`vftable'	00D4D974	
+const wxContextMenuEvent::`vftable'	00D4D98C	
+const wxDCTemp::`vftable'	00D4D9A4	
+const wxFont::`vftable'	00D4DACC	
+const wxWindow::`vftable'	00D4DB44	
+const wxObjectRefData::`vftable'	00D4DDEC	
+const wxGDIRefData::`vftable'	00D4DDF4	
+const wxFontRefData::`vftable'	00D4DE10	
+const wxColour::`vftable'	00D4DF34	
+const wxObjectList::`vftable'	00D4DF7C	
+const wxObjectListNode::`vftable'	00D4DF98	
+const wxList::`vftable'	00D4DFA4	
+const wxGDIImage::`vftable'	00D4DFC0	
+const wxModule::`vftable'	00D4DFF0	
+const wxBitmap::`vftable'	00D4E00C	
+const wxImageHandler::`vftable'	00D4E054	
+const wxBMPHandler::`vftable'	00D4E098	
+const wxXPMHandler::`vftable'	00D4E100	
+const wxImageRefData::`vftable'	00D4E138	
+const wxImage::`vftable'	00D4E140	
+const wxImageModule::`vftable'	00D4E204	
+const wxAcceleratorRefData::`vftable'	00D4E65C	
+const wxAcceleratorTable::`vftable'	00D4E664	
+const wxPNGHandler::`vftable'	00D4E6A0	
+const wxGDIImageHandler::`vftable'	00D4E7BC	
+const wxMask::`vftable'	00D4E7DC	
+const wxBitmapHandler::`vftable'	00D4E7F0	
+const wxGDIImageRefData::`vftable'	00D4E81C	
+const wxBitmapRefData::`vftable'	00D4E828	
+const wxNodeBase::`vftable'	00D4E87C	
+const wxStringListBase::`vftable'	00D4E888	
+const wxStringListNode::`vftable'	00D4E8A4	
+const wxStringList::`vftable'	00D4E8B0	
+const wxEvent::`vftable'	00D4E900	
+const wxScrollEvent::`vftable'	00D4E918	
+const wxScrollWinEvent::`vftable'	00D4E930	
+const wxMouseEvent::`vftable'	00D4E948	
+const wxKeyEvent::`vftable'	00D4E960	
+const wxWindowCreateEvent::`vftable'	00D4E978	
+const wxWindowDestroyEvent::`vftable'	00D4E990	
+const wxChildFocusEvent::`vftable'	00D4E9A8	
+const wxEvtHandler::`vftable'	00D4E9C0	
+const wxNotifyEvent::`vftable'	00D4E9F0	
+const wxMenuEvent::`vftable'	00D4EA08	
+const wxIdleEvent::`vftable'	00D4EA20	
+const wxIcon::`vftable'	00D4F124	
+const wxIconRefData::`vftable'	00D4F158	
+const wxCursor::`vftable'	00D4F16C	
+const wxCursorRefData::`vftable'	00D4F19C	
+const wxRegionRefData::`vftable'	00D4F37C	
+const wxRegionIterator::`vftable'	00D4F384	
+const wxButtonBase::`vftable'	00D4F3DC	
+const wxItemContainer::`vftable'	00D4F604	
+const wxControlWithItems::`vftable'	00D4F640	
+const wxControlWithItems::`vftable'	00D4F67C	
+const wxCheckBoxBase::`vftable'	00D4F89C	
+const wxChoiceBase::`vftable'	00D4FAC0	
+const wxChoiceBase::`vftable'	00D4FAFC	
+const wxScrollBarBase::`vftable'	00D4FD2C	
+const wxStaticTextBase::`vftable'	00D4FF5C	
+const wxStaticBitmapBase::`vftable'	00D5017C	
+const wxStaticBoxBase::`vftable'	00D503AC	
+const wxRadioButton::`vftable'	00D505CC	
+const wxTextCtrl::`vftable'	00D507F4	
+const wxButton::`vftable'	00D50ABC	
+const wxBitmapButtonBase::`vftable'	00D50CE4	
+const wxBitmapButton::`vftable'	00D50F14	
+const wxCheckBox::`vftable'	00D51154	
+const wxChoice::`vftable'	00D51378	
+const wxChoice::`vftable'	00D513B4	
+const wxScrollBar::`vftable'	00D515E4	
+const wxStaticText::`vftable'	00D51814	
+const wxStaticBitmap::`vftable'	00D51A34	
+const wxStaticBox::`vftable'	00D51C64	
+const wxComboBox::`vftable'	00D51E80	
+const wxComboBox::`vftable'	00D51EBC	
+const wxSpinButtonBase::`vftable'	00D5211C	
+const wxSpinButton::`vftable'	00D5234C	
+const wxPaletteRefData::`vftable'	00D527DC	
+const wxPalette::`vftable'	00D527E4	
+const wxWindowDC::`vftable'	00D52834	
+const wxClientDC::`vftable'	00D5295C	
+const wxPaintDC::`vftable'	00D52A84	
+const wxMBConv::`vftable'	00D52D74	
+const wxStrConvModule::`vftable'	00D52D84	
+const wxEncodingConverter::`vftable'	00D52DA0	
+const wxMBConvUTF7::`vftable'	00D52DB4	
+const wxMBConvUTF8::`vftable'	00D52DC4	
+const wxCharacterSet::`vftable'	00D52DD4	
+const wxCSConv::`vftable'	00D52E84	
+const wxTreeListColumnInfo::`vftable'	00D52F08	
+const wxTreeListCtrl::`vftable'	00D52F1C	
+const wxTreeListTextCtrl::`vftable'	00D5313C	
+const wxPanel::`vftable'	00D53404	
+const wxTimerBase::`vftable'	00D53618	
+const wxTimer::`vftable'	00D5363C	
+const wxGenericScrolledWindow::`vftable'	00D53664	
+const wxGenericScrolledWindow::`vftable'	00D536A4	
+const wxScrolledWindow::`vftable'	00D538BC	
+const wxScrolledWindow::`vftable'	00D538FC	
+const wxListItem::`vftable'	00D53B10	
+const wxTreeListRenameTimer::`vftable'	00D53B24	
+const wxTreeListHeaderWindow::`vftable'	00D53B4C	
+const wxListEvent::`vftable'	00D53D5C	
+const wxTreeListMainWindow::`vftable'	00D53D74	
+const wxTreeListMainWindow::`vftable'	00D53DB4	
+const wxTopLevelWindowMSW::`vftable'	00D540F4	
+const wxTopLevelWindow::`vftable'	00D5432C	
+const wxDialogBase::`vftable'	00D54564	
+const wxDialog::`vftable'	00D547A4	
+const wxTreeEvent::`vftable'	00D54A24	
+const wxTLWHiddenParentModule::`vftable'	00D54A64	
+const wxTopLevelWindowBase::`vftable'	00D54B34	
+const wxControl::`vftable'	00D54D7C	
+const wxControlBase::`vftable'	00D54FF4	
+const wxSizerItem::`vftable'	00D55208	
+const wxSizer::`vftable'	00D5522C	
+const wxSizer::`vftable'	00D55294	
+const wxGridSizer::`vftable'	00D552AC	
+const wxGridSizer::`vftable'	00D552C4	
+const wxFlexGridSizer::`vftable'	00D5532C	
+const wxFlexGridSizer::`vftable'	00D55344	
+const wxBoxSizer::`vftable'	00D553AC	
+const wxBoxSizer::`vftable'	00D553C4	
+const wxStaticBoxSizer::`vftable'	00D5542C	
+const wxStaticBoxSizer::`vftable'	00D55444	
+const wxNotebookSizer::`vftable'	00D554AC	
+const wxNotebookSizer::`vftable'	00D554C4	
+const wxValidator::`vftable'	00D555EC	
+const wxApp::`vftable'	00D5593C	
+const wxWinHashTable::`vftable'	00D559E8	
+const wxMenuItemList::`vftable'	00D55BBC	
+const wxwxMenuItemListNode::`vftable'	00D55BD8	
+const wxMenuBase::`vftable'	00D55BE4	
+const wxMenu::`vftable'	00D55C44	
+const wxTextUrlEvent::`vftable'	00D55CA4	
+const wxRichEditModule::`vftable'	00D55CBC	
+const wxSplitterEvent::`vftable'	00D55FA8	
+const wxSplitterWindow::`vftable'	00D55FC4	
+const wxMenuBar::`vftable'	00D56254	
+const wxTextCtrlBase::`vftable'	00D564BC	
+const wxListCtrl::`vftable'	00D5694C	
+const wxListView::`vftable'	00D56CFC	
+const wxStatusBar::`vftable'	00D56F7C	
+const wxFrame::`vftable'	00D571AC	
+const wxStatusBarGeneric::`vftable'	00D5743C	
+const wxMenuList::`vftable'	00D57688	
+const wxwxMenuListNode::`vftable'	00D576A4	
+const wxMenuItemBase::`vftable'	00D576B0	
+const wxMenuBarBase::`vftable'	00D578DC	
+const wxClientData::`vftable'	00D583E8	
+const wxImageList::`vftable'	00D583F0	
+const wxTreeItemData::`vftable'	00D58404	
+const wxTreeCtrl::`vftable'	00D5840C	
+const wxDirItemData::`vftable'	00D5862C	
+const wxGenericDirCtrl::`vftable'	00D58634	
+const wxDirFilterListCtrl::`vftable'	00D588CC	
+const wxDirFilterListCtrl::`vftable'	00D5890C	
+const wxOwnerDrawn::`vftable'	00D58CA4	
+const wxMenuItem::`vftable'	00D58CB4	
+const wxMenuItem::`vftable'	00D58CC4	
+const wxNotebookBase::`vftable'	00D58D24	
+const wxNotebookEvent::`vftable'	00D58F88	
+const wxNotebook::`vftable'	00D58FA4	
+const wxToolBar::`vftable'	00D592BC	
+const wxFrameBase::`vftable'	00D5958C	
+const wxMessageOutput::`vftable'	00D598AC	
+const wxMessageOutputMessageBox::`vftable'	00D598B8	
+const wxAppBase::`vftable'	00D598C4	
+const wxBMPFileHandler::`vftable'	00D59BDC	
+const wxBMPResourceHandler::`vftable'	00D59C08	
+const wxIconHandler::`vftable'	00D59C64	
+const wxICOFileHandler::`vftable'	00D59C88	
+const wxICOResourceHandler::`vftable'	00D59CD0	
+const wxSplashScreen::`vftable'	00D5A054	
+const wxSplashScreenWindow::`vftable'	00D5A2E4	
+const wxThread::`vftable'	00D5A6F0	
+const wxThreadModule::`vftable'	00D5A700	
+const wxSliderBase::`vftable'	00D5A97C	
+const wxSlider95::`vftable'	00D5ABE4	
+const wxFileDialog::`vftable'	00D5AE8C	
+const wxMessageDialog::`vftable'	00D5B1FC	
+const wxDirDialog::`vftable'	00D5B474	
+const wxDateTimeHolidaysModule::`vftable'	00D5B708	
+const wxDateTimeHolidayAuthority::`vftable'	00D5B724	
+const wxDateTimeWorkDays::`vftable'	00D5B7FC	
+const wxURL::`vftable'	00D5BDB0	
+const wxURLModule::`vftable'	00D5BDC4	
+const wxPenList::`vftable'	00D5BE90	
+const wxBrushList::`vftable'	00D5BEAC	
+const wxFontList::`vftable'	00D5BEC8	
+const wxResourceCache::`vftable'	00D5BEE4	
+const wxColourDatabase::`vftable'	00D5BF00	
+const wxBitmapList::`vftable'	00D5C9D4	
+const wxStringTokenizer::`vftable'	00D5CABC	
+const wxLocaleModule::`vftable'	00D5CAD0	
+const wxLog::`vftable'	00D5ECA4	
+const wxLogStderr::`vftable'	00D5ED3C	
+const wxLogChain::`vftable'	00D5ED58	
+const wxLogPassThrough::`vftable'	00D5ED6C	
+const wxContextHelpEvtHandler::`vftable'	00D5EE20	
+const wxHelpProvider::`vftable'	00D5EE50	
+const wxHelpProviderModule::`vftable'	00D5EE6C	
+const wxContextHelp::`vftable'	00D5EE88	
+const wxContextHelpButton::`vftable'	00D5EE9C	
+const wxSimpleHelpProvider::`vftable'	00D5F0D8	
+const wxHelpControllerHelpProvider::`vftable'	00D5F0F4	
+const wxSystemSettingsModule::`vftable'	00D5F224	
+const wxSleepTimer::`vftable'	00D5F4E4	
+const wxBrush::`vftable'	00D5F51C	
+const wxDCBase::`vftable'	00D5F55C	
+const wxDCCacheEntry::`vftable'	00D5F694	
+const wxDCModule::`vftable'	00D5F6A8	
+const wxDC::`vftable'	00D5F6C4	
+const wxToolTip::`vftable'	00D5F848	
+const wxIndividualLayoutConstraint::`vftable'	00D5F8BC	
+const wxLayoutConstraints::`vftable'	00D5F8D0	
+const wxProcess::`vftable'	00D5F98C	
+const wxFontDialogBase::`vftable'	00D5FA44	
+const wxFontDialog::`vftable'	00D5FC94	
+const wxListString::`vftable'	00D5FF08	
+const wxwxListStringNode::`vftable'	00D5FF24	
+const wxStatusBarBase::`vftable'	00D5FF34	
+const wxHashTableBase::`vftable'	00D60184	
+const wxStringHashTable::`vftable'	00D60198	
+const wxHashTable::`vftable'	00D601AC	
+const wxHashTableLong::`vftable'	00D601C0	
+const wxPopupWindowBase::`vftable'	00D601F4	
+const wxPopupWindow::`vftable'	00D6040C	
+const wxBrushRefData::`vftable'	00D6064C	
+const wxDropTargetBase::`vftable'	00D60664	
+const wxIDropTarget::`vftable'	00D60684	
+const wxDropTarget::`vftable'	00D606A8	
+const wxSpinCtrl::`vftable'	00D606DC	
+const wxMemoryDC::`vftable'	00D60934	
+const wxMemoryConfig::`vftable'	00D61474	
+const wxFontMapper::`vftable'	00D614E8	
+const wxFontMapperModule::`vftable'	00D614FC	
+const wxFontData::`vftable'	00D61898	
+const wxModuleList::`vftable'	00D61C9C	
+const wxwxModuleListNode::`vftable'	00D61CB8	
+const wxICOHandler::`vftable'	00D61D58	
+const wxCURHandler::`vftable'	00D61DC4	
+const wxANIHandler::`vftable'	00D61E34	
+const wxFileInputStream::`vftable'	00D6265C	
+const wxFileOutputStream::`vftable'	00D62690	
+const wxFFileInputStream::`vftable'	00D626BC	
+const wxFFileOutputStream::`vftable'	00D626F4	
+const wxFileStream::`vftable'	00D62720	
+const wxFileStream::`vftable'	00D6274C	
+const wxFFileStream::`vftable'	00D62780	
+const wxFFileStream::`vftable'	00D627AC	
+const wxStreamBuffer::`vftable'	00D627E0	
+const wxStreamBase::`vftable'	00D62804	
+const wxInputStream::`vftable'	00D62818	
+const wxOutputStream::`vftable'	00D6284C	
+const wxCountingOutputStream::`vftable'	00D62878	
+const wxFilterInputStream::`vftable'	00D628A4	
+const wxFilterOutputStream::`vftable'	00D628D8	
+const wxBufferedInputStream::`vftable'	00D62904	
+const wxBufferedOutputStream::`vftable'	00D62938	
+const wxPathList::`vftable'	00D62964	
+const wxPenRefData::`vftable'	00D6468C	
+const wxPen::`vftable'	00D64694	
+const wxSpinEvent::`vftable'	00D6477C	
+const wxListBoxBase::`vftable'{for `wxItemContainer'}	00D647D4	
+const wxListBoxBase::`vftable'	00D64814	
+const wxListBoxItem::`vftable'	00D64A50	
+const wxListBox::`vftable'	00D64A60	
+const wxListBox::`vftable'	00D64A9C	
+const wxScrollHelperEvtHandler::`vftable'	00D64CFC	
+const wxAutoScrollTimer::`vftable'	00D64D2C	
+const wxScrollHelper::`vftable'	00D64D54	
+const wxTimerEvent::`vftable'	00D64DC4	
+const wxScreenDC::`vftable'	00D64F1C	
+const wxClientDataContainer::`vftable'	00D650AC	
+const wxTextBuffer::`vftable'	00D656A0	
+const wxMDIParentFrame::`vftable'	00D658EC	
+const wxMDIChildFrame::`vftable'	00D65C54	
+const wxMDIClientWindow::`vftable'	00D65EE4	
+const wxDragImage::`vftable'	00D661EC	
+const wxTreeTraversal::`vftable'	00D66200	
+const wxTreeItemIndirectData::`vftable'	00D66224	
+const wxDirTraverser::`vftable'	00D66254	
+const wxDirTraverserSimple::`vftable'	00D66260	
+const wxMSWSystemMenuFontModule::`vftable'	00D662CC	
+const wxUxThemeModule::`vftable'	00D66334	
+const wxRadioBoxBase::`vftable'	00D66734	
+const wxRadioBox::`vftable'	00D66768	
+const wxRadioBox::`vftable'	00D6679C	
+const wxStaticLineBase::`vftable'	00D669DC	
+const wxStaticLine::`vftable'	00D66BFC	
+const wxToolBarToolsList::`vftable'	00D66E3C	
+const wxwxToolBarToolsListNode::`vftable'	00D66E58	
+const wxToolBarToolBase::`vftable'	00D66E64	
+const wxToolBarBase::`vftable'	00D66E84	
+const wxToolBarTool::`vftable'	00D67184	
+const wxConfigBase::`vftable'	00D6720C	
+const wxLogFrame::`vftable'	00D673BC	
+const wxLogWindow::`vftable'	00D6765C	
+const wxLogDialog::`vftable'	00D6767C	
+const wxLogTextCtrl::`vftable'	00D67974	
+const wxLogGui::`vftable'	00D67988	
+const wxEnhMetaFile::`vftable'	00D67B1C	
+const wxClipboard::`vftable'	00D67C80	
+const wxFileProto::`vftable'	00D67E14	
+const wxHTTPStream::`vftable'	00D67E94	
+const wxHTTP::`vftable'	00D67ECC	
+const wxInputFTPStream::`vftable'	00D6808C	
+const wxOutputFTPStream::`vftable'	00D680C0	
+const wxFTP::`vftable'	00D68104	
+const wxSockAddress::`vftable'	00D68564	
+const wxIPV4address::`vftable'	00D68584	
+const wxTipWindow::`vftable'	00D689F4	
+const wxTipWindowView::`vftable'	00D68C1C	
+const wxPipeInputStream::`vftable'	00D68E7C	
+const wxPipeOutputStream::`vftable'	00D68EB0	
+const wxSystemOptionsModule::`vftable'	00D68FA0	
+const wxProcessEvent::`vftable'	00D68FE8	
+const wxColourData::`vftable'	00D6903C	
+const wxPrintData::`vftable'	00D69084	
+const wxPrintDialogData::`vftable'	00D69098	
+const wxPageSetupDialogData::`vftable'	00D690AC	
+const wxTextOutputStream::`vftable'	00D69164	
+const wxTextEntryDialog::`vftable'	00D6917C	
+const wxColourDialog::`vftable'	00D693F4	
+const wxPopupWindowHandler::`vftable'	00D69690	
+const wxPopupFocusHandler::`vftable'	00D696C0	
+const wxPopupTransientWindow::`vftable'	00D696F4	
+const wxDataObjectSimple::`vftable'	00D6994C	
+const wxSimpleDataObjectList::`vftable'	00D69984	
+const wxwxSimpleDataObjectListNode::`vftable'	00D699A0	
+const wxFileDataObjectBase::`vftable'	00D699AC	
+const wxDataObjectBase::`vftable'	00D699E4	
+const wxDataObjectComposite::`vftable'	00D69A04	
+const wxCustomDataObject::`vftable'	00D69A34	
+const wxFileDataObject::`vftable'	00D69A7C	
+const wxTextDataObject::`vftable'	00D69ABC	
+const wxTextDropTarget::`vftable'	00D69B00	
+const wxFileDropTarget::`vftable'	00D69B24	
+const wxMemoryText::`vftable'	00D69B54	
+const wxFileConfig::`vftable'	00D6A634	
+const wxAnyChoiceDialog::`vftable'	00D6A70C	
+const wxSingleChoiceDialog::`vftable'	00D6A954	
+const wxMultiChoiceDialog::`vftable'	00D6AB9C	
+const wxQuantize::`vftable'	00D6AE38	
+const wxPluginLibraryModule::`vftable'	00D6C4CC	
+const wxRegConfig::`vftable'	00D6C694	
+const wxArtProvidersList::`vftable'	00D6C7C0	
+const wxwxArtProvidersListNode::`vftable'	00D6C7DC	
+const wxArtProviderModule::`vftable'	00D6C7E8	
+const wxEnhMetaFileDC::`vftable'	00D6C86C	
+const wxEnhMetaFileDataObject::`vftable'	00D6C994	
+const wxIDataObject::`vftable'	00D6CA60	
+const wxDataObject::`vftable'	00D6CC00	
+const wxIEnumFORMATETC::`vftable'	00D6CCFC	
+const wxURLDataObject::`vftable'	00D6CD8C	
+const wxSocketEvent::`vftable'	00D6CDB8	
+const wxSocketState::`vftable'	00D6CDD0	
+const wxSocketBase::`vftable'	00D6CDE4	
+const wxSocketModule::`vftable'	00D6CE38	
+const wxSocketServer::`vftable'	00D6CEA4	
+const wxSocketClient::`vftable'	00D6CEC4	
+const wxDatagramSocket::`vftable'	00D6CEE8	
+const wxProtoInfo::`vftable'	00D6CFC4	
+const wxProtocol::`vftable'	00D6CFDC	
+const wxSocketOutputStream::`vftable'	00D6D020	
+const wxSocketInputStream::`vftable'	00D6D04C	
+const wxSocketStream::`vftable'	00D6D080	
+const wxSocketStream::`vftable'	00D6D0AC	
+const wxServerBase::`vftable'	00D6D0EC	
+const wxClientBase::`vftable'	00D6D108	
+const wxDDEModule::`vftable'	00D6D128	
+const wxDDEConnection::`vftable'	00D6D144	
+const wxDDEClient::`vftable'	00D6D194	
+const wxDDEServer::`vftable'	00D6DD40	
+const wxPrintPaperType::`vftable'	00D6E180	
+const wxPrintPaperDatabase::`vftable'	00D6E19C	
+const wxPrintPaperModule::`vftable'	00D6E1B8	
+const wxTextValidator::`vftable'	00D6EAB4	
+const wxTextFile::`vftable'	00D6ECBC	
+const wxArtProvider::`vftable'	00D7170C	
+const wxDefaultArtProvider::`vftable'	00D71A98	
+const wxClipboardModule::`vftable'	00D71AB0	
+const wxClipboardBase::`vftable'	00D71ACC	
+const wxConnectionBase::`vftable'	00D71BAC	
+const Wm3::Distance<float,Wm3::Vector2<float>>::`vftable'	00D71C2C	
+const Wm3::Distance<float,Wm3::Vector3<float>>::`vftable'	00D71C54	
+const Wm3::Distance<double,Wm3::Vector2<double>>::`vftable'	00D71C7C	
+const Wm3::Distance<double,Wm3::Vector3<double>>::`vftable'	00D71CA4	
+const Wm3::IntrBox3Sphere3<float>::`vftable'	00D71CFC	
+const Wm3::IntrBox3Sphere3<double>::`vftable'	00D71D14	
+const Wm3::Intersector<float,Wm3::Vector2<float>>::`vftable'	00D71D2C	
+const Wm3::Intersector<float,Wm3::Vector3<float>>::`vftable'	00D71D44	
+const Wm3::Intersector<double,Wm3::Vector2<double>>::`vftable'	00D71D5C	
+const Wm3::Intersector<double,Wm3::Vector3<double>>::`vftable'	00D71D74	
+const Wm3::DistVector3Box3<float>::`vftable'	00D71D8C	
+const Wm3::DistVector3Box3<double>::`vftable'	00D71DB4	
+const Wm3::IntrSegment3Box3<float>::`vftable'	00D71DDC	
+const Wm3::IntrSegment3Box3<double>::`vftable'	00D71DF4	
+const Wm3::IntrSegment3Sphere3<float>::`vftable'	00D71E0C	
+const Wm3::IntrSegment3Sphere3<double>::`vftable'	00D71E24	
+const Wm3::IntrBox2Box2<float>::`vftable'	00D71E3C	
+const Wm3::IntrBox2Box2<double>::`vftable'	00D71E54	
+const Wm3::DistVector3Segment3<float>::`vftable'	00D71E6C	
+const Wm3::DistVector3Segment3<double>::`vftable'	00D71E94	
+const Wm3::IntrBox2Circle2<float>::`vftable'	00D71EC4	
+const Wm3::IntrBox2Circle2<double>::`vftable'	00D71EDC	
+const Wm3::IntrLine3Box3<float>::`vftable'	00D71EF4	
+const Wm3::IntrLine3Box3<double>::`vftable'	00D71F0C	
+const Wm3::Query::`vftable'	00D71F2C	
+const Wm3::Query3<float>::`vftable'	00D71F38	
+const Wm3::Query3<double>::`vftable'	00D71F5C	
+const Wm3::Query3Int64<float>::`vftable'	00D71F80	
+const Wm3::Query3Int64<double>::`vftable'	00D71FA4	
+const Wm3::Query3TInteger<float>::`vftable'	00D71FC8	
+const Wm3::Query3TInteger<double>::`vftable'	00D71FEC	
+const Wm3::Query3TRational<float>::`vftable'	00D72010	
+const Wm3::Query3TRational<double>::`vftable'	00D72034	
+const Wm3::ConvexHull3<float>::`vftable'	00D72058	
+const Wm3::ConvexHull3<double>::`vftable'	00D72060	
+const Wm3::ConvexHull<float>::`vftable'	00D72084	
+const Wm3::ConvexHull<double>::`vftable'	00D7208C	
+const Wm3::IntrSegment3Capsule3<float>::`vftable'	00D72094	
+const Wm3::IntrSegment3Capsule3<double>::`vftable'	00D720AC	
+const Wm3::DistVector2Box2<float>::`vftable'	00D720C4	
+const Wm3::DistVector2Box2<double>::`vftable'	00D720EC	
+const Wm3::ConvexHull1<float>::`vftable'	00D72114	
+const Wm3::ConvexHull1<double>::`vftable'	00D7211C	
+const Wm3::ConvexHull2<float>::`vftable'	00D72124	
+const Wm3::ConvexHull2<double>::`vftable'	00D7212C	
+const Wm3::Query2<float>::`vftable'	00D72134	
+const Wm3::Query2<double>::`vftable'	00D72158	
+const Wm3::Query2Int64<float>::`vftable'	00D7217C	
+const Wm3::Query2Int64<double>::`vftable'	00D721A0	
+const Wm3::Query2TInteger<float>::`vftable'	00D721C4	
+const Wm3::Query2TInteger<double>::`vftable'	00D721E8	
+const Wm3::Query2TRational<float>::`vftable'	00D7220C	
+const Wm3::Query2TRational<double>::`vftable'	00D72230	
+const Wm3::DistSegment3Segment3<float>::`vftable'	00D72254	
+const Wm3::DistSegment3Segment3<double>::`vftable'	00D7227C	
+const Wm3::IntrLine3Capsule3<float>::`vftable'	00D722A4	
+const Wm3::IntrLine3Capsule3<double>::`vftable'	00D722BC	
+const Wm3::DistLine3Segment3<float>::`vftable'	00D722D4	
+const Wm3::DistLine3Segment3<double>::`vftable'	00D722FC	
+const WSupComFrame::`vftable'	00E4F434	
+const WrapFileTypeInfo::`RTTI Complete Object Locator'	00E51AEC	
+const wxInitDialogEvent::`RTTI Complete Object Locator'	00E53D50	
+const wxCloseEvent::`RTTI Complete Object Locator'	00E53DA0	
+const wxUpdateUIEvent::`RTTI Complete Object Locator'	00E53DF0	
+const wxSysColourChangedEvent::`RTTI Complete Object Locator'	00E53E80	
+const wxRegion::`RTTI Complete Object Locator'	00E53ED0	
+const wxCommandEvent::`RTTI Complete Object Locator'	00E53F20	
+const wxSetCursorEvent::`RTTI Complete Object Locator'	00E53F34	
+const wxSizeEvent::`RTTI Complete Object Locator'	00E53F84	
+const wxMoveEvent::`RTTI Complete Object Locator'	00E53FD4	
+const wxNcPaintEvent::`RTTI Complete Object Locator'	00E54024	
+const wxEraseEvent::`RTTI Complete Object Locator'	00E54074	
+const wxFocusEvent::`RTTI Complete Object Locator'	00E540C4	
+const wxActivateEvent::`RTTI Complete Object Locator'	00E54114	
+const wxShowEvent::`RTTI Complete Object Locator'	00E54164	
+const wxIconizeEvent::`RTTI Complete Object Locator'	00E541B4	
+const wxMaximizeEvent::`RTTI Complete Object Locator'	00E54204	
+const wxJoystickEvent::`RTTI Complete Object Locator'	00E54254	
+const wxDropFilesEvent::`RTTI Complete Object Locator'	00E542A4	
+const wxMouseCaptureChangedEvent::`RTTI Complete Object Locator'	00E542F4	
+const wxDisplayChangedEvent::`RTTI Complete Object Locator'	00E54344	
+const wxPaletteChangedEvent::`RTTI Complete Object Locator'	00E54394	
+const wxQueryNewPaletteEvent::`RTTI Complete Object Locator'	00E543E4	
+const wxNavigationKeyEvent::`RTTI Complete Object Locator'	00E54434	
+const wxHelpEvent::`RTTI Complete Object Locator'	00E54484	
+const wxContextMenuEvent::`RTTI Complete Object Locator'	00E544D8	
+const wxDCTemp::`RTTI Complete Object Locator'	00E5452C	
+const wxFontRefData::`RTTI Complete Object Locator'	00E545F4	
+const wxColour::`RTTI Complete Object Locator'	00E54644	
+const wxObjectList::`RTTI Complete Object Locator'	00E54690	
+const wxObjectListNode::`RTTI Complete Object Locator'	00E546E0	
+const wxList::`RTTI Complete Object Locator'	00E5472C	
+const wxModule::`RTTI Complete Object Locator'	00E54780	
+const wxBMPHandler::`RTTI Complete Object Locator'	00E547CC	
+const wxXPMHandler::`RTTI Complete Object Locator'	00E5481C	
+const wxImageRefData::`RTTI Complete Object Locator'	00E5486C	
+const wxImage::`RTTI Complete Object Locator'	00E548B8	
+const wxImageModule::`RTTI Complete Object Locator'	00E54904	
+const wxAcceleratorRefData::`RTTI Complete Object Locator'	00E54954	
+const wxAcceleratorTable::`RTTI Complete Object Locator'	00E549A0	
+const wxGDIImageHandler::`RTTI Complete Object Locator'	00E549EC	
+const wxMask::`RTTI Complete Object Locator'	00E54A38	
+const wxBitmapHandler::`RTTI Complete Object Locator'	00E54A84	
+const wxBitmapRefData::`RTTI Complete Object Locator'	00E54AD4	
+const wxNodeBase::`RTTI Complete Object Locator'	00E54B28	
+const wxStringListBase::`RTTI Complete Object Locator'	00E54B3C	
+const wxStringListNode::`RTTI Complete Object Locator'	00E54B8C	
+const wxStringList::`RTTI Complete Object Locator'	00E54BD8	
+const wxEvent::`RTTI Complete Object Locator'	00E54C2C	
+const wxScrollEvent::`RTTI Complete Object Locator'	00E54C40	
+const wxScrollWinEvent::`RTTI Complete Object Locator'	00E54C94	
+const wxMouseEvent::`RTTI Complete Object Locator'	00E54CE4	
+const wxKeyEvent::`RTTI Complete Object Locator'	00E54D34	
+const wxWindowCreateEvent::`RTTI Complete Object Locator'	00E54D84	
+const wxWindowDestroyEvent::`RTTI Complete Object Locator'	00E54DD8	
+const wxChildFocusEvent::`RTTI Complete Object Locator'	00E54E2C	
+const wxEvtHandler::`RTTI Complete Object Locator'	00E54E80	
+const wxNotifyEvent::`RTTI Complete Object Locator'	00E54E94	
+const wxMenuEvent::`RTTI Complete Object Locator'	00E54EE8	
+const wxIdleEvent::`RTTI Complete Object Locator'	00E54F38	
+const wxCursor::`RTTI Complete Object Locator'	00E54F88	
+const wxCursorRefData::`RTTI Complete Object Locator'	00E54FDC	
+const wxRegionRefData::`RTTI Complete Object Locator'	00E55030	
+const wxRegionIterator::`RTTI Complete Object Locator'	00E55080	
+const wxScrollBarBase::`RTTI Complete Object Locator'	00E550CC	
+const wxStaticBitmapBase::`RTTI Complete Object Locator'	00E5512C	
+const wxRadioButton::`RTTI Complete Object Locator'	00E5518C	
+const wxScrollBar::`RTTI Complete Object Locator'	00E551EC	
+const wxStaticBitmap::`RTTI Complete Object Locator'	00E55250	
+const wxSpinButtonBase::`RTTI Complete Object Locator'	00E552B4	
+const wxSpinButton::`RTTI Complete Object Locator'	00E55314	
+const wxPaletteRefData::`RTTI Complete Object Locator'	00E55378	
+const wxPalette::`RTTI Complete Object Locator'	00E553C8	
+const wxWindowDC::`RTTI Complete Object Locator'	00E55418	
+const wxClientDC::`RTTI Complete Object Locator'	00E5546C	
+const wxPaintDC::`RTTI Complete Object Locator'	00E554C4	
+const wxMBConv::`RTTI Complete Object Locator'	00E55520	
+const wxStrConvModule::`RTTI Complete Object Locator'	00E55568	
+const wxEncodingConverter::`RTTI Complete Object Locator'	00E555B8	
+const wxMBConvUTF7::`RTTI Complete Object Locator'	00E55604	
+const wxMBConvUTF8::`RTTI Complete Object Locator'	00E55650	
+const wxCharacterSet::`RTTI Complete Object Locator'	00E5569C	
+const wxCSConv::`RTTI Complete Object Locator'	00E557C8	
+const wxTreeListTextCtrl::`RTTI Complete Object Locator'	00E55814	
+const wxTimerBase::`RTTI Complete Object Locator'	00E5587C	
+const wxTimer::`RTTI Complete Object Locator'	00E558C8	
+const wxGenericScrolledWindow::`RTTI Complete Object Locator'	00E55918	
+const wxGenericScrolledWindow::`RTTI Complete Object Locator'	00E559C8	
+const wxScrolledWindow::`RTTI Complete Object Locator'	00E559DC	
+const wxScrolledWindow::`RTTI Complete Object Locator'	00E55A40	
+const wxListItem::`RTTI Complete Object Locator'	00E55A54	
+const wxTreeListRenameTimer::`RTTI Complete Object Locator'	00E55AA0	
+const wxTreeListHeaderWindow::`RTTI Complete Object Locator'	00E55AF4	
+const wxListEvent::`RTTI Complete Object Locator'	00E55B4C	
+const wxTreeListMainWindow::`RTTI Complete Object Locator'	00E55BA4	
+const wxTreeListMainWindow::`RTTI Complete Object Locator'	00E55C0C	
+const wxTreeEvent::`RTTI Complete Object Locator'	00E55C20	
+const wxTLWHiddenParentModule::`RTTI Complete Object Locator'	00E55C78	
+const wxTopLevelWindowBase::`RTTI Complete Object Locator'	00E55CC8	
+const wxSizerItem::`RTTI Complete Object Locator'	00E55CDC	
+const wxSizer::`RTTI Complete Object Locator'	00E55D28	
+const wxSizer::`RTTI Complete Object Locator'	00E55DC8	
+const wxGridSizer::`RTTI Complete Object Locator'	00E55DDC	
+const wxGridSizer::`RTTI Complete Object Locator'	00E55E30	
+const wxFlexGridSizer::`RTTI Complete Object Locator'	00E55E44	
+const wxFlexGridSizer::`RTTI Complete Object Locator'	00E55E9C	
+const wxBoxSizer::`RTTI Complete Object Locator'	00E55EB0	
+const wxBoxSizer::`RTTI Complete Object Locator'	00E55F04	
+const wxStaticBoxSizer::`RTTI Complete Object Locator'	00E55F18	
+const wxStaticBoxSizer::`RTTI Complete Object Locator'	00E55F70	
+const wxNotebookSizer::`RTTI Complete Object Locator'	00E55F84	
+const wxNotebookSizer::`RTTI Complete Object Locator'	00E55FD8	
+const wxValidator::`RTTI Complete Object Locator'	00E55FEC	
+const wxApp::`RTTI Complete Object Locator'	00E5603C	
+const wxWinHashTable::`RTTI Complete Object Locator'	00E56050	
+const wxTextUrlEvent::`RTTI Complete Object Locator'	00E560D8	
+const wxRichEditModule::`RTTI Complete Object Locator'	00E5612C	
+const wxSplitterEvent::`RTTI Complete Object Locator'	00E5617C	
+const wxMenuBar::`RTTI Complete Object Locator'	00E561D4	
+const wxTextCtrlBase::`RTTI Complete Object Locator'	00E56274	
+const wxListView::`RTTI Complete Object Locator'	00E56288	
+const wxStatusBar::`RTTI Complete Object Locator'	00E562EC	
+const wxStatusBarGeneric::`RTTI Complete Object Locator'	00E5638C	
+const wxMenuList::`RTTI Complete Object Locator'	00E563E8	
+const wxwxMenuListNode::`RTTI Complete Object Locator'	00E56438	
+const wxMenuItemBase::`RTTI Complete Object Locator'	00E56484	
+const wxMenuBarBase::`RTTI Complete Object Locator'	00E564D0	
+const wxTreeCtrl::`RTTI Complete Object Locator'	00E564E4	
+const wxDirItemData::`RTTI Complete Object Locator'	00E56544	
+const wxDirFilterListCtrl::`RTTI Complete Object Locator'	00E56594	
+const wxDirFilterListCtrl::`RTTI Complete Object Locator'	00E56604	
+const wxOwnerDrawn::`RTTI Complete Object Locator'	00E56618	
+const wxMenuItem::`RTTI Complete Object Locator'	00E56660	
+const wxMenuItem::`RTTI Complete Object Locator'	00E566D0	
+const wxNotebookBase::`RTTI Complete Object Locator'	00E566E4	
+const wxNotebookEvent::`RTTI Complete Object Locator'	00E566F8	
+const wxNotebook::`RTTI Complete Object Locator'	00E56750	
+const wxToolBar::`RTTI Complete Object Locator'	00E56764	
+const wxFrameBase::`RTTI Complete Object Locator'	00E56814	
+const wxMessageOutput::`RTTI Complete Object Locator'	00E56828	
+const wxMessageOutputMessageBox::`RTTI Complete Object Locator'	00E56870	
+const wxAppBase::`RTTI Complete Object Locator'	00E568BC	
+const wxBMPFileHandler::`RTTI Complete Object Locator'	00E568D0	
+const wxBMPResourceHandler::`RTTI Complete Object Locator'	00E56924	
+const wxIconHandler::`RTTI Complete Object Locator'	00E56978	
+const wxICOFileHandler::`RTTI Complete Object Locator'	00E569C8	
+const wxICOResourceHandler::`RTTI Complete Object Locator'	00E56A1C	
+const wxSplashScreen::`RTTI Complete Object Locator'	00E56A70	
+const wxSplashScreenWindow::`RTTI Complete Object Locator'	00E56ADC	
+const wxThread::`RTTI Complete Object Locator'	00E56B34	
+const wxThreadModule::`RTTI Complete Object Locator'	00E56B7C	
+const wxFileDialog::`RTTI Complete Object Locator'	00E56BCC	
+const wxMessageDialog::`RTTI Complete Object Locator'	00E56C38	
+const wxDirDialog::`RTTI Complete Object Locator'	00E56CA4	
+const wxDateTimeHolidaysModule::`RTTI Complete Object Locator'	00E56D10	
+const wxDateTimeHolidayAuthority::`RTTI Complete Object Locator'	00E56D60	
+const wxDateTimeWorkDays::`RTTI Complete Object Locator'	00E56DA8	
+const wxURL::`RTTI Complete Object Locator'	00E56DF4	
+const wxURLModule::`RTTI Complete Object Locator'	00E56E40	
+const wxPenList::`RTTI Complete Object Locator'	00E56E90	
+const wxBrushList::`RTTI Complete Object Locator'	00E56EE8	
+const wxFontList::`RTTI Complete Object Locator'	00E56F40	
+const wxResourceCache::`RTTI Complete Object Locator'	00E56F98	
+const wxColourDatabase::`RTTI Complete Object Locator'	00E56FF0	
+const wxBitmapList::`RTTI Complete Object Locator'	00E57048	
+const wxStringTokenizer::`RTTI Complete Object Locator'	00E570A0	
+const wxLocaleModule::`RTTI Complete Object Locator'	00E570EC	
+const wxLog::`RTTI Complete Object Locator'	00E5713C	
+const wxLogStderr::`RTTI Complete Object Locator'	00E57184	
+const wxLogChain::`RTTI Complete Object Locator'	00E571D0	
+const wxLogPassThrough::`RTTI Complete Object Locator'	00E5721C	
+const wxContextHelpEvtHandler::`RTTI Complete Object Locator'	00E5726C	
+const wxHelpProvider::`RTTI Complete Object Locator'	00E572BC	
+const wxHelpProviderModule::`RTTI Complete Object Locator'	00E57304	
+const wxContextHelp::`RTTI Complete Object Locator'	00E57354	
+const wxContextHelpButton::`RTTI Complete Object Locator'	00E573A0	
+const wxSimpleHelpProvider::`RTTI Complete Object Locator'	00E57410	
+const wxHelpControllerHelpProvider::`RTTI Complete Object Locator'	00E5745C	
+const wxSystemSettingsModule::`RTTI Complete Object Locator'	00E574AC	
+const wxSleepTimer::`RTTI Complete Object Locator'	00E574FC	
+const wxBrush::`RTTI Complete Object Locator'	00E57550	
+const wxDCBase::`RTTI Complete Object Locator'	00E575A0	
+const wxDCCacheEntry::`RTTI Complete Object Locator'	00E575B4	
+const wxDCModule::`RTTI Complete Object Locator'	00E57600	
+const wxDC::`RTTI Complete Object Locator'	00E57650	
+const wxToolTip::`RTTI Complete Object Locator'	00E57664	
+const wxIndividualLayoutConstraint::`RTTI Complete Object Locator'	00E576B0	
+const wxLayoutConstraints::`RTTI Complete Object Locator'	00E576FC	
+const wxProcess::`RTTI Complete Object Locator'	00E57748	
+const wxFontDialogBase::`RTTI Complete Object Locator'	00E57798	
+const wxFontDialog::`RTTI Complete Object Locator'	00E57804	
+const wxListString::`RTTI Complete Object Locator'	00E57874	
+const wxwxListStringNode::`RTTI Complete Object Locator'	00E578C4	
+const wxStatusBarBase::`RTTI Complete Object Locator'	00E57910	
+const wxHashTableBase::`RTTI Complete Object Locator'	00E57924	
+const wxStringHashTable::`RTTI Complete Object Locator'	00E57938	
+const wxHashTable::`RTTI Complete Object Locator'	00E57984	
+const wxHashTableLong::`RTTI Complete Object Locator'	00E579D0	
+const wxPopupWindowBase::`RTTI Complete Object Locator'	00E57A1C	
+const wxPopupWindow::`RTTI Complete Object Locator'	00E57A74	
+const wxBrushRefData::`RTTI Complete Object Locator'	00E57AD0	
+const wxDropTargetBase::`RTTI Complete Object Locator'	00E57B20	
+const wxIDropTarget::`RTTI Complete Object Locator'	00E57B68	
+const wxDropTarget::`RTTI Complete Object Locator'	00E57BF0	
+const wxSpinCtrl::`RTTI Complete Object Locator'	00E57C3C	
+const wxMemoryDC::`RTTI Complete Object Locator'	00E57CA4	
+const wxMemoryConfig::`RTTI Complete Object Locator'	00E57CF8	
+const wxFontMapper::`RTTI Complete Object Locator'	00E57DB4	
+const wxFontMapperModule::`RTTI Complete Object Locator'	00E57DFC	
+const wxFontData::`RTTI Complete Object Locator'	00E57E4C	
+const wxModuleList::`RTTI Complete Object Locator'	00E57E98	
+const wxwxModuleListNode::`RTTI Complete Object Locator'	00E57EE8	
+const wxICOHandler::`RTTI Complete Object Locator'	00E57F34	
+const wxCURHandler::`RTTI Complete Object Locator'	00E57F88	
+const wxANIHandler::`RTTI Complete Object Locator'	00E57FE0	
+const wxFileInputStream::`RTTI Complete Object Locator'	00E5803C	
+const wxFileOutputStream::`RTTI Complete Object Locator'	00E580F8	
+const wxFFileInputStream::`RTTI Complete Object Locator'	00E58180	
+const wxFFileOutputStream::`RTTI Complete Object Locator'	00E581D0	
+const wxFileStream::`RTTI Complete Object Locator'	00E58220	
+const wxFileStream::`RTTI Complete Object Locator'	00E582F0	
+const wxFFileStream::`RTTI Complete Object Locator'	00E58304	
+const wxFFileStream::`RTTI Complete Object Locator'	00E58380	
+const wxStreamBuffer::`RTTI Complete Object Locator'	00E58394	
+const wxStreamBase::`RTTI Complete Object Locator'	00E583DC	
+const wxInputStream::`RTTI Complete Object Locator'	00E583F0	
+const wxOutputStream::`RTTI Complete Object Locator'	00E58404	
+const wxCountingOutputStream::`RTTI Complete Object Locator'	00E58418	
+const wxFilterInputStream::`RTTI Complete Object Locator'	00E58468	
+const wxFilterOutputStream::`RTTI Complete Object Locator'	00E584B8	
+const wxBufferedInputStream::`RTTI Complete Object Locator'	00E58508	
+const wxBufferedOutputStream::`RTTI Complete Object Locator'	00E5855C	
+const wxPathList::`RTTI Complete Object Locator'	00E585B0	
+const wxPenRefData::`RTTI Complete Object Locator'	00E58608	
+const wxPen::`RTTI Complete Object Locator'	00E58658	
+const wxSpinEvent::`RTTI Complete Object Locator'	00E586A8	
+const wxListBoxBase::`RTTI Complete Object Locator'	00E58700	
+const wxListBoxBase::`RTTI Complete Object Locator'	00E58768	
+const wxListBoxItem::`RTTI Complete Object Locator'	00E5877C	
+const wxListBox::`RTTI Complete Object Locator'	00E587C8	
+const wxListBox::`RTTI Complete Object Locator'	00E58834	
+const wxScrollHelperEvtHandler::`RTTI Complete Object Locator'	00E58848	
+const wxAutoScrollTimer::`RTTI Complete Object Locator'	00E58898	
+const wxScrollHelper::`RTTI Complete Object Locator'	00E588EC	
+const wxTimerEvent::`RTTI Complete Object Locator'	00E58900	
+const wxScreenDC::`RTTI Complete Object Locator'	00E58950	
+const wxClientDataContainer::`RTTI Complete Object Locator'	00E589A8	
+const wxTextBuffer::`RTTI Complete Object Locator'	00E589BC	
+const wxMDIParentFrame::`RTTI Complete Object Locator'	00E58A04	
+const wxMDIChildFrame::`RTTI Complete Object Locator'	00E58A70	
+const wxMDIClientWindow::`RTTI Complete Object Locator'	00E58ADC	
+const wxDragImage::`RTTI Complete Object Locator'	00E58B34	
+const wxTreeTraversal::`RTTI Complete Object Locator'	00E58B80	
+const wxTreeItemIndirectData::`RTTI Complete Object Locator'	00E58BC8	
+const wxDirTraverser::`RTTI Complete Object Locator'	00E58CB0	
+const wxDirTraverserSimple::`RTTI Complete Object Locator'	00E58CF8	
+const wxMSWSystemMenuFontModule::`RTTI Complete Object Locator'	00E58D44	
+const wxUxThemeModule::`RTTI Complete Object Locator'	00E58D94	
+const wxRadioBoxBase::`RTTI Complete Object Locator'	00E58DE4	
+const wxRadioBox::`RTTI Complete Object Locator'	00E58E2C	
+const wxRadioBox::`RTTI Complete Object Locator'	00E58EAC	
+const wxStaticLineBase::`RTTI Complete Object Locator'	00E58EC0	
+const wxStaticLine::`RTTI Complete Object Locator'	00E58F20	
+const wxToolBarToolsList::`RTTI Complete Object Locator'	00E58F84	
+const wxwxToolBarToolsListNode::`RTTI Complete Object Locator'	00E58FD4	
+const wxToolBarToolBase::`RTTI Complete Object Locator'	00E59020	
+const wxToolBarBase::`RTTI Complete Object Locator'	00E5906C	
+const wxToolBarTool::`RTTI Complete Object Locator'	00E59080	
+const wxConfigBase::`RTTI Complete Object Locator'	00E590D0	
+const wxLogFrame::`RTTI Complete Object Locator'	00E590E4	
+const wxLogWindow::`RTTI Complete Object Locator'	00E59150	
+const wxLogDialog::`RTTI Complete Object Locator'	00E591A4	
+const wxLogTextCtrl::`RTTI Complete Object Locator'	00E59210	
+const wxLogGui::`RTTI Complete Object Locator'	00E5925C	
+const wxEnhMetaFile::`RTTI Complete Object Locator'	00E592A8	
+const wxClipboard::`RTTI Complete Object Locator'	00E592F4	
+const wxFileProto::`RTTI Complete Object Locator'	00E59340	
+const wxHTTPStream::`RTTI Complete Object Locator'	00E5944C	
+const wxHTTP::`RTTI Complete Object Locator'	00E594DC	
+const wxInputFTPStream::`RTTI Complete Object Locator'	00E59534	
+const wxOutputFTPStream::`RTTI Complete Object Locator'	00E59588	
+const wxFTP::`RTTI Complete Object Locator'	00E59618	
+const wxSockAddress::`RTTI Complete Object Locator'	00E59670	
+const wxIPV4address::`RTTI Complete Object Locator'	00E596BC	
+const wxTipWindow::`RTTI Complete Object Locator'	00E5970C	
+const wxTipWindowView::`RTTI Complete Object Locator'	00E597BC	
+const wxPipeInputStream::`RTTI Complete Object Locator'	00E59814	
+const wxPipeOutputStream::`RTTI Complete Object Locator'	00E59864	
+const wxSystemOptionsModule::`RTTI Complete Object Locator'	00E598B4	
+const wxProcessEvent::`RTTI Complete Object Locator'	00E59904	
+const wxColourData::`RTTI Complete Object Locator'	00E59954	
+const wxPrintData::`RTTI Complete Object Locator'	00E599A0	
+const wxPrintDialogData::`RTTI Complete Object Locator'	00E599EC	
+const wxPageSetupDialogData::`RTTI Complete Object Locator'	00E59A38	
+const wxTextOutputStream::`RTTI Complete Object Locator'	00E59A84	
+const wxTextEntryDialog::`RTTI Complete Object Locator'	00E59ACC	
+const wxColourDialog::`RTTI Complete Object Locator'	00E59B38	
+const wxPopupWindowHandler::`RTTI Complete Object Locator'	00E59BA4	
+const wxPopupFocusHandler::`RTTI Complete Object Locator'	00E59BF4	
+const wxPopupTransientWindow::`RTTI Complete Object Locator'	00E59C44	
+const wxDataObjectSimple::`RTTI Complete Object Locator'	00E59C58	
+const wxSimpleDataObjectList::`RTTI Complete Object Locator'	00E59D14	
+const wxwxSimpleDataObjectListNode::`RTTI Complete Object Locator'	00E59D64	
+const wxFileDataObjectBase::`RTTI Complete Object Locator'	00E59DB0	
+const wxDataObjectBase::`RTTI Complete Object Locator'	00E59E04	
+const wxDataObjectComposite::`RTTI Complete Object Locator'	00E59E18	
+const wxCustomDataObject::`RTTI Complete Object Locator'	00E59E68	
+const wxFileDataObject::`RTTI Complete Object Locator'	00E59EBC	
+const wxTextDataObject::`RTTI Complete Object Locator'	00E59F14	
+const wxTextDropTarget::`RTTI Complete Object Locator'	00E59F68	
+const wxFileDropTarget::`RTTI Complete Object Locator'	00E59FB8	
+const wxMemoryText::`RTTI Complete Object Locator'	00E5A008	
+const wxFileConfig::`RTTI Complete Object Locator'	00E5A054	
+const wxAnyChoiceDialog::`RTTI Complete Object Locator'	00E5A068	
+const wxSingleChoiceDialog::`RTTI Complete Object Locator'	00E5A0D4	
+const wxMultiChoiceDialog::`RTTI Complete Object Locator'	00E5A144	
+const wxQuantize::`RTTI Complete Object Locator'	00E5A1B4	
+const wxPluginLibraryModule::`RTTI Complete Object Locator'	00E5A200	
+const wxRegConfig::`RTTI Complete Object Locator'	00E5A250	
+const wxArtProvidersList::`RTTI Complete Object Locator'	00E5A29C	
+const wxwxArtProvidersListNode::`RTTI Complete Object Locator'	00E5A2EC	
+const wxArtProviderModule::`RTTI Complete Object Locator'	00E5A338	
+const wxEnhMetaFileDC::`RTTI Complete Object Locator'	00E5A388	
+const wxEnhMetaFileDataObject::`RTTI Complete Object Locator'	00E5A3DC	
+const wxIDataObject::`RTTI Complete Object Locator'	00E5A42C	
+const wxDataObject::`RTTI Complete Object Locator'	00E5A4B4	
+const wxIEnumFORMATETC::`RTTI Complete Object Locator'	00E5A520	
+const wxURLDataObject::`RTTI Complete Object Locator'	00E5A5A8	
+const wxSocketEvent::`RTTI Complete Object Locator'	00E5A5FC	
+const wxSocketState::`RTTI Complete Object Locator'	00E5A64C	
+const wxSocketBase::`RTTI Complete Object Locator'	00E5A698	
+const wxSocketModule::`RTTI Complete Object Locator'	00E5A6AC	
+const wxSocketServer::`RTTI Complete Object Locator'	00E5A6FC	
+const wxSocketClient::`RTTI Complete Object Locator'	00E5A74C	
+const wxDatagramSocket::`RTTI Complete Object Locator'	00E5A760	
+const wxProtoInfo::`RTTI Complete Object Locator'	00E5A7B0	
+const wxProtocol::`RTTI Complete Object Locator'	00E5A7FC	
+const wxSocketOutputStream::`RTTI Complete Object Locator'	00E5A810	
+const wxSocketInputStream::`RTTI Complete Object Locator'	00E5A824	
+const wxSocketStream::`RTTI Complete Object Locator'	00E5A838	
+const wxSocketStream::`RTTI Complete Object Locator'	00E5A8EC	
+const wxServerBase::`RTTI Complete Object Locator'	00E5A900	
+const wxClientBase::`RTTI Complete Object Locator'	00E5A94C	
+const wxDDEModule::`RTTI Complete Object Locator'	00E5A998	
+const wxDDEConnection::`RTTI Complete Object Locator'	00E5A9E8	
+const wxDDEClient::`RTTI Complete Object Locator'	00E5AA70	
+const wxDDEServer::`RTTI Complete Object Locator'	00E5AAC0	
+const wxPrintPaperType::`RTTI Complete Object Locator'	00E5AB10	
+const wxPrintPaperDatabase::`RTTI Complete Object Locator'	00E5AB5C	
+const wxPrintPaperModule::`RTTI Complete Object Locator'	00E5ABB4	
+const wxTextValidator::`RTTI Complete Object Locator'	00E5AC04	
+const wxTextFile::`RTTI Complete Object Locator'	00E5AC58	
+const wxArtProvider::`RTTI Complete Object Locator'	00E5ACA4	
+const wxDefaultArtProvider::`RTTI Complete Object Locator'	00E5ACF0	
+const wxClipboardModule::`RTTI Complete Object Locator'	00E5AD40	
+const wxClipboardBase::`RTTI Complete Object Locator'	00E5AD90	
+const wxConnectionBase::`RTTI Complete Object Locator'	00E5ADDC	
+const Wm3::Distance<float,Wm3::Vector2<float>>::`RTTI Complete Object Locator'	00E5ADF0	
+const Wm3::Distance<float,Wm3::Vector3<float>>::`RTTI Complete Object Locator'	00E5AE38	
+const Wm3::Distance<double,Wm3::Vector2<double>>::`RTTI Complete Object Locator'	00E5AE80	
+const Wm3::Distance<double,Wm3::Vector3<double>>::`RTTI Complete Object Locator'	00E5AEC8	
+const Wm3::IntrBox3Sphere3<float>::`RTTI Complete Object Locator'	00E5AF10	
+const Wm3::IntrBox3Sphere3<double>::`RTTI Complete Object Locator'	00E5AF90	
+const Wm3::Intersector<float,Wm3::Vector2<float>>::`RTTI Complete Object Locator'	00E5B010	
+const Wm3::Intersector<float,Wm3::Vector3<float>>::`RTTI Complete Object Locator'	00E5B058	
+const Wm3::Intersector<double,Wm3::Vector2<double>>::`RTTI Complete Object Locator'	00E5B06C	
+const Wm3::Intersector<double,Wm3::Vector3<double>>::`RTTI Complete Object Locator'	00E5B0B4	
+const Wm3::DistVector3Box3<float>::`RTTI Complete Object Locator'	00E5B0C8	
+const Wm3::DistVector3Box3<double>::`RTTI Complete Object Locator'	00E5B114	
+const Wm3::IntrSegment3Box3<float>::`RTTI Complete Object Locator'	00E5B160	
+const Wm3::IntrSegment3Box3<double>::`RTTI Complete Object Locator'	00E5B1AC	
+const Wm3::IntrSegment3Sphere3<float>::`RTTI Complete Object Locator'	00E5B1F8	
+const Wm3::IntrSegment3Sphere3<double>::`RTTI Complete Object Locator'	00E5B244	
+const Wm3::IntrBox2Box2<float>::`RTTI Complete Object Locator'	00E5B290	
+const Wm3::IntrBox2Box2<double>::`RTTI Complete Object Locator'	00E5B2DC	
+const Wm3::DistVector3Segment3<float>::`RTTI Complete Object Locator'	00E5B328	
+const Wm3::DistVector3Segment3<double>::`RTTI Complete Object Locator'	00E5B374	
+const Wm3::IntrBox2Circle2<float>::`RTTI Complete Object Locator'	00E5B3C0	
+const Wm3::IntrBox2Circle2<double>::`RTTI Complete Object Locator'	00E5B40C	
+const Wm3::IntrLine3Box3<float>::`RTTI Complete Object Locator'	00E5B458	
+const Wm3::IntrLine3Box3<double>::`RTTI Complete Object Locator'	00E5B4A4	
+const Wm3::Query::`RTTI Complete Object Locator'	00E5B4F0	
+const Wm3::Query3<float>::`RTTI Complete Object Locator'	00E5B538	
+const Wm3::Query3<double>::`RTTI Complete Object Locator'	00E5B584	
+const Wm3::Query3Int64<float>::`RTTI Complete Object Locator'	00E5B5D0	
+const Wm3::Query3Int64<double>::`RTTI Complete Object Locator'	00E5B620	
+const Wm3::Query3TInteger<float>::`RTTI Complete Object Locator'	00E5B670	
+const Wm3::Query3TInteger<double>::`RTTI Complete Object Locator'	00E5B6C0	
+const Wm3::Query3TRational<float>::`RTTI Complete Object Locator'	00E5B710	
+const Wm3::Query3TRational<double>::`RTTI Complete Object Locator'	00E5B760	
+const Wm3::ConvexHull3<float>::`RTTI Complete Object Locator'	00E5B7B0	
+const Wm3::ConvexHull3<double>::`RTTI Complete Object Locator'	00E5B830	
+const Wm3::ConvexHull<float>::`RTTI Complete Object Locator'	00E5B8B0	
+const Wm3::ConvexHull<double>::`RTTI Complete Object Locator'	00E5B8C4	
+const Wm3::IntrSegment3Capsule3<float>::`RTTI Complete Object Locator'	00E5B8D8	
+const Wm3::IntrSegment3Capsule3<double>::`RTTI Complete Object Locator'	00E5B924	
+const Wm3::DistVector2Box2<float>::`RTTI Complete Object Locator'	00E5B970	
+const Wm3::DistVector2Box2<double>::`RTTI Complete Object Locator'	00E5B9BC	
+const Wm3::ConvexHull1<float>::`RTTI Complete Object Locator'	00E5BA08	
+const Wm3::ConvexHull1<double>::`RTTI Complete Object Locator'	00E5BA54	
+const Wm3::ConvexHull2<float>::`RTTI Complete Object Locator'	00E5BAA0	
+const Wm3::ConvexHull2<double>::`RTTI Complete Object Locator'	00E5BAEC	
+const Wm3::Query2<float>::`RTTI Complete Object Locator'	00E5BB38	
+const Wm3::Query2<double>::`RTTI Complete Object Locator'	00E5BB84	
+const Wm3::Query2Int64<float>::`RTTI Complete Object Locator'	00E5BBD0	
+const Wm3::Query2Int64<double>::`RTTI Complete Object Locator'	00E5BC20	
+const Wm3::Query2TInteger<float>::`RTTI Complete Object Locator'	00E5BC70	
+const Wm3::Query2TInteger<double>::`RTTI Complete Object Locator'	00E5BCC0	
+const Wm3::Query2TRational<float>::`RTTI Complete Object Locator'	00E5BD10	
+const Wm3::Query2TRational<double>::`RTTI Complete Object Locator'	00E5BD60	
+const Wm3::DistSegment3Segment3<float>::`RTTI Complete Object Locator'	00E5BDB0	
+const Wm3::DistSegment3Segment3<double>::`RTTI Complete Object Locator'	00E5BDFC	
+const Wm3::IntrLine3Capsule3<float>::`RTTI Complete Object Locator'	00E5BE48	
+const Wm3::IntrLine3Capsule3<double>::`RTTI Complete Object Locator'	00E5BE94	
+const Wm3::DistLine3Segment3<float>::`RTTI Complete Object Locator'	00E5BEE0	
+const Wm3::DistLine3Segment3<double>::`RTTI Complete Object Locator'	00E5BF2C	
+const wxPNGHandler::`RTTI Complete Object Locator'	00E5E684	
+const wxImageHandler::`RTTI Complete Object Locator'	00E5E6D4	
+const wxWindowListNode::`RTTI Complete Object Locator'	00E5E720	
+const wxWindowBase::`RTTI Complete Object Locator'	00E5E7A0	
+const wxWindowList::`RTTI Complete Object Locator'	00E5E7B4	
+const wxWindow::`RTTI Complete Object Locator'	00E5E804	
+const wxFont::`RTTI Complete Object Locator'	00E5E8CC	
+const wxFontBase::`RTTI Complete Object Locator'	00E5E920	
+const wxGDIObject::`RTTI Complete Object Locator'	00E5E970	
+const wxListBase::`RTTI Complete Object Locator'	00E5E9BC	
+const wxObject::`RTTI Complete Object Locator'	00E5EA08	
+const wxTreeListCtrl::`RTTI Complete Object Locator'	00E61854	
+const wxTreeListColumnInfo::`RTTI Complete Object Locator'	00E61940	
+const wxTreeItemData::`RTTI Complete Object Locator'	00E6198C	
+const wxDialogBase::`RTTI Complete Object Locator'	00E619D8	
+const wxTopLevelWindow::`RTTI Complete Object Locator'	00E619EC	
+const wxTopLevelWindowMSW::`RTTI Complete Object Locator'	00E61A00	
+const wxClientData::`RTTI Complete Object Locator'	00E61A14	
+const wxDialog::`RTTI Complete Object Locator'	00E61A5C	
+const wxListCtrl::`RTTI Complete Object Locator'	00E62680	
+const wxGenericDirCtrl::`RTTI Complete Object Locator'	00E626E0	
+const wxSplitterWindow::`RTTI Complete Object Locator'	00E62740	
+const wxStaticText::`RTTI Complete Object Locator'	00E62798	
+const wxStaticTextBase::`RTTI Complete Object Locator'	00E627FC	
+const wxMenuBase::`RTTI Complete Object Locator'	00E6285C	
+const wxMenuItemList::`RTTI Complete Object Locator'	00E62870	
+const wxwxMenuItemListNode::`RTTI Complete Object Locator'	00E628C0	
+const wxButton::`RTTI Complete Object Locator'	00E6290C	
+const wxButtonBase::`RTTI Complete Object Locator'	00E62970	
+const wxMenu::`RTTI Complete Object Locator'	00E629D0	
+const wxFrame::`RTTI Complete Object Locator'	00E62A60	
+const wxTextCtrl::`RTTI Complete Object Locator'	00E62B18	
+const wxImageList::`RTTI Complete Object Locator'	00E63018	
+const wxIconRefData::`RTTI Complete Object Locator'	00E65CC0	
+const wxGDIImage::`RTTI Complete Object Locator'	00E65D14	
+const wxGDIImageRefData::`RTTI Complete Object Locator'	00E65D28	
+const wxIcon::`RTTI Complete Object Locator'	00E65D78	
+const wxGDIRefData::`RTTI Complete Object Locator'	00E65E08	
+const wxObjectRefData::`RTTI Complete Object Locator'	00E65E54	
+const wxStaticBox::`RTTI Complete Object Locator'	00E66150	
+const wxStaticBoxBase::`RTTI Complete Object Locator'	00E661B4	
+const wxCheckBox::`RTTI Complete Object Locator'	00E66214	
+const wxCheckBoxBase::`RTTI Complete Object Locator'	00E66278	
+const wxBitmap::`RTTI Complete Object Locator'	00E662D8	
+const wxBitmapButton::`RTTI Complete Object Locator'	00E666E0	
+const wxBitmapButtonBase::`RTTI Complete Object Locator'	00E6674C	
+const wxPanel::`RTTI Complete Object Locator'	00E667B4	
+const wxComboBox::`RTTI Complete Object Locator'	00E7E780	
+const wxComboBox::`RTTI Complete Object Locator'	00E7E794	
+const wxSlider95::`RTTI Complete Object Locator'	00E7E804	
+const wxSliderBase::`RTTI Complete Object Locator'	00E7E868	
+const wxChoice::`RTTI Complete Object Locator'	00E7E8C8	
+const wxChoice::`RTTI Complete Object Locator'	00E7E8DC	
+const wxChoiceBase::`RTTI Complete Object Locator'	00E7E948	
+const wxChoiceBase::`RTTI Complete Object Locator'	00E7E95C	
+const wxControlWithItems::`RTTI Complete Object Locator'	00E7E9C4	
+const wxControlWithItems::`RTTI Complete Object Locator'	00E7E9D8	
+const wxItemContainer::`RTTI Complete Object Locator'	00E7EA58	
+const wxControlBase::`RTTI Complete Object Locator'	00E7EAA0	
+const wxControl::`RTTI Complete Object Locator'	00E7EAB4	
+const WSupComFrame::`RTTI Complete Object Locator'	00E9F8EC	
+const wxPaintEvent::`RTTI Complete Object Locator'	00E9F9E8	
+

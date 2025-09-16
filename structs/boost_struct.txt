@@ -1,0 +1,162 @@
+const boost::thread_exception::`vftable'	00D41D4C	
+const boost::lock_error::`vftable'	00D41D58	
+const boost::detail::sp_counted_base::`vftable'	00D42210	
+const boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::`vftable'	00D422F0	
+const boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D9>::`vftable'	00D42304	
+const boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D9>::`vftable'	00D42318	
+const boost::detail::sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D9>::`vftable'	00D4232C	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexFormatD3D9>::`vftable'	00D42340	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexBufferD3D9>::`vftable'	00D42354	
+const boost::detail::sp_counted_impl_p<gpg::gal::IndexBufferD3D9>::`vftable'	00D42368	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectD3D9>::`vftable'	00D4237C	
+const boost::detail::sp_counted_impl_p<gpg::gal::PipelineStateD3D9>::`vftable'	00D42390	
+const boost::bad_weak_ptr::`vftable'	00D42C94	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectD3D10>::`vftable'	00D430C4	
+const boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D10>::`vftable'	00D430D8	
+const boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D10>::`vftable'	00D430EC	
+const boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D10>::`vftable'	00D43100	
+const boost::detail::sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D10>::`vftable'	00D43114	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexFormatD3D10>::`vftable'	00D43128	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexBufferD3D10>::`vftable'	00D4313C	
+const boost::detail::sp_counted_impl_p<gpg::gal::IndexBufferD3D10>::`vftable'	00D43150	
+const boost::detail::sp_counted_impl_p<gpg::gal::PipelineStateD3D10>::`vftable'	00D43164	
+const boost::detail::sp_counted_impl_p<std::basic_stringstream<char,std::char_traits<char>,std::allocator<char>>>::`vftable'	00D47090	
+const boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::`vftable'	00D47818	
+const boost::thread_resource_error::`vftable'	00D4793C	
+const boost::bad_function_call::`vftable'	00D47948	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::`vftable'	00D47D44	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D9>::`vftable'	00D47D58	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::`vftable'	00D4887C	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::`vftable'	00D48890	
+const boost::detail::sp_counted_impl_pd<char *,void (*)(void *)>::`vftable'	00D48A00	
+const boost::unsupported_thread_option::`vftable'	00D7ED2C	
+const boost::invalid_thread_argument::`vftable'	00D7ED5C	
+const boost::thread_permission_error::`vftable'	00D7ED88	
+const boost::detail::sp_counted_impl_p<Moho::CD3DRenderTarget>::`vftable'	00E022EC	
+const boost::detail::sp_counted_impl_p<Moho::CD3DDepthStencil>::`vftable'	00E02300	
+const boost::detail::sp_counted_impl_p<Moho::RD3DTextureResource>::`vftable'	00E02978	
+const boost::detail::sp_counted_impl_p<gpg::MemBuffer<char const>>::`vftable'	00E0298C	
+const boost::detail::sp_counted_impl_p<Moho::CD3DDynamicTextureSheet>::`vftable'	00E029A0	
+const boost::detail::sp_counted_impl_p<Moho::SBatchTextureData>::`vftable'	00E02B44	
+const boost::detail::sp_counted_impl_p<Moho::CD3DRawBatchTexture>::`vftable'	00E02B58	
+const boost::detail::sp_counted_impl_pd<Moho::CD3DFileBatchTexture *,void (*)(Moho::CD3DFileBatchTexture *)>::`vftable'	00E02B6C	
+const boost::detail::sp_counted_impl_p<Moho::CD3DSolidBatchTexture>::`vftable'	00E02B80	
+const boost::detail::sp_counted_impl_pd<char *,int (*)(void const *)>::`vftable'	00E03220	
+const boost::detail::sp_counted_impl_pd<void *,void (*)(void *)>::`vftable'	00E03828	
+const boost::detail::sp_counted_impl_p<Moho::SZipLocalFileHeader>::`vftable'	00E0383C	
+const boost::detail::sp_counted_impl_p<Moho::CNetUDPConnector>::`vftable'	00E0613C	
+const boost::bad_ptr_container_operation::`vftable'	00E068F0	
+const boost::bad_pointer::`vftable'	00E068FC	
+const boost::detail::sp_counted_impl_p<Moho::PrefetchData>::`vftable'	00E07668	
+const boost::detail::sp_counted_impl_p<Moho::AudioEngine>::`vftable'	00E0B724	
+const boost::detail::sp_counted_impl_p<Moho::RScmResource>::`vftable'	00E163F0	
+const boost::detail::sp_counted_impl_p<Moho::RScaResource>::`vftable'	00E164AC	
+const boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::`vftable'	00E16F30	
+const boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *,void (*)(void *)>::`vftable'	00E174B8	
+const boost::detail::sp_counted_impl_p<Moho::CHeightField>::`vftable'	00E19434	
+const boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::`vftable'	00E1DBE0	
+const boost::detail::sp_counted_impl_p<Moho::CIntelGrid>::`vftable'	00E1DBF4	
+const boost::detail::sp_counted_impl_p<Moho::CAniPose>::`vftable'	00E21FDC	
+const boost::detail::sp_counted_impl_p<Moho::STrigger>::`vftable'	00E312EC	
+const boost::detail::sp_counted_impl_p<Moho::ISimResources>::`vftable'	00E348EC	
+const boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::`vftable'	00E34900	
+const boost::detail::sp_counted_impl_p<Moho::SParticleBuffer>::`vftable'	00E34914	
+const boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::`vftable'	00E35D90	
+const boost::detail::sp_counted_impl_p<Moho::CMauiFrame>::`vftable'	00E39A8C	
+const boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::`vftable'	00E3D790	
+const boost::detail::sp_counted_impl_p<Moho::MeshMaterial>::`vftable'	00E3F4BC	
+const boost::detail::sp_counted_impl_p<Moho::Mesh>::`vftable'	00E3F4D0	
+const boost::detail::sp_counted_impl_p<Moho::RMeshBlueprintLOD>::`vftable'	00E3F4E4	
+const boost::detail::sp_counted_impl_p<Moho::MeshBatch>::`vftable'	00E3F4F8	
+const boost::detail::sp_counted_impl_pd<Moho::Mesh *,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::`vftable'	00E3F50C	
+const boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::`vftable'	00E407E4	
+const boost::detail::sp_counted_impl_p<Moho::CD3DTextureBatcher>::`vftable'	00E407F8	
+const boost::detail::sp_counted_impl_p<Moho::CD3DPrimBatcher>::`vftable'	00E4080C	
+const boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::`vftable'	00E40D3C	
+const boost::detail::sp_counted_impl_p<Moho::ShoreCell>::`vftable'	00E42078	
+const boost::detail::sp_counted_impl_p<Moho::MeshInstance>::`vftable'	00E42CA0	
+const boost::detail::sp_counted_impl_pd<_iobuf *,Moho::SFileStarCloser>::`vftable'	00E49DA0	
+const boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::`vftable'	00E49DB4	
+const boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::`vftable'	00E4B35C	
+const boost::detail::sp_counted_impl_p<Moho::UICommandGraph>::`vftable'	00E4B370	
+const boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D9>::`RTTI Complete Object Locator'	00E50558	
+const boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D9>::`RTTI Complete Object Locator'	00E505A4	
+const boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D9>::`RTTI Complete Object Locator'	00E505F0	
+const boost::detail::sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D9>::`RTTI Complete Object Locator'	00E5063C	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexFormatD3D9>::`RTTI Complete Object Locator'	00E50688	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexBufferD3D9>::`RTTI Complete Object Locator'	00E506D4	
+const boost::detail::sp_counted_impl_p<gpg::gal::IndexBufferD3D9>::`RTTI Complete Object Locator'	00E50720	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectD3D9>::`RTTI Complete Object Locator'	00E5076C	
+const boost::detail::sp_counted_impl_p<gpg::gal::PipelineStateD3D9>::`RTTI Complete Object Locator'	00E507B8	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectD3D10>::`RTTI Complete Object Locator'	00E50C84	
+const boost::detail::sp_counted_impl_p<gpg::gal::TextureD3D10>::`RTTI Complete Object Locator'	00E50CD0	
+const boost::detail::sp_counted_impl_p<gpg::gal::RenderTargetD3D10>::`RTTI Complete Object Locator'	00E50D1C	
+const boost::detail::sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D10>::`RTTI Complete Object Locator'	00E50D68	
+const boost::detail::sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D10>::`RTTI Complete Object Locator'	00E50DB4	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexFormatD3D10>::`RTTI Complete Object Locator'	00E50E00	
+const boost::detail::sp_counted_impl_p<gpg::gal::VertexBufferD3D10>::`RTTI Complete Object Locator'	00E50E4C	
+const boost::detail::sp_counted_impl_p<gpg::gal::IndexBufferD3D10>::`RTTI Complete Object Locator'	00E50E98	
+const boost::detail::sp_counted_impl_p<gpg::gal::PipelineStateD3D10>::`RTTI Complete Object Locator'	00E50EE4	
+const boost::detail::sp_counted_impl_p<std::basic_stringstream<char,std::char_traits<char>,std::allocator<char>>>::`RTTI Complete Object Locator'	00E52D2C	
+const boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::`RTTI Complete Object Locator'	00E52DC0	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::`RTTI Complete Object Locator'	00E53284	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D9>::`RTTI Complete Object Locator'	00E532D0	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::`RTTI Complete Object Locator'	00E53860	
+const boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::`RTTI Complete Object Locator'	00E538AC	
+const boost::detail::sp_counted_impl_pd<char *,void (*)(void *)>::`RTTI Complete Object Locator'	00E53A30	
+const boost::unsupported_thread_option::`RTTI Complete Object Locator'	00E5C2CC	
+const boost::invalid_thread_argument::`RTTI Complete Object Locator'	00E5C31C	
+const boost::thread_permission_error::`RTTI Complete Object Locator'	00E5C36C	
+const boost::lock_error::`RTTI Complete Object Locator'	00E5D314	
+const boost::thread_exception::`RTTI Complete Object Locator'	00E5D364	
+const boost::bad_function_call::`RTTI Complete Object Locator'	00E5D784	
+const boost::detail::sp_counted_impl_p<Moho::CD3DDepthStencil>::`RTTI Complete Object Locator'	00E5E4B4	
+const boost::detail::sp_counted_impl_p<Moho::CD3DRenderTarget>::`RTTI Complete Object Locator'	00E5E500	
+const boost::detail::sp_counted_base::`RTTI Complete Object Locator'	00E5EBC4	
+const boost::detail::sp_counted_impl_p<Moho::CD3DDynamicTextureSheet>::`RTTI Complete Object Locator'	00E5EC5C	
+const boost::detail::sp_counted_impl_p<gpg::MemBuffer<char const>>::`RTTI Complete Object Locator'	00E5ECA8	
+const boost::detail::sp_counted_impl_p<Moho::RD3DTextureResource>::`RTTI Complete Object Locator'	00E5ECF4	
+const boost::detail::sp_counted_impl_p<Moho::CD3DSolidBatchTexture>::`RTTI Complete Object Locator'	00E5F7D4	
+const boost::detail::sp_counted_impl_pd<Moho::CD3DFileBatchTexture *,void (*)(Moho::CD3DFileBatchTexture *)>::`RTTI Complete Object Locator'	00E5F820	
+const boost::detail::sp_counted_impl_p<Moho::CD3DRawBatchTexture>::`RTTI Complete Object Locator'	00E5F86C	
+const boost::detail::sp_counted_impl_p<Moho::SBatchTextureData>::`RTTI Complete Object Locator'	00E5F8B8	
+const boost::bad_weak_ptr::`RTTI Complete Object Locator'	00E5FC94	
+const boost::detail::sp_counted_impl_pd<char *,int (*)(void const *)>::`RTTI Complete Object Locator'	00E5FEC0	
+const boost::thread_resource_error::`RTTI Complete Object Locator'	00E5FF0C	
+const boost::detail::sp_counted_impl_p<Moho::SZipLocalFileHeader>::`RTTI Complete Object Locator'	00E60068	
+const boost::detail::sp_counted_impl_pd<void *,void (*)(void *)>::`RTTI Complete Object Locator'	00E600B4	
+const boost::detail::sp_counted_impl_p<Moho::CNetUDPConnector>::`RTTI Complete Object Locator'	00E60D24	
+const boost::bad_pointer::`RTTI Complete Object Locator'	00E616B4	
+const boost::bad_ptr_container_operation::`RTTI Complete Object Locator'	00E61704	
+const boost::detail::sp_counted_impl_p<Moho::PrefetchData>::`RTTI Complete Object Locator'	00E62028	
+const boost::detail::sp_counted_impl_p<Moho::AudioEngine>::`RTTI Complete Object Locator'	00E64744	
+const boost::detail::sp_counted_impl_p<Moho::RScmResource>::`RTTI Complete Object Locator'	00E6A604	
+const boost::detail::sp_counted_impl_p<Moho::RScaResource>::`RTTI Complete Object Locator'	00E6AACC	
+const boost::detail::sp_counted_impl_p<Moho::LaunchInfoNew>::`RTTI Complete Object Locator'	00E6B0C0	
+const boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *,void (*)(void *)>::`RTTI Complete Object Locator'	00E6BA88	
+const boost::detail::sp_counted_impl_p<Moho::CHeightField>::`RTTI Complete Object Locator'	00E6E440	
+const boost::detail::sp_counted_impl_p<Moho::CIntelGrid>::`RTTI Complete Object Locator'	00E7381C	
+const boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::`RTTI Complete Object Locator'	00E73868	
+const boost::detail::sp_counted_impl_p<Moho::CAniPose>::`RTTI Complete Object Locator'	00E7B860	
+const boost::detail::sp_counted_impl_p<Moho::STrigger>::`RTTI Complete Object Locator'	00E8AF70	
+const boost::detail::sp_counted_impl_p<Moho::SParticleBuffer>::`RTTI Complete Object Locator'	00E8DB20	
+const boost::detail::sp_counted_impl_p<Moho::CDebugCanvas>::`RTTI Complete Object Locator'	00E8DB6C	
+const boost::detail::sp_counted_impl_p<Moho::ISimResources>::`RTTI Complete Object Locator'	00E8DBB8	
+const boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::`RTTI Complete Object Locator'	00E8F6B0	
+const boost::detail::sp_counted_impl_p<Moho::CMauiFrame>::`RTTI Complete Object Locator'	00E93C10	
+const boost::detail::sp_counted_impl_p<Moho::CGpgNetInterface>::`RTTI Complete Object Locator'	00E966B0	
+const boost::detail::sp_counted_impl_pd<Moho::Mesh *,Moho::RefCountedCache<Moho::MeshKey,Moho::Mesh>::Deleter>::`RTTI Complete Object Locator'	00E97B54	
+const boost::detail::sp_counted_impl_p<Moho::MeshBatch>::`RTTI Complete Object Locator'	00E97BA0	
+const boost::detail::sp_counted_impl_p<Moho::RMeshBlueprintLOD>::`RTTI Complete Object Locator'	00E97BEC	
+const boost::detail::sp_counted_impl_p<Moho::Mesh>::`RTTI Complete Object Locator'	00E97C38	
+const boost::detail::sp_counted_impl_p<Moho::MeshMaterial>::`RTTI Complete Object Locator'	00E97C84	
+const boost::detail::sp_counted_impl_p<Moho::CD3DPrimBatcher>::`RTTI Complete Object Locator'	00E98484	
+const boost::detail::sp_counted_impl_p<Moho::CD3DTextureBatcher>::`RTTI Complete Object Locator'	00E984D0	
+const boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::`RTTI Complete Object Locator'	00E9851C	
+const boost::detail::sp_counted_impl_p<Moho::ID3DVertexSheet>::`RTTI Complete Object Locator'	00E986F8	
+const boost::detail::sp_counted_impl_p<Moho::ShoreCell>::`RTTI Complete Object Locator'	00E98A90	
+const boost::detail::sp_counted_impl_p<Moho::MeshInstance>::`RTTI Complete Object Locator'	00E98E24	
+const boost::detail::sp_counted_impl_p<Moho::LaunchInfoLoad>::`RTTI Complete Object Locator'	00E9C47C	
+const boost::detail::sp_counted_impl_pd<_iobuf *,Moho::SFileStarCloser>::`RTTI Complete Object Locator'	00E9C4C8	
+const boost::detail::sp_counted_impl_p<Moho::UICommandGraph>::`RTTI Complete Object Locator'	00E9CE14	
+const boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::`RTTI Complete Object Locator'	00E9CE60	

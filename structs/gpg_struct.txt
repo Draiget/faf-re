@@ -1,0 +1,1402 @@
+const gpg::RObject::`vftable'	00D4145C	
+const gpg::BadRefCast::`vftable'	00D41608	
+const gpg::RType::`vftable'	00D41694	
+const gpg::RTypeTypeInfo::`vftable'	00D41BF8	
+const gpg::RObjectTypeInfo::`vftable'	00D41C30	
+const gpg::MemBufferStream::`vftable'	00D41E20	
+const gpg::gal::CubeRenderTargetContext::`vftable'	00D420AC	
+const gpg::gal::DeviceContext::`vftable'	00D420B4	
+const gpg::gal::Error::`vftable'	00D42104	
+const gpg::gal::Head::`vftable'	00D42128	
+const gpg::gal::OutputContext::`vftable'	00D42180	
+const gpg::gal::RenderTargetContext::`vftable'	00D42188	
+const gpg::gal::TextureContext::`vftable'	00D42190	
+const gpg::gal::DepthStencilTarget::`vftable'	00D421B8	
+const gpg::gal::DepthStencilTargetD3D9::`vftable'	00D421C4	
+const gpg::gal::Device::`vftable'	00D42224	
+const gpg::gal::AdapterModeD3D9::`vftable'	00D423A4	
+const gpg::gal::DeviceD3D9::`vftable'	00D4273C	
+const gpg::gal::AdapterD3D9::`vftable'	00D42808	
+const gpg::gal::EffectTechnique::`vftable'	00D42CA0	
+const gpg::gal::EffectTechniqueD3D9::`vftable'	00D42CCC	
+const gpg::gal::IndexBuffer::`vftable'	00D42D98	
+const gpg::gal::IndexBufferD3D9::`vftable'	00D42DAC	
+const gpg::gal::RenderTarget::`vftable'	00D42EAC	
+const gpg::gal::RenderTargetD3D9::`vftable'	00D42EBC	
+const gpg::gal::VertexBuffer::`vftable'	00D42F08	
+const gpg::gal::VertexBufferD3D9::`vftable'	00D42F1C	
+const gpg::gal::AdapterD3D10::`vftable'	00D42FF8	
+const gpg::gal::CubeRenderTarget::`vftable'	00D43000	
+const gpg::gal::CubeRenderTargetD3D10::`vftable'	00D4300C	
+const gpg::gal::CursorD3D10::`vftable'	00D43018	
+const gpg::gal::EffectMacro::`vftable'	00D43178	
+const gpg::gal::DeviceD3D10::`vftable'	00D4340C	
+const gpg::gal::EffectContext::`vftable'	00D434D8	
+const gpg::gal::EffectTechniqueD3D10::`vftable'	00D435CC	
+const gpg::gal::IndexBufferD3D10::`vftable'	00D43654	
+const gpg::gal::PipelineState::`vftable'	00D436F0	
+const gpg::gal::PipelineStateD3D10::`vftable'	00D436F8	
+const gpg::gal::RenderTargetD3D10::`vftable'	00D43794	
+const gpg::gal::Texture::`vftable'	00D43AFC	
+const gpg::gal::TextureD3D10::`vftable'	00D43B18	
+const gpg::gal::VertexFormat::`vftable'	00D449A4	
+const gpg::gal::VertexFormatD3D10::`vftable'	00D449AC	
+const gpg::SerializationError::`vftable'	00D44AC4	
+const gpg::SerSaveLoadHelper<gpg::Rect2<int>>::`vftable'	00D44B2C	
+const gpg::SerSaveLoadHelper<gpg::Rect2<float>>::`vftable'	00D44B34	
+const gpg::Rect2fSerializer::`vftable'	00D44B3C	
+const gpg::Rect2iSerializer::`vftable'	00D44B44	
+const gpg::Rect2iTypeInfo::`vftable'	00D44B4C	
+const gpg::Rect2fTypeInfo::`vftable'	00D44B84	
+const gpg::PipeBuf::`vftable'	00D44BBC	
+const gpg::StreamLogTarget::`vftable'	00D44BF8	
+const gpg::SerSaveLoadHelper<LuaPlus::LuaObject>::`vftable'	00D44EC0	
+const gpg::SerSaveConstructHelper<LuaPlus::LuaState>::`vftable'	00D44EC8	
+const gpg::SerConstructHelper<LuaPlus::LuaState>::`vftable'	00D44ED0	
+const gpg::SerSaveLoadHelper<LuaPlus::LuaState>::`vftable'	00D44ED8	
+const gpg::SerSaveLoadHelper<TObject>::`vftable'	00D469B0	
+const gpg::SerSaveConstructHelper<TString>::`vftable'	00D469B8	
+const gpg::SerConstructHelper<TString>::`vftable'	00D469C0	
+const gpg::SerSaveLoadHelper<TString>::`vftable'	00D469C8	
+const gpg::SerSaveConstructHelper<Table>::`vftable'	00D469D0	
+const gpg::SerConstructHelper<Table>::`vftable'	00D469D8	
+const gpg::SerSaveLoadHelper<Table>::`vftable'	00D469E0	
+const gpg::SerSaveConstructHelper<LClosure>::`vftable'	00D469E8	
+const gpg::SerConstructHelper<LClosure>::`vftable'	00D469F0	
+const gpg::SerSaveLoadHelper<LClosure>::`vftable'	00D469F8	
+const gpg::SerSaveConstructHelper<UpVal>::`vftable'	00D46A00	
+const gpg::SerConstructHelper<UpVal>::`vftable'	00D46A08	
+const gpg::SerSaveLoadHelper<UpVal>::`vftable'	00D46A10	
+const gpg::SerSaveConstructHelper<Proto>::`vftable'	00D46A18	
+const gpg::SerConstructHelper<Proto>::`vftable'	00D46A20	
+const gpg::SerSaveLoadHelper<Proto>::`vftable'	00D46A28	
+const gpg::SerSaveConstructHelper<lua_State>::`vftable'	00D46A30	
+const gpg::SerConstructHelper<lua_State>::`vftable'	00D46A38	
+const gpg::SerSaveLoadHelper<lua_State>::`vftable'	00D46A40	
+const gpg::SerSaveConstructHelper<Udata>::`vftable'	00D46A48	
+const gpg::SerConstructHelper<Udata>::`vftable'	00D46A50	
+const gpg::SerSaveLoadHelper<Udata>::`vftable'	00D46A58	
+const gpg::HaStar::Cluster::ICache::`vftable'	00D47810	
+const gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>::`vftable'	00D47884	
+const gpg::HaStar::ClusterInternalCache<gpg::HaStar::SubclusterData>::`vftable'	00D4788C	
+const gpg::DebugOutputStreambuf::`vftable'	00D478A0	
+const gpg::LogTarget::`vftable'	00D47990	
+const gpg::gal::CursorContext::`vftable'	00D47B20	
+const gpg::gal::DepthStencilTargetContext::`vftable'	00D47B28	
+const gpg::gal::DrawContext::`vftable'	00D47B30	
+const gpg::gal::DrawIndexedContext::`vftable'	00D47B38	
+const gpg::gal::IndexBufferContext::`vftable'	00D47C78	
+const gpg::gal::VertexBufferContext::`vftable'	00D47C80	
+const gpg::gal::Class::`vftable'	00D47C88	
+const gpg::gal::CubeRenderTargetD3D9::`vftable'	00D47CB4	
+const gpg::gal::Effect::`vftable'	00D47D24	
+const gpg::gal::EffectD3D9::`vftable'	00D47D6C	
+const gpg::gal::EffectVariable::`vftable'	00D47E44	
+const gpg::gal::EffectVariableD3D9::`vftable'	00D47E94	
+const gpg::gal::MeshFormatter::`vftable'	00D47F20	
+const gpg::gal::HardwareVertexFormatterD3D9::`vftable'	00D47F38	
+const gpg::gal::Float16HardwareVertexFormatterD3D9::`vftable'	00D47F50	
+const gpg::gal::PipelineStateD3D9::`vftable'	00D47F6C	
+const gpg::gal::StateCache<_D3DRENDERSTATETYPE,uint>::`vftable'	00D47F74	
+const gpg::gal::StateCache<_D3DSAMPLERSTATETYPE,uint>::`vftable'	00D47F7C	
+const gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,uint>::`vftable'	00D47F84	
+const gpg::gal::StateManagerD3D9::`vftable'	00D47F8C	
+const gpg::gal::TextureD3D9::`vftable'	00D481D4	
+const gpg::gal::VertexFormatD3D9::`vftable'	00D48754	
+const gpg::gal::DepthStencilTargetD3D10::`vftable'	00D487D0	
+const gpg::gal::EffectD3D10::`vftable'	00D4885C	
+const gpg::gal::EffectVariableD3D10::`vftable'	00D488DC	
+const gpg::gal::HardwareVertexFormatterD3D10::`vftable'	00D48980	
+const gpg::gal::Float16HardwareVertexFormatterD3D10::`vftable'	00D48998	
+const gpg::gal::VertexBufferD3D10::`vftable'	00D489B0	
+const gpg::SerHelperBase::`vftable'	00D48B90	
+const gpg::REnumType::`vftable'	00D48CA0	
+const gpg::ReadArchive::`vftable'	00D48D14	
+const gpg::WriteArchive::`vftable'	00D48DDC	
+const gpg::FileStream::`vftable'	00D4947C	
+const gpg::FileStream::IOError::`vftable'	00D494A8	
+const gpg::PipeStream::`vftable'	00D495F0	
+const gpg::Stream::`vftable'	00D49658	
+const gpg::Stream::UnsupportedOperation::`vftable'	00D49684	
+const gpg::ZLibOutputFilterStream::`vftable'	00D496F0	
+const gpg::RIndexed::`vftable'	00DFFECC	
+const gpg::RFastVectorType<uint>::`vftable'	00DFFEE0	
+const gpg::RFastVectorType<uint>::`vftable'	00DFFF10	
+const gpg::SerSaveLoadHelper<Moho::BVIntSet>::`vftable'	00DFFF5C	
+const gpg::SerSaveLoadHelper<Moho::IdPool>::`vftable'	00DFFFF0	
+const gpg::SerSaveLoadHelper<Moho::CTaskEvent>::`vftable'	00E00214	
+const gpg::SerConstructHelper<Moho::CTaskThread>::`vftable'	00E003E4	
+const gpg::SerSaveLoadHelper<Moho::CTaskThread>::`vftable'	00E003F4	
+const gpg::SerSaveLoadHelper<Moho::CTaskStage>::`vftable'	00E00434	
+const gpg::RPointerType<Moho::CTaskThread>::`vftable'	00E0043C	
+const gpg::RPointerType<Moho::CTaskThread>::`vftable'	00E0046C	
+const gpg::SerSaveLoadHelper<Moho::CMersenneTwister>::`vftable'	00E0058C	
+const gpg::SerSaveLoadHelper<Moho::CRandomStream>::`vftable'	00E005CC	
+const gpg::PrimitiveSerHelper<Moho::EStatType,int>::`vftable'	00E010B4	
+const gpg::SerSaveLoadHelper<Moho::EStatType>::`vftable'	00E010BC	
+const gpg::PrimitiveSerHelper<Moho::EPulseMode,int>::`vftable'	00E010F4	
+const gpg::SerSaveLoadHelper<Moho::EPulseMode>::`vftable'	00E010FC	
+const gpg::SerSaveLoadHelper<Moho::StatItem>::`vftable'	00E0113C	
+const gpg::RPointerType<Moho::CLuaConOutputHandler>::`vftable'	00E017C0	
+const gpg::RPointerType<Moho::CLuaConOutputHandler>::`vftable'	00E017F0	
+const gpg::BinaryReader::PrematureEOF::`vftable'	00E028CC	
+const gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::`vftable'	00E03904	
+const gpg::SerSaveLoadHelper<Wm3::Box3<float>>::`vftable'	00E0394C	
+const gpg::RWeakPointerType<Moho::INetNATTraversalProvider>::`vftable'	00E04304	
+const gpg::SerSaveConstructHelper<Moho::CParticleTexture>::`vftable'	00E06268	
+const gpg::SerConstructHelper<Moho::CParticleTexture>::`vftable'	00E06278	
+const gpg::PrimitiveSerHelper<Moho::SWorldBeam::BlendMode,int>::`vftable'	00E062B0	
+const gpg::SerSaveLoadHelper<Moho::SWorldBeam::BlendMode>::`vftable'	00E062B8	
+const gpg::SerSaveLoadHelper<Moho::SWorldBeam>::`vftable'	00E062F8	
+const gpg::PrimitiveSerHelper<Moho::SWorldParticle::BlendMode,int>::`vftable'	00E06330	
+const gpg::SerSaveLoadHelper<Moho::SWorldParticle::BlendMode>::`vftable'	00E06338	
+const gpg::PrimitiveSerHelper<Moho::SWorldParticle::ZMode,int>::`vftable'	00E06370	
+const gpg::SerSaveLoadHelper<Moho::SWorldParticle::ZMode>::`vftable'	00E06378	
+const gpg::SerSaveLoadHelper<Moho::SWorldParticle>::`vftable'	00E063B8	
+const gpg::RVectorType<Moho::PrefetchHandleBase>::`vftable'	00E072E0	
+const gpg::RVectorType<Moho::PrefetchHandleBase>::`vftable'	00E07310	
+const gpg::SerSaveLoadHelper<Moho::CPrefetchSet>::`vftable'	00E0732C	
+const gpg::SerSaveLoadHelper<Moho::RResId>::`vftable'	00E073C4	
+const gpg::SerSaveLoadHelper<Moho::PrefetchHandleBase>::`vftable'	00E07660	
+const gpg::SerSaveConstructHelper<Moho::ScrDiskWatcherTask>::`vftable'	00E08B9C	
+const gpg::SerConstructHelper<Moho::ScrDiskWatcherTask>::`vftable'	00E08BAC	
+const gpg::SerSaveLoadHelper<Moho::CScriptObject>::`vftable'	00E092B8	
+const gpg::RPointerType<Moho::CScriptObject>::`vftable'	00E092D0	
+const gpg::RPointerType<Moho::CScriptObject>::`vftable'	00E09300	
+const gpg::SerConstructHelper<Moho::CLuaTask>::`vftable'	00E099A0	
+const gpg::SerSaveLoadHelper<Moho::CLuaTask>::`vftable'	00E099B0	
+const gpg::SerSaveLoadHelper<Moho::CScriptEvent>::`vftable'	00E099D0	
+const gpg::SerConstructHelper<Moho::CWaitForTask>::`vftable'	00E09A1C	
+const gpg::SerSaveLoadHelper<Moho::CWaitForTask>::`vftable'	00E09A2C	
+const gpg::SerSaveConstructHelper<Moho::CSndVar>::`vftable'	00E0BA40	
+const gpg::SerConstructHelper<Moho::CSndVar>::`vftable'	00E0BA50	
+const gpg::SerSaveConstructHelper<Moho::CSndParams>::`vftable'	00E0BA90	
+const gpg::SerConstructHelper<Moho::CSndParams>::`vftable'	00E0BAA0	
+const gpg::SerSaveLoadHelper<Moho::SAudioRequest>::`vftable'	00E0BAE0	
+const gpg::RPointerType<Moho::CSndParams>::`vftable'	00E0BAF8	
+const gpg::RPointerType<Moho::CSndParams>::`vftable'	00E0BB28	
+const gpg::SerSaveLoadHelper<Wm3::AxisAlignedBox3<float>>::`vftable'	00E0BCF8	
+const gpg::SerSaveLoadHelper<Wm3::IVector2<int>>::`vftable'	00E0BD38	
+const gpg::SerSaveLoadHelper<Wm3::IVector3<int>>::`vftable'	00E0BD78	
+const gpg::SerSaveLoadHelper<Wm3::Vector2<float>>::`vftable'	00E0BDB8	
+const gpg::SerSaveLoadHelper<Wm3::Vector3<float>>::`vftable'	00E0BDF8	
+const gpg::SerSaveLoadHelper<Moho::Vector4f>::`vftable'	00E0BE38	
+const gpg::SerSaveLoadHelper<Wm3::Quaternion<float>>::`vftable'	00E0BE78	
+const gpg::SerSaveLoadHelper<Moho::VEulers3>::`vftable'	00E0BEB8	
+const gpg::SerSaveLoadHelper<Moho::VAxes3>::`vftable'	00E0BEF8	
+const gpg::SerSaveLoadHelper<Moho::VMatrix4>::`vftable'	00E0BF44	
+const gpg::SerSaveLoadHelper<Moho::VTransform>::`vftable'	00E0BFA4	
+const gpg::SerSaveConstructHelper<Moho::CColPrimitive<Wm3::Sphere3<float>>>::`vftable'	00E0D4E4	
+const gpg::SerConstructHelper<Moho::CColPrimitive<Wm3::Sphere3<float>>>::`vftable'	00E0D4F4	
+const gpg::SerSaveLoadHelper<Moho::CColPrimitive<Wm3::Sphere3<float>>>::`vftable'	00E0D504	
+const gpg::SerSaveConstructHelper<Moho::CColPrimitive<Wm3::Box3<float>>>::`vftable'	00E0D570	
+const gpg::SerConstructHelper<Moho::CColPrimitive<Wm3::Box3<float>>>::`vftable'	00E0D580	
+const gpg::SerSaveLoadHelper<Moho::CColPrimitive<Wm3::Box3<float>>>::`vftable'	00E0D590	
+const gpg::RVectorType<Moho::SDelayedSubVizInfo>::`vftable'	00E0D700	
+const gpg::RVectorType<Moho::SDelayedSubVizInfo>::`vftable'	00E0D730	
+const gpg::SerSaveLoadHelper<Moho::SDelayedSubVizInfo>::`vftable'	00E0D77C	
+const gpg::SerSaveConstructHelper<Moho::CIntelGrid>::`vftable'	00E0D7BC	
+const gpg::SerConstructHelper<Moho::CIntelGrid>::`vftable'	00E0D7CC	
+const gpg::SerSaveLoadHelper<Moho::CIntelGrid>::`vftable'	00E0D7DC	
+const gpg::PrimitiveSerHelper<Moho::EAlliance,int>::`vftable'	00E0DA94	
+const gpg::SerSaveLoadHelper<Moho::EAlliance>::`vftable'	00E0DA9C	
+const gpg::PrimitiveSerHelper<Moho::EImpactType,int>::`vftable'	00E0DAD4	
+const gpg::SerSaveLoadHelper<Moho::EImpactType>::`vftable'	00E0DADC	
+const gpg::PrimitiveSerHelper<Moho::EVisibilityMode,int>::`vftable'	00E0DB14	
+const gpg::SerSaveLoadHelper<Moho::EVisibilityMode>::`vftable'	00E0DB1C	
+const gpg::PrimitiveSerHelper<Moho::ESiloType,int>::`vftable'	00E0DB54	
+const gpg::SerSaveLoadHelper<Moho::ESiloType>::`vftable'	00E0DB5C	
+const gpg::PrimitiveSerHelper<Moho::EIntel,int>::`vftable'	00E0DB94	
+const gpg::SerSaveLoadHelper<Moho::EIntel>::`vftable'	00E0DB9C	
+const gpg::PrimitiveSerHelper<Moho::ELayer,int>::`vftable'	00E0DCEC	
+const gpg::SerSaveLoadHelper<Moho::ELayer>::`vftable'	00E0DCF4	
+const gpg::SerSaveLoadHelper<Moho::SCoordsVec2>::`vftable'	00E0DD34	
+const gpg::SerSaveLoadHelper<Moho::SOCellPos>::`vftable'	00E0DD74	
+const gpg::SerSaveLoadHelper<Moho::SNavGoal>::`vftable'	00E0DDB4	
+const gpg::SerSaveLoadHelper<Moho::SPointVector>::`vftable'	00E0DDF4	
+const gpg::SerSaveLoadHelper<Moho::SFootprint>::`vftable'	00E0DE34	
+const gpg::SerSaveConstructHelper<Moho::REmitterBlueprint>::`vftable'	00E0EC24	
+const gpg::SerConstructHelper<Moho::REmitterBlueprint>::`vftable'	00E0EC34	
+const gpg::SerSaveConstructHelper<Moho::RTrailBlueprint>::`vftable'	00E0EC44	
+const gpg::SerConstructHelper<Moho::RTrailBlueprint>::`vftable'	00E0EC54	
+const gpg::SerSaveConstructHelper<Moho::RBeamBlueprint>::`vftable'	00E0EC64	
+const gpg::SerConstructHelper<Moho::RBeamBlueprint>::`vftable'	00E0EC74	
+const gpg::RVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`vftable'	00E0F640	
+const gpg::RVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`vftable'	00E0F670	
+const gpg::RListType<Moho::SNamedFootprint>::`vftable'	00E0F770	
+const gpg::RFastVectorType<Wm3::Vector3<float>>::`vftable'	00E0F914	
+const gpg::RFastVectorType<Wm3::Vector3<float>>::`vftable'	00E0F944	
+const gpg::SerSaveLoadHelper<Moho::SEfxCurve>::`vftable'	00E0F990	
+const gpg::RVectorType<Moho::REmitterCurveKey>::`vftable'	00E0F998	
+const gpg::RVectorType<Moho::REmitterCurveKey>::`vftable'	00E0F9C8	
+const gpg::RVectorType<Moho::RMeshBlueprintLOD>::`vftable'	00E0FE4C	
+const gpg::RVectorType<Moho::RMeshBlueprintLOD>::`vftable'	00E0FE7C	
+const gpg::SerSaveConstructHelper<Moho::RMeshBlueprint>::`vftable'	00E0FE98	
+const gpg::SerConstructHelper<Moho::RMeshBlueprint>::`vftable'	00E0FEA8	
+const gpg::SerSaveConstructHelper<Moho::RProjectileBlueprint>::`vftable'	00E10DD4	
+const gpg::SerConstructHelper<Moho::RProjectileBlueprint>::`vftable'	00E10DE4	
+const gpg::SerSaveConstructHelper<Moho::RPropBlueprint>::`vftable'	00E11080	
+const gpg::SerConstructHelper<Moho::RPropBlueprint>::`vftable'	00E11090	
+const gpg::PrimitiveSerHelper<Moho::ERuleBPUnitMovementType,int>::`vftable'	00E156B4	
+const gpg::SerSaveLoadHelper<Moho::ERuleBPUnitMovementType>::`vftable'	00E156BC	
+const gpg::PrimitiveSerHelper<Moho::ERuleBPUnitCommandCaps,int>::`vftable'	00E156F4	
+const gpg::SerSaveLoadHelper<Moho::ERuleBPUnitCommandCaps>::`vftable'	00E156FC	
+const gpg::PrimitiveSerHelper<Moho::ERuleBPUnitToggleCaps,int>::`vftable'	00E15734	
+const gpg::SerSaveLoadHelper<Moho::ERuleBPUnitToggleCaps>::`vftable'	00E1573C	
+const gpg::RVectorType<float>::`vftable'	00E15834	
+const gpg::RVectorType<float>::`vftable'	00E15864	
+const gpg::RVectorType<Moho::RUnitBlueprintWeapon>::`vftable'	00E15A58	
+const gpg::RVectorType<Moho::RUnitBlueprintWeapon>::`vftable'	00E15A88	
+const gpg::SerSaveConstructHelper<Moho::RUnitBlueprint>::`vftable'	00E15AA4	
+const gpg::SerConstructHelper<Moho::RUnitBlueprint>::`vftable'	00E15AB4	
+const gpg::SerSaveConstructHelper<Moho::RUnitBlueprintWeapon>::`vftable'	00E15AC4	
+const gpg::SerConstructHelper<Moho::RUnitBlueprintWeapon>::`vftable'	00E15AD4	
+const gpg::SerSaveConstructHelper<Moho::CAniResourceSkel>::`vftable'	00E16348	
+const gpg::SerConstructHelper<Moho::CAniResourceSkel>::`vftable'	00E16358	
+const gpg::SerSaveConstructHelper<Moho::RScmResource>::`vftable'	00E16398	
+const gpg::SerConstructHelper<Moho::RScmResource>::`vftable'	00E163A8	
+const gpg::SerSaveConstructHelper<Moho::RScaResource>::`vftable'	00E16454	
+const gpg::SerConstructHelper<Moho::RScaResource>::`vftable'	00E16464	
+const gpg::SerSaveLoadHelper<Moho::ArmyLaunchInfo>::`vftable'	00E16E64	
+const gpg::RVectorType<Moho::ArmyLaunchInfo>::`vftable'	00E16E6C	
+const gpg::RVectorType<Moho::ArmyLaunchInfo>::`vftable'	00E16E9C	
+const gpg::SerSaveLoadHelper<Moho::LaunchInfoBase>::`vftable'	00E16EE8	
+const gpg::SerSaveLoadHelper<Moho::LaunchInfoNew>::`vftable'	00E16F28	
+const gpg::PrimitiveSerHelper<Moho::EResourceType,int>::`vftable'	00E170EC	
+const gpg::SerSaveLoadHelper<Moho::EResourceType>::`vftable'	00E170F4	
+const gpg::SerSaveLoadHelper<Moho::ResourceDeposit>::`vftable'	00E17134	
+const gpg::RVectorType<Moho::ResourceDeposit>::`vftable'	00E1713C	
+const gpg::RVectorType<Moho::ResourceDeposit>::`vftable'	00E1716C	
+const gpg::SerSaveLoadHelper<Moho::CSimResources>::`vftable'	00E171EC	
+const gpg::SerSaveConstructHelper<Moho::CAniDefaultSkel>::`vftable'	00E173DC	
+const gpg::SerConstructHelper<Moho::CAniDefaultSkel>::`vftable'	00E173EC	
+const gpg::SerSaveLoadHelper<Moho::CAniPose>::`vftable'	00E1742C	
+const gpg::RFastVectorType<Moho::CAniPoseBone>::`vftable'	00E17464	
+const gpg::RFastVectorType<Moho::CAniPoseBone>::`vftable'	00E17494	
+const gpg::SerSaveLoadHelper<Moho::CAniPoseBone>::`vftable'	00E174B0	
+const gpg::SerSaveLoadHelper<Moho::SSTIArmyConstantData>::`vftable'	00E1753C	
+const gpg::SerSaveLoadHelper<Moho::SSTIArmyVariableData>::`vftable'	00E1757C	
+const gpg::SerSaveLoadHelper<Moho::IArmy>::`vftable'	00E175BC	
+const gpg::PrimitiveSerHelper<Moho::EUnitCommandType,int>::`vftable'	00E17A34	
+const gpg::SerSaveLoadHelper<Moho::EUnitCommandType>::`vftable'	00E17A3C	
+const gpg::SerSaveLoadHelper<Moho::SSTICommandConstantData>::`vftable'	00E17A7C	
+const gpg::RFastVectorType<Moho::EntId>::`vftable'	00E17A84	
+const gpg::RFastVectorType<Moho::EntId>::`vftable'	00E17AB4	
+const gpg::RFastVectorType<Moho::SOCellPos>::`vftable'	00E17AC8	
+const gpg::RFastVectorType<Moho::SOCellPos>::`vftable'	00E17AF8	
+const gpg::SerSaveLoadHelper<Moho::SSTICommandVariableData>::`vftable'	00E17B44	
+const gpg::RPointerType<Moho::RBlueprint>::`vftable'	00E17D68	
+const gpg::RPointerType<Moho::RBlueprint>::`vftable'	00E17D98	
+const gpg::SerSaveLoadHelper<Moho::EntId>::`vftable'	00E17E64	
+const gpg::SerSaveLoadHelper<Moho::SSTIEntityConstantData>::`vftable'	00E17EA4	
+const gpg::SerSaveLoadHelper<Moho::SSTIEntityAttachInfo>::`vftable'	00E17EE4	
+const gpg::SerSaveLoadHelper<Moho::EntityAttributes>::`vftable'	00E17F24	
+const gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>::`vftable'	00E17F2C	
+const gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>::`vftable'	00E17F5C	
+const gpg::SerSaveLoadHelper<Moho::SSTIEntityVariableData>::`vftable'	00E17FA8	
+const gpg::PrimitiveSerHelper<Moho::ESTITargetType,int>::`vftable'	00E18040	
+const gpg::SerSaveLoadHelper<Moho::ESTITargetType>::`vftable'	00E18048	
+const gpg::SerSaveLoadHelper<Moho::SSTITarget>::`vftable'	00E18088	
+const gpg::PrimitiveSerHelper<Moho::EJobType,int>::`vftable'	00E186DC	
+const gpg::SerSaveLoadHelper<Moho::EJobType>::`vftable'	00E186E4	
+const gpg::PrimitiveSerHelper<Moho::EFireState,int>::`vftable'	00E1871C	
+const gpg::SerSaveLoadHelper<Moho::EFireState>::`vftable'	00E18724	
+const gpg::PrimitiveSerHelper<Moho::EUnitState,int>::`vftable'	00E1875C	
+const gpg::SerSaveLoadHelper<Moho::EUnitState>::`vftable'	00E18764	
+const gpg::SerSaveLoadHelper<Moho::UnitWeaponInfo>::`vftable'	00E187A4	
+const gpg::SerSaveLoadHelper<Moho::UnitAttributes>::`vftable'	00E187E4	
+const gpg::SerSaveLoadHelper<Moho::SSTIUnitConstantData>::`vftable'	00E18824	
+const gpg::RFastVectorType<Moho::UnitWeaponInfo>::`vftable'	00E1882C	
+const gpg::RFastVectorType<Moho::UnitWeaponInfo>::`vftable'	00E1885C	
+const gpg::RSharedPointerType<Moho::CAniPose>::`vftable'	00E188A0	
+const gpg::RSharedPointerType<Moho::CAniPose>::`vftable'	00E188D0	
+const gpg::SerSaveLoadHelper<Moho::SSTIUnitVariableData>::`vftable'	00E188EC	
+const gpg::PrimitiveSerHelper<Moho::EEconResource,int>::`vftable'	00E1896C	
+const gpg::SerSaveLoadHelper<Moho::EEconResource>::`vftable'	00E18974	
+const gpg::SerSaveLoadHelper<Moho::SEconValue>::`vftable'	00E189B4	
+const gpg::SerSaveLoadHelper<Moho::SEconTotals>::`vftable'	00E189F4	
+const gpg::SerSaveLoadHelper<Moho::SUnitOffsetInfo>::`vftable'	00E18EE0	
+const gpg::RMapType<Moho::EntId,Moho::SUnitOffsetInfo>::`vftable'	00E18EE8	
+const gpg::SerSaveLoadHelper<Moho::SOffsetInfo>::`vftable'	00E18F50	
+const gpg::SerSaveLoadHelper<Moho::IFormationInstance>::`vftable'	00E18FC0	
+const gpg::SerSaveLoadHelper<Moho::SAssignedLocInfo>::`vftable'	00E19000	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::IUnit>>::`vftable'	00E19008	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::IUnit>>::`vftable'	00E19038	
+const gpg::RFastVectorType<Moho::SOffsetInfo>::`vftable'	00E1904C	
+const gpg::RFastVectorType<Moho::SOffsetInfo>::`vftable'	00E1907C	
+const gpg::RFastVectorType<Moho::SAssignedLocInfo>::`vftable'	00E19090	
+const gpg::RFastVectorType<Moho::SAssignedLocInfo>::`vftable'	00E190C0	
+const gpg::RMapType<Moho::EntId,Moho::SCoordsVec2>::`vftable'	00E190D4	
+const gpg::SerSaveLoadHelper<Moho::CFormationInstance>::`vftable'	00E1913C	
+const gpg::RVectorType<Moho::SPointVector>::`vftable'	00E19994	
+const gpg::RVectorType<Moho::SPointVector>::`vftable'	00E199C4	
+const gpg::SerSaveLoadHelper<Moho::SBuildReserveInfo>::`vftable'	00E19A10	
+const gpg::RMapType<Wm3::IVector2<int>,Moho::SBuildReserveInfo>::`vftable'	00E19A18	
+const gpg::SerConstructHelper<Moho::CAiBrain>::`vftable'	00E19A50	
+const gpg::SerSaveLoadHelper<Moho::CAiBrain>::`vftable'	00E19A60	
+const gpg::SerSaveLoadHelper<Moho::SMassInfo>::`vftable'	00E1AF54	
+const gpg::PrimitiveSerHelper<Moho::ECollisionType,int>::`vftable'	00E1B2E0	
+const gpg::SerSaveLoadHelper<Moho::ECollisionType>::`vftable'	00E1B2E8	
+const gpg::SerSaveLoadHelper<Moho::SCollisionInfo>::`vftable'	00E1B328	
+const gpg::SerConstructHelper<Moho::IAiCommandDispatchImpl>::`vftable'	00E1B400	
+const gpg::SerSaveLoadHelper<Moho::IAiCommandDispatchImpl>::`vftable'	00E1B410	
+const gpg::SerSaveLoadHelper<Moho::CAiFormationInstance>::`vftable'	00E1B524	
+const gpg::RFastVectorType<Moho::IFormationInstance *>::`vftable'	00E1B578	
+const gpg::RFastVectorType<Moho::IFormationInstance *>::`vftable'	00E1B5A8	
+const gpg::SerSaveLoadHelper<Moho::CAiFormationDBImpl>::`vftable'	00E1B5F4	
+const gpg::RPointerType<Moho::IFormationInstance>::`vftable'	00E1B5FC	
+const gpg::RPointerType<Moho::IFormationInstance>::`vftable'	00E1B62C	
+const gpg::RMapType<uint,Moho::RUnitBlueprint const *>::`vftable'	00E1B79C	
+const gpg::SerConstructHelper<Moho::CAiBuilderImpl>::`vftable'	00E1B804	
+const gpg::SerSaveLoadHelper<Moho::CAiBuilderImpl>::`vftable'	00E1B814	
+const gpg::RPointerType<Moho::RUnitBlueprint>::`vftable'	00E1B81C	
+const gpg::RPointerType<Moho::RUnitBlueprint>::`vftable'	00E1B84C	
+const gpg::PrimitiveSerHelper<Moho::EAiNavigatorStatus,int>::`vftable'	00E1BFB8	
+const gpg::SerSaveLoadHelper<Moho::EAiNavigatorStatus>::`vftable'	00E1BFC0	
+const gpg::PrimitiveSerHelper<Moho::EAiNavigatorEvent,int>::`vftable'	00E1BFF8	
+const gpg::SerSaveLoadHelper<Moho::EAiNavigatorEvent>::`vftable'	00E1C000	
+const gpg::SerSaveLoadHelper<Moho::IAiNavigator>::`vftable'	00E1C070	
+const gpg::SerSaveLoadHelper<Moho::CAiNavigatorImpl>::`vftable'	00E1C0B0	
+const gpg::SerConstructHelper<Moho::CAiNavigatorLand>::`vftable'	00E1C0F8	
+const gpg::SerSaveLoadHelper<Moho::CAiNavigatorLand>::`vftable'	00E1C108	
+const gpg::SerConstructHelper<Moho::CAiNavigatorAir>::`vftable'	00E1C148	
+const gpg::SerSaveLoadHelper<Moho::CAiNavigatorAir>::`vftable'	00E1C158	
+const gpg::RListType<gpg::Rect2<int>>::`vftable'	00E1C36C	
+const gpg::PrimitiveSerHelper<Moho::ESearchType,int>::`vftable'	00E1C3CC	
+const gpg::SerSaveLoadHelper<Moho::ESearchType>::`vftable'	00E1C3D4	
+const gpg::SerSaveLoadHelper<Moho::CAiPathFinder>::`vftable'	00E1C414	
+const gpg::PrimitiveSerHelper<Moho::CAiPathNavigator::State,int>::`vftable'	00E1C6A4	
+const gpg::SerSaveLoadHelper<Moho::CAiPathNavigator::State>::`vftable'	00E1C6AC	
+const gpg::SerSaveLoadHelper<Moho::CAiPathNavigator>::`vftable'	00E1C6EC	
+const gpg::PrimitiveSerHelper<Moho::EPathType,int>::`vftable'	00E1C85C	
+const gpg::SerSaveLoadHelper<Moho::EPathType>::`vftable'	00E1C864	
+const gpg::SerSaveLoadHelper<Moho::SContinueInfo>::`vftable'	00E1C8A4	
+const gpg::SerSaveLoadHelper<Moho::CAiPathSpline>::`vftable'	00E1C8E4	
+const gpg::RFastVectorType<Moho::CPathPoint>::`vftable'	00E1C8EC	
+const gpg::RFastVectorType<Moho::CPathPoint>::`vftable'	00E1C91C	
+const gpg::SerSaveLoadHelper<Moho::SValuePair>::`vftable'	00E1CA90	
+const gpg::SerConstructHelper<Moho::CAiPersonality>::`vftable'	00E1CAA0	
+const gpg::SerSaveLoadHelper<Moho::CAiPersonality>::`vftable'	00E1CAB0	
+const gpg::SerSaveLoadHelper<Moho::SPerArmyReconInfo>::`vftable'	00E1D9A4	
+const gpg::RVectorType<Moho::SPerArmyReconInfo>::`vftable'	00E1D9AC	
+const gpg::RVectorType<Moho::SPerArmyReconInfo>::`vftable'	00E1D9DC	
+const gpg::RVectorType<Moho::ReconBlip *>::`vftable'	00E1DA00	
+const gpg::RVectorType<Moho::ReconBlip *>::`vftable'	00E1DA30	
+const gpg::SerSaveConstructHelper<Moho::ReconBlip>::`vftable'	00E1DA4C	
+const gpg::SerConstructHelper<Moho::ReconBlip>::`vftable'	00E1DA5C	
+const gpg::SerSaveLoadHelper<Moho::ReconBlip>::`vftable'	00E1DA6C	
+const gpg::SerSaveLoadHelper<Moho::SReconKey>::`vftable'	00E1DAAC	
+const gpg::RMultiMapType<Moho::SReconKey,Moho::ReconBlip *>::`vftable'	00E1DB14	
+const gpg::SerSaveLoadHelper<Moho::CAiReconDBImpl>::`vftable'	00E1DB4C	
+const gpg::RPointerType<Moho::ReconBlip>::`vftable'	00E1DB9C	
+const gpg::RPointerType<Moho::ReconBlip>::`vftable'	00E1DBCC	
+const gpg::PrimitiveSerHelper<Moho::ESiloBuildStage,int>::`vftable'	00E1DD54	
+const gpg::SerSaveLoadHelper<Moho::ESiloBuildStage>::`vftable'	00E1DD5C	
+const gpg::SerSaveLoadHelper<Moho::SSiloBuildInfo>::`vftable'	00E1DD9C	
+const gpg::RListType<Moho::ESiloType>::`vftable'	00E1DDA4	
+const gpg::SerConstructHelper<Moho::CAiSiloBuildImpl>::`vftable'	00E1DE40	
+const gpg::SerSaveLoadHelper<Moho::CAiSiloBuildImpl>::`vftable'	00E1DE50	
+const gpg::SerSaveLoadHelper<Moho::CAiSteeringImpl>::`vftable'	00E1E150	
+const gpg::PrimitiveSerHelper<Moho::EAiAttackerEvent,int>::`vftable'	00E1E8C0	
+const gpg::SerSaveLoadHelper<Moho::EAiAttackerEvent>::`vftable'	00E1E8C8	
+const gpg::RVectorType<Moho::UnitWeapon *>::`vftable'	00E1E900	
+const gpg::RVectorType<Moho::UnitWeapon *>::`vftable'	00E1E930	
+const gpg::RVectorType<Moho::CAcquireTargetTask *>::`vftable'	00E1E944	
+const gpg::RVectorType<Moho::CAcquireTargetTask *>::`vftable'	00E1E974	
+const gpg::SerSaveLoadHelper<Moho::IAiAttacker>::`vftable'	00E1E9C0	
+const gpg::SerSaveLoadHelper<Moho::LAiAttackerImpl>::`vftable'	00E1EACC	
+const gpg::SerConstructHelper<Moho::CAiAttackerImpl>::`vftable'	00E1EADC	
+const gpg::SerSaveLoadHelper<Moho::CAiAttackerImpl>::`vftable'	00E1EAEC	
+const gpg::SerSaveLoadHelper<Moho::CAcquireTargetTask>::`vftable'	00E1EB2C	
+const gpg::RPointerType<Moho::UnitWeapon>::`vftable'	00E1EBC4	
+const gpg::RPointerType<Moho::UnitWeapon>::`vftable'	00E1EBF4	
+const gpg::RPointerType<Moho::CAcquireTargetTask>::`vftable'	00E1EC08	
+const gpg::RPointerType<Moho::CAcquireTargetTask>::`vftable'	00E1EC38	
+const gpg::PrimitiveSerHelper<Moho::EAiTargetType,int>::`vftable'	00E1ED14	
+const gpg::SerSaveLoadHelper<Moho::EAiTargetType>::`vftable'	00E1ED1C	
+const gpg::SerSaveLoadHelper<Moho::CAiTarget>::`vftable'	00E1ED5C	
+const gpg::PrimitiveSerHelper<Moho::EAiTransportEvent,int>::`vftable'	00E1F1BC	
+const gpg::RVectorType<int>::`vftable'	00E1F1FC	
+const gpg::RVectorType<int>::`vftable'	00E1F22C	
+const gpg::SerSaveLoadHelper<Moho::SAiReservedTransportBone>::`vftable'	00E1F278	
+const gpg::RVectorType<Moho::SAiReservedTransportBone>::`vftable'	00E1F280	
+const gpg::RVectorType<Moho::SAiReservedTransportBone>::`vftable'	00E1F2B0	
+const gpg::SerSaveLoadHelper<Moho::SAttachPoint>::`vftable'	00E1F2FC	
+const gpg::RVectorType<Moho::SAttachPoint>::`vftable'	00E1F304	
+const gpg::RVectorType<Moho::SAttachPoint>::`vftable'	00E1F334	
+const gpg::SerSaveLoadHelper<Moho::STransportPickUpInfo>::`vftable'	00E1F380	
+const gpg::SerSaveLoadHelper<Moho::IAiTransport>::`vftable'	00E1F3C0	
+const gpg::SerConstructHelper<Moho::CAiTransportImpl>::`vftable'	00E1F4B4	
+const gpg::SerSaveLoadHelper<Moho::CAiTransportImpl>::`vftable'	00E1F4C4	
+const gpg::SerSaveLoadHelper<Moho::CUnitAssistMoveTask>::`vftable'	00E1F540	
+const gpg::SerSaveLoadHelper<Moho::CUnitAttackTargetTask>::`vftable'	00E1F6B0	
+const gpg::SerSaveLoadHelper<Moho::CBuildTaskHelper>::`vftable'	00E1F9E0	
+const gpg::SerSaveLoadHelper<Moho::CUnitMobileBuildTask>::`vftable'	00E1FA34	
+const gpg::SerSaveLoadHelper<Moho::CUnitUpgradeTask>::`vftable'	00E1FA80	
+const gpg::SerSaveLoadHelper<Moho::CUnitRepairTask>::`vftable'	00E1FAD4	
+const gpg::SerSaveLoadHelper<Moho::CFactoryBuildTask>::`vftable'	00E1FB20	
+const gpg::SerSaveLoadHelper<Moho::CUnitSacrificeTask>::`vftable'	00E1FB74	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallTransport>::`vftable'	00E1FD18	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallLandTransport>::`vftable'	00E1FD64	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallTeleport>::`vftable'	00E1FDB0	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallAirStagingPlatform>::`vftable'	00E1FDFC	
+const gpg::SerSaveLoadHelper<Moho::CUnitCaptureTask>::`vftable'	00E1FF5C	
+const gpg::SerSaveLoadHelper<Moho::CUnitCarrierRetrieve>::`vftable'	00E20088	
+const gpg::SerSaveLoadHelper<Moho::CUnitCarrierLand>::`vftable'	00E200D4	
+const gpg::SerSaveLoadHelper<Moho::CUnitCarrierLaunch>::`vftable'	00E20120	
+const gpg::PrimitiveSerHelper<Moho::EAiResult,int>::`vftable'	00E20270	
+const gpg::SerSaveLoadHelper<Moho::EAiResult>::`vftable'	00E20278	
+const gpg::SerSaveLoadHelper<Moho::CCommandTask>::`vftable'	00E202B8	
+const gpg::SerSaveLoadHelper<Moho::CUnitGetBuiltTask>::`vftable'	00E20304	
+const gpg::SerSaveLoadHelper<Moho::CUnitTeleportTask>::`vftable'	00E20350	
+const gpg::SerSaveLoadHelper<Moho::CUnitFireAtTask>::`vftable'	00E2039C	
+const gpg::SerSaveLoadHelper<Moho::CUnitFerryTask>::`vftable'	00E20424	
+const gpg::SerSaveLoadHelper<Moho::CUnitWaitForFerryTask>::`vftable'	00E20470	
+const gpg::SerSaveLoadHelper<Moho::CUnitGuardTask>::`vftable'	00E20518	
+const gpg::SerSaveLoadHelper<Moho::CUnitMeleeAttackTargetTask>::`vftable'	00E205C8	
+const gpg::SerSaveLoadHelper<Moho::CUnitMoveTask>::`vftable'	00E2069C	
+const gpg::SerSaveLoadHelper<Moho::CUnitFormAndMoveTask>::`vftable'	00E20700	
+const gpg::SerConstructHelper<Moho::CUnitPatrolTask>::`vftable'	00E2078C	
+const gpg::SerSaveLoadHelper<Moho::CUnitPatrolTask>::`vftable'	00E2079C	
+const gpg::SerSaveLoadHelper<Moho::CUnitPodAssist>::`vftable'	00E20840	
+const gpg::SerSaveLoadHelper<Moho::CUnitReclaimTask>::`vftable'	00E20984	
+const gpg::SerSaveLoadHelper<Moho::CUnitRefuel>::`vftable'	00E20A50	
+const gpg::SerSaveLoadHelper<Moho::CUnitScriptTask>::`vftable'	00E20CA0	
+const gpg::SerSaveLoadHelper<Moho::SPickUpInfo>::`vftable'	00E20DE4	
+const gpg::RVectorType<Moho::SPickUpInfo>::`vftable'	00E20DEC	
+const gpg::RVectorType<Moho::SPickUpInfo>::`vftable'	00E20E1C	
+const gpg::SerSaveLoadHelper<Moho::CUnitLoadUnits>::`vftable'	00E20E74	
+const gpg::SerSaveLoadHelper<Moho::CUnitUnloadUnits>::`vftable'	00E20EC0	
+const gpg::PrimitiveSerHelper<Moho::EPathPointState,int>::`vftable'	00E2103C	
+const gpg::SerSaveLoadHelper<Moho::EPathPointState>::`vftable'	00E21044	
+const gpg::SerSaveLoadHelper<Moho::CPathPoint>::`vftable'	00E21084	
+const gpg::SerSaveLoadHelper<Moho::CAimManipulator>::`vftable'	00E21428	
+const gpg::SerSaveLoadHelper<Moho::CBoneEntityManipulator>::`vftable'	00E215A8	
+const gpg::SerSaveLoadHelper<Moho::CBuilderArmManipulator>::`vftable'	00E217CC	
+const gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::`vftable'	00E21A38	
+const gpg::SerSaveLoadHelper<Moho::CFootPlantManipulator>::`vftable'	00E21B74	
+const gpg::SerSaveLoadHelper<Moho::CAniActor>::`vftable'	00E21EDC	
+const gpg::SerSaveLoadHelper<Moho::SAniManipBinding>::`vftable'	00E21F1C	
+const gpg::RFastVectorType<Moho::SAniManipBinding>::`vftable'	00E21F24	
+const gpg::RFastVectorType<Moho::SAniManipBinding>::`vftable'	00E21F54	
+const gpg::SerSaveLoadHelper<Moho::IAniManipulator>::`vftable'	00E21F70	
+const gpg::RPointerType<Moho::IAniManipulator>::`vftable'	00E21F98	
+const gpg::RPointerType<Moho::IAniManipulator>::`vftable'	00E21FC8	
+const gpg::RVectorType<bool>::`vftable'	00E22510	
+const gpg::RVectorType<bool>::`vftable'	00E22540	
+const gpg::SerConstructHelper<Moho::CAnimationManipulator>::`vftable'	00E22564	
+const gpg::SerSaveLoadHelper<Moho::CAnimationManipulator>::`vftable'	00E22574	
+const gpg::SerSaveLoadHelper<Moho::CRotateManipulator>::`vftable'	00E22B38	
+const gpg::SerSaveLoadHelper<Moho::CSlaveManipulator>::`vftable'	00E22D50	
+const gpg::SerSaveLoadHelper<Moho::CSlideManipulator>::`vftable'	00E22F84	
+const gpg::SerSaveLoadHelper<Moho::CStorageManipulator>::`vftable'	00E230BC	
+const gpg::SerSaveLoadHelper<Moho::CThrustManipulator>::`vftable'	00E2322C	
+const gpg::SerSaveLoadHelper<Moho::CEfxBeam>::`vftable'	00E23C54	
+const gpg::RFastVectorType<float>::`vftable'	00E23D2C	
+const gpg::RFastVectorType<float>::`vftable'	00E23D5C	
+const gpg::RFastVectorType<Moho::CountedPtr<Moho::CParticleTexture>>::`vftable'	00E23DB4	
+const gpg::RFastVectorType<Moho::CountedPtr<Moho::CParticleTexture>>::`vftable'	00E23DE4	
+const gpg::RFastVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`vftable'	00E23DF8	
+const gpg::RFastVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`vftable'	00E23E28	
+const gpg::SerSaveLoadHelper<Moho::CEffectImpl>::`vftable'	00E23E44	
+const gpg::PrimitiveSerHelper<Moho::EmitterType,int>::`vftable'	00E2416C	
+const gpg::SerSaveLoadHelper<Moho::EmitterType>::`vftable'	00E24174	
+const gpg::RFastVectorType<Moho::SEfxCurve>::`vftable'	00E2417C	
+const gpg::RFastVectorType<Moho::SEfxCurve>::`vftable'	00E241AC	
+const gpg::SerSaveLoadHelper<Moho::CEfxEmitter>::`vftable'	00E241C8	
+const gpg::SerConstructHelper<Moho::CEffectManagerImpl>::`vftable'	00E25E78	
+const gpg::SerSaveLoadHelper<Moho::CEffectManagerImpl>::`vftable'	00E25E88	
+const gpg::RPointerType<Moho::IEffect>::`vftable'	00E25E90	
+const gpg::RPointerType<Moho::IEffect>::`vftable'	00E25EC0	
+const gpg::SerSaveLoadHelper<Moho::CEfxTrailEmitter>::`vftable'	00E26964	
+const gpg::SerSaveConstructHelper<Moho::CollisionBeamEntity>::`vftable'	00E26F7C	
+const gpg::SerConstructHelper<Moho::CollisionBeamEntity>::`vftable'	00E26F8C	
+const gpg::SerSaveLoadHelper<Moho::CollisionBeamEntity>::`vftable'	00E26F9C	
+const gpg::RVectorType<Moho::Entity *>::`vftable'	00E27610	
+const gpg::RVectorType<Moho::Entity *>::`vftable'	00E27640	
+const gpg::SerSaveLoadHelper<Moho::SEntAttachInfo>::`vftable'	00E2768C	
+const gpg::SerSaveLoadHelper<Moho::PositionHistory>::`vftable'	00E276CC	
+const gpg::SerSaveConstructHelper<Moho::Entity>::`vftable'	00E276DC	
+const gpg::SerConstructHelper<Moho::Entity>::`vftable'	00E276EC	
+const gpg::SerSaveLoadHelper<Moho::Entity>::`vftable'	00E276FC	
+const gpg::RPointerType<Moho::Entity>::`vftable'	00E27704	
+const gpg::RPointerType<Moho::Entity>::`vftable'	00E27734	
+const gpg::RMapType<uint,Moho::IdPool>::`vftable'	00E278F0	
+const gpg::RListType<Moho::Entity *>::`vftable'	00E27920	
+const gpg::SerSaveLoadHelper<Moho::EntityDB>::`vftable'	00E27988	
+const gpg::RFastVectorType<Moho::Entity *>::`vftable'	00E28E28	
+const gpg::RFastVectorType<Moho::Entity *>::`vftable'	00E28E58	
+const gpg::SerSaveLoadHelper<Moho::EntitySetBase>::`vftable'	00E28EA4	
+const gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<Moho::Entity>>::`vftable'	00E28EE4	
+const gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<Moho::Entity>>::`vftable'	00E28F24	
+const gpg::SerSaveLoadHelper<Moho::Motor>::`vftable'	00E28F6C	
+const gpg::SerConstructHelper<Moho::MotorFallDown>::`vftable'	00E291EC	
+const gpg::SerSaveLoadHelper<Moho::MotorFallDown>::`vftable'	00E291FC	
+const gpg::SerConstructHelper<Moho::MotorSinkAway>::`vftable'	00E292C0	
+const gpg::SerSaveLoadHelper<Moho::MotorSinkAway>::`vftable'	00E292D0	
+const gpg::SerSaveConstructHelper<Moho::SPhysBody>::`vftable'	00E2932C	
+const gpg::SerConstructHelper<Moho::SPhysBody>::`vftable'	00E2933C	
+const gpg::SerSaveLoadHelper<Moho::SPhysBody>::`vftable'	00E2934C	
+const gpg::SerSaveLoadHelper<Moho::SPhysConstants>::`vftable'	00E294C4	
+const gpg::PrimitiveSerHelper<Moho::EProjectileImpactEvent,int>::`vftable'	00E29734	
+const gpg::SerSaveLoadHelper<Moho::EProjectileImpactEvent>::`vftable'	00E2973C	
+const gpg::SerSaveLoadHelper<Moho::CProjectileAttributes>::`vftable'	00E2977C	
+const gpg::SerSaveConstructHelper<Moho::Projectile>::`vftable'	00E297BC	
+const gpg::SerConstructHelper<Moho::Projectile>::`vftable'	00E297CC	
+const gpg::SerSaveLoadHelper<Moho::Projectile>::`vftable'	00E297DC	
+const gpg::RMapType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>,float>::`vftable'	00E2A708	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::Entity>>::`vftable'	00E2A738	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::Entity>>::`vftable'	00E2A768	
+const gpg::RFastVectorType<Moho::ReconBlip *>::`vftable'	00E2A77C	
+const gpg::RFastVectorType<Moho::ReconBlip *>::`vftable'	00E2A7AC	
+const gpg::SerSaveLoadHelper<Moho::SInfoCache>::`vftable'	00E2A7F8	
+const gpg::SerSaveConstructHelper<Moho::Unit>::`vftable'	00E2A808	
+const gpg::SerConstructHelper<Moho::Unit>::`vftable'	00E2A818	
+const gpg::SerSaveLoadHelper<Moho::Unit>::`vftable'	00E2A828	
+const gpg::RPointerType<Moho::CEconomyEvent>::`vftable'	00E2A830	
+const gpg::RPointerType<Moho::CEconomyEvent>::`vftable'	00E2A860	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionState,int>::`vftable'	00E2AB58	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionState>::`vftable'	00E2AB60	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionCarrierEvent,int>::`vftable'	00E2AB98	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionCarrierEvent>::`vftable'	00E2ABA0	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionHorzEvent,int>::`vftable'	00E2ABD8	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionHorzEvent>::`vftable'	00E2ABE0	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionVertEvent,int>::`vftable'	00E2AC18	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionVertEvent>::`vftable'	00E2AC20	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionTurnEvent,int>::`vftable'	00E2AC58	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionTurnEvent>::`vftable'	00E2AC60	
+const gpg::PrimitiveSerHelper<Moho::EAirCombatState,int>::`vftable'	00E2AC98	
+const gpg::SerSaveLoadHelper<Moho::EAirCombatState>::`vftable'	00E2ACA0	
+const gpg::SerConstructHelper<Moho::CUnitMotion>::`vftable'	00E2ACE0	
+const gpg::SerSaveLoadHelper<Moho::CUnitMotion>::`vftable'	00E2ACF0	
+const gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<Moho::Unit>>::`vftable'	00E2D7F4	
+const gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<Moho::Unit>>::`vftable'	00E2D834	
+const gpg::RVectorType<Moho::BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>>::`vftable'	00E2E1B4	
+const gpg::RVectorType<Moho::BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>>::`vftable'	00E2E1E4	
+const gpg::SerSaveLoadHelper<Moho::CWeaponAttributes>::`vftable'	00E2E230	
+const gpg::SerSaveLoadHelper<Moho::SBlackListInfo>::`vftable'	00E2E270	
+const gpg::RVectorType<Moho::SBlackListInfo>::`vftable'	00E2E278	
+const gpg::RVectorType<Moho::SBlackListInfo>::`vftable'	00E2E2A8	
+const gpg::SerSaveLoadHelper<Moho::CFireWeaponTask>::`vftable'	00E2E2F4	
+const gpg::SerConstructHelper<Moho::UnitWeapon>::`vftable'	00E2E304	
+const gpg::SerSaveLoadHelper<Moho::UnitWeapon>::`vftable'	00E2E314	
+const gpg::SerSaveConstructHelper<Moho::CCommandDB>::`vftable'	00E2E500	
+const gpg::SerConstructHelper<Moho::CCommandDB>::`vftable'	00E2E510	
+const gpg::SerSaveLoadHelper<Moho::CCommandDB>::`vftable'	00E2E520	
+const gpg::RPointerType<Moho::CUnitCommand>::`vftable'	00E2E528	
+const gpg::RPointerType<Moho::CUnitCommand>::`vftable'	00E2E558	
+const gpg::PrimitiveSerHelper<Moho::ECommandEvent,int>::`vftable'	00E2E968	
+const gpg::SerSaveLoadHelper<Moho::ECommandEvent>::`vftable'	00E2E970	
+const gpg::RVectorType<Moho::WeakPtr<Moho::CUnitCommand>>::`vftable'	00E2E9BC	
+const gpg::RVectorType<Moho::WeakPtr<Moho::CUnitCommand>>::`vftable'	00E2E9EC	
+const gpg::SerConstructHelper<Moho::CUnitCommand>::`vftable'	00E2EA4C	
+const gpg::SerSaveLoadHelper<Moho::CUnitCommand>::`vftable'	00E2EA5C	
+const gpg::SerSaveConstructHelper<Moho::CUnitCommandQueue>::`vftable'	00E2F22C	
+const gpg::SerConstructHelper<Moho::CUnitCommandQueue>::`vftable'	00E2F23C	
+const gpg::SerSaveLoadHelper<Moho::CUnitCommandQueue>::`vftable'	00E2F24C	
+const gpg::SerSaveLoadHelper<Moho::SPropPriorityInfo>::`vftable'	00E2F4CC	
+const gpg::SerSaveConstructHelper<Moho::Prop>::`vftable'	00E2F4DC	
+const gpg::SerConstructHelper<Moho::Prop>::`vftable'	00E2F4EC	
+const gpg::SerSaveLoadHelper<Moho::Prop>::`vftable'	00E2F4FC	
+const gpg::SerSaveLoadHelper<Moho::SimArmy>::`vftable'	00E2FACC	
+const gpg::RVectorType<Moho::EntitySetTemplate<Moho::Unit>>::`vftable'	00E2FAD4	
+const gpg::RVectorType<Moho::EntitySetTemplate<Moho::Unit>>::`vftable'	00E2FB04	
+const gpg::SerSaveLoadHelper<Moho::CArmyImpl>::`vftable'	00E2FC34	
+const gpg::PrimitiveSerHelper<Moho::ETriggerOperator,int>::`vftable'	00E31060	
+const gpg::SerSaveLoadHelper<Moho::ETriggerOperator>::`vftable'	00E31068	
+const gpg::SerSaveLoadHelper<Moho::SCondition>::`vftable'	00E310A8	
+const gpg::RFastVectorType<Moho::SCondition>::`vftable'	00E310B0	
+const gpg::RFastVectorType<Moho::SCondition>::`vftable'	00E310E0	
+const gpg::SerSaveLoadHelper<Moho::STrigger>::`vftable'	00E3112C	
+const gpg::RSharedPointerType<Moho::STrigger>::`vftable'	00E31134	
+const gpg::RSharedPointerType<Moho::STrigger>::`vftable'	00E31164	
+const gpg::RMapType<Moho::RUnitBlueprint const *,float>::`vftable'	00E31178	
+const gpg::SerSaveLoadHelper<Moho::CArmyStatItem>::`vftable'	00E311E0	
+const gpg::RMapType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>,Moho::CArmyStatItem *>::`vftable'	00E311E8	
+const gpg::RListType<boost::shared_ptr<Moho::STrigger>>::`vftable'	00E31218	
+const gpg::SerSaveConstructHelper<Moho::CArmyStats>::`vftable'	00E31280	
+const gpg::SerConstructHelper<Moho::CArmyStats>::`vftable'	00E31290	
+const gpg::SerSaveLoadHelper<Moho::CArmyStats>::`vftable'	00E312A0	
+const gpg::RPointerType<Moho::CArmyStatItem>::`vftable'	00E312A8	
+const gpg::RPointerType<Moho::CArmyStatItem>::`vftable'	00E312D8	
+const gpg::PrimitiveSerHelper<Moho::EThreatType,int>::`vftable'	00E3171C	
+const gpg::SerSaveLoadHelper<Moho::EThreatType>::`vftable'	00E31724	
+const gpg::SerConstructHelper<Moho::CInfluenceMap>::`vftable'	00E31764	
+const gpg::SerSaveLoadHelper<Moho::CInfluenceMap>::`vftable'	00E31774	
+const gpg::SerSaveLoadHelper<Moho::InfluenceMapEntry>::`vftable'	00E317B4	
+const gpg::RMapType<uint,int>::`vftable'	00E317BC	
+const gpg::RVectorType<Moho::InfluenceGrid>::`vftable'	00E317EC	
+const gpg::RVectorType<Moho::InfluenceGrid>::`vftable'	00E3181C	
+const gpg::RMapType<uint,Moho::InfluenceMapEntry>::`vftable'	00E31830	
+const gpg::RVectorType<Moho::SThreat>::`vftable'	00E31860	
+const gpg::RVectorType<Moho::SThreat>::`vftable'	00E31890	
+const gpg::SerSaveLoadHelper<Moho::SThreat>::`vftable'	00E318DC	
+const gpg::SerSaveLoadHelper<Moho::InfluenceGrid>::`vftable'	00E3191C	
+const gpg::SerSaveLoadHelper<Moho::COGrid>::`vftable'	00E31964	
+const gpg::PrimitiveSerHelper<Moho::ESquadClass,int>::`vftable'	00E31B28	
+const gpg::SerSaveLoadHelper<Moho::ESquadClass>::`vftable'	00E31B30	
+const gpg::SerConstructHelper<Moho::CSquad>::`vftable'	00E31B70	
+const gpg::SerSaveLoadHelper<Moho::CSquad>::`vftable'	00E31B80	
+const gpg::SerConstructHelper<Moho::CPlatoon>::`vftable'	00E31B90	
+const gpg::SerSaveLoadHelper<Moho::CPlatoon>::`vftable'	00E31BA0	
+const gpg::RVectorType<Moho::SimArmy *>::`vftable'	00E34778	
+const gpg::RVectorType<Moho::SimArmy *>::`vftable'	00E347A8	
+const gpg::RListType<Moho::Shield *>::`vftable'	00E347BC	
+const gpg::SerSaveLoadHelper<Moho::Sim>::`vftable'	00E34824	
+const gpg::RPointerType<Moho::SimArmy>::`vftable'	00E34864	
+const gpg::RPointerType<Moho::SimArmy>::`vftable'	00E34894	
+const gpg::RPointerType<Moho::Shield>::`vftable'	00E348A8	
+const gpg::RPointerType<Moho::Shield>::`vftable'	00E348D8	
+const gpg::RFastVectorType<Moho::SAudioRequest>::`vftable'	00E359CC	
+const gpg::RFastVectorType<Moho::SAudioRequest>::`vftable'	00E359FC	
+const gpg::SerSaveLoadHelper<Moho::ISoundManager>::`vftable'	00E35A48	
+const gpg::SerSaveConstructHelper<Moho::CSimSoundManager>::`vftable'	00E35AA4	
+const gpg::SerConstructHelper<Moho::CSimSoundManager>::`vftable'	00E35AB4	
+const gpg::SerSaveLoadHelper<Moho::CSimSoundManager>::`vftable'	00E35AC4	
+const gpg::SerSaveLoadHelper<Moho::HPathCell>::`vftable'	00E35B24	
+const gpg::SerSaveLoadHelper<Moho::NavPath>::`vftable'	00E35B64	
+const gpg::RVectorType<Moho::HPathCell>::`vftable'	00E35B6C	
+const gpg::RVectorType<Moho::HPathCell>::`vftable'	00E35B9C	
+const gpg::RDListType<Moho::IPathTraveler,void>::`vftable'	00E35F60	
+const gpg::SerSaveLoadHelper<Moho::PathQueue>::`vftable'	00E35FC8	
+const gpg::SerSaveLoadHelper<Moho::PathQueue::Impl>::`vftable'	00E36008	
+const gpg::HaStar::IOccupationSource::`vftable'	00E360D0	
+const gpg::SerSaveLoadHelper<std::pair<Moho::HPathCell,float>>::`vftable'	00E36168	
+const gpg::SerSaveLoadHelper<Moho::CIntel>::`vftable'	00E3621C	
+const gpg::SerConstructHelper<Moho::CIntelPosHandle>::`vftable'	00E36314	
+const gpg::SerSaveLoadHelper<Moho::CIntelPosHandle>::`vftable'	00E36324	
+const gpg::SerConstructHelper<Moho::CIntelCounterHandle>::`vftable'	00E36364	
+const gpg::SerSaveLoadHelper<Moho::CIntelCounterHandle>::`vftable'	00E36374	
+const gpg::SerSaveLoadHelper<Moho::IEffect>::`vftable'	00E36BCC	
+const gpg::SerConstructHelper<Moho::CEconomy>::`vftable'	00E36DA8	
+const gpg::SerSaveLoadHelper<Moho::CEconomy>::`vftable'	00E36DB8	
+const gpg::SerConstructHelper<Moho::CEconStorage>::`vftable'	00E36DF8	
+const gpg::SerSaveLoadHelper<Moho::CEconStorage>::`vftable'	00E36E08	
+const gpg::SerConstructHelper<Moho::CEconRequest>::`vftable'	00E36E48	
+const gpg::SerSaveLoadHelper<Moho::CEconRequest>::`vftable'	00E36E58	
+const gpg::SerConstructHelper<Moho::CEconomyEvent>::`vftable'	00E36FEC	
+const gpg::SerSaveLoadHelper<Moho::CEconomyEvent>::`vftable'	00E36FFC	
+const gpg::SerSaveConstructHelper<Moho::Shield>::`vftable'	00E37144	
+const gpg::SerConstructHelper<Moho::Shield>::`vftable'	00E37154	
+const gpg::SerSaveLoadHelper<Moho::Shield>::`vftable'	00E37164	
+const gpg::PrimitiveSerHelper<Moho::EScrollType,int>::`vftable'	00E37230	
+const gpg::SerSaveLoadHelper<Moho::EScrollType>::`vftable'	00E37238	
+const gpg::SerSaveLoadHelper<Moho::SScroller>::`vftable'	00E37278	
+const gpg::SerSaveLoadHelper<Moho::CTextureScroller>::`vftable'	00E372B8	
+const gpg::SerSaveLoadHelper<Moho::SDecalInfo>::`vftable'	00E37370	
+const gpg::RListType<Moho::SDecalInfo>::`vftable'	00E373A8	
+const gpg::SerSaveLoadHelper<Moho::CDecalBuffer>::`vftable'	00E373E0	
+const gpg::SerSaveLoadHelper<Moho::CDecalHandle>::`vftable'	00E373F0	
+const gpg::RPointerType<Moho::CDecalHandle>::`vftable'	00E373F8	
+const gpg::RPointerType<Moho::CDecalHandle>::`vftable'	00E37428	
+const gpg::SerSaveLoadHelper<Moho::SSavedGameArmyInfo>::`vftable'	00E49CF8	
+const gpg::RVectorType<Moho::SSavedGameArmyInfo>::`vftable'	00E49D00	
+const gpg::RVectorType<Moho::SSavedGameArmyInfo>::`vftable'	00E49D30	
+const gpg::SerSaveLoadHelper<Moho::SSavedGameHeader>::`vftable'	00E49D7C	
+const gpg::RMultiMapType<Moho::EntId,std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`vftable'	00E4B27C	
+const gpg::SerSaveLoadHelper<Moho::SSessionSaveData>::`vftable'	00E4B2E4	
+const gpg::RType::`RTTI Complete Object Locator'	00E4FA90	
+const gpg::RTypeTypeInfo::`RTTI Complete Object Locator'	00E502A4	
+const gpg::RObjectTypeInfo::`RTTI Complete Object Locator'	00E502F4	
+const gpg::MemBufferStream::`RTTI Complete Object Locator'	00E50390	
+const gpg::gal::CubeRenderTargetContext::`RTTI Complete Object Locator'	00E503E0	
+const gpg::gal::TextureContext::`RTTI Complete Object Locator'	00E50428	
+const gpg::gal::DepthStencilTarget::`RTTI Complete Object Locator'	00E50470	
+const gpg::gal::DepthStencilTargetD3D9::`RTTI Complete Object Locator'	00E504BC	
+const gpg::gal::Device::`RTTI Complete Object Locator'	00E5050C	
+const gpg::gal::AdapterModeD3D9::`RTTI Complete Object Locator'	00E50804	
+const gpg::gal::DeviceD3D9::`RTTI Complete Object Locator'	00E5084C	
+const gpg::gal::AdapterD3D9::`RTTI Complete Object Locator'	00E5089C	
+const gpg::gal::EffectTechnique::`RTTI Complete Object Locator'	00E508E4	
+const gpg::gal::EffectTechniqueD3D9::`RTTI Complete Object Locator'	00E50930	
+const gpg::gal::IndexBuffer::`RTTI Complete Object Locator'	00E50980	
+const gpg::gal::IndexBufferD3D9::`RTTI Complete Object Locator'	00E509CC	
+const gpg::gal::RenderTarget::`RTTI Complete Object Locator'	00E50A1C	
+const gpg::gal::RenderTargetD3D9::`RTTI Complete Object Locator'	00E50A68	
+const gpg::gal::VertexBuffer::`RTTI Complete Object Locator'	00E50AB8	
+const gpg::gal::VertexBufferD3D9::`RTTI Complete Object Locator'	00E50B04	
+const gpg::gal::AdapterD3D10::`RTTI Complete Object Locator'	00E50B54	
+const gpg::gal::CubeRenderTarget::`RTTI Complete Object Locator'	00E50B9C	
+const gpg::gal::CubeRenderTargetD3D10::`RTTI Complete Object Locator'	00E50BE8	
+const gpg::gal::CursorD3D10::`RTTI Complete Object Locator'	00E50C38	
+const gpg::gal::EffectMacro::`RTTI Complete Object Locator'	00E50F30	
+const gpg::gal::DeviceD3D10::`RTTI Complete Object Locator'	00E50F78	
+const gpg::gal::EffectContext::`RTTI Complete Object Locator'	00E50FC8	
+const gpg::gal::EffectTechniqueD3D10::`RTTI Complete Object Locator'	00E51010	
+const gpg::gal::IndexBufferD3D10::`RTTI Complete Object Locator'	00E51060	
+const gpg::gal::PipelineState::`RTTI Complete Object Locator'	00E510B0	
+const gpg::gal::PipelineStateD3D10::`RTTI Complete Object Locator'	00E510FC	
+const gpg::gal::RenderTargetD3D10::`RTTI Complete Object Locator'	00E5114C	
+const gpg::gal::Texture::`RTTI Complete Object Locator'	00E5119C	
+const gpg::gal::TextureD3D10::`RTTI Complete Object Locator'	00E511E8	
+const gpg::gal::VertexFormat::`RTTI Complete Object Locator'	00E51238	
+const gpg::gal::VertexFormatD3D10::`RTTI Complete Object Locator'	00E51284	
+const gpg::SerSaveLoadHelper<gpg::Rect2<int>>::`RTTI Complete Object Locator'	00E51414	
+const gpg::SerSaveLoadHelper<gpg::Rect2<float>>::`RTTI Complete Object Locator'	00E51468	
+const gpg::Rect2fSerializer::`RTTI Complete Object Locator'	00E514BC	
+const gpg::Rect2iSerializer::`RTTI Complete Object Locator'	00E51514	
+const gpg::Rect2iTypeInfo::`RTTI Complete Object Locator'	00E5156C	
+const gpg::Rect2fTypeInfo::`RTTI Complete Object Locator'	00E515BC	
+const gpg::PipeBuf::`RTTI Complete Object Locator'	00E5160C	
+const gpg::StreamLogTarget::`RTTI Complete Object Locator'	00E51658	
+const gpg::SerSaveLoadHelper<LuaPlus::LuaObject>::`RTTI Complete Object Locator'	00E516A4	
+const gpg::SerSaveConstructHelper<LuaPlus::LuaState>::`RTTI Complete Object Locator'	00E516F8	
+const gpg::SerConstructHelper<LuaPlus::LuaState>::`RTTI Complete Object Locator'	00E5174C	
+const gpg::SerSaveLoadHelper<LuaPlus::LuaState>::`RTTI Complete Object Locator'	00E517A0	
+const gpg::SerSaveLoadHelper<TObject>::`RTTI Complete Object Locator'	00E51BE4	
+const gpg::SerSaveConstructHelper<TString>::`RTTI Complete Object Locator'	00E51C38	
+const gpg::SerConstructHelper<TString>::`RTTI Complete Object Locator'	00E51C8C	
+const gpg::SerSaveLoadHelper<TString>::`RTTI Complete Object Locator'	00E51CE0	
+const gpg::SerSaveConstructHelper<Table>::`RTTI Complete Object Locator'	00E51D34	
+const gpg::SerConstructHelper<Table>::`RTTI Complete Object Locator'	00E51D88	
+const gpg::SerSaveLoadHelper<Table>::`RTTI Complete Object Locator'	00E51DDC	
+const gpg::SerSaveConstructHelper<LClosure>::`RTTI Complete Object Locator'	00E51E30	
+const gpg::SerConstructHelper<LClosure>::`RTTI Complete Object Locator'	00E51E84	
+const gpg::SerSaveLoadHelper<LClosure>::`RTTI Complete Object Locator'	00E51ED8	
+const gpg::SerSaveConstructHelper<UpVal>::`RTTI Complete Object Locator'	00E51F2C	
+const gpg::SerConstructHelper<UpVal>::`RTTI Complete Object Locator'	00E51F80	
+const gpg::SerSaveLoadHelper<UpVal>::`RTTI Complete Object Locator'	00E51FD4	
+const gpg::SerSaveConstructHelper<Proto>::`RTTI Complete Object Locator'	00E52028	
+const gpg::SerConstructHelper<Proto>::`RTTI Complete Object Locator'	00E5207C	
+const gpg::SerSaveLoadHelper<Proto>::`RTTI Complete Object Locator'	00E520D0	
+const gpg::SerSaveConstructHelper<lua_State>::`RTTI Complete Object Locator'	00E52124	
+const gpg::SerConstructHelper<lua_State>::`RTTI Complete Object Locator'	00E52178	
+const gpg::SerSaveLoadHelper<lua_State>::`RTTI Complete Object Locator'	00E521CC	
+const gpg::SerSaveConstructHelper<Udata>::`RTTI Complete Object Locator'	00E52220	
+const gpg::SerConstructHelper<Udata>::`RTTI Complete Object Locator'	00E52274	
+const gpg::SerSaveLoadHelper<Udata>::`RTTI Complete Object Locator'	00E522C8	
+const gpg::HaStar::Cluster::ICache::`RTTI Complete Object Locator'	00E52D78	
+const gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>::`RTTI Complete Object Locator'	00E52E0C	
+const gpg::HaStar::ClusterInternalCache<gpg::HaStar::SubclusterData>::`RTTI Complete Object Locator'	00E52E58	
+const gpg::DebugOutputStreambuf::`RTTI Complete Object Locator'	00E52EA4	
+const gpg::LogTarget::`RTTI Complete Object Locator'	00E52EF0	
+const gpg::gal::CursorContext::`RTTI Complete Object Locator'	00E52FF0	
+const gpg::gal::DepthStencilTargetContext::`RTTI Complete Object Locator'	00E53038	
+const gpg::gal::DrawContext::`RTTI Complete Object Locator'	00E53080	
+const gpg::gal::DrawIndexedContext::`RTTI Complete Object Locator'	00E530C8	
+const gpg::gal::IndexBufferContext::`RTTI Complete Object Locator'	00E53110	
+const gpg::gal::VertexBufferContext::`RTTI Complete Object Locator'	00E53158	
+const gpg::gal::Class::`RTTI Complete Object Locator'	00E531A0	
+const gpg::gal::CubeRenderTargetD3D9::`RTTI Complete Object Locator'	00E531E8	
+const gpg::gal::Effect::`RTTI Complete Object Locator'	00E53238	
+const gpg::gal::EffectD3D9::`RTTI Complete Object Locator'	00E5331C	
+const gpg::gal::EffectVariable::`RTTI Complete Object Locator'	00E533C0	
+const gpg::gal::EffectVariableD3D9::`RTTI Complete Object Locator'	00E5340C	
+const gpg::gal::MeshFormatter::`RTTI Complete Object Locator'	00E5345C	
+const gpg::gal::HardwareVertexFormatterD3D9::`RTTI Complete Object Locator'	00E534A4	
+const gpg::gal::Float16HardwareVertexFormatterD3D9::`RTTI Complete Object Locator'	00E534F0	
+const gpg::gal::PipelineStateD3D9::`RTTI Complete Object Locator'	00E5353C	
+const gpg::gal::StateCache<_D3DRENDERSTATETYPE,uint>::`RTTI Complete Object Locator'	00E5358C	
+const gpg::gal::StateCache<_D3DSAMPLERSTATETYPE,uint>::`RTTI Complete Object Locator'	00E535D4	
+const gpg::gal::StateCache<_D3DTEXTURESTAGESTATETYPE,uint>::`RTTI Complete Object Locator'	00E5361C	
+const gpg::gal::StateManagerD3D9::`RTTI Complete Object Locator'	00E53664	
+const gpg::gal::TextureD3D9::`RTTI Complete Object Locator'	00E53720	
+const gpg::gal::VertexFormatD3D9::`RTTI Complete Object Locator'	00E53770	
+const gpg::gal::DepthStencilTargetD3D10::`RTTI Complete Object Locator'	00E537C0	
+const gpg::gal::EffectD3D10::`RTTI Complete Object Locator'	00E53810	
+const gpg::gal::EffectVariableD3D10::`RTTI Complete Object Locator'	00E538F8	
+const gpg::gal::HardwareVertexFormatterD3D10::`RTTI Complete Object Locator'	00E53948	
+const gpg::gal::Float16HardwareVertexFormatterD3D10::`RTTI Complete Object Locator'	00E53994	
+const gpg::gal::VertexBufferD3D10::`RTTI Complete Object Locator'	00E539E0	
+const gpg::SerHelperBase::`RTTI Complete Object Locator'	00E53B1C	
+const gpg::ReadArchive::`RTTI Complete Object Locator'	00E53B84	
+const gpg::WriteArchive::`RTTI Complete Object Locator'	00E53B98	
+const gpg::FileStream::`RTTI Complete Object Locator'	00E53BAC	
+const gpg::FileStream::IOError::`RTTI Complete Object Locator'	00E53BFC	
+const gpg::PipeStream::`RTTI Complete Object Locator'	00E53C4C	
+const gpg::Stream::`RTTI Complete Object Locator'	00E53C9C	
+const gpg::Stream::UnsupportedOperation::`RTTI Complete Object Locator'	00E53CB0	
+const gpg::ZLibOutputFilterStream::`RTTI Complete Object Locator'	00E53D00	
+const gpg::SerSaveLoadHelper<Moho::BVIntSet>::`RTTI Complete Object Locator'	00E5C3BC	
+const gpg::RFastVectorType<uint>::`RTTI Complete Object Locator'	00E5C5B4	
+const gpg::RFastVectorType<uint>::`RTTI Complete Object Locator'	00E5C5C8	
+const gpg::RIndexed::`RTTI Complete Object Locator'	00E5C670	
+const gpg::RObject::`RTTI Complete Object Locator'	00E5C6B8	
+const gpg::SerSaveLoadHelper<Moho::IdPool>::`RTTI Complete Object Locator'	00E5C750	
+const gpg::SerSaveLoadHelper<Moho::CTaskEvent>::`RTTI Complete Object Locator'	00E5C968	
+const gpg::SerSaveLoadHelper<Moho::STaskEventLinkage>::`RTTI Complete Object Locator'	00E5CACC	
+const gpg::SerializationError::`RTTI Complete Object Locator'	00E5CBC8	
+const gpg::RPointerType<Moho::CTaskThread>::`RTTI Complete Object Locator'	00E5CC60	
+const gpg::RPointerType<Moho::CTaskThread>::`RTTI Complete Object Locator'	00E5CC74	
+const gpg::SerSaveLoadHelper<Moho::CTaskStage>::`RTTI Complete Object Locator'	00E5CCC8	
+const gpg::SerSaveLoadHelper<Moho::CTaskThread>::`RTTI Complete Object Locator'	00E5CDC4	
+const gpg::SerConstructHelper<Moho::CTaskThread>::`RTTI Complete Object Locator'	00E5CE70	
+const gpg::SerSaveLoadHelper<Moho::CTask>::`RTTI Complete Object Locator'	00E5CFD4	
+const gpg::BadRefCast::`RTTI Complete Object Locator'	00E5D0D0	
+const gpg::SerSaveLoadHelper<Moho::CRandomStream>::`RTTI Complete Object Locator'	00E5D4EC	
+const gpg::SerSaveLoadHelper<Moho::CMersenneTwister>::`RTTI Complete Object Locator'	00E5D5E8	
+const gpg::SerSaveLoadHelper<Moho::StatItem>::`RTTI Complete Object Locator'	00E5D8F4	
+const gpg::SerSaveLoadHelper<Moho::EPulseMode>::`RTTI Complete Object Locator'	00E5D9F0	
+const gpg::PrimitiveSerHelper<Moho::EPulseMode,int>::`RTTI Complete Object Locator'	00E5DA04	
+const gpg::SerSaveLoadHelper<Moho::EStatType>::`RTTI Complete Object Locator'	00E5DAF0	
+const gpg::PrimitiveSerHelper<Moho::EStatType,int>::`RTTI Complete Object Locator'	00E5DB04	
+const gpg::REnumType::`RTTI Complete Object Locator'	00E5DC40	
+const gpg::RPointerType<Moho::CLuaConOutputHandler>::`RTTI Complete Object Locator'	00E5DD30	
+const gpg::RPointerType<Moho::CLuaConOutputHandler>::`RTTI Complete Object Locator'	00E5DD44	
+const gpg::gal::DeviceContext::`RTTI Complete Object Locator'	00E5EAEC	
+const gpg::gal::Head::`RTTI Complete Object Locator'	00E5EB34	
+const gpg::gal::OutputContext::`RTTI Complete Object Locator'	00E5EB7C	
+const gpg::BinaryReader::PrematureEOF::`RTTI Complete Object Locator'	00E5EEBC	
+const gpg::gal::RenderTargetContext::`RTTI Complete Object Locator'	00E5F78C	
+const gpg::SerSaveLoadHelper<Wm3::Sphere3<float>>::`RTTI Complete Object Locator'	00E60100	
+const gpg::SerSaveLoadHelper<Wm3::Box3<float>>::`RTTI Complete Object Locator'	00E601FC	
+const gpg::RWeakPointerType<Moho::INetNATTraversalProvider>::`RTTI Complete Object Locator'	00E60948	
+const gpg::SerSaveLoadHelper<Moho::SWorldParticle>::`RTTI Complete Object Locator'	00E60F30	
+const gpg::SerSaveLoadHelper<Moho::SWorldParticle::ZMode>::`RTTI Complete Object Locator'	00E6102C	
+const gpg::PrimitiveSerHelper<Moho::SWorldParticle::ZMode,int>::`RTTI Complete Object Locator'	00E61040	
+const gpg::SerSaveLoadHelper<Moho::SWorldParticle::BlendMode>::`RTTI Complete Object Locator'	00E6112C	
+const gpg::PrimitiveSerHelper<Moho::SWorldParticle::BlendMode,int>::`RTTI Complete Object Locator'	00E61140	
+const gpg::SerSaveLoadHelper<Moho::SWorldBeam>::`RTTI Complete Object Locator'	00E6122C	
+const gpg::SerSaveLoadHelper<Moho::SWorldBeam::BlendMode>::`RTTI Complete Object Locator'	00E61328	
+const gpg::PrimitiveSerHelper<Moho::SWorldBeam::BlendMode,int>::`RTTI Complete Object Locator'	00E6133C	
+const gpg::SerConstructHelper<Moho::CParticleTexture>::`RTTI Complete Object Locator'	00E61428	
+const gpg::SerSaveConstructHelper<Moho::CParticleTexture>::`RTTI Complete Object Locator'	00E614D4	
+const gpg::SerSaveLoadHelper<Moho::CPrefetchSet>::`RTTI Complete Object Locator'	00E61D28	
+const gpg::RVectorType<Moho::PrefetchHandleBase>::`RTTI Complete Object Locator'	00E61DD4	
+const gpg::RVectorType<Moho::PrefetchHandleBase>::`RTTI Complete Object Locator'	00E61DE8	
+const gpg::SerSaveLoadHelper<Moho::RResId>::`RTTI Complete Object Locator'	00E61ED8	
+const gpg::SerSaveLoadHelper<Moho::PrefetchHandleBase>::`RTTI Complete Object Locator'	00E62074	
+const gpg::SerConstructHelper<Moho::ScrDiskWatcherTask>::`RTTI Complete Object Locator'	00E62BC8	
+const gpg::SerSaveConstructHelper<Moho::ScrDiskWatcherTask>::`RTTI Complete Object Locator'	00E62C74	
+const gpg::RPointerType<Moho::CScriptObject>::`RTTI Complete Object Locator'	00E631A8	
+const gpg::RPointerType<Moho::CScriptObject>::`RTTI Complete Object Locator'	00E631BC	
+const gpg::SerSaveLoadHelper<Moho::CScriptObject>::`RTTI Complete Object Locator'	00E632AC	
+const gpg::SerSaveLoadHelper<Moho::CWaitForTask>::`RTTI Complete Object Locator'	00E63590	
+const gpg::SerConstructHelper<Moho::CWaitForTask>::`RTTI Complete Object Locator'	00E6363C	
+const gpg::SerSaveLoadHelper<Moho::CScriptEvent>::`RTTI Complete Object Locator'	00E637E0	
+const gpg::SerSaveLoadHelper<Moho::CLuaTask>::`RTTI Complete Object Locator'	00E6392C	
+const gpg::SerConstructHelper<Moho::CLuaTask>::`RTTI Complete Object Locator'	00E639D8	
+const gpg::RPointerType<Moho::CSndParams>::`RTTI Complete Object Locator'	00E648C0	
+const gpg::RPointerType<Moho::CSndParams>::`RTTI Complete Object Locator'	00E648D4	
+const gpg::SerSaveLoadHelper<Moho::SAudioRequest>::`RTTI Complete Object Locator'	00E649C0	
+const gpg::SerConstructHelper<Moho::CSndParams>::`RTTI Complete Object Locator'	00E64ABC	
+const gpg::SerSaveConstructHelper<Moho::CSndParams>::`RTTI Complete Object Locator'	00E64B68	
+const gpg::SerConstructHelper<Moho::CSndVar>::`RTTI Complete Object Locator'	00E64C64	
+const gpg::SerSaveConstructHelper<Moho::CSndVar>::`RTTI Complete Object Locator'	00E64D10	
+const gpg::SerSaveLoadHelper<Moho::SParamKey>::`RTTI Complete Object Locator'	00E64EFC	
+const gpg::SerSaveLoadHelper<Moho::VAxes3>::`RTTI Complete Object Locator'	00E65118	
+const gpg::SerSaveLoadHelper<Moho::VEulers3>::`RTTI Complete Object Locator'	00E65214	
+const gpg::SerSaveLoadHelper<Wm3::Quaternion<float>>::`RTTI Complete Object Locator'	00E65310	
+const gpg::SerSaveLoadHelper<Moho::Vector4f>::`RTTI Complete Object Locator'	00E6540C	
+const gpg::SerSaveLoadHelper<Wm3::Vector3<float>>::`RTTI Complete Object Locator'	00E65508	
+const gpg::SerSaveLoadHelper<Wm3::Vector2<float>>::`RTTI Complete Object Locator'	00E65604	
+const gpg::SerSaveLoadHelper<Wm3::IVector3<int>>::`RTTI Complete Object Locator'	00E65700	
+const gpg::SerSaveLoadHelper<Wm3::IVector2<int>>::`RTTI Complete Object Locator'	00E657FC	
+const gpg::SerSaveLoadHelper<Wm3::AxisAlignedBox3<float>>::`RTTI Complete Object Locator'	00E658F8	
+const gpg::SerSaveLoadHelper<Moho::VMatrix4>::`RTTI Complete Object Locator'	00E659F4	
+const gpg::SerSaveLoadHelper<Moho::VTransform>::`RTTI Complete Object Locator'	00E65AF0	
+const gpg::SerSaveLoadHelper<Moho::CColPrimitive<Wm3::Box3<float>>>::`RTTI Complete Object Locator'	00E66878	
+const gpg::SerConstructHelper<Moho::CColPrimitive<Wm3::Box3<float>>>::`RTTI Complete Object Locator'	00E66924	
+const gpg::SerSaveConstructHelper<Moho::CColPrimitive<Wm3::Box3<float>>>::`RTTI Complete Object Locator'	00E669D0	
+const gpg::SerSaveLoadHelper<Moho::CColPrimitive<Wm3::Sphere3<float>>>::`RTTI Complete Object Locator'	00E66B18	
+const gpg::SerConstructHelper<Moho::CColPrimitive<Wm3::Sphere3<float>>>::`RTTI Complete Object Locator'	00E66BC4	
+const gpg::SerSaveConstructHelper<Moho::CColPrimitive<Wm3::Sphere3<float>>>::`RTTI Complete Object Locator'	00E66C70	
+const gpg::SerSaveLoadHelper<Moho::CIntelGrid>::`RTTI Complete Object Locator'	00E66EA4	
+const gpg::SerConstructHelper<Moho::CIntelGrid>::`RTTI Complete Object Locator'	00E66F50	
+const gpg::SerSaveConstructHelper<Moho::CIntelGrid>::`RTTI Complete Object Locator'	00E66FFC	
+const gpg::SerSaveLoadHelper<Moho::SDelayedSubVizInfo>::`RTTI Complete Object Locator'	00E670F8	
+const gpg::RVectorType<Moho::SDelayedSubVizInfo>::`RTTI Complete Object Locator'	00E671F4	
+const gpg::RVectorType<Moho::SDelayedSubVizInfo>::`RTTI Complete Object Locator'	00E67208	
+const gpg::SerSaveLoadHelper<Moho::EIntel>::`RTTI Complete Object Locator'	00E6725C	
+const gpg::PrimitiveSerHelper<Moho::EIntel,int>::`RTTI Complete Object Locator'	00E67270	
+const gpg::SerSaveLoadHelper<Moho::ESiloType>::`RTTI Complete Object Locator'	00E6735C	
+const gpg::PrimitiveSerHelper<Moho::ESiloType,int>::`RTTI Complete Object Locator'	00E67370	
+const gpg::SerSaveLoadHelper<Moho::EVisibilityMode>::`RTTI Complete Object Locator'	00E6745C	
+const gpg::PrimitiveSerHelper<Moho::EVisibilityMode,int>::`RTTI Complete Object Locator'	00E67470	
+const gpg::SerSaveLoadHelper<Moho::EImpactType>::`RTTI Complete Object Locator'	00E6755C	
+const gpg::PrimitiveSerHelper<Moho::EImpactType,int>::`RTTI Complete Object Locator'	00E67570	
+const gpg::SerSaveLoadHelper<Moho::EAlliance>::`RTTI Complete Object Locator'	00E6765C	
+const gpg::PrimitiveSerHelper<Moho::EAlliance,int>::`RTTI Complete Object Locator'	00E67670	
+const gpg::SerSaveLoadHelper<Moho::SFootprint>::`RTTI Complete Object Locator'	00E6775C	
+const gpg::SerSaveLoadHelper<Moho::SPointVector>::`RTTI Complete Object Locator'	00E67858	
+const gpg::SerSaveLoadHelper<Moho::SNavGoal>::`RTTI Complete Object Locator'	00E67954	
+const gpg::SerSaveLoadHelper<Moho::SOCellPos>::`RTTI Complete Object Locator'	00E67A50	
+const gpg::SerSaveLoadHelper<Moho::SCoordsVec2>::`RTTI Complete Object Locator'	00E67B4C	
+const gpg::SerSaveLoadHelper<Moho::ELayer>::`RTTI Complete Object Locator'	00E67C48	
+const gpg::PrimitiveSerHelper<Moho::ELayer,int>::`RTTI Complete Object Locator'	00E67C5C	
+const gpg::SerConstructHelper<Moho::RBeamBlueprint>::`RTTI Complete Object Locator'	00E67F78	
+const gpg::SerSaveConstructHelper<Moho::RBeamBlueprint>::`RTTI Complete Object Locator'	00E68024	
+const gpg::SerConstructHelper<Moho::RTrailBlueprint>::`RTTI Complete Object Locator'	00E680D0	
+const gpg::SerSaveConstructHelper<Moho::RTrailBlueprint>::`RTTI Complete Object Locator'	00E6817C	
+const gpg::SerConstructHelper<Moho::REmitterBlueprint>::`RTTI Complete Object Locator'	00E68228	
+const gpg::SerSaveConstructHelper<Moho::REmitterBlueprint>::`RTTI Complete Object Locator'	00E682D4	
+const gpg::RVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`RTTI Complete Object Locator'	00E68648	
+const gpg::RVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`RTTI Complete Object Locator'	00E6865C	
+const gpg::RListType<Moho::SNamedFootprint>::`RTTI Complete Object Locator'	00E687A4	
+const gpg::RVectorType<Moho::REmitterCurveKey>::`RTTI Complete Object Locator'	00E68898	
+const gpg::RVectorType<Moho::REmitterCurveKey>::`RTTI Complete Object Locator'	00E688AC	
+const gpg::SerSaveLoadHelper<Moho::SEfxCurve>::`RTTI Complete Object Locator'	00E68900	
+const gpg::RFastVectorType<Wm3::Vector3<float>>::`RTTI Complete Object Locator'	00E689FC	
+const gpg::RFastVectorType<Wm3::Vector3<float>>::`RTTI Complete Object Locator'	00E68A10	
+const gpg::SerConstructHelper<Moho::RMeshBlueprint>::`RTTI Complete Object Locator'	00E68B50	
+const gpg::SerSaveConstructHelper<Moho::RMeshBlueprint>::`RTTI Complete Object Locator'	00E68BFC	
+const gpg::RVectorType<Moho::RMeshBlueprintLOD>::`RTTI Complete Object Locator'	00E68CA8	
+const gpg::RVectorType<Moho::RMeshBlueprintLOD>::`RTTI Complete Object Locator'	00E68CBC	
+const gpg::SerConstructHelper<Moho::RProjectileBlueprint>::`RTTI Complete Object Locator'	00E68DB0	
+const gpg::SerSaveConstructHelper<Moho::RProjectileBlueprint>::`RTTI Complete Object Locator'	00E68E5C	
+const gpg::SerConstructHelper<Moho::RPropBlueprint>::`RTTI Complete Object Locator'	00E690A0	
+const gpg::SerSaveConstructHelper<Moho::RPropBlueprint>::`RTTI Complete Object Locator'	00E6914C	
+const gpg::SerConstructHelper<Moho::RUnitBlueprintWeapon>::`RTTI Complete Object Locator'	00E69390	
+const gpg::SerSaveConstructHelper<Moho::RUnitBlueprintWeapon>::`RTTI Complete Object Locator'	00E6943C	
+const gpg::SerConstructHelper<Moho::RUnitBlueprint>::`RTTI Complete Object Locator'	00E694E8	
+const gpg::SerSaveConstructHelper<Moho::RUnitBlueprint>::`RTTI Complete Object Locator'	00E69594	
+const gpg::RVectorType<Moho::RUnitBlueprintWeapon>::`RTTI Complete Object Locator'	00E69640	
+const gpg::RVectorType<Moho::RUnitBlueprintWeapon>::`RTTI Complete Object Locator'	00E69654	
+const gpg::RVectorType<float>::`RTTI Complete Object Locator'	00E699CC	
+const gpg::RVectorType<float>::`RTTI Complete Object Locator'	00E699E0	
+const gpg::SerSaveLoadHelper<Moho::ERuleBPUnitToggleCaps>::`RTTI Complete Object Locator'	00E69BD0	
+const gpg::PrimitiveSerHelper<Moho::ERuleBPUnitToggleCaps,int>::`RTTI Complete Object Locator'	00E69BE4	
+const gpg::SerSaveLoadHelper<Moho::ERuleBPUnitCommandCaps>::`RTTI Complete Object Locator'	00E69CD0	
+const gpg::PrimitiveSerHelper<Moho::ERuleBPUnitCommandCaps,int>::`RTTI Complete Object Locator'	00E69CE4	
+const gpg::SerSaveLoadHelper<Moho::ERuleBPUnitMovementType>::`RTTI Complete Object Locator'	00E69DD0	
+const gpg::PrimitiveSerHelper<Moho::ERuleBPUnitMovementType,int>::`RTTI Complete Object Locator'	00E69DE4	
+const gpg::SerSaveLoadHelper<Moho::EntityCategoryHelper>::`RTTI Complete Object Locator'	00E69FC4	
+const gpg::SerConstructHelper<Moho::RScmResource>::`RTTI Complete Object Locator'	00E6A6F4	
+const gpg::SerSaveConstructHelper<Moho::RScmResource>::`RTTI Complete Object Locator'	00E6A7A0	
+const gpg::SerConstructHelper<Moho::CAniResourceSkel>::`RTTI Complete Object Locator'	00E6A89C	
+const gpg::SerSaveConstructHelper<Moho::CAniResourceSkel>::`RTTI Complete Object Locator'	00E6A948	
+const gpg::SerConstructHelper<Moho::RScaResource>::`RTTI Complete Object Locator'	00E6ABBC	
+const gpg::SerSaveConstructHelper<Moho::RScaResource>::`RTTI Complete Object Locator'	00E6AC68	
+const gpg::SerSaveLoadHelper<Moho::LaunchInfoNew>::`RTTI Complete Object Locator'	00E6B10C	
+const gpg::SerSaveLoadHelper<Moho::LaunchInfoBase>::`RTTI Complete Object Locator'	00E6B208	
+const gpg::RVectorType<Moho::ArmyLaunchInfo>::`RTTI Complete Object Locator'	00E6B304	
+const gpg::RVectorType<Moho::ArmyLaunchInfo>::`RTTI Complete Object Locator'	00E6B318	
+const gpg::SerSaveLoadHelper<Moho::ArmyLaunchInfo>::`RTTI Complete Object Locator'	00E6B36C	
+const gpg::SerSaveLoadHelper<Moho::CSimResources>::`RTTI Complete Object Locator'	00E6B638	
+const gpg::RVectorType<Moho::ResourceDeposit>::`RTTI Complete Object Locator'	00E6B788	
+const gpg::RVectorType<Moho::ResourceDeposit>::`RTTI Complete Object Locator'	00E6B79C	
+const gpg::SerSaveLoadHelper<Moho::ResourceDeposit>::`RTTI Complete Object Locator'	00E6B7F0	
+const gpg::SerSaveLoadHelper<Moho::EResourceType>::`RTTI Complete Object Locator'	00E6B8EC	
+const gpg::PrimitiveSerHelper<Moho::EResourceType,int>::`RTTI Complete Object Locator'	00E6B900	
+const gpg::SerSaveLoadHelper<Moho::CAniPoseBone>::`RTTI Complete Object Locator'	00E6BAD4	
+const gpg::RFastVectorType<Moho::CAniPoseBone>::`RTTI Complete Object Locator'	00E6BB80	
+const gpg::RFastVectorType<Moho::CAniPoseBone>::`RTTI Complete Object Locator'	00E6BB94	
+const gpg::SerSaveLoadHelper<Moho::CAniPose>::`RTTI Complete Object Locator'	00E6BC38	
+const gpg::SerConstructHelper<Moho::CAniDefaultSkel>::`RTTI Complete Object Locator'	00E6BD34	
+const gpg::SerSaveConstructHelper<Moho::CAniDefaultSkel>::`RTTI Complete Object Locator'	00E6BDE0	
+const gpg::SerSaveLoadHelper<Moho::IArmy>::`RTTI Complete Object Locator'	00E6BF90	
+const gpg::SerSaveLoadHelper<Moho::SSTIArmyVariableData>::`RTTI Complete Object Locator'	00E6C08C	
+const gpg::SerSaveLoadHelper<Moho::SSTIArmyConstantData>::`RTTI Complete Object Locator'	00E6C188	
+const gpg::SerSaveLoadHelper<Moho::SSTICommandVariableData>::`RTTI Complete Object Locator'	00E6C284	
+const gpg::RFastVectorType<Moho::SOCellPos>::`RTTI Complete Object Locator'	00E6C380	
+const gpg::RFastVectorType<Moho::SOCellPos>::`RTTI Complete Object Locator'	00E6C394	
+const gpg::RFastVectorType<Moho::EntId>::`RTTI Complete Object Locator'	00E6C3E8	
+const gpg::RFastVectorType<Moho::EntId>::`RTTI Complete Object Locator'	00E6C3FC	
+const gpg::SerSaveLoadHelper<Moho::SSTICommandConstantData>::`RTTI Complete Object Locator'	00E6C450	
+const gpg::SerSaveLoadHelper<Moho::EUnitCommandType>::`RTTI Complete Object Locator'	00E6C54C	
+const gpg::PrimitiveSerHelper<Moho::EUnitCommandType,int>::`RTTI Complete Object Locator'	00E6C560	
+const gpg::RPointerType<Moho::RBlueprint>::`RTTI Complete Object Locator'	00E6C64C	
+const gpg::RPointerType<Moho::RBlueprint>::`RTTI Complete Object Locator'	00E6C660	
+const gpg::SerSaveLoadHelper<Moho::SSTIEntityVariableData>::`RTTI Complete Object Locator'	00E6C8E8	
+const gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>::`RTTI Complete Object Locator'	00E6C9E4	
+const gpg::RFastVectorType<Moho::SSTIEntityAttachInfo>::`RTTI Complete Object Locator'	00E6C9F8	
+const gpg::SerSaveLoadHelper<Moho::EntityAttributes>::`RTTI Complete Object Locator'	00E6CA4C	
+const gpg::SerSaveLoadHelper<Moho::SSTIEntityAttachInfo>::`RTTI Complete Object Locator'	00E6CB48	
+const gpg::SerSaveLoadHelper<Moho::SSTIEntityConstantData>::`RTTI Complete Object Locator'	00E6CC44	
+const gpg::SerSaveLoadHelper<Moho::EntId>::`RTTI Complete Object Locator'	00E6CD40	
+const gpg::SerSaveLoadHelper<Moho::SSTITarget>::`RTTI Complete Object Locator'	00E6CE3C	
+const gpg::SerSaveLoadHelper<Moho::ESTITargetType>::`RTTI Complete Object Locator'	00E6CF38	
+const gpg::PrimitiveSerHelper<Moho::ESTITargetType,int>::`RTTI Complete Object Locator'	00E6CF4C	
+const gpg::SerSaveLoadHelper<Moho::SSTIUnitVariableData>::`RTTI Complete Object Locator'	00E6D088	
+const gpg::RSharedPointerType<Moho::CAniPose>::`RTTI Complete Object Locator'	00E6D134	
+const gpg::RSharedPointerType<Moho::CAniPose>::`RTTI Complete Object Locator'	00E6D148	
+const gpg::RFastVectorType<Moho::UnitWeaponInfo>::`RTTI Complete Object Locator'	00E6D1EC	
+const gpg::RFastVectorType<Moho::UnitWeaponInfo>::`RTTI Complete Object Locator'	00E6D200	
+const gpg::SerSaveLoadHelper<Moho::SSTIUnitConstantData>::`RTTI Complete Object Locator'	00E6D254	
+const gpg::SerSaveLoadHelper<Moho::UnitAttributes>::`RTTI Complete Object Locator'	00E6D350	
+const gpg::SerSaveLoadHelper<Moho::UnitWeaponInfo>::`RTTI Complete Object Locator'	00E6D44C	
+const gpg::SerSaveLoadHelper<Moho::EUnitState>::`RTTI Complete Object Locator'	00E6D548	
+const gpg::PrimitiveSerHelper<Moho::EUnitState,int>::`RTTI Complete Object Locator'	00E6D55C	
+const gpg::SerSaveLoadHelper<Moho::EFireState>::`RTTI Complete Object Locator'	00E6D648	
+const gpg::PrimitiveSerHelper<Moho::EFireState,int>::`RTTI Complete Object Locator'	00E6D65C	
+const gpg::SerSaveLoadHelper<Moho::EJobType>::`RTTI Complete Object Locator'	00E6D748	
+const gpg::PrimitiveSerHelper<Moho::EJobType,int>::`RTTI Complete Object Locator'	00E6D75C	
+const gpg::SerSaveLoadHelper<Moho::SEconTotals>::`RTTI Complete Object Locator'	00E6D848	
+const gpg::SerSaveLoadHelper<Moho::SEconValue>::`RTTI Complete Object Locator'	00E6D944	
+const gpg::SerSaveLoadHelper<Moho::EEconResource>::`RTTI Complete Object Locator'	00E6DA40	
+const gpg::PrimitiveSerHelper<Moho::EEconResource,int>::`RTTI Complete Object Locator'	00E6DA54	
+const gpg::SerSaveLoadHelper<Moho::CFormationInstance>::`RTTI Complete Object Locator'	00E6DB94	
+const gpg::RMapType<Moho::EntId,Moho::SCoordsVec2>::`RTTI Complete Object Locator'	00E6DC90	
+const gpg::RFastVectorType<Moho::SAssignedLocInfo>::`RTTI Complete Object Locator'	00E6DCE0	
+const gpg::RFastVectorType<Moho::SAssignedLocInfo>::`RTTI Complete Object Locator'	00E6DCF4	
+const gpg::RFastVectorType<Moho::SOffsetInfo>::`RTTI Complete Object Locator'	00E6DD48	
+const gpg::RFastVectorType<Moho::SOffsetInfo>::`RTTI Complete Object Locator'	00E6DD5C	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::IUnit>>::`RTTI Complete Object Locator'	00E6DDB0	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::IUnit>>::`RTTI Complete Object Locator'	00E6DDC4	
+const gpg::SerSaveLoadHelper<Moho::SAssignedLocInfo>::`RTTI Complete Object Locator'	00E6DE18	
+const gpg::SerSaveLoadHelper<Moho::IFormationInstance>::`RTTI Complete Object Locator'	00E6DF14	
+const gpg::SerSaveLoadHelper<Moho::SOffsetInfo>::`RTTI Complete Object Locator'	00E6E060	
+const gpg::RMapType<Moho::EntId,Moho::SUnitOffsetInfo>::`RTTI Complete Object Locator'	00E6E15C	
+const gpg::SerSaveLoadHelper<Moho::SUnitOffsetInfo>::`RTTI Complete Object Locator'	00E6E1AC	
+const gpg::SerSaveLoadHelper<Moho::CAiBrain>::`RTTI Complete Object Locator'	00E6E5C0	
+const gpg::SerConstructHelper<Moho::CAiBrain>::`RTTI Complete Object Locator'	00E6E66C	
+const gpg::RMapType<Wm3::IVector2<int>,Moho::SBuildReserveInfo>::`RTTI Complete Object Locator'	00E6E718	
+const gpg::SerSaveLoadHelper<Moho::SBuildReserveInfo>::`RTTI Complete Object Locator'	00E6E768	
+const gpg::RVectorType<Moho::SPointVector>::`RTTI Complete Object Locator'	00E6E864	
+const gpg::RVectorType<Moho::SPointVector>::`RTTI Complete Object Locator'	00E6E878	
+const gpg::SerSaveLoadHelper<Moho::SMassInfo>::`RTTI Complete Object Locator'	00E70028	
+const gpg::SerSaveLoadHelper<Moho::SCollisionInfo>::`RTTI Complete Object Locator'	00E70174	
+const gpg::SerSaveLoadHelper<Moho::ECollisionType>::`RTTI Complete Object Locator'	00E70270	
+const gpg::PrimitiveSerHelper<Moho::ECollisionType,int>::`RTTI Complete Object Locator'	00E70284	
+const gpg::SerSaveLoadHelper<Moho::IAiCommandDispatchImpl>::`RTTI Complete Object Locator'	00E70370	
+const gpg::SerConstructHelper<Moho::IAiCommandDispatchImpl>::`RTTI Complete Object Locator'	00E7041C	
+const gpg::RPointerType<Moho::IFormationInstance>::`RTTI Complete Object Locator'	00E7081C	
+const gpg::RPointerType<Moho::IFormationInstance>::`RTTI Complete Object Locator'	00E70830	
+const gpg::SerSaveLoadHelper<Moho::CAiFormationDBImpl>::`RTTI Complete Object Locator'	00E70884	
+const gpg::RFastVectorType<Moho::IFormationInstance *>::`RTTI Complete Object Locator'	00E70980	
+const gpg::RFastVectorType<Moho::IFormationInstance *>::`RTTI Complete Object Locator'	00E70994	
+const gpg::SerSaveLoadHelper<Moho::CAiFormationInstance>::`RTTI Complete Object Locator'	00E70A84	
+const gpg::RPointerType<Moho::RUnitBlueprint>::`RTTI Complete Object Locator'	00E70C20	
+const gpg::RPointerType<Moho::RUnitBlueprint>::`RTTI Complete Object Locator'	00E70C34	
+const gpg::SerSaveLoadHelper<Moho::CAiBuilderImpl>::`RTTI Complete Object Locator'	00E70C88	
+const gpg::SerConstructHelper<Moho::CAiBuilderImpl>::`RTTI Complete Object Locator'	00E70D34	
+const gpg::RMapType<uint,Moho::RUnitBlueprint const *>::`RTTI Complete Object Locator'	00E70E30	
+const gpg::SerSaveLoadHelper<Moho::CAiNavigatorAir>::`RTTI Complete Object Locator'	00E713C4	
+const gpg::SerConstructHelper<Moho::CAiNavigatorAir>::`RTTI Complete Object Locator'	00E71470	
+const gpg::SerSaveLoadHelper<Moho::CAiNavigatorLand>::`RTTI Complete Object Locator'	00E7156C	
+const gpg::SerConstructHelper<Moho::CAiNavigatorLand>::`RTTI Complete Object Locator'	00E71618	
+const gpg::SerSaveLoadHelper<Moho::CAiNavigatorImpl>::`RTTI Complete Object Locator'	00E71760	
+const gpg::SerSaveLoadHelper<Moho::IAiNavigator>::`RTTI Complete Object Locator'	00E7185C	
+const gpg::SerSaveLoadHelper<Moho::EAiNavigatorEvent>::`RTTI Complete Object Locator'	00E719A8	
+const gpg::PrimitiveSerHelper<Moho::EAiNavigatorEvent,int>::`RTTI Complete Object Locator'	00E719BC	
+const gpg::SerSaveLoadHelper<Moho::EAiNavigatorStatus>::`RTTI Complete Object Locator'	00E71AA8	
+const gpg::PrimitiveSerHelper<Moho::EAiNavigatorStatus,int>::`RTTI Complete Object Locator'	00E71ABC	
+const gpg::SerSaveLoadHelper<Moho::CAiPathFinder>::`RTTI Complete Object Locator'	00E72044	
+const gpg::SerSaveLoadHelper<Moho::ESearchType>::`RTTI Complete Object Locator'	00E72140	
+const gpg::PrimitiveSerHelper<Moho::ESearchType,int>::`RTTI Complete Object Locator'	00E72154	
+const gpg::RListType<gpg::Rect2<int>>::`RTTI Complete Object Locator'	00E72240	
+const gpg::SerSaveLoadHelper<Moho::CAiPathNavigator>::`RTTI Complete Object Locator'	00E723DC	
+const gpg::SerSaveLoadHelper<Moho::CAiPathNavigator::State>::`RTTI Complete Object Locator'	00E724D8	
+const gpg::PrimitiveSerHelper<Moho::CAiPathNavigator::State,int>::`RTTI Complete Object Locator'	00E724EC	
+const gpg::RFastVectorType<Moho::CPathPoint>::`RTTI Complete Object Locator'	00E7262C	
+const gpg::RFastVectorType<Moho::CPathPoint>::`RTTI Complete Object Locator'	00E72640	
+const gpg::SerSaveLoadHelper<Moho::CAiPathSpline>::`RTTI Complete Object Locator'	00E72694	
+const gpg::SerSaveLoadHelper<Moho::SContinueInfo>::`RTTI Complete Object Locator'	00E72790	
+const gpg::SerSaveLoadHelper<Moho::EPathType>::`RTTI Complete Object Locator'	00E7288C	
+const gpg::PrimitiveSerHelper<Moho::EPathType,int>::`RTTI Complete Object Locator'	00E728A0	
+const gpg::SerSaveLoadHelper<Moho::CAiPersonality>::`RTTI Complete Object Locator'	00E729D8	
+const gpg::SerConstructHelper<Moho::CAiPersonality>::`RTTI Complete Object Locator'	00E72A84	
+const gpg::SerSaveLoadHelper<Moho::SValuePair>::`RTTI Complete Object Locator'	00E72B30	
+const gpg::RPointerType<Moho::ReconBlip>::`RTTI Complete Object Locator'	00E738B4	
+const gpg::RPointerType<Moho::ReconBlip>::`RTTI Complete Object Locator'	00E738C8	
+const gpg::SerSaveLoadHelper<Moho::CAiReconDBImpl>::`RTTI Complete Object Locator'	00E73BEC	
+const gpg::RMultiMapType<Moho::SReconKey,Moho::ReconBlip *>::`RTTI Complete Object Locator'	00E73C98	
+const gpg::SerSaveLoadHelper<Moho::SReconKey>::`RTTI Complete Object Locator'	00E73D88	
+const gpg::SerSaveLoadHelper<Moho::ReconBlip>::`RTTI Complete Object Locator'	00E73E84	
+const gpg::SerConstructHelper<Moho::ReconBlip>::`RTTI Complete Object Locator'	00E73F30	
+const gpg::SerSaveConstructHelper<Moho::ReconBlip>::`RTTI Complete Object Locator'	00E73FDC	
+const gpg::RVectorType<Moho::ReconBlip *>::`RTTI Complete Object Locator'	00E74088	
+const gpg::RVectorType<Moho::ReconBlip *>::`RTTI Complete Object Locator'	00E7409C	
+const gpg::RVectorType<Moho::SPerArmyReconInfo>::`RTTI Complete Object Locator'	00E74188	
+const gpg::RVectorType<Moho::SPerArmyReconInfo>::`RTTI Complete Object Locator'	00E7419C	
+const gpg::SerSaveLoadHelper<Moho::SPerArmyReconInfo>::`RTTI Complete Object Locator'	00E741F0	
+const gpg::SerSaveLoadHelper<Moho::CAiSiloBuildImpl>::`RTTI Complete Object Locator'	00E747E4	
+const gpg::SerConstructHelper<Moho::CAiSiloBuildImpl>::`RTTI Complete Object Locator'	00E74890	
+const gpg::RListType<Moho::ESiloType>::`RTTI Complete Object Locator'	00E749D8	
+const gpg::SerSaveLoadHelper<Moho::SSiloBuildInfo>::`RTTI Complete Object Locator'	00E74A28	
+const gpg::SerSaveLoadHelper<Moho::ESiloBuildStage>::`RTTI Complete Object Locator'	00E74B24	
+const gpg::PrimitiveSerHelper<Moho::ESiloBuildStage,int>::`RTTI Complete Object Locator'	00E74B38	
+const gpg::SerSaveLoadHelper<Moho::CAiSteeringImpl>::`RTTI Complete Object Locator'	00E74D08	
+const gpg::RPointerType<Moho::CAcquireTargetTask>::`RTTI Complete Object Locator'	00E75030	
+const gpg::RPointerType<Moho::CAcquireTargetTask>::`RTTI Complete Object Locator'	00E75044	
+const gpg::RPointerType<Moho::UnitWeapon>::`RTTI Complete Object Locator'	00E75098	
+const gpg::RPointerType<Moho::UnitWeapon>::`RTTI Complete Object Locator'	00E750AC	
+const gpg::SerSaveLoadHelper<Moho::CAcquireTargetTask>::`RTTI Complete Object Locator'	00E7569C	
+const gpg::SerSaveLoadHelper<Moho::CAiAttackerImpl>::`RTTI Complete Object Locator'	00E75798	
+const gpg::SerConstructHelper<Moho::CAiAttackerImpl>::`RTTI Complete Object Locator'	00E75844	
+const gpg::SerSaveLoadHelper<Moho::LAiAttackerImpl>::`RTTI Complete Object Locator'	00E758F0	
+const gpg::SerSaveLoadHelper<Moho::IAiAttacker>::`RTTI Complete Object Locator'	00E75BCC	
+const gpg::RVectorType<Moho::CAcquireTargetTask *>::`RTTI Complete Object Locator'	00E75CC8	
+const gpg::RVectorType<Moho::CAcquireTargetTask *>::`RTTI Complete Object Locator'	00E75CDC	
+const gpg::RVectorType<Moho::UnitWeapon *>::`RTTI Complete Object Locator'	00E75D30	
+const gpg::RVectorType<Moho::UnitWeapon *>::`RTTI Complete Object Locator'	00E75D44	
+const gpg::SerSaveLoadHelper<Moho::EAiAttackerEvent>::`RTTI Complete Object Locator'	00E75DE8	
+const gpg::PrimitiveSerHelper<Moho::EAiAttackerEvent,int>::`RTTI Complete Object Locator'	00E75DFC	
+const gpg::SerSaveLoadHelper<Moho::CAiTarget>::`RTTI Complete Object Locator'	00E7620C	
+const gpg::SerSaveLoadHelper<Moho::EAiTargetType>::`RTTI Complete Object Locator'	00E76308	
+const gpg::PrimitiveSerHelper<Moho::EAiTargetType,int>::`RTTI Complete Object Locator'	00E7631C	
+const gpg::SerSaveLoadHelper<Moho::CAiTransportImpl>::`RTTI Complete Object Locator'	00E764A4	
+const gpg::SerConstructHelper<Moho::CAiTransportImpl>::`RTTI Complete Object Locator'	00E76550	
+const gpg::SerSaveLoadHelper<Moho::IAiTransport>::`RTTI Complete Object Locator'	00E7669C	
+const gpg::SerSaveLoadHelper<Moho::STransportPickUpInfo>::`RTTI Complete Object Locator'	00E76798	
+const gpg::RVectorType<Moho::SAttachPoint>::`RTTI Complete Object Locator'	00E76894	
+const gpg::RVectorType<Moho::SAttachPoint>::`RTTI Complete Object Locator'	00E768A8	
+const gpg::SerSaveLoadHelper<Moho::SAttachPoint>::`RTTI Complete Object Locator'	00E768FC	
+const gpg::RVectorType<Moho::SAiReservedTransportBone>::`RTTI Complete Object Locator'	00E769F8	
+const gpg::RVectorType<Moho::SAiReservedTransportBone>::`RTTI Complete Object Locator'	00E76A0C	
+const gpg::SerSaveLoadHelper<Moho::SAiReservedTransportBone>::`RTTI Complete Object Locator'	00E76A60	
+const gpg::RVectorType<int>::`RTTI Complete Object Locator'	00E76B5C	
+const gpg::RVectorType<int>::`RTTI Complete Object Locator'	00E76B70	
+const gpg::SerSaveLoadHelper<Moho::EAiTransportEvent>::`RTTI Complete Object Locator'	00E76C14	
+const gpg::PrimitiveSerHelper<Moho::EAiTransportEvent,int>::`RTTI Complete Object Locator'	00E76C28	
+const gpg::SerSaveLoadHelper<Moho::CUnitAssistMoveTask>::`RTTI Complete Object Locator'	00E76E00	
+const gpg::SerSaveLoadHelper<Moho::CUnitAttackTargetTask>::`RTTI Complete Object Locator'	00E76F58	
+const gpg::SerSaveLoadHelper<Moho::CUnitSacrificeTask>::`RTTI Complete Object Locator'	00E77314	
+const gpg::SerSaveLoadHelper<Moho::CFactoryBuildTask>::`RTTI Complete Object Locator'	00E7748C	
+const gpg::SerSaveLoadHelper<Moho::CUnitRepairTask>::`RTTI Complete Object Locator'	00E775E4	
+const gpg::SerSaveLoadHelper<Moho::CUnitUpgradeTask>::`RTTI Complete Object Locator'	00E7775C	
+const gpg::SerSaveLoadHelper<Moho::CUnitMobileBuildTask>::`RTTI Complete Object Locator'	00E778B4	
+const gpg::SerSaveLoadHelper<Moho::CBuildTaskHelper>::`RTTI Complete Object Locator'	00E77A64	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallAirStagingPlatform>::`RTTI Complete Object Locator'	00E77B60	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallTeleport>::`RTTI Complete Object Locator'	00E77CB8	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallLandTransport>::`RTTI Complete Object Locator'	00E77E10	
+const gpg::SerSaveLoadHelper<Moho::CUnitCallTransport>::`RTTI Complete Object Locator'	00E77F68	
+const gpg::SerSaveLoadHelper<Moho::CUnitCaptureTask>::`RTTI Complete Object Locator'	00E780C0	
+const gpg::SerSaveLoadHelper<Moho::CUnitCarrierLaunch>::`RTTI Complete Object Locator'	00E78238	
+const gpg::SerSaveLoadHelper<Moho::CUnitCarrierLand>::`RTTI Complete Object Locator'	00E78390	
+const gpg::SerSaveLoadHelper<Moho::CUnitCarrierRetrieve>::`RTTI Complete Object Locator'	00E784E8	
+const gpg::SerSaveLoadHelper<Moho::CUnitFireAtTask>::`RTTI Complete Object Locator'	00E78640	
+const gpg::SerSaveLoadHelper<Moho::CUnitTeleportTask>::`RTTI Complete Object Locator'	00E78798	
+const gpg::SerSaveLoadHelper<Moho::CUnitGetBuiltTask>::`RTTI Complete Object Locator'	00E788F0	
+const gpg::SerSaveLoadHelper<Moho::CCommandTask>::`RTTI Complete Object Locator'	00E78A48	
+const gpg::SerSaveLoadHelper<Moho::EAiResult>::`RTTI Complete Object Locator'	00E78B44	
+const gpg::PrimitiveSerHelper<Moho::EAiResult,int>::`RTTI Complete Object Locator'	00E78B58	
+const gpg::SerSaveLoadHelper<Moho::CUnitWaitForFerryTask>::`RTTI Complete Object Locator'	00E78C44	
+const gpg::SerSaveLoadHelper<Moho::CUnitFerryTask>::`RTTI Complete Object Locator'	00E78D9C	
+const gpg::SerSaveLoadHelper<Moho::CUnitGuardTask>::`RTTI Complete Object Locator'	00E78EF4	
+const gpg::SerSaveLoadHelper<Moho::CUnitMeleeAttackTargetTask>::`RTTI Complete Object Locator'	00E7906C	
+const gpg::SerSaveLoadHelper<Moho::CUnitFormAndMoveTask>::`RTTI Complete Object Locator'	00E79204	
+const gpg::SerSaveLoadHelper<Moho::CUnitMoveTask>::`RTTI Complete Object Locator'	00E793BC	
+const gpg::SerSaveLoadHelper<Moho::CUnitPatrolTask>::`RTTI Complete Object Locator'	00E79780	
+const gpg::SerConstructHelper<Moho::CUnitPatrolTask>::`RTTI Complete Object Locator'	00E7982C	
+const gpg::SerSaveLoadHelper<Moho::CUnitPodAssist>::`RTTI Complete Object Locator'	00E799C4	
+const gpg::SerSaveLoadHelper<Moho::CUnitReclaimTask>::`RTTI Complete Object Locator'	00E79B1C	
+const gpg::SerSaveLoadHelper<Moho::CUnitRefuel>::`RTTI Complete Object Locator'	00E79C94	
+const gpg::SerSaveLoadHelper<Moho::CUnitScriptTask>::`RTTI Complete Object Locator'	00E79F2C	
+const gpg::SerSaveLoadHelper<Moho::CUnitUnloadUnits>::`RTTI Complete Object Locator'	00E7A1F8	
+const gpg::SerSaveLoadHelper<Moho::CUnitLoadUnits>::`RTTI Complete Object Locator'	00E7A350	
+const gpg::RVectorType<Moho::SPickUpInfo>::`RTTI Complete Object Locator'	00E7A4A8	
+const gpg::RVectorType<Moho::SPickUpInfo>::`RTTI Complete Object Locator'	00E7A4BC	
+const gpg::SerSaveLoadHelper<Moho::SPickUpInfo>::`RTTI Complete Object Locator'	00E7A510	
+const gpg::SerSaveLoadHelper<Moho::CPathPoint>::`RTTI Complete Object Locator'	00E7A60C	
+const gpg::SerSaveLoadHelper<Moho::EPathPointState>::`RTTI Complete Object Locator'	00E7A708	
+const gpg::PrimitiveSerHelper<Moho::EPathPointState,int>::`RTTI Complete Object Locator'	00E7A71C	
+const gpg::SerSaveLoadHelper<Moho::CAimManipulator>::`RTTI Complete Object Locator'	00E7AA88	
+const gpg::SerSaveLoadHelper<Moho::CBoneEntityManipulator>::`RTTI Complete Object Locator'	00E7AE10	
+const gpg::SerSaveLoadHelper<Moho::CBuilderArmManipulator>::`RTTI Complete Object Locator'	00E7B11C	
+const gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::`RTTI Complete Object Locator'	00E7B478	
+const gpg::SerSaveLoadHelper<Moho::CFootPlantManipulator>::`RTTI Complete Object Locator'	00E7B694	
+const gpg::RPointerType<Moho::IAniManipulator>::`RTTI Complete Object Locator'	00E7B8AC	
+const gpg::RPointerType<Moho::IAniManipulator>::`RTTI Complete Object Locator'	00E7B8C0	
+const gpg::SerSaveLoadHelper<Moho::IAniManipulator>::`RTTI Complete Object Locator'	00E7BA54	
+const gpg::RFastVectorType<Moho::SAniManipBinding>::`RTTI Complete Object Locator'	00E7BB00	
+const gpg::RFastVectorType<Moho::SAniManipBinding>::`RTTI Complete Object Locator'	00E7BB14	
+const gpg::SerSaveLoadHelper<Moho::SAniManipBinding>::`RTTI Complete Object Locator'	00E7BB68	
+const gpg::SerSaveLoadHelper<Moho::CAniActor>::`RTTI Complete Object Locator'	00E7BC64	
+const gpg::SerConstructHelper<Moho::CAniActor>::`RTTI Complete Object Locator'	00E7BD10	
+const gpg::SerSaveLoadHelper<Moho::CAnimationManipulator>::`RTTI Complete Object Locator'	00E7C26C	
+const gpg::SerConstructHelper<Moho::CAnimationManipulator>::`RTTI Complete Object Locator'	00E7C318	
+const gpg::RVectorType<bool>::`RTTI Complete Object Locator'	00E7C410	
+const gpg::RVectorType<bool>::`RTTI Complete Object Locator'	00E7C424	
+const gpg::SerSaveLoadHelper<Moho::CRotateManipulator>::`RTTI Complete Object Locator'	00E7C8BC	
+const gpg::SerSaveLoadHelper<Moho::CSlaveManipulator>::`RTTI Complete Object Locator'	00E7CB28	
+const gpg::SerSaveLoadHelper<Moho::CSlideManipulator>::`RTTI Complete Object Locator'	00E7CF24	
+const gpg::SerSaveLoadHelper<Moho::CStorageManipulator>::`RTTI Complete Object Locator'	00E7D140	
+const gpg::SerSaveLoadHelper<Moho::CThrustManipulator>::`RTTI Complete Object Locator'	00E7D3AC	
+const gpg::SerSaveLoadHelper<Moho::CEfxBeam>::`RTTI Complete Object Locator'	00E7DE10	
+const gpg::SerSaveLoadHelper<Moho::CEffectImpl>::`RTTI Complete Object Locator'	00E7E0D0	
+const gpg::RFastVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`RTTI Complete Object Locator'	00E7E17C	
+const gpg::RFastVectorType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`RTTI Complete Object Locator'	00E7E190	
+const gpg::RFastVectorType<Moho::CountedPtr<Moho::CParticleTexture>>::`RTTI Complete Object Locator'	00E7E1E4	
+const gpg::RFastVectorType<Moho::CountedPtr<Moho::CParticleTexture>>::`RTTI Complete Object Locator'	00E7E1F8	
+const gpg::RFastVectorType<float>::`RTTI Complete Object Locator'	00E7E2B4	
+const gpg::RFastVectorType<float>::`RTTI Complete Object Locator'	00E7E2C8	
+const gpg::SerSaveLoadHelper<Moho::CEfxEmitter>::`RTTI Complete Object Locator'	00E7E380	
+const gpg::RFastVectorType<Moho::SEfxCurve>::`RTTI Complete Object Locator'	00E7E42C	
+const gpg::RFastVectorType<Moho::SEfxCurve>::`RTTI Complete Object Locator'	00E7E440	
+const gpg::SerSaveLoadHelper<Moho::EmitterType>::`RTTI Complete Object Locator'	00E7E494	
+const gpg::PrimitiveSerHelper<Moho::EmitterType,int>::`RTTI Complete Object Locator'	00E7E4A8	
+const gpg::RPointerType<Moho::IEffect>::`RTTI Complete Object Locator'	00E7EAC8	
+const gpg::RPointerType<Moho::IEffect>::`RTTI Complete Object Locator'	00E7EADC	
+const gpg::SerSaveLoadHelper<Moho::CEffectManagerImpl>::`RTTI Complete Object Locator'	00E7EB30	
+const gpg::SerConstructHelper<Moho::CEffectManagerImpl>::`RTTI Complete Object Locator'	00E7EBDC	
+const gpg::SerSaveConstructHelper<Moho::CEffectManagerImpl>::`RTTI Complete Object Locator'	00E7EC88	
+const gpg::SerSaveLoadHelper<Moho::CEfxTrailEmitter>::`RTTI Complete Object Locator'	00E7F4A4	
+const gpg::SerSaveLoadHelper<Moho::CollisionBeamEntity>::`RTTI Complete Object Locator'	00E7F7EC	
+const gpg::SerConstructHelper<Moho::CollisionBeamEntity>::`RTTI Complete Object Locator'	00E7F898	
+const gpg::SerSaveConstructHelper<Moho::CollisionBeamEntity>::`RTTI Complete Object Locator'	00E7F944	
+const gpg::RPointerType<Moho::Entity>::`RTTI Complete Object Locator'	00E7FE24	
+const gpg::RPointerType<Moho::Entity>::`RTTI Complete Object Locator'	00E7FE38	
+const gpg::SerSaveLoadHelper<Moho::Entity>::`RTTI Complete Object Locator'	00E7FE8C	
+const gpg::SerConstructHelper<Moho::Entity>::`RTTI Complete Object Locator'	00E7FF38	
+const gpg::SerSaveConstructHelper<Moho::Entity>::`RTTI Complete Object Locator'	00E7FFE4	
+const gpg::SerSaveLoadHelper<Moho::PositionHistory>::`RTTI Complete Object Locator'	00E80090	
+const gpg::SerSaveLoadHelper<Moho::SEntAttachInfo>::`RTTI Complete Object Locator'	00E8018C	
+const gpg::RVectorType<Moho::Entity *>::`RTTI Complete Object Locator'	00E80288	
+const gpg::RVectorType<Moho::Entity *>::`RTTI Complete Object Locator'	00E8029C	
+const gpg::SerSaveLoadHelper<Moho::EntityDB>::`RTTI Complete Object Locator'	00E803D0	
+const gpg::RListType<Moho::Entity *>::`RTTI Complete Object Locator'	00E804CC	
+const gpg::RMapType<uint,Moho::IdPool>::`RTTI Complete Object Locator'	00E8051C	
+const gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<Moho::Entity>>::`RTTI Complete Object Locator'	00E818CC	
+const gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<Moho::Entity>>::`RTTI Complete Object Locator'	00E819C8	
+const gpg::SerSaveLoadHelper<Moho::EntitySetBase>::`RTTI Complete Object Locator'	00E81AC4	
+const gpg::RFastVectorType<Moho::Entity *>::`RTTI Complete Object Locator'	00E81BC0	
+const gpg::RFastVectorType<Moho::Entity *>::`RTTI Complete Object Locator'	00E81BD4	
+const gpg::SerSaveLoadHelper<Moho::Motor>::`RTTI Complete Object Locator'	00E81C28	
+const gpg::SerSaveLoadHelper<Moho::MotorFallDown>::`RTTI Complete Object Locator'	00E81E10	
+const gpg::SerConstructHelper<Moho::MotorFallDown>::`RTTI Complete Object Locator'	00E81EBC	
+const gpg::SerSaveLoadHelper<Moho::MotorSinkAway>::`RTTI Complete Object Locator'	00E821F0	
+const gpg::SerConstructHelper<Moho::MotorSinkAway>::`RTTI Complete Object Locator'	00E8229C	
+const gpg::SerSaveLoadHelper<Moho::SPhysBody>::`RTTI Complete Object Locator'	00E82460	
+const gpg::SerConstructHelper<Moho::SPhysBody>::`RTTI Complete Object Locator'	00E8250C	
+const gpg::SerSaveConstructHelper<Moho::SPhysBody>::`RTTI Complete Object Locator'	00E825B8	
+const gpg::SerSaveLoadHelper<Moho::SPhysConstants>::`RTTI Complete Object Locator'	00E826B4	
+const gpg::SerSaveLoadHelper<Moho::Projectile>::`RTTI Complete Object Locator'	00E827B0	
+const gpg::SerConstructHelper<Moho::Projectile>::`RTTI Complete Object Locator'	00E8285C	
+const gpg::SerSaveConstructHelper<Moho::Projectile>::`RTTI Complete Object Locator'	00E82908	
+const gpg::SerSaveLoadHelper<Moho::CProjectileAttributes>::`RTTI Complete Object Locator'	00E82A04	
+const gpg::SerSaveLoadHelper<Moho::EProjectileImpactEvent>::`RTTI Complete Object Locator'	00E82B00	
+const gpg::PrimitiveSerHelper<Moho::EProjectileImpactEvent,int>::`RTTI Complete Object Locator'	00E82B14	
+const gpg::RPointerType<Moho::CEconomyEvent>::`RTTI Complete Object Locator'	00E8373C	
+const gpg::RPointerType<Moho::CEconomyEvent>::`RTTI Complete Object Locator'	00E83750	
+const gpg::SerSaveLoadHelper<Moho::Unit>::`RTTI Complete Object Locator'	00E837A4	
+const gpg::SerConstructHelper<Moho::Unit>::`RTTI Complete Object Locator'	00E83850	
+const gpg::SerSaveConstructHelper<Moho::Unit>::`RTTI Complete Object Locator'	00E838FC	
+const gpg::SerSaveLoadHelper<Moho::SInfoCache>::`RTTI Complete Object Locator'	00E839A8	
+const gpg::RFastVectorType<Moho::ReconBlip *>::`RTTI Complete Object Locator'	00E83AA4	
+const gpg::RFastVectorType<Moho::ReconBlip *>::`RTTI Complete Object Locator'	00E83AB8	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::Entity>>::`RTTI Complete Object Locator'	00E83B0C	
+const gpg::RFastVectorType<Moho::WeakPtr<Moho::Entity>>::`RTTI Complete Object Locator'	00E83B20	
+const gpg::RMapType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>,float>::`RTTI Complete Object Locator'	00E83B74	
+const gpg::SerSaveLoadHelper<Moho::CUnitMotion>::`RTTI Complete Object Locator'	00E83F70	
+const gpg::SerConstructHelper<Moho::CUnitMotion>::`RTTI Complete Object Locator'	00E8401C	
+const gpg::SerSaveLoadHelper<Moho::EAirCombatState>::`RTTI Complete Object Locator'	00E84118	
+const gpg::PrimitiveSerHelper<Moho::EAirCombatState,int>::`RTTI Complete Object Locator'	00E8412C	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionTurnEvent>::`RTTI Complete Object Locator'	00E84218	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionTurnEvent,int>::`RTTI Complete Object Locator'	00E8422C	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionVertEvent>::`RTTI Complete Object Locator'	00E84318	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionVertEvent,int>::`RTTI Complete Object Locator'	00E8432C	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionHorzEvent>::`RTTI Complete Object Locator'	00E84418	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionHorzEvent,int>::`RTTI Complete Object Locator'	00E8442C	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionCarrierEvent>::`RTTI Complete Object Locator'	00E84518	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionCarrierEvent,int>::`RTTI Complete Object Locator'	00E8452C	
+const gpg::SerSaveLoadHelper<Moho::EUnitMotionState>::`RTTI Complete Object Locator'	00E84618	
+const gpg::PrimitiveSerHelper<Moho::EUnitMotionState,int>::`RTTI Complete Object Locator'	00E8462C	
+const gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<Moho::Unit>>::`RTTI Complete Object Locator'	00E86F18	
+const gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<Moho::Unit>>::`RTTI Complete Object Locator'	00E87014	
+const gpg::SerSaveLoadHelper<Moho::UnitWeapon>::`RTTI Complete Object Locator'	00E87B10	
+const gpg::SerConstructHelper<Moho::UnitWeapon>::`RTTI Complete Object Locator'	00E87BBC	
+const gpg::SerSaveLoadHelper<Moho::CFireWeaponTask>::`RTTI Complete Object Locator'	00E87C68	
+const gpg::RVectorType<Moho::SBlackListInfo>::`RTTI Complete Object Locator'	00E87D64	
+const gpg::RVectorType<Moho::SBlackListInfo>::`RTTI Complete Object Locator'	00E87D78	
+const gpg::SerSaveLoadHelper<Moho::SBlackListInfo>::`RTTI Complete Object Locator'	00E87DCC	
+const gpg::SerSaveLoadHelper<Moho::CWeaponAttributes>::`RTTI Complete Object Locator'	00E87EC8	
+const gpg::RVectorType<Moho::BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>>::`RTTI Complete Object Locator'	00E87FC4	
+const gpg::RVectorType<Moho::BVSet<Moho::RBlueprint const *,Moho::EntityCategoryHelper>>::`RTTI Complete Object Locator'	00E87FD8	
+const gpg::RPointerType<Moho::CUnitCommand>::`RTTI Complete Object Locator'	00E881EC	
+const gpg::RPointerType<Moho::CUnitCommand>::`RTTI Complete Object Locator'	00E88200	
+const gpg::SerSaveLoadHelper<Moho::CCommandDB>::`RTTI Complete Object Locator'	00E88254	
+const gpg::SerConstructHelper<Moho::CCommandDB>::`RTTI Complete Object Locator'	00E88300	
+const gpg::SerSaveConstructHelper<Moho::CCommandDB>::`RTTI Complete Object Locator'	00E883AC	
+const gpg::SerSaveLoadHelper<Moho::CUnitCommand>::`RTTI Complete Object Locator'	00E88624	
+const gpg::SerConstructHelper<Moho::CUnitCommand>::`RTTI Complete Object Locator'	00E886D0	
+const gpg::RVectorType<Moho::WeakPtr<Moho::CUnitCommand>>::`RTTI Complete Object Locator'	00E887E4	
+const gpg::RVectorType<Moho::WeakPtr<Moho::CUnitCommand>>::`RTTI Complete Object Locator'	00E887F8	
+const gpg::SerSaveLoadHelper<Moho::ECommandEvent>::`RTTI Complete Object Locator'	00E888B4	
+const gpg::PrimitiveSerHelper<Moho::ECommandEvent,int>::`RTTI Complete Object Locator'	00E888C8	
+const gpg::SerSaveLoadHelper<Moho::CUnitCommandQueue>::`RTTI Complete Object Locator'	00E897D8	
+const gpg::SerConstructHelper<Moho::CUnitCommandQueue>::`RTTI Complete Object Locator'	00E89884	
+const gpg::SerSaveConstructHelper<Moho::CUnitCommandQueue>::`RTTI Complete Object Locator'	00E89930	
+const gpg::SerSaveLoadHelper<Moho::Prop>::`RTTI Complete Object Locator'	00E89B20	
+const gpg::SerConstructHelper<Moho::Prop>::`RTTI Complete Object Locator'	00E89BCC	
+const gpg::SerSaveConstructHelper<Moho::Prop>::`RTTI Complete Object Locator'	00E89C78	
+const gpg::SerSaveLoadHelper<Moho::SPropPriorityInfo>::`RTTI Complete Object Locator'	00E89D24	
+const gpg::SerSaveLoadHelper<Moho::CArmyImpl>::`RTTI Complete Object Locator'	00E8A138	
+const gpg::RVectorType<Moho::EntitySetTemplate<Moho::Unit>>::`RTTI Complete Object Locator'	00E8A284	
+const gpg::RVectorType<Moho::EntitySetTemplate<Moho::Unit>>::`RTTI Complete Object Locator'	00E8A298	
+const gpg::SerSaveLoadHelper<Moho::SimArmy>::`RTTI Complete Object Locator'	00E8A2EC	
+const gpg::RPointerType<Moho::CArmyStatItem>::`RTTI Complete Object Locator'	00E8AFBC	
+const gpg::RPointerType<Moho::CArmyStatItem>::`RTTI Complete Object Locator'	00E8AFD0	
+const gpg::SerSaveLoadHelper<Moho::CArmyStats>::`RTTI Complete Object Locator'	00E8B024	
+const gpg::SerConstructHelper<Moho::CArmyStats>::`RTTI Complete Object Locator'	00E8B0D0	
+const gpg::SerSaveConstructHelper<Moho::CArmyStats>::`RTTI Complete Object Locator'	00E8B17C	
+const gpg::RListType<boost::shared_ptr<Moho::STrigger>>::`RTTI Complete Object Locator'	00E8B278	
+const gpg::RMapType<std::basic_string<char,std::char_traits<char>,std::allocator<char>>,Moho::CArmyStatItem *>::`RTTI Complete Object Locator'	00E8B2C8	
+const gpg::SerSaveLoadHelper<Moho::CArmyStatItem>::`RTTI Complete Object Locator'	00E8B318	
+const gpg::RMapType<Moho::RUnitBlueprint const *,float>::`RTTI Complete Object Locator'	00E8B414	
+const gpg::RSharedPointerType<Moho::STrigger>::`RTTI Complete Object Locator'	00E8B464	
+const gpg::RSharedPointerType<Moho::STrigger>::`RTTI Complete Object Locator'	00E8B478	
+const gpg::SerSaveLoadHelper<Moho::STrigger>::`RTTI Complete Object Locator'	00E8B4CC	
+const gpg::RFastVectorType<Moho::SCondition>::`RTTI Complete Object Locator'	00E8B5C8	
+const gpg::RFastVectorType<Moho::SCondition>::`RTTI Complete Object Locator'	00E8B5DC	
+const gpg::SerSaveLoadHelper<Moho::SCondition>::`RTTI Complete Object Locator'	00E8B630	
+const gpg::SerSaveLoadHelper<Moho::ETriggerOperator>::`RTTI Complete Object Locator'	00E8B72C	
+const gpg::PrimitiveSerHelper<Moho::ETriggerOperator,int>::`RTTI Complete Object Locator'	00E8B740	
+const gpg::SerSaveLoadHelper<Moho::InfluenceGrid>::`RTTI Complete Object Locator'	00E8B87C	
+const gpg::SerSaveLoadHelper<Moho::SThreat>::`RTTI Complete Object Locator'	00E8B978	
+const gpg::RVectorType<Moho::SThreat>::`RTTI Complete Object Locator'	00E8BA74	
+const gpg::RVectorType<Moho::SThreat>::`RTTI Complete Object Locator'	00E8BA88	
+const gpg::RMapType<uint,Moho::InfluenceMapEntry>::`RTTI Complete Object Locator'	00E8BADC	
+const gpg::RVectorType<Moho::InfluenceGrid>::`RTTI Complete Object Locator'	00E8BB2C	
+const gpg::RVectorType<Moho::InfluenceGrid>::`RTTI Complete Object Locator'	00E8BB40	
+const gpg::RMapType<uint,int>::`RTTI Complete Object Locator'	00E8BB94	
+const gpg::SerSaveLoadHelper<Moho::InfluenceMapEntry>::`RTTI Complete Object Locator'	00E8BBE4	
+const gpg::SerSaveLoadHelper<Moho::CInfluenceMap>::`RTTI Complete Object Locator'	00E8BCE0	
+const gpg::SerConstructHelper<Moho::CInfluenceMap>::`RTTI Complete Object Locator'	00E8BD8C	
+const gpg::SerSaveLoadHelper<Moho::EThreatType>::`RTTI Complete Object Locator'	00E8BE88	
+const gpg::PrimitiveSerHelper<Moho::EThreatType,int>::`RTTI Complete Object Locator'	00E8BE9C	
+const gpg::SerSaveLoadHelper<Moho::COGrid>::`RTTI Complete Object Locator'	00E8BF88	
+const gpg::SerSaveLoadHelper<Moho::CPlatoon>::`RTTI Complete Object Locator'	00E8C0D0	
+const gpg::SerConstructHelper<Moho::CPlatoon>::`RTTI Complete Object Locator'	00E8C17C	
+const gpg::SerSaveLoadHelper<Moho::CSquad>::`RTTI Complete Object Locator'	00E8C228	
+const gpg::SerConstructHelper<Moho::CSquad>::`RTTI Complete Object Locator'	00E8C2D4	
+const gpg::SerSaveLoadHelper<Moho::ESquadClass>::`RTTI Complete Object Locator'	00E8C3D0	
+const gpg::PrimitiveSerHelper<Moho::ESquadClass,int>::`RTTI Complete Object Locator'	00E8C3E4	
+const gpg::RPointerType<Moho::Shield>::`RTTI Complete Object Locator'	00E8DC04	
+const gpg::RPointerType<Moho::Shield>::`RTTI Complete Object Locator'	00E8DC18	
+const gpg::RPointerType<Moho::SimArmy>::`RTTI Complete Object Locator'	00E8DC6C	
+const gpg::RPointerType<Moho::SimArmy>::`RTTI Complete Object Locator'	00E8DC80	
+const gpg::SerSaveLoadHelper<Moho::Sim>::`RTTI Complete Object Locator'	00E8DF04	
+const gpg::RListType<Moho::Shield *>::`RTTI Complete Object Locator'	00E8E000	
+const gpg::RVectorType<Moho::SimArmy *>::`RTTI Complete Object Locator'	00E8E050	
+const gpg::RVectorType<Moho::SimArmy *>::`RTTI Complete Object Locator'	00E8E064	
+const gpg::SerSaveLoadHelper<Moho::CSimSoundManager>::`RTTI Complete Object Locator'	00E8EF64	
+const gpg::SerConstructHelper<Moho::CSimSoundManager>::`RTTI Complete Object Locator'	00E8F010	
+const gpg::SerSaveConstructHelper<Moho::CSimSoundManager>::`RTTI Complete Object Locator'	00E8F0BC	
+const gpg::SerSaveLoadHelper<Moho::ISoundManager>::`RTTI Complete Object Locator'	00E8F204	
+const gpg::RFastVectorType<Moho::SAudioRequest>::`RTTI Complete Object Locator'	00E8F300	
+const gpg::RFastVectorType<Moho::SAudioRequest>::`RTTI Complete Object Locator'	00E8F314	
+const gpg::RVectorType<Moho::HPathCell>::`RTTI Complete Object Locator'	00E8F450	
+const gpg::RVectorType<Moho::HPathCell>::`RTTI Complete Object Locator'	00E8F464	
+const gpg::SerSaveLoadHelper<Moho::NavPath>::`RTTI Complete Object Locator'	00E8F4B8	
+const gpg::SerSaveLoadHelper<Moho::HPathCell>::`RTTI Complete Object Locator'	00E8F5B4	
+const gpg::SerSaveLoadHelper<Moho::PathQueue::Impl>::`RTTI Complete Object Locator'	00E8F788	
+const gpg::SerSaveLoadHelper<Moho::PathQueue>::`RTTI Complete Object Locator'	00E8F884	
+const gpg::RDListType<Moho::IPathTraveler,void>::`RTTI Complete Object Locator'	00E8F980	
+const gpg::HaStar::IOccupationSource::`RTTI Complete Object Locator'	00E8FA6C	
+const gpg::SerSaveLoadHelper<std::pair<Moho::HPathCell,float>>::`RTTI Complete Object Locator'	00E8FB04	
+const gpg::SerSaveLoadHelper<Moho::CIntel>::`RTTI Complete Object Locator'	00E8FC00	
+const gpg::SerSaveLoadHelper<Moho::CIntelCounterHandle>::`RTTI Complete Object Locator'	00E8FD90	
+const gpg::SerConstructHelper<Moho::CIntelCounterHandle>::`RTTI Complete Object Locator'	00E8FE3C	
+const gpg::SerSaveLoadHelper<Moho::CIntelPosHandle>::`RTTI Complete Object Locator'	00E8FF38	
+const gpg::SerConstructHelper<Moho::CIntelPosHandle>::`RTTI Complete Object Locator'	00E8FFE4	
+const gpg::SerSaveLoadHelper<Moho::IEffect>::`RTTI Complete Object Locator'	00E900E0	
+const gpg::SerSaveLoadHelper<Moho::CEconRequest>::`RTTI Complete Object Locator'	00E9037C	
+const gpg::SerConstructHelper<Moho::CEconRequest>::`RTTI Complete Object Locator'	00E90428	
+const gpg::SerSaveLoadHelper<Moho::CEconStorage>::`RTTI Complete Object Locator'	00E90524	
+const gpg::SerConstructHelper<Moho::CEconStorage>::`RTTI Complete Object Locator'	00E905D0	
+const gpg::SerSaveLoadHelper<Moho::CEconomy>::`RTTI Complete Object Locator'	00E906CC	
+const gpg::SerConstructHelper<Moho::CEconomy>::`RTTI Complete Object Locator'	00E90778	
+const gpg::SerSaveLoadHelper<Moho::CEconomyEvent>::`RTTI Complete Object Locator'	00E90964	
+const gpg::SerConstructHelper<Moho::CEconomyEvent>::`RTTI Complete Object Locator'	00E90A10	
+const gpg::SerSaveLoadHelper<Moho::Shield>::`RTTI Complete Object Locator'	00E90CE8	
+const gpg::SerConstructHelper<Moho::Shield>::`RTTI Complete Object Locator'	00E90D94	
+const gpg::SerSaveConstructHelper<Moho::Shield>::`RTTI Complete Object Locator'	00E90E40	
+const gpg::SerSaveLoadHelper<Moho::CTextureScroller>::`RTTI Complete Object Locator'	00E91070	
+const gpg::SerSaveLoadHelper<Moho::SScroller>::`RTTI Complete Object Locator'	00E9116C	
+const gpg::SerSaveLoadHelper<Moho::EScrollType>::`RTTI Complete Object Locator'	00E91268	
+const gpg::PrimitiveSerHelper<Moho::EScrollType,int>::`RTTI Complete Object Locator'	00E9127C	
+const gpg::RPointerType<Moho::CDecalHandle>::`RTTI Complete Object Locator'	00E91368	
+const gpg::RPointerType<Moho::CDecalHandle>::`RTTI Complete Object Locator'	00E9137C	
+const gpg::SerSaveLoadHelper<Moho::CDecalHandle>::`RTTI Complete Object Locator'	00E913D0	
+const gpg::SerSaveLoadHelper<Moho::CDecalBuffer>::`RTTI Complete Object Locator'	00E9147C	
+const gpg::RListType<Moho::SDecalInfo>::`RTTI Complete Object Locator'	00E91528	
+const gpg::SerSaveLoadHelper<Moho::SDecalInfo>::`RTTI Complete Object Locator'	00E915C8	
+const gpg::SerSaveLoadHelper<Moho::SSavedGameHeader>::`RTTI Complete Object Locator'	00E9C600	
+const gpg::RVectorType<Moho::SSavedGameArmyInfo>::`RTTI Complete Object Locator'	00E9C6FC	
+const gpg::RVectorType<Moho::SSavedGameArmyInfo>::`RTTI Complete Object Locator'	00E9C710	
+const gpg::SerSaveLoadHelper<Moho::SSavedGameArmyInfo>::`RTTI Complete Object Locator'	00E9C764	
+const gpg::SerSaveLoadHelper<Moho::SSessionSaveData>::`RTTI Complete Object Locator'	00E9D30C	
+const gpg::RMultiMapType<Moho::EntId,std::basic_string<char,std::char_traits<char>,std::allocator<char>>>::`RTTI Complete Object Locator'	00E9D408	
+const gpg::gal::Error::`RTTI Complete Object Locator'	00E9D59C	
+
