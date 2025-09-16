@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{a6f8502f-3d49-4578-ac83-d434981ad676}</ProjectGuid>
+    <RootNamespace>sdk</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="gpg\core\algorithms\Cluster.cpp" />
+    <ClCompile Include="gpg\core\containers\Set.cpp" />
+    <ClCompile Include="gpg\core\containers\String.cpp" />
+    <ClCompile Include="gpg\core\random\Random.cpp" />
+    <ClCompile Include="gpg\core\reflection\Reflection.cpp" />
+    <ClCompile Include="gpg\core\streams\FileStream.cpp" />
+    <ClCompile Include="gpg\core\streams\MemBufferStream.cpp" />
+    <ClCompile Include="gpg\core\streams\PipeStream.cpp" />
+    <ClCompile Include="gpg\core\streams\Stream.cpp" />
+    <ClCompile Include="gpg\core\utils\BoostWrappers.cpp" />
+    <ClCompile Include="gpg\core\utils\Global.cpp" />
+    <ClCompile Include="gpg\core\utils\Logging.cpp" />
+    <ClCompile Include="legacy\containers\String.cpp" />
+    <ClCompile Include="legacy\containers\Vector.cpp" />
+    <ClCompile Include="moho\command\ICommandSink.cpp" />
+    <ClCompile Include="moho\math\GridPos.cpp" />
+    <ClCompile Include="moho\math\Vector2f.cpp" />
+    <ClCompile Include="moho\math\Vector3f.cpp" />
+    <ClCompile Include="moho\math\Vector4f.cpp" />
+    <ClCompile Include="moho\misc\StatItem.cpp" />
+    <ClCompile Include="moho\misc\Stats.cpp" />
+    <ClCompile Include="moho\net\CClientBase.cpp" />
+    <ClCompile Include="moho\net\CMessage.cpp" />
+    <ClCompile Include="moho\net\CMessageStream.cpp" />
+    <ClCompile Include="moho\net\CNetClient.cpp" />
+    <ClCompile Include="moho\resource\CSimResources.cpp" />
+    <ClCompile Include="moho\resource\ISimResources.cpp" />
+    <ClCompile Include="moho\sim\CArmyImpl.cpp" />
+    <ClCompile Include="moho\sim\CArmyStats.cpp" />
+    <ClCompile Include="moho\sim\ISTIDriver.cpp" />
+    <ClCompile Include="moho\sim\Sim.cpp" />
+    <ClCompile Include="moho\sim\SimArmy.cpp" />
+    <ClCompile Include="moho\sim\SimDriver.cpp" />
+    <ClCompile Include="moho\sim\STIMap.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="boost\condition.h" />
+    <ClInclude Include="boost\mutex.h" />
+    <ClInclude Include="boost\xtime.h" />
+    <ClInclude Include="gpg\core\algorithms\Cluster.h" />
+    <ClInclude Include="gpg\core\containers\ByteSpan.h" />
+    <ClInclude Include="gpg\core\containers\DList.h" />
+    <ClInclude Include="gpg\core\containers\DListItem.h" />
+    <ClInclude Include="gpg\core\containers\FastVector.h" />
+    <ClInclude Include="gpg\core\containers\IntrusiveLink.h" />
+    <ClInclude Include="gpg\core\containers\IntrusiveRbTree.h" />
+    <ClInclude Include="gpg\core\containers\ReadArchive.h" />
+    <ClInclude Include="gpg\core\containers\Rect2.h" />
+    <ClInclude Include="gpg\core\containers\Set.h" />
+    <ClInclude Include="gpg\core\containers\String.h" />
+    <ClInclude Include="gpg\core\random\Random.h" />
+    <ClInclude Include="gpg\core\reflection\Reflection.h" />
+    <ClInclude Include="gpg\core\containers\WriteArchive.h" />
+    <ClInclude Include="gpg\core\streams\FileStream.h" />
+    <ClInclude Include="gpg\core\streams\MemBufferStream.h" />
+    <ClInclude Include="gpg\core\streams\PipeStream.h" />
+    <ClInclude Include="gpg\core\streams\Stream.h" />
+    <ClInclude Include="gpg\core\utils\BoostUtils.h" />
+    <ClInclude Include="gpg\core\utils\BoostWrappers.h" />
+    <ClInclude Include="gpg\core\utils\Global.h" />
+    <ClInclude Include="gpg\core\utils\Logging.h" />
+    <ClInclude Include="gpg\core\utils\Sync.h" />
+    <ClInclude Include="gpg\core\utils\Tss.h" />
+    <ClInclude Include="gpg\gal\backends\d3d10\AdapterD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\CubeRenderTargetD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\CursorD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\DepthStencilTargetD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\DeviceD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\EffectD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\EffectTechniqueD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\EffectVariableD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\Float16HardwareVertexFormatterD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\HardwareVertexFormatterD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\IndexBufferD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\PipelineStateD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\RenderTargetD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\TextureD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\VertexBufferD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d10\VertexFormatD3D10.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\AdapterD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\AdapterModeD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\CubeRenderTargetD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\DepthStencilTargetD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\DeviceD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\EffectD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\EffectTechniqueD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\EffectVariableD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\Float16HardwareVertexFormatterD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\HardwareVertexFormatterD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\IndexBufferD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\PipelineStateD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\RenderTargetD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\StateManagerD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\TextureD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\VertexBufferD3D9.hpp" />
+    <ClInclude Include="gpg\gal\backends\d3d9\VertexFormatD3D9.hpp" />
+    <ClInclude Include="gpg\gal\Class.hpp" />
+    <ClInclude Include="gpg\gal\CubeRenderTarget.hpp" />
+    <ClInclude Include="gpg\gal\CubeRenderTargetContext.hpp" />
+    <ClInclude Include="gpg\gal\CursorContext.hpp" />
+    <ClInclude Include="gpg\gal\D3D9Utils.h" />
+    <ClInclude Include="gpg\gal\DepthStencilTarget.hpp" />
+    <ClInclude Include="gpg\gal\DepthStencilTargetContext.hpp" />
+    <ClInclude Include="gpg\gal\Device.hpp" />
+    <ClInclude Include="gpg\gal\DeviceContext.hpp" />
+    <ClInclude Include="gpg\gal\DrawContext.hpp" />
+    <ClInclude Include="gpg\gal\DrawIndexedContext.hpp" />
+    <ClInclude Include="gpg\gal\Effect.hpp" />
+    <ClInclude Include="gpg\gal\EffectContext.hpp" />
+    <ClInclude Include="gpg\gal\EffectMacro.hpp" />
+    <ClInclude Include="gpg\gal\EffectTechnique.hpp" />
+    <ClInclude Include="gpg\gal\EffectVariable.hpp" />
+    <ClInclude Include="gpg\gal\Error.hpp" />
+    <ClInclude Include="gpg\gal\Head.hpp" />
+    <ClInclude Include="gpg\gal\IndexBuffer.hpp" />
+    <ClInclude Include="gpg\gal\IndexBufferContext.hpp" />
+    <ClInclude Include="gpg\gal\Matrix.h" />
+    <ClInclude Include="gpg\gal\OutputContext.hpp" />
+    <ClInclude Include="gpg\gal\PipelineState.hpp" />
+    <ClInclude Include="gpg\gal\RenderTarget.hpp" />
+    <ClInclude Include="gpg\gal\RenderTargetContext.hpp" />
+    <ClInclude Include="gpg\gal\StateCache.h" />
+    <ClInclude Include="gpg\gal\StateCache_D3DRENDERSTATETYPE.hpp" />
+    <ClInclude Include="gpg\gal\StateCache_D3DSAMPLERSTATETYPE.hpp" />
+    <ClInclude Include="gpg\gal\StateCache_D3DTEXTURESTAGESTATETYPE.hpp" />
+    <ClInclude Include="gpg\gal\Texture.hpp" />
+    <ClInclude Include="gpg\gal\TextureContext.hpp" />
+    <ClInclude Include="gpg\gal\VertexBuffer.hpp" />
+    <ClInclude Include="gpg\gal\VertexBufferContext.hpp" />
+    <ClInclude Include="gpg\gal\VertexFormat.hpp" />
+    <ClInclude Include="legacy\containers\String.h" />
+    <ClInclude Include="legacy\containers\Tree.h" />
+    <ClInclude Include="legacy\containers\Vector.h" />
+    <ClInclude Include="lua\LuaDebug.h" />
+    <ClInclude Include="lua\LuaObject.h" />
+    <ClInclude Include="lua\LuaState.h" />
+    <ClInclude Include="moho\ai\CAiAttackerImpl.h" />
+    <ClInclude Include="moho\ai\CAiBrain.h" />
+    <ClInclude Include="moho\ai\CAiSiloBuildImpl.h" />
+    <ClInclude Include="moho\ai\IAiSiloBuild.h" />
+    <ClInclude Include="moho\collision\AABB.h" />
+    <ClInclude Include="moho\collision\CColPrimitiveBase.h" />
+    <ClInclude Include="moho\collision\CGeomSolid3.h" />
+    <ClInclude Include="moho\command\ICommandSink.h" />
+    <ClInclude Include="moho\entity\Entity.h" />
+    <ClInclude Include="moho\entity\IUnit.h" />
+    <ClInclude Include="moho\entity\Unit.h" />
+    <ClInclude Include="moho\entity\UserEntity.h" />
+    <ClInclude Include="moho\entity\UserUnit.h" />
+    <ClInclude Include="moho\math\Angle.h" />
+    <ClInclude Include="moho\math\GridPos.h" />
+    <ClInclude Include="moho\math\Vector2f.h" />
+    <ClInclude Include="moho\math\Vector3f.h" />
+    <ClInclude Include="moho\math\Vector4f.h" />
+    <ClInclude Include="moho\math\VMatrix4.h" />
+    <ClInclude Include="moho\misc\InstanceCounter.h" />
+    <ClInclude Include="moho\misc\StatItem.h" />
+    <ClInclude Include="moho\misc\Stats.h" />
+    <ClInclude Include="moho\misc\TDatListItem.h" />
+    <ClInclude Include="moho\misc\TDatTreeItem.h" />
+    <ClInclude Include="moho\misc\VisionDb.h" />
+    <ClInclude Include="moho\misc\WeakObject.h" />
+    <ClInclude Include="moho\net\CClientBase.h" />
+    <ClInclude Include="moho\net\CClientManagerImpl.h" />
+    <ClInclude Include="moho\net\CMessage.h" />
+    <ClInclude Include="moho\net\CMessageDispatcher.h" />
+    <ClInclude Include="moho\net\CNetClient.h" />
+    <ClInclude Include="moho\net\CNetUDPConnection.h" />
+    <ClInclude Include="moho\net\CNetUDPConnector.h" />
+    <ClInclude Include="moho\net\IClient.h" />
+    <ClInclude Include="moho\net\IMessageReceiver.h" />
+    <ClInclude Include="moho\net\INetConnection.h" />
+    <ClInclude Include="moho\net\INetConnector.h" />
+    <ClInclude Include="moho\net\INetNATTraversalHandler.h" />
+    <ClInclude Include="moho\net\CMessageStream.h" />
+    <ClInclude Include="moho\net\SMsgReceiverLinkage.h" />
+    <ClInclude Include="moho\render\camera\GeomCamera3.h" />
+    <ClInclude Include="moho\render\camera\VTransform.h" />
+    <ClInclude Include="moho\resource\CSimResources.h" />
+    <ClInclude Include="moho\resource\IResources.h" />
+    <ClInclude Include="moho\resource\ISimResources.h" />
+    <ClInclude Include="moho\resource\ResourceDeposit.h" />
+    <ClInclude Include="moho\resource\RScmResource.h" />
+    <ClInclude Include="moho\script\CScriptObject.h" />
+    <ClInclude Include="moho\sim\CArmyImpl.h" />
+    <ClInclude Include="moho\sim\CArmyStats.h" />
+    <ClInclude Include="moho\sim\CWldSession.h" />
+    <ClInclude Include="moho\sim\IArmy.h" />
+    <ClInclude Include="moho\sim\IdleUnitSelector.h" />
+    <ClInclude Include="moho\sim\ISessionListener.h" />
+    <ClInclude Include="moho\sim\ISTIDriver.h" />
+    <ClInclude Include="moho\sim\PauseListener.h" />
+    <ClInclude Include="moho\sim\SelectionListener.h" />
+    <ClInclude Include="moho\sim\Sim.h" />
+    <ClInclude Include="moho\sim\SimArmy.h" />
+    <ClInclude Include="moho\sim\SimDriver.h" />
+    <ClInclude Include="moho\sim\SSyncFilter.h" />
+    <ClInclude Include="moho\sim\STIMap.h" />
+    <ClInclude Include="moho\task\CTask.h" />
+    <ClInclude Include="platform\Platform.h" />
+    <ClInclude Include="util\Build.h" />
+    <ClInclude Include="util\Debug.h" />
+    <ClInclude Include="moho\misc\TypeInfo.h" />
+    <ClInclude Include="util\VTCall.h" />
+    <ClInclude Include="wm3\AABB.h" />
+    <ClInclude Include="wm3\Box3.h" />
+    <ClInclude Include="wm3\Mat34.h" />
+    <ClInclude Include="wm3\Plane3.h" />
+    <ClInclude Include="wm3\Quaternion.h" />
+    <ClInclude Include="wm3\Vector2.h" />
+    <ClInclude Include="wm3\Vector3.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

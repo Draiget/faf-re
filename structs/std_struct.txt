@@ -1,0 +1,86 @@
+const std::bad_alloc::`vftable'	00D41438	
+const std::locale::facet::`vftable'	00D41444	
+const std::ctype_base::`vftable'	00D4144C	
+const std::ios_base::`vftable'	00D41454	
+const std::basic_ostream<char,std::char_traits<char>>::`vftable'	00D414E0	
+const std::basic_istream<char,std::char_traits<char>>::`vftable'	00D414E8	
+const std::basic_iostream<char,std::char_traits<char>>::`vftable'	00D414F0	
+const std::basic_ios<char,std::char_traits<char>>::`vftable'	00D414F8	
+const std::basic_streambuf<char,std::char_traits<char>>::`vftable'	00D41510	
+const std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>>::`vftable'	00D4154C	
+const std::basic_stringstream<char,std::char_traits<char>,std::allocator<char>>::`vftable'	00D41588	
+const std::logic_error::`vftable'	00D41590	
+const std::runtime_error::`vftable'	00D4159C	
+const std::length_error::`vftable'	00D415B4	
+const std::out_of_range::`vftable'	00D415C0	
+const std::ios_base::failure::`vftable'	00D415CC	
+const std::ctype<char>::`vftable'	00D415D8	
+const std::invalid_argument::`vftable'	00D41E4C	
+const std::codecvt_base::`vftable'	00D421FC	
+const std::basic_filebuf<char,std::char_traits<char>>::`vftable'	00D423AC	
+const std::range_error::`vftable'	00D423E8	
+const std::basic_ifstream<char,std::char_traits<char>>::`vftable'	00D426C4	
+const std::num_put<char,std::ostreambuf_iterator<char,std::char_traits<char>>>::`vftable'	00D426CC	
+const std::codecvt<char,char,int>::`vftable'	00D426F4	
+const std::numpunct<char>::`vftable'	00D42718	
+const std::basic_ofstream<char,std::char_traits<char>>::`vftable'	00D42734	
+const std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>>::`vftable'	00D44E1C	
+const std::num_get<char,std::istreambuf_iterator<char,std::char_traits<char>>>::`vftable'	00D47A5C	
+const std::exception::`vftable'	00D72A44	
+const std::bad_cast::`vftable'	00D72A64	
+const std::bad_typeid::`vftable'	00D72A70	
+const std::__non_rtti_object::`vftable'	00D72A7C	
+const std::bad_exception::`vftable'	00D737F8	
+const std::locale::_Locimp::`vftable'	00D7EB08	
+const std::domain_error::`vftable'	00E03CA4	
+const std::basic_ios<wchar_t,std::char_traits<wchar_t>>::`vftable'	00E0C40C	
+const std::basic_streambuf<wchar_t,std::char_traits<wchar_t>>::`vftable'	00E0C414	
+const std::basic_istream<wchar_t,std::char_traits<wchar_t>>::`vftable'	00E0C450	
+const std::basic_ostream<wchar_t,std::char_traits<wchar_t>>::`vftable'{for `std::_Iosb<int>'}	00E0C460	
+const std::basic_iostream<wchar_t,std::char_traits<wchar_t>>::`vftable'{for `std::basic_ios<wchar_t,std::char_traits<wchar_t>>'}	00E0C470	
+const std::basic_stringbuf<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::`vftable'	00E0C488	
+const std::basic_stringstream<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::`vftable'	00E0C4C4	
+const std::ctype<wchar_t>::`vftable'	00E0C4DC	
+const std::num_get<char,std::istreambuf_iterator<char,std::char_traits<char>>>::`RTTI Complete Object Locator'	00E52FA4	
+const std::exception::`RTTI Complete Object Locator'	00E5BF78	
+const std::bad_cast::`RTTI Complete Object Locator'	00E5BF8C	
+const std::bad_typeid::`RTTI Complete Object Locator'	00E5BFD8	
+const std::__non_rtti_object::`RTTI Complete Object Locator'	00E5C024	
+const std::bad_exception::`RTTI Complete Object Locator'	00E5C0BC	
+const std::locale::_Locimp::`RTTI Complete Object Locator'	00E5C280	
+const std::runtime_error::`RTTI Complete Object Locator'	00E5C89C	
+const std::bad_alloc::`RTTI Complete Object Locator'	00E5C8E8	
+const std::length_error::`RTTI Complete Object Locator'	00E5D3B0	
+const std::logic_error::`RTTI Complete Object Locator'	00E5D400	
+const std::out_of_range::`RTTI Complete Object Locator'	00E5E364	
+const std::range_error::`RTTI Complete Object Locator'	00E5EC0C	
+const std::ios_base::failure::`RTTI Complete Object Locator'	00E602F8	
+const std::ctype<char>::`RTTI Complete Object Locator'	00E60348	
+const std::ctype_base::`RTTI Complete Object Locator'	00E60398	
+const std::locale::facet::`RTTI Complete Object Locator'	00E603E4	
+const std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>>::`RTTI Complete Object Locator'	00E6042C	
+const std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>>::`RTTI Complete Object Locator'	00E60484	
+const std::basic_ostream<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E604D0	
+const std::basic_streambuf<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E60578	
+const std::basic_ios<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E605C0	
+const std::ios_base::`RTTI Complete Object Locator'	00E60610	
+const std::domain_error::`RTTI Complete Object Locator'	00E60864	
+const std::num_put<char,std::ostreambuf_iterator<char,std::char_traits<char>>>::`RTTI Complete Object Locator'	00E6226C	
+const std::numpunct<char>::`RTTI Complete Object Locator'	00E622B8	
+const std::codecvt<char,char,int>::`RTTI Complete Object Locator'	00E62E18	
+const std::codecvt_base::`RTTI Complete Object Locator'	00E63064	
+const std::basic_ifstream<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E630B0	
+const std::basic_filebuf<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E63108	
+const std::basic_istream<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E63154	
+const std::invalid_argument::`RTTI Complete Object Locator'	00E645F0	
+const std::basic_ofstream<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E65E9C	
+const std::ctype<wchar_t>::`RTTI Complete Object Locator'	00E6632C	
+const std::basic_stringstream<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::`RTTI Complete Object Locator'	00E6637C	
+const std::basic_stringbuf<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::`RTTI Complete Object Locator'	00E663E8	
+const std::basic_iostream<wchar_t,std::char_traits<wchar_t>>::`RTTI Complete Object Locator'	00E66434	
+const std::basic_ostream<wchar_t,std::char_traits<wchar_t>>::`RTTI Complete Object Locator'	00E664B8	
+const std::basic_istream<wchar_t,std::char_traits<wchar_t>>::`RTTI Complete Object Locator'	00E6650C	
+const std::basic_streambuf<wchar_t,std::char_traits<wchar_t>>::`RTTI Complete Object Locator'	00E6657C	
+const std::basic_ios<wchar_t,std::char_traits<wchar_t>>::`RTTI Complete Object Locator'	00E665C4	
+const std::basic_stringstream<char,std::char_traits<char>,std::allocator<char>>::`RTTI Complete Object Locator'	00E9FA38	
+const std::basic_iostream<char,std::char_traits<char>>::`RTTI Complete Object Locator'	00E9FAA4	
