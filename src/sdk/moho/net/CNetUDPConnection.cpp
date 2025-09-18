@@ -9,6 +9,7 @@
 using namespace moho;
 
 int32_t net_SendDelay = 0;
+int32_t net_AckDelay = 0;
 int32_t net_DebugLevel = 0;
 
 float CNetUDPConnection::GetPing() {
@@ -225,7 +226,7 @@ CNetUDPConnection::~CNetUDPConnection() {
 	};
 
 	// Un-acked
-	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.endit(); )
+	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.end(); )
 	{
 		auto* n = it.node();
 		SPacket* p = UnAckedView::owner_from_node(n);
@@ -234,7 +235,7 @@ CNetUDPConnection::~CNetUDPConnection() {
 	}
 
 	// Early
-	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.endit(); )
+	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.end(); )
 	{
 		auto* n = it.node();
 		SPacket* p = EarlyView::owner_from_node(n);
@@ -304,6 +305,285 @@ void CNetUDPConnection::CreateFilterStream() {
 	}
 }
 
+bool CNetUDPConnection::ProcessConnect(const SPacket* pack) {
+	// Obsolete CONNECT: ignore
+	if (pack->mTime <= mTime1) {
+		if (net_DebugLevel) {
+			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring obsolete CONNECT",
+				GetPort(), ToString().c_str());
+		}
+		return true;
+	}
+
+	// Fresh packet: record last-recv wall clock from peer
+	mLastRecv = pack->mSentTime;
+
+	// Unknown compression method
+	if (pack->mCompMethod >= NETCOMP_Deflate + 1) {
+		if (net_DebugLevel) {
+			gpg::Logf(
+				"CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring connect w/ unknown compression method (%u)",
+				GetPort(), ToString().c_str(), static_cast<unsigned>(pack->mCompMethod));
+		}
+		return true;
+	}
+
+	switch (mState) {
+	case ENetConnectionState::Pending:    // 0
+	case ENetConnectionState::Answering:  // 2
+	{
+		// Copy remote nonce and adopt compression.
+		std::memcpy(mDat2, pack->mDat1, sizeof(mDat2));
+		mTime1 = pack->mTime;
+		mReceivedCompressionMethod = static_cast<int>(pack->mCompMethod);
+
+		// Binary rebinds/repurposes packet memory to this connection.
+		AdoptPacket(pack);
+		return true;
+	}
+	case ENetConnectionState::Connecting: // 1 (Connecting)
+	{
+		std::memcpy(mDat2, pack->mDat1, sizeof(mDat2));
+		mTime1 = pack->mTime;
+		mReceivedCompressionMethod = static_cast<int>(pack->mCompMethod);
+
+		AdoptPacket(pack);
+
+		// Transition to Answering
+		mState = ENetConnectionState::Answering;
+		return true;
+	}
+	case ENetConnectionState::Establishing: // 3
+	case ENetConnectionState::TimedOut:     // 4
+	{
+		// Move to Retired and shut down input.
+		mState = ENetConnectionState::TimedOut; // 5
+		mReceivedEndOfInput = true;
+
+		// Close input side (ModeBoth per binary)
+		mInputBuffer.Close(gpg::Stream::ModeBoth);
+
+		if (mConnector->event_) {
+#if defined(_WIN32)
+			::WSASetEvent(mConnector->event_);
+#endif
+		}
+		return false;
+	}
+	default:
+		GPG_UNREACHABLE()
+		return false;
+	}
+}
+
+void CNetUDPConnection::ProcessAnswer(const SPacket* pack) {
+	// Strict size check: expected 92 bytes
+	if (pack->mSize != 92) {
+		if (net_DebugLevel) {
+			gpg::Logf(
+				"CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring wrong length ANSWER (got %d bytes, required %d)",
+				GetPort(), ToString().c_str(), pack->mSize, 92);
+		}
+		return;
+	}
+
+	// Obsolete ANSWER
+	if (pack->mTime <= mTime1) {
+		if (net_DebugLevel) {
+			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring obsolete ANSWER",
+				GetPort(), ToString().c_str());
+		}
+		return;
+	}
+
+	// Receiver nonce must match what we sent earlier
+	if (std::memcmp(mDat1, pack->mDat2, sizeof(mDat1)) != 0) {
+		if (net_DebugLevel) {
+			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER with wrong receiver nonce",
+				GetPort(), ToString().c_str());
+		}
+		return;
+	}
+
+	// Unknown compression method
+	if (pack->mCompMethod >= 2u) {
+		if (net_DebugLevel) {
+			gpg::Logf(
+				"CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring answer w/ unknown compression method (%u)",
+				GetPort(), ToString().c_str(), static_cast<unsigned>(pack->mCompMethod));
+		}
+		return;
+	}
+
+	// Must be in Connecting (1) or Answering (2)
+	if (mState == ENetConnectionState::Pending) {
+		if (net_DebugLevel) {
+			gpg::Logf(
+				"CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER on pending connection",
+				GetPort(), ToString().c_str());
+		}
+		return;
+	}
+
+	if (!(mState == ENetConnectionState::Connecting || mState == ENetConnectionState::Answering)) {
+		if (net_DebugLevel) {
+			gpg::Logf(
+				"CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER on established connection",
+				GetPort(), ToString().c_str());
+		}
+		return;
+	}
+
+	// Update remote timing/window from header.
+	ApplyRemoteHeader(*pack);
+
+	// Refresh peer time and negotiated params.
+	mLastRecv = pack->mSentTime;
+	std::memcpy(mDat2, pack->mDat1, sizeof(mDat2));
+	mTime1 = pack->mTime;
+	mReceivedCompressionMethod = static_cast<int>(pack->mCompMethod);
+
+	// Enable RX filter according to negotiated compression. 
+	CreateFilterStream();
+
+	// Binary rebinds/repurposes packet memory to this connection. 
+	AdoptPacket(pack);
+
+#if defined(_WIN32)
+	::WSASetEvent(mConnector->event_);
+#endif
+}
+
+bool CNetUDPConnection::ProcessAck(const SPacket* pack) {
+	switch (mState) {
+	case ENetConnectionState::Pending: { // 0
+		if (net_DebugLevel) {
+			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Pending connection.",
+				GetPort(), ToString().c_str());
+		}
+		return false;
+	}
+	case ENetConnectionState::Connecting: { // 1
+		if (net_DebugLevel) {
+			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Connecting connection.",
+				GetPort(), ToString().c_str());
+		}
+		return false;
+	}
+	case ENetConnectionState::Answering: // 2
+		// First ACK on Active path turns on RX filter if not set.
+		CreateFilterStream();
+	case ENetConnectionState::Establishing: // 3
+		break; // proceed
+	case ENetConnectionState::TimedOut: // 4
+		// Transition per binary: Error -> Closing before handling.
+		mState = ENetConnectionState::Establishing;
+		break;
+	case ENetConnectionState::Errored: { // 5
+		if (net_DebugLevel) {
+			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Errored connection.",
+				GetPort(), ToString().c_str());
+		}
+		return false;
+	}
+	default:
+		GPG_UNREACHABLE()
+		return false;
+	}
+
+	// Validate that remote's ExpectedSeq isn't ahead of what we've sent.
+	const uint16_t expected = pack->mExpectedSequenceNumber;
+	if (static_cast<int16_t>(mNextSequenceNumber - expected) < 0) {
+		if (net_DebugLevel) {
+			gpg::Logf(
+				"CNetUDPConnection<%u,%s>::ProcessHeader(): ignoring acknowledgement of data we haven't sent (packet=%u, next=%u)",
+				GetPort(), ToString().c_str(),
+				static_cast<unsigned>(expected),
+				static_cast<unsigned>(mNextSequenceNumber));
+		}
+		return false;
+	}
+
+	// Fold in timing/window accounting first.
+	ApplyRemoteHeader(*pack);
+
+	// Ack window: ack everything older than 'expected', and also bits in early mask for last 32.
+	const uint32_t earlyMask = pack->mEarlyMask;
+
+	// Iterate intrusive list of un-acked payloads. We must be tolerant to node deletion while iterating.
+	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.end(); ++it) {
+		auto* n = it.node();
+		SPacket* p = UnAckedView::owner_from_node(n);
+		const int16_t d = static_cast<int16_t>(p->mSequenceNumber - expected);
+
+		bool ack = false;
+		if (d < 0) {
+			// Packet seq < expected: implicitly acknowledged.
+			ack = true;
+		} else {
+			// d in [1..32] acknowledged by early mask bit (d-1).
+			const uint16_t idx = static_cast<uint16_t>(d - 1);
+			if (idx <= 0x1F) {
+				ack = ((earlyMask >> idx) & 1u) != 0;
+			}
+		}
+
+		if (ack) {
+			// Return packet to connector's pool (binary calls CNetUDPConnector::AddPacket(&p, connector))
+			if (mConnector) {
+				mConnector->AddPacket(p);
+			}
+			// The ReleasePacket should also unlink from mUnAckedPayloads; if not, remove explicitly here.
+			// mUnAckedPayloads.erase(prev_it) - implement with your intrusive list API
+		}
+	}
+
+	// Track far end's window head if it advanced.
+	if (static_cast<int16_t>(expected - mRemoteExpectedSequenceNumber) > 0) {
+		mRemoteExpectedSequenceNumber = expected;
+	}
+
+	return true;
+}
+
 void CNetUDPConnection::SetState(const ENetConnectionState state) {
 	mState = state;
+}
+
+void CNetUDPConnection::AdoptPacket(const SPacket* packet) {
+	mInResponseTo = packet->mSerialNumber;
+
+	if (mSendBy.mTime == 0) {
+		// net_AckDelay (ms) -> us
+		const int64_t ackDelayUs = static_cast<int64_t>(net_AckDelay) * 1000LL;
+		mSendBy.mTime = packet->mSentTime + ackDelayUs;
+	}
+}
+
+void CNetUDPConnection::ApplyRemoteHeader(const SPacket& packet) {
+	if (!packet.mInResponseTo) {
+		return;
+	}
+
+	const uint16_t src = packet.mInResponseTo;
+	const uint32_t idx = (src & 0x7F); // 128-entry ring
+
+	if (mTimings[idx].mSource == src)
+	{
+		// Elapsed time in ms since we timestamped that serial
+		const float rawMs = mTimings[idx].mTime.ElapsedMilliSeconds();
+
+		// Update running stats (median/jitter)
+		mPings.Append(rawMs);
+		const float filtered = mPings.Median();
+		mPingTime = filtered;
+		const float jit = mPings.Jitter(filtered);
+
+		if (net_DebugLevel) {
+			gpg::Logf("Ping time: raw=%7.3fms filtered=%7.3fms, jitter=%7.3f", rawMs, mPingTime, jit);
+		}
+
+		// Reset keep-alive cadence to 2s (microseconds)
+		mKeepAliveFreqUs = 2'000'000;
+	}
 }
