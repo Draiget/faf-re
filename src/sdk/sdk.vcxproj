@@ -98,11 +98,16 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -114,11 +119,16 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -128,11 +138,16 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -144,14 +159,20 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="gpg\core\algorithms\Cluster.cpp" />
+    <ClCompile Include="gpg\core\algorithms\MD5.cpp" />
     <ClCompile Include="gpg\core\containers\Set.cpp" />
     <ClCompile Include="gpg\core\containers\String.cpp" />
     <ClCompile Include="gpg\core\random\Random.cpp" />
@@ -160,11 +181,97 @@
     <ClCompile Include="gpg\core\streams\MemBufferStream.cpp" />
     <ClCompile Include="gpg\core\streams\PipeStream.cpp" />
     <ClCompile Include="gpg\core\streams\Stream.cpp" />
+    <ClCompile Include="gpg\core\streams\ZLibOutputFilterStream.cpp" />
+    <ClCompile Include="gpg\core\time\Timer.cpp" />
     <ClCompile Include="gpg\core\utils\BoostWrappers.cpp" />
     <ClCompile Include="gpg\core\utils\Global.cpp" />
     <ClCompile Include="gpg\core\utils\Logging.cpp" />
     <ClCompile Include="legacy\containers\String.cpp" />
     <ClCompile Include="legacy\containers\Vector.cpp" />
+    <ClCompile Include="moho\ai\CAiAttackerImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiAttackerImplConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiAttackerImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiAttackerImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiBrain.cpp" />
+    <ClCompile Include="moho\ai\CAiBrainConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiBrainSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiBrainTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiBuilderImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiBuilderImplConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiBuilderImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiBuilderImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiFormationDBImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiFormationDBImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiFormationDBImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiFormationInstance.cpp" />
+    <ClCompile Include="moho\ai\CAiFormationInstanceSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiFormationInstanceTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAimManipulator.cpp" />
+    <ClCompile Include="moho\ai\CAimManipulatorSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAimManipulatorTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorAir.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorAirConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorAirSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorAirTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorLand.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorLandConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorLandSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiNavigatorLandTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiPathFinder.cpp" />
+    <ClCompile Include="moho\ai\CAiPathFinderSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiPathFinderTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiPathNavigator.cpp" />
+    <ClCompile Include="moho\ai\CAiPathNavigatorSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiPathNavigatorTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiPersonality.cpp" />
+    <ClCompile Include="moho\ai\CAiPersonalityConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiPersonalitySerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiPersonalityTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiReconDBImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiReconDBImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiReconDBImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiSiloBuildImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiSiloBuildImplConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiSiloBuildImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiSiloBuildImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiSteeringImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiSteeringImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiSteeringImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\CAiTransportImpl.cpp" />
+    <ClCompile Include="moho\ai\CAiTransportImplConstruct.cpp" />
+    <ClCompile Include="moho\ai\CAiTransportImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\CAiTransportImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiAttacker.cpp" />
+    <ClCompile Include="moho\ai\IAiAttackerSerializer.cpp" />
+    <ClCompile Include="moho\ai\IAiAttackerTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiBuilder.cpp" />
+    <ClCompile Include="moho\ai\IAiBuilderTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiCommandDispatch.cpp" />
+    <ClCompile Include="moho\ai\IAiCommandDispatchImpl.cpp" />
+    <ClCompile Include="moho\ai\IAiCommandDispatchImplConstruct.cpp" />
+    <ClCompile Include="moho\ai\IAiCommandDispatchImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\IAiCommandDispatchImplTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiCommandDispatchTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiFormationDB.cpp" />
+    <ClCompile Include="moho\ai\IAiFormationDBTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiNavigator.cpp" />
+    <ClCompile Include="moho\ai\IAiNavigatorSerializer.cpp" />
+    <ClCompile Include="moho\ai\IAiNavigatorTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiReconDB.cpp" />
+    <ClCompile Include="moho\ai\IAiReconDBTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiSiloBuild.cpp" />
+    <ClCompile Include="moho\ai\IAiSiloBuildTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiSteering.cpp" />
+    <ClCompile Include="moho\ai\IAiSteeringTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\IAiTransport.cpp" />
+    <ClCompile Include="moho\ai\IAiTransportSerializer.cpp" />
+    <ClCompile Include="moho\ai\IAiTransportTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\LAiAttackerImpl.cpp" />
+    <ClCompile Include="moho\ai\LAiAttackerImplSerializer.cpp" />
+    <ClCompile Include="moho\ai\LAiAttackerImplTypeInfo.cpp" />
     <ClCompile Include="moho\command\ICommandSink.cpp" />
     <ClCompile Include="moho\math\GridPos.cpp" />
     <ClCompile Include="moho\math\Vector2f.cpp" />
@@ -176,6 +283,12 @@
     <ClCompile Include="moho\net\CMessage.cpp" />
     <ClCompile Include="moho\net\CMessageStream.cpp" />
     <ClCompile Include="moho\net\CNetClient.cpp" />
+    <ClCompile Include="moho\net\CNetUDPConnection.cpp" />
+    <ClCompile Include="moho\net\CNetUDPConnector.cpp" />
+    <ClCompile Include="moho\net\General.cpp" />
+    <ClCompile Include="moho\net\INetConnector.cpp" />
+    <ClCompile Include="moho\net\INetNATTraversalHandler.cpp" />
+    <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
     <ClCompile Include="moho\resource\CSimResources.cpp" />
     <ClCompile Include="moho\resource\ISimResources.cpp" />
     <ClCompile Include="moho\sim\CArmyImpl.cpp" />
@@ -185,12 +298,18 @@
     <ClCompile Include="moho\sim\SimArmy.cpp" />
     <ClCompile Include="moho\sim\SimDriver.cpp" />
     <ClCompile Include="moho\sim\STIMap.cpp" />
+    <ClCompile Include="moho\unit\core\IUnit.cpp" />
+    <ClCompile Include="moho\unit\core\Unit.cpp" />
+    <ClCompile Include="moho\unit\core\UserUnit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
     <ClInclude Include="boost\mutex.h" />
+    <ClInclude Include="boost\sp_counted_base.h" />
+    <ClInclude Include="boost\weak_ptr.h" />
     <ClInclude Include="boost\xtime.h" />
     <ClInclude Include="gpg\core\algorithms\Cluster.h" />
+    <ClInclude Include="gpg\core\algorithms\MD5.h" />
     <ClInclude Include="gpg\core\containers\ByteSpan.h" />
     <ClInclude Include="gpg\core\containers\DList.h" />
     <ClInclude Include="gpg\core\containers\DListItem.h" />
@@ -208,6 +327,8 @@
     <ClInclude Include="gpg\core\streams\MemBufferStream.h" />
     <ClInclude Include="gpg\core\streams\PipeStream.h" />
     <ClInclude Include="gpg\core\streams\Stream.h" />
+    <ClInclude Include="gpg\core\streams\ZLibOutputFilterStream.h" />
+    <ClInclude Include="gpg\core\time\Timer.h" />
     <ClInclude Include="gpg\core\utils\BoostUtils.h" />
     <ClInclude Include="gpg\core\utils\BoostWrappers.h" />
     <ClInclude Include="gpg\core\utils\Global.h" />
@@ -281,6 +402,7 @@
     <ClInclude Include="gpg\gal\VertexBuffer.hpp" />
     <ClInclude Include="gpg\gal\VertexBufferContext.hpp" />
     <ClInclude Include="gpg\gal\VertexFormat.hpp" />
+    <ClInclude Include="legacy\containers\Deque.h" />
     <ClInclude Include="legacy\containers\String.h" />
     <ClInclude Include="legacy\containers\Tree.h" />
     <ClInclude Include="legacy\containers\Vector.h" />
@@ -288,18 +410,95 @@
     <ClInclude Include="lua\LuaObject.h" />
     <ClInclude Include="lua\LuaState.h" />
     <ClInclude Include="moho\ai\CAiAttackerImpl.h" />
+    <ClInclude Include="moho\ai\CAiAttackerImplConstruct.h" />
+    <ClInclude Include="moho\ai\CAiAttackerImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiAttackerImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiBrain.h" />
+    <ClInclude Include="moho\ai\CAiBrainConstruct.h" />
+    <ClInclude Include="moho\ai\CAiBrainSerializer.h" />
+    <ClInclude Include="moho\ai\CAiBrainTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiBuilderImpl.h" />
+    <ClInclude Include="moho\ai\CAiBuilderImplConstruct.h" />
+    <ClInclude Include="moho\ai\CAiBuilderImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiBuilderImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiFormationDBImpl.h" />
+    <ClInclude Include="moho\ai\CAiFormationDBImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiFormationDBImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiFormationInstance.h" />
+    <ClInclude Include="moho\ai\CAiFormationInstanceSerializer.h" />
+    <ClInclude Include="moho\ai\CAiFormationInstanceTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAimManipulator.h" />
+    <ClInclude Include="moho\ai\CAimManipulatorSerializer.h" />
+    <ClInclude Include="moho\ai\CAimManipulatorTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorAir.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorAirConstruct.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorAirSerializer.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorAirTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorImpl.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorLand.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorLandConstruct.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorLandSerializer.h" />
+    <ClInclude Include="moho\ai\CAiNavigatorLandTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiPathFinder.h" />
+    <ClInclude Include="moho\ai\CAiPathFinderSerializer.h" />
+    <ClInclude Include="moho\ai\CAiPathFinderTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiPathNavigator.h" />
+    <ClInclude Include="moho\ai\CAiPathNavigatorSerializer.h" />
+    <ClInclude Include="moho\ai\CAiPathNavigatorTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiPersonality.h" />
+    <ClInclude Include="moho\ai\CAiPersonalityConstruct.h" />
+    <ClInclude Include="moho\ai\CAiPersonalitySerializer.h" />
+    <ClInclude Include="moho\ai\CAiPersonalityTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiReconDBImpl.h" />
+    <ClInclude Include="moho\ai\CAiReconDBImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiReconDBImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiSiloBuildImpl.h" />
+    <ClInclude Include="moho\ai\CAiSiloBuildImplConstruct.h" />
+    <ClInclude Include="moho\ai\CAiSiloBuildImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiSiloBuildImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiSteeringImpl.h" />
+    <ClInclude Include="moho\ai\CAiSteeringImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiSteeringImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\CAiTransportImpl.h" />
+    <ClInclude Include="moho\ai\CAiTransportImplConstruct.h" />
+    <ClInclude Include="moho\ai\CAiTransportImplSerializer.h" />
+    <ClInclude Include="moho\ai\CAiTransportImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiAttacker.h" />
+    <ClInclude Include="moho\ai\IAiAttackerSerializer.h" />
+    <ClInclude Include="moho\ai\IAiAttackerTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiBuilder.h" />
+    <ClInclude Include="moho\ai\IAiBuilderTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiCommandDispatch.h" />
+    <ClInclude Include="moho\ai\IAiCommandDispatchImpl.h" />
+    <ClInclude Include="moho\ai\IAiCommandDispatchImplConstruct.h" />
+    <ClInclude Include="moho\ai\IAiCommandDispatchImplSerializer.h" />
+    <ClInclude Include="moho\ai\IAiCommandDispatchImplTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiCommandDispatchTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiFormationDB.h" />
+    <ClInclude Include="moho\ai\IAiFormationDBTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiNavigator.h" />
+    <ClInclude Include="moho\ai\IAiNavigatorSerializer.h" />
+    <ClInclude Include="moho\ai\IAiNavigatorTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiReconDB.h" />
+    <ClInclude Include="moho\ai\IAiReconDBTypeInfo.h" />
     <ClInclude Include="moho\ai\IAiSiloBuild.h" />
+    <ClInclude Include="moho\ai\IAiSiloBuildTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiSteering.h" />
+    <ClInclude Include="moho\ai\IAiSteeringTypeInfo.h" />
+    <ClInclude Include="moho\ai\IAiTransport.h" />
+    <ClInclude Include="moho\ai\IAiTransportSerializer.h" />
+    <ClInclude Include="moho\ai\IAiTransportTypeInfo.h" />
+    <ClInclude Include="moho\ai\LAiAttackerImpl.h" />
+    <ClInclude Include="moho\ai\LAiAttackerImplSerializer.h" />
+    <ClInclude Include="moho\ai\LAiAttackerImplTypeInfo.h" />
     <ClInclude Include="moho\collision\AABB.h" />
     <ClInclude Include="moho\collision\CColPrimitiveBase.h" />
     <ClInclude Include="moho\collision\CGeomSolid3.h" />
     <ClInclude Include="moho\command\ICommandSink.h" />
     <ClInclude Include="moho\entity\Entity.h" />
-    <ClInclude Include="moho\entity\IUnit.h" />
-    <ClInclude Include="moho\entity\Unit.h" />
     <ClInclude Include="moho\entity\UserEntity.h" />
-    <ClInclude Include="moho\entity\UserUnit.h" />
     <ClInclude Include="moho\math\Angle.h" />
     <ClInclude Include="moho\math\GridPos.h" />
     <ClInclude Include="moho\math\Vector2f.h" />
@@ -309,24 +508,26 @@
     <ClInclude Include="moho\misc\InstanceCounter.h" />
     <ClInclude Include="moho\misc\StatItem.h" />
     <ClInclude Include="moho\misc\Stats.h" />
-    <ClInclude Include="moho\misc\TDatListItem.h" />
+    <ClInclude Include="moho\misc\TDatList.h" />
     <ClInclude Include="moho\misc\TDatTreeItem.h" />
     <ClInclude Include="moho\misc\VisionDb.h" />
     <ClInclude Include="moho\misc\WeakObject.h" />
     <ClInclude Include="moho\net\CClientBase.h" />
     <ClInclude Include="moho\net\CClientManagerImpl.h" />
+    <ClInclude Include="moho\net\CHostManager.h" />
     <ClInclude Include="moho\net\CMessage.h" />
-    <ClInclude Include="moho\net\CMessageDispatcher.h" />
     <ClInclude Include="moho\net\CNetClient.h" />
     <ClInclude Include="moho\net\CNetUDPConnection.h" />
     <ClInclude Include="moho\net\CNetUDPConnector.h" />
+    <ClInclude Include="moho\net\General.h" />
     <ClInclude Include="moho\net\IClient.h" />
     <ClInclude Include="moho\net\IMessageReceiver.h" />
     <ClInclude Include="moho\net\INetConnection.h" />
     <ClInclude Include="moho\net\INetConnector.h" />
     <ClInclude Include="moho\net\INetNATTraversalHandler.h" />
     <ClInclude Include="moho\net\CMessageStream.h" />
-    <ClInclude Include="moho\net\SMsgReceiverLinkage.h" />
+    <ClInclude Include="moho\net\INetNATTraversalProvider.h" />
+    <ClInclude Include="moho\net\SPacket.h" />
     <ClInclude Include="moho\render\camera\GeomCamera3.h" />
     <ClInclude Include="moho\render\camera\VTransform.h" />
     <ClInclude Include="moho\resource\CSimResources.h" />
@@ -350,6 +551,9 @@
     <ClInclude Include="moho\sim\SSyncFilter.h" />
     <ClInclude Include="moho\sim\STIMap.h" />
     <ClInclude Include="moho\task\CTask.h" />
+    <ClInclude Include="moho\unit\core\IUnit.h" />
+    <ClInclude Include="moho\unit\core\Unit.h" />
+    <ClInclude Include="moho\unit\core\UserUnit.h" />
     <ClInclude Include="platform\Platform.h" />
     <ClInclude Include="util\Build.h" />
     <ClInclude Include="util\Debug.h" />

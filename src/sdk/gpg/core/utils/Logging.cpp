@@ -93,3 +93,41 @@ void gpg::Warnf(const char* fmt, ...) {
         g_LogCtx->Dispatch(kWarn, msg);
     }
 }
+
+// 0x00937C30
+// ReSharper disable once IdentifierTypo
+void gpg::Debugf(const char* fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+    const msvc8::string msg = STR_Va(fmt, va);
+    va_end(va);
+
+    std::call_once(g_LogOnce, &InitLogSingleton);
+
+    if (g_LogCtx) {
+        g_LogCtx->Dispatch(kWarn, msg);
+    }
+}
+
+msvc8::string gpg::FileTimeToString(const FILETIME time) {
+    // Convert microseconds to 100-ns ticks expected by FILETIME APIs
+    FILETIME ft100ns{};
+    *reinterpret_cast<ULONGLONG*>(&ft100ns) =
+        static_cast<ULONGLONG>(*reinterpret_cast<const ULONGLONG*>(&time)) * 10ULL;
+
+    // FILETIME (UTC) -> local FILETIME -> SYSTEMTIME (local)
+    FILETIME localFt{};
+    SYSTEMTIME st{};
+    if (!::FileTimeToLocalFileTime(&ft100ns, &localFt) ||
+        !::FileTimeToSystemTime(&localFt, &st))
+    {
+        return {};
+    }
+
+    // Format as HH:MM:SS.mmm
+    return STR_Printf("%02u:%02u:%02u.%03u",
+        static_cast<unsigned>(st.wHour),
+        static_cast<unsigned>(st.wMinute),
+        static_cast<unsigned>(st.wSecond),
+        static_cast<unsigned>(st.wMilliseconds));
+}

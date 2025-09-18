@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #if defined(_MSC_VER)
 #define FA_FASTCALL __fastcall
@@ -13,7 +13,9 @@
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
-#  include <windows.h>
+	#include <winsock2.h>
+	#include <ws2tcpip.h>
+	#include <windows.h>
 #else
 #  include <pthread.h>
 #  include <errno.h>
@@ -28,4 +30,8 @@
 #include <immintrin.h>
 #define MOHO_FORCEINLINE inline __attribute__((always_inline))
 #define MOHO_RESTRICT __restrict__
+#endif
+
+#if defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_)
+#  error "winsock.h (v1) was included instead of winsock2.h. Fix your include order."
 #endif

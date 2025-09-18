@@ -59,7 +59,7 @@ namespace boost
          * The lock must own a boost::mutex at entry; it is atomically released
          * during wait and reacquired before return.
          */
-        void wait(boost::mutex::scoped_lock& lock) noexcept {
+        void wait(mutex::scoped_lock& lock) noexcept {
 #if defined(_WIN32)
             EnterCriticalSection(&waiters_lock_);
             ++waiters_;
@@ -91,11 +91,11 @@ namespace boost
          * Timed wait until absolute deadline `xt`. Returns true if signaled, false on timeout.
          * The lock is atomically released and reacquired across the wait.
          */
-        bool timed_wait(boost::mutex::scoped_lock& lock, const boost::xtime& xt) noexcept {
+        bool timed_wait(mutex::scoped_lock& lock, const xtime& xt) noexcept {
 #if defined(_WIN32)
             // Compute timeout in milliseconds relative to now (TIME_UTC)
-            boost::xtime now{};
-            if (boost::xtime_get(&now, boost::kTimeUtc) != boost::kTimeUtc) {
+            xtime now{};
+            if (xtime_get(&now, kTimeUtc) != kTimeUtc) {
                 // Unable to get time: fall back to immediate timeout behavior
                 return false;
             }

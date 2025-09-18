@@ -1,113 +1,108 @@
 #pragma once
 
+#include "General.h"
+#include "platform/Platform.h"
+
 namespace moho
 {
+	class CNetUDPConnection;
+
+    /**
+     * VFTABLE: 0x00E03CB0
+     * COL:  0x00E6081C
+     */
 	class INetConnector
 	{
-        // Primary vftable (13 entries)
 	public:
         /**
-         * In binary: 
-         *
-         * PDB address: 0x47EAE0
-         * VFTable SLOT: 0
-         */
-        virtual void sub_47EAE0() = 0;
+	     * Address: 0x0047EAE0
+	     * Slot: 0
+	     * Demangled: public: __thiscall Moho::INetConnector::~INetConnector()
+	     */
+        virtual ~INetConnector() = default;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 1
+         * Address: 0x00A82547
+         * Slot: 1
+         * Demangled: _purecall
          */
-        virtual void sub_A82547() = 0; 
+        virtual void Destroy() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 2
+         * Address: 0x00A82547
+         * Slot: 2
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_1() = 0;
+        virtual ENetProtocolType GetProtocol() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 3
+         * Address: 0x00A82547
+         * Slot: 3
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_2() = 0; 
+        virtual u_short GetLocalPort() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 4
+         * Address: 0x00A82547
+         * Slot: 4
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_3() = 0;
+        virtual CNetUDPConnection* Connect(u_long address, u_short port) = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 5
+         * Address: 0x00A82547
+         * Slot: 5
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_4() = 0;
+        virtual bool FindNextAddr(u_long& outAddress, u_short& outPort) = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 6
+         * Address: 0x00A82547
+         * Slot: 6
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_5() = 0;
+        virtual void Accept() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 7
+         * Address: 0x00A82547
+         * Slot: 7
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_6() = 0;
+        virtual int Reject(u_long address, u_short port) = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 8
+         * Address: 0x00A82547
+         * Slot: 8
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_7() = 0;
+        virtual void Pull() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 9
+         * Address: 0x00A82547
+         * Slot: 9
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_8() = 0;
+        virtual void Push() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 10
+         * Address: 0x00A82547
+         * Slot: 10
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_9() = 0;
+        virtual void SelectEvent() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x47EAD0
-         * VFTable SLOT: 11
+         * Address: 0x0047EAD0
+         * Slot: 11
+         * Demangled: Moho::INetConnector::Debug
          */
-        virtual void sub_47EAD0() = 0;
+        virtual void Debug() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0xA82547
-         * VFTable SLOT: 12
+         * Address: 0x00A82547
+         * Slot: 12
+         * Demangled: _purecall
          */
-        virtual void sub_A82547_10() = 0;
+        virtual SendStampView& SnapshotSendStamps(SendStampView& out, int windowMs) = 0;
 	};
 }

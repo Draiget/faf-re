@@ -11,6 +11,7 @@ namespace gpg
      * Severity levels mapped to original call sites.
      */
     enum : int {
+        kDebug = 0,
         kInfo = 1,
         kWarn = 2,
     };
@@ -118,4 +119,17 @@ namespace gpg
      * @param ... Arguments
      */
     void Warnf(const char* fmt, ...);
+
+    // ReSharper disable once IdentifierTypo
+    /**
+     * Printf-style logging helper (debug severity).
+     * Builds a formatted string and dispatches it to registered targets.
+     * Address: 0x00937C30
+     *
+     * @param fmt Format string
+     * @param ... Arguments
+     */
+    void Debugf(const char* fmt, ...);
+
+    msvc8::string FileTimeToString(FILETIME time);
 }

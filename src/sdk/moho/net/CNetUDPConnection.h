@@ -1,77 +1,122 @@
 ﻿#pragma once
 #include "INetConnection.h"
+#include "INetConnector.h"
+#include "SPacket.h"
+#include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/streams/PipeStream.h"
+#include "gpg/core/streams/ZLibOutputFilterStream.h"
+#include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/BoostUtils.h"
+#include "legacy/containers/String.h"
 
 namespace moho
 {
+    static ENetCompressionMethod net_CompressionMethod = NETCOMP_Deflate;
+
+	class CNetUDPConnector;
+	/**
+     * VFTABLE: 0x00E06118
+     * COL:  0x00E60D70
+     */
 	class CNetUDPConnection : public INetConnection, boost::noncopyable_::noncopyable
 	{
-        // Primary vftable (8 entries)
     public:
         /**
-         * In binary: 
-         *
-         * PDB address: 0x485BE0
-         * VFTable SLOT: 0
-         */
-        virtual void sub_485BE0() = 0;
+	     * Address: 0x00485BE0
+	     * Slot: 0
+	     * Demangled: moho::CNetUDPConnection::GetAddr
+	     */
+        u_long GetAddr() override {
+            return mAddr;
+        }
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x485BF0
-         * VFTable SLOT: 1
+         * Address: 0x00485BF0
+         * Slot: 1
+         * Demangled: moho::CNetUDPConnection::GetPort
          */
-        virtual void sub_485BF0() = 0;
+        uint16_t GetPort() override {
+            return mPort;
+        }
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x489550
-         * VFTable SLOT: 2
+         * Address: 0x00489550
+         * Slot: 2
+         * Demangled: moho::CNetUDPConnection::GetPing
          */
-        virtual void sub_489550() = 0;
+        float GetPing() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x489590
-         * VFTable SLOT: 3
+         * Address: 0x00489590
+         * Slot: 3
+         * Demangled: moho::CNetUDPConnection::GetTime
          */
-        virtual void sub_489590() = 0;
+        float GetTime() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x489130
-         * VFTable SLOT: 4
+         * Address: 0x00489130
+         * Slot: 4
+         * Demangled: moho::CNetUDPConnection::Write
          */
-        virtual void sub_489130() = 0;
+        void Write(NetDataSpan* data) override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x4893F0
-         * VFTable SLOT: 5
+         * Address: 0x004893F0
+         * Slot: 5
+         * Demangled: moho::CNetUDPConnection::Close
          */
-        virtual void sub_4893F0() = 0;
+        void Close() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x4894C0
-         * VFTable SLOT: 6
+         * Address: 0x004894C0
+         * Slot: 6
+         * Demangled: moho::CNetUDPConnection::ToString
          */
-        virtual void sub_4894C0() = 0;
+        msvc8::string ToString() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x489660
-         * VFTable SLOT: 7
+         * Address: 0x00489660
+         * Slot: 7
+         * Demangled: moho::CNetUDPConnection::ScheduleDestroy
          */
-        virtual void sub_489660() = 0;
+        void ScheduleDestroy() override;
 
+        /**
+         * Address: 0x00485D30
+         */
+        CNetUDPConnection(CNetUDPConnector& connector, u_long address, u_short port, ENetConnectionState state);
+
+        /**
+         * Address: 0x00486150
+         */
+        virtual ~CNetUDPConnection();
+
+        /**
+         * Address: 0x00486910
+         *
+		 * Initialize receive-side filter stream according to compression method.
+         */
+        void CreateFilterStream();
+
+        bool ProcessConnect(SPacket* pack); // 0x00486380
+        void ProcessAnswer(SPacket* pack); // 0x004865E0
+        bool ProcessAck(SPacket* pack); // 0x00486B10
+        void ProcessData(SPacket* pack); // 0x00486DB0
+        void ProcessKeepAlive(SPacket* pack); // 0x00487310
+        void ProcessGoodbye(SPacket* pack); // 0x00487340
+        void ProcessNATTraversal(SPacket* pack); // 0x00487370
+        int64_t CalcResendDelay(SPacket* pack); // 0x00488170
+        int GetSentTime(int64_t time); // 0x00488260
+        int SendData(); // 0x00488300
+        bool HasPacketWaiting(int64_t time); // 0x00488730
+        SPacket* NextPacket_0(); // 0x00488810
+        SPacket* NextPacket_1(); // 0x004888C0
+        SPacket* ReadPacket(); // 0x00488980
+        SPacket* NextPacket_7(); // 0x00488AA0
+        SPacket* NextPacket(char state, int size, bool inherit); // 0x00488B20
+        void SendPacket(SPacket* pack); // 0x00488D80
+
+        void SetState(ENetConnectionState state);
 	public:
         // ...
         // +0x410  ListEntry linkInConnector
@@ -81,5 +126,63 @@ namespace moho
         // vtable[0]: uint32_t RemoteAddrBE() const
         // vtable[1]: uint16_t RemotePort()  const
         // vtable[7]: void CloseOrRelease()
+
+        using UnAckedView = TPairList<SPacket, SPacketHeader, void, &SPacketHeader::mList>;
+        using EarlyView = TPairList<SPacket, SPacketHeader, void, &SPacketHeader::mList>;
+
+        TDatListItem<CNetUDPConnection, void> mConnList;
+        CNetUDPConnector* mConnector;
+        u_long mAddr;
+        u_short mPort;
+        WORD gap1;
+        ENetCompressionMethod mOurCompressionMethod;
+        int mReceivedCompressionMethod;
+        ENetConnectionState mState;
+        gpg::time::Timer mLastSend;
+        int64_t mSendTime;
+        int64_t mLastRecv;
+        int64_t mLastKeepAlive;
+        uint32_t mKeepAliveFreqUs{ 2'000'000 }; // set to 0x1E8480 (~2s)
+        char mDat1[32];
+        char mDat2[32];
+        int v293;
+        int64_t mTime1;
+        uint16_t mNextSerialNumber;
+        uint16_t mInResponseTo;
+        gpg::time::Timer mSendBy;
+        uint16_t mNextSequenceNumber;
+        uint16_t mRemoteExpectedSequenceNumber;
+        uint16_t mExpectedSequenceNumber;
+        uint16_t v1;
+        gpg::PipeStream mOutputData;
+        gpg::ZLibOutputFilterStream* mOutputFilterStream;
+        BYTE gap500[4];
+        DWORD mFlushedOutputData;
+        bool mOutputShutdown;
+        bool mSentShutdown;
+        WORD gap50E;
+        UnAckedView mUnAckedPayloads;
+        NetPacketTime mTimings[128];
+        NetSpeeds mPings;
+        float mPingTime;
+        EarlyView mEarlyPackets;
+        DWORD gapD94;
+        gpg::PipeStream mInputBuffer;
+        gpg::ZLibOutputFilterStream* mFilterStream{nullptr};
+        bool mReceivedEndOfInput;
+        bool mDispatchedEndOfInput;
+        CMessage mMessage;
+        DWORD v866;
+        bool  mScheduleDestroy;
+        bool v867b;
+        bool  mClosed;
+        int64_t mTotalBytesQueued;
+        int64_t mTotalBytesSent;
+        int64_t mTotalBytesReceived;
+        int64_t mTotalBytesDispatched;
+        gpg::MD5Context mTotalBytesQueuedMD5;
+        gpg::MD5Context mTotalBytesSentMD5;
+        gpg::MD5Context mTotalBytesReceivedMD5;
+        gpg::MD5Context mTotalBytesDispatchedMD5;
 	};
 }

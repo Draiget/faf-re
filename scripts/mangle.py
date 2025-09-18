@@ -310,6 +310,49 @@ def decode_scoped(s: str, i: int) -> Tuple[str, int]:
     fq = "::".join(list(reversed(outers)) + [inner]) if outers else inner
     return fq, i
 
+def decode_templated_named(s: str, i: int) -> Tuple[str, int]:
+    """
+    Decode a templated named type inside decorated symbols, starting at i:
+      ?$Name@<arg1><@><arg2><@>...<@><Scope>@@
+    Returns (fully_qualified_name_with_args, new_index).
+    """
+    # expect '?$'
+    if not s.startswith("?$", i):
+        raise ValueError("decode_templated_named: not at '?$'")
+    i += 2
+    # template identifier up to '@'
+    j = s.find("@", i)
+    if j == -1:
+        raise ValueError("decode_templated_named: missing '@' after template name")
+    tmpl_name = s[i:j]
+    i = j + 1
+
+    # parse args: sequence of MSVC types, separated by one or more '@'
+    args = []
+    while True:
+        t, i = decode_type(s, i)
+        args.append(t)
+        # consume '@' separators after each arg
+        k = i
+        while k < len(s) and s[k] == '@':
+            k += 1
+        # If a scope follows here, args are done.
+        try:
+            _probe, _ = decode_scoped(s, k)
+            i = k
+            break
+        except Exception:
+            i = k
+            if i >= len(s):
+                break
+
+    # scope (may be empty for local/anonymous, but usually present)
+    scope = ""
+    if i < len(s):
+        scope, i = decode_scoped(s, i)
+    fq = f"{scope}::{tmpl_name}" if scope else tmpl_name
+    return f"{fq}<{', '.join(args)}>", i
+
 def decode_type(s: str, i: int) -> Tuple[str, int]:
     """
     Decode a type starting at `i` in a mangled string `s`, returning (type_text, new_index).
@@ -333,7 +376,13 @@ def decode_type(s: str, i: int) -> Tuple[str, int]:
         return f"enum {name}", j
     # class/struct/union by value
     if s[i] in ('V', 'U', 'T'):
-        name, j = decode_scoped(s, i+1)
+        j = i + 1
+        # support templated names in function signatures: V?$Name@Args@Scope@@
+        if s.startswith("?$", j):
+            name, j = decode_templated_named(s, j)
+        else:
+            name, j = decode_scoped(s, j)
+        # Note: return bare qualified name (no 'class/struct' prefix)
         return name, j
     # primitives
     if s[i] == '_' and s[i:i+2] in TYPE_DECODE:
@@ -427,7 +476,7 @@ def demangle(deco: str) -> str:
     
     # Data symbols (globals / static members), layout:
     # ?<name>@<scopes>@@<stor><type-encoding><cv-letter>
-    m_data = re.match(r"^\?([^@?]+(?:@[^@?]+)*)@@([0-9A-Z])(.*)$", deco)
+    m_data = re.match(r"^\?([^@?]+(?:@[^@?]+)*)@@([0-9])(.*)$", deco)
     if m_data:
         name_seg = m_data.group(1)      # e.g. 'g_Var@Ns2@Ns1'
         stor     = m_data.group(2)      # '3' = global (unused further here)

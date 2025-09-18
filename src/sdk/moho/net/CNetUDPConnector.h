@@ -1,31 +1,27 @@
 #pragma once
 #include <cstdint>
 
+#include "platform/Platform.h"
 #include "CNetUDPConnection.h"
 #include "INetConnector.h"
 #include "INetNATTraversalHandler.h"
+#include "INetNATTraversalProvider.h"
+#include "SPacket.h"
+#include "boost/weak_ptr.h"
 #include "gpg/core/containers/IntrusiveLink.h"
+#include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Sync.h"
+#include "legacy/containers/Deque.h"
+#include "legacy/containers/Vector.h"
+#include "moho/misc/TDatList.h"
 
 namespace moho
 {
-    enum class NetConnectorType : int32_t
-	{
-        TCP = 1, // guess
-        UDP = 2  // confirmed by GetType()
-    };
-
-    enum EPacketState
+    struct SReceivePacket
     {
-        CONNECT,
-        ANSWER,
-        RESETSERIAL,
-        SERIALRESET,
-        DATA,
-        ACK,
-        KEEPALIVE,
-        GOODBYE,
-        NATTRAVERSAL,
+	    SPacket* mPacket;
+    	u_long mAddr;
+    	u_short mPort;
     };
 
     /*
@@ -46,149 +42,148 @@ namespace moho
      * 7 - Restart Requested
      * 8 - Session Halted
      */
-
-	class CNetUDPConnector : public INetConnector, public INetNATTraversalHandler
+	class CNetUDPConnector :
+		public INetConnector,
+		public INetNATTraversalHandler
 	{
-        // Primary vftable (13 entries)
 	public:
-        /**
-         * In binary: dtor
-         *
-         * PDB address: 0x4899E0
-         * VFTable SLOT: 0
-         */
-        void ~CNetUDPConnector() = default;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x489D20
-         * VFTable SLOT: 1
+		 * Releases lists, socket/event, packet pool, NAT provider weak_ptr.
+		 *
+         * Address: 0x004899E0
+         * Slot: 0
+         * Demangled: Moho::CNetUDPConnector::dtr
          */
-        virtual void Shutdown() = 0;
+        ~CNetUDPConnector() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x485CA0
-         * VFTable SLOT: 2
+		 * In binary this does:
+		 * 1) locks weak_ptr to NAT provider and notifies it with local port
+		 * 2) clears weak_ptr safely
+		 * 3) calls a "close/shutdown" on each connection
+		 * 4) sets a "stopping" flag and signals worker event
+		 *
+         * Address: 0x00489D20
+         * Slot: 1
+         * Demangled: Moho::CNetUDPConnector::Destroy
          */
-        virtual NetConnectorType GetType() = 0;
+        void Destroy() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B250
-         * VFTable SLOT: 3
+         * Address: 0x00485CA0
+         * Slot: 2
+         * Demangled: Moho::CNetUDPConnector::GetProtocol
          */
-        virtual uint16_t GetLocalPort() = 0;
+        ENetProtocolType GetProtocol() override {
+            return ENetProtocolType::UDP;
+        };
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B2B0
-         * VFTable SLOT: 4
+         * Address: 0x0048B250
+         * Slot: 3
+         * Demangled: Moho::CNetUDPConnector::GetLocalPort
          */
-        virtual CNetUDPConnection* AcceptConnection(uint32_t address, uint16_t port) = 0;
+        u_short GetLocalPort() override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B410
-         * VFTable SLOT: 5
+         * Address: 0x0048B2B0
+         * Slot: 4
+         * Demangled: Moho::CNetUDPConnector::Connect
          */
-        virtual bool TryGetIdlePeer(uint32_t& outAddress, uint16_t& outPort) = 0;
+        CNetUDPConnection* Connect(u_long address, u_short port) override;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B4F0
-         * VFTable SLOT: 6
+         * Address: 0x0048B410
+         * Slot: 5
+         * Demangled: Moho::CNetUDPConnector::FindNextAddr
          */
-        virtual void sub_48B4F0() = 0;
+        virtual bool FindNextAddr(u_long& outAddress, u_short& outPort) = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B500
-         * VFTable SLOT: 7
+         * Address: 0x0048B4F0
+         * Slot: 6
+         * Demangled: Moho::CNetUDPConnector::Accept
          */
-        virtual int CloseIdlePeer(uint32_t address, uint16_t port) = 0;
+        virtual void Accept() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B5C0
-         * VFTable SLOT: 8
+         * Address: 0x0048B500
+         * Slot: 7
+         * Demangled: Moho::CNetUDPConnector::Reject
          */
-        virtual void sub_48B5C0() = 0; 
+        virtual int Reject(u_long address, u_short port) = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B7F0
-         * VFTable SLOT: 9
+         * Address: 0x0048B5C0
+         * Slot: 8
+         * Demangled: Moho::CNetUDPConnector::Pull
          */
-        virtual void sub_48B7F0() = 0;
+        virtual void Pull() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B9A0
-         * VFTable SLOT: 10
+         * Address: 0x0048B7F0
+         * Slot: 9
+         * Demangled: Moho::CNetUDPConnector::Push
          */
-        virtual void sub_48B9A0() = 0; 
+        virtual void Push() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B8E0
-         * VFTable SLOT: 11
+         * Address: 0x0048B9A0
+         * Slot: 10
+         * Demangled: Moho::CNetUDPConnector::SelectEvent
          */
-        virtual void sub_48B8E0() = 0;
+        virtual void SelectEvent() = 0;
 
         /**
-         * In binary:
-         *
-         * PDB address: 0x48B9E0
-         * VFTable SLOT: 12
+         * Address: 0x0048B8E0
+         * Slot: 11
+         * Demangled: Moho::CNetUDPConnector::Debug
          */
-        virtual void sub_48B9E0() = 0;
+        virtual void Debug() = 0;
 
-    // Secondary vftable at subobject offset 4 (2 entries)
-    public:
-        void sub_A82547() override = 0; // 0x48BA80
-        void sub_A82547_1() override = 0; // 0x48BAE0
+        /**
+         * Address: 0x0048B9E0
+         * Slot: 12
+         * Demangled: Moho::CNetUDPConnector::Func3
+         */
+        virtual SendStampView& SnapshotSendStamps(SendStampView& out, int windowMs);
+
+        /**
+         * Address: 0x00489F30
+         *
+         * Returns a monotonic microsecond timestamp based on (v14 baseline) + (timer elapsed),
+         * clamped so it never goes backwards.
+         */
+        int64_t GetTime();
 
 	public:
         // +0x00  vptr(INetConnector)
         // +0x04  vptr(INetNATTraversalHandler)
 
-        // at 0x08
-        gpg::core::Mutex sync_;
-
-        // at 0x14
+        gpg::core::SharedLock lock_;
         SOCKET socket_;
-
-        // at 0x24
+        HANDLE event_;
+        boost::weak_ptr<INetNATTraversalProvider> mNatTravProv;
         gpg::core::IntrusiveLink<CNetUDPConnection*> connections_;
+        TDatList<CNetUDPConnection, void> mConnections;
+        TDatList<SPacket, void> mPacketList;
+        int mPacketPoolSize;
+        _FILETIME v14;
+        gpg::time::Timer mTimer;
+        int64_t mCurTime{ 0 };
 
-        // +0x1C  void*  currentToken_    // cleared in Shutdown()
-        // +0x20  RefCounted* rcToken_    // released in Shutdown()
-	    // +0x24  ListEntry connections_; // sentinel
-	    // +0x28  connections_.Flink
-	    // ...
-	    // +0x2C  free-list anchor for small packet pool (this+44)
-	    // +0x38  smallPoolHead_ (this[11])
-	    // +0x34  smallPoolCount_ (this[13])
-	    //
-	    // Outbound ring (ring buffer of pending sends):
-	    // +0x6C  void** outRingItems_    // this[27]
-	    // +0x70  uint32_t outRingCap_    // this[28]
-	    // +0x74  uint32_t outRingHead_   // this[29]
-	    // +0x78  uint32_t outRingCount_  // this[30]
-	    //
-	    // +0x50  uint8_t resignalWorkerFlag_ // this[80]
-	    // +0x51  uint8_t inPumpFlag_         // this[81]
+        // Resignal worker when Pull/Push finishes (this[80])
+        std::atomic<bool> resignalWorker_{ false };
+        // In Pull() guard flag (this[81])
+        std::atomic<bool> inPump_{ false };
+
+        msvc8::deque<SReceivePacket> mPackets1;
+        msvc8::deque<SReceivePacket> mPackets2;
+
+        SendStampBuffer mBuff;
+
+        FILE* mFile;
+        int gap;
 	};
 }

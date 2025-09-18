@@ -10,7 +10,8 @@ namespace moho
      * VFTABLE: 0x00E16CF4
      * COL:  0x00E6AD78
      */
-    class CNetClient : public CClientBase {
+    class CNetClient : public CClientBase
+	{
     public:
         /**
          * Address: 0x0053B930
