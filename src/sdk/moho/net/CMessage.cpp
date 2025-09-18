@@ -13,6 +13,7 @@ CMessage::CMessage(int size, const char type) {
     SetSize(size);
     SetType(type);
 }
+
 int CMessage::GetMessageSize() {
     int size = this->GetSize();
     if (size >= 3) {
@@ -31,6 +32,23 @@ unsigned int CMessage::Append(const char* ptr, const size_t size) {
     const auto targetSize = this->mBuf.Size();
     this->SetSize(targetSize);
     return targetSize;
+}
+
+void inline CMessage::Clear() noexcept {
+    // If we currently point into heap memory, free it
+    if (mBuf.start_ != mBuf.originalVec_) {
+        delete[] mBuf.start_;
+
+        // Restore start to inline storage base
+        mBuf.start_ = mBuf.originalVec_;
+
+        // Inline header stores capacity pointer at [originalVec]
+        // (binary: capacity = *(char**)originalVec)
+        mBuf.capacity_ = *reinterpret_cast<char**>(mBuf.originalVec_);
+    }
+
+    // Reset logical size to 0 (binary: end = start)
+    mBuf.end_ = mBuf.start_;
 }
 
 bool CMessage::ReadMessage(gpg::Stream* stream) {

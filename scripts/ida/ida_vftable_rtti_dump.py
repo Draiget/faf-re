@@ -309,6 +309,17 @@ def parse_chd_bases(chd_ea: int) -> list:
     except Exception:
         return []
 
+# ---------- Small utilities ----------
+def _dedup_preserve(seq):
+    """Preserve order, drop duplicates."""
+    seen = set()
+    out = []
+    for x in seq:
+        if x not in seen:
+            seen.add(x); out.append(x)
+    return out
+
+
 # ---------- Immediate base heuristic ----------
 def _choose_immediate_bases(c) -> list:
     """
@@ -1009,8 +1020,10 @@ def _emit_doc_header(c, indent=""):
     return "\n".join(lines) + "\n"
 
 def _emit_class_decl(c, indent=""):
-    # only immediate base, not the entire ancestry
-    bases = _choose_immediate_bases(c)
+    # Use precomputed immediate bases when available; fallback to heuristic.
+    bases = c.get("immediate_bases")
+    if bases is None:
+        bases = _choose_immediate_bases(c)
     base_clause = " : " + ", ".join([f"public {b}" for b in bases]) if bases else ""
     # Decide display name (template specialization vs plain)
     display, base_for_dtor, tmpl_args = _display_class_name_for_emit(c)
@@ -1195,6 +1208,49 @@ def _emit_forward_block_for_qnames(qnames: set) -> str:
     out.append("\n")
     return "".join(out)
 
+def _compute_immediate_bases_for_all(classes):
+    """
+    Compute direct (immediate) bases for each class using RTTI of bases when available:
+    - Start from the full RTTI base list of the class (minus 'self').
+    - Remove any base 'B' that also appears in the RTTI base list of another base 'X' from the same set.
+      That means 'B' is an ancestor of 'X', not a direct parent of the class.
+    - Result preserves original order.
+    """
+    # Build lookup: qualified name -> list of its (full) bases
+    by_qualified = {}
+    for c in classes:
+        q = (c.get("qualified") or "").strip()
+        if q:
+            by_qualified[q] = c.get("bases", []) or []
+
+    for c in classes:
+        bases_all = c.get("bases", []) or []
+        if not bases_all:
+            c["immediate_bases"] = []
+            continue
+        # remove self from candidate set
+        self_q = (c.get("qualified") or "").strip()
+        self_simple = _class_simple_from_qualified(self_q, c.get("sanitized_class",""))
+        cand = [b for b in bases_all if b != self_q and b.split("::")[-1] != self_simple]
+        cand = _dedup_preserve(cand)
+        if not cand:
+            c["immediate_bases"] = []
+            continue
+        # filter out transitives: if b appears in bases of any other b2 in the same set → drop b
+        cand_set = set(cand)
+        drop = set()
+        for b2 in cand:
+            b2_bases = by_qualified.get(b2, [])
+            if not b2_bases:
+                continue
+            for b in cand:
+                if b == b2: 
+                    continue
+                if b in b2_bases:
+                    drop.add(b)
+        imm = [b for b in cand if b not in drop]
+        c["immediate_bases"] = imm
+
 def _header_has_luaplus_forward(text: str) -> bool:
     # any forward for LuaPlus::LuaState / LuaPlus::LuaObject already present
     return bool(re.search(r'namespace\s+LuaPlus\s*{\s*class\s+Lua(State|Object)\s*;', text))
@@ -1289,6 +1345,9 @@ def _insert_block_before_namespace_close(filepath: str, ns_chain: list, content:
 
 def emit_cpp_headers(classes, root, qname_to_rel):
     classes_by_name = { c.get("sanitized_class",""): c for c in classes }
+    # Precompute immediate (direct) bases for all classes to support multiple inheritance.
+    _compute_immediate_bases_for_all(classes)
+
     # collect wrappers by owner header (insert once per owner)
     wrappers_by_owner = defaultdict(list)  # key: (hdr_abs, tuple(ns_chain)), val: [classes]
     normals = []
@@ -1329,8 +1388,12 @@ def emit_cpp_headers(classes, root, qname_to_rel):
             extra_types = extract_user_types([args])
             user_qtypes |= extra_types
 
+        # Include only direct bases (we still keep forwards for other user types).
         local_includes = []
-        for b in c.get("bases", []):
+        bases_for_includes = c.get("immediate_bases")
+        if bases_for_includes is None:
+            bases_for_includes = _choose_immediate_bases(c)
+        for b in bases_for_includes:
             rel = qname_to_rel.get(b)
             if rel and rel != c["header_rel"]:
                 local_includes.append(rel)

@@ -49,7 +49,7 @@ Dependencies:
 - LuaPlus 5.0 build 1081 (with slight modifications to Lua threads)
 - WX Widgets 2.4.2 (MSW version, though using the portable build)
 - Wild Magic 3.8 (a physics library now called Geometric Tools)
-- zlib 1.2.3 (also included in WX but seems to be included separately as well)
+- [zlib 1.2.3](https://github.com/OSDVF/zlib-win-x64) (also included in WX but seems to be included separately as well)
 - BugSplat
 - CRI Middleware (Sofdec and ADX) - proprietary
 - DirectX 9 & 10 (including XACT audio engine) - DX10 is not fully enabled and does not work

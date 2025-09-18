@@ -118,7 +118,7 @@ namespace gpg
 		 */
 		PipeStream();
 
-	private:
+	public:
 		boost::mutex mLock{};
 		bool mClosed{ false };
 		boost::condition mCond{};

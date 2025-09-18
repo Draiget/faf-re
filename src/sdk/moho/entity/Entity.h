@@ -134,4 +134,10 @@ namespace moho
 
 	static_assert(sizeof(Entity) == 0x270, "size of Entity == 0x270");
     ABI_SIZE_MUST_BE(Entity, 0x270);
+
+    template<class T>
+    class EntitySetTemplate
+    {
+	    
+    };
 }

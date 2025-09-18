@@ -61,9 +61,13 @@ namespace gpg
             return this->mWriteEnd - this->mWriteHead;
         } // inline
 
-        int LeftToFlush() {
-            return this->mWriteHead - this->mWriteStart;
+        /**
+         * Bytes pending in the small inline input buffer.
+         */
+        size_t LeftToFlush() {
+            return static_cast<size_t>(mWriteHead - mWriteStart);
         }
+
         void Write(const char* buf, size_t size); // 0x0043D130
 
         bool Close(Mode access); // 0x00955760

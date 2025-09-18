@@ -6,3 +6,4 @@ output/
 decomp/
 buildstage/
 dumps/
+dependencies/zlib-1.2.3/**/*
