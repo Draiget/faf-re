@@ -289,6 +289,7 @@
     <ClCompile Include="moho\net\INetConnector.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalHandler.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
+    <ClCompile Include="moho\net\SPacket.cpp" />
     <ClCompile Include="moho\resource\CSimResources.cpp" />
     <ClCompile Include="moho\resource\ISimResources.cpp" />
     <ClCompile Include="moho\sim\CArmyImpl.cpp" />
@@ -301,6 +302,7 @@
     <ClCompile Include="moho\unit\core\IUnit.cpp" />
     <ClCompile Include="moho\unit\core\Unit.cpp" />
     <ClCompile Include="moho\unit\core\UserUnit.cpp" />
+    <ClCompile Include="moho\vision\VisionDB.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
@@ -519,6 +521,7 @@
     <ClInclude Include="moho\net\CNetClient.h" />
     <ClInclude Include="moho\net\CNetUDPConnection.h" />
     <ClInclude Include="moho\net\CNetUDPConnector.h" />
+    <ClInclude Include="moho\net\ECmdStreamOp.h" />
     <ClInclude Include="moho\net\General.h" />
     <ClInclude Include="moho\net\IClient.h" />
     <ClInclude Include="moho\net\IMessageReceiver.h" />
@@ -554,6 +557,7 @@
     <ClInclude Include="moho\unit\core\IUnit.h" />
     <ClInclude Include="moho\unit\core\Unit.h" />
     <ClInclude Include="moho\unit\core\UserUnit.h" />
+    <ClInclude Include="moho\vision\VisionDB.h" />
     <ClInclude Include="platform\Platform.h" />
     <ClInclude Include="util\Build.h" />
     <ClInclude Include="util\Debug.h" />

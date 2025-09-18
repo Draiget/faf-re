@@ -8,8 +8,7 @@ using namespace moho;
 CNetUDPConnector::~CNetUDPConnector() {
     // Drain packet free-list.
     while (mPacketList.mNext != &mPacketList) {
-        auto* n = mPacketList.mNext;
-        if (n) {
+	    if (auto* n = mPacketList.mNext) {
             // Unlink from intrusive list and free
             n->mPrev->mNext = n->mNext;
             n->mNext->mPrev = n->mPrev;
@@ -73,11 +72,11 @@ void CNetUDPConnector::Destroy() {
             Node* const n = it.node();
             CNetUDPConnection* const conn =
                 moho::owner_from_node_with_base<
-                CNetUDPConnection,               // Owner
-                CNetUDPConnection,               // Base that contains the hook
-                void,                                   // tag
-                Node                                    // Hook node type
-                >(n, &CNetUDPConnection::mConnList);  // pointer-to-member hook
+                CNetUDPConnection,                   // Owner
+                CNetUDPConnection,                   // Base that contains the hook
+                void,                                // tag
+                Node                                 // Hook node type
+                >(n, &CNetUDPConnection::mConnList); // pointer-to-member hook
 
             // Call on the owner
             conn->ScheduleDestroy();
@@ -100,7 +99,7 @@ u_short CNetUDPConnector::GetLocalPort() {
     return 0;
 }
 
-CNetUDPConnection* CNetUDPConnector::Connect(u_long address, u_short port) {
+CNetUDPConnection* CNetUDPConnector::Connect(const u_long address, const u_short port) {
 #if defined(_WIN32)
     gpg::core::SharedReadGuard lock(lock_);
     WSASetEvent(event_);
@@ -176,4 +175,24 @@ int64_t CNetUDPConnector::GetTime() {
 
     mCurTime = static_cast<int64_t>(next);
     return mCurTime;
+}
+
+void CNetUDPConnector::AddPacket(SPacket* packet) {
+    if (!packet) {
+        return;
+    }
+
+    // Detach from whatever list the packet currently belongs to
+    packet->mList.ListUnlink();
+
+    // Pool has a hard cap of 20 packets — delete excess
+    if (mPacketPoolSize >= 20u) {
+        ::operator delete(packet); // binary used plain operator delete
+        return;
+    }
+
+    // Push-back into pool list (insert before sentinel = tail)
+    packet->mList.ListLinkBefore(&mPacketList);
+
+    ++mPacketPoolSize;
 }

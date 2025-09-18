@@ -681,6 +681,8 @@ moho/
     INetTCPServer.h
     INetTCPSocket.cpp
     INetTCPSocket.h
+    Lobby.cpp
+    Lobby.h
   path/
     IPathTraveler.cpp
     IPathTraveler.h
@@ -2415,13 +2417,7 @@ moho/
     MediumFidelityTerrain.h
     TerrainCommon.cpp
     TerrainCommon.h
-  user/
-    CBuilderArmManipulator.cpp
-    CBuilderArmManipulator.h
-    Lobby.cpp
-    Lobby.h
-    CLuaWldUIProvider.cpp
-    CLuaWldUIProvider.h
+  ui/
     CMauiBitmap.cpp
     CMauiBitmap.h
     CMauiBorder.cpp
@@ -2464,22 +2460,31 @@ moho/
     CUIWorldMesh.h
     CUIWorldView.cpp
     CUIWorldView.h
-    SessionLoader.cpp
-    SessionLoader.h
-    CWldUiInterface.cpp
-    CWldUiInterface.h
-    CameraDragger.cpp
-    CameraDragger.h
-    IClientMgrUIInterface.cpp
-    IClientMgrUIInterface.h
     IMauiDragger.cpp
     IMauiDragger.h
-    RenTerrain.cpp
-    RenTerrain.h
+    CWldUiInterface.cpp
+    CWldUiInterface.h
     ISelectionDragger.cpp
     ISelectionDragger.h
     IUIManager.cpp
     IUIManager.h
+    UIBuildDragger.cpp
+    UIBuildDragger.h
+    UICommandDragger.cpp
+    UICommandDragger.h
+  user/
+    CBuilderArmManipulator.cpp
+    CBuilderArmManipulator.h
+    CLuaWldUIProvider.cpp
+    CLuaWldUIProvider.h
+    SessionLoader.cpp
+    SessionLoader.h
+    CameraDragger.cpp
+    CameraDragger.h
+    IClientMgrUIInterface.cpp
+    IClientMgrUIInterface.h
+    RenTerrain.cpp
+    RenTerrain.h
     IWldSessionLoader.cpp
     IWldSessionLoader.h
     IWldUIProvider.cpp
@@ -2490,10 +2495,6 @@ moho/
     SelectionDragger2D.h
     SelectionDragger3D.cpp
     SelectionDragger3D.h
-    UIBuildDragger.cpp
-    UIBuildDragger.h
-    UICommandDragger.cpp
-    UICommandDragger.h
   unit/
     core/
       IUnit.cpp

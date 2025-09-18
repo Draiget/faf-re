@@ -222,13 +222,13 @@ namespace moho
     {
         typedef TDatListItem<Owner, U> node_t;
 
-        Owner* start; // acts as first sentinel address
-        Owner* end;   // acts as second sentinel address
+        Owner* start_; // acts as first sentinel address
+        Owner* end_;   // acts as second sentinel address
 
         /**
          * Construct empty (uninitialized); call init_empty() before use.
          */
-        TPairList() : start(0), end(0) {}
+        TPairList() : start_(0), end_(0) {}
 
         /**
          * Initialize empty state exactly like in PE: start == &end; link sentinels.
@@ -237,8 +237,8 @@ namespace moho
         {
             end_node()->mNext = start_node();
             start_node()->mPrev = end_node();
-            start = reinterpret_cast<Owner*>(&end);
-            end = reinterpret_cast<Owner*>(&end);
+            start_ = reinterpret_cast<Owner*>(&end_);
+            end_ = reinterpret_cast<Owner*>(&end_);
         }
 
         /**
@@ -246,17 +246,17 @@ namespace moho
          */
         bool empty() const noexcept
         {
-            return reinterpret_cast<const void*>(start) ==
-                reinterpret_cast<const void*>(&end);
+            return reinterpret_cast<const void*>(start_) ==
+                reinterpret_cast<const void*>(&end_);
         }
 
         /**
          * Access sentinel nodes placed over &start / &end.
          */
-        node_t* start_node()       noexcept { return reinterpret_cast<node_t*>(&start); }
-        const node_t* start_node() const noexcept { return reinterpret_cast<const node_t*>(&start); }
-        node_t* end_node()         noexcept { return reinterpret_cast<node_t*>(&end); }
-        const node_t* end_node()   const noexcept { return reinterpret_cast<const node_t*>(&end); }
+        node_t* start_node()       noexcept { return reinterpret_cast<node_t*>(&start_); }
+        const node_t* start_node() const noexcept { return reinterpret_cast<const node_t*>(&start_); }
+        node_t* end_node()         noexcept { return reinterpret_cast<node_t*>(&end_); }
+        const node_t* end_node()   const noexcept { return reinterpret_cast<const node_t*>(&end_); }
 
         /**
          * Node from owner (Owner* -> node_t*) via Base::Hook.
@@ -304,9 +304,9 @@ namespace moho
         typedef Iterator<true>  const_iterator;
 
         iterator       begin()       noexcept { return iterator{ start_node()->mNext }; }
-        iterator       endit()       noexcept { return iterator{ end_node() }; }
+        iterator       end()         noexcept { return iterator{ end_node() }; }
         const_iterator begin() const noexcept { return const_iterator{ start_node()->mNext }; }
-        const_iterator endit() const noexcept { return const_iterator{ end_node() }; }
+        const_iterator end()   const noexcept { return const_iterator{ end_node() }; }
 
         /**
          * Push element at front/back (owner pointer), element must be unlinked.

@@ -11,9 +11,11 @@
 
 namespace moho
 {
+    // Forward declarations
+    class CNetUDPConnector;
+
     static ENetCompressionMethod net_CompressionMethod = NETCOMP_Deflate;
 
-	class CNetUDPConnector;
 	/**
      * VFTABLE: 0x00E06118
      * COL:  0x00E60D70
@@ -92,15 +94,27 @@ namespace moho
         virtual ~CNetUDPConnection();
 
         /**
-         * Address: 0x00486910
-         *
 		 * Initialize receive-side filter stream according to compression method.
+		 *
+         * Address: 0x00486910
          */
         void CreateFilterStream();
 
-        bool ProcessConnect(SPacket* pack); // 0x00486380
-        void ProcessAnswer(SPacket* pack); // 0x004865E0
-        bool ProcessAck(SPacket* pack); // 0x00486B10
+        /**
+         * Address: 0x00486380
+         */
+        bool ProcessConnect(const SPacket* pack);
+
+        /**
+         * Address: 0x004865E0
+         */
+        void ProcessAnswer(const SPacket* pack);
+
+        /**
+         * Address: 0x00486B10
+         */
+        bool ProcessAck(const SPacket* pack);
+
         void ProcessData(SPacket* pack); // 0x00486DB0
         void ProcessKeepAlive(SPacket* pack); // 0x00487310
         void ProcessGoodbye(SPacket* pack); // 0x00487340
@@ -117,6 +131,18 @@ namespace moho
         void SendPacket(SPacket* pack); // 0x00488D80
 
         void SetState(ENetConnectionState state);
+
+	private:
+        /**
+         * Address: 0x00488220
+         */
+        void AdoptPacket(const SPacket* packet);
+
+        /**
+         * Address: 0x004874C0
+         */
+        void ApplyRemoteHeader(const SPacket& packet);
+
 	public:
         // ...
         // +0x410  ListEntry linkInConnector

@@ -77,7 +77,7 @@ namespace moho
          */
         ENetProtocolType GetProtocol() override {
             return ENetProtocolType::UDP;
-        };
+        }
 
         /**
          * Address: 0x0048B250
@@ -156,6 +156,12 @@ namespace moho
          * clamped so it never goes backwards.
          */
         int64_t GetTime();
+	public:
+        /**
+         * Address: 00489ED0
+         * @param packet 
+         */
+        void AddPacket(SPacket* packet);
 
 	public:
         // +0x00  vptr(INetConnector)

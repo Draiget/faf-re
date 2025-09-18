@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <algorithm>
 #include <map>
 
 #include "boost/Mutex.h"
@@ -23,7 +24,7 @@ namespace moho
         Errored = 5,
     };
 
-    enum EPacketState
+    enum EPacketState : uint8_t
     {
         CONNECT,
         ANSWER,
@@ -36,7 +37,7 @@ namespace moho
         NATTRAVERSAL,
     };
 
-    enum ENetCompressionMethod : int32_t
+    enum ENetCompressionMethod : uint8_t
     {
         NETCOMP_None = 0,
         NETCOMP_Deflate = 1,
@@ -61,7 +62,69 @@ namespace moho
         int head;
         int tail;
 
-        ~NetSpeeds(){}
+        NetSpeeds() : vals{}, v1{ 0 }, head{ 0 }, tail{ 0 } {}
+
+        ~NetSpeeds() = default;
+
+        MOHO_FORCEINLINE int Append(const float sample) noexcept {
+            // next position after current tail
+            const int next = (tail + 1) % 25;
+
+            // if full (next would collide with head) - drop oldest by advancing head
+            if (next == head) {
+                head = (head + 1) % 25;
+            }
+
+            // write sample at current tail
+            vals[tail] = sample;
+
+            // return 1 if we wrapped, 0 otherwise (matches (tail+1)/25 from binary)
+            const int wrapped = (tail + 1) / 25;
+
+            // advance tail
+            tail = next;
+
+            return wrapped;
+        }
+
+        MOHO_FORCEINLINE float Median() const noexcept {
+            // gather values from `head <-> tail` into a small stack array
+            float tmp[25];
+            int i = 0;
+            int h = head;
+            const int t = tail;
+
+            while (h != t) {
+                tmp[i++] = vals[h];
+                h = (h + 1) % 25;
+            }
+
+            if (i == 0) {
+                return 0.0f;
+            }
+
+            std::sort(tmp, tmp + i);
+            return tmp[i / 2];
+        }
+
+        MOHO_FORCEINLINE float Jitter(const float center) const noexcept {
+            float tmp[25];
+            int i = 0;
+            int h = head;
+            const int t = tail;
+
+            while (h != t) {
+                tmp[i++] = std::fabs(vals[h] - center);
+                h = (h + 1) % 25;
+            }
+
+            if (i == 0) {
+                return 0.0f;
+            }
+
+            std::sort(tmp, tmp + i);
+            return tmp[i / 2];
+        }
     };
 
     struct SendStamp
