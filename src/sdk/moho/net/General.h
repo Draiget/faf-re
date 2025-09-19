@@ -1,14 +1,11 @@
 ﻿#pragma once
 
 #include <algorithm>
-#include <map>
 
-#include "boost/Mutex.h"
-#include "gpg/core/time/Timer.h"
 #include "platform/Platform.h"
+#include "gpg/core/time/Timer.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/misc/TDatList.h"
 
 namespace moho
 {
@@ -129,9 +126,9 @@ namespace moho
 
     struct SendStamp
     {
-        uint32_t v0;
+        uint32_t direction;
         uint32_t v1;
-        FILETIME when; // used as 64-bit tick container in the binary
+        FILETIME time; // used as 64-bit tick container in the binary
         uint32_t size;
         uint32_t v4;
     };
@@ -145,12 +142,11 @@ namespace moho
 
     struct SendStampBuffer
     {
-        static constexpr uint32_t kCap = 4096;
-        static constexpr uint32_t kMask = kCap - 1;
+        static constexpr uint32_t cap = 4096;
 
-        SendStamp mDat[kCap];
-        int mEnd = 0; // oldest
-        int mStart = 0; // next write
+        SendStamp mDat[cap];
+        uint32_t mEnd = 0; // oldest
+        uint32_t mStart = 0; // next write
 
         /**
          * Address: 0x0047D110
@@ -164,6 +160,11 @@ namespace moho
          */
         void Reset();
 
+        /**
+         * Address: 0x0047D0A0
+         */
+        uint32_t Push(int dir, FILETIME timeUs, int size) noexcept;
+
         [[nodiscard]]
         bool empty() const noexcept {
             return mStart == mEnd;
@@ -171,15 +172,27 @@ namespace moho
 
         [[nodiscard]]
         uint32_t size() const noexcept {
-            return mStart - mEnd & kMask; // valid for power-of-two capacity
+            return mStart - mEnd & cap; // valid for power-of-two capacity
         }
 
         void push(const SendStamp& s) noexcept {
             mDat[mStart] = s;
-            mStart = mStart + 1 & kMask;
+            mStart = mStart + 1 & cap;
             if (mStart == mEnd) {
-                mEnd = mEnd + 1 & kMask;
+                mEnd = mEnd + 1 & cap;
             }
+        }
+
+    private:
+        /**
+         * Place entry at mStart and advance mStart by 1 (mod 4096).
+         * Address: 0x0047D630
+         */
+        MOHO_FORCEINLINE uint32_t EmplaceAndAdvance(const SendStamp& s) noexcept
+        {
+            mDat[mStart] = s;
+            mStart = (mStart + 1u) & cap;
+            return mStart;
         }
     };
     
@@ -192,4 +205,9 @@ namespace moho
 	 * Address: 0x0047FEE0
 	 */
 	msvc8::string NET_GetHostName(u_long address);
+
+    /**
+     * Address: 0x0047F5F0
+     */
+    MOHO_FORCEINLINE const char* NET_GetWinsockErrorString() noexcept;
 }

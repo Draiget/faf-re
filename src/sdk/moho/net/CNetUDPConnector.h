@@ -6,7 +6,7 @@
 #include "INetConnector.h"
 #include "INetNATTraversalHandler.h"
 #include "INetNATTraversalProvider.h"
-#include "SPacket.h"
+#include "SNetPacket.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Sync.h"
@@ -19,7 +19,7 @@ namespace moho
 
     struct SReceivePacket
     {
-	    SPacket* mPacket;
+	    SNetPacket* mPacket;
     	u_long mAddr;
     	u_short mPort;
     };
@@ -172,20 +172,30 @@ namespace moho
         int64_t GetTime();
 
         /**
+         * Address: 0x0048A288
+         */
+        int64_t ReceiveData();
+
+        /**
+         * Address: 0x0048AA40
+         */
+        void ProcessConnect(const SNetPacket* packet, u_long address, u_short port);
+
+        /**
          * Address: 0x0048B040
          *
          * @param direction
-         * @param timestamp_us
-         * @param addr_host
-         * @param port_host
+         * @param timestampUs
+         * @param addressHost
+         * @param portHost
          * @param payload
          * @param payloadLen
          */
         MOHO_FORCEINLINE void LogPacket(
             int direction,
-            std::int64_t timestamp_us,
-            std::uint32_t addr_host,
-            std::uint16_t port_host,
+            std::int64_t timestampUs,
+            std::uint32_t addressHost,
+            std::uint16_t portHost,
             const void* payload,
             int payloadLen
         );
@@ -194,10 +204,9 @@ namespace moho
          * Address: 00489ED0
          * @param packet 
          */
-        void AddPacket(SPacket* packet);
+        void AddPacket(SNetPacket* packet);
 
 	public:
-
         // +0x00  vptr(INetConnector)
         // +0x04  vptr(INetNATTraversalHandler)
 
@@ -206,7 +215,7 @@ namespace moho
         HANDLE event_;
         boost::weak_ptr<INetNATTraversalProvider> mNatTravProv;
         TDatList<CNetUDPConnection, void> mConnections;
-        TDatList<SPacket, void> mPacketList;
+        TDatList<SNetPacket, void> mPacketList;
         uint32_t mPacketPoolSize;
         _FILETIME v14;
         gpg::time::Timer mTimer;

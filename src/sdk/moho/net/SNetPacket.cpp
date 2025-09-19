@@ -1,4 +1,4 @@
-#include "SPacket.h"
+#include "SNetPacket.h"
 
 #include "gpg/core/containers/String.h"
 using namespace moho;
@@ -15,7 +15,7 @@ const char* sPacketStateString[9]{
     "NATTRAVERSAL",
 };
 
-msvc8::string SPacket::ToString() const {
+msvc8::string SNetPacket::ToString() const {
     const char* stateStr;
 
     // Choose state string: known table for <9, otherwise hex like "%02x".

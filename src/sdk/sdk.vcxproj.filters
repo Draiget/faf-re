@@ -408,7 +408,7 @@
     <ClCompile Include="moho\vision\VisionDB.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\net\SPacket.cpp">
+    <ClCompile Include="moho\net\SNetPacket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1178,7 +1178,7 @@
     <ClInclude Include="boost\sp_counted_base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\net\SPacket.h">
+    <ClInclude Include="moho\net\SNetPacket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="legacy\containers\Deque.h">
