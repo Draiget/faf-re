@@ -1,10 +1,13 @@
 #pragma once
 #include <list>
+#include <map>
 #include <mutex>
 #include <unordered_map>
 
+#include "boost/mutex.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
+#include "moho/misc/TDatList.h"
 
 namespace moho
 {
@@ -19,7 +22,7 @@ namespace moho
             char buf[INET_ADDRSTRLEN]{};
 
             // Note: make sure WSAStartup() was called earlier on Windows.
-            const char* s = ::inet_ntop(AF_INET, &a, buf,
+            const char* s = inet_ntop(AF_INET, &a, buf,
 #if defined(_WIN32)
                 sizeof(buf)
 #else
@@ -70,7 +73,7 @@ namespace moho
     {
         boost::mutex mLock;
         std::map<unsigned, Host> mHosts;
-        moho::TDatList<Host, void> mHostList;
+        TDatList<Host, void> mHostList;
 
         /** Resolve (or fetch cached) host name for IPv4 address (host byte order). */
         msvc8::string GetHostName(u_long host) {
@@ -96,7 +99,7 @@ namespace moho
 
                 if (inserted) {
                     // New entry goes to MRU front: pass NODE (object itself)
-                    mHostList.push_front(static_cast<moho::TDatListItem<Host, void>*>(&h));
+                    mHostList.push_front(static_cast<TDatListItem<Host, void>*>(&h));
                     EvictIfNeeded();
                 } else {
                     // Already present: move to MRU front
@@ -121,7 +124,7 @@ namespace moho
          */
         void Touch(Host& h) noexcept {
             // Node is the object itself when Host derives the node
-            auto& node = static_cast<moho::TDatListItem<Host, void>&>(h);
+            auto& node = static_cast<TDatListItem<Host, void>&>(h);
             node.ListUnlink();
             node.ListLinkAfter(&mHostList);
 
@@ -142,7 +145,7 @@ namespace moho
                 auto* n = it.node(); // node pointer (TDatListItem<Host,void>*)
 
                 // Safety: sentinel check (sentinel is the head itself)
-                if (n == static_cast<moho::TDatListItem<Host, void>*>(&mHostList))
+                if (n == static_cast<TDatListItem<Host, void>*>(&mHostList))
                     break;
 
                 Host* lru = static_cast<Host*>(n); // node -> owner when owner derives node
@@ -180,7 +183,7 @@ namespace moho
             char node[0x401]{}; // 1025 bytes as in the binary
             char serv[0x20]{};  // 32   bytes as in the binary
 
-            const int rv = ::getnameinfo(reinterpret_cast<const sockaddr*>(&sa),
+            const int rv = getnameinfo(reinterpret_cast<const sockaddr*>(&sa),
                 sizeof(sa),
                 node, sizeof(node),
                 serv, sizeof(serv),

@@ -125,7 +125,9 @@ CNetUDPConnection::CNetUDPConnection(
 	mOurCompressionMethod(net_CompressionMethod), // [esi+0x424]
 	mState(state),
 	mFilterStream(nullptr), 
-	mMessage(0, 0) // [esi+0x42C]
+	mMessage(0, 0), // [esi+0x42C]
+	mUnAckedPayloads(),
+	mEarlyPackets()
 {
 	// Init timers and timestamps
 	// (ASM zeroes a lot of POD around; we rely on default ctor or explicit zeros above)
@@ -133,9 +135,6 @@ CNetUDPConnection::CNetUDPConnection(
 	mSendTime = 0;
 	mLastRecv = 0;
 	mLastKeepAlive = 0;
-
-	mUnAckedPayloads.init_empty();
-	mEarlyPackets.init_empty();
 
 	// Init small scratch buffers
 	std::memset(mNonceA, 0, sizeof(mNonceA));
@@ -180,7 +179,7 @@ CNetUDPConnection::CNetUDPConnection(
 
 	// Link this connection into connector's intrusive list
 	// ASM: uses node at +0x410; do the same in Attach().
-	connector.mConnections.push_front(&mConnList);
+	connector.mConnections.push_front(this);
 
 	// Select SEND compression (controlled by Moho::net_CompressionMethod)
 	switch (mOurCompressionMethod) {
@@ -219,14 +218,14 @@ CNetUDPConnection::CNetUDPConnection(
 CNetUDPConnection::~CNetUDPConnection() {
 	constexpr int poolCap = 0x14u;
 
-	auto recyclePacket = [this](SPacket* p) noexcept {
+	auto recyclePacket = [this](SNetPacket* p) noexcept {
 		if (!p) {
 			return;
 		}
 		if (mConnector->mPacketPoolSize >= poolCap) {
 			operator delete(p);
 		} else {
-			mConnector->mPacketList.push_back(&p->mList);
+			mConnector->mPacketList.push_back(p);
 			++mConnector->mPacketPoolSize;
 		}
 	};
@@ -235,7 +234,7 @@ CNetUDPConnection::~CNetUDPConnection() {
 	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.end(); )
 	{
 		auto* n = it.node();
-		SPacket* p = UnAckedView::owner_from_node(n);
+		auto* p = static_cast<SNetPacket*>(n);
 		it = mUnAckedPayloads.erase(it);
 		recyclePacket(p);
 	}
@@ -244,7 +243,7 @@ CNetUDPConnection::~CNetUDPConnection() {
 	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.end(); )
 	{
 		auto* n = it.node();
-		SPacket* p = EarlyView::owner_from_node(n);
+		auto* p = static_cast<SNetPacket*>(n);
 		it = mEarlyPackets.erase(it);
 		recyclePacket(p);
 	}
@@ -294,7 +293,7 @@ void CNetUDPConnection::CreateFilterStream() {
 
 		// Replace existing filter with a fresh inflate (operation=0) filter attached to mInputBuffer.
 		// Note: in the game binary mOperation==0 -> inflate, mOperation==1 -> deflate.
-		auto* const old = mFilterStream;
+		const auto* const old = mFilterStream;
 		mFilterStream = new gpg::ZLibOutputFilterStream(&mInputBuffer, /*operation=*/0);
 		if (old) {
 			delete old;
@@ -311,7 +310,7 @@ void CNetUDPConnection::CreateFilterStream() {
 	}
 }
 
-bool CNetUDPConnection::ProcessConnect(const SPacket* packet) {
+bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
 	const auto& pConnect = *reinterpret_cast<const SPacketBodyConnect*>(packet->data);
 
 	// Obsolete CONNECT: ignore
@@ -384,7 +383,7 @@ bool CNetUDPConnection::ProcessConnect(const SPacket* packet) {
 	}
 }
 
-void CNetUDPConnection::ProcessAnswer(const SPacket* packet) {
+void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet) {
 	const auto& pAnswer = *reinterpret_cast<const SPacketBodyAnswer*>(packet->data);
 
 	// Strict size check: expected 92 bytes
@@ -464,7 +463,7 @@ void CNetUDPConnection::ProcessAnswer(const SPacket* packet) {
 #endif
 }
 
-bool CNetUDPConnection::ProcessAckInternal(const SPacket* packet) {
+bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet) {
 	switch (mState) {
 	case ENetConnectionState::Pending: { // 0
 		if (net_DebugLevel) {
@@ -523,7 +522,7 @@ bool CNetUDPConnection::ProcessAckInternal(const SPacket* packet) {
 	// Iterate intrusive list of un-acked payloads. We must be tolerant to node deletion while iterating.
 	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.end(); ++it) {
 		auto* n = it.node();
-		SPacket* p = UnAckedView::owner_from_node(n);
+		auto* p = static_cast<SNetPacket*>(n);
 		const int16_t d = static_cast<int16_t>(p->header.mSequenceNumber - expected);
 
 		bool ack = false;
@@ -556,7 +555,7 @@ bool CNetUDPConnection::ProcessAckInternal(const SPacket* packet) {
 	return true;
 }
 
-void CNetUDPConnection::ProcessData(SPacket* packet) {
+void CNetUDPConnection::ProcessData(SNetPacket* packet) {
 	if (!ProcessAckInternal(packet)) {
 		return;
 	}
@@ -622,7 +621,7 @@ void CNetUDPConnection::ProcessData(SPacket* packet) {
 					GetPort(), ToString().c_str());
 			}
 
-			SPacket* drop = EarlyPopFront();
+			SNetPacket* drop = EarlyPopFront();
 			if (drop && mConnector) {
 				mConnector->AddPacket(drop);
 			}
@@ -630,7 +629,8 @@ void CNetUDPConnection::ProcessData(SPacket* packet) {
 		}
 
 		// Peek head; stop if not the expected sequence
-		SPacket* headPacket = EarlyView::owner_from_node(mEarlyPackets.begin().node());
+		auto* n = mEarlyPackets.begin().node();
+		auto* headPacket = static_cast<SNetPacket*>(n);
 		if (headPacket->header.mSequenceNumber != mExpectedSequenceNumber) {
 			break;
 		}
@@ -651,7 +651,7 @@ void CNetUDPConnection::ProcessData(SPacket* packet) {
 #endif
 }
 
-bool CNetUDPConnection::ProcessAck(const SPacket* packet) {
+bool CNetUDPConnection::ProcessAck(const SNetPacket* packet) {
 	if (!ProcessAckInternal(packet)) {
 		return false;
 	}
@@ -660,7 +660,7 @@ bool CNetUDPConnection::ProcessAck(const SPacket* packet) {
 	return true;
 }
 
-bool CNetUDPConnection::ProcessKeepAlive(const SPacket* packet) {
+bool CNetUDPConnection::ProcessKeepAlive(const SNetPacket* packet) {
 	if (!ProcessAckInternal(packet)) {
 		return false;
 	}
@@ -670,7 +670,7 @@ bool CNetUDPConnection::ProcessKeepAlive(const SPacket* packet) {
 	return true;
 }
 
-bool CNetUDPConnection::ProcessGoodbye(const SPacket* packet) {
+bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet) {
 	if (!ProcessAckInternal(packet)) {
 		return false;
 	}
@@ -684,7 +684,7 @@ bool CNetUDPConnection::ProcessGoodbye(const SPacket* packet) {
 
 		if (mFilterStream) {
 			mFilterStream->Close(gpg::Stream::ModeBoth); // VirtClose(2)
-			auto* z = mFilterStream;
+			const auto* z = mFilterStream;
 			mFilterStream = nullptr;
 			delete z; // vtable dtr in asm
 		}
@@ -700,9 +700,10 @@ bool CNetUDPConnection::ProcessGoodbye(const SPacket* packet) {
 	return true;
 }
 
-int64_t CNetUDPConnection::CalcResendDelay(const SPacket* packet) {
-	float baseMs = mPingTime * net_ResendPingMultiplier + static_cast<float>(net_ResendDelayBias);
-
+int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const {
+	const float baseMs = 
+		mPingTime * net_ResendPingMultiplier + 
+		static_cast<float>(net_ResendDelayBias);
 
 	int rc = packet->mResendCount;
 	if (rc > 3) {
@@ -720,13 +721,13 @@ int64_t CNetUDPConnection::CalcResendDelay(const SPacket* packet) {
 	return static_cast<int64_t>(delayMs) * 1000LL;
 }
 
-int CNetUDPConnection::GetSentTime(const int64_t nowUs) {
+int CNetUDPConnection::GetSentTime(const int64_t time) {
 	const uint32_t credit = static_cast<uint32_t>(mSendTime & 0xFFFFFFFFULL);
 	if (credit == 0) {
 		return 0;
 	}
 
-	const double dtUs = static_cast<double>(nowUs - mLastSend.mTime);
+	const double dtUs = static_cast<double>(time - mLastSend.mTime);
 	const double remain = static_cast<double>(credit)
 		- dtUs * static_cast<double>(net_MaxSendRate) * 1e-6;
 
@@ -777,7 +778,7 @@ int CNetUDPConnection::SendData() {
 			((now - mLastSend.mTime) >= 1'000'000); // 1s
 
 		if (needKick) {
-			SPacket* p = NextConnectPacket();
+			SNetPacket* p = NextConnectPacket();
 			SendPacket(p);
 		}
 
@@ -798,7 +799,7 @@ int CNetUDPConnection::SendData() {
 			((now - mLastSend.mTime) >= 1'000'000);
 
 		if (needKick) {
-			SPacket* p = NextAnswerPacket();
+			SNetPacket* p = NextAnswerPacket();
 			SendPacket(p);
 		}
 
@@ -820,16 +821,15 @@ int CNetUDPConnection::SendData() {
 			// fallthrough to TimedOut handling below
 		} else
 		{
-			SPacket* toSend = nullptr;
+			SNetPacket* toSend = nullptr;
 
 			// Resend logic: if un-acked exists and resend due
 			if (!mUnAckedPayloads.empty()) {
-				SPacket* head = UnAckedView::owner_from_node(mUnAckedPayloads.begin().node());
-				if (now >= head->mSentTime) {
-					// Detach for resend
-					UnAckedView::node_t* node = UnAckedView::node_from_owner(head);
-					node->ListUnlink();
-					toSend = head;
+				auto* n = mUnAckedPayloads.begin().node();
+				auto* headPacket = static_cast<SNetPacket*>(n);
+				if (now >= headPacket->mSentTime) {
+					n->ListUnlink();
+					toSend = headPacket;
 				}
 			}
 
@@ -865,8 +865,9 @@ int CNetUDPConnection::SendData() {
 			int next = timeUntil(mLastKeepAlive + mKeepAliveFreqUs);
 
 			if (!mUnAckedPayloads.empty()) {
-				const SPacket* head = UnAckedView::owner_from_node(mUnAckedPayloads.begin().node());
-				const int r = timeUntil(head->mSentTime);
+				auto* n = mUnAckedPayloads.begin().node();
+				const auto* headPacket = static_cast<SNetPacket*>(n);
+				const int r = timeUntil(headPacket->mSentTime);
 				if (r != -1 && (next == -1 || next >= r)) {
 					next = r;
 				}
@@ -875,7 +876,7 @@ int CNetUDPConnection::SendData() {
 			if (mSendBy.mTime &&
 				(mInResponseTo || mOutputData.GetLength() || gap500[0]))
 			{
-				int r = timeUntil(mSendBy.mTime);
+				const int r = timeUntil(mSendBy.mTime);
 				if (r != -1 && (next == -1 || next >= r))
 					return r;
 			}
@@ -895,7 +896,7 @@ int CNetUDPConnection::SendData() {
 		const int64_t now = mConnector->GetTime();
 		if ((now - mLastKeepAlive) > mKeepAliveFreqUs) {
 			// KEEPALIVE
-			SPacket* p = NextPacket(true, 0, KEEPALIVE);
+			SNetPacket* p = NextPacket(true, 0, KEEPALIVE);
 			SendPacket(p);
 		}
 
@@ -946,7 +947,7 @@ bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs) {
 	return mOutputData.GetLength() != 0;
 }
 
-SPacket* CNetUDPConnection::ReadPacket() {
+SNetPacket* CNetUDPConnection::ReadPacket() {
 	// clamp payload to wire limit
 	unsigned int len = mOutputData.GetLength();
 	if (len >= static_cast<unsigned int>(kNetPacketMaxPayload)) {
@@ -954,7 +955,7 @@ SPacket* CNetUDPConnection::ReadPacket() {
 	}
 
 	// allocate with header inheritance (seq/expected/mask)
-	SPacket* packet = NextPacket(true, static_cast<int>(len), DATA);
+	SNetPacket* packet = NextPacket(true, static_cast<int>(len), DATA);
 	if (!packet) {
 		return nullptr;
 	}
@@ -994,47 +995,47 @@ SPacket* CNetUDPConnection::ReadPacket() {
 	return packet;
 }
 
-SPacket* CNetUDPConnection::NextConnectPacket() const {
+SNetPacket* CNetUDPConnection::NextConnectPacket() const {
 	constexpr auto payloadSize = sizeof(SPacketBodyConnect);
 
 	// allocate with no header inheritance (seq/expected/mask all zero)
-	SPacket* packet = NextPacket(false, payloadSize, CONNECT);
+	SNetPacket* packet = NextPacket(false, payloadSize, CONNECT);
 	if (!packet) {
 		return nullptr;
 	}
 
-	const auto connectPacket = reinterpret_cast<SPacketConnectPkt*>(packet)->body();
+	auto& connectPacket = packet->As<SPacketBodyConnect>();
 
-	connectPacket->protocol = 2u;
-	connectPacket->time = mConnector->GetTime();
-	connectPacket->comp = mOurCompressionMethod;
+	connectPacket.protocol = 2u;
+	connectPacket.time = mConnector->GetTime();
+	connectPacket.comp = mOurCompressionMethod;
 
-	std::memcpy(connectPacket->nonceA, mNonceA, 32);
+	std::memcpy(connectPacket.nonceA, mNonceA, 32);
 	return packet;
 }
 
-SPacket* CNetUDPConnection::NextAnswerPacket() const {
+SNetPacket* CNetUDPConnection::NextAnswerPacket() const {
 	constexpr auto payloadSize = sizeof(SPacketBodyAnswer);
 
 	// allocate with no header inheritance (seq/expected/mask all zero)
-	SPacket* packet = NextPacket(false, payloadSize, ANSWER);
+	SNetPacket* packet = NextPacket(false, payloadSize, ANSWER);
 	if (!packet) {
 		return nullptr;
 	}
 
-	const auto answerPacket = reinterpret_cast<SPacketAnswerPkt*>(packet)->body();
+	auto& answerPacket = packet->As<SPacketBodyAnswer>();
 
-	answerPacket->protocol = 2u;
-	answerPacket->time = mConnector->GetTime();
-	answerPacket->comp = mOurCompressionMethod;
+	answerPacket.protocol = 2u;
+	answerPacket.time = mConnector->GetTime();
+	answerPacket.comp = mOurCompressionMethod;
 
-	std::memcpy(answerPacket->nonceA, mNonceA, 32);
-	std::memcpy(answerPacket->nonceB, mNonceB, 32);
+	std::memcpy(answerPacket.nonceA, mNonceA, 32);
+	std::memcpy(answerPacket.nonceB, mNonceB, 32);
 	return packet;
 }
 
-SPacket* CNetUDPConnection::NextGoodbyePacket() const {
-	SPacket* packet = NextPacket(false, 0, GOODBYE);
+SNetPacket* CNetUDPConnection::NextGoodbyePacket() const {
+	SNetPacket* packet = NextPacket(false, 0, GOODBYE);
 	if (!packet) {
 		return nullptr;
 	}
@@ -1042,25 +1043,25 @@ SPacket* CNetUDPConnection::NextGoodbyePacket() const {
 	return packet;
 }
 
-SPacket* CNetUDPConnection::NextPacket(const bool inherit, const int size, const EPacketState state) const {
+SNetPacket* CNetUDPConnection::NextPacket(const bool inherit, const int size, const EPacketState state) const {
 	// take from connector's pool or allocate
-	SPacket* pkt;
+	SNetPacket* pkt;
 	if (mConnector->mPacketList.mNext != &mConnector->mPacketList) {
 		--mConnector->mPacketPoolSize;
-		pkt = reinterpret_cast<SPacket*>(mConnector->mPacketList.mNext);
+		pkt = reinterpret_cast<SNetPacket*>(mConnector->mPacketList.mNext);
 		// unlink from pool
-		pkt->mList.mPrev->mNext = pkt->mList.mNext;
-		pkt->mList.mNext->mPrev = pkt->mList.mPrev;
+		pkt->mPrev->mNext = pkt->mNext;
+		pkt->mNext->mPrev = pkt->mPrev;
 	} else {
 		// 536 bytes (0x218 from asm)
-		pkt = new SPacket();
+		pkt = new SNetPacket();
 		if (!pkt) {
 			return nullptr;
 		}
 	}
 	// reset intrusive node
-	pkt->mList.mNext = &pkt->mList;
-	pkt->mList.mPrev = &pkt->mList;
+	pkt->mNext = pkt;
+	pkt->mPrev = pkt;
 
 	// zero resend counter and set wire sizes/state
 	pkt->mResendCount = 0;
@@ -1078,7 +1079,7 @@ SPacket* CNetUDPConnection::NextPacket(const bool inherit, const int size, const
 	return pkt;
 }
 
-void CNetUDPConnection::SendPacket(SPacket* packet) {
+void CNetUDPConnection::SendPacket(SNetPacket* packet) {
 	packet->header.mSerialNumber = mNextSerialNumber;
 	packet->header.mInResponseTo = mInResponseTo;
 
@@ -1109,9 +1110,9 @@ void CNetUDPConnection::SendPacket(SPacket* packet) {
 	}
 
 	if (net_DebugLevel >= 2) {
-		auto pktStr = packet->ToString();
-		auto connStr = ToString();
-		auto timeStr = gpg::FileTimeToString(gpg::FileTimeLocal());
+		const auto pktStr = packet->ToString();
+		const auto connStr = ToString();
+		const auto timeStr = gpg::FileTimeToString(gpg::FileTimeLocal());
 		gpg::Debugf("%s: send %s, %s",
 			timeStr.c_str(),
 			connStr.c_str(),
@@ -1154,7 +1155,7 @@ void CNetUDPConnection::SetState(const ENetConnectionState state) {
 	mState = state;
 }
 
-void CNetUDPConnection::AdoptPacket(const SPacket* packet) {
+void CNetUDPConnection::AdoptPacket(const SNetPacket* packet) {
 	mInResponseTo = packet->header.mSerialNumber;
 
 	if (mSendBy.mTime == 0) {
@@ -1164,7 +1165,7 @@ void CNetUDPConnection::AdoptPacket(const SPacket* packet) {
 	}
 }
 
-void CNetUDPConnection::ApplyRemoteHeader(const SPacket& packet) {
+void CNetUDPConnection::ApplyRemoteHeader(const SNetPacket& packet) {
 	if (!packet.header.mInResponseTo) {
 		return;
 	}
@@ -1192,21 +1193,21 @@ void CNetUDPConnection::ApplyRemoteHeader(const SPacket& packet) {
 	}
 }
 
-bool CNetUDPConnection::InsertEarlySorted(SPacket* packet) {
+bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet) {
 	// Ensure the node is detached
-	auto* node = EarlyView::node_from_owner(packet);
-	node->ListUnlink();
+	const auto node = packet->ListUnlink();
 
 	// Walk list to find insertion point (first element with seq > p->seq)
 	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.end(); ++it) {
-		const SPacket* cur = EarlyView::owner_from_node(it.node());
+		auto* n = it.node();
+		const auto* cur = static_cast<SNetPacket*>(n);
 		if (cur->header.mSequenceNumber == packet->header.mSequenceNumber) {
 			// Duplicate of a future DATA - ignore insertion
 			return false;
 		}
 		if (static_cast<int16_t>(cur->header.mSequenceNumber - packet->header.mSequenceNumber) > 0) {
 			// Insert before 'it'
-			node->ListLinkBefore(it.node());
+			n->ListLinkBefore(it.node());
 			return true;
 		}
 	}
@@ -1216,20 +1217,21 @@ bool CNetUDPConnection::InsertEarlySorted(SPacket* packet) {
 	return true;
 }
 
-SPacket* CNetUDPConnection::EarlyPopFront() {
+SNetPacket* CNetUDPConnection::EarlyPopFront() {
 	if (mEarlyPackets.empty()) {
 		return nullptr;
 	}
-	const auto it = mEarlyPackets.begin();
-	SPacket* p = EarlyView::owner_from_node(it.node());
-	(void)mEarlyPackets.erase(it);
+
+	const auto node = mEarlyPackets.ListUnlink();
+	auto* p = static_cast<SNetPacket*>(node);
 	return p;
 }
 
 void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& mask) {
 	mask = 0;
 	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.end(); ++it) {
-		const SPacket* cur = EarlyView::owner_from_node(it.node());
+		auto* n = it.node();
+		const auto* cur = static_cast<SNetPacket*>(n);
 		const int16_t d = static_cast<int16_t>(cur->header.mSequenceNumber - expected);
 		if (d >= 1 && d <= 32) {
 			mask |= (1u << (d - 1));
@@ -1237,7 +1239,7 @@ void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& m
 	}
 }
 
-void CNetUDPConnection::ConsumePacketHeaderData(SPacket* packet) {
+void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet) {
 	const uint16_t payloadLen = packet->header.mPayloadLength;
 
 	if (payloadLen != 0) {
@@ -1274,19 +1276,17 @@ void CNetUDPConnection::ConsumePacketHeaderData(SPacket* packet) {
 	}
 }
 
-void CNetUDPConnection::InsertUnAckedSorted(SPacket* packet) {
-	auto* selfNode = UnAckedView::node_from_owner(packet);
-	selfNode->ListUnlink();
+void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet) {
+	const auto node = packet->ListUnlink();
 
-	auto it = mUnAckedPayloads.begin();
-	for (; it != mUnAckedPayloads.end(); ++it)
-	{
-		SPacket* cur = UnAckedView::owner_from_node(it.node());
+	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.end(); ++it) {
+		auto* n = it.node();
+		const auto* cur = static_cast<SNetPacket*>(n);
 		if (packet->mSentTime < cur->mSentTime) {
-			selfNode->ListLinkBefore(it.node());
+			node->ListLinkBefore(it.node());
 			return;
 		}
 	}
 	// append at tail
-	selfNode->ListLinkBefore(mUnAckedPayloads.end_node());
+	node->ListLinkBefore(mUnAckedPayloads.end().node());
 }

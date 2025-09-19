@@ -289,7 +289,7 @@
     <ClCompile Include="moho\net\INetConnector.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalHandler.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
-    <ClCompile Include="moho\net\SPacket.cpp" />
+    <ClCompile Include="moho\net\SNetPacket.cpp" />
     <ClCompile Include="moho\resource\CSimResources.cpp" />
     <ClCompile Include="moho\resource\ISimResources.cpp" />
     <ClCompile Include="moho\sim\CArmyImpl.cpp" />
@@ -530,7 +530,7 @@
     <ClInclude Include="moho\net\INetNATTraversalHandler.h" />
     <ClInclude Include="moho\net\CMessageStream.h" />
     <ClInclude Include="moho\net\INetNATTraversalProvider.h" />
-    <ClInclude Include="moho\net\SPacket.h" />
+    <ClInclude Include="moho\net\SNetPacket.h" />
     <ClInclude Include="moho\render\camera\GeomCamera3.h" />
     <ClInclude Include="moho\render\camera\VTransform.h" />
     <ClInclude Include="moho\resource\CSimResources.h" />

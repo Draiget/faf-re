@@ -16,6 +16,9 @@
 	#include <winsock2.h>
 	#include <ws2tcpip.h>
 	#include <windows.h>
+#ifdef _MSC_VER
+#pragma comment(lib, "Ws2_32.lib")
+#endif
 #else
 #  include <pthread.h>
 #  include <errno.h>

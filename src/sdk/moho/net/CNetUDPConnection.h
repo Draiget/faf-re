@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "INetConnection.h"
 #include "INetConnector.h"
-#include "SPacket.h"
+#include "SNetPacket.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
@@ -20,7 +20,10 @@ namespace moho
      * VFTABLE: 0x00E06118
      * COL:  0x00E60D70
      */
-	class CNetUDPConnection : public INetConnection, boost::noncopyable_::noncopyable
+	class CNetUDPConnection :
+		public INetConnection,
+        public TDatListItem<CNetUDPConnection, void>,
+        public boost::noncopyable_::noncopyable
 	{
     public:
         /**
@@ -103,42 +106,42 @@ namespace moho
         /**
          * Address: 0x00486380
          */
-        bool ProcessConnect(const SPacket* pack);
+        bool ProcessConnect(const SNetPacket* pack);
 
         /**
          * Address: 0x004865E0
          */
-        void ProcessAnswer(const SPacket* pack);
+        void ProcessAnswer(const SNetPacket* pack);
 
         /**
          * Address: 0x00486B10
          */
-        bool ProcessAckInternal(const SPacket* packet);
+        bool ProcessAckInternal(const SNetPacket* packet);
 
         /**
          * Address: 0x00486DB0
          */
-        void ProcessData(SPacket* packet);
+        void ProcessData(SNetPacket* packet);
 
         /**
          * Address: 0x00487310
          */
-        bool ProcessAck(const SPacket* packet);
+        bool ProcessAck(const SNetPacket* packet);
 
         /**
          * Address: 0x00487340
          */
-        bool ProcessKeepAlive(const SPacket* packet);
+        bool ProcessKeepAlive(const SNetPacket* packet);
 
         /**
          * Address: 0x00487370
          */
-        bool ProcessGoodbye(const SPacket* packet);
+        bool ProcessGoodbye(const SNetPacket* packet);
 
         /**
          * Address: 0x00488170
          */
-        int64_t CalcResendDelay(const SPacket* packet);
+        int64_t CalcResendDelay(const SNetPacket* packet) const;
 
         /**
          * Address: 0x00488260
@@ -158,36 +161,36 @@ namespace moho
         /**
          * Address: 0x00488980
          */
-        SPacket* ReadPacket();
+        SNetPacket* ReadPacket();
 
         /**
          * Address: 0x00488810
          */
         [[nodiscard]]
-		SPacket* NextConnectPacket() const;
+		SNetPacket* NextConnectPacket() const;
 
         /**
          * Address: 0x004888C0
          */
         [[nodiscard]]
-		SPacket* NextAnswerPacket() const;
+		SNetPacket* NextAnswerPacket() const;
 
         /**
          * Address: 0x00488AA0
          */
         [[nodiscard]]
-		SPacket* NextGoodbyePacket() const;
+		SNetPacket* NextGoodbyePacket() const;
 
         /**
          * Address: 0x00488B20
          */
         [[nodiscard]]
-		SPacket* NextPacket(bool inherit, int size, EPacketState state) const;
+		SNetPacket* NextPacket(bool inherit, int size, EPacketState state) const;
 
         /**
          * Address: 0x00488D80
          */
-        void SendPacket(SPacket* packet);
+        void SendPacket(SNetPacket* packet);
 
         void SetState(ENetConnectionState state);
 
@@ -195,22 +198,22 @@ namespace moho
         /**
          * Address: 0x00488220
          */
-        void AdoptPacket(const SPacket* packet);
+        void AdoptPacket(const SNetPacket* packet);
 
         /**
          * Address: 0x004874C0
          */
-        void ApplyRemoteHeader(const SPacket& packet);
+        void ApplyRemoteHeader(const SNetPacket& packet);
 
-        MOHO_FORCEINLINE bool InsertEarlySorted(SPacket* packet);
+        MOHO_FORCEINLINE bool InsertEarlySorted(SNetPacket* packet);
 
-        MOHO_FORCEINLINE SPacket* EarlyPopFront();
+        MOHO_FORCEINLINE SNetPacket* EarlyPopFront();
 
         MOHO_FORCEINLINE void EarlyRebuildAckMask(uint16_t expected, uint32_t& mask);
 
-        MOHO_FORCEINLINE void ConsumePacketHeaderData(SPacket* packet);
+        MOHO_FORCEINLINE void ConsumePacketHeaderData(SNetPacket* packet);
 
-        MOHO_FORCEINLINE void InsertUnAckedSorted(SPacket* packet);
+        MOHO_FORCEINLINE void InsertUnAckedSorted(SNetPacket* packet);
 	public:
         // ...
         // +0x410  ListEntry linkInConnector
@@ -221,10 +224,6 @@ namespace moho
         // vtable[1]: uint16_t RemotePort()  const
         // vtable[7]: void CloseOrRelease()
 
-        using UnAckedView = TPairList<SPacket, SPacketContainer, void, &SPacketContainer::mList>;
-        using EarlyView = TPairList<SPacket, SPacketContainer, void, &SPacketContainer::mList>;
-
-        TDatListItem<CNetUDPConnection, void> mConnList;
         CNetUDPConnector* mConnector;
         u_long mAddr;
         u_short mPort;
@@ -255,11 +254,11 @@ namespace moho
         bool mOutputShutdown;
         bool mSentShutdown;
         WORD gap50E;
-        UnAckedView mUnAckedPayloads;
+        TDatList<SNetPacket, void> mUnAckedPayloads;
         NetPacketTime mTimings[128];
         NetSpeeds mPings;
         float mPingTime;
-        EarlyView mEarlyPackets;
+        TDatList<SNetPacket, void> mEarlyPackets;
         uint32_t mMask;
         gpg::PipeStream mInputBuffer;
         gpg::ZLibOutputFilterStream* mFilterStream{nullptr};
