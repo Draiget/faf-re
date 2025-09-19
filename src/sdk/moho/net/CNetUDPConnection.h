@@ -113,22 +113,81 @@ namespace moho
         /**
          * Address: 0x00486B10
          */
-        bool ProcessAck(const SPacket* pack);
+        bool ProcessAckInternal(const SPacket* packet);
 
-        void ProcessData(SPacket* pack); // 0x00486DB0
-        void ProcessKeepAlive(SPacket* pack); // 0x00487310
-        void ProcessGoodbye(SPacket* pack); // 0x00487340
-        void ProcessNATTraversal(SPacket* pack); // 0x00487370
-        int64_t CalcResendDelay(SPacket* pack); // 0x00488170
-        int GetSentTime(int64_t time); // 0x00488260
-        int SendData(); // 0x00488300
-        bool HasPacketWaiting(int64_t time); // 0x00488730
-        SPacket* NextPacket_0(); // 0x00488810
-        SPacket* NextPacket_1(); // 0x004888C0
-        SPacket* ReadPacket(); // 0x00488980
-        SPacket* NextPacket_7(); // 0x00488AA0
-        SPacket* NextPacket(char state, int size, bool inherit); // 0x00488B20
-        void SendPacket(SPacket* pack); // 0x00488D80
+        /**
+         * Address: 0x00486DB0
+         */
+        void ProcessData(SPacket* packet);
+
+        /**
+         * Address: 0x00487310
+         */
+        bool ProcessAck(const SPacket* packet);
+
+        /**
+         * Address: 0x00487340
+         */
+        bool ProcessKeepAlive(const SPacket* packet);
+
+        /**
+         * Address: 0x00487370
+         */
+        bool ProcessGoodbye(const SPacket* packet);
+
+        /**
+         * Address: 0x00488170
+         */
+        int64_t CalcResendDelay(const SPacket* packet);
+
+        /**
+         * Address: 0x00488260
+         */
+        int GetSentTime(int64_t time);
+
+        /**
+         * Address: 0x00488300
+         */
+        int SendData();
+
+        /**
+         * Address: 0x00488730
+         */
+        bool HasPacketWaiting(int64_t nowUs);
+
+        /**
+         * Address: 0x00488980
+         */
+        SPacket* ReadPacket();
+
+        /**
+         * Address: 0x00488810
+         */
+        [[nodiscard]]
+		SPacket* NextConnectPacket() const;
+
+        /**
+         * Address: 0x004888C0
+         */
+        [[nodiscard]]
+		SPacket* NextAnswerPacket() const;
+
+        /**
+         * Address: 0x00488AA0
+         */
+        [[nodiscard]]
+		SPacket* NextGoodbyePacket() const;
+
+        /**
+         * Address: 0x00488B20
+         */
+        [[nodiscard]]
+		SPacket* NextPacket(bool inherit, int size, EPacketState state) const;
+
+        /**
+         * Address: 0x00488D80
+         */
+        void SendPacket(SPacket* packet);
 
         void SetState(ENetConnectionState state);
 
@@ -143,6 +202,15 @@ namespace moho
          */
         void ApplyRemoteHeader(const SPacket& packet);
 
+        MOHO_FORCEINLINE bool InsertEarlySorted(SPacket* packet);
+
+        MOHO_FORCEINLINE SPacket* EarlyPopFront();
+
+        MOHO_FORCEINLINE void EarlyRebuildAckMask(uint16_t expected, uint32_t& mask);
+
+        MOHO_FORCEINLINE void ConsumePacketHeaderData(SPacket* packet);
+
+        MOHO_FORCEINLINE void InsertUnAckedSorted(SPacket* packet);
 	public:
         // ...
         // +0x410  ListEntry linkInConnector
@@ -153,8 +221,8 @@ namespace moho
         // vtable[1]: uint16_t RemotePort()  const
         // vtable[7]: void CloseOrRelease()
 
-        using UnAckedView = TPairList<SPacket, SPacketHeader, void, &SPacketHeader::mList>;
-        using EarlyView = TPairList<SPacket, SPacketHeader, void, &SPacketHeader::mList>;
+        using UnAckedView = TPairList<SPacket, SPacketContainer, void, &SPacketContainer::mList>;
+        using EarlyView = TPairList<SPacket, SPacketContainer, void, &SPacketContainer::mList>;
 
         TDatListItem<CNetUDPConnection, void> mConnList;
         CNetUDPConnector* mConnector;
@@ -169,8 +237,8 @@ namespace moho
         int64_t mLastRecv;
         int64_t mLastKeepAlive;
         uint32_t mKeepAliveFreqUs{ 2'000'000 }; // set to 0x1E8480 (~2s)
-        char mDat1[32];
-        char mDat2[32];
+        char mNonceA[32];
+        char mNonceB[32];
         int v293;
         int64_t mTime1;
         uint16_t mNextSerialNumber;
@@ -192,7 +260,7 @@ namespace moho
         NetSpeeds mPings;
         float mPingTime;
         EarlyView mEarlyPackets;
-        DWORD gapD94;
+        uint32_t mMask;
         gpg::PipeStream mInputBuffer;
         gpg::ZLibOutputFilterStream* mFilterStream{nullptr};
         bool mReceivedEndOfInput;

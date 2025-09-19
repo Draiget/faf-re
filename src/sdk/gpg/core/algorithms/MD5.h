@@ -68,7 +68,7 @@ namespace gpg
          * Address: 0x004A48B0
          * Update with a std::string; includes the trailing '\0' like original code.
          */
-        void Update(std::string s);
+        void Update(const std::string& s);
 
         /**
          * Address: 0x008E4F40

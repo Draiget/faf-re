@@ -8,21 +8,35 @@
 #include "INetNATTraversalProvider.h"
 #include "SPacket.h"
 #include "boost/weak_ptr.h"
-#include "gpg/core/containers/IntrusiveLink.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Sync.h"
 #include "legacy/containers/Deque.h"
-#include "legacy/containers/Vector.h"
 #include "moho/misc/TDatList.h"
 
 namespace moho
 {
+    constexpr uint32_t kReceiveUdpPacketPoolSize = 20;
+
     struct SReceivePacket
     {
 	    SPacket* mPacket;
     	u_long mAddr;
     	u_short mPort;
     };
+
+#pragma pack(push, 1)
+    /**
+     * 16-byte header written before each payload block in .pktlog.
+     */
+    struct PacketLogRecord
+    {
+        std::int64_t  timestamp_us;  // a3
+        std::uint32_t addr;          // IPv4 (host-order as in asm)
+        std::uint16_t len_flags;     // low 15 bits = payload len, bit15 (0x8000) = incoming
+        std::uint16_t port;          // host-order
+    };
+    static_assert(sizeof(PacketLogRecord) == 16, "PacketLogRecord must be 16 bytes");
+#pragma pack(pop)
 
     /*
      * Game Types:
@@ -156,6 +170,25 @@ namespace moho
          * clamped so it never goes backwards.
          */
         int64_t GetTime();
+
+        /**
+         * Address: 0x0048B040
+         *
+         * @param direction
+         * @param timestamp_us
+         * @param addr_host
+         * @param port_host
+         * @param payload
+         * @param payloadLen
+         */
+        MOHO_FORCEINLINE void LogPacket(
+            int direction,
+            std::int64_t timestamp_us,
+            std::uint32_t addr_host,
+            std::uint16_t port_host,
+            const void* payload,
+            int payloadLen
+        );
 	public:
         /**
          * Address: 00489ED0
@@ -164,6 +197,7 @@ namespace moho
         void AddPacket(SPacket* packet);
 
 	public:
+
         // +0x00  vptr(INetConnector)
         // +0x04  vptr(INetNATTraversalHandler)
 
@@ -171,10 +205,9 @@ namespace moho
         SOCKET socket_;
         HANDLE event_;
         boost::weak_ptr<INetNATTraversalProvider> mNatTravProv;
-        gpg::core::IntrusiveLink<CNetUDPConnection*> connections_;
         TDatList<CNetUDPConnection, void> mConnections;
         TDatList<SPacket, void> mPacketList;
-        int mPacketPoolSize;
+        uint32_t mPacketPoolSize;
         _FILETIME v14;
         gpg::time::Timer mTimer;
         int64_t mCurTime{ 0 };
@@ -188,7 +221,8 @@ namespace moho
         msvc8::deque<SReceivePacket> mPackets2;
 
         SendStampBuffer mBuff;
-
+        
+        HANDLE v31;
         FILE* mFile;
         int gap;
 	};

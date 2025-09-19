@@ -131,5 +131,7 @@ namespace gpg
      */
     void Debugf(const char* fmt, ...);
 
+    FILETIME FileTimeLocal();
+
     msvc8::string FileTimeToString(FILETIME time);
 }
