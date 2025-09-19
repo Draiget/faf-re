@@ -2,8 +2,11 @@
 
 #include "INetNATTraversalProvider.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/misc/TDatList.h"
 using namespace moho;
+
+extern int32_t net_LogPackets;
 
 CNetUDPConnector::~CNetUDPConnector() {
     // Drain packet free-list.
@@ -177,6 +180,78 @@ int64_t CNetUDPConnector::GetTime() {
     return mCurTime;
 }
 
+void CNetUDPConnector::LogPacket(
+    int direction,
+    std::int64_t timestamp_us,
+    std::uint32_t addr_host,
+    std::uint16_t port_host,
+    const void* payload,
+    int payloadLen)
+{
+    if (!net_LogPackets) {
+        return;
+    }
+
+    // Lazy open
+    if (!mFile)
+    {
+        char* temp = nullptr;
+        size_t sz = 0;
+        if (_dupenv_s(&temp, &sz, "TEMP") != 0 || temp == nullptr)
+        {
+            net_LogPackets = 0;
+            gpg::Logf("NET: Can't find a place for the packet log -- %%TEMP%% not set!");
+            return;
+        }
+
+        char host[260] = {};
+        if (gethostname(host, sizeof(host) - 1) == -1) {
+            net_LogPackets = 0;
+            gpg::Logf("NET: Can't figure out a name for the packet log -- gethostname failed.");
+            return;
+        }
+
+        const unsigned localPort = GetLocalPort();
+        std::string path;
+        path.reserve(512);
+        {
+            char buf[512];
+            std::snprintf(buf, sizeof(buf), "%s\\%s-%u.pktlog", temp, host, localPort);
+            path.assign(buf);
+        }
+
+        const auto err = fopen_s(&mFile, path.c_str(), "ab");
+        if (err > 0 || !mFile) {
+            net_LogPackets = 0;
+            gpg::Logf("NET: can't open packet log \"%s\" for writing.", path.c_str());
+            return;
+        }
+
+        free(temp);
+        gpg::Logf("NET: Packet log \"%s\" opened.", path.c_str());
+
+        // Write 16-byte "start" record: {timestamp_us, time64(0), 0, 0}
+        PacketLogRecord start;
+        start.timestamp_us = timestamp_us;
+        start.addr = static_cast<std::uint32_t>(::_time64(nullptr)); // time64(0)
+        start.len_flags = 0;
+        start.port = 0;
+        std::fwrite(&start, sizeof(start), 1, mFile);
+    }
+
+    // Record header
+    PacketLogRecord rec;
+    rec.timestamp_us = timestamp_us;
+    rec.addr = addr_host;
+    rec.len_flags = static_cast<std::uint16_t>(payloadLen & 0x7FFF);
+    if (direction == 1) rec.len_flags |= 0x8000; // incoming flag
+    rec.port = port_host;
+
+    // Write header + payload
+    std::fwrite(&rec, sizeof(rec), 1, mFile);
+    std::fwrite(payload, 1, static_cast<size_t>(payloadLen), mFile);
+}
+
 void CNetUDPConnector::AddPacket(SPacket* packet) {
     if (!packet) {
         return;
@@ -185,8 +260,8 @@ void CNetUDPConnector::AddPacket(SPacket* packet) {
     // Detach from whatever list the packet currently belongs to
     packet->mList.ListUnlink();
 
-    // Pool has a hard cap of 20 packets — delete excess
-    if (mPacketPoolSize >= 20u) {
+    // Pool has a hard cap of 20 packets - delete excess
+    if (mPacketPoolSize >= kReceiveUdpPacketPoolSize) {
         ::operator delete(packet); // binary used plain operator delete
         return;
     }

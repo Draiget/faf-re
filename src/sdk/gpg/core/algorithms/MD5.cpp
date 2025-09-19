@@ -49,7 +49,7 @@ namespace gpg
         // block content can remain undefined until used; we clear on padding path.
     }
 
-    void MD5Context::Update(std::string s)
+    void MD5Context::Update(const std::string& s)
     {
         // Original passed size+1 to include trailing '\0'
         const char* p = s.c_str();

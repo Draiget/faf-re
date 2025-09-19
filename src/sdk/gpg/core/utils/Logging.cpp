@@ -109,6 +109,13 @@ void gpg::Debugf(const char* fmt, ...) {
     }
 }
 
+FILETIME gpg::FileTimeLocal() {
+    FILETIME ftUtc{}, ftLocal{};
+    GetSystemTimeAsFileTime(&ftUtc);
+    FileTimeToLocalFileTime(&ftUtc, &ftLocal);
+    return ftLocal;
+}
+
 msvc8::string gpg::FileTimeToString(const FILETIME time) {
     // Convert microseconds to 100-ns ticks expected by FILETIME APIs
     FILETIME ft100ns{};
