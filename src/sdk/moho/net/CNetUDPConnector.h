@@ -7,6 +7,7 @@
 #include "INetNATTraversalHandler.h"
 #include "INetNATTraversalProvider.h"
 #include "SNetPacket.h"
+#include "boost/recursive_mutex.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Sync.h"
@@ -90,7 +91,7 @@ namespace moho
          * Demangled: Moho::CNetUDPConnector::GetProtocol
          */
         ENetProtocolType GetProtocol() override {
-            return ENetProtocolType::UDP;
+            return ENetProtocolType::kUdp;
         }
 
         /**
@@ -112,28 +113,28 @@ namespace moho
          * Slot: 5
          * Demangled: Moho::CNetUDPConnector::FindNextAddr
          */
-        virtual bool FindNextAddr(u_long& outAddress, u_short& outPort) = 0;
+        bool FindNextAddress(u_long& outAddress, u_short& outPort) override;
 
         /**
          * Address: 0x0048B4F0
          * Slot: 6
          * Demangled: Moho::CNetUDPConnector::Accept
          */
-        virtual void Accept() = 0;
+        INetConnection* Accept(u_long address, u_short port) override;
 
         /**
          * Address: 0x0048B500
          * Slot: 7
          * Demangled: Moho::CNetUDPConnector::Reject
          */
-        virtual int Reject(u_long address, u_short port) = 0;
+        void Reject(u_long address, u_short port) override;
 
         /**
          * Address: 0x0048B5C0
          * Slot: 8
          * Demangled: Moho::CNetUDPConnector::Pull
          */
-        virtual void Pull() = 0;
+        void Pull() override;
 
         /**
          * Address: 0x0048B7F0
@@ -199,6 +200,12 @@ namespace moho
             const void* payload,
             int payloadLen
         );
+
+        /**
+         * Address: 0x00489ED0
+         */
+        void DisposePacket(SNetPacket* packet);
+
 	public:
         /**
          * Address: 00489ED0
@@ -210,28 +217,22 @@ namespace moho
         // +0x00  vptr(INetConnector)
         // +0x04  vptr(INetNATTraversalHandler)
 
-        gpg::core::SharedLock lock_;
+        boost::recursive_mutex lock_;
         SOCKET socket_;
         HANDLE event_;
-        boost::weak_ptr<INetNATTraversalProvider> mNatTravProv;
+        boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProv;
         TDatList<CNetUDPConnection, void> mConnections;
         TDatList<SNetPacket, void> mPacketList;
         uint32_t mPacketPoolSize;
-        _FILETIME v14;
+        int64_t initTime_;
         gpg::time::Timer mTimer;
         int64_t mCurTime{ 0 };
-
-        // Resignal worker when Pull/Push finishes (this[80])
-        std::atomic<bool> resignalWorker_{ false };
-        // In Pull() guard flag (this[81])
-        std::atomic<bool> inPump_{ false };
-
+        bool mClosed{ false };
+        bool mIsPulling{ false };
         msvc8::deque<SReceivePacket> mPackets1;
         msvc8::deque<SReceivePacket> mPackets2;
-
+        HANDLE mSelectedEvent;
         SendStampBuffer mBuff;
-        
-        HANDLE v31;
         FILE* mFile;
         int gap;
 	};

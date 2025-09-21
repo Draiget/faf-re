@@ -210,6 +210,11 @@ namespace moho
          */
 		[[nodiscard]]
 		msvc8::string ToString() const;
+
+        /**
+         * Address: 0x00487A30
+         */
+		void LogPacket(const char* dirType, int64_t receiveOrSentTime) const;
 	};
 #pragma pack(pop)
 
@@ -252,7 +257,7 @@ namespace moho
 #pragma pack(push, 1)
     struct SPacketBodyConnect
 	{
-        std::uint32_t protocol; // must be 2
+        ENetProtocolType protocol; // must be 2
         int64_t time;
         ENetCompressionMethod comp;
         char nonceA[32]; // Sender nonce
@@ -261,7 +266,7 @@ namespace moho
 
     struct SPacketBodyAnswer
     {
-        std::uint32_t protocol; // must be 2
+        ENetProtocolType protocol; // must be 2
         int64_t time;
         ENetCompressionMethod comp;
         char nonceA[32];

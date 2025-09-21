@@ -116,7 +116,7 @@ FILETIME gpg::FileTimeLocal() {
     return ftLocal;
 }
 
-msvc8::string gpg::FileTimeToString(const FILETIME time) {
+msvc8::string gpg::FileTimeToString(const LONGLONG time) {
     // Convert microseconds to 100-ns ticks expected by FILETIME APIs
     FILETIME ft100ns{};
     *reinterpret_cast<ULONGLONG*>(&ft100ns) =

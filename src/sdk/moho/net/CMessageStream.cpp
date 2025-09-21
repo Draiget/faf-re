@@ -81,7 +81,7 @@ void CMessageStream::VirtWrite(const char* data, const size_t size) {
 std::pair<char*, char*> CMessageStream::PayloadWindow(CMessage& m) noexcept {
     // base pointer to entire message buffer
     // safe even for SBO: &mBuf[0] is contiguous storage
-    char* base = &m.mBuf[0];
+    char* base = &m.mBuff[0];
 
     // total size from header (LE), consistent with your GetSize()
     const unsigned total = m.GetSize();

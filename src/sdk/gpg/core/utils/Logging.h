@@ -133,5 +133,5 @@ namespace gpg
 
     FILETIME FileTimeLocal();
 
-    msvc8::string FileTimeToString(FILETIME time);
+    msvc8::string FileTimeToString(LONGLONG time);
 }

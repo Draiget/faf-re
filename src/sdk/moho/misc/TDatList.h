@@ -12,7 +12,8 @@ namespace moho
     template<class T, class U>
     struct TDatListItem
     {
-        using item_t = TDatListItem<T, U>;
+        using type = T;
+        using item_t = TDatListItem<type, U>;
 
         item_t* mPrev;
         item_t* mNext;
@@ -73,6 +74,42 @@ namespace moho
             prev->mNext = this;
             that->mPrev = this;
             return mPrev;
+        }
+
+        /**
+         * Return owner object for next node.
+         */
+        type* ListGetNext() noexcept {
+            return static_cast<type*>(this->mNext);
+        }
+
+        /**
+         * Return owner object for prev node.
+         */
+        type* ListGetPrev() noexcept {
+            return static_cast<type*>(this->mPrev);
+        }
+
+        /**
+         * Is this node unlinked (self-linked)?
+         */
+        [[nodiscard]]
+    	bool ListIsSingleton() const noexcept {
+	        return mNext == this && mPrev == this;
+        }
+
+        /**
+         * Move this node to be the first after head (MRU push).
+         */
+        void ListMoveToFront(item_t* head) noexcept {
+	        ListLinkAfter(head);
+        }
+
+        /**
+         * Move this node to be right before head (LRU push).
+         */
+        void ListMoveToBack(item_t* head) noexcept {
+	        ListLinkBefore(head);
         }
     };
 
@@ -167,161 +204,43 @@ namespace moho
             p->ListUnlink();
             return p;
         }
-    };
 
-    /**
-     * Compute runtime offset of Base subobject and 'Hook' member within Owner.
-     * Works with multiple/diamond inheritance like in MSVC layout for non-virtual bases.
-     */
-    template<class Owner, class Base, class HookNode>
-    inline std::ptrdiff_t offset_of_member_in_owner(HookNode Base::* Hook) noexcept
-    {
-        Owner* o = reinterpret_cast<Owner*>(0x1000);
-        Base* b = static_cast<Base*>(o); // may add base offset
-        HookNode* mem = &(b->*Hook);
-        return reinterpret_cast<char*>(mem) - reinterpret_cast<char*>(o);
-    }
+    	/**
+    	 * Iterator that yields owner (T*) instead of node.
+    	 */
+        struct owner_iterator {
+            item_t* pos{ nullptr };
 
-    /**
-     * Convert node pointer (pointing at Base::Hook) back to Owner*.
-     * HookNode must be TDatList<Base,U> or TDatListItem<Base,U> (layout-compatible).
-     */
-    template<class Owner, class Base, class U, class HookNode>
-    inline Owner* owner_from_node_with_base(TDatListItem<Base, U>* n, HookNode Base::* Hook) noexcept
-    {
-        const std::ptrdiff_t off = offset_of_member_in_owner<Owner, Base>(Hook);
-        return reinterpret_cast<Owner*>(reinterpret_cast<char*>(n) - off);
-    }
+            owner_iterator& operator++() noexcept { pos = pos->mNext; return *this; }
+            owner_iterator& operator--() noexcept { pos = pos->mPrev; return *this; }
 
-    /**
-     * Get node pointer (Base::Hook) from Owner*.
-     * HookNode may be TDatList<Base,U> or TDatListItem<Base,U>.
-     */
-    template<class Owner, class Base, class U, class HookNode>
-    inline TDatListItem<Base, U>* node_from_owner_with_base(Owner* o, HookNode Base::* Hook) noexcept
-    {
-        Base* b = static_cast<Base*>(o);
-        HookNode* m = &(b->*Hook);
-        return static_cast<TDatListItem<Base, U>*>(m); // HookNode derives from TDatListItem
-    }
+            T* operator*()  const noexcept {
+#ifndef NDEBUG
+                // Debug-time sanity roundtrip: node -> owner -> node
+                auto* d = static_cast<T*>(pos);
+                assert(static_cast<item_t*>(d) == pos);
+#endif
+                return static_cast<T*>(pos); // centralized downcast
+            }
+            T* operator->() const noexcept { return **this; }
 
-    /**
-     * Two-pointer head (start/end) for lists whose node lives in Base as member Hook.
-     * Owner: most-derived element type (SPacket)
-     * Base:  base class that contains Hook (SPacketHeader)
-     * U:     tag
-     * Hook:  pointer-to-member in Base of type TDatList<Owner,U>
-     */
-    template<
-        class Owner,
-        class Base,
-        class U,
-        TDatList<Owner, U> Base::* Hook
-    >
-    struct TPairList
-    {
-        typedef TDatListItem<Owner, U> node_t;
-
-        Owner* start_; // acts as first sentinel address
-        Owner* end_;   // acts as second sentinel address
-
-        /**
-         * Construct empty (uninitialized); call init_empty() before use.
-         */
-        TPairList() : start_(0), end_(0) {}
-
-        /**
-         * Initialize empty state exactly like in PE: start == &end; link sentinels.
-         */
-        void init_empty() noexcept
-        {
-            end_node()->mNext = start_node();
-            start_node()->mPrev = end_node();
-            start_ = reinterpret_cast<Owner*>(&end_);
-            end_ = reinterpret_cast<Owner*>(&end_);
-        }
-
-        /**
-         * Return true if empty (start points to &end).
-         */
-        bool empty() const noexcept
-        {
-            return reinterpret_cast<const void*>(start_) ==
-                reinterpret_cast<const void*>(&end_);
-        }
-
-        /**
-         * Access sentinel nodes placed over &start / &end.
-         */
-        node_t* start_node()       noexcept { return reinterpret_cast<node_t*>(&start_); }
-        const node_t* start_node() const noexcept { return reinterpret_cast<const node_t*>(&start_); }
-        node_t* end_node()         noexcept { return reinterpret_cast<node_t*>(&end_); }
-        const node_t* end_node()   const noexcept { return reinterpret_cast<const node_t*>(&end_); }
-
-        /**
-         * Node from owner (Owner* -> node_t*) via Base::Hook.
-         */
-        static node_t* node_from_owner(Owner* o) noexcept
-        {
-            Base* b = static_cast<Base*>(o);
-            TDatList<Owner, U>* m = &(b->*Hook);
-            return static_cast<node_t*>(m); // first base of TDatList is node_t
-        }
-
-        /**
-         * Owner from node (node_t* -> Owner*) using Base::Hook offset inside Owner.
-         */
-        static Owner* owner_from_node(node_t* n) noexcept
-        {
-            // compute offset of Base::Hook within Owner
-            Owner* dummy = reinterpret_cast<Owner*>(0x1000);
-            Base* db = static_cast<Base*>(dummy);                    // base offset
-            TDatList<Owner, U>* dm = &(db->*Hook);                        // member addr
-            std::ptrdiff_t off = reinterpret_cast<char*>(dm) - reinterpret_cast<char*>(dummy);
-            return reinterpret_cast<Owner*>(reinterpret_cast<char*>(n) - off);
-        }
-
-        /**
-         * Iterator over nodes between sentinels.
-         */
-        template<bool IsConst>
-        struct Iterator
-        {
-            typedef typename std::conditional<IsConst, const node_t, node_t>::type node_type;
-            node_type* pos;
-            Iterator& operator++() noexcept { pos = pos->mNext; return *this; }
-            Iterator& operator--() noexcept { pos = pos->mPrev; return *this; }
-            node_type& operator*()  const noexcept { return *pos; }
-            node_type* operator->() const noexcept { return pos; }
-            node_type* node()       const noexcept { return pos; }
-            bool operator==(const Iterator& r) const noexcept { return pos == r.pos; }
-            bool operator!=(const Iterator& r) const noexcept { return pos != r.pos; }
-            Iterator() : pos(0) {}
-            explicit Iterator(node_type* p) : pos(p) {}
+            bool operator==(const owner_iterator& r) const noexcept { return pos == r.pos; }
+            bool operator!=(const owner_iterator& r) const noexcept { return pos != r.pos; }
         };
 
-        typedef Iterator<false> iterator;
-        typedef Iterator<true>  const_iterator;
+        struct owner_range {
+            owner_iterator b, e;
+            owner_iterator begin() const noexcept { return b; }
+            owner_iterator end()   const noexcept { return e; }
+        };
 
-        iterator       begin()       noexcept { return iterator{ start_node()->mNext }; }
-        iterator       end()         noexcept { return iterator{ end_node() }; }
-        const_iterator begin() const noexcept { return const_iterator{ start_node()->mNext }; }
-        const_iterator end()   const noexcept { return const_iterator{ end_node() }; }
-
-        /**
-         * Push element at front/back (owner pointer), element must be unlinked.
-         */
-        void push_front(Owner* o) noexcept { node_from_owner(o)->ListLinkAfter(start_node()); }
-        void push_back(Owner* o) noexcept { node_from_owner(o)->ListLinkBefore(end_node()); }
-
-        /**
-         * Erase node at iterator; return iterator to next.
-         */
-        iterator erase(iterator it) noexcept
-        {
-            node_t* const next = it.pos->mNext;
-            it.pos->ListUnlink();
-            return iterator{ next };
+        owner_range owners() noexcept {
+            return { owner_iterator{ this->mNext }, owner_iterator{ static_cast<item_t*>(this) } };
+        }
+        owner_range owners() const noexcept {
+            // const-версию можно сделать отдельно, если нужен const T*
+            return { owner_iterator{ const_cast<item_t*>(this->mNext) },
+                     owner_iterator{ const_cast<item_t*>(static_cast<const item_t*>(this)) } };
         }
     };
 }

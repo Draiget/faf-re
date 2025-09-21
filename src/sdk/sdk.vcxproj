@@ -286,6 +286,7 @@
     <ClCompile Include="moho\net\CNetUDPConnection.cpp" />
     <ClCompile Include="moho\net\CNetUDPConnector.cpp" />
     <ClCompile Include="moho\net\General.cpp" />
+    <ClCompile Include="moho\net\IMessageReceiver.cpp" />
     <ClCompile Include="moho\net\INetConnector.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalHandler.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
@@ -307,6 +308,7 @@
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
     <ClInclude Include="boost\mutex.h" />
+    <ClInclude Include="boost\recursive_mutex.h" />
     <ClInclude Include="boost\sp_counted_base.h" />
     <ClInclude Include="boost\weak_ptr.h" />
     <ClInclude Include="boost\xtime.h" />

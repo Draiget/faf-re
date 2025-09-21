@@ -1,7 +1,67 @@
 #include "General.h"
 
 #include "CHostManager.h"
+#include "gpg/core/containers/String.h"
 using namespace moho;
+
+void moho::NetPacketStateToStr(const EPacketState state, msvc8::string& out) {
+	switch (state) {
+	case ACK:
+        out = "ACK";
+        return;
+	case KEEPALIVE:
+        out = "ACK";
+        return;
+	case GOODBYE:
+        out = "ACK";
+        return;
+	case ANSWER:
+        out = "ACK";
+        return;
+	case CONNECT:
+        out = "ACK";
+        return;
+	case DATA:
+        out = "ACK";
+        return;
+	case NATTRAVERSAL:
+        out = "ACK";
+        return;
+	case RESETSERIAL:
+        out = "ACK";
+        return;
+	case SERIALRESET:
+        out = "ACK";
+        return;
+	default:
+        out = gpg::STR_Printf("%02x", static_cast<uint8_t>(state));
+	}
+}
+
+const char* moho::NetConnectionStateToStr(const ENetConnectionState state) {
+	switch (state) {
+	case ACK:
+        return "ACK";
+	case KEEPALIVE:
+        return "KEEPALIVE";
+	case GOODBYE:
+        return "GOODBYE";
+	case ANSWER:
+        return "ANSWER";
+	case CONNECT:
+        return "CONNECT";
+	case DATA:
+        return "DATA";
+	case NATTRAVERSAL:
+        return "NATTRAVERSAL";
+	case RESETSERIAL:
+        return "RESETSERIAL";
+	case SERIALRESET:
+        return "SERIALRESET";
+	default:
+        return "???";
+	}
+}
 
 void SendStampBuffer::ExtractWindow(SendStampView& out, const uint64_t now, const uint64_t window) const {
     // threshold = now - window
@@ -147,4 +207,13 @@ const char* moho::NET_GetWinsockErrorString() noexcept {
     // Non-Windows build: no Winsock -> stable stub.
     return "NO_WINSOCK";
 #endif
+}
+
+msvc8::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number) {
+    return gpg::STR_Printf(
+        "%d.%d.%d.%d", 
+        HIWORD(HIBYTE(number)),
+        HIWORD(LOBYTE(number)),
+        HIBYTE(number),
+        LOBYTE(number));
 }

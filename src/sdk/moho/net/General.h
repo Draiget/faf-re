@@ -11,14 +11,14 @@ namespace moho
 {
     struct CHostManager;
 
-    enum class ENetConnectionState
+    enum ENetConnectionState
     {
-        Pending = 0,
-        Connecting = 1,
-        Answering = 2,
-        Establishing = 3,
-        TimedOut = 4,
-        Errored = 5,
+        kNetStatePending = 0,
+        kNetStateConnecting = 1,
+        kNetStateAnswering = 2,
+        kNetStateEstablishing = 3,
+        kNetStateTimedOut = 4,
+        kNetStateErrored = 5,
     };
 
     enum EPacketState : uint8_t
@@ -34,16 +34,20 @@ namespace moho
         NATTRAVERSAL,
     };
 
+    void NetPacketStateToStr(EPacketState state, msvc8::string& out);
+    const char* NetConnectionStateToStr(ENetConnectionState state);
+
     enum ENetCompressionMethod : uint8_t
     {
         NETCOMP_None = 0,
         NETCOMP_Deflate = 1,
     };
 
-    enum class ENetProtocolType : int32_t
+    enum ENetProtocolType : int32_t
     {
-        TCP = 1, // guess
-        UDP = 2  // confirmed by GetType()
+        kNone = 0,
+        kTcp = 1, // guess
+        kUdp = 2  // confirmed by GetType()
     };
 
     struct NetPacketTime
@@ -210,4 +214,11 @@ namespace moho
      * Address: 0x0047F5F0
      */
     MOHO_FORCEINLINE const char* NET_GetWinsockErrorString() noexcept;
+
+    /**
+     * Address: 0x004801C0
+     * @param number 
+     * @return 
+     */
+    MOHO_FORCEINLINE msvc8::string NET_GetDottedOctetFromUInt32(uint32_t number);
 }

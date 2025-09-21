@@ -2,29 +2,31 @@
 #include "CNetUDPConnection.h"
 
 #include "CNetUDPConnector.h"
+#include "ECmdStreamOp.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 using namespace moho;
 
-int32_t net_SendDelay = 0;
-int32_t net_AckDelay = 0;
-int32_t net_DebugLevel = 0;
-float net_ResendPingMultiplier = 1;
-int32_t net_ResendDelayBias = 0;
-int32_t net_MaxResendDelay = 0;
-int32_t net_MinResendDelay = 0;
-int32_t net_MaxSendRate = 1000;
-int32_t net_LogPackets = 0;
+int32_t net_SendDelay = 0; // 0x00F58DE4
+int32_t net_AckDelay = 0; // 0x00F58DE0
+int32_t net_DebugLevel = 0; // 0x010A6384
+float net_ResendPingMultiplier = 1; // 0x00F58DFC
+int32_t net_ResendDelayBias = 0; // 0x00F58E00
+int32_t net_MinResendDelay = 0; // 0x00F58DE8
+int32_t net_MaxResendDelay = 0; // 0x00F58DEC
+int32_t net_MaxSendRate = 1000; // 0x00F58DF0
+int32_t net_LogPackets = 0; // 0x010A6381
+int32_t net_MaxBacklog = 0; // 0x00F58DF4
 
 float CNetUDPConnection::GetPing() {
-	gpg::core::SharedLock(mConnector->lock_);
+	boost::recursive_mutex::scoped_lock lock{ mConnector->lock_ };
 	return mPingTime;
 }
 
 float CNetUDPConnection::GetTime() {
-	gpg::core::SharedLock(mConnector->lock_);
+	boost::recursive_mutex::scoped_lock lock{ mConnector->lock_ };
 	if (!mLastRecv) {
 		return -1.0;
 	}
@@ -37,12 +39,12 @@ void CNetUDPConnection::Write(NetDataSpan* data) {
 	const uint8_t* begin = data->start;
 	const uint8_t* end = data->end;
     const size_t len = static_cast<size_t>(end - begin);
-	gpg::core::SharedLock(mConnector->lock_);
+	boost::recursive_mutex::scoped_lock lock{ mConnector->lock_ };
 
 	if (auto* target = mOutputFilterStream) {
 		target->VirtWrite(reinterpret_cast<const char*>(begin), len);
 	} else {
-		mOutputData.VirtWrite(reinterpret_cast<const char*>(begin), len);
+		mPendingOutputData.VirtWrite(reinterpret_cast<const char*>(begin), len);
 	}
 
 	// Schedule earliest send time once:
@@ -52,9 +54,9 @@ void CNetUDPConnection::Write(NetDataSpan* data) {
 		mSendBy.mTime = now + static_cast<std::int64_t>(net_SendDelay) * 1000;
 	}
 
-	// Mark output pending (gap500[0] = 1 in the binary)
+	// Mark output pending (mHasWritten = 1 in the binary)
 	// mHasPendingOutput ?
-	gap500[0] = true;
+	mHasWritten = true;
 
 	// Update counters and MD5 of total queued bytes
 	mTotalBytesQueued += static_cast<std::uint64_t>(len);
@@ -63,7 +65,7 @@ void CNetUDPConnection::Write(NetDataSpan* data) {
 	// Verbose debug (net_DebugLevel >= 3)
 	if (net_DebugLevel >= 3) {
 		const auto dig = mTotalBytesQueuedMD5.Digest();
-		const auto ts = gpg::FileTimeToString(static_cast<FILETIME>(mConnector->GetTime()));
+		const auto ts = gpg::FileTimeToString(mConnector->GetTime());
 
 		const unsigned msgType = len ? begin[0] : 0;
 		gpg::Debugf("%s: %s: msg type %u queued [%zu bytes, total now %llu, md5 %s]",
@@ -78,7 +80,7 @@ void CNetUDPConnection::Write(NetDataSpan* data) {
 }
 
 void CNetUDPConnection::Close() {
-	gpg::core::SharedLock(mConnector->lock_);
+	boost::recursive_mutex::scoped_lock lock{ mConnector->lock_ };
 	if (mOutputShutdown) {
 		return;
 	}
@@ -88,10 +90,10 @@ void CNetUDPConnection::Close() {
 		delete mOutputFilterStream;
 	}
 
-	mOutputData.VirtClose(gpg::Stream::ModeSend);
+	mPendingOutputData.VirtClose(gpg::Stream::ModeSend);
 	mOutputShutdown = true;
 	// mHasPendingOutput ?
-	gap500[0] = false;
+	mHasWritten = false;
 
 #if defined(_WIN32)
 	WSASetEvent(mConnector->event_);
@@ -104,7 +106,7 @@ msvc8::string CNetUDPConnection::ToString() {
 }
 
 void CNetUDPConnection::ScheduleDestroy() {
-	gpg::core::SharedLock(mConnector->lock_);
+	boost::recursive_mutex::scoped_lock lock{ mConnector->lock_ };
 	Close();
 	mScheduleDestroy = true;
 
@@ -192,7 +194,7 @@ CNetUDPConnection::CNetUDPConnection(
 
 		// Allocate filter (operator new 0x460 seen in asm).
 		// Construct zlib filter for deflate (send path).
-		const auto filterStream = new gpg::ZLibOutputFilterStream(&mOutputData, 1);
+		const auto filterStream = new gpg::ZLibOutputFilterStream(&mPendingOutputData, 1);
 		if (filterStream) {
 			if (mOutputFilterStream) {
 				operator delete(mOutputFilterStream);
@@ -250,16 +252,15 @@ CNetUDPConnection::~CNetUDPConnection() {
 }
 
 void CNetUDPConnection::CreateFilterStream() {
-	// Original assigns raw 3 into mState; route via helper for clarity/portability.
-	SetState(ENetConnectionState::Answering);
+	mState = kNetStateAnswering;
 
 	// 1) Push a small control message (type 201) into the input buffer.
 	//    The original code emits CMessage(201) and appends its bytes into PipeStream.
 	{
 		const CMessage msg{ 0, static_cast<char>(201) };
 
-		const char* const src = msg.mBuf.start_;
-		const size_t size = static_cast<size_t>(msg.mBuf.end_ - msg.mBuf.start_);
+		const char* const src = msg.mBuff.start_;
+		const size_t size = static_cast<size_t>(msg.mBuff.end_ - msg.mBuff.start_);
 
 		// Fast path: write directly if there is enough contiguous space in the write window.
 		char* const writeHead = mInputBuffer.mWriteHead;
@@ -336,8 +337,8 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
 	}
 
 	switch (mState) {
-	case ENetConnectionState::Pending:    // 0
-	case ENetConnectionState::Answering:  // 2
+	case kNetStatePending:    // 0
+	case kNetStateAnswering:  // 2
 	{
 		// Copy remote nonce and adopt compression.
 		std::memcpy(mNonceB, pConnect.nonceA, sizeof(mNonceB));
@@ -348,7 +349,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
 		AdoptPacket(packet);
 		return true;
 	}
-	case ENetConnectionState::Connecting: // 1 (Connecting)
+	case kNetStateConnecting: // 1 (Connecting)
 	{
 		std::memcpy(mNonceB, pConnect.nonceA, sizeof(mNonceB));
 		mTime1 = pConnect.time;
@@ -357,14 +358,14 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
 		AdoptPacket(packet);
 
 		// Transition to Answering
-		mState = ENetConnectionState::Answering;
+		mState = kNetStateAnswering;
 		return true;
 	}
-	case ENetConnectionState::Establishing: // 3
-	case ENetConnectionState::TimedOut:     // 4
+	case kNetStateEstablishing: // 3
+	case kNetStateTimedOut:     // 4
 	{
 		// Move to Retired and shut down input.
-		mState = ENetConnectionState::TimedOut; // 5
+		mState = kNetStateTimedOut; // 5
 		mReceivedEndOfInput = true;
 
 		// Close input side (ModeBoth per binary)
@@ -425,7 +426,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet) {
 	}
 
 	// Must be in Connecting (1) or Answering (2)
-	if (mState == ENetConnectionState::Pending) {
+	if (mState == kNetStatePending) {
 		if (net_DebugLevel) {
 			gpg::Logf(
 				"CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER on pending connection",
@@ -434,7 +435,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet) {
 		return;
 	}
 
-	if (!(mState == ENetConnectionState::Connecting || mState == ENetConnectionState::Answering)) {
+	if (!(mState == kNetStateConnecting || mState == kNetStateAnswering)) {
 		if (net_DebugLevel) {
 			gpg::Logf(
 				"CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER on established connection",
@@ -465,30 +466,30 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet) {
 
 bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet) {
 	switch (mState) {
-	case ENetConnectionState::Pending: { // 0
+	case kNetStatePending: { // 0
 		if (net_DebugLevel) {
 			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Pending connection.",
 				GetPort(), ToString().c_str());
 		}
 		return false;
 	}
-	case ENetConnectionState::Connecting: { // 1
+	case kNetStateConnecting: { // 1
 		if (net_DebugLevel) {
 			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Connecting connection.",
 				GetPort(), ToString().c_str());
 		}
 		return false;
 	}
-	case ENetConnectionState::Answering: // 2
+	case kNetStateAnswering: // 2
 		// First ACK on Active path turns on RX filter if not set.
 		CreateFilterStream();
-	case ENetConnectionState::Establishing: // 3
+	case kNetStateEstablishing: // 3
 		break; // proceed
-	case ENetConnectionState::TimedOut: // 4
+	case kNetStateTimedOut: // 4
 		// Transition per binary: Error -> Closing before handling.
-		mState = ENetConnectionState::Establishing;
+		mState = kNetStateEstablishing;
 		break;
-	case ENetConnectionState::Errored: { // 5
+	case kNetStateErrored: { // 5
 		if (net_DebugLevel) {
 			gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Errored connection.",
 				GetPort(), ToString().c_str());
@@ -645,8 +646,8 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet) {
 
 	// Signal connector event if progressed (matches SetEvent path in asm)
 #if defined(_WIN32)
-	if (progressed && mConnector && mConnector->v31) {
-		SetEvent(mConnector->v31);
+	if (progressed && mConnector && mConnector->mSelectedEvent) {
+		SetEvent(mConnector->mSelectedEvent);
 	}
 #endif
 }
@@ -679,7 +680,7 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet) {
 
 	if (!mReceivedEndOfInput)
 	{
-		mState = ENetConnectionState::Errored;
+		mState = kNetStateErrored;
 		mReceivedEndOfInput = true;
 
 		if (mFilterStream) {
@@ -691,8 +692,8 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet) {
 
 		mInputBuffer.Close(gpg::Stream::ModeBoth);
 #if defined(_WIN32)
-		if (mConnector && mConnector->v31) {
-			SetEvent(mConnector->v31);
+		if (mConnector && mConnector->mSelectedEvent) {
+			SetEvent(mConnector->mSelectedEvent);
 		}
 #endif
 	}
@@ -721,186 +722,139 @@ int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const {
 	return static_cast<int64_t>(delayMs) * 1000LL;
 }
 
-int CNetUDPConnection::GetSentTime(const int64_t time) {
-	const uint32_t credit = static_cast<uint32_t>(mSendTime & 0xFFFFFFFFULL);
-	if (credit == 0) {
-		return 0;
+int CNetUDPConnection::GetBacklog(const int64_t time) {
+	if (mSendTime != 0) {
+		const int result = mSendTime - (time - mLastSend.mTime) * net_MaxSendRate * 0.000001;
+		if (result > 0) {
+			return result;
+		}
+		mSendTime = 0;
 	}
-
-	const double dtUs = static_cast<double>(time - mLastSend.mTime);
-	const double remain = static_cast<double>(credit)
-		- dtUs * static_cast<double>(net_MaxSendRate) * 1e-6;
-
-	const int r = static_cast<int>(remain);
-	if (r > 0)
-		return r;
-
-	mSendTime &= 0xFFFFFFFF00000000ULL; // LODWORD(mSendTime) = 0
 	return 0;
 }
 
-int CNetUDPConnection::SendData() {
-	// Helper: time until 'ts' (us).
-	// Return -1 if already passed.
-	auto timeUntil = [&](const int64_t ts) -> int {
-		const int64_t now = mConnector->GetTime();
-		const int64_t d = ts - now;
-		if (d <= 0) return -1;
-		if (d > std::numeric_limits<int>::max()) return std::numeric_limits<int>::max();
-		return static_cast<int>(d);
-	};
+int CNetUDPConnection::GetBacklogTimeout(const LONGLONG time, int& timeout) {
+	const int backlog = GetBacklog(time);
+	if (backlog > net_MaxBacklog) {
+		timeout = 1000 * (backlog - net_MaxBacklog) / net_MaxSendRate;
+		return false;
+	}
 
-	// already scheduled/finished destruction
-	if (v867b) { 
+	timeout = 0;
+	return true;
+}
+
+int64_t CNetUDPConnection::TimeSince(const int64_t time) const {
+	const int64_t since = (time - mConnector->GetTime()) / 1000;
+	if (since < 0) {
+		return 0;
+	}
+	return since;
+}
+
+int64_t CNetUDPConnection::SendData() {
+	if (mDestroyed) { 
 		return -1;
 	}
 
 	switch (mState)
 	{
-	case ENetConnectionState::Pending:
-	case ENetConnectionState::Errored:
+	case kNetStatePending:
+	case kNetStateErrored:
 		if (mScheduleDestroy) {
-			v867b = true;
+			mDestroyed = true;
 			return -1;
 		}
 		return -1;
 
-	case ENetConnectionState::Connecting:
+	case kNetStateConnecting:
 	{
 		if (mScheduleDestroy) {
-			v867b = true;
+			mDestroyed = true;
 			return -1;
 		}
 
-		const int64_t now = mConnector->GetTime();
-		const bool needKick =
-			(mInResponseTo != 0) ||
-			((now - mLastSend.mTime) >= 1'000'000); // 1s
-
-		if (needKick) {
-			SNetPacket* p = NextConnectPacket();
-			SendPacket(p);
+		if (mInResponseTo != 0 || mConnector->GetTime() - mLastSend.mTime > 1'000'000) {
+			SendPacket(NewConnectPacket());
 		}
 
-		// schedule next kick around 1s cadence
-		return timeUntil(mLastSend.mTime + 1'000'000);
+		return TimeSince(mLastSend.mTime + 1'000'000);
 	}
 
-	case ENetConnectionState::Answering:
+	case kNetStateAnswering:
 	{
 		if (mScheduleDestroy) {
-			v867b = true;
+			mDestroyed = true;
 			return -1;
 		}
 
-		const int64_t now = mConnector->GetTime();
-		const bool needKick =
-			(mInResponseTo != 0) ||
-			((now - mLastSend.mTime) >= 1'000'000);
-
-		if (needKick) {
-			SNetPacket* p = NextAnswerPacket();
-			SendPacket(p);
+		if (mInResponseTo != 0 || mConnector->GetTime() - mLastSend.mTime > 1'000'000) {
+			SendPacket(NewAnswerPacket());
 		}
 
-		return timeUntil(mLastSend.mTime + 1'000'000);
+		return TimeSince(mLastSend.mTime + 1'000'000);
 	}
 
-	case ENetConnectionState::Establishing:
+	case kNetStateEstablishing:
 	{
-		const int64_t now = mConnector->GetTime();
-		const int64_t idle = now - mLastRecv;
+		const int64_t curTime = mConnector->GetTime();
+		const int64_t idle = curTime - mLastRecv;
 
-		// Timeout after 10 seconds of no incoming traffic
-		if (!(idle < 0 || idle <= 10'000'000)) {
+		if (curTime - mLastRecv > 10'000'000) {
 			if (net_DebugLevel) {
 				gpg::Logf("CNetUDPConnection<%u,%s>::SendData(): connection timed out.",
 					GetPort(), ToString().c_str());
 			}
-			mState = ENetConnectionState::TimedOut;
-			// fallthrough to TimedOut handling below
-		} else
-		{
-			SNetPacket* toSend = nullptr;
-
-			// Resend logic: if un-acked exists and resend due
-			if (!mUnAckedPayloads.empty()) {
-				auto* n = mUnAckedPayloads.begin().node();
-				auto* headPacket = static_cast<SNetPacket*>(n);
-				if (now >= headPacket->mSentTime) {
-					n->ListUnlink();
-					toSend = headPacket;
-				}
+			mState = kNetStateTimedOut;
+			[[fallthrough]];
+		} else {
+			SNetPacket* packet = nullptr;
+			if (!mUnAckedPayloads.empty() && curTime >= mUnAckedPayloads.ListGetNext()->mSentTime) {
+				packet = mUnAckedPayloads.ListGetNext();
+				packet->ListUnlink();
+			} else if (HasPacketWaiting(curTime)) {
+				packet = ReadPacket();
+			} else if (mScheduleDestroy && mSentShutdown && mUnAckedPayloads.empty()) {
+				packet = NewGoodbyePacket();
+				mDestroyed = true;
+			} else if (curTime >= mLastKeepAlive + mKeepAliveFreqUs) {
+				packet = NewPacket(true, 0, KEEPALIVE);
+			} else if (mInResponseTo == 0 && curTime >= mSendBy.mTime) {
+				packet = NewPacket(true, 0, ACK);
 			}
 
-			// No resend due: build new packet if we have work
-			if (!toSend) {
-				if (HasPacketWaiting(now)) {
-					toSend = ReadPacket();
-				} else if (mScheduleDestroy && mSentShutdown && mUnAckedPayloads.empty()) {
-					toSend = NextGoodbyePacket(); // final close/bye packet
-					v867b = true;
-				} else if (now < (mLastKeepAlive + mKeepAliveFreqUs)) {
-					// Ack-only if we owe an ack and deadline reached
-					if (mInResponseTo && now >= mSendBy.mTime) {
-						// ACK-only; state id per your map
-						toSend = NextPacket(true, 0, ACK); 
-					}
-				} else {
-					// Keepalive if period elapsed
-					// KEEPALIVE; state id per your map (6 in asm)
-					toSend = NextPacket(true, 0, KEEPALIVE);
-				}
+			if (packet) {
+				SendPacket(packet);
 			}
 
-			if (toSend)
-				SendPacket(toSend);
-
-			// Compute next delay:
-			// If we have just flushed output or buffer is "big", go now.
-			if (mFlushedOutputData || mOutputData.GetLength() > 0x1F1)
+			if (mFlushedOutputData || mPendingOutputData.GetLength() > 0x1F1) {
 				return 0;
+			}
 
-			// Soonest of: keepalive deadline, resend of oldest unacked, ack deadline (if owed)
-			int next = timeUntil(mLastKeepAlive + mKeepAliveFreqUs);
-
+			auto since = TimeSince(mLastKeepAlive + mKeepAliveFreqUs);
 			if (!mUnAckedPayloads.empty()) {
-				auto* n = mUnAckedPayloads.begin().node();
-				const auto* headPacket = static_cast<SNetPacket*>(n);
-				const int r = timeUntil(headPacket->mSentTime);
-				if (r != -1 && (next == -1 || next >= r)) {
-					next = r;
-				}
+				const auto sentTime = mUnAckedPayloads.ListGetNext()->mSentTime;
+				since = ChooseTimeout(since, TimeSince(sentTime));
 			}
-
-			if (mSendBy.mTime &&
-				(mInResponseTo || mOutputData.GetLength() || gap500[0]))
+			if (mSendBy.mTime != 0 &&
+				(mInResponseTo != 0 || mPendingOutputData.GetLength() != 0 || mHasWritten)) 
 			{
-				const int r = timeUntil(mSendBy.mTime);
-				if (r != -1 && (next == -1 || next >= r))
-					return r;
+				since = ChooseTimeout(since, TimeSince(mSendBy.mTime));
 			}
-
-			return next;
+			return since;
 		}
-		// fallthrough to TimedOut case
 	}
-	case ENetConnectionState::TimedOut:
+	case kNetStateTimedOut:
 	{
 		if (mScheduleDestroy) {
-			v867b = true;
+			mDestroyed = true;
 			return -1;
 		}
 
-		// On timed-out, still send keepalives if interval elapsed
-		const int64_t now = mConnector->GetTime();
-		if ((now - mLastKeepAlive) > mKeepAliveFreqUs) {
-			// KEEPALIVE
-			SNetPacket* p = NextPacket(true, 0, KEEPALIVE);
-			SendPacket(p);
+		if (mConnector->GetTime() - mLastKeepAlive > mKeepAliveFreqUs) {
+			SendPacket(NewPacket(true, 0, KEEPALIVE));
 		}
-
-		return timeUntil(mLastKeepAlive + mKeepAliveFreqUs);
+		return TimeSince(mLastKeepAlive + mKeepAliveFreqUs);
 	}
 
 	default:
@@ -915,10 +869,10 @@ bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs) {
 		return false;
 	}
 
-	gpg::PipeStream* out = &mOutputData;
+	gpg::PipeStream* out = &mPendingOutputData;
 
 	// End-of-stream pending? (read head == read end && AtEnd && !mSentShutdown)
-	if (mOutputData.mReadHead == mOutputData.mReadEnd && 
+	if (mPendingOutputData.mReadHead == mPendingOutputData.mReadEnd && 
 		out->VirtAtEnd() &&
 		!mSentShutdown)
 	{
@@ -931,31 +885,31 @@ bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs) {
 		nowUs < (mLastKeepAlive + mKeepAliveFreqUs))
 	{
 		// 497 bytes threshold from asm
-		return mOutputData.GetLength() >= 0x1F1;
+		return mPendingOutputData.GetLength() >= kNetPacketMaxPayload;
 	}
 
 	// Pending flush request?
-	if (gap500[0]) {
+	if (mHasWritten) {
 		if (mOutputFilterStream) {
 			mOutputFilterStream->VirtFlush();
 		}
 		out->VirtFlush();
-		gap500[0] = 0;
+		mHasWritten = false;
 	}
 
 	// Any bytes available?
-	return mOutputData.GetLength() != 0;
+	return mPendingOutputData.GetLength() != 0;
 }
 
 SNetPacket* CNetUDPConnection::ReadPacket() {
 	// clamp payload to wire limit
-	unsigned int len = mOutputData.GetLength();
+	unsigned int len = mPendingOutputData.GetLength();
 	if (len >= static_cast<unsigned int>(kNetPacketMaxPayload)) {
 		len = kNetPacketMaxPayload;
 	}
 
 	// allocate with header inheritance (seq/expected/mask)
-	SNetPacket* packet = NextPacket(true, static_cast<int>(len), DATA);
+	SNetPacket* packet = NewPacket(true, static_cast<int>(len), DATA);
 	if (!packet) {
 		return nullptr;
 	}
@@ -965,11 +919,11 @@ SNetPacket* CNetUDPConnection::ReadPacket() {
 		const auto dst = reinterpret_cast<char*>(&packet->data[0]);
 
 		// fast path if contiguous
-		if (len <= static_cast<unsigned int>(mOutputData.mReadEnd - mOutputData.mReadHead)) {
-			std::memcpy(dst, mOutputData.mReadHead, len);
-			mOutputData.mReadHead += len;
+		if (len <= static_cast<unsigned int>(mPendingOutputData.mReadEnd - mPendingOutputData.mReadHead)) {
+			std::memcpy(dst, mPendingOutputData.mReadHead, len);
+			mPendingOutputData.mReadHead += len;
 		} else {
-			mOutputData.Read(dst, len); // virtual read
+			mPendingOutputData.Read(dst, len); // virtual read
 		}
 
 		// adjust "flushed output" debt
@@ -995,18 +949,18 @@ SNetPacket* CNetUDPConnection::ReadPacket() {
 	return packet;
 }
 
-SNetPacket* CNetUDPConnection::NextConnectPacket() const {
+SNetPacket* CNetUDPConnection::NewConnectPacket() const {
 	constexpr auto payloadSize = sizeof(SPacketBodyConnect);
 
 	// allocate with no header inheritance (seq/expected/mask all zero)
-	SNetPacket* packet = NextPacket(false, payloadSize, CONNECT);
+	SNetPacket* packet = NewPacket(false, payloadSize, CONNECT);
 	if (!packet) {
 		return nullptr;
 	}
 
 	auto& connectPacket = packet->As<SPacketBodyConnect>();
 
-	connectPacket.protocol = 2u;
+	connectPacket.protocol = kUdp;
 	connectPacket.time = mConnector->GetTime();
 	connectPacket.comp = mOurCompressionMethod;
 
@@ -1014,18 +968,18 @@ SNetPacket* CNetUDPConnection::NextConnectPacket() const {
 	return packet;
 }
 
-SNetPacket* CNetUDPConnection::NextAnswerPacket() const {
+SNetPacket* CNetUDPConnection::NewAnswerPacket() const {
 	constexpr auto payloadSize = sizeof(SPacketBodyAnswer);
 
 	// allocate with no header inheritance (seq/expected/mask all zero)
-	SNetPacket* packet = NextPacket(false, payloadSize, ANSWER);
+	SNetPacket* packet = NewPacket(false, payloadSize, ANSWER);
 	if (!packet) {
 		return nullptr;
 	}
 
 	auto& answerPacket = packet->As<SPacketBodyAnswer>();
 
-	answerPacket.protocol = 2u;
+	answerPacket.protocol = kUdp;
 	answerPacket.time = mConnector->GetTime();
 	answerPacket.comp = mOurCompressionMethod;
 
@@ -1034,8 +988,8 @@ SNetPacket* CNetUDPConnection::NextAnswerPacket() const {
 	return packet;
 }
 
-SNetPacket* CNetUDPConnection::NextGoodbyePacket() const {
-	SNetPacket* packet = NextPacket(false, 0, GOODBYE);
+SNetPacket* CNetUDPConnection::NewGoodbyePacket() const {
+	SNetPacket* packet = NewPacket(false, 0, GOODBYE);
 	if (!packet) {
 		return nullptr;
 	}
@@ -1043,7 +997,7 @@ SNetPacket* CNetUDPConnection::NextGoodbyePacket() const {
 	return packet;
 }
 
-SNetPacket* CNetUDPConnection::NextPacket(const bool inherit, const int size, const EPacketState state) const {
+SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, const EPacketState state) const {
 	// take from connector's pool or allocate
 	SNetPacket* pkt;
 	if (mConnector->mPacketList.mNext != &mConnector->mPacketList) {
@@ -1112,7 +1066,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet) {
 	if (net_DebugLevel >= 2) {
 		const auto pktStr = packet->ToString();
 		const auto connStr = ToString();
-		const auto timeStr = gpg::FileTimeToString(gpg::FileTimeLocal());
+		const auto timeStr = gpg::FileTimeToString(gpg::time::GetTime());
 		gpg::Debugf("%s: send %s, %s",
 			timeStr.c_str(),
 			connStr.c_str(),
@@ -1122,7 +1076,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet) {
 	++mNextSerialNumber;
 	mInResponseTo = 0;
 
-	if (mOutputData.GetLength()) {
+	if (mPendingOutputData.GetLength()) {
 		// time in us
 		mSendBy.mTime = nowUs + 1000LL * net_SendDelay;
 	} else {
@@ -1135,7 +1089,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet) {
 	mTimings[sidx].mTime.Reset();
 
 	// Pacing credit: low 32 bits accumulate bytes just sent
-	const std::uint32_t remain = static_cast<std::uint32_t>(GetSentTime(nowUs));
+	const std::uint32_t remain = static_cast<std::uint32_t>(GetBacklog(nowUs));
 	const std::uint32_t credit = remain + reinterpret_cast<std::uint32_t>(payload);
 	mSendTime = (mSendTime & 0xFFFFFFFF00000000ULL) | credit;
 
@@ -1151,8 +1105,123 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet) {
 	}
 }
 
-void CNetUDPConnection::SetState(const ENetConnectionState state) {
-	mState = state;
+void CNetUDPConnection::FlushInput() {
+	if (!mScheduleDestroy && !mReceivedEndOfInput) {
+		if (mFilterStream != nullptr) {
+			mFilterStream->VirtFlush();
+		}
+		mInputBuffer.VirtFlush();
+	}
+}
+
+void CNetUDPConnection::DispatchFromInput() {
+	if (mDispatchedEndOfInput || mScheduleDestroy) {
+		return;
+	}
+
+	while (mMessage.Read(&mInputBuffer)) {
+		const auto streamCmd = static_cast<ECmdStreamOp>(mMessage.GetType());
+
+		if (streamCmd != ECmdStreamOp::Answering) {
+			const size_t len = mMessage.mBuff.Size();
+			mTotalBytesDispatched += len;
+			mTotalBytesDispatchedMD5.Update(&mMessage.mBuff[0], len);
+		}
+
+		if (net_DebugLevel >= 3) {
+			msvc8::string digStr = mTotalBytesDispatchedMD5.Digest().ToString();
+			msvc8::string thisStr = ToString();
+			msvc8::string timeStr = gpg::FileTimeToString(mConnector->GetTime());
+			gpg::Debugf(
+				"%s: %s: msg type %d dispatched [%d bytes, total now %lld, md5 %s]",
+				timeStr.c_str(),
+				thisStr.c_str(),
+				&mMessage.mBuff[0],
+				mMessage.mBuff.Size(),
+				mTotalBytesDispatched,
+				digStr.c_str()
+			);
+		}
+
+		const auto receiver = mReceivers[static_cast<int32_t>(mMessage.GetType())];
+		if (receiver == nullptr) {
+			msvc8::string host = NET_GetHostName(mAddr);
+			gpg::Warnf(
+				"No receiver for message type %d received from %s:%d.",
+				mMessage.GetType(),
+				host.c_str(),
+				mPort
+			);
+		} else {
+			receiver->Receive(&mMessage, this);
+		}
+		mMessage.mBuff.Clear();
+		mMessage.mPos = 0;
+		if (mScheduleDestroy) {
+			return;
+		}
+	}
+	if (mInputBuffer.LeftToRead() == 0 && mInputBuffer.VirtAtEnd()) {
+		mDispatchedEndOfInput = true;
+		if (mState == 5) {
+			Dispatch(new CMessage{ 0, static_cast<char>(202) });
+		} else {
+			Dispatch(new CMessage{ 0, static_cast<char>(203) });
+		}
+	}
+}
+
+void CNetUDPConnection::Debug() {
+	const auto time = mConnector->GetTime();
+	gpg::Logf("  CNetUDPConnection 0x%08x:", this);
+	const msvc8::string address = NET_GetDottedOctetFromUInt32(mAddr);
+	const msvc8::string hostname = NET_GetHostName(mAddr);
+	gpg::Logf("    remote addr: %s[%s]:%d", hostname.c_str(), address.c_str(), mPort);
+	const char* state;
+	if (mState > kNetStateErrored) {
+		state = gpg::STR_Printf("??? (%d)", mState).c_str();
+	} else {
+		state = NetConnectionStateToStr(mState);
+	}
+	gpg::Logf("    State: %s", state);
+	gpg::Logf("    Last Send: %7dusec ago", time - mLastSend.mTime);
+	gpg::Logf("    Last Recv: %7dusec ago", time - mLastRecv);
+	gpg::Logf("    Last KeepAlive: %7dusec ago", time - mLastKeepAlive);
+	gpg::Logf("    KeepAlive Freq: %d", mKeepAliveFreqUs);
+	gpg::Logf("    Next Serial Number: %d", mNextSerialNumber);
+	gpg::Logf("    In Response To: %d", mInResponseTo);
+	if (mSendBy.mTime != 0) {
+		gpg::Logf("    Send By: %7dusec from now", mSendBy.mTime - time);
+	} else {
+		gpg::Logf("    Send By: NA");
+	}
+	const LONGLONG sentTime = GetBacklog(time);
+	gpg::Logf("    Backlog: %d bytes", sentTime);
+	gpg::Logf("    Next Sequence Number: %d", mNextSequenceNumber);
+	gpg::Logf("    Remote Expected Sequence Number: %d", mRemoteExpectedSequenceNumber);
+	gpg::Logf("    Expected Sequence Number: %d", mExpectedSequenceNumber);
+	gpg::Logf("    Pending Output Data: %d", mPendingOutputData.GetLength());
+	gpg::Logf("    Flushed Output Data: %d", mFlushedOutputData);
+	gpg::Logf("    Output Shutdown: %s", mOutputShutdown ? "true" : "false");
+	gpg::Logf("    Sent Shutdown: %s", mSentShutdown ? "true" : "false");
+	gpg::Logf("    Unacked Payloads:");
+	for (const auto* packet : mUnAckedPayloads.owners()) {
+		packet->LogPacket("Sent", time);
+	}
+	gpg::Logf("    Ping Time=%f", mPingTime);
+	gpg::Logf("    Early Packets:");
+	for (const auto* packet : mUnAckedPayloads.owners()) {
+		packet->LogPacket("Received", time);
+	}
+	gpg::Logf("    Buffered Input Data: %d bytes", mInputBuffer.GetLength());
+	gpg::Logf("    Received End of Input: %s", mReceivedEndOfInput ? "true" : "false");
+	gpg::Logf("    Dispatched End of Input: %s", mDispatchedEndOfInput ? "true" : "false");
+	gpg::Logf("    Closed: %s", mScheduleDestroy);
+	gpg::Logf("    Total bytes queued: %llu [%s]", mTotalBytesQueued, mTotalBytesQueuedMD5.Digest().ToString().c_str());
+	gpg::Logf("    Total bytes sent: %llu [%s]", mTotalBytesSent, mTotalBytesSentMD5.Digest().ToString().c_str());
+	gpg::Logf("    Total bytes received: %llu [%s]", mTotalBytesReceived, mTotalBytesReceivedMD5.Digest().ToString().c_str());
+	gpg::Logf("    Total bytes dispatched: %llu [%s]", mTotalBytesDispatched, mTotalBytesDispatchedMD5.Digest().ToString().c_str());
+
 }
 
 void CNetUDPConnection::AdoptPacket(const SNetPacket* packet) {
@@ -1198,17 +1267,14 @@ bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet) {
 	const auto node = packet->ListUnlink();
 
 	// Walk list to find insertion point (first element with seq > p->seq)
-	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.end(); ++it) {
-		auto* n = it.node();
-		const auto* cur = static_cast<SNetPacket*>(n);
+	for (auto* cur : mEarlyPackets.owners()) {
 		if (cur->header.mSequenceNumber == packet->header.mSequenceNumber) {
 			// Duplicate of a future DATA - ignore insertion
 			return false;
 		}
+
 		if (static_cast<int16_t>(cur->header.mSequenceNumber - packet->header.mSequenceNumber) > 0) {
-			// Insert before 'it'
-			n->ListLinkBefore(it.node());
-			return true;
+			cur->ListLinkBefore(cur);
 		}
 	}
 
@@ -1229,9 +1295,7 @@ SNetPacket* CNetUDPConnection::EarlyPopFront() {
 
 void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& mask) {
 	mask = 0;
-	for (auto it = mEarlyPackets.begin(); it != mEarlyPackets.end(); ++it) {
-		auto* n = it.node();
-		const auto* cur = static_cast<SNetPacket*>(n);
+	for (const auto* cur : mEarlyPackets.owners()) {
 		const int16_t d = static_cast<int16_t>(cur->header.mSequenceNumber - expected);
 		if (d >= 1 && d <= 32) {
 			mask |= (1u << (d - 1));

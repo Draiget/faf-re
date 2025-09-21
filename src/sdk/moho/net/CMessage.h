@@ -8,7 +8,7 @@ namespace moho
 {
     struct CMessage
     {
-        gpg::core::FastVectorN<char, 64> mBuf;
+        gpg::core::FastVectorN<char, 64> mBuff;
         int mPos;
 
         /**
@@ -20,8 +20,8 @@ namespace moho
          * PDB address: 0x0047BE62
          */
         void SetSize(const size_t size) {
-            this->mBuf[1] = LOBYTE(size);
-            this->mBuf[2] = HIBYTE(size);
+            this->mBuff[1] = LOBYTE(size);
+            this->mBuff[2] = HIBYTE(size);
         }
 
         /**
@@ -29,7 +29,7 @@ namespace moho
          */
         unsigned short GetSize() {
             // return *(unsigned short *)(&this->mBuf[1]);
-            return MAKEWORD(this->mBuf[1], this->mBuf[2]);
+            return MAKEWORD(this->mBuff[1], this->mBuff[2]);
         }
 
         /**
@@ -44,14 +44,14 @@ namespace moho
          * PDB address: 0x007BFB97
          */
         char GetType() {
-            return this->mBuf[0];
+            return this->mBuff[0];
         }
 
         /**
          * PDB address: 0x004834E9
          */
         void SetType(const char type) {
-            this->mBuf[0] = type;
+            this->mBuff[0] = type;
         }
 
         /**
