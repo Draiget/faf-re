@@ -24,7 +24,9 @@ namespace gpg
 	 *  Returns true on success and stores into *dest.
 	 *  Accepts only ASCII digits/letters; requires that the entire span is valid.
 	 */
-	bool func_ParseNum(const char* start, const char* end, int* dest) noexcept;
+	bool ParseNum(const char* start, const char* end, int* dest) noexcept;
+
+	void SetThreadName(unsigned int id, const char* name); // 0x009071D0
 }
 
 static gpg::die_handler_t dieHandler; // 0x00F8EBDC

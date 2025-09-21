@@ -1,8 +1,11 @@
 #include "General.h"
 
 #include "CHostManager.h"
+#include "CNetUDPConnector.h"
 #include "gpg/core/containers/String.h"
 using namespace moho;
+
+extern int32_t net_DebugLevel = 0;
 
 void moho::NetPacketStateToStr(const EPacketState state, msvc8::string& out) {
 	switch (state) {
@@ -63,47 +66,31 @@ const char* moho::NetConnectionStateToStr(const ENetConnectionState state) {
 	}
 }
 
-void SendStampBuffer::ExtractWindow(SendStampView& out, const uint64_t now, const uint64_t window) const {
-    // threshold = now - window
-    const uint64_t threshold = now - window;
-
-    // Convert u64 -> FILETIME (binary treats FILETIME as raw 64-bit)
-    out.from.dwLowDateTime = static_cast<DWORD>(threshold & 0xFFFFFFFFu);
-    out.from.dwHighDateTime = static_cast<DWORD>(threshold >> 32);
-    out.to.dwLowDateTime = static_cast<DWORD>(now & 0xFFFFFFFFu);
-    out.to.dwHighDateTime = static_cast<DWORD>(now >> 32);
-
-    // Logical size of the ring
-    uint32_t count;
-    if (mStart >= mEnd) {
-        count = mStart - mEnd;
+SendStampView SendStampBuffer::GetBetween(const uint64_t startTime, const uint64_t endTime) {
+    uint64_t dur = endTime - startTime;
+    unsigned int len;
+    if (mEnd < mStart) {
+        len = mEnd - mStart + 4096;
     } else {
-        count = mStart - mEnd + cap;
+        len = mEnd - mStart;
     }
-
-    // Lower_bound by time over [0, count), indexing with (mEnd + idx) % kCap
-    uint32_t lo = 0, hi = count;
-    while (lo < hi) {
-        const uint32_t mid = (lo + hi) >> 1;
-        const SendStamp& s = mDat[(mEnd + mid) % cap];
-        const uint64_t t =
-            (static_cast<uint64_t>(s.time.dwHighDateTime) << 32)
-            | static_cast<uint64_t>(s.time.dwLowDateTime);
-
-        if (t >= threshold) {
-            hi = mid;
+    unsigned int start = 0;
+    unsigned int end = len;
+    while (start < end) {
+        unsigned int cur = (end + start) / 2;
+        if (Get(cur).time >= dur) {
+            end = cur;
         } else {
-            lo = mid + 1;
+            start = cur + 1;
         }
     }
 
-    // Prepare output vector and copy the window
-    const uint32_t take = count - lo;
-    out.items.clear();
-    out.items.reserve(take);
-    for (uint32_t i = lo; i < count; ++i) {
-        out.items.push_back(mDat[(mEnd + i) % cap]);
+    SendStampView out{ dur, end };
+    out.items.reserve(len - end);
+    for (auto i = end; i < len; ++i) {
+        out.items.push_back(Get(i));
     }
+    return out;
 }
 
 void SendStampBuffer::Reset() {
@@ -111,7 +98,7 @@ void SendStampBuffer::Reset() {
     mStart = 0;
 }
 
-uint32_t SendStampBuffer::Push(const int dir, const FILETIME timeUs, const int size) noexcept {
+uint32_t SendStampBuffer::Push(const int dir, const LONGLONG timeUs, const int size) noexcept {
     // If advancing start would collide with end, drop the oldest.
     const std::uint32_t next = (mStart + 1u) & static_cast<std::uint32_t>(cap);
     if (next == mEnd) {
@@ -126,6 +113,77 @@ uint32_t SendStampBuffer::Push(const int dir, const FILETIME timeUs, const int s
 
     return EmplaceAndAdvance(s);
 }
+
+void SendStampBuffer::Add(const int direction, const LONGLONG time, const int size) {
+    if ((mEnd + 1) % cap == mStart) {
+        mStart = (mStart + 1) % cap;
+    }
+
+    SendStamp s;
+    s.time = time;
+    s.direction = direction;
+    s.size = size;
+    Append(&s);
+}
+
+void SendStampBuffer::Append(const SendStamp* s) {
+    const auto pos = &mDat[mEnd];
+    if (pos != nullptr) {
+        *pos = *s;
+    }
+    mEnd = (mEnd + 1) % cap;
+}
+
+bool moho::NET_Init() {
+#if defined(_WIN32)
+    static bool sWinsockInitialized = false;
+    if (!sWinsockInitialized) {
+        WSAData wsaData;
+        if (::WSAStartup(MAKEWORD(1, 1), &wsaData)) {
+            gpg::Logf("Net_Init(): WSAStartup failed: %s", NET_GetWinsockErrorString());
+        } else {
+            sWinsockInitialized = true;
+        }
+    }
+    return sWinsockInitialized;
+#else
+    return false;
+#endif
+}
+
+INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<INetNATTraversalProvider> prov) {
+    if (!NET_Init()) {
+        return nullptr;
+    }
+    SOCKET sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock == INVALID_SOCKET) {
+        if (net_DebugLevel != 0) {
+            gpg::Logf("NET_MakeUDPConnector: socket() failed: %s", NET_GetWinsockErrorString());
+        }
+        return nullptr;
+    }
+    u_long argp = 1;
+    if (::ioctlsocket(sock, FIONBIO, &argp) == SOCKET_ERROR) {
+        if (net_DebugLevel != 0) {
+            gpg::Logf("NET_MakeUDPConnector: ioctlsocket(FIONBIO) failed: %s", NET_GetWinsockErrorString());
+        }
+        ::closesocket(sock);
+        return nullptr;
+    }
+    sockaddr_in name;
+    name.sin_family = AF_INET;
+    name.sin_port = ::htons(port);
+    name.sin_addr.S_un.S_addr = ::htonl(0);
+    if (::bind(sock, (SOCKADDR*)&name, sizeof(name)) == SOCKET_ERROR) {
+        if (net_DebugLevel != 0) {
+            gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
+        }
+        ::closesocket(sock);
+        return nullptr;
+    }
+    return new CNetUDPConnector{ sock, prov };
+}
+
 
 CHostManager* moho::NET_GetHostManager() {
     static CHostManager manager;

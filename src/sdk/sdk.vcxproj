@@ -273,6 +273,7 @@
     <ClCompile Include="moho\ai\LAiAttackerImplSerializer.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplTypeInfo.cpp" />
     <ClCompile Include="moho\command\ICommandSink.cpp" />
+    <ClCompile Include="moho\core\Thread.cpp" />
     <ClCompile Include="moho\math\GridPos.cpp" />
     <ClCompile Include="moho\math\Vector2f.cpp" />
     <ClCompile Include="moho\math\Vector3f.cpp" />
@@ -307,6 +308,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
+    <ClInclude Include="boost\function.h" />
     <ClInclude Include="boost\mutex.h" />
     <ClInclude Include="boost\recursive_mutex.h" />
     <ClInclude Include="boost\sp_counted_base.h" />
@@ -501,6 +503,7 @@
     <ClInclude Include="moho\collision\CColPrimitiveBase.h" />
     <ClInclude Include="moho\collision\CGeomSolid3.h" />
     <ClInclude Include="moho\command\ICommandSink.h" />
+    <ClInclude Include="moho\core\Thread.h" />
     <ClInclude Include="moho\entity\Entity.h" />
     <ClInclude Include="moho\entity\UserEntity.h" />
     <ClInclude Include="moho\math\Angle.h" />

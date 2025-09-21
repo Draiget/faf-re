@@ -15,7 +15,7 @@ namespace gpg::time
 		LONGLONG ElapsedCycles() const; // 0x00955700
 		LONGLONG ElapsedMicroseconds() const; // 0x00485A40
 		LONGLONG ElapsedSeconds() const; // 0x004A3560
-		LONGLONG ElapsedMilliSeconds() const; // 0x00461A90
+		LONGLONG ElapsedMilliseconds() const; // 0x00461A90
 	};
 
     LONGLONG GetTime(); // 0x00955400

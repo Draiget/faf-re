@@ -73,6 +73,11 @@ namespace moho
         ~CNetUDPConnector() override;
 
         /**
+         * Address: 0x004896F0
+         */
+        CNetUDPConnector(SOCKET sock, boost::weak_ptr<INetNATTraversalProvider>& prov);
+
+        /**
 		 * In binary this does:
 		 * 1) locks weak_ptr to NAT provider and notifies it with local port
 		 * 2) clears weak_ptr safely
@@ -91,7 +96,7 @@ namespace moho
          * Demangled: Moho::CNetUDPConnector::GetProtocol
          */
         ENetProtocolType GetProtocol() override {
-            return ENetProtocolType::kUdp;
+            return kUdp;
         }
 
         /**
@@ -141,28 +146,28 @@ namespace moho
          * Slot: 9
          * Demangled: Moho::CNetUDPConnector::Push
          */
-        virtual void Push() = 0;
+        void Push() override;
 
         /**
          * Address: 0x0048B9A0
          * Slot: 10
          * Demangled: Moho::CNetUDPConnector::SelectEvent
          */
-        virtual void SelectEvent() = 0;
+        void SelectEvent(HANDLE ev) override;
 
         /**
          * Address: 0x0048B8E0
          * Slot: 11
          * Demangled: Moho::CNetUDPConnector::Debug
          */
-        virtual void Debug() = 0;
+        void Debug() override;
 
         /**
          * Address: 0x0048B9E0
          * Slot: 12
          * Demangled: Moho::CNetUDPConnector::Func3
          */
-        virtual SendStampView& SnapshotSendStamps(SendStampView& out, int windowMs);
+        SendStampView SnapshotSendStamps(uint64_t since) override;
 
         /**
          * Address: 0x00489F30
@@ -171,6 +176,11 @@ namespace moho
          * clamped so it never goes backwards.
          */
         int64_t GetTime();
+
+        /**
+         * Address: 0x00488150
+         */
+        static int32_t ChooseTimeout(int32_t current, int32_t choice);
 
         /**
          * Address: 0x0048A288
@@ -206,6 +216,31 @@ namespace moho
          */
         void DisposePacket(SNetPacket* packet);
 
+        /**
+         * Address: 0x0048BA80
+         */
+        void Func1(CMessage* msg) override;
+
+        /**
+         * Address: 0x0048BAE0
+         */
+        void ReceivePacket(u_long address, u_short port, const char* dat, size_t size) override;
+
+        /**
+         * Address: 0x00489E80
+         */
+        SNetPacket* NewPacket();
+
+        /**
+         * Address: 0x00489F90
+         */
+        void Entry();
+
+        /**
+         * Address: 0x0048AC40
+         */
+        int32_t SendData();
+
 	public:
         /**
          * Address: 00489ED0
@@ -220,7 +255,7 @@ namespace moho
         boost::recursive_mutex lock_;
         SOCKET socket_;
         HANDLE event_;
-        boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProv;
+        boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;
         TDatList<CNetUDPConnection, void> mConnections;
         TDatList<SNetPacket, void> mPacketList;
         uint32_t mPacketPoolSize;

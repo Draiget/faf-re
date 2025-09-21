@@ -2,6 +2,7 @@
 #include "INetConnection.h"
 #include "INetConnector.h"
 #include "SNetPacket.h"
+#include "boost/weak_ptr.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
@@ -11,7 +12,8 @@
 
 namespace moho
 {
-    // Forward declarations
+	class INetNATTraversalProvider;
+	// Forward declarations
     class CNetUDPConnector;
 
     static ENetCompressionMethod net_CompressionMethod = NETCOMP_Deflate;
@@ -224,6 +226,11 @@ namespace moho
         void FlushInput();
 
         /**
+         * Address: 0x004879E0
+         */
+        bool FlushOutput();
+
+        /**
          * Address: 0x004876A0
          */
         void DispatchFromInput();
@@ -242,7 +249,7 @@ namespace moho
         /**
          * Address: 0x004874C0
          */
-        void ApplyRemoteHeader(const SNetPacket& packet);
+        void UpdatePingInfoFromPacket(const SNetPacket& packet);
 
         MOHO_FORCEINLINE bool InsertEarlySorted(SNetPacket* packet);
 

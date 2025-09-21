@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <iterator>
 #include <type_traits>
+#include <assert.h>
 
 namespace moho
 {
