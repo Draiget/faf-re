@@ -205,6 +205,17 @@ namespace gpg::core
             this->end_ += insertCount;
         }
 
+        void Append(T& o) {
+            if (this->end_ == this->capacity_) {
+                this->InsertAt(this->end_, &o, &o + 1);
+            } else {
+                if (this->end_ != nullptr) {
+                    *this->end_ = o;
+                }
+                ++this->end_;
+            }
+        }
+
     private:
         /** Reallocate to exactly newCap elements; preserve contents. */
         void GrowToCapacity(size_t newCap) {

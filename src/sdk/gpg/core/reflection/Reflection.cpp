@@ -230,7 +230,7 @@ bool REnumType::SetLexical(const RRef& dest, const char* str) const {
 
         // Fallback: numeric parse from span [tokenBegin, tokenEnd)
         if (!matched) {
-            if (!func_ParseNum(tokenBegin, tokenEnd, &num)) {
+            if (!ParseNum(tokenBegin, tokenEnd, &num)) {
                 return false;
             }
         }

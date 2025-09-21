@@ -94,7 +94,7 @@ namespace moho
          * Slot: 10
          * Demangled: _purecall
          */
-        virtual void SelectEvent() = 0;
+        virtual void SelectEvent(HANDLE ev) = 0;
 
         /**
          * Address: 0x0047EAD0
@@ -108,6 +108,6 @@ namespace moho
          * Slot: 12
          * Demangled: _purecall
          */
-        virtual SendStampView& SnapshotSendStamps(SendStampView& out, int windowMs) = 0;
+        virtual SendStampView SnapshotSendStamps(uint64_t since) = 0;
 	};
 }

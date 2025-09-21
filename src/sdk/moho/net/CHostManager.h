@@ -75,12 +75,16 @@ namespace moho
         std::map<unsigned, Host> mHosts;
         TDatList<Host, void> mHostList;
 
-        /** Resolve (or fetch cached) host name for IPv4 address (host byte order). */
+        /**
+         * Resolve (or fetch cached) host name for IPv4 address (host byte order).
+         */
         msvc8::string GetHostName(u_long host) {
+            NET_Init();
+
             // 1) Try cache under lock
             {
                 boost::mutex::scoped_lock g(mLock);
-                auto it = mHosts.find(host);
+                const auto it = mHosts.find(host);
                 if (it != mHosts.end()) {
                     Touch(it->second);
                     return it->second.mName;
@@ -88,11 +92,11 @@ namespace moho
             }
 
             // 2) Miss: resolve without holding the lock
-            const msvc8::string name = ResolveHostName(host);
 
             // 3) Insert/update under lock (handle racing inserts)
             {
-                boost::mutex::scoped_lock g(mLock);
+	            const msvc8::string name = ResolveHostName(host);
+	            boost::mutex::scoped_lock g(mLock);
                 auto [it, inserted] = mHosts.emplace(host, Host{});
                 Host& h = it->second;
                 h.mName = name;
@@ -109,7 +113,9 @@ namespace moho
             }
         }
 
-        /** Out-parameter variant (drop-in for old code). */
+        /**
+         * Out-parameter variant (drop-in for old code).
+         */
         msvc8::string& GetHostName(const u_long host, msvc8::string& out) {
             out = GetHostName(host);
             return out;

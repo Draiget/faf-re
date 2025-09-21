@@ -7,7 +7,7 @@ namespace moho
 {
 	/**
 	 * VFTABLE: 0x00E3D740
-	 * COL:  0x00E969A4
+	 * COL:		0x00E969A4
 	 */
 	class INetNATTraversalProvider
 	{

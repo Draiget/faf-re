@@ -40,7 +40,7 @@ void gpg::Die(const char* args, ...) {
     }
 }
 
-bool gpg::func_ParseNum(const char* start, const char* end, int* dest) noexcept {
+bool gpg::ParseNum(const char* start, const char* end, int* dest) noexcept {
     if (!start || !end || start >= end || !dest) return false;
 
     // Sign
@@ -91,4 +91,8 @@ bool gpg::func_ParseNum(const char* start, const char* end, int* dest) noexcept 
     if (neg) value = -value;
     *dest = value;
     return true;
+}
+
+void gpg::SetThreadName(unsigned int id, const char* name) {
+    
 }

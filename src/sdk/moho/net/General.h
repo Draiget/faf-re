@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "INetNATTraversalProvider.h"
+#include "boost/weak_ptr.h"
 #include "platform/Platform.h"
 #include "gpg/core/time/Timer.h"
 #include "legacy/containers/String.h"
@@ -9,7 +11,8 @@
 
 namespace moho
 {
-    struct CHostManager;
+	class INetConnector;
+	struct CHostManager;
 
     enum ENetConnectionState
     {
@@ -23,15 +26,15 @@ namespace moho
 
     enum EPacketState : uint8_t
     {
-        CONNECT,
-        ANSWER,
-        RESETSERIAL,
-        SERIALRESET,
-        DATA,
-        ACK,
-        KEEPALIVE,
-        GOODBYE,
-        NATTRAVERSAL,
+        CONNECT = 0,
+        ANSWER = 1,
+        RESETSERIAL = 2,
+        SERIALRESET = 3,
+        DATA = 4,
+        ACK = 5,
+        KEEPALIVE = 6,
+        GOODBYE = 7,
+        NATTRAVERSAL = 8,
     };
 
     void NetPacketStateToStr(EPacketState state, msvc8::string& out);
@@ -132,7 +135,7 @@ namespace moho
     {
         uint32_t direction;
         uint32_t v1;
-        FILETIME time; // used as 64-bit tick container in the binary
+        uint64_t time; // used as 64-bit tick container in the binary
         uint32_t size;
         uint32_t v4;
     };
@@ -140,8 +143,22 @@ namespace moho
     struct SendStampView
     {
         msvc8::vector<SendStamp> items; // contiguous vector of copies
-        FILETIME from;                  // threshold = now - window
-        FILETIME to;                    // now
+        uint64_t from;                  // threshold = now - window
+        uint64_t to;                    // now
+
+        /**
+         * Address: 0x0047D1D0
+         * NOTE: Inlined
+         *
+         * @param start 
+         * @param end 
+         */
+        SendStampView(const uint64_t start, const uint64_t end) :
+            items{},
+            from{ start },
+            to{ end }
+        {
+        }
     };
 
     struct SendStampBuffer
@@ -157,7 +174,7 @@ namespace moho
          *
          * lower-bound in circular buffer, copy window into out
          */
-        void ExtractWindow(SendStampView& out, uint64_t now, uint64_t window) const;
+        SendStampView GetBetween(uint64_t startTime, uint64_t endTime);
 
         /**
          * Address: 0x0047D990
@@ -167,7 +184,17 @@ namespace moho
         /**
          * Address: 0x0047D0A0
          */
-        uint32_t Push(int dir, FILETIME timeUs, int size) noexcept;
+        uint32_t Push(int dir, LONGLONG timeUs, int size) noexcept;
+
+        /**
+         * Address: 0x0047D0A0
+         */
+        void Add(int direction, LONGLONG time, int size);
+
+        /**
+         * Address: 0x0047D630
+         */
+        void Append(const SendStamp* s);
 
         [[nodiscard]]
         bool empty() const noexcept {
@@ -187,6 +214,10 @@ namespace moho
             }
         }
 
+        SendStamp& Get(const size_t index) {
+            return mDat[(mStart + index) % 4096];
+        }
+
     private:
         /**
          * Place entry at mStart and advance mStart by 1 (mod 4096).
@@ -199,7 +230,12 @@ namespace moho
             return mStart;
         }
     };
-    
+
+    /**
+     * Address: 0x0047F5A0
+     */
+    bool NET_Init();
+
     /**
      * Address: 0x0047F990
      */
@@ -221,4 +257,9 @@ namespace moho
      * @return 
      */
     MOHO_FORCEINLINE msvc8::string NET_GetDottedOctetFromUInt32(uint32_t number);
+
+    /**
+     * Address: 0x0048BBE0
+     */
+    INetConnector* NET_MakeUDPConnector(u_short port, boost::weak_ptr<INetNATTraversalProvider> prov);
 }

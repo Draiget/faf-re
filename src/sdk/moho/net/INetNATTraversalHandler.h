@@ -21,6 +21,6 @@ namespace moho
 		 * Address: 0x00A82547
 		 * Slot: 1
 		 */
-		virtual void ReceivePacket(u_long addr, u_short port, void* dat, size_t size) = 0;
+		virtual void ReceivePacket(u_long addr, u_short port, const char* dat, size_t size) = 0;
 	};
 }

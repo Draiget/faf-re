@@ -48,7 +48,7 @@ LONGLONG time::Timer::ElapsedSeconds() const {
     return CyclesToSeconds(this->ElapsedCycles());
 }
 
-LONGLONG time::Timer::ElapsedMilliSeconds() const {
+LONGLONG time::Timer::ElapsedMilliseconds() const {
     return CyclesToMilliseconds(this->ElapsedCycles());
 }
 

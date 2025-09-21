@@ -49,7 +49,7 @@ void CNetUDPConnection::Write(NetDataSpan* data) {
 
 	// Schedule earliest send time once:
 	// mSendBy = now + net_SendDelay * 1000 (ms > us ticks in bin)
-	if (!mSendBy.mTime) {
+	if (mSendBy.mTime == 0) {
 		const std::int64_t now = mConnector->GetTime();
 		mSendBy.mTime = now + static_cast<std::int64_t>(net_SendDelay) * 1000;
 	}
@@ -92,7 +92,6 @@ void CNetUDPConnection::Close() {
 
 	mPendingOutputData.VirtClose(gpg::Stream::ModeSend);
 	mOutputShutdown = true;
-	// mHasPendingOutput ?
 	mHasWritten = false;
 
 #if defined(_WIN32)
@@ -126,9 +125,9 @@ CNetUDPConnection::CNetUDPConnection(
 	mPort(port), // [esi+0x420]
 	mOurCompressionMethod(net_CompressionMethod), // [esi+0x424]
 	mState(state),
-	mFilterStream(nullptr), 
-	mMessage(0, 0), // [esi+0x42C]
+	mFilterStream(nullptr),
 	mUnAckedPayloads(),
+	mMessage(0, 0), // [esi+0x42C]
 	mEarlyPackets()
 {
 	// Init timers and timestamps
@@ -445,7 +444,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet) {
 	}
 
 	// Update remote timing/window from header.
-	ApplyRemoteHeader(*packet);
+	UpdatePingInfoFromPacket(*packet);
 
 	// Refresh peer time and negotiated params.
 	mLastRecv = packet->mSentTime;
@@ -515,7 +514,7 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet) {
 	}
 
 	// Fold in timing/window accounting first.
-	ApplyRemoteHeader(*packet);
+	UpdatePingInfoFromPacket(*packet);
 
 	// Ack window: ack everything older than 'expected', and also bits in early mask for last 32.
 	const uint32_t earlyMask = packet->header.mEarlyMask;
@@ -1083,24 +1082,17 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet) {
 		mSendBy.mTime = 0;
 	}
 
-	// Per-serial timing slot (128 ring)
-	const std::uint16_t sidx = packet->header.mSerialNumber & 0x7F;
-	mTimings[sidx].mSource = packet->header.mSerialNumber;
-	mTimings[sidx].mTime.Reset();
+	mTimings[packet->header.mSerialNumber & 0x7F].mSource = packet->header.mSerialNumber;
+	mTimings[packet->header.mSerialNumber & 0x8000007F].mTime.Reset();
 
-	// Pacing credit: low 32 bits accumulate bytes just sent
-	const std::uint32_t remain = static_cast<std::uint32_t>(GetBacklog(nowUs));
-	const std::uint32_t credit = remain + reinterpret_cast<std::uint32_t>(payload);
-	mSendTime = (mSendTime & 0xFFFFFFFF00000000ULL) | credit;
-
-	// Last send / keepalive housekeeping
+	mSendTime = packet->mSize + GetBacklog(nowUs);
 	mLastSend.mTime = nowUs;
 
-	if (packet->header.mState != ACK) {
+	if (packet->header.mState != KEEPALIVE) {
 		mLastKeepAlive = nowUs;
 	}
 
-	if (packet->header.mState == KEEPALIVE) {
+	if (packet->header.mState == GOODBYE) {
 		mKeepAliveFreqUs = 2'000'000; // 2s
 	}
 }
@@ -1112,6 +1104,17 @@ void CNetUDPConnection::FlushInput() {
 		}
 		mInputBuffer.VirtFlush();
 	}
+}
+
+bool CNetUDPConnection::FlushOutput() {
+	if (!mOutputShutdown) {
+		if (mOutputFilterStream != nullptr) {
+			mOutputFilterStream->VirtFlush();
+		}
+		mPendingOutputData.VirtFlush();
+		mFlushedOutputData = mPendingOutputData.GetLength();
+	}
+	return mFlushedOutputData != 0;
 }
 
 void CNetUDPConnection::DispatchFromInput() {
@@ -1234,18 +1237,18 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet) {
 	}
 }
 
-void CNetUDPConnection::ApplyRemoteHeader(const SNetPacket& packet) {
+void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet) {
 	if (!packet.header.mInResponseTo) {
 		return;
 	}
 
 	const uint16_t src = packet.header.mInResponseTo;
-	const uint32_t idx = (src & 0x7F); // 128-entry ring
+	const uint32_t index = (src & 0x7F); // 128-entry ring
 
-	if (mTimings[idx].mSource == src)
+	if (mTimings[index].mSource == src)
 	{
 		// Elapsed time in ms since we timestamped that serial
-		const float rawMs = mTimings[idx].mTime.ElapsedMilliSeconds();
+		const float rawMs = mTimings[index].mTime.ElapsedMilliseconds();
 
 		// Update running stats (median/jitter)
 		mPings.Append(rawMs);
@@ -1343,11 +1346,9 @@ void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet) {
 void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet) {
 	const auto node = packet->ListUnlink();
 
-	for (auto it = mUnAckedPayloads.begin(); it != mUnAckedPayloads.end(); ++it) {
-		auto* n = it.node();
-		const auto* cur = static_cast<SNetPacket*>(n);
+	for (auto* cur : mUnAckedPayloads.owners()) {
 		if (packet->mSentTime < cur->mSentTime) {
-			node->ListLinkBefore(it.node());
+			node->ListLinkBefore(cur);
 			return;
 		}
 	}
