@@ -411,6 +411,9 @@
     <ClCompile Include="moho\net\SNetPacket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\net\IMessageReceiver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="moho\sim\Sim.h">
@@ -1206,6 +1209,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\net\ECmdStreamOp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="boost\recursive_mutex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

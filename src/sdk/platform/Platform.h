@@ -38,3 +38,6 @@
 #if defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_)
 #  error "winsock.h (v1) was included instead of winsock2.h. Fix your include order."
 #endif
+
+#define LODWORD(x) (*reinterpret_cast<unsigned long*>(& (x)))
+#define HIDWORD(x) (*reinterpret_cast<unsigned long*>(& (x) + 1))

@@ -5,6 +5,11 @@
 
 namespace moho
 {
+	class INetConnection;
+}
+
+namespace moho
+{
 	class CNetUDPConnection;
 
     /**
@@ -54,21 +59,21 @@ namespace moho
          * Slot: 5
          * Demangled: _purecall
          */
-        virtual bool FindNextAddr(u_long& outAddress, u_short& outPort) = 0;
+        virtual bool FindNextAddress(u_long& outAddress, u_short& outPort) = 0;
 
         /**
          * Address: 0x00A82547
          * Slot: 6
          * Demangled: _purecall
          */
-        virtual void Accept() = 0;
+        virtual INetConnection* Accept(u_long address, u_short port) = 0;
 
         /**
          * Address: 0x00A82547
          * Slot: 7
          * Demangled: _purecall
          */
-        virtual int Reject(u_long address, u_short port) = 0;
+        virtual void Reject(u_long address, u_short port) = 0;
 
         /**
          * Address: 0x00A82547

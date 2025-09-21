@@ -146,12 +146,38 @@ namespace moho
         /**
          * Address: 0x00488260
          */
-        int GetSentTime(int64_t time);
+        int GetBacklog(int64_t time);
+
+        /**
+         * Address: 0x004882C0
+         */
+        int GetBacklogTimeout(LONGLONG time, int32_t& timeout);
+
+        /**
+         * Address: 0x004881F0
+         */
+        int64_t TimeSince(int64_t time) const;
 
         /**
          * Address: 0x00488300
          */
-        int SendData();
+        int64_t SendData();
+
+        /**
+         * Address: 00488145
+         */
+        template<class T>
+        constexpr T ChooseTimeout(T cur, T candidate) {
+            const T inf = static_cast<T>(-1);
+            if (cur == inf) {
+	            return candidate;
+            }
+            if (candidate == inf) {
+	            return cur;
+            }
+            using U = std::make_unsigned_t<T>;
+            return (static_cast<U>(candidate) >= static_cast<U>(cur)) ? cur : candidate;
+        }
 
         /**
          * Address: 0x00488730
@@ -167,32 +193,45 @@ namespace moho
          * Address: 0x00488810
          */
         [[nodiscard]]
-		SNetPacket* NextConnectPacket() const;
+		SNetPacket* NewConnectPacket() const;
 
         /**
          * Address: 0x004888C0
          */
         [[nodiscard]]
-		SNetPacket* NextAnswerPacket() const;
+		SNetPacket* NewAnswerPacket() const;
 
         /**
          * Address: 0x00488AA0
          */
         [[nodiscard]]
-		SNetPacket* NextGoodbyePacket() const;
+		SNetPacket* NewGoodbyePacket() const;
 
         /**
          * Address: 0x00488B20
          */
         [[nodiscard]]
-		SNetPacket* NextPacket(bool inherit, int size, EPacketState state) const;
+		SNetPacket* NewPacket(bool inherit, int size, EPacketState state) const;
 
         /**
          * Address: 0x00488D80
          */
         void SendPacket(SNetPacket* packet);
 
-        void SetState(ENetConnectionState state);
+        /**
+         * Address: 0x00487590
+         */
+        void FlushInput();
+
+        /**
+         * Address: 0x004876A0
+         */
+        void DispatchFromInput();
+
+        /**
+         * Address: 0x00487B90
+         */
+        void Debug();
 
 	private:
         /**
@@ -247,9 +286,9 @@ namespace moho
         uint16_t mRemoteExpectedSequenceNumber;
         uint16_t mExpectedSequenceNumber;
         uint16_t v1;
-        gpg::PipeStream mOutputData;
+        gpg::PipeStream mPendingOutputData;
         gpg::ZLibOutputFilterStream* mOutputFilterStream;
-        BYTE gap500[4];
+        bool mHasWritten;
         DWORD mFlushedOutputData;
         bool mOutputShutdown;
         bool mSentShutdown;
@@ -267,7 +306,7 @@ namespace moho
         CMessage mMessage;
         DWORD v866;
         bool  mScheduleDestroy;
-        bool v867b;
+        bool mDestroyed;
         bool  mClosed;
         int64_t mTotalBytesQueued;
         int64_t mTotalBytesSent;

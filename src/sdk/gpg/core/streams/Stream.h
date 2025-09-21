@@ -53,18 +53,18 @@ namespace gpg
 
         Stream() = default; // 0x00956DB0
 
-        int LeftToRead() {
-            return this->mReadEnd - this->mReadHead;
+        int LeftToRead() const {
+            return mReadEnd - mReadHead;
         } // inline
 
-        int LeftToWrite() {
-            return this->mWriteEnd - this->mWriteHead;
+        int LeftToWrite() const {
+            return mWriteEnd - mWriteHead;
         } // inline
 
         /**
          * Bytes pending in the small inline input buffer.
          */
-        size_t LeftToFlush() {
+        size_t LeftToFlush() const {
             return static_cast<size_t>(mWriteHead - mWriteStart);
         }
 
@@ -75,17 +75,17 @@ namespace gpg
         size_t Read(char* buf, size_t size); // 0x0043D100
 
         size_t ReadNonBlocking(char* buf, size_t size) {
-            if (size > this->LeftToRead()) {
-                size = this->VirtReadNonBlocking(buf, size);
+            if (size > LeftToRead()) {
+                size = VirtReadNonBlocking(buf, size);
             } else if (size) {
-                memcpy(buf, this->mReadHead, size);
-                this->mReadHead += size;
+                memcpy(buf, mReadHead, size);
+                mReadHead += size;
             }
             return size;
         } // inline e.g. 0x0047BF13
 
         void Write(core::FastVector<char>& vec) {
-            this->Write(vec.start_, vec.Size());
+            Write(vec.start_, vec.Size());
         } // inline
     };
 }

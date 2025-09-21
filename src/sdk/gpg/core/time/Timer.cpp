@@ -39,16 +39,16 @@ LONGLONG time::Timer::ElapsedCycles() const {
 }
 
 // 0x00485A40
-float time::Timer::ElapsedMicroseconds() const {
+LONGLONG time::Timer::ElapsedMicroseconds() const {
     return CyclesToMicroseconds(this->ElapsedCycles());
 }
 
 // 0x004A3560
-float time::Timer::ElapsedSeconds() const {
+LONGLONG time::Timer::ElapsedSeconds() const {
     return CyclesToSeconds(this->ElapsedCycles());
 }
 
-float time::Timer::ElapsedMilliSeconds() const {
+LONGLONG time::Timer::ElapsedMilliSeconds() const {
     return CyclesToMilliseconds(this->ElapsedCycles());
 }
 
