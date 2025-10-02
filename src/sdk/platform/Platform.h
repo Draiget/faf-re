@@ -41,3 +41,54 @@
 
 #define LODWORD(x) (*reinterpret_cast<unsigned long*>(& (x)))
 #define HIDWORD(x) (*reinterpret_cast<unsigned long*>(& (x) + 1))
+
+#ifdef CreateEvent
+#undef CreateEvent
+#endif
+
+#if defined(MOHO_CUSTOM_BUILD_IGNORE_EBO_PADDING)
+#include <array>
+#endif
+
+/** Internal: token pasting helper */
+#define MOHO_EBO__CAT_IMPL(a,b) a##b
+#define MOHO_EBO__CAT(a,b)      MOHO_EBO__CAT_IMPL(a,b)
+
+/** Internal: counter fallback */
+#ifndef __COUNTER__
+#define __COUNTER__ __LINE__
+#endif
+
+/**
+ * Declare a unique padding member sized in 4-byte units.
+ * Usage: MOHO_EBO_PADDING_FIELD(3); // reserves 12 bytes (unless ignored)
+ */
+#if !defined(MOHO_CUSTOM_BUILD_IGNORE_EBO_PADDING)
+
+#define MOHO_EBO_PADDING_FIELD(N)                                                     \
+    static_assert((N) >= 0, "padding units must be non-negative");                      \
+    [[maybe_unused]] std::uint8_t MOHO_EBO__CAT(eboPadding_, __COUNTER__)[(N) * 4]{}
+
+#else
+ /* No actual storage, but keep a member for debug/inspection:
+    - GCC/Clang: zero-sized array (extension).
+    - MSVC/others: zero-size via [[no_unique_address]] empty std::array. */
+#if defined(__clang__) || defined(__GNUC__)
+#define MOHO_EBO_PADDING_FIELD(N)                                                   \
+      [[maybe_unused]] std::uint8_t MOHO_EBO__CAT(eboPadding_, __COUNTER__)[0]{}
+#else
+#define MOHO_EBO_PADDING_FIELD(N)                                                   \
+      [[maybe_unused]] [[no_unique_address]]                                            \
+      std::array<std::uint8_t, 0> MOHO_EBO__CAT(eboPadding_, __COUNTER__){}
+#endif
+#endif
+
+#if defined(_MSC_VER)
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+#define MOHO_EMPTY_BASES
+#else
+#define MOHO_EMPTY_BASES __declspec(empty_bases)
+#endif
+#else
+#define MOHO_EMPTY_BASES
+#endif

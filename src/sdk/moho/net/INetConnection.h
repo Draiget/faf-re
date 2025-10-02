@@ -1,19 +1,44 @@
 #pragma once
 
-#include <string>
-
 #include "IMessageReceiver.h"
 #include "legacy/containers/String.h"
 
 namespace moho
 {
+    class CMessageStream;
+
     struct NetDataSpan
     {
         uint8_t* start;
         uint8_t* end;
+
+        /**
+         * Construct from raw pointers.
+         */
+        NetDataSpan(uint8_t* b, uint8_t* e) noexcept
+            : start(b), end(e) {
+        }
+
+        /**
+         * Construct from CMessageStream using its write window [mWriteStart, mWriteEnd).
+         */
+        explicit NetDataSpan(const CMessageStream& s) noexcept;
+
+        /**
+         * Size in bytes.
+         */
+        [[nodiscard]]
+    	size_t size() const noexcept { return static_cast<size_t>(end - start); }
+
+        /**
+         * Address: 0x00000000
+         * Data pointer.
+         */
+        [[nodiscard]]
+        uint8_t* data() const noexcept { return start; }
     };
 
-    /**
+	/**
      * VFTABLE: 0x00E0499C
      * COL:     0x00E60C88
      */
@@ -67,5 +92,16 @@ namespace moho
          * Slot: 7
          */
         virtual void ScheduleDestroy() = 0;
+
+        /**
+         * Convenience overload: write from CMessageStream written window.
+         * Does not change vtable; just forwards to the virtual Write(NetDataSpan*).
+         */
+        void Write(const CMessageStream& stream) {
+            // [mWriteStart, mWriteHead)
+            NetDataSpan tmp(stream);     
+            // forwarded to engine virtual
+            Write(&tmp);           
+        }
 	};
 }

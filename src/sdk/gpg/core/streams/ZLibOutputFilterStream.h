@@ -6,6 +6,12 @@
 
 namespace gpg
 {
+    enum EFilterOperation
+    {
+        FLOP_Inflate = 0,
+        FLOP_Deflate = 1,
+    };
+
     /**
      * VFTABLE: 0x00D496F0
      * COL:     0x00E53D00
@@ -86,7 +92,7 @@ namespace gpg
         /**
          * Address: 0x00957360
          */
-        ZLibOutputFilterStream(PipeStream* str, int operation);
+        ZLibOutputFilterStream(PipeStream* str, EFilterOperation operation);
 
     private:
         /**

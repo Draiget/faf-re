@@ -186,7 +186,7 @@ namespace moho
          *  Moho::CReplayClient::Process (0x0053D900)
          *  Moho::CReplayClient::Start
          */
-        Replay_Process0 = 50,
+        Replay_Ack = 50,
 
         /**
          * Answer packet to `Replay_ClientOnLoad` (id = 52).
@@ -196,7 +196,7 @@ namespace moho
          * Referenced in:
          *  Moho::CReplayClient::Process (0x0053D900)
          */
-        Replay_Process1 = 51,
+        Replay_Dispatch = 51,
 
         /**
          * Answer packet to `Replay_ClientOnLoad` (id = 52).
@@ -206,7 +206,7 @@ namespace moho
          * Referenced in:
          *  Moho::CClientManagerImpl::OnLoad (0x0053EB9A) - Near ++*p_mAvailableBeat
          */
-        Replay_ClientOnLoad = 52,
+        Replay_Available = 52,
 
         /**
          * Data payload:
@@ -215,7 +215,7 @@ namespace moho
          * Referenced in:
          *  Moho::CClientManagerImpl::Cleanup (0x0053E51A)
          */
-        Replay_Cleanup = 53,
+        Replay_Ready = 53,
 
         /**
          * Data payload:
@@ -226,7 +226,7 @@ namespace moho
          *  Moho::CClientBase::Eject,
          *  > sub_53F2C0 (0x0053F2C0)
          */
-        Replay_EjectClient = 54,
+        Replay_Eject = 54,
 
         /**
          * Data payload:
@@ -235,7 +235,7 @@ namespace moho
          * Referenced in:
          *  Moho::CClientBase::Func7 (0x0053C9CB)
          */
-        Replay_BlobData = 55,
+        Replay_ReceiveChat = 55,
 
         /**
          * Data payload:
@@ -245,7 +245,7 @@ namespace moho
          * Referenced in:
          *  Moho::CClientManagerImpl::SetSimRate (0x0053E5EC)
          */
-        Replay_SetSimRate = 56,
+        Replay_AdjustSimSpeed = 56,
 
         /**
          * Data payload:
@@ -257,16 +257,18 @@ namespace moho
         ClientMgr_IntParam = 57,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
-         * - uint32_t - player id?
          * - string - player name
+         * - uint32_t - requested UID
          *
          * Referenced in:
          *  Moho::CLobby::ConnectionMade (0x007C5CA0)
          */
-        ConnectionMade = 100,
+        ConnectionEstablished = 100,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - string - reason
          *
@@ -277,6 +279,7 @@ namespace moho
         ConnectionReject = 101,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - uint32_t - player name size
          * - uint32_t - player UUID
@@ -289,10 +292,11 @@ namespace moho
         PeerJoined = 102,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - string name
-         * - uint32_t - field40
-         * - uint16_t - field44
+         * - u_long - host
+         * - u_short - port
          * - uint32_t - uid
          *
          * Referenced in:
@@ -301,6 +305,7 @@ namespace moho
         PeerInfo = 103,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - uint32_t - uid
          *
@@ -310,6 +315,7 @@ namespace moho
         PeerDisconnected = 104,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - int32_t[] uid
          * - int32_t - (end of a list is -1 value)
@@ -320,15 +326,17 @@ namespace moho
         PollTask = 105,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - LuaByteStream - serialized lua objects
          *
          * Referenced in:
          *  Moho::CLobby::BroadcastScriptData (0x007C2210)
          */
-        BroadcastData = 106,
+        BroadcastScriptData = 106,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Filters out to which user we should send inside SendScriptData.
          *
          * Data payload:
@@ -362,6 +370,7 @@ namespace moho
         DiscoveryResponse = 111,
 
         /**
+         * Could be related to `ELobbyMsg`.
          * Data payload:
          * - (nothing)
          *
@@ -372,6 +381,7 @@ namespace moho
 
         /**
          * // when state = ENetConnectionState::Establishing
+         * Could be related to `ELobbyMsg`.
          *
          * Data payload:
          * - (nothing)
@@ -383,6 +393,7 @@ namespace moho
 
         /**
          * // when state == ENetConnectionState::Errored
+         * Could be related to `ELobbyMsg`.
          *
          * Data payload:
          * - (nothing)
@@ -394,6 +405,7 @@ namespace moho
 
         /**
          * // else (end of input from client?)
+         * Could be related to `ELobbyMsg`.
          *
          * Data payload:
          * - (nothing)

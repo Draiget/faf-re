@@ -1,4 +1,5 @@
 #pragma once
+
 #include "gpg/core/streams/Stream.h"
 
 namespace moho
@@ -12,6 +13,12 @@ namespace moho
     class CMessageStream : public gpg::Stream
 	{
     public:
+        enum class Access
+        {
+	        kReadOnly,
+        	kReadWrite
+        };
+
         /**
          * Address: 0x0047C030
          * Slot: 0
@@ -82,6 +89,23 @@ namespace moho
          */
         void VirtClose(Mode mode) override {}
 
+        /**
+         * Address: 0x0047BFE0
+         * NOTE: Could be inlined in binary, example: 0x007C64E7
+         *
+         * @param msg
+         * @param access
+         */
+        explicit CMessageStream(CMessage& msg, Access access = Access::kReadWrite);
+
+        /**
+         * Address: 0x0047C060
+         *
+         * @param msg
+         * @param access
+         */
+        explicit CMessageStream(CMessage* msg, Access access = Access::kReadOnly);
+
     private:
         CMessage* msg_ = nullptr;
 
@@ -95,4 +119,5 @@ namespace moho
          */
         void RebindToMessagePreserve(size_t readOff, size_t writeOffPlus = 0) noexcept;
     };
-} // namespace moho
+
+} 

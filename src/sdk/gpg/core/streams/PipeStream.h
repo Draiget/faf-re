@@ -7,6 +7,30 @@
 
 namespace gpg
 {
+#pragma pack(push, 4)
+	/**
+	 * Fixed-size 4KB chunk, chained via intrusive DList.
+	 */
+	struct PipeStreamBuffer : DListItem<PipeStreamBuffer>
+	{
+		static constexpr size_t kSize = 4096;
+		char mData[kSize];
+
+		char* begin() noexcept {
+			return mData;
+		}
+		char* end() noexcept {
+			return mData + kSize;
+		}
+
+		[[nodiscard]] const char* begin() const noexcept {
+			return mData;
+		}
+		[[nodiscard]] const char* end() const noexcept {
+			return mData + kSize;
+		}
+	};
+
 	/**
 	 * Pipe-like in-memory stream with blocking and non-blocking reads.
 	 * Layout and behavior follow the original Moho engine, with RAII and small safety fixes.
@@ -14,32 +38,10 @@ namespace gpg
 	 * VFTABLE: 0x00D495F0 (original)
 	 * COL:     0x00E53C4C (original)
 	 */
-	class PipeStream : public Stream
+	class PipeStream :
+		public Stream
 	{
 	public:
-		/**
-		 * Fixed-size 4KB chunk, chained via intrusive DList.
-		 */
-		struct Buffer : DListItem<Buffer>
-		{
-			static constexpr size_t kSize = 4096;
-			char mData[kSize];
-
-			char* begin() noexcept {
-				return mData;
-			}
-			char* end() noexcept {
-				return mData + kSize;
-			}
-
-			[[nodiscard]] const char* begin() const noexcept {
-				return mData;
-			}
-			[[nodiscard]] const char* end() const noexcept {
-				return mData + kSize;
-			}
-		};
-
 		/**
 		 * Non-virtual dtor frees all buffers.
 		 *
@@ -87,7 +89,7 @@ namespace gpg
 		 *
 		 * Address: 0x00956920
 		 */
-		void VirtClose(gpg::Stream::Mode mode) override;
+		void VirtClose(Mode mode) override;
 
 		/**
 		 * True if there is nothing to read at the moment.
@@ -118,25 +120,11 @@ namespace gpg
 		 */
 		PipeStream();
 
-	public:
+	protected:
 		boost::mutex mLock{};
-		bool mClosed{ false };
+		BOOL mClosed{ false };
 		boost::condition mCond{};
-
-		// intrusive sentinel (head)
-		DList<Buffer> mBuff;
-
-		// Sliding window pointers (inside the chain)
-		// Read window: [mReadHead, mReadEnd)
-		char* mReadHead{ nullptr };
-		char* mReadStart{ nullptr }; // kept for parity with original
-		char* mReadEnd{ nullptr };
-
-		// Write window in the last buffer: committed boundary is mWriteStart
-		// Readers can consume only up to mWriteStart.
-		char* mWriteHead{ nullptr };
-		char* mWriteStart{ nullptr };
-		char* mWriteEnd{ nullptr };
+		DList<PipeStreamBuffer, void> mBuff;
 
 	private:
 		/**
@@ -147,16 +135,18 @@ namespace gpg
 		/**
 		 * Return pointer to the last (tail) buffer (undefined if list empty).
 		 */
-		Buffer* tailNode() noexcept;
+		PipeStreamBuffer* tailNode() noexcept;
 
 		/**
 		 * Return pointer to the first (head) buffer (undefined if list empty).
 		 */
-		Buffer* headNode() noexcept;
+		PipeStreamBuffer* headNode() noexcept;
 
 		/**
 		 * Reset to a pristine single-buffer state (assumes lock held).
 		 */
-		void resetStateWithOneBuffer(Buffer* buf);
+		void resetStateWithOneBuffer(PipeStreamBuffer* buf);
 	};
+#pragma pack(pop)
+	static_assert(sizeof(PipeStream) == 0x48, "PipeStream size must be 0x48");
 }

@@ -310,3 +310,101 @@ msvc8::string msvc8::string::adopt(char* buf, const uint32_t len, const uint32_t
     // leave _Alval as nullptr; we never free adopted memory
     return s;
 }
+
+msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, std::size_t count) noexcept {
+    // Basic sanity checks: if source is bogus, clear destination.
+    if (!other.basic_sanity()) {
+        clear();
+        return *this;
+    }
+
+    // Range check like _Xran(): clamp pos to size (produces empty result if pos == size).
+    if (pos > other.mySize) {
+        pos = other.mySize;
+    }
+
+    const std::size_t remainder = static_cast<std::size_t>(other.mySize) - pos;
+    std::size_t len = (count == npos || count > remainder) ? remainder : count;
+
+    // Self-assign path (this == &other): turn into in-place substring.
+    if (this == &other) {
+        if (len == 0) {
+            // Empty result
+            raw_data_mut_unsafe()[0] = '\0';
+            mySize = 0;
+            return *this;
+        }
+        // Move [pos..pos+len) to the beginning; safe with memmove for overlap.
+        char* d = raw_data_mut_unsafe();
+        std::memmove(d, d + pos, len);
+        d[len] = '\0';
+        mySize = static_cast<uint32_t>(len);
+        return *this;
+    }
+
+    // Non-self: fast empty case.
+    if (len == 0) {
+        raw_data_mut_unsafe()[0] = '\0';
+        mySize = 0;
+        return *this;
+    }
+
+    // Destination pointer and capacity.
+    char* dst = raw_data_mut_unsafe();
+    const auto  dstCap = static_cast<std::size_t>(myRes);
+
+    // Source pointer (to substring start).
+    const char* src = other.raw_data_unsafe() + pos;
+
+    // MSVC8 would reallocate if len > capacity(); we cannot, so we truncate.
+    const std::size_t ncopy = (len <= dstCap) ? len : dstCap;
+
+    if (ncopy) {
+        // Use memmove, not memcpy, to be robust in rare aliasing cases.
+        std::memmove(dst, src, ncopy);
+    }
+
+    // Always NUL-terminate within available space.
+    dst[ncopy] = '\0';
+    mySize = static_cast<uint32_t>(ncopy);
+    return *this;
+}
+
+msvc8::string msvc8::string::operator+(const string& rhs) const noexcept {
+    return msvc8::detail::concat_impl(this->view(), rhs.view());
+}
+
+msvc8::string msvc8::string::operator+(std::string_view rhs) const noexcept {
+    return msvc8::detail::concat_impl(this->view(), rhs);
+}
+
+msvc8::string msvc8::string::operator+(const char* rhs) const noexcept {
+    return msvc8::detail::concat_impl(this->view(), std::string_view(rhs ? rhs : ""));
+}
+
+msvc8::string msvc8::string::concat_impl_(std::string_view a, std::string_view b) noexcept {
+    const std::size_t total = a.size() + b.size();
+
+    if (total <= 15) {
+        string out;
+        (void)out.append(a.data(), a.size());
+        (void)out.append(b.data(), b.size());
+        return out;
+    }
+
+    auto [buf, cap] = detail::get_concat_buffer(total + 1 /* NUL */);
+    if (a.size()) std::memcpy(buf, a.data(), a.size());
+    if (b.size()) std::memcpy(buf + a.size(), b.data(), b.size());
+    buf[total] = '\0';
+
+    const uint32_t effCap = (cap > 0) ? static_cast<uint32_t>(cap - 1) : 0u; // cap excludes NUL
+    return string::adopt(buf, static_cast<uint32_t>(total), effCap);
+}
+
+msvc8::string msvc8::operator+(std::string_view lhs, const string& rhs) noexcept {
+    return detail::concat_impl(lhs, rhs.view());
+}
+
+msvc8::string msvc8::operator+(const char* lhs, const string& rhs) noexcept {
+    return detail::concat_impl(std::string_view(lhs ? lhs : ""), rhs.view());
+}

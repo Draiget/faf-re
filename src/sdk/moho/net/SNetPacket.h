@@ -2,9 +2,9 @@
 
 #include <span>
 
-#include "General.h"
+#include "Common.h"
 #include "legacy/containers/String.h"
-#include "moho/misc/TDatList.h"
+#include "moho/containers/TDatList.h"
 
 namespace moho
 {
@@ -40,12 +40,12 @@ namespace moho
     struct SNetPacketHeader
 	{
         EPacketState mState;                   // +0 (1)
-        std::uint32_t mEarlyMask;              // +1 .. +4
-        std::uint16_t mSerialNumber;           // +5 .. +6
-        std::uint16_t mInResponseTo;           // +7 .. +8
-        std::uint16_t mSequenceNumber;         // +9 .. +10
-        std::uint16_t mExpectedSequenceNumber; // +11 .. +12
-        std::uint16_t mPayloadLength;          // +13 .. +14
+        uint32_t mEarlyMask;              // +1 .. +4
+        uint16_t mSerialNumber;           // +5 .. +6
+        uint16_t mInResponseTo;           // +7 .. +8
+        uint16_t mSequenceNumber;         // +9 .. +10
+        uint16_t mExpectedSequenceNumber; // +11 .. +12
+        uint16_t mPayloadLength;          // +13 .. +14
     };
     static_assert(sizeof(SNetPacketHeader) == 15, "SPacketHeader must be 15 bytes");
 

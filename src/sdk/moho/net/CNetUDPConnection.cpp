@@ -1,8 +1,10 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
 
+#include "CLobby.h"
 #include "CNetUDPConnector.h"
 #include "ECmdStreamOp.h"
+#include "ELobbyMsg.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
 #include "gpg/core/utils/Global.h"
@@ -125,10 +127,9 @@ CNetUDPConnection::CNetUDPConnection(
 	mPort(port), // [esi+0x420]
 	mOurCompressionMethod(net_CompressionMethod), // [esi+0x424]
 	mState(state),
-	mFilterStream(nullptr),
 	mUnAckedPayloads(),
-	mMessage(0, 0), // [esi+0x42C]
-	mEarlyPackets()
+	mEarlyPackets(), // [esi+0x42C]
+	mMessage()
 {
 	// Init timers and timestamps
 	// (ASM zeroes a lot of POD around; we rely on default ctor or explicit zeros above)
@@ -193,7 +194,7 @@ CNetUDPConnection::CNetUDPConnection(
 
 		// Allocate filter (operator new 0x460 seen in asm).
 		// Construct zlib filter for deflate (send path).
-		const auto filterStream = new gpg::ZLibOutputFilterStream(&mPendingOutputData, 1);
+		const auto filterStream = new gpg::ZLibOutputFilterStream(&mPendingOutputData, gpg::FLOP_Deflate);
 		if (filterStream) {
 			if (mOutputFilterStream) {
 				operator delete(mOutputFilterStream);
@@ -250,64 +251,33 @@ CNetUDPConnection::~CNetUDPConnection() {
 	}
 }
 
+// 0x00486910
 void CNetUDPConnection::CreateFilterStream() {
 	mState = kNetStateAnswering;
 
-	// 1) Push a small control message (type 201) into the input buffer.
-	//    The original code emits CMessage(201) and appends its bytes into PipeStream.
-	{
-		const CMessage msg{ 0, static_cast<char>(201) };
+	CMessage msg{ ELobbyMsg::LOBMSG_ConnMade };
+	mInputBuffer.Write(msg.mBuff.Data(), msg.mBuff.Size());
 
-		const char* const src = msg.mBuff.start_;
-		const size_t size = static_cast<size_t>(msg.mBuff.end_ - msg.mBuff.start_);
-
-		// Fast path: write directly if there is enough contiguous space in the write window.
-		char* const writeHead = mInputBuffer.mWriteHead;
-		const char* const writeEnd = mInputBuffer.mWriteEnd;
-
-		const size_t avail = static_cast<size_t>(writeEnd - writeHead);
-		if (size > avail) {
-			// Fallback to the virtual streaming write (handles growth/flush).
-			mInputBuffer.VirtWrite(src, size);
-		} else {
-			std::memcpy(writeHead, src, size);
-			mInputBuffer.mWriteHead += size;
-		}
-	}
-
-	// 2) Decide on receive compression and (re)create the filter.
-	//    In the binary, non-zero means "deflate" (value 1), zero means "no compression".
-	const auto receivedCompressionMethod =
-		static_cast<ENetCompressionMethod>(mReceivedCompressionMethod);
-
-	// Build a human-readable endpoint string for logs.
-	const msvc8::string who = ToString();
-
-	if (receivedCompressionMethod != NETCOMP_None) {
-		// The original asserts that only value 1 (deflate) is expected here.
-		if (receivedCompressionMethod != NETCOMP_Deflate) {
-			GPG_UNREACHABLE()
-		}
-
-		gpg::Logf("NET: using deflate compression for receives from %s", who.c_str());
-
-		// Replace existing filter with a fresh inflate (operation=0) filter attached to mInputBuffer.
-		// Note: in the game binary mOperation==0 -> inflate, mOperation==1 -> deflate.
-		const auto* const old = mFilterStream;
-		mFilterStream = new gpg::ZLibOutputFilterStream(&mInputBuffer, /*operation=*/0);
-		if (old) {
-			delete old;
-		}
-	} else {
-		gpg::Logf("NET: using no compression for receives from %s", who.c_str());
+	if (mReceivedCompressionMethod == NETCOMP_None) {
+		gpg::Logf("NET: using no compression for receives from %s", ToString().c_str());
 
 		// No filter needed on receive side; drop any old one.
-		if (mFilterStream)
-		{
+		if (mFilterStream) {
 			delete mFilterStream;
 			mFilterStream = nullptr;
 		}
+		return;
+	} 
+
+	if (mReceivedCompressionMethod != NETCOMP_Deflate) {
+		GPG_UNREACHABLE()
 	}
+
+	gpg::Logf("NET: using deflate compression for receives from %s", ToString().c_str());
+
+	const auto* const old = mFilterStream;
+	mFilterStream = new gpg::ZLibOutputFilterStream(&mInputBuffer, gpg::FLOP_Deflate);
+	delete old;
 }
 
 bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
@@ -342,7 +312,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
 		// Copy remote nonce and adopt compression.
 		std::memcpy(mNonceB, pConnect.nonceA, sizeof(mNonceB));
 		mTime1 = pConnect.time;
-		mReceivedCompressionMethod = static_cast<int>(pConnect.comp);
+		mReceivedCompressionMethod = pConnect.comp;
 
 		// Binary rebinds/repurposes packet memory to this connection.
 		AdoptPacket(packet);
@@ -352,7 +322,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet) {
 	{
 		std::memcpy(mNonceB, pConnect.nonceA, sizeof(mNonceB));
 		mTime1 = pConnect.time;
-		mReceivedCompressionMethod = static_cast<int>(pConnect.comp);
+		mReceivedCompressionMethod = pConnect.comp;
 
 		AdoptPacket(packet);
 
@@ -450,7 +420,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet) {
 	mLastRecv = packet->mSentTime;
 	std::memcpy(mNonceB, pAnswer.nonceA, sizeof(mNonceB));
 	mTime1 = pAnswer.time;
-	mReceivedCompressionMethod = static_cast<int>(pAnswer.comp);
+	mReceivedCompressionMethod = pAnswer.comp;
 
 	// Enable RX filter according to negotiated compression. 
 	CreateFilterStream();
@@ -959,7 +929,7 @@ SNetPacket* CNetUDPConnection::NewConnectPacket() const {
 
 	auto& connectPacket = packet->As<SPacketBodyConnect>();
 
-	connectPacket.protocol = kUdp;
+	connectPacket.protocol = ENetProtocolType::kUdp;
 	connectPacket.time = mConnector->GetTime();
 	connectPacket.comp = mOurCompressionMethod;
 
@@ -978,7 +948,7 @@ SNetPacket* CNetUDPConnection::NewAnswerPacket() const {
 
 	auto& answerPacket = packet->As<SPacketBodyAnswer>();
 
-	answerPacket.protocol = kUdp;
+	answerPacket.protocol = ENetProtocolType::kUdp;
 	answerPacket.time = mConnector->GetTime();
 	answerPacket.comp = mOurCompressionMethod;
 
@@ -1123,7 +1093,7 @@ void CNetUDPConnection::DispatchFromInput() {
 	}
 
 	while (mMessage.Read(&mInputBuffer)) {
-		const auto streamCmd = static_cast<ECmdStreamOp>(mMessage.GetType());
+		const ECmdStreamOp streamCmd = mMessage.GetType();
 
 		if (streamCmd != ECmdStreamOp::Answering) {
 			const size_t len = mMessage.mBuff.Size();
@@ -1146,7 +1116,7 @@ void CNetUDPConnection::DispatchFromInput() {
 			);
 		}
 
-		const auto receiver = mReceivers[static_cast<int32_t>(mMessage.GetType())];
+		const auto receiver = mReceivers[static_cast<uint8_t>(mMessage.GetType())];
 		if (receiver == nullptr) {
 			msvc8::string host = NET_GetHostName(mAddr);
 			gpg::Warnf(
@@ -1164,12 +1134,12 @@ void CNetUDPConnection::DispatchFromInput() {
 			return;
 		}
 	}
-	if (mInputBuffer.LeftToRead() == 0 && mInputBuffer.VirtAtEnd()) {
+	if (!mInputBuffer.CanRead() && mInputBuffer.VirtAtEnd()) {
 		mDispatchedEndOfInput = true;
-		if (mState == 5) {
-			Dispatch(new CMessage{ 0, static_cast<char>(202) });
+		if (mState == kNetStateErrored) {
+			Dispatch(new CMessage{ ELobbyMsg::LOBMSG_ConnLostErrored });
 		} else {
-			Dispatch(new CMessage{ 0, static_cast<char>(203) });
+			Dispatch(new CMessage{ ELobbyMsg::LOBMSG_ConnLostEof });
 		}
 	}
 }

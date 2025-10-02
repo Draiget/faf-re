@@ -4,104 +4,106 @@
 #include "gpg/core/containers/Set.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/PipeStream.h"
+#include "moho/containers/BVIntSet.h"
 #include "moho/sim/SSyncFilter.h"
 #include "platform/Platform.h"
 
 namespace moho
 {
-	class CClientManagerImpl;
+	class CClientBase;
+    class CClientManagerImpl;
 
-    struct EjectRequest
+#pragma pack(push, 4)
+
+    struct SEjectRequest
     {
-        gpg::StrArg* mRequester;
+        CClientBase* mRequester;
         int mAfterBeat;
+    };
+
+    struct SClientBottleneckInfo
+    {
+        enum Type
+        {
+            Nothing = 0,
+            Readiness = 1,
+            Data = 2,
+            Ack = 3,
+        };
+
+        Type mType;
+        int mVal;
+        BVIntSet mSubobj;
+        float mFloat;
     };
 
 	/**
      * VFTABLE: 0x00E16BD4
-     * COL:  0x00E6AED8
+     * COL:     0x00E6AED8
      */
-    class CClientBase : public IClient
+    class MOHO_EMPTY_BASES CClientBase :
+		public IClient
 	{
     public:
         /**
-         * Address: 
+         * Address: 0053B930
          * Slot: 0
-         * Demangled: 
          */
-        virtual Set* GetValidCommandSources() = 0;
+        BVIntSet* GetValidCommandSources() override;
 
         /**
-         * True if no ejection is pending.
-         *
          * Address: 0x0053C960
          * Slot: 1
-         * Demangled: _purecall
          */
-        virtual bool NoEjectionPending();
+        bool NoEjectionPending() override;
 
         /**
-         * TODO: name/semantics unknown (pure).
-         *
          * Address: 0x00A82547
          * Slot: 2
-         * Demangled: _purecall
          */
-        virtual void OnAttach() = 0;
+        void OnAttach() override = 0;
 
         /**
-         * TODO: name/semantics unknown (pure).
-         *
          * Address: 0x00A82547
          * Slot: 3
-         * Demangled: _purecall
          */
-        virtual void OnDetach() = 0;
+        void OnDetach() override = 0;
 
         /**
          * Return pointer to latest-acks vector payload (implementation detail).
          *
          * Address: 0x0053CA60
          * Slot: 4
-         * Demangled: _purecall
          */
-        virtual const void* GetLatestAcksVector() = 0;
+        const msvc8::vector<int32_t>* GetLatestAcksVector() override;
 
         /**
-         * Output the latest beat dispatched to remote peer.
-         *
          * Address: 0x0053CA90
          * Slot: 5
-         * Demangled: _purecall
          */
-        virtual void GetLatestBeatDispatchedRemote(uint32_t& out) = 0;
+        void GetLatestBeatDispatchedRemote(uint32_t& out) override;
 
         /**
          * Output available remote beat counter.
          *
          * Address: 0x0053CAD0
          * Slot: 6
-         * Demangled: _purecall
          */
-        virtual void GetAvailableBeatRemote(uint32_t& out) = 0;
+        void GetAvailableBeatRemote(uint32_t& out) override;
 
         /**
-         * Core message processor invoked by CClientBase::DispatchRawBuffer.
-         *
          * Address: 0x00A82547
          * Slot: 7
-         * Demangled: _purecall
          */
-        virtual void Process(CMessage& msg, int a, int b) = 0;
+        void Process(CMessage& msg) override = 0;
 
         /**
          * Build a message from raw span and forward to Process(...).
          *
          * Address: 0x0053C9A0
          * Slot: 8
-         * Demangled: _purecall
          */
-        virtual void DispatchRawBuffer(const gpg::ByteSpan& span) = 0;
+        void ReceiveChat(gpg::MemBuffer<const char> data) override;
 
         /**
          * Output queued beat number.
@@ -110,7 +112,7 @@ namespace moho
          * Slot: 9
          * Demangled: _purecall
          */
-        virtual void GetQueuedBeat(uint32_t& out) = 0;
+        void GetQueuedBeat(uint32_t& out) override;
 
         /**
          * Schedule ejection sequence; see CClientBase::Eject().
@@ -119,7 +121,7 @@ namespace moho
          * Slot: 10
          * Demangled: _purecall
          */
-        virtual void Eject() = 0;
+        void Eject() override;
 
         /**
          * Copy pending IDs from EjectRequests vector into out.
@@ -128,16 +130,15 @@ namespace moho
          * Slot: 11
          * Demangled: _purecall
          */
-        virtual void CollectPendingIds(msvc8::vector<int>& out) = 0;
+        void CollectPendingIds(msvc8::vector<int>& out) override = 0;
 
         /**
          * Return small numeric property (client id, channel, etc.).
          *
          * Address: 0x0053CDC0
          * Slot: 12
-         * Demangled: _purecall
          */
-        virtual int GetClientNumeric() = 0;
+        int32_t GetSimRate() override;
 
         /**
          * Address: 0x0053B930
@@ -160,22 +161,49 @@ namespace moho
          */
         virtual void Debug() = 0;
 
+        /**
+         * Address: 0x0053BD40
+         */
+        CClientBase(
+            int clientIndex, 
+            CClientManagerImpl* manager, 
+            const char* name, 
+            LaunchInfoBase* launchInfo, 
+            BVIntSet& commandSources,
+            uint32_t sourceId
+        );
+
+        /**
+         * Address: 0x0053F2C0
+         * @param manager 
+         * @param beat 
+         */
+        void ProcessEject(CClientManagerImpl* manager, uint32_t beat) const;
+
+        /**
+         * Address: 0x0053CD50
+         * @param requester
+         */
+        void RemoveEjectRequestsByRequester(const CClientBase* requester);
+
     public:
         CClientManagerImpl* mManager;
-        BYTE gap2C[4];
-        SSyncFilter::Subobj1 mValidCommandSources;
-        BYTE gap44[12];
-        DWORD mCommandSource;
-        BYTE mReady;
+        int32_t gap;
+        BVIntSet mValidCommandSources;
+        uint32_t mCommandSourceId;
+        bool mReady;
         gpg::PipeStream mPipe;
-        DWORD mQueuedBeat;
-        DWORD mDispatchedBeat;
-        DWORD mAvailableBeatRemote;
-        msvc8::vector<void*> mLatestAckReceived;
-        DWORD mLatestBeatDispatchedRemote;
-        BYTE mEjectPending;
-        BYTE mEjected;
-        msvc8::vector<EjectRequest*> mEjectRequests;
-        int v1;
+        uint32_t mQueuedBeat;
+        uint32_t mDispatchedBeat;
+        uint32_t mAvailableBeatRemote;
+        msvc8::vector<int32_t> mLatestAckReceived;
+        int32_t mLatestBeatDispatchedRemote;
+        bool mEjectPending;
+        bool mEjected;
+        msvc8::vector<SEjectRequest*> mEjectRequests;
+        int32_t mSimRate;
     };
-} // namespace moho
+    static_assert(sizeof(CClientBase) == 0xD8, "CLocalClient size must be 0xD8");
+#pragma pack(pop)
+}
+

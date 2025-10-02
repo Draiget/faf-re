@@ -6,6 +6,26 @@
 
 #include "platform/Platform.h"
 
+namespace boost {
+
+    template<class T> class shared_ptr;                 // forward for prototypes below
+    template<class T> class enable_shared_from_this;    // forward (no include!)
+
+    namespace detail {
+
+        // Two overloads selected when Y derives from enable_shared_from_this<Y>.
+        template<class X, class Y>
+        void sp_enable_shared_from_this(shared_ptr<X> const* /*ppx*/, Y* /*p*/, enable_shared_from_this<Y>* /*pe*/);
+
+        template<class X, class Y>
+        void sp_enable_shared_from_this(shared_ptr<X> const* /*ppx*/, Y* /*p*/, enable_shared_from_this<Y> const* /*pe*/);
+
+        // Fallback when Y does not derive from enable_shared_from_this<Y>.
+        inline void sp_enable_shared_from_this(...) { /* no-op */ }
+
+    }
+}
+
 namespace boost
 {
 
@@ -322,6 +342,7 @@ namespace boost
             , pi_(nullptr)
         {
             try_construct_default_(p);
+            detail::sp_enable_shared_from_this(this, p, p);
         }
 
         /** Construct from raw pointer + deleter. D must be callable as D(T*). */
@@ -331,6 +352,7 @@ namespace boost
             , pi_(nullptr)
         {
             try_construct_deleter_(p, std::move(d));
+            detail::sp_enable_shared_from_this(this, p, p);
         }
 
         /** Aliasing constructor: shares ownership with r but holds pointer p. */
@@ -340,6 +362,7 @@ namespace boost
             , pi_(r.pi_)
         {
             if (pi_) pi_->add_ref_copy();
+            detail::sp_enable_shared_from_this(this, p, r.get());
         }
 
         /** Copy-construct from convertible shared_ptr<U>. */

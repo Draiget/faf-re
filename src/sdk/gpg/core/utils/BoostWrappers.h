@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "boost/shared_ptr.h"
+
 namespace boost
 {
 	namespace detail
@@ -22,33 +24,6 @@ namespace boost
         // Mirror BOOST_SP_TYPEID from Boost: wraps typeid(T)
 #define BOOST_SP_TYPEID(T) typeid(T)
 #endif
-
-    // Base control block: 12 bytes on x86 (vptr + 2 longs)
-        class sp_counted_base {
-        public:
-            // vtbl[2] dispose: destroy the managed object
-            virtual void dispose() = 0;
-
-            // vtbl[3] destroy: delete this control block
-            virtual void destroy() { operator delete(this); }
-
-            // vtbl[4] get_deleter: return deleter by type_info (often nullptr in impl_p)
-            virtual void* get_deleter(sp_typeinfo const&) noexcept { return nullptr; } // <-- noexcept добавлен
-
-            // Non-virtual RC API omitted for brevity (add_ref_copy, release, etc.)
-        protected:
-            sp_counted_base() : use_count_(1), weak_count_(1) {}
-            virtual ~sp_counted_base() {}
-
-        private:
-            sp_counted_base(sp_counted_base const&) = delete;
-            sp_counted_base& operator=(sp_counted_base const&) = delete;
-
-            volatile long use_count_;   // +0x04
-            volatile long weak_count_;  // +0x08
-        };
-
-        static_assert(sizeof(sp_counted_base) == 12, "must be 12 bytes on x86");
 	}
 
     // Raw layout of boost::shared_ptr<T> used by VC8-era Boost on x86:

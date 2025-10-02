@@ -1,7 +1,7 @@
 #pragma once
 
-#include "moho/misc/TDatList.h"
 #include "CMessage.h"
+#include "moho/containers/TDatList.h"
 
 namespace moho
 {
@@ -53,17 +53,14 @@ namespace moho
          */
         ~IMessageReceiver() = default;
     };
+    static_assert(sizeof(IMessageReceiver) == 0x0C, "IMessageReceiver size should be 0x0C");
 
-    struct SMsgReceiverLinkage : 
-        TDatListItem<SMsgReceiverLinkage, void>,
-        struct_filler4,
-        IMessageReceiver
+    class SMsgReceiverLinkage :
+        public TDatListItem<SMsgReceiverLinkage, void>,
+        public struct_filler4,
+        public IMessageReceiver
     {
-        unsigned int mLower;
-        unsigned int mUpper;
-        IMessageReceiver* mReceiver;
-        CMessageDispatcher* mDispatcher;
-
+    public:
         /**
          * Address: 0x0047C37A
          * NOTE: Inlined
@@ -81,5 +78,11 @@ namespace moho
         );
 
         void Receive(CMessage* message, CMessageDispatcher* dispatcher) override;
+
+    public:
+        unsigned int mLower;
+        unsigned int mUpper;
+        IMessageReceiver* mReceiver;
+        CMessageDispatcher* mDispatcher;
     };
 }

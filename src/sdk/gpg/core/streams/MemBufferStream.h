@@ -1,83 +1,102 @@
 #pragma once
 
 #include <stdexcept>
+#include <cstddef>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "boost/shared_ptr.h"
 
 namespace gpg
 {
-	template<class T>
-	class MemBuffer 
-	{
-		using type = T;
-	public:
+    /**
+     * Lightweight shared view over a contiguous memory range [mBegin, mEnd).
+     * Ownership is kept via boost::shared_ptr<T> (typically allocated as an array).
+     * The view itself is non-owning; copying shares ownership of the same buffer.
+     */
+    template<class T>
+    class MemBuffer
+    {
+        using type = T;
 
-        boost::SharedPtrRaw<type> mData;
-		type* mBegin;
-		type* mEnd;
+    public:
+        boost::shared_ptr<type> mData{};
+        type* mBegin{ nullptr };
+        type* mEnd{ nullptr };
 
-        MemBuffer() :
-            mData{},
-            mBegin{ nullptr },
-            mEnd{ nullptr }
-        {
-        }
-        MemBuffer(const MemBuffer<type>& cpy) :
-            mData{ cpy.mData },
-            mBegin{ cpy.mBegin },
-            mEnd{ cpy.mEnd }
-        {
-        }
-        MemBuffer(boost::SharedPtrRaw<type> ptr, type* begin, T* end) :
-            mData{ ptr },
-            mBegin{ begin },
-            mEnd{ end }
-        {
-        }
-        MemBuffer(boost::SharedPtrRaw<type> ptr, unsigned int len) :
-            mData{ ptr },
-            mBegin{ ptr.data() },
-            mEnd{ ptr.data() + len }
-        {
+        /** Default ctor - empty view. */
+        MemBuffer() noexcept = default;
+
+        /** Copy ctor - shallow copy (shares ownership). */
+        MemBuffer(const MemBuffer& cpy) noexcept = default;
+
+        /** Construct from owner + raw range [begin, end). */
+        MemBuffer(boost::shared_ptr<type> ptr, type* begin, type* end) noexcept
+            : mData{ ptr }, mBegin{ begin }, mEnd{ end } {
         }
 
-        type* GetPtr(unsigned int start, unsigned int len) {
-            type* begin = &this->mBegin[start];
-            if (&begin[len] > this->mEnd) {
-                throw std::range_error{ std::string{"Out of bound access in MemBuffer<>::GetPtr()"} };
+        /** Construct from owner + length (range is [ptr.get(), ptr.get()+len)). */
+        MemBuffer(boost::shared_ptr<type> ptr, std::size_t len) noexcept
+            : mData{ ptr }, mBegin{ ptr.get() }, mEnd{ ptr.get() + len } {
+        }
+
+        /** Get pointer to subrange start with bounds check for [start, start+len). */
+        type* GetPtr(std::size_t start, std::size_t len) const
+        {
+            if (!mBegin && (start || len)) {
+                throw std::range_error("MemBuffer::GetPtr: null buffer");
             }
-            return begin;
+            type* p = mBegin + start;
+            if (p < mBegin || p > mEnd || p + len > mEnd) {
+                throw std::range_error("Out of bound access in MemBuffer<>::GetPtr()");
+            }
+            return p;
         }
-        gpg::MemBuffer<type> SubBuffer(unsigned int start, unsigned int len) {
-            return gpg::MemBuffer<type>{this->mData, this->GetPtr(start, end), this->GetPtr(start + end, 0)};
+
+        /** Create a sub-buffer view [start, start+len). */
+        MemBuffer SubBuffer(std::size_t start, std::size_t len) const
+        {
+            type* b = GetPtr(start, 0);
+            type* e = GetPtr(start + len, 0);
+            return MemBuffer{ this->mData, b, e };
         }
-        void Reset() {
-            this->mData.release();
+
+        /** Reset to empty; releases shared ownership. */
+        void Reset() noexcept
+        {
+            this->mData.reset();
             this->mBegin = nullptr;
             this->mEnd = nullptr;
         }
-        size_t Size() {
-            return (this->mEnd - this->mBegin) / sizeof(type);
-        }
-        gpg::MemBuffer<type>& operator=(gpg::MemBuffer<type> const& that) {
-            this->mData = that.mData;
-            this->mBegin = that.mBegin;
-            this->mEnd = that.mEnd;
+
+        /** Size in elements. */
+        std::size_t Size() const noexcept
+        {
+            return static_cast<std::size_t>(mEnd - mBegin);
         }
 
-		operator type* () {
-            return *this->mBegin;
-        }
-        type* begin() {
-            return this->mBegin;
-        }
-        type* end() {
-            return this->mEnd;
-        }
-        type& operator[](int ind) {
-            return &this->mBegin[ind];
-        }
-	};
+        /** Copy assignment (shares ownership). */
+        MemBuffer& operator=(const MemBuffer&) noexcept = default;
 
-    MemBuffer<char> AllocMemBuffer(size_t size); // 0x0094E320
+        /** Implicit conversion to raw pointer (begin). */
+        operator type* () noexcept { return mBegin; }
+        operator const type* () const noexcept { return mBegin; }
+
+        /** Raw data accessors. */
+        type* data() noexcept { return mBegin; }
+        const type* data() const noexcept { return mBegin; }
+
+        /** STL-like iterators. */
+        type* begin() noexcept { return mBegin; }
+        const type* begin() const noexcept { return mBegin; }
+        type* end() noexcept { return mEnd; }
+        const type* end() const noexcept { return mEnd; }
+
+        /** Unchecked element access. */
+        type& operator[](std::size_t ind) noexcept { return mBegin[ind]; }
+        const type& operator[](std::size_t ind) const noexcept { return mBegin[ind]; }
+    };
+
+    /**
+     * Address: 0x0094E320
+     */
+    MemBuffer<char> AllocMemBuffer(std::size_t size);
 }

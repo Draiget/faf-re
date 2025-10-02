@@ -172,7 +172,7 @@ namespace gpg
             return Mt19937Ref::FromLegacy(base625);
         }
 
-        extern "C" uint32_t FA_FASTCALL mt_twist_bridge(void* owner, uint32_t* legacy625) {
+        uint32_t FA_FASTCALL mt_twist_bridge(void* owner, uint32_t* legacy625) {
             auto ref = Mt19937Ref::FromLegacy(legacy625);
             return MersenneTwister19937Ops::Twist(owner, ref);
         }

@@ -1,7 +1,7 @@
 ﻿// Auto-generated from IDA VFTABLE/RTTI scan.
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
-#include "moho/misc/TDatList.h"
+#include "moho/containers/TDatList.h"
 
 namespace moho
 {

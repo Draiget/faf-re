@@ -396,7 +396,7 @@
     <ClCompile Include="moho\net\CNetUDPConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\net\General.cpp">
+    <ClCompile Include="moho\net\Common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\streams\ZLibOutputFilterStream.cpp">
@@ -415,6 +415,69 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\core\Thread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\CLobby.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\task\CTaskThread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\task\CTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\app\WinApp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\script\CScriptObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\core\streams\BinaryReader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\containers\Map.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lua\LuaObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\client\Localization.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\BVIntSet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\BVSet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\IClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\INetConnection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\containers\Set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\StringUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\CClientManagerImpl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\CHostManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\INetDatagramSocket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\CNetDatagramSocketImpl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\CGpgNetInterface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\app\CWaitHandleSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -491,7 +554,7 @@
     <ClInclude Include="moho\misc\StatItem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\misc\TDatTreeItem.h">
+    <ClInclude Include="moho\containers\TDatTreeItem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\utils\Sync.h">
@@ -516,9 +579,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lua\LuaState.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaDebug.h">
@@ -611,7 +671,7 @@
     <ClInclude Include="gpg\core\containers\DListItem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\misc\TDatList.h">
+    <ClInclude Include="moho\containers\TDatList.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\net\IMessageReceiver.h">
@@ -1181,7 +1241,7 @@
     <ClInclude Include="boost\weak_ptr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="boost\sp_counted_base.h">
+    <ClInclude Include="boost\shared_ptr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\net\SNetPacket.h">
@@ -1196,7 +1256,7 @@
     <ClInclude Include="moho\net\INetNATTraversalProvider.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\net\General.h">
+    <ClInclude Include="moho\net\Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\net\CHostManager.h">
@@ -1221,6 +1281,75 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="boost\function.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\CLobby.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\INetDatagramHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\INetDatagramSocket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\task\CTaskThread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\app\WinApp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\streams\BinaryReader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="legacy\containers\Map.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\task\CLuaTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\client\Localization.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\containers\BVIntSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\containers\BVSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\IClientManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\CLocalClient.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="legacy\containers\Set.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\StringUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\CGpgNetInterface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="boost\thread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="boost\enable_shared_from_this.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\INetTCPServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\INetTCPSocket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\CNetDatagramSocketImpl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\ELobbyMsg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\app\CWaitHandleSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

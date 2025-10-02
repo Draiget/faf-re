@@ -1,12 +1,20 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 
-#include "TDatTreeItem.h"
-#include "../../legacy/containers/String.h"
-#include "../../gpg/core/utils/Sync.h"
+#include "legacy/containers/String.h"
+#include "boost/mutex.h"
+#include "moho/containers/TDatTreeItem.h"
 
 namespace moho
 {
+	enum class EStatType : uint32_t
+	{
+		kNone = 0,
+		kFloat = 1,
+		kInt = 2,
+		kString = 3,
+	};
+
 	class StatItem : public TDatTreeItem<StatItem>
 	{
 	public:
@@ -29,15 +37,35 @@ namespace moho
 		virtual void PushToLua() = 0;
 
 	public:
-		// ---- payload ----
-		int32_t   value_int_or_float;   // 0x24  (raw storage read by getters)
-		uint8_t   pad_28[0x78 - 0x28];  // 0x28..0x77
+		std::uint32_t mTreeAux{ 0 };     // +0x20  // auxiliary field next to tree heads (zeroed in ctor)
+		DWORD         mCounter;        // +0x24  // InstanceCounter<T> hits this (lock xadd)
 
-		msvc8::string name;             // 0x78..0x93  (size at +0x8C)
+		// Textual value buffer (used by string stats / formatting helpers)
+		msvc8::string mValue;      // +0x28  // SSO string; ctor touches size@+0x3C, res@+0x40, buf[0]@+0x2C
 
-		uint32_t  valueType;            // 0x90  (0=float, 1=int, 2=string)
-		uint32_t  useCurrent_flag;      // 0x94  (==1 -> pass true to getters)
-		gpg::core::Mutex sync;          // 0x98
-		uint8_t   pad_9D[0xA0 - 0x9D];  // 0x9D..0x9F
+		// Integer value / accumulator for INT kind
+		DWORD         mIntValue;       // +0x44
+
+		// Scratch string for conversions/formatting (second working buffer)
+		msvc8::string mValueScratch;   // +0x48  // second SSO string; size@+0x5C, res@+0x60, buf[0]@+0x4C
+
+		// Explicit padding hole the ctor does not touch (kept for exact layout)
+		BYTE          pad64[4];        // +0x64..+0x67
+
+		// Reserved/zeroed dwords (purpose TBD; ctor writes zeros here)
+		DWORD         mSpare0;         // +0x68
+		DWORD         mSpare1;         // +0x6C
+		DWORD         mSpare2;         // +0x70
+
+		// Human-readable stat name (exported to Lua as "Name")
+		msvc8::string mName;           // +0x74  // SSO string; constructed from ctor parameter
+
+		// Value kind and read-mode flag (ToLua branches on type; flag used as (==1))
+		EStatType     mType{ EStatType::kNone }; // +0x90
+		volatile int  mRealtimeFlag{ 0 };        // +0x94  // when 1, readers use "instant" mode
+
+		// Engine-era thin mutex (pImpl; 8 bytes)
+		boost::mutex  mLock;          // +0x98
 	};
+	static_assert(sizeof(StatItem) == 0xA0u, "StatItem == 0xA0");
 }

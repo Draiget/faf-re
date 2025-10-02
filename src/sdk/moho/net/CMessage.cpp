@@ -6,7 +6,10 @@
 #include "gpg/core/streams/Stream.h"
 using namespace moho;
 
-CMessage::CMessage(int size, const char type) {
+CMessage::CMessage() {
+}
+
+CMessage::CMessage(const MessageType type, size_t size) {
     size += 3;
     constexpr char fill = 0;
     mBuff.Resize(size, fill);
@@ -15,7 +18,7 @@ CMessage::CMessage(int size, const char type) {
 }
 
 int CMessage::GetMessageSize() {
-    int size = this->GetSize();
+    int size = GetSize();
     if (size >= 3) {
         size -= 3;
     }
@@ -23,14 +26,14 @@ int CMessage::GetMessageSize() {
 }
 
 unsigned int CMessage::Append(const char* ptr, const size_t size) {
-    if (this->mBuff.Size() + size > 0x10000) {
+    if (mBuff.Size() + size > 0x10000) {
         throw std::runtime_error{ std::string{"Message too large"} };
     }
 
-    this->mBuff.InsertAt(this->mBuff.end_, ptr, &ptr[size]);
+    mBuff.InsertAt(mBuff.end_, ptr, &ptr[size]);
 
-    const auto targetSize = this->mBuff.Size();
-    this->SetSize(targetSize);
+    const auto targetSize = mBuff.Size();
+    SetSize(targetSize);
     return targetSize;
 }
 
@@ -53,41 +56,41 @@ void inline CMessage::Clear() noexcept {
 
 bool CMessage::ReadMessage(gpg::Stream* stream) {
 	constexpr char fill = 0;
-    this->mBuff.Resize(3, fill);
-    if (stream->Read(this->mBuff.start_, 3) != 3) {
+    mBuff.Resize(3, fill);
+    if (stream->Read(mBuff.start_, 3) != 3) {
         return false;
     }
-	const size_t size = this->GetSize();
+	const size_t size = GetSize();
     if (size < 3) {
         return false;
     }
     if (size == 3) {
         return true;
     }
-    this->mBuff.Resize(size - 3, fill);
-    return stream->Read(&this->mBuff[3], size - 3) == size - 3;
+    mBuff.Resize(size - 3, fill);
+    return stream->Read(&mBuff[3], size - 3) == size - 3;
 }
 
 bool CMessage::Read(gpg::Stream* stream) {
-    if (!this->HasReadLength()) {
-        if (this->mBuff.Size() == 0) {
+    if (!HasReadLength()) {
+        if (mBuff.Size() == 0) {
 	        constexpr char fill = 0;
-            this->mBuff.Resize(3, fill);
+            mBuff.Resize(3, fill);
         }
-        this->mPos += static_cast<int>(stream->ReadNonBlocking(&this->mBuff[this->mPos], 3 - this->mPos));
-        if (!this->HasReadLength()) {
+        mPos += static_cast<int>(stream->ReadNonBlocking(&mBuff[mPos], 3 - mPos));
+        if (!HasReadLength()) {
             return false;
         }
     }
-    const int newSize = this->GetSize();
+    const int newSize = GetSize();
     if (newSize < 3) {
         return false;
     }
-    if (newSize == this->mPos) {
+    if (newSize == mPos) {
         return true;
     }
     constexpr char fill = 0;
-    this->mBuff.Resize(newSize, fill);
-    this->mPos += static_cast<int>(stream->ReadNonBlocking(&this->mBuff[this->mPos], newSize - this->mPos));
-    return this->mPos == newSize;
+    mBuff.Resize(newSize, fill);
+    mPos += static_cast<int>(stream->ReadNonBlocking(&mBuff[mPos], newSize - mPos));
+    return mPos == newSize;
 }

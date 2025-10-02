@@ -24,11 +24,11 @@ size_t Stream::VirtRead(char*, size_t) {
 
 // 0x00956DE0
 size_t Stream::VirtReadNonBlocking(char* buf, size_t len) {
-    return this->VirtRead(buf, len);
+    return VirtRead(buf, len);
 }
 
 // 0x00956FD0
-void Stream::VirtUnGetByte(int) {
+void Stream::VirtUnGetByte(int unknown) {
     throw UnsupportedOperation{};
 }
 
@@ -48,29 +48,67 @@ void Stream::VirtFlush() {}
 // 0x00956E10
 void Stream::VirtClose(Mode) {}
 
+void Stream::Write(const msvc8::string& str) {
+    Write(str.c_str(), str.size() + 1);
+}
+
 // 0x0043D130
-void Stream::Write(const char* buf, size_t size) {
-    if (size > this->LeftToWrite()) {
-        this->VirtWrite(buf, size);
-    } else {
-        memcpy(this->mWriteHead, buf, size);
-        this->mWriteHead += size;
+void Stream::Write(const char* buf, const size_t size) {
+    if (size > LeftToWrite()) {
+        VirtWrite(buf, size);
+        return;
     }
+
+    memcpy(mWriteHead, buf, size);
+    mWriteHead += size;
+}
+
+// 0x004CCD80
+void Stream::Write(const char* buf) {
+    const auto len = strlen(buf) + 1;
+    Write(buf, len);
 }
 
 // 0x00955760
 bool Stream::Close(Mode access) {
-    this->VirtClose(access);
+    VirtClose(access);
     return true;
 }
 
 // 0x0043D100
 size_t Stream::Read(char* buf, size_t size) {
-    if (size > this->LeftToRead()) {
-        size = this->VirtRead(buf, size);
+    if (size > BytesRead()) {
+        size = VirtRead(buf, size);
     } else if (size) {
-        memcpy(buf, this->mReadHead, size);
-        this->mReadHead += size;
+        memcpy(buf, mReadHead, size);
+        mReadHead += size;
     }
     return size;
+}
+
+size_t Stream::ReadNonBlocking(char* buf, size_t size) {
+    if (size > BytesRead()) {
+        size = VirtReadNonBlocking(buf, size);
+    } else if (size) {
+        memcpy(buf, mReadHead, size);
+        mReadHead += size;
+    }
+    return size;
+}
+
+// 0x004CCDEC
+int8_t Stream::GetByte() {
+    if (mReadHead != mReadEnd) {
+        const unsigned char c = static_cast<unsigned char>(*mReadHead);
+        ++mReadHead;
+        return static_cast<int8_t>(c);
+    }
+
+    unsigned char b = 0;
+    const size_t got = VirtRead(reinterpret_cast<char*>(&b), 1u);
+    if (got == 1u) {
+        return static_cast<int8_t>(b);
+    }
+
+    return -1;
 }

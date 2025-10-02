@@ -3,6 +3,7 @@
 
 #include "platform/Platform.h"
 #include "CNetUDPConnection.h"
+#include "Common.h"
 #include "INetConnector.h"
 #include "INetNATTraversalHandler.h"
 #include "INetNATTraversalProvider.h"
@@ -12,7 +13,7 @@
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Sync.h"
 #include "legacy/containers/Deque.h"
-#include "moho/misc/TDatList.h"
+#include "moho/containers/TDatList.h"
 
 namespace moho
 {
@@ -31,10 +32,10 @@ namespace moho
      */
     struct PacketLogRecord
     {
-        std::int64_t  timestamp_us;  // a3
-        std::uint32_t addr;          // IPv4 (host-order as in asm)
-        std::uint16_t len_flags;     // low 15 bits = payload len, bit15 (0x8000) = incoming
-        std::uint16_t port;          // host-order
+        int64_t  timestamp_us;  // a3
+        uint32_t addr;          // IPv4 (host-order as in asm)
+        uint16_t len_flags;     // low 15 bits = payload len, bit15 (0x8000) = incoming
+        uint16_t port;          // host-order
     };
     static_assert(sizeof(PacketLogRecord) == 16, "PacketLogRecord must be 16 bytes");
 #pragma pack(pop)
@@ -96,7 +97,7 @@ namespace moho
          * Demangled: Moho::CNetUDPConnector::GetProtocol
          */
         ENetProtocolType GetProtocol() override {
-            return kUdp;
+            return ENetProtocolType::kUdp;
         }
 
         /**
@@ -167,7 +168,7 @@ namespace moho
          * Slot: 12
          * Demangled: Moho::CNetUDPConnector::Func3
          */
-        SendStampView SnapshotSendStamps(uint64_t since) override;
+        SSendStampView SnapshotSendStamps(uint64_t since) override;
 
         /**
          * Address: 0x00489F30
@@ -267,7 +268,7 @@ namespace moho
         msvc8::deque<SReceivePacket> mPackets1;
         msvc8::deque<SReceivePacket> mPackets2;
         HANDLE mSelectedEvent;
-        SendStampBuffer mBuff;
+        SSendStampBuffer mBuff;
         FILE* mFile;
         int gap;
 	};

@@ -4,7 +4,8 @@
 namespace moho
 {
     template<class T>
-    struct InstanceCounter {
+    struct InstanceCounter
+	{
         InstanceCounter() noexcept { ++s_count; }
         InstanceCounter(const InstanceCounter&) noexcept { ++s_count; }
         ~InstanceCounter() noexcept { --s_count; }

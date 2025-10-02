@@ -4,19 +4,19 @@ using namespace gpg;
 /**
  * Ensure intrusive list sentinel is initialized self-linked.
  */
-static void init_sentinel(DList<PipeStream::Buffer>& list) noexcept {
+static void init_sentinel(DList<PipeStreamBuffer>& list) noexcept {
     list.mNext = &list;
     list.mPrev = &list;
 }
 
 static bool is_sentinel(
-    const DListItem<PipeStream::Buffer>* n,
-    const DList<PipeStream::Buffer>* s) noexcept
+    const DListItem<PipeStreamBuffer>* n,
+    const DList<PipeStreamBuffer>* s) noexcept
 {
     return reinterpret_cast<const void*>(n) == reinterpret_cast<const void*>(s);
 }
 
-static void link_before(DList<PipeStream::Buffer>& where, PipeStream::Buffer* node) noexcept {
+static void link_before(DList<PipeStreamBuffer>& where, PipeStreamBuffer* node) noexcept {
     // Insert node before 'where' (i.e., at tail if where==sentinel)
     node->mPrev = where.mPrev;
     node->mNext = &where;
@@ -24,7 +24,7 @@ static void link_before(DList<PipeStream::Buffer>& where, PipeStream::Buffer* no
     where.mPrev = node;
 }
 
-static void unlink_and_isolate(PipeStream::Buffer* node) noexcept {
+static void unlink_and_isolate(PipeStreamBuffer* node) noexcept {
     node->mPrev->mNext = node->mNext;
     node->mNext->mPrev = node->mPrev;
     node->mPrev = node;
@@ -32,7 +32,7 @@ static void unlink_and_isolate(PipeStream::Buffer* node) noexcept {
 }
 
 void PipeStream::allocateTailBuffer() {
-	const auto b = new Buffer(); // DListItem ctor should self-link
+	const auto b = new PipeStreamBuffer(); // DListItem ctor should self-link
     link_before(mBuff, b);    // push_back
     // Update write window to this fresh buffer
     mWriteHead = b->begin();
@@ -44,17 +44,17 @@ void PipeStream::allocateTailBuffer() {
     }
 }
 
-PipeStream::Buffer* PipeStream::tailNode() noexcept {
+PipeStreamBuffer* PipeStream::tailNode() noexcept {
     return is_sentinel(mBuff.mPrev, &mBuff) ? nullptr
-        : static_cast<Buffer*>(mBuff.mPrev);
+        : static_cast<PipeStreamBuffer*>(mBuff.mPrev);
 }
 
-PipeStream::Buffer* PipeStream::headNode() noexcept {
+PipeStreamBuffer* PipeStream::headNode() noexcept {
     return is_sentinel(mBuff.mNext, &mBuff) ? nullptr
-        : static_cast<Buffer*>(mBuff.mNext);
+        : static_cast<PipeStreamBuffer*>(mBuff.mNext);
 }
 
-void PipeStream::resetStateWithOneBuffer(Buffer* buf) {
+void PipeStream::resetStateWithOneBuffer(PipeStreamBuffer* buf) {
     // Set both read and write windows to this single buffer.
     mReadHead = buf->begin();
     mReadStart = buf->begin();
@@ -83,7 +83,7 @@ PipeStream::~PipeStream()
     while (!is_sentinel(n, &mBuff)) {
         // save next before unlink
         auto* next = n->mNext;                    
-        auto* buf = static_cast<Buffer*>(n);
+        auto* buf = static_cast<PipeStreamBuffer*>(n);
         // detach from list
         unlink_and_isolate(buf);
         // free 4KB block
@@ -129,7 +129,7 @@ void PipeStream::VirtWrite(const char* data, size_t size)
 
     while (size > 0) {
         // Ensure there is a tail buffer to write into
-        const Buffer* tail = tailNode();
+        const PipeStreamBuffer* tail = tailNode();
         if (!tail) {
             allocateTailBuffer();
             tail = tailNode();
@@ -212,7 +212,7 @@ size_t PipeStream::GetLength()
 
     // Middle full buffers
     for (const auto* n = mBuff.mNext->mNext; n != mBuff.mPrev; n = n->mNext) {
-        total += Buffer::kSize;
+        total += PipeStreamBuffer::kSize;
     }
 
     // Tail partial up to writeStart
@@ -248,7 +248,7 @@ size_t PipeStream::DoRead(char* dst, const size_t len, const bool doWait)
             mReadEnd = mWriteStart;
         } else {
             // Multi-buffer: head reads up to its end
-            auto* head = static_cast<Buffer*>(mBuff.mNext);
+            auto* head = static_cast<PipeStreamBuffer*>(mBuff.mNext);
             if (mReadHead < head->begin() || mReadHead > head->end()) {
                 mReadHead = head->begin();
                 mReadStart = head->begin();
@@ -279,8 +279,8 @@ size_t PipeStream::DoRead(char* dst, const size_t len, const bool doWait)
             }
 
             // Advance to next buffer
-            auto* head = static_cast<Buffer*>(mBuff.mNext);
-            auto* next = static_cast<Buffer*>(head->mNext);
+            auto* head = static_cast<PipeStreamBuffer*>(mBuff.mNext);
+            auto* next = static_cast<PipeStreamBuffer*>(head->mNext);
 
             // Unlink and destroy current head
             unlink_and_isolate(head);
@@ -289,7 +289,7 @@ size_t PipeStream::DoRead(char* dst, const size_t len, const bool doWait)
             // Setup new read window at 'next'
             mReadHead = next->begin();
             mReadStart = next->begin();
-            if (next == static_cast<Buffer*>(mBuff.mPrev)) {
+            if (next == static_cast<PipeStreamBuffer*>(mBuff.mPrev)) {
 	            // Next is also tail: clamp by published boundary
 	            mReadEnd = mWriteStart;
             } else {
