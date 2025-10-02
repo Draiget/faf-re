@@ -5,23 +5,27 @@
 
 #include "CMessageStream.h"
 #include "gpg/core/containers/ByteSpan.h"
-#include "gpg/core/containers/Set.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "legacy/containers/Vector.h"
 
 namespace moho
 {
-    /**
+	class LaunchInfoBase;
+	struct BVIntSet;
+
+	/**
      * VFTABLE: 0x00E16ABC
      * COL:  0x00E6AFC0
      */
-    class IClient {
+    class IClient
+	{
     public:
         /**
          * Address: 0x00A82547
          * Slot: 0
          * Demangled: _purecall
          */
-        virtual Set* GetValidCommandSources() = 0;
+        virtual BVIntSet* GetValidCommandSources() = 0;
 
         /**
          * True if no ejection is pending.
@@ -57,7 +61,7 @@ namespace moho
          * Slot: 4
          * Demangled: _purecall
          */
-        virtual const void* GetLatestAcksVector() = 0;
+        virtual const msvc8::vector<int32_t>* GetLatestAcksVector() = 0;
 
         /**
          * Output the latest beat dispatched to remote peer.
@@ -84,7 +88,7 @@ namespace moho
          * Slot: 7
          * Demangled: _purecall
          */
-        virtual void Process(CMessage& msg, int a, int b) = 0;
+        virtual void Process(CMessage& msg) = 0;
 
         /**
          * Build a message from raw span and forward to Process(...).
@@ -93,7 +97,7 @@ namespace moho
          * Slot: 8
          * Demangled: _purecall
          */
-        virtual void DispatchRawBuffer(const gpg::ByteSpan& span) = 0;
+        virtual void ReceiveChat(gpg::MemBuffer<const char> data) = 0;
 
         /**
          * Output queued beat number.
@@ -129,6 +133,17 @@ namespace moho
          * Slot: 12
          * Demangled: _purecall
          */
-        virtual int GetClientNumeric() = 0;
+        virtual int GetSimRate() = 0;
+
+        /**
+         * Address: 0x0053B5E0
+         */
+        IClient(const char* name, int index, LaunchInfoBase* launchInfo);
+
+    protected:
+        msvc8::string mNickname;
+        int mIndex;
+        LaunchInfoBase* mLaunchInfo;
     };
+    static_assert(sizeof(IClient) == 0x28, "IClient size must be 0x28");
 }

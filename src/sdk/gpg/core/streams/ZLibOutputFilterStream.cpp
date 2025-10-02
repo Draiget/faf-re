@@ -49,8 +49,8 @@ void ZLibOutputFilterStream::VirtWrite(char const* data, const size_t size) {
         throw std::runtime_error{ std::string{"ZLibOutputFilterStream: stream closed."} };
     }
 
-    if (this->LeftToFlush()) {
-        this->DoWrite(this->mWriteStart, this->LeftToFlush(), Z_NO_FLUSH);
+    if (this->BytesRead()) {
+        this->DoWrite(this->mWriteStart, this->BytesRead(), Z_NO_FLUSH);
         this->mWriteHead = this->mWriteStart;
     }
 
@@ -62,13 +62,13 @@ void ZLibOutputFilterStream::VirtFlush() {
         throw std::runtime_error{ std::string{"ZLibOutputFilterStream: stream closed."} };
     }
 
-    this->DoWrite(this->mWriteStart, this->LeftToFlush(), Z_SYNC_FLUSH);
+    this->DoWrite(this->mWriteStart, this->BytesRead(), Z_SYNC_FLUSH);
     this->mWriteStart = this->mWriteHead;
 }
 
 void ZLibOutputFilterStream::VirtClose(const Mode mode) {
     if ((mode & ModeSend) && !mClosed) {
-        this->DoWrite(this->mWriteStart, this->LeftToFlush(), Z_FINISH);
+        this->DoWrite(this->mWriteStart, this->BytesRead(), Z_FINISH);
         if (this->mOperation == 0 && !this->mEnded) {
             this->mClosed = true;
             throw std::runtime_error{
@@ -81,7 +81,7 @@ void ZLibOutputFilterStream::VirtClose(const Mode mode) {
     }
 }
 
-ZLibOutputFilterStream::ZLibOutputFilterStream(PipeStream* str, const int operation) :
+ZLibOutputFilterStream::ZLibOutputFilterStream(PipeStream* str, const EFilterOperation operation) :
 	Stream(),
 	mPipeStream(str)
 {
@@ -94,11 +94,11 @@ ZLibOutputFilterStream::ZLibOutputFilterStream(PipeStream* str, const int operat
 
 	// inflateInit2_(&mZStream, -14, "1.2.3", 56);
 	// deflateInit2_(&mZStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -14, 8, 0, "1.2.3", 56);
-	if (operation == 0) {
+	if (operation == FLOP_Inflate) {
 		if (inflateInit2_(&mZStream, -14, "1.2.3", sizeof(z_stream)) != Z_OK) {
 			throw std::runtime_error{std::string{"ZLibOutputFilterStream: inflateInit2() failed."}};
 		}
-	} else if (operation == 1) {
+	} else if (operation == FLOP_Deflate) {
 		if (deflateInit2_(&mZStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -14, 8, 0, "1.2.3", sizeof(z_stream)) != Z_OK) {
 			throw std::runtime_error{std::string{"ZLibOutputFilterStream: deflateInit2() failed."}};
 		}

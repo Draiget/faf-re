@@ -13,24 +13,13 @@ size_t CMessageStream::VirtSeek(Mode mode, SeekOrigin orig, size_t pos) {
 	throw UnsupportedOperation();
 }
 
-size_t CMessageStream::VirtRead(char* buff, const size_t len) {
-    if (!buff || !mReadHead || !mReadEnd) {
-        return 0;
+size_t CMessageStream::VirtRead(char* buff, size_t len) {
+    if (len > CanRead()) {
+        len = CanRead();
     }
-
-    // Compute available bytes without crossing end
-    const size_t avail = static_cast<size_t>(mReadEnd - mReadHead);
-    const size_t toCopy = std::min(len, avail);
-
-    // Fast path: nothing to read
-    if (toCopy == 0) {
-        return 0;
-    }
-
-    // Copy and advance head
-    std::memcpy(buff, mReadHead, toCopy);
-    mReadHead += toCopy;
-    return toCopy;
+    memcpy(buff, mReadHead, len);
+    mReadHead += len;
+    return len;
 }
 
 size_t CMessageStream::VirtReadNonBlocking(char* buf, const size_t len) {
@@ -45,14 +34,16 @@ void CMessageStream::VirtUnGetByte(int i) {
 }
 
 bool CMessageStream::VirtAtEnd() {
-    return mReadHead == mReadEnd;
+    return !CanRead();
 }
 
 void CMessageStream::VirtWrite(const char* data, const size_t size) {
     if (!mWriteStart) {
         throw std::logic_error("Can't write to a read-only message.");
     }
-    if (!data || size == 0) return;
+    if (!data || size == 0) {
+	    return;
+    }
 
     // In-place write within current window
     const size_t windowLeft = static_cast<size_t>(mWriteEnd - mWriteHead);
@@ -64,7 +55,9 @@ void CMessageStream::VirtWrite(const char* data, const size_t size) {
 
     // Overflow => append + rebind
     const size_t overflow = size - inPlace;
-    if (overflow == 0) return;
+    if (overflow == 0) {
+	    return;
+    }
 
     // preserve offsets
     const size_t readOff = static_cast<size_t>(mReadHead - mReadStart);
@@ -76,6 +69,40 @@ void CMessageStream::VirtWrite(const char* data, const size_t size) {
 
     // Rebind to the (possibly) new buffer; write head gets +overflow
     RebindToMessagePreserve(readOff, writeOff + overflow);
+}
+
+CMessageStream::CMessageStream(CMessage& msg, const Access access) :
+	Stream(),
+	msg_(&msg)
+{
+    auto [start, end] = PayloadWindow(*msg_);
+
+    mReadStart = start;
+    mReadHead = start;
+    mReadEnd = end;
+
+    if (access == Access::kReadWrite) {
+        mWriteStart = start;
+        mWriteHead = start;
+        mWriteEnd = end;
+    }
+}
+
+CMessageStream::CMessageStream(CMessage* msg, const Access access) :
+	Stream(),
+	msg_(msg)
+{
+    auto [start, end] = PayloadWindow(*msg_);
+
+    mReadStart = start;
+    mReadHead = start;
+    mReadEnd = end;
+
+    if (access == Access::kReadWrite) {
+        mWriteStart = start;
+        mWriteHead = start;
+        mWriteEnd = end;
+    }
 }
 
 std::pair<char*, char*> CMessageStream::PayloadWindow(CMessage& m) noexcept {

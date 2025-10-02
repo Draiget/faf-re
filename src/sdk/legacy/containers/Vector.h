@@ -27,7 +27,11 @@ namespace msvc8
      * aren't used by anything really and just sitting alone there.
      */
     template <class T>
-    class vector {
+    class vector
+	{
+        using iterator = T*;
+        using const_iterator = const T*;
+
         void* myProxy_; // +0x0  (opaque _Container_proxy*)
         T* first_;      // +0x4
         T* last_;       // +0x8
@@ -288,6 +292,55 @@ namespace msvc8
             assign(src);
         }
 
+        /**
+         * Erase one element at position `pos`.
+         * Shifts the tail left by 1, destroys the last duplicated slot,
+         * and returns iterator to the position of erased element.
+         */
+        iterator erase(iterator pos) {
+            assert(pos >= first_ && pos < last_);
+            iterator next = pos + 1;
+            const std::size_t tail = static_cast<std::size_t>(last_ - next);
+            if (tail) {
+                if constexpr (std::is_trivially_copyable_v<T>) {
+                    std::memmove(pos, next, tail * sizeof(T));
+                } else {
+                    for (std::size_t i = 0; i < tail; ++i)
+                        pos[i] = std::move(next[i]);
+                }
+            }
+            --last_;
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                last_->~T();
+            }
+            return pos;
+        }
+
+        /**
+         * Erase a range [first,last). Returns iterator to the position that
+         * now contains the element that followed the last erased element.
+         */
+        iterator erase(iterator first, iterator last) {
+            assert(first_ <= first && first <= last && last <= last_);
+            const std::size_t count = static_cast<std::size_t>(last - first);
+            if (count == 0) return first;
+
+            const std::size_t tail = static_cast<std::size_t>(last_ - last);
+            if (tail) {
+                if constexpr (std::is_trivially_copyable_v<T>) {
+                    std::memmove(first, last, tail * sizeof(T));
+                } else {
+                    for (std::size_t i = 0; i < tail; ++i)
+                        first[i] = std::move(last[i]);
+                }
+            }
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                destroy_range(last_ - count, last_);
+            }
+            last_ -= count;
+            return first;
+        }
+
     private:
         /**
          * Destroy [first,last)
@@ -466,6 +519,7 @@ namespace msvc8
             end_ = newFirst + newCap;
         }
     };
+    static_assert(sizeof(vector<int>) == 16, "msvc8::set must be 16 bytes on x86");
 
     /**
 	 * Small-vector with inline storage and heap fallback (non-owning SDK view).

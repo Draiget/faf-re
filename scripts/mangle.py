@@ -16,9 +16,9 @@ Supported features
 Limitations
 -----------
 - Encodes/decodes the **x86** scheme only
-- No function template mangling (demangling of templated types is supported)
+- Function template **demangling** of method containers is limited (best-effort TODO)
 - No arrays
-- No multi‑level ** / *& chains
+- No multi-level ** / *& chains
 """
 
 import re
@@ -83,17 +83,22 @@ CC_MEMBER_CODE = { "__thiscall":"E", "__cdecl":"A", "__stdcall":"G", "__fastcall
 CC_MEMBER_NAME = { v:k for k,v in CC_MEMBER_CODE.items() }
 
 # ---- signature parsers ----
+# Allow template components in qualified names: Ns::C<T,U>::Method
+_TPL_PART = r"[A-Za-z_]\w*(?:<[^<>(){}\[\]]*(?:<[^<>(){}\[\]]*>[^<>(){}\[\]]*)*>?)?"
+_QUAL_NAME = rf"(?:{_TPL_PART}(?:::)*)+{_TPL_PART}"
+
 SIG_RE = re.compile(
     r"""^\s*
         (?:(?P<virtual>virtual)\s+|(?P<static>static)\s+)?     # optional
         (?P<ret>[^()\s][^()]*?)\s+                             # return type
         (?:(?P<cc>__cdecl|__stdcall|__fastcall)\s+)?           # optional CC
-        (?P<name>(?:[A-Za-z_]\w*(?:::)*)+[A-Za-z_]\w*)\s*      # ns::Class::func
+        (?P<name>""" + _QUAL_NAME + r""")\s*                   # ns::Class or ns::Class<T...>::func
         \(\s*(?P<params>.*)\s*\)\s*
         (?P<cv>const(?:\s+volatile)?|volatile(?:\s+const)?)?   # trailing const
         \s*;?\s*$
     """, re.VERBOSE,
 )
+
 CTOR_RE = re.compile(
     r"""^\s*
         (?:(?P<virtual>virtual)\s+)?                           # (ignored for ctor)
@@ -114,6 +119,7 @@ DTOR_RE = re.compile(
 def split_params(s: str) -> List[str]:
     """
     Split a raw parameter list string into individual parameter type tokens.
+    Supports '...' (C/C++ varargs) as a standalone token.
     - Handles nested templates and parenthesis to avoid splitting inside them.
     - Removes parameter names and default values.
     - Leaves pointer-to-function parameters as-is (unsupported for encoding).
@@ -138,14 +144,70 @@ def split_params(s: str) -> List[str]:
         it = re.sub(r"=\s*[^,]+$", "", it).strip()
         if re.search(r"\(\s*\*\s*.*\)\s*\(", it):  # ptr-to-func — not supported
             cleaned.append(it); continue
+        if it == "...":  # keep ellipsis as-is; handled in arglist encoder
+            cleaned.append(it); continue
+        # 1) common case: "... type name"
         m = re.search(r"^(.*\S)\s+([_A-Za-z]\w*)\s*$", it)
-        cleaned.append(m.group(1) if m else it)
+        if m:
+            cleaned.append(m.group(1).strip())
+            continue
+        # 2) sticky names like "Type*name" / "Type&name" / "Type*&name"
+        m2 = re.search(r"^(.*[\*\&])\s*([_A-Za-z]\w*)\s*$", it)
+        if m2:
+            cleaned.append(m2.group(1).strip())
+            continue
+        cleaned.append(it)
     return cleaned
 
 def encode_scoped(name: str) -> str:
     """Encode a C++ scoped name `A::B::C` into MSVC `C@B@A@@` form."""
     parts = [p for p in name.split("::") if p]
     return parts[-1] + ("@" + "@".join(parts[-2::-1]) if len(parts)>1 else "") + "@@"
+
+# --- templates in scope encoding (A::B<T,U>::C) ---
+def _split_tpl_args(s: str) -> List[str]:
+    """Split template argument list 'T, U<V>' into ['T', 'U<V>'] (handles nesting)."""
+    args, cur, depth = [], [], 0
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == '<':
+            depth += 1
+        elif ch == '>':
+            depth = max(0, depth - 1)
+        elif ch == ',' and depth == 0:
+            args.append("".join(cur).strip()); cur=[]
+            i += 1; continue
+        cur.append(ch)
+        i += 1
+    if cur: args.append("".join(cur).strip())
+    return args
+
+def encode_scoped_tpl(name: str) -> str:
+    """
+    Encode scope with possible template components.
+    Examples:
+      'Moho::X'                  -> 'X@Moho@@'
+      'Moho::FastVectorN<T>'     -> '?$FastVectorN@VT@@@Moho@@'
+      'Ns::V<A*, const B&>::M'   -> '?$V@PAT@@ABVNs::B@@@Ns@@'
+    """
+    parts = [p for p in name.split("::") if p]
+    enc_parts: List[str] = []
+    for p in parts[::-1]:  # inner->outer in MSVC
+        if '<' not in p:
+            enc_parts.append(p + "@")
+            continue
+        # templated
+        base, _, rest = p.partition("<")
+        args_txt = rest.rsplit(">", 1)[0]
+        args = _split_tpl_args(args_txt)
+        arg_codes = ""
+        for a in args:
+            a = a.strip()
+            # allow bare dependent names like 'T'
+            arg_codes += encode_type(a)
+        enc_parts.append("?$" + base + "@" + arg_codes + "@")
+    return "".join(enc_parts) + "@@"
 
 def normalize_base_type(t: str) -> str:
     """Remove top-level `const`/`volatile`, collapse whitespace, and apply aliases."""
@@ -223,14 +285,24 @@ def encode_arglist(params: List[str]) -> str:
     Rules:
     - "X" if there are no parameters (i.e., `void`).
     - Otherwise, concatenate encoded types and terminate with '@'.
+    - If the parameter list is variadic (contains '...'), terminate with 'Z'
+      instead of '@'. This matches MSVC/Clang Microsoft ABI:
+      empty fixed part + 'Z' encodes e.g. `f(...)`.
     - Repeated types may be encoded as digits "0".."9" that refer to the N‑th
       unique parameter type encountered in this parameter list (0 = first unique type).
     """
-    if not params:
+    # Detect and strip '...' marker
+    is_variadic = any(p.strip() == "..." for p in params)
+    fixed = [p for p in params if p.strip() != "..."]
+
+    # No parameters and not variadic => 'X'
+    if not fixed and not is_variadic:
         return "X"
+    
+    # Encode fixed part
     table: List[str] = []
     out: List[str] = []
-    for p in params:
+    for p in fixed:
         enc = encode_type(p)
         try:
             idx = table.index(enc)
@@ -242,7 +314,8 @@ def encode_arglist(params: List[str]) -> str:
             out.append(enc)
             if len(table) < 10:
                 table.append(enc)
-    return "".join(out) + "@"
+    # Terminator: '@' for non-variadic, 'Z' for variadic ('...' present)
+    return "".join(out) + ("Z" if is_variadic else "@")
 
 # ---- helpers: "is this a member function?" heuristics ----
 def looks_like_class(tok: str) -> bool:
@@ -506,14 +579,18 @@ def demangle(deco: str) -> str:
         prefix = deco[i:i+3]; i += 3
         if i < len(deco) and deco[i] == '@': i += 1
         # args
+        args=[]; is_var=False
         if i < len(deco) and deco[i] == 'X':
             i += 1
-            args=[]
         else:
-            args=[]
-            while i < len(deco) and deco[i] != '@':
+            while i < len(deco) and deco[i] not in "@Z":
                 t, i = decode_type(deco, i); args.append(t)
-            if i < len(deco) and deco[i] == '@': i += 1
+            if i < len(deco):
+                if deco[i] == 'Z':
+                    is_var = True
+                i += 1
+        if is_var:
+            args.append("...")
         cc = CC_MEMBER_NAME.get(prefix[2], None)
         cc_str = f"{cc} " if (cc and prefix[2] != 'E') else ""
         return f"{cc_str}{cls}::{cls.split('::')[-1]}(" + (", ".join(args) if args else "") + ")"
@@ -555,13 +632,18 @@ def demangle(deco: str) -> str:
         is_const = (prefix[1] == 'B')
         i = 0
         ret, i = decode_type(rest, 0)
+        args=[]; is_var=False
         if i < len(rest) and rest[i] == 'X':
-            args=[]; i+=1
+            i += 1
         else:
-            args=[]
-            while i < len(rest) and rest[i] != '@':
+            while i < len(rest) and rest[i] not in "@Z":
                 t, i = decode_type(rest, i); args.append(t)
-            if i < len(rest) and rest[i] == '@': i+=1
+            if i < len(rest):
+                if rest[i] == 'Z':
+                    is_var = True
+                i += 1
+        if is_var:
+            args.append("...")
         cc = CC_MEMBER_NAME.get(prefix[2], None)
         cc_str = f"{cc} " if (cc and prefix[2] != 'E') else ""
         sig = f"{ret} {cc_str}{cls}::{meth}(" + (", ".join(args) if args else "") + ")"
@@ -578,13 +660,18 @@ def demangle(deco: str) -> str:
         ns = "::".join(reversed(scope_raw.split('@')[:-1]))
         i = 0
         ret, i = decode_type(rest, 0)
+        args=[]; is_var=False
         if i < len(rest) and rest[i] == 'X':
-            args=[]; i+=1
+            i += 1
         else:
-            args=[]
-            while i < len(rest) and rest[i] != '@':
+            while i < len(rest) and rest[i] not in "@Z":
                 t, i = decode_type(rest, i); args.append(t)
-            if i < len(rest) and rest[i] == '@': i+=1
+            if i < len(rest):
+                if rest[i] == 'Z':
+                    is_var = True
+                i += 1
+        if is_var:
+            args.append("...")
         cc_txt = CC_FREE_NAME.get(call, None)
         cc_str = (cc_txt + " ") if (cc_txt and call != 'A') else ""
         scope = (ns + "::") if ns else ""
@@ -666,7 +753,8 @@ def mangle_regular(m: re.Match) -> str:
     is_member, container, meth = detect_member(full_name)
 
     if is_member:
-        scope = encode_scoped(container)
+        # Handle templates in the container scope
+        scope = encode_scoped_tpl(container) if ('<' in container and '>' in container) else encode_scoped(container)
         if is_static:
             cv_m = "B" if is_const_method else "A"
             call = CC_FREE_CODE.get(cc or "__cdecl", "A")

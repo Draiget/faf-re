@@ -1,6 +1,6 @@
 #pragma once
 
-#include "General.h"
+#include "Common.h"
 #include "platform/Platform.h"
 
 namespace moho
@@ -108,6 +108,6 @@ namespace moho
          * Slot: 12
          * Demangled: _purecall
          */
-        virtual SendStampView SnapshotSendStamps(uint64_t since) = 0;
+        virtual SSendStampView SnapshotSendStamps(uint64_t since) = 0;
 	};
 }

@@ -197,5 +197,4 @@ namespace boost
         pthread_mutex_t  mtx_{};
 #endif
     };
-
 } // namespace boost

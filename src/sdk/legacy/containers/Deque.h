@@ -1,107 +1,34 @@
 #pragma once
 #include <cstddef>
-#include <stdexcept>
+#include <cstdint>
 #include <new>
+#include <stdexcept>
+#include <cassert>
+
+#ifndef MSVC8_DEQUE_DISABLE_FREE
+#define MSVC8_DEQUE_DISABLE_FREE 0
+#endif
 
 namespace msvc8
 {
-
     /**
-     * Deque compatible layout for MSVC8-era Dinkumware on x86.
-     * - First member is a debug proxy pointer (as with vector) to match _SECURE_SCL.
-     * - Memory organization follows SGI-style: a map of node pointers, each node is a fixed-size block.
-     * - Start/Finish are full iterators with (cur, first, last, node).
+     * MSVC8-compatible deque (x86) with strict 0x14-bytes layout:
+     *   +0x00: void*   _Myproxy
+     *   +0x04: T**     _Map
+     *   +0x08: size_t  _Mapsize      (number of map slots)
+     *   +0x0C: size_t  _Myoff        (offset of begin in elements, modulo capacity)
+     *   +0x10: size_t  _Mysize       (current size in elements)
      *
-     * Layout (x86):
-     *   +0x00: void*      _Myproxy
-     *   +0x04: T**        _Map
-     *   +0x08: size_t     _Mapsize
-     *   +0x0C: iterator   _Start   (4*4 = 16 bytes)
-     *   +0x1C: iterator   _Finish  (16 bytes)
-     * Total: 0x2C (44 bytes), not accounting for padding rules (none needed on x86).
-     *
-     * NOTE: This is a clean-room reconstruction for RE, not the original header.
+     * Nodes are fixed-size blocks; the map is a circular array of pointers to nodes.
+     * Iterators are synthesized from (_Myoff, _Mysize).
      */
     template<class T, class Alloc = std::allocator<T>>
-    class deque {
+    class deque
+    {
         static_assert(sizeof(void*) == 4, "This layout targets 32-bit x86.");
+        static_assert(sizeof(std::size_t) == 4, "This layout targets 32-bit x86.");
 
     public:
-        /** Iterator over segmented storage: keeps current element and node frame. */
-        struct iterator {
-            T* cur;   // current element within the node
-            T* first; // first element address of the node
-            T* last;  // one-past-last element address of the node
-            T** node;  // pointer into the map pointing to this node
-
-            /** Default constructs a singular iterator. */
-            iterator() : cur(nullptr), first(nullptr), last(nullptr), node(nullptr) {}
-
-            /** Difference (random access): counts elements across nodes. */
-            std::ptrdiff_t operator-(const iterator& rhs) const {
-                // Both singular? define as 0.
-                if (node == nullptr && rhs.node == nullptr) return 0;
-                // Fast path: same node.
-                if (node == rhs.node) return cur - rhs.cur;
-
-                // Cross-node computation.
-                std::ptrdiff_t diff = 0;
-                const T** n = rhs.node;
-                if (n == nullptr) return 0;
-
-                // accumulate from rhs to end of its node
-                diff += rhs.last - rhs.cur;
-
-                // full nodes between rhs.node+1 .. node-1
-                for (const T** it = rhs.node + 1; it < node; ++it) {
-                    const T* f = *it;
-                    const T* l = f + (rhs.last - rhs.first); // same block size everywhere
-                    diff += (l - f);
-                }
-
-                // and from start of this node to cur
-                diff += (cur - first);
-
-                return diff;
-            }
-
-            /** Increment to next element (spill to next node when needed). */
-            iterator& operator++() {
-                ++cur;
-                if (cur == last) {
-                    // move to next node
-                    ++node;
-                    first = *node;
-                    // block size is preserved across nodes
-                    last = first + (last - first);
-                    cur = first;
-                }
-                return *this;
-            }
-            iterator operator++(int) { iterator tmp = *this; ++(*this); return tmp; }
-
-            /** Decrement to previous element (spill to previous node when needed). */
-            iterator& operator--() {
-                if (cur == first) {
-                    // move to prev node
-                    --node;
-                    first = *node;
-                    last = first + (last - first);
-                    cur = last - 1;
-                } else {
-                    --cur;
-                }
-                return *this;
-            }
-            iterator operator--(int) { iterator tmp = *this; --(*this); return tmp; }
-
-            T& operator*()  const { return *cur; }
-            T* operator->() const { return  cur; }
-
-            bool operator==(const iterator& rhs) const { return cur == rhs.cur && node == rhs.node; }
-            bool operator!=(const iterator& rhs) const { return !(*this == rhs); }
-        };
-
         using value_type = T;
         using allocator_type = Alloc;
         using size_type = std::size_t;
@@ -109,217 +36,237 @@ namespace msvc8
         using reference = T&;
         using const_reference = const T&;
 
-        /** Number of elements stored per node (Dinkumware used 512-byte chunks). */
+        /** Elements-per-node follows classic 512-byte chunks. */
         static constexpr size_type kBlockBytes = 512;
-        static constexpr size_type block_size_for(size_type elem_size) {
-            return elem_size ? (kBlockBytes / elem_size > 0 ? kBlockBytes / elem_size : 1u) : 1u;
-        }
+        static constexpr size_type kBlockSize = (sizeof(T) < kBlockBytes ? (kBlockBytes / (sizeof(T) ? sizeof(T) : 1)) : 1);
 
-        /** Constructor: empty deque with initial map of few nodes. */
+        /** Minimal initial map slots (power-of-two not required). */
+        static constexpr size_type kInitMapSlots = 8;
+
+        /** Random-access iterator synthesized from container + logical offset. */
+        struct iterator
+        {
+            deque* cont{};
+            size_type off{}; // offset from begin(), in elements
+
+            iterator() = default;
+            iterator(deque* c, size_type o) : cont(c), off(o) {}
+
+            reference operator*() const { return *cont->ptr_at(off); }
+            T* operator->() const { return  cont->ptr_at(off); }
+
+            iterator& operator++() { ++off; return *this; }
+            iterator  operator++(int) { iterator t = *this; ++(*this); return t; }
+            iterator& operator--() { --off; return *this; }
+            iterator  operator--(int) { iterator t = *this; --(*this); return t; }
+
+            iterator& operator+=(difference_type n) { off = static_cast<size_type>(off + n); return *this; }
+            iterator& operator-=(difference_type n) { off = static_cast<size_type>(off - n); return *this; }
+
+            friend iterator operator+(iterator it, difference_type n) { it += n; return it; }
+            friend iterator operator+(difference_type n, iterator it) { it += n; return it; }
+            friend iterator operator-(iterator it, difference_type n) { it -= n; return it; }
+            friend difference_type operator-(const iterator& a, const iterator& b)
+            {
+                assert(a.cont == b.cont);
+                return static_cast<difference_type>(a.off) - static_cast<difference_type>(b.off);
+            }
+
+            friend bool operator==(const iterator& a, const iterator& b) { return a.cont == b.cont && a.off == b.off; }
+            friend bool operator!=(const iterator& a, const iterator& b) { return !(a == b); }
+            friend bool operator<(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off < b.off; }
+            friend bool operator<=(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off <= b.off; }
+            friend bool operator>(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off > b.off; }
+            friend bool operator>=(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off >= b.off; }
+        };
+
+        // ---- Ctors / Dtor ----
         deque()
-            : _Myproxy(nullptr),
-            _Map(nullptr),
-            _Mapsize(0)
+            : _Myproxy(nullptr), _Map(nullptr), _Mapsize(0), _Myoff(0), _Mysize(0)
         {
             init_empty();
         }
 
-        /** Destructor: destroys elements and releases nodes and map. */
-        ~deque() {
+        ~deque()
+        {
             clear();
-            release_all_nodes_and_map();
+#if !MSVC8_DEQUE_DISABLE_FREE
+            release_all();
+#endif
         }
 
-        /** Disable copying for safety in this RE scaffold; add if you need it. */
         deque(const deque&) = delete;
         deque& operator=(const deque&) = delete;
 
-        /** Returns the number of elements. */
-        size_type size() const {
-            return static_cast<size_type>(_Finish - _Start);
-        }
+        // ---- Capacity / state ----
+        size_type size()     const noexcept { return _Mysize; }
+        bool      empty()    const noexcept { return _Mysize == 0; }
+        size_type capacity() const noexcept { return _Mapsize * kBlockSize; }
 
-        /** True if no elements are stored. */
-        bool empty() const { return _Start.cur == _Finish.cur && _Start.node == _Finish.node; }
+        // ---- Element access ----
+        reference       operator[](size_type n) { return *ptr_at(n); }
+        const_reference operator[](size_type n) const { return *ptr_at(n); }
 
-        /** Random access by index (unchecked). */
-        reference operator[](size_type n) {
-            return *index_to_iterator(n).cur;
-        }
-        const_reference operator[](size_type n) const {
-            return *index_to_iterator(n).cur;
-        }
-
-        /** Random access by index (checked). */
-        reference at(size_type n) {
-            if (n >= size()) throw std::out_of_range("deque::at");
+        reference at(size_type n)
+        {
+            if (n >= _Mysize) throw std::out_of_range("deque::at");
             return (*this)[n];
         }
-        const_reference at(size_type n) const {
-            if (n >= size()) throw std::out_of_range("deque::at");
+        const_reference at(size_type n) const
+        {
+            if (n >= _Mysize) throw std::out_of_range("deque::at");
             return (*this)[n];
         }
 
-        /** Front/Back access. */
-        reference front() { return *(_Start.cur); }
-        const_reference front() const { return *(_Start.cur); }
-        reference back() { iterator it = _Finish; --it; return *it.cur; }
-        const_reference back() const { iterator it = _Finish; --it; return *it.cur; }
+        reference       front() { assert(!empty()); return *ptr_at(0); }
+        const_reference front() const { assert(!empty()); return *ptr_at(0); }
 
-        /** Begin/End iterators (non-const for brevity). */
-        iterator begin() { return _Start; }
-        iterator end() { return _Finish; }
+        reference       back() { assert(!empty()); return *ptr_at(_Mysize - 1); }
+        const_reference back()  const { assert(!empty()); return *ptr_at(_Mysize - 1); }
 
-        /**
-         * Pushes an element at the end.
-         * Uses in-place new on current node; spills to a new node if needed.
-         */
-        void push_back(const T& v) {
-            if (_Finish.cur != _Finish.last) {
-                new (static_cast<void*>(_Finish.cur)) T(v);
-                ++_Finish;
-            } else {
-                push_back_aux(v);
+        // ---- Iterators ----
+        iterator begin() { return iterator{ this, 0 }; }
+        iterator end() { return iterator{ this, _Mysize }; }
+
+        // ---- Modifiers (minimal set) ----
+        void clear()
+        {
+            // Destroy all elements in logical order
+            for (size_type i = 0; i < _Mysize; ++i)
+            {
+                ptr_at(i)->~T();
             }
+            _Mysize = 0;
+            // Keep nodes and map for capacity, as Dinkumware typically did
         }
 
-        /** Pushes an element at the front. */
-        void push_front(const T& v) {
-            if (_Start.cur != _Start.first) {
-                --_Start;
-                new (static_cast<void*>(_Start.cur)) T(v);
-            } else {
-                push_front_aux(v);
-            }
+        void push_back(const T& v)
+        {
+            grow_if_full(1);
+            ensure_node_for_write(_Mysize); // element at logical index = size()
+            T* p = ptr_at(_Mysize);
+            ::new (static_cast<void*>(p)) T(v);
+            ++_Mysize;
         }
 
-        /**
-         * Pops the last element (calls destructor).
-         * Assumes non-empty.
-         */
-        void pop_back() {
-            iterator it = _Finish;
-            --it;
-            it.cur->~T();
-            _Finish = it;
-            if (_Finish.cur == _Finish.first) {
-                // last element in node removed; if more nodes present, move finish to previous node end
-                if (_Finish.node > _Start.node) {
-                    // release the currently unused tail node (optional)
-                    // keep nodes to avoid churn, as Dinkumware often did
-                }
-            }
+        void push_front(const T& v)
+        {
+            grow_if_full(1);
+            // Move begin one step left in the circular space
+            if (_Myoff == 0)
+                _Myoff = capacity();
+            --_Myoff; // now begin() shifts left by one element
+
+            ensure_node_for_write(0);
+            T* p = ptr_at(0);
+            ::new (static_cast<void*>(p)) T(v);
+            ++_Mysize;
         }
 
-        /** Pops the first element. Assumes non-empty. */
-        void pop_front() {
-            _Start.cur->~T();
-            ++_Start;
-            if (_Start.cur == _Start.last) {
-                // node became empty; move to next node
-                // (we keep nodes allocated to minimize reallocations)
-            }
+        void pop_back()
+        {
+            assert(!empty());
+            T* p = ptr_at(_Mysize - 1);
+            p->~T();
+            --_Mysize;
         }
 
-        /**
-         * Destroys all elements. Keeps allocated nodes and map around.
-         * This mirrors the common Dinkumware approach to retain capacity.
-         */
-        void clear() {
-            // Destroy elements across nodes
-            for (iterator it = _Start; it != _Finish; ++it) {
-                it.cur->~T();
-            }
-            _Finish = _Start;
+        void pop_front()
+        {
+            assert(!empty());
+            T* p = ptr_at(0);
+            p->~T();
+            ++_Myoff;
+            if (_Myoff == capacity())
+                _Myoff = 0;
+            --_Mysize;
         }
 
-        /** Returns the allocator (trivial pass-through here). */
         allocator_type get_allocator() const { return allocator_type(); }
 
-        // ---- Debug proxy API (no-op placeholder) ----
+        // Debug-proxy passthrough (opaque)
         void* get_debug_proxy() const { return _Myproxy; }
         void  set_debug_proxy(void* p) { _Myproxy = p; }
 
     private:
-        // --- Internal types and constants ---
-        static constexpr size_type kBlockSize = block_size_for(sizeof(T));
-        static constexpr size_type kInitMapNodes = 8; // room to grow both ends without re-map
+        // ---- Exact layout (keep order!) ----
+        void* _Myproxy;   // +0x00
+        T** _Map;       // +0x04
+        size_type _Mapsize;   // +0x08
+        size_type _Myoff;     // +0x0C
+        size_type _Mysize;    // +0x10
 
-        // --- Members (keep exact order for layout!) ---
-        void* _Myproxy;   // +0x00 : _SECURE_SCL proxy
-        T** _Map;       // +0x04 : array of node pointers
-        size_type _Mapsize;  // +0x08 : number of T* slots in _Map
-        iterator _Start;     // +0x0C
-        iterator _Finish;    // +0x1C
-
-        // If your binary shows a stored size, enable and position it carefully:
-        // #if MOHO_MSVC8_DEQUE_HAS_MYSIZE
-        // size_type _Mysize; // must be placed where your binary expects it
-        // #endif
-
-        /** Initialize an empty deque with a fresh map and a single centered node. */
-        void init_empty() {
-            allocate_map(kInitMapNodes);
-            // center start/finish on the middle node, empty range
-            const size_type center = _Mapsize / 2;
-            ensure_node(center);
-            T* first = _Map[center];
-            _Start = make_iter(first, center, 0);
-            _Finish = _Start;
+        // ---- Helpers ----
+        void init_empty()
+        {
+            allocate_map(kInitMapSlots);
+            // Center begin offset to allow both-end growth without remap
+            _Myoff = (_Mapsize / 2) * kBlockSize;
+            _Mysize = 0;
         }
 
-        /** Convert logical index to iterator (unchecked). */
-        iterator index_to_iterator(size_type n) const {
-            iterator it = _Start;
-            // Advance across nodes by full blocks
-            size_type offset = n;
-            while (offset) {
-                size_type block_rem = static_cast<size_type>(it.last - it.cur);
-                if (offset < block_rem) {
-                    it.cur += static_cast<std::ptrdiff_t>(offset);
-                    return it;
-                }
-                // jump to next node
-                offset -= block_rem;
-                ++it;
-            }
-            return it;
-        }
-
-        /** Allocates the map (array of T*), uninitialized nodes. */
-        void allocate_map(size_type map_nodes) {
-            // align to at least 2
-            if (map_nodes < 2) map_nodes = 2;
-            _Mapsize = map_nodes;
-            _Map = static_cast<T**>(::operator new(sizeof(T*) * _Mapsize));
-            // zero-init entries
+        void allocate_map(size_type slots)
+        {
+            if (slots < 2) slots = 2;
+            _Map = static_cast<T**>(::operator new(sizeof(T*) * slots));
+            _Mapsize = slots;
             for (size_type i = 0; i < _Mapsize; ++i) _Map[i] = nullptr;
         }
 
-        /** Ensures node at index exists (allocates block if needed). */
-        void ensure_node(size_type idx) {
-            if (_Map[idx] == nullptr) {
-                _Map[idx] = allocate_node();
-            }
+        static size_type node_index_from_global(size_type global, size_type mapsize) noexcept
+        {
+            const size_type node = (global / kBlockSize) % mapsize;
+            return node;
         }
 
-        /** Allocates a node (block of kBlockSize elements, raw storage). */
-        T* allocate_node() {
-            // raw uninitialized storage for T[kBlockSize]
-            T* mem = static_cast<T*>(::operator new(sizeof(T) * kBlockSize));
-            return mem;
+        static size_type in_node_index_from_global(size_type global) noexcept
+        {
+            return global % kBlockSize;
         }
 
-        /** Deallocates a node (no element dtors here!). */
-        void deallocate_node(T* p) {
+        // Returns a pointer to element for logical index n (0.._Mysize), assumes node exists for read.
+        T* ptr_at(size_type logical_index) const
+        {
+            const size_type global = _Myoff + logical_index;
+            const size_type node_idx = node_index_from_global(global, _Mapsize);
+            const size_type within = in_node_index_from_global(global);
+            T* base = _Map[node_idx];
+            assert(base != nullptr && "node must exist for ptr_at()");
+            return base + within;
+        }
+
+        // Ensures node for write at logical index exists (allocates node storage if needed).
+        void ensure_node_for_write(size_type logical_index)
+        {
+            const size_type global = _Myoff + logical_index;
+            const size_type node_idx = node_index_from_global(global, _Mapsize);
+            if (_Map[node_idx] == nullptr)
+                _Map[node_idx] = allocate_node();
+        }
+
+        T* allocate_node()
+        {
+            // Raw uninitialized storage for kBlockSize elements
+            return static_cast<T*>(::operator new(sizeof(T) * kBlockSize));
+        }
+
+        void deallocate_node(T* p)
+        {
+#if !MSVC8_DEQUE_DISABLE_FREE
             ::operator delete(static_cast<void*>(p));
+#else
+            (void)p;
+#endif
         }
 
-        /** Releases all nodes and the map (no element dtors; call clear() first). */
-        void release_all_nodes_and_map() {
-            if (_Map) {
-                for (size_type i = 0; i < _Mapsize; ++i) {
-                    if (_Map[i]) {
+        void release_all()
+        {
+            if (_Map)
+            {
+                for (size_type i = 0; i < _Mapsize; ++i)
+                {
+                    if (_Map[i])
+                    {
                         deallocate_node(_Map[i]);
                         _Map[i] = nullptr;
                     }
@@ -328,99 +275,68 @@ namespace msvc8
                 _Map = nullptr;
                 _Mapsize = 0;
             }
-            _Start = iterator{};
-            _Finish = iterator{};
+            _Myoff = _Mysize = 0;
         }
 
-        /** Re-maps: grow map and recenter nodes to keep amortized O(1) at ends. */
-        void grow_map(size_type extra_front_nodes, size_type extra_back_nodes) {
-            const size_type new_size = _Mapsize + extra_front_nodes + extra_back_nodes + kInitMapNodes;
-            T** new_map = static_cast<T**>(::operator new(sizeof(T*) * new_size));
-            for (size_type i = 0; i < new_size; ++i) new_map[i] = nullptr;
+        // Grow map capacity if total elements would exceed capacity.
+        void grow_if_full(size_type to_add)
+        {
+            const size_type need = _Mysize + to_add;
+            if (need <= capacity())
+                return;
 
-            // current range of nodes used
-            const size_type start_idx = static_cast<size_type>(_Start.node - _Map);
-            const size_type finish_idx = static_cast<size_type>(_Finish.node - _Map);
-            const size_type used_nodes = (start_idx == finish_idx && _Start.cur == _Finish.cur)
-                ? 1u
-                : (finish_idx - start_idx + 1u);
+            // Determine new map size (simple doubling strategy).
+            size_type new_slots = _Mapsize ? _Mapsize * 2 : kInitMapSlots;
+            while (need > new_slots * kBlockSize)
+                new_slots *= 2;
 
-            // place used nodes centered after extra_front_nodes
-            const size_type new_start_idx = (new_size - used_nodes) / 2;
-            for (size_type i = 0; i < used_nodes; ++i) {
-                new_map[new_start_idx + i] = _Map[start_idx + i];
+            remap_preserving_data(new_slots);
+        }
+
+        void remap_preserving_data(size_type new_slots)
+        {
+            // Compute used node span in old map
+            const size_type old_slots = _Mapsize;
+            T** old_map = _Map;
+
+            // Choose a centered new begin offset
+            const size_type new_begin_node = new_slots / 2;
+            const size_type new_off = new_begin_node * kBlockSize + (_Myoff % kBlockSize);
+
+            // Allocate new map and clear
+            T** new_map = static_cast<T**>(::operator new(sizeof(T*) * new_slots));
+            for (size_type i = 0; i < new_slots; ++i) new_map[i] = nullptr;
+
+            if (_Mysize)
+            {
+                // Determine the first and last global element indices (half-open)
+                const size_type first_global = _Myoff;
+                const size_type last_global = _Myoff + _Mysize;
+
+                const size_type first_node = first_global / kBlockSize;
+                const size_type last_node = (last_global + kBlockSize - 1) / kBlockSize; // one past
+
+                const size_type used_nodes = last_node - first_node;
+
+                // Copy node pointers in order so elements keep their storage
+                for (size_type i = 0; i < used_nodes; ++i)
+                {
+                    const size_type old_node_idx = (first_node + i) % old_slots;
+                    const size_type new_node_idx = (new_begin_node + i) % new_slots;
+                    new_map[new_node_idx] = old_map[old_node_idx];
+                }
             }
 
-            // fix iterators
-            const std::ptrdiff_t block_bytes = (_Start.last - _Start.first);
-            iterator oldS = _Start;
-            iterator oldF = _Finish;
-
-            _Start.node = new_map + new_start_idx;
-            _Start.first = *_Start.node;
-            _Start.last = _Start.first + block_bytes;
-            _Start.cur = _Start.first + (oldS.cur - oldS.first);
-
-            _Finish.node = _Start.node + (oldF.node - oldS.node);
-            _Finish.first = *_Finish.node;
-            _Finish.last = _Finish.first + block_bytes;
-            _Finish.cur = _Finish.first + (oldF.cur - oldF.first);
-
-            // old map goes away
+            // Install new map
+#if !MSVC8_DEQUE_DISABLE_FREE
             ::operator delete(static_cast<void*>(_Map));
+#endif
             _Map = new_map;
-            _Mapsize = new_size;
-        }
-
-        /** Build iterator for node index with current offset inside node. */
-        iterator make_iter(T* node_first, size_type node_idx, size_type offset_in_node) const {
-            iterator it;
-            it.first = node_first;
-            it.last = it.first + kBlockSize;
-            it.node = _Map + node_idx;
-            it.cur = it.first + static_cast<std::ptrdiff_t>(offset_in_node);
-            return it;
-        }
-
-        /** Append with node spill handling. */
-        void push_back_aux(const T& v) {
-            // need a new node at _Finish.node + 1
-            size_type finish_idx = static_cast<size_type>(_Finish.node - _Map);
-            if (finish_idx + 1 >= _Mapsize) {
-                grow_map(0, 1);
-                finish_idx = static_cast<size_type>(_Finish.node - _Map);
-            }
-            const size_type next_idx = finish_idx + 1;
-            ensure_node(next_idx);
-
-            // move finish to next node's beginning and emplace value
-            _Finish.node = _Map + next_idx;
-            _Finish.first = *_Finish.node;
-            _Finish.last = _Finish.first + kBlockSize;
-            _Finish.cur = _Finish.first;
-            new (static_cast<void*>(_Finish.cur)) T(v);
-            ++_Finish;
-        }
-
-        /** Prepend with node spill handling. */
-        void push_front_aux(const T& v) {
-            // need a new node before _Start.node
-            size_type start_idx = static_cast<size_type>(_Start.node - _Map);
-            if (start_idx == 0) {
-                grow_map(1, 0);
-                start_idx = static_cast<size_type>(_Start.node - _Map);
-            }
-            const size_type prev_idx = start_idx - 1;
-            ensure_node(prev_idx);
-
-            // move start to previous node's end and emplace value just before end
-            _Start.node = _Map + prev_idx;
-            _Start.first = *_Start.node;
-            _Start.last = _Start.first + kBlockSize;
-            _Start.cur = _Start.last; // one past last
-            --_Start;
-            new (static_cast<void*>(_Start.cur)) T(v);
+            _Mapsize = new_slots;
+            _Myoff = new_off;
         }
     };
 
+    static_assert(sizeof(deque<int>) == 0x14, "msvc8::deque must be 20 bytes on x86.");
+    static_assert(sizeof(deque<void*>) == 0x14, "msvc8::deque must be 20 bytes on x86.");
 } // namespace msvc8

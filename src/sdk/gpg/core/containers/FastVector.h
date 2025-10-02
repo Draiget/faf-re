@@ -2,13 +2,15 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iterator> // reverse_iterator
+#include <cstddef>  // std::ptrdiff_t
 
 namespace gpg::core
 {
     /**
      * Three-pointer vector with raw ownership. Size math is done in bytes to avoid
      * compiler quirks and to support T=void (elem size is 1 in that case).
-	 */
+     */
     template<class T>
     class FastVector {
     protected:
@@ -16,8 +18,8 @@ namespace gpg::core
         static constexpr size_t elem_ = std::is_void_v<T> ? 1 : sizeof(T);
 
         static size_t index_of(const T* base, const T* p) noexcept {
-	        const auto b = reinterpret_cast<const std::byte*>(base);
-	        const auto q = reinterpret_cast<const std::byte*>(p);
+            const auto b = reinterpret_cast<const std::byte*>(base);
+            const auto q = reinterpret_cast<const std::byte*>(p);
             return static_cast<size_t>(q - b) / elem_;
         }
         static T* ptr_at(T* base, const size_t idx) noexcept {
@@ -26,6 +28,18 @@ namespace gpg::core
         }
 
     public:
+        using value_type = T;
+        using size_type = std::size_t;
+        using difference_type = std::ptrdiff_t;
+        using reference = T&;
+        using const_reference = const T&;
+        using pointer = T*;
+        using const_pointer = const T*;
+        using iterator = T*;
+        using const_iterator = const T*;
+        using reverse_iterator = std::reverse_iterator<iterator>;
+        using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
         T* start_{ nullptr };
         T* end_{ nullptr };
         T* capacity_{ nullptr };
@@ -36,26 +50,77 @@ namespace gpg::core
             delete[] start_;
         }
 
+        /**
+         * Returns number of elements.
+         */
         [[nodiscard]]
         size_t Size() const noexcept {
-	        const auto b = reinterpret_cast<const std::byte*>(start_);
-	        const auto e = reinterpret_cast<const std::byte*>(end_);
-            return static_cast<size_t>(e - b) / elem_;
+            const auto s = reinterpret_cast<const std::byte*>(start_);
+            const auto e = reinterpret_cast<const std::byte*>(end_);
+            return static_cast<size_t>(e - s) / elem_;
         }
 
+        /**
+         * Returns capacity in elements.
+         */
         [[nodiscard]]
         size_t Capacity() const noexcept {
-	        const auto b = reinterpret_cast<const std::byte*>(start_);
-	        const auto c = reinterpret_cast<const std::byte*>(capacity_);
-            return static_cast<size_t>(c - b) / elem_;
+            const auto s = reinterpret_cast<const std::byte*>(start_);
+            const auto c = reinterpret_cast<const std::byte*>(capacity_);
+            return static_cast<size_t>(c - s) / elem_;
         }
 
+        /**
+         * Returns true if size == 0.
+         */
+        [[nodiscard]]
+        bool Empty() const noexcept {
+	        return start_ == end_;
+        }
+
+        /**
+         * Returns raw data pointer (maybe null if empty and unallocated).
+         */
+        [[nodiscard]]
+        T* Data() noexcept { return start_; }
+        [[nodiscard]]
+        const T* Data() const noexcept { return start_; }
+
+        /** Random access operators (no bounds checks). */
         T& operator[](const size_t idx) noexcept {
             return *ptr_at(start_, idx);
         }
         const T& operator[](const size_t idx) const noexcept {
             return *ptr_at(const_cast<T*>(start_), idx);
         }
+
+        /** Front/back (UB if empty; mirrors std::vector behavior without checks). */
+        T& Front() noexcept { return *start_; }
+        const T& Front() const noexcept { return *start_; }
+        T& Back() noexcept { return *(end_ - 1); }
+        const T& Back() const noexcept { return *(end_ - 1); }
+
+        /** Iterator accessors. */
+        /** begin iterator */
+        iterator begin() noexcept { return start_; }
+        /** end iterator */
+        iterator end() noexcept { return end_; }
+        /** const begin iterator */
+        const_iterator begin() const noexcept { return start_; }
+        /** const end iterator */
+        const_iterator end() const noexcept { return end_; }
+        /** cbegin iterator */
+        const_iterator cbegin() const noexcept { return start_; }
+        /** cend iterator */
+        const_iterator cend() const noexcept { return end_; }
+
+        /** reverse iterators */
+        reverse_iterator rbegin() noexcept { return reverse_iterator(end_); }
+        reverse_iterator rend() noexcept { return reverse_iterator(start_); }
+        const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(end_); }
+        const_reverse_iterator rend() const noexcept { return const_reverse_iterator(start_); }
+        const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(end_); }
+        const_reverse_iterator crend() const noexcept { return const_reverse_iterator(start_); }
 
         /**
          * Reserve at least n elements; does not shrink.
@@ -76,14 +141,18 @@ namespace gpg::core
             capacity_ = newBuf + n;
         }
 
+        /**
+         * Append by copy; grows capacity exponentially.
+         */
         void PushBack(const T& v) {
             if (end_ == capacity_) {
-	            const size_t newCap = Capacity() ? Capacity() * 2 : 4;
+                const size_t newCap = Capacity() ? Capacity() * 2 : 4;
                 Reserve(newCap);
             }
             *end_++ = v;
         }
 
+        /** Clears size to zero without releasing memory. */
         void Clear() noexcept { end_ = start_; }
 
         FastVector(const FastVector&) = delete;
@@ -106,9 +175,9 @@ namespace gpg::core
     };
 
     /**
-	 * Small-buffer optimized vector based on FastVector.
-	 * No dependency on Base internals (has its own byte helpers).
-	 */
+     * Small-buffer optimized vector based on FastVector.
+     * No dependency on Base internals (has its own byte helpers).
+     */
     template<class T, size_t N>
     class FastVectorN : public FastVector<T> {
         using Base = FastVector<T>;
@@ -216,7 +285,65 @@ namespace gpg::core
             }
         }
 
+        // Reset to inline storage and copy from a plain FastVector view
+        void ResetFrom(const FastVector<T>& src) {
+            ResetInline_();
+            CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
+        }
+
+        // Reset to inline storage and copy from another FastVectorN
+        void ResetFrom(const FastVectorN<T, N>& src) {
+            ResetInline_();
+            CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
+        }
+
     private:
+        /**
+         * Rebind this container to its inline buffer (like func_Reset_fastvector_n prologue)
+         */
+        void ResetInline_() noexcept {
+            this->start_ = inlineVec_;
+            this->end_ = inlineVec_;
+            this->capacity_ = inlineVec_ + N;
+            originalVec_ = inlineVec_;
+        }
+
+        /**
+         * Copy 'count' elements from raw memory; expand to exact-fit heap if count > N
+         */
+        void CopyFromRaw_(const T* src, size_t count) {
+            if (count == 0 || src == nullptr) {
+                return;
+            }
+
+            if (count <= N) {
+                if constexpr (std::is_trivially_copyable_v<T>) {
+                    std::memcpy(this->start_, src, count * ElemSize);
+                } else {
+                    for (size_t i = 0; i < count; ++i) this->start_[i] = src[i];
+                }
+                this->end_ = this->start_ + count;
+                return;
+            }
+
+            // Need heap buffer of exact count (matches engine's "capacity_ = start_ + count")
+            T* p = new T[count];
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                std::memcpy(p, src, count * ElemSize);
+            } else {
+                for (size_t i = 0; i < count; ++i) p[i] = src[i];
+            }
+
+            // Free previous heap buffer only if not using inline storage
+            if (this->start_ && this->start_ != originalVec_) {
+                delete[] this->start_;
+            }
+
+            this->start_ = p;
+            this->end_ = p + count;
+            this->capacity_ = p + count;
+        }
+
         /** Reallocate to exactly newCap elements; preserve contents. */
         void GrowToCapacity(size_t newCap) {
             const size_t sz = this->Size();

@@ -158,7 +158,8 @@ namespace moho
         /**
          * Address: 0x004881F0
          */
-        int64_t TimeSince(int64_t time) const;
+        [[nodiscard]]
+		int64_t TimeSince(int64_t time) const;
 
         /**
          * Address: 0x00488300
@@ -275,7 +276,7 @@ namespace moho
         u_short mPort;
         WORD gap1;
         ENetCompressionMethod mOurCompressionMethod;
-        int mReceivedCompressionMethod;
+        ENetCompressionMethod mReceivedCompressionMethod;
         ENetConnectionState mState;
         gpg::time::Timer mLastSend;
         int64_t mSendTime;

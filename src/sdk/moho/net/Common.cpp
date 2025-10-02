@@ -1,11 +1,11 @@
-#include "General.h"
+﻿#include "Common.h"
 
 #include "CHostManager.h"
 #include "CNetUDPConnector.h"
 #include "gpg/core/containers/String.h"
 using namespace moho;
 
-extern int32_t net_DebugLevel = 0;
+extern int32_t net_DebugLevel;
 
 void moho::NetPacketStateToStr(const EPacketState state, msvc8::string& out) {
 	switch (state) {
@@ -66,39 +66,45 @@ const char* moho::NetConnectionStateToStr(const ENetConnectionState state) {
 	}
 }
 
-SendStampView SendStampBuffer::GetBetween(const uint64_t startTime, const uint64_t endTime) {
-    uint64_t dur = endTime - startTime;
-    unsigned int len;
-    if (mEnd < mStart) {
-        len = mEnd - mStart + 4096;
-    } else {
-        len = mEnd - mStart;
-    }
-    unsigned int start = 0;
-    unsigned int end = len;
-    while (start < end) {
-        unsigned int cur = (end + start) / 2;
-        if (Get(cur).time >= dur) {
-            end = cur;
+SSendStampView SSendStampBuffer::GetBetween(const uint64_t startTime, const uint64_t endTime) {
+    // delta = startTime - endTime (как в движке)
+    const uint64_t delta = startTime - endTime;
+
+    // Compute logical length in the ring [mEnd .. mStart) with capacity 4096
+    // Matches: (mEnd > mStart) ? (mStart - mEnd + 4096) : (mStart - mEnd)
+    const unsigned int len = (mEnd > mStart) ? (mStart - mEnd + cap) : (mStart - mEnd);
+
+    // Lower_bound over [0, len): first index with time >= delta
+    unsigned int lo = 0, hi = len;
+    while (lo < hi) {
+        const unsigned int mid = (lo + hi) >> 1;
+        if (Get(mid).time >= delta) {
+            hi = mid;
         } else {
-            start = cur + 1;
+            lo = mid + 1;
         }
     }
 
-    SendStampView out{ dur, end };
-    out.items.reserve(len - end);
-    for (auto i = end; i < len; ++i) {
+    // View header matches engine: from=delta, to=startTime
+    SSendStampView out{ delta, startTime };
+
+    // Reserve exactly the number of items we will push (len - lo)
+    out.items.reserve(len - lo);
+
+    // Emit tail [lo .. len)
+    for (unsigned int i = lo; i < len; ++i) {
         out.items.push_back(Get(i));
     }
+
     return out;
 }
 
-void SendStampBuffer::Reset() {
+void SSendStampBuffer::Reset() {
     mEnd = 0;
     mStart = 0;
 }
 
-uint32_t SendStampBuffer::Push(const int dir, const LONGLONG timeUs, const int size) noexcept {
+uint32_t SSendStampBuffer::Push(const int dir, const LONGLONG timeUs, const int size) noexcept {
     // If advancing start would collide with end, drop the oldest.
     const std::uint32_t next = (mStart + 1u) & static_cast<std::uint32_t>(cap);
     if (next == mEnd) {
@@ -106,7 +112,7 @@ uint32_t SendStampBuffer::Push(const int dir, const LONGLONG timeUs, const int s
     }
 
     // Prepare entry (a1a in the asm)
-    SendStamp s;
+    SSendStamp s;
     s.time = timeUs;
     s.direction = dir;
     s.size = size;
@@ -114,19 +120,19 @@ uint32_t SendStampBuffer::Push(const int dir, const LONGLONG timeUs, const int s
     return EmplaceAndAdvance(s);
 }
 
-void SendStampBuffer::Add(const int direction, const LONGLONG time, const int size) {
+void SSendStampBuffer::Add(const int direction, const LONGLONG time, const int size) {
     if ((mEnd + 1) % cap == mStart) {
         mStart = (mStart + 1) % cap;
     }
 
-    SendStamp s;
+    SSendStamp s;
     s.time = time;
     s.direction = direction;
     s.size = size;
     Append(&s);
 }
 
-void SendStampBuffer::Append(const SendStamp* s) {
+void SSendStampBuffer::Append(const SSendStamp* s) {
     const auto pos = &mDat[mEnd];
     if (pos != nullptr) {
         *pos = *s;
@@ -274,4 +280,23 @@ msvc8::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number) {
         HIWORD(LOBYTE(number)),
         HIBYTE(number),
         LOBYTE(number));
+}
+
+ENetProtocolType moho::NET_ProtocolFromString(const char* str) {
+    if (!str) {
+        throw std::domain_error("invalid protocol (null)");
+    }
+
+    if (_stricmp(str, "None") == 0) {
+        return ENetProtocolType::kNone;
+    }
+    if (_stricmp(str, "TCP") == 0) {
+        return ENetProtocolType::kTcp;
+    }
+    if (_stricmp(str, "UDP") == 0) {
+        return ENetProtocolType::kUdp;
+    }
+
+    const msvc8::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
+    throw std::domain_error(msg.c_str());
 }

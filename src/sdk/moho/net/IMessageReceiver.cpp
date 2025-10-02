@@ -22,6 +22,18 @@ void CMessageDispatcher::PushReceiver(const unsigned int lower, const unsigned i
     }
 }
 
+bool CMessageDispatcher::Dispatch(CMessage* msg) {
+    const uint8_t idx = *msg->mBuff.start_;
+
+    IMessageReceiver* rec = mReceivers[idx];
+    if (!rec) {
+	    return false;
+    }
+
+    rec->Receive(msg, this);
+    return true;
+}
+
 SMsgReceiverLinkage::SMsgReceiverLinkage(
 	const unsigned int lower,
 	const unsigned int upper, 

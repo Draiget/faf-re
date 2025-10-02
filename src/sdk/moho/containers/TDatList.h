@@ -42,11 +42,7 @@ namespace moho
          */
         item_t* ListLinkAfter(item_t* that) noexcept
         {
-            // detach self
-            mPrev->mNext = mNext;
-            mNext->mPrev = mPrev;
-            mPrev = this;
-            mNext = this;
+            ListUnlink();
 
             // insert after 'that'
             item_t* const next = that->mNext;
@@ -62,11 +58,7 @@ namespace moho
          */
         item_t* ListLinkBefore(item_t* that) noexcept
         {
-            // detach self
-            mPrev->mNext = mNext;
-            mNext->mPrev = mPrev;
-            mPrev = this;
-            mNext = this;
+            ListUnlink();
 
             // insert before 'that'
             item_t* const prev = that->mPrev;

@@ -5,7 +5,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/core/Thread.h"
-#include "moho/misc/TDatList.h"
+#include "moho/containers/TDatList.h"
 using namespace moho;
 
 extern int32_t net_LogPackets;
@@ -217,7 +217,10 @@ void CNetUDPConnector::SelectEvent(const HANDLE ev) {
 #endif
 }
 
-SendStampView CNetUDPConnector::SnapshotSendStamps(const uint64_t since) {
+void CNetUDPConnector::Debug() {
+}
+
+SSendStampView CNetUDPConnector::SnapshotSendStamps(const uint64_t since) {
     boost::recursive_mutex::scoped_lock lock{ lock_ };
     return mBuff.GetBetween(1000 * since, GetTime());
 }
@@ -487,7 +490,7 @@ void CNetUDPConnector::ProcessConnect(const SNetPacket* packet, const u_long add
 
     const auto& connectPacket = packet->As<SPacketBodyConnect>();
 
-    if (connectPacket.protocol != kUdp) {
+    if (connectPacket.protocol != ENetProtocolType::kUdp) {
         if (net_DebugLevel) {
 	        const auto host = NET_GetHostName(address);
             gpg::Logf(

@@ -5,7 +5,8 @@ namespace gpg
     /**
      * Very small SSO-less byte span holder used only to mirror the decompiled call pattern.
      */
-    struct ByteSpan {
+    struct ByteSpan
+	{
         const char* begin{};
         const char* end{};
 

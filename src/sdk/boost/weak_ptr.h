@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include "sp_counted_base.h"
+#include "shared_ptr.h"
 
 namespace boost
 {

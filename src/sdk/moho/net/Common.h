@@ -46,7 +46,7 @@ namespace moho
         NETCOMP_Deflate = 1,
     };
 
-    enum ENetProtocolType : int32_t
+    enum class ENetProtocolType : int32_t
     {
         kNone = 0,
         kTcp = 1, // guess
@@ -131,7 +131,7 @@ namespace moho
         }
     };
 
-    struct SendStamp
+    struct SSendStamp
     {
         uint32_t direction;
         uint32_t v1;
@@ -140,9 +140,9 @@ namespace moho
         uint32_t v4;
     };
 
-    struct SendStampView
+    struct SSendStampView
     {
-        msvc8::vector<SendStamp> items; // contiguous vector of copies
+        msvc8::vector<SSendStamp> items; // contiguous vector of copies
         uint64_t from;                  // threshold = now - window
         uint64_t to;                    // now
 
@@ -153,7 +153,7 @@ namespace moho
          * @param start 
          * @param end 
          */
-        SendStampView(const uint64_t start, const uint64_t end) :
+        SSendStampView(const uint64_t start, const uint64_t end) :
             items{},
             from{ start },
             to{ end }
@@ -161,11 +161,11 @@ namespace moho
         }
     };
 
-    struct SendStampBuffer
+    struct SSendStampBuffer
     {
         static constexpr uint32_t cap = 4096;
 
-        SendStamp mDat[cap];
+        SSendStamp mDat[cap];
         uint32_t mEnd = 0; // oldest
         uint32_t mStart = 0; // next write
 
@@ -174,7 +174,7 @@ namespace moho
          *
          * lower-bound in circular buffer, copy window into out
          */
-        SendStampView GetBetween(uint64_t startTime, uint64_t endTime);
+        SSendStampView GetBetween(uint64_t startTime, uint64_t endTime);
 
         /**
          * Address: 0x0047D990
@@ -194,7 +194,7 @@ namespace moho
         /**
          * Address: 0x0047D630
          */
-        void Append(const SendStamp* s);
+        void Append(const SSendStamp* s);
 
         [[nodiscard]]
         bool empty() const noexcept {
@@ -206,7 +206,7 @@ namespace moho
             return mStart - mEnd & cap; // valid for power-of-two capacity
         }
 
-        void push(const SendStamp& s) noexcept {
+        void push(const SSendStamp& s) noexcept {
             mDat[mStart] = s;
             mStart = mStart + 1 & cap;
             if (mStart == mEnd) {
@@ -214,7 +214,7 @@ namespace moho
             }
         }
 
-        SendStamp& Get(const size_t index) {
+        SSendStamp& Get(const size_t index) {
             return mDat[(mStart + index) % 4096];
         }
 
@@ -223,7 +223,7 @@ namespace moho
          * Place entry at mStart and advance mStart by 1 (mod 4096).
          * Address: 0x0047D630
          */
-        MOHO_FORCEINLINE uint32_t EmplaceAndAdvance(const SendStamp& s) noexcept
+        MOHO_FORCEINLINE uint32_t EmplaceAndAdvance(const SSendStamp& s) noexcept
         {
             mDat[mStart] = s;
             mStart = (mStart + 1u) & cap;
@@ -248,6 +248,9 @@ namespace moho
 
     /**
      * Address: 0x0047F5F0
+     * Render getnameinfo/gai/WSA error to string for logs.
+     *
+     * @return
      */
     MOHO_FORCEINLINE const char* NET_GetWinsockErrorString() noexcept;
 
@@ -257,6 +260,14 @@ namespace moho
      * @return 
      */
     MOHO_FORCEINLINE msvc8::string NET_GetDottedOctetFromUInt32(uint32_t number);
+
+    /**
+     * Address: 0x0047ED50
+     *
+     * @param str 
+     * @return 
+     */
+    ENetProtocolType NET_ProtocolFromString(const char* str);
 
     /**
      * Address: 0x0048BBE0

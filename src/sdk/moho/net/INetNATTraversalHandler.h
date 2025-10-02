@@ -1,6 +1,6 @@
 #pragma once
 #include "CMessage.h"
-#include "boost/sp_counted_base.h"
+#include "boost/shared_ptr.h"
 
 namespace moho
 {

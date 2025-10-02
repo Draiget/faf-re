@@ -73,22 +73,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -177,6 +177,7 @@
     <ClCompile Include="gpg\core\containers\String.cpp" />
     <ClCompile Include="gpg\core\random\Random.cpp" />
     <ClCompile Include="gpg\core\reflection\Reflection.cpp" />
+    <ClCompile Include="gpg\core\streams\BinaryReader.cpp" />
     <ClCompile Include="gpg\core\streams\FileStream.cpp" />
     <ClCompile Include="gpg\core\streams\MemBufferStream.cpp" />
     <ClCompile Include="gpg\core\streams\PipeStream.cpp" />
@@ -186,8 +187,11 @@
     <ClCompile Include="gpg\core\utils\BoostWrappers.cpp" />
     <ClCompile Include="gpg\core\utils\Global.cpp" />
     <ClCompile Include="gpg\core\utils\Logging.cpp" />
+    <ClCompile Include="legacy\containers\Map.cpp" />
+    <ClCompile Include="legacy\containers\Set.cpp" />
     <ClCompile Include="legacy\containers\String.cpp" />
     <ClCompile Include="legacy\containers\Vector.cpp" />
+    <ClCompile Include="lua\LuaObject.cpp" />
     <ClCompile Include="moho\ai\CAiAttackerImpl.cpp" />
     <ClCompile Include="moho\ai\CAiAttackerImplConstruct.cpp" />
     <ClCompile Include="moho\ai\CAiAttackerImplSerializer.cpp" />
@@ -272,7 +276,12 @@
     <ClCompile Include="moho\ai\LAiAttackerImpl.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplSerializer.cpp" />
     <ClCompile Include="moho\ai\LAiAttackerImplTypeInfo.cpp" />
+    <ClCompile Include="moho\app\CWaitHandleSet.cpp" />
+    <ClCompile Include="moho\app\WinApp.cpp" />
+    <ClCompile Include="moho\client\Localization.cpp" />
     <ClCompile Include="moho\command\ICommandSink.cpp" />
+    <ClCompile Include="moho\containers\BVIntSet.cpp" />
+    <ClCompile Include="moho\containers\BVSet.cpp" />
     <ClCompile Include="moho\core\Thread.cpp" />
     <ClCompile Include="moho\math\GridPos.cpp" />
     <ClCompile Include="moho\math\Vector2f.cpp" />
@@ -280,20 +289,30 @@
     <ClCompile Include="moho\math\Vector4f.cpp" />
     <ClCompile Include="moho\misc\StatItem.cpp" />
     <ClCompile Include="moho\misc\Stats.cpp" />
+    <ClCompile Include="moho\misc\StringUtils.cpp" />
     <ClCompile Include="moho\net\CClientBase.cpp" />
+    <ClCompile Include="moho\net\CClientManagerImpl.cpp" />
+    <ClCompile Include="moho\net\CGpgNetInterface.cpp" />
+    <ClCompile Include="moho\net\CHostManager.cpp" />
+    <ClCompile Include="moho\net\CLobby.cpp" />
     <ClCompile Include="moho\net\CMessage.cpp" />
     <ClCompile Include="moho\net\CMessageStream.cpp" />
     <ClCompile Include="moho\net\CNetClient.cpp" />
+    <ClCompile Include="moho\net\CNetDatagramSocketImpl.cpp" />
     <ClCompile Include="moho\net\CNetUDPConnection.cpp" />
     <ClCompile Include="moho\net\CNetUDPConnector.cpp" />
-    <ClCompile Include="moho\net\General.cpp" />
+    <ClCompile Include="moho\net\Common.cpp" />
+    <ClCompile Include="moho\net\IClient.cpp" />
     <ClCompile Include="moho\net\IMessageReceiver.cpp" />
+    <ClCompile Include="moho\net\INetConnection.cpp" />
     <ClCompile Include="moho\net\INetConnector.cpp" />
+    <ClCompile Include="moho\net\INetDatagramSocket.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalHandler.cpp" />
     <ClCompile Include="moho\net\INetNATTraversalProvider.cpp" />
     <ClCompile Include="moho\net\SNetPacket.cpp" />
     <ClCompile Include="moho\resource\CSimResources.cpp" />
     <ClCompile Include="moho\resource\ISimResources.cpp" />
+    <ClCompile Include="moho\script\CScriptObject.cpp" />
     <ClCompile Include="moho\sim\CArmyImpl.cpp" />
     <ClCompile Include="moho\sim\CArmyStats.cpp" />
     <ClCompile Include="moho\sim\ISTIDriver.cpp" />
@@ -301,6 +320,8 @@
     <ClCompile Include="moho\sim\SimArmy.cpp" />
     <ClCompile Include="moho\sim\SimDriver.cpp" />
     <ClCompile Include="moho\sim\STIMap.cpp" />
+    <ClCompile Include="moho\task\CTask.cpp" />
+    <ClCompile Include="moho\task\CTaskThread.cpp" />
     <ClCompile Include="moho\unit\core\IUnit.cpp" />
     <ClCompile Include="moho\unit\core\Unit.cpp" />
     <ClCompile Include="moho\unit\core\UserUnit.cpp" />
@@ -308,10 +329,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
+    <ClInclude Include="boost\enable_shared_from_this.h" />
     <ClInclude Include="boost\function.h" />
     <ClInclude Include="boost\mutex.h" />
     <ClInclude Include="boost\recursive_mutex.h" />
-    <ClInclude Include="boost\sp_counted_base.h" />
+    <ClInclude Include="boost\shared_ptr.h" />
+    <ClInclude Include="boost\thread.h" />
     <ClInclude Include="boost\weak_ptr.h" />
     <ClInclude Include="boost\xtime.h" />
     <ClInclude Include="gpg\core\algorithms\Cluster.h" />
@@ -329,6 +352,7 @@
     <ClInclude Include="gpg\core\random\Random.h" />
     <ClInclude Include="gpg\core\reflection\Reflection.h" />
     <ClInclude Include="gpg\core\containers\WriteArchive.h" />
+    <ClInclude Include="gpg\core\streams\BinaryReader.h" />
     <ClInclude Include="gpg\core\streams\FileStream.h" />
     <ClInclude Include="gpg\core\streams\MemBufferStream.h" />
     <ClInclude Include="gpg\core\streams\PipeStream.h" />
@@ -409,12 +433,26 @@
     <ClInclude Include="gpg\gal\VertexBufferContext.hpp" />
     <ClInclude Include="gpg\gal\VertexFormat.hpp" />
     <ClInclude Include="legacy\containers\Deque.h" />
+    <ClInclude Include="legacy\containers\Map.h" />
+    <ClInclude Include="legacy\containers\Set.h" />
     <ClInclude Include="legacy\containers\String.h" />
     <ClInclude Include="legacy\containers\Tree.h" />
     <ClInclude Include="legacy\containers\Vector.h" />
+    <ClInclude Include="moho\app\CWaitHandleSet.h" />
+    <ClInclude Include="moho\client\Localization.h" />
+    <ClInclude Include="moho\containers\BVIntSet.h" />
+    <ClInclude Include="moho\containers\BVSet.h" />
+    <ClInclude Include="moho\misc\StringUtils.h" />
+    <ClInclude Include="moho\net\CGpgNetInterface.h" />
+    <ClInclude Include="moho\net\CLocalClient.h" />
+    <ClInclude Include="moho\net\CNetDatagramSocketImpl.h" />
+    <ClInclude Include="moho\net\ELobbyMsg.h" />
+    <ClInclude Include="moho\net\IClientManager.h" />
+    <ClInclude Include="moho\net\INetTCPServer.h" />
+    <ClInclude Include="moho\net\INetTCPSocket.h" />
+    <ClInclude Include="moho\task\CLuaTask.h" />
     <ClInclude Include="lua\LuaDebug.h" />
     <ClInclude Include="lua\LuaObject.h" />
-    <ClInclude Include="lua\LuaState.h" />
     <ClInclude Include="moho\ai\CAiAttackerImpl.h" />
     <ClInclude Include="moho\ai\CAiAttackerImplConstruct.h" />
     <ClInclude Include="moho\ai\CAiAttackerImplSerializer.h" />
@@ -499,6 +537,7 @@
     <ClInclude Include="moho\ai\LAiAttackerImpl.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplSerializer.h" />
     <ClInclude Include="moho\ai\LAiAttackerImplTypeInfo.h" />
+    <ClInclude Include="moho\app\WinApp.h" />
     <ClInclude Include="moho\collision\AABB.h" />
     <ClInclude Include="moho\collision\CColPrimitiveBase.h" />
     <ClInclude Include="moho\collision\CGeomSolid3.h" />
@@ -515,23 +554,26 @@
     <ClInclude Include="moho\misc\InstanceCounter.h" />
     <ClInclude Include="moho\misc\StatItem.h" />
     <ClInclude Include="moho\misc\Stats.h" />
-    <ClInclude Include="moho\misc\TDatList.h" />
-    <ClInclude Include="moho\misc\TDatTreeItem.h" />
+    <ClInclude Include="moho\containers\TDatList.h" />
+    <ClInclude Include="moho\containers\TDatTreeItem.h" />
     <ClInclude Include="moho\misc\VisionDb.h" />
     <ClInclude Include="moho\misc\WeakObject.h" />
     <ClInclude Include="moho\net\CClientBase.h" />
     <ClInclude Include="moho\net\CClientManagerImpl.h" />
     <ClInclude Include="moho\net\CHostManager.h" />
+    <ClInclude Include="moho\net\CLobby.h" />
     <ClInclude Include="moho\net\CMessage.h" />
     <ClInclude Include="moho\net\CNetClient.h" />
     <ClInclude Include="moho\net\CNetUDPConnection.h" />
     <ClInclude Include="moho\net\CNetUDPConnector.h" />
     <ClInclude Include="moho\net\ECmdStreamOp.h" />
-    <ClInclude Include="moho\net\General.h" />
+    <ClInclude Include="moho\net\Common.h" />
     <ClInclude Include="moho\net\IClient.h" />
     <ClInclude Include="moho\net\IMessageReceiver.h" />
     <ClInclude Include="moho\net\INetConnection.h" />
     <ClInclude Include="moho\net\INetConnector.h" />
+    <ClInclude Include="moho\net\INetDatagramHandler.h" />
+    <ClInclude Include="moho\net\INetDatagramSocket.h" />
     <ClInclude Include="moho\net\INetNATTraversalHandler.h" />
     <ClInclude Include="moho\net\CMessageStream.h" />
     <ClInclude Include="moho\net\INetNATTraversalProvider.h" />
@@ -559,6 +601,7 @@
     <ClInclude Include="moho\sim\SSyncFilter.h" />
     <ClInclude Include="moho\sim\STIMap.h" />
     <ClInclude Include="moho\task\CTask.h" />
+    <ClInclude Include="moho\task\CTaskThread.h" />
     <ClInclude Include="moho\unit\core\IUnit.h" />
     <ClInclude Include="moho\unit\core\Unit.h" />
     <ClInclude Include="moho\unit\core\UserUnit.h" />

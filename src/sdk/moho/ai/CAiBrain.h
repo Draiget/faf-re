@@ -3,7 +3,11 @@
 #pragma once
 
 #include "legacy/containers/String.h"
-#include "lua/LuaState.h"
+
+namespace LuaPlus
+{
+	class LuaState;
+}
 
 namespace moho {
     /**

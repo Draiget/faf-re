@@ -55,11 +55,15 @@ namespace gpg
 	};
 	static_assert(sizeof(RObject) == 0x04, "RObject must be 0x04");
 
+    // template<class T>
 	class RRef
 	{
 	public:
 		void* mObj;
 		RType* mType;
+
+        // RRef(T*);
+        // RRef(void* ptr, gpg::RType* type) : mObj{ ptr }, mType{ type } {}
 
 		msvc8::string GetLexical() const; // 0x004A35D0
 		bool SetLexical(const char*) const; // 0x004A3600
@@ -77,7 +81,7 @@ namespace gpg
 		void Delete(); // 0x008D8800
 	};
 
-	/**
+    /**
 	 * Global registries (original: func_GetRTypeMap / func_GetRTypeVec).
 	 */
 	inline TypeMap& GetRTypeMap() {

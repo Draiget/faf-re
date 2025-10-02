@@ -1,7 +1,7 @@
 #pragma once
 
 #include "INetNATTraversalHandler.h"
-#include "boost/sp_counted_base.h"
+#include "boost/shared_ptr.h"
 
 namespace moho
 {
@@ -22,6 +22,6 @@ namespace moho
 		 * Address: 0x00A82547
 		 * Slot: 1
 		 */
-		virtual void ReceivePacket(u_long addr, u_short port, const char* dat, size_t size) = 0;
+		virtual void ReceivePacket(u_long address, u_short port, const char* dat, size_t size) = 0;
 	};
 }
