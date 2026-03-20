@@ -1,161 +1,194 @@
 #pragma once
 
+#include <cstddef>
+
+#include "EnumByte.h"
 #include "gpg/core/containers/FastVector.h"
 #include "platform/Platform.h"
 
 namespace gpg
 {
-    class Stream;
+  class Stream;
 }
 
 namespace moho
 {
+  /**
+   * Message type byte wrapper.
+   */
+  struct MessageType : EnumByte
+  {
+    using EnumByte::EnumByte;
+    MessageType() noexcept = default;
+  };
+  static_assert(sizeof(MessageType) == 0x1, "MessageType size must be 0x1");
+
+  /**
+   * Network message data-container.
+   */
+  struct CMessage
+  {
+    gpg::core::FastVectorN<char, 64> mBuff; // +0x00, full wire buffer (type + size + payload)
+    int mPos{0};                            // +0x50, incremental read cursor used by Read()
+
     /**
-     * Accept only enums with uint8_t underlying type.
+     * Address: 0x00483510 (FUN_00483510)
+     *
+     * What it does:
+     * Initializes inline message storage and resets incremental read cursor.
      */
-    template <class E>
-    concept IsU8Enum =
-        std::is_enum_v<E> &&
-        std::is_same_v<std::underlying_type_t<E>, std::uint8_t>;
+    CMessage();
 
     /**
-	 * Tiny wrapper over a single byte that can convert to any enum class : uint8_t.
-	 */
-    struct MessageType
-    {
-        std::uint8_t value{ 0 };
-
-        /** 
-         * Default ctor.
-         */
-        constexpr MessageType() = default;
-
-        /**
-         * Construct from raw byte.
-         */
-        explicit constexpr MessageType(std::uint8_t v) noexcept : value(v) {}
-
-        /** 
-         * Construct from any enum class : uint8_t.
-         */
-        template <IsU8Enum E>
-        constexpr MessageType(E e) noexcept : value(static_cast<std::uint8_t>(e)) {}
-
-        /** 
-         * Implicit conversion to any enum class : uint8_t (enables: const ELobbyMsg t = GetType()).
-         */
-        template <IsU8Enum E>
-        constexpr operator E() const noexcept { return static_cast<E>(value); }
-
-        /** 
-         * Explicit conversion to raw byte (avoid accidental promotions).
-         */
-        explicit constexpr operator std::uint8_t() const noexcept { return value; }
-
-        constexpr std::uint8_t raw() const noexcept { return value; }
-
-        /** 
-         * Equality vs any enum class : uint8_t.
-         */
-        template <IsU8Enum E>
-        friend constexpr bool operator==(MessageType t, E e) noexcept {
-            return t.value == static_cast<std::uint8_t>(e);
-        }
-        template <IsU8Enum E>
-        friend constexpr bool operator==(E e, MessageType t) noexcept {
-            return t == e;
-        }
-        template <IsU8Enum E>
-        friend constexpr bool operator!=(MessageType t, E e) noexcept {
-            return !(t == e);
-        }
-        template <IsU8Enum E>
-        friend constexpr bool operator!=(E e, MessageType t) noexcept {
-            return !(t == e);
-        }
-    };
-
-    /**
-     * Network message data-container.
+     * Address: 0x00483490 (FUN_00483490)
+     * Address: 0x10076360 (sub_10076360)
+     * Address: 0x100763B0 (sub_100763B0)
+     *
+     * What it does:
+     * Builds a message with a 3-byte header and pre-sized payload area.
      */
-    struct CMessage
+    CMessage(MessageType type, size_t size = 0);
+
+    /**
+     * Host-build helper (synthetic):
+     * Allows direct enum usage (for example `ECmdStreamOp`) without explicit cast wrappers.
+     */
+    template <U8Enum E>
+    explicit CMessage(E type, size_t size = 0)
+      : CMessage(MessageType(type), size)
+    {}
+
+    /**
+     * Host-build helper (synthetic):
+     * Deep-copy message payload and read position.
+     */
+    CMessage(const CMessage& other);
+
+    /**
+     * Host-build helper (synthetic):
+     * Deep-copy assignment for message payload and read position.
+     */
+    CMessage& operator=(const CMessage& other);
+
+    /**
+     * Host-build helper (synthetic):
+     * Move-construct by payload transfer semantics (implemented as safe clone+reset).
+     */
+    CMessage(CMessage&& other);
+
+    /**
+     * Host-build helper (synthetic):
+     * Move-assign by payload transfer semantics (implemented as safe clone+reset).
+     */
+    CMessage& operator=(CMessage&& other);
+
+    /**
+     * Address: <inlined helper>
+     *
+     * What it does:
+     * Stores message wire-size (header + payload) into bytes 1..2.
+     */
+    void SetSize(const size_t size)
     {
-        gpg::core::FastVectorN<char, 64> mBuff;
-        int mPos;
+      mBuff[1] = LOBYTE(size);
+      mBuff[2] = HIBYTE(size);
+    }
 
-        CMessage();
+    /**
+     * Address: <inlined helper>
+     *
+     * What it does:
+     * Reads message wire-size (header + payload) from bytes 1..2.
+     */
+    unsigned short GetSize()
+    {
+      return MAKEWORD(mBuff[1], mBuff[2]);
+    }
 
-        /**
-         * Address: 0x00483490
-         */
-        CMessage(MessageType type, size_t size = 0);
+    /**
+     * Address: <inlined helper>
+     *
+     * What it does:
+     * Returns whether the 3-byte message header has been read.
+     */
+    [[nodiscard]]
+    bool HasReadLength() const
+    {
+      return mPos >= 3;
+    }
 
-        /**
-         * Address: 0x0047BE62
-         */
-        void SetSize(const size_t size) {
-            mBuff[1] = LOBYTE(size);
-            mBuff[2] = HIBYTE(size);
-        }
+    /**
+     * Address: <inlined helper>
+     *
+     * What it does:
+     * Returns message type stored in header byte 0.
+     */
+    MessageType GetType()
+    {
+      return MessageType(static_cast<std::uint8_t>(this->mBuff[0]));
+    }
 
-        /**
-         * Address: 0x0047BF4C
-         */
-        unsigned short GetSize() {
-            // return *(unsigned short *)(&mBuf[1]);
-            return MAKEWORD(mBuff[1], mBuff[2]);
-        }
+    /**
+     * Address: <inlined helper>
+     *
+     * What it does:
+     * Writes message type to header byte 0.
+     */
+    void SetType(const MessageType type)
+    {
+      mBuff[0] = type.raw();
+    }
 
-        /**
-         * Address: 0x0047BEE5
-         */
-        [[nodiscard]]
-    	bool HasReadLength() const {
-            return mPos >= 3;
-        }
+    template <U8Enum E>
+    void SetType(E e)
+    {
+      this->mBuff[0] = static_cast<std::uint8_t>(e);
+    }
 
-        /**
-         * Address: 0x007BFB97
-         */
-        MessageType GetType() {
-            return MessageType(static_cast<std::uint8_t>(this->mBuff[0]));
-        }
+    /**
+     * Address: 0x0047BE90 (FUN_0047BE90)
+     * Address: 0x100764F0 (sub_100764F0)
+     *
+     * What it does:
+     * Returns payload size, excluding the 3-byte header.
+     */
+    int GetMessageSize();
 
-        /**
-         * Address: 0x004834E9
-         */
-        void SetType(const MessageType type) {
-            mBuff[0] = type.raw();
-        }
+    /**
+     * Address: 0x0047BD40 (FUN_0047BD40)
+     * Address: 0x100763E0 (sub_100763E0)
+     *
+     * What it does:
+     * Reads a full message from stream in one blocking call path.
+     */
+    bool ReadMessage(gpg::Stream* stream);
 
-        template <IsU8Enum E>
-        void SetType(E e) {
-            this->mBuff[0] = static_cast<std::uint8_t>(e);
-        }
+    /**
+     * Address: 0x0047BEE0 (FUN_0047BEE0)
+     * Address: 0x10076530 (sub_10076530)
+     *
+     * What it does:
+     * Incrementally reads header and payload using non-blocking reads.
+     */
+    bool Read(gpg::Stream* stream);
 
-        /**
-         * Address: 0x0047BE90
-         */
-        int GetMessageSize();
+    /**
+     * Address: 0x0047BDE0 (FUN_0047BDE0)
+     * Address: 0x10076460 (sub_10076460)
+     *
+     * What it does:
+     * Appends payload bytes, updates header length, and returns high-byte of wire-size.
+     */
+    unsigned int Append(const char* ptr, size_t size);
 
-        /**
-         * Address: 0x0047BD40
-         */
-        bool ReadMessage(gpg::Stream* stream);
+    /**
+     * Address: 0x00483530 (FUN_00483530)
+     *
+     * What it does:
+     * Resets storage to inline buffer and clears read cursor.
+     */
+    void Clear() noexcept;
+  };
 
-        /**
-         * Address: 0x0047BEE0
-         */
-        bool Read(gpg::Stream* stream);
-
-        /**
-         * Address: 0x0047BDE0
-         */
-        unsigned int Append(const char* ptr, size_t size);
-
-        /**
-         * Address: <inlined>
-         */
-        void inline Clear() noexcept;
-    };
-}
+  static_assert(sizeof(CMessage) == 0x54, "CMessage size must be 0x54");
+} // namespace moho

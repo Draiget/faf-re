@@ -42,27 +42,6 @@ namespace boost
         /** Destructor. */
         ~weak_ptr() = default;
 
-        /** Assignments. */
-        weak_ptr& operator=(weak_ptr const& r) noexcept
-        {
-            weak_ptr(r).swap(*this);
-            return *this;
-        }
-
-        template<class U>
-        weak_ptr& operator=(weak_ptr<U> const& r) noexcept
-        {
-            weak_ptr(r).swap(*this);
-            return *this;
-        }
-
-        template<class U>
-        weak_ptr& operator=(shared_ptr<U> const& r) noexcept
-        {
-            weak_ptr(r).swap(*this);
-            return *this;
-        }
-
         /** Reset to empty. */
         void reset() noexcept { weak_ptr().swap(*this); }
 
@@ -94,6 +73,44 @@ namespace boost
         bool owner_before(shared_ptr<U> const& r) const noexcept
         {
             return pn_.get() < r.pi_;
+        }
+
+        /** Assignments. */
+        weak_ptr& operator=(weak_ptr const& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+
+        template<class U>
+        weak_ptr& operator=(weak_ptr<U> const& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+
+        template<class U>
+        weak_ptr& operator=(shared_ptr<U> const& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+
+        // NEW: assignment from pointer to shared_ptr<U>
+        template<class U,
+            class = typename std::enable_if<std::is_convertible<U*, T*>::value>::type>
+        weak_ptr& operator=(shared_ptr<U>* const ppx) noexcept
+        {
+            if (ppx)
+            {
+                // Leverage existing ctor weak_ptr(shared_ptr<U> const&)
+                weak_ptr tmp(*ppx);
+                tmp.swap(*this);
+            } else
+            {
+                this->reset();
+            }
+            return *this;
         }
 
     private:

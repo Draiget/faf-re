@@ -1,4 +1,6 @@
 #pragma once
+#include <cstdlib>
+#include <mutex>
 #include <span>
 
 #include "Sync.h"
@@ -61,6 +63,17 @@ namespace gpg
         ThreadCtxEntry** end{};      // +0x08
         ThreadCtxEntry** cap{};      // +0x0C
         std::uint32_t    depthCache{}; // +0x10
+
+        ~ThreadState() {
+            if (begin) {
+                for (ThreadCtxEntry** it = begin; it != end; ++it) {
+                    delete *it;
+                }
+                delete[] begin;
+            }
+            begin = end = cap = nullptr;
+            depthCache = 0;
+        }
     };
 
     /**
@@ -76,6 +89,24 @@ namespace gpg
          * Dispatch formatted message to targets with TLS snapshot
          */
         void Dispatch(int level, const msvc8::string& msg);
+    };
+
+    /**
+     * RAII scope that pushes one thread-local logging context label for nested logs.
+     */
+    class ScopedLogContext
+    {
+    public:
+        explicit ScopedLogContext(const msvc8::string& text);
+        explicit ScopedLogContext(const char* text);
+        ~ScopedLogContext();
+
+        ScopedLogContext(const ScopedLogContext&) = delete;
+        ScopedLogContext& operator=(const ScopedLogContext&) = delete;
+
+    private:
+        ThreadState* mTls{};
+        ThreadCtxEntry* mEntry{};
     };
 
     /**

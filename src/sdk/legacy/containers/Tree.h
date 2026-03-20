@@ -5,130 +5,325 @@
 
 namespace msvc8
 {
-    namespace tree
-	{
+  /**
+   * Minimal RB-tree node base used only for navigation.
+   * Matches MSVC-era header layout: first three pointers are {parent,left,right}.
+   */
+  struct NodeBase
+  {
+    NodeBase* parent; // +0
+    NodeBase* left;   // +4
+    NodeBase* right;  // +8
+                      // Note: color/flags and value payload are not modeled here.
+  };
 
-        /**
-         * Minimal RB-tree node base used only for navigation.
-         * Matches MSVC-era header layout: first three pointers are {parent,left,right}.
-         */
-        struct NodeBase
-    	{
-            NodeBase* parent; // +0
-            NodeBase* left;   // +4
-            NodeBase* right;  // +8
-            // Note: color/flags and value payload are not modeled here.
-        };
+  /**
+   * Reusable intrusive tree-link base for recovered nodes.
+   *
+   * Layout matches common MSVC8-era node prefix used in many engine maps:
+   * left/parent/right at +0x00/+0x04/+0x08.
+   */
+  template <class Node>
+  struct Tree
+  {
+    Node* left;   // +0x00
+    Node* parent; // +0x04
+    Node* right;  // +0x08
+  };
 
-        /**
-         * Sentinel "head" node used by MSVC's _Tree:
-         * - head->parent = root
-         * - head->left   = leftmost
-         * - head->right  = rightmost
-         * The end() iterator equals head itself.
-         */
-        using Head = NodeBase;
+  /**
+   * Sentinel "head" node used by MSVC's _Tree:
+   * - head->parent = root
+   * - head->left   = leftmost
+   * - head->right  = rightmost
+   * The end() iterator equals head itself.
+   */
+  using Head = NodeBase;
 
-        /** Return root pointer. */
-        inline NodeBase* root(Head* head) noexcept { return head->parent; }
-        /** Return leftmost node. */
-        inline NodeBase* leftmost(Head* head) noexcept { return head->left; }
-        /** Return rightmost node. */
-        inline NodeBase* rightmost(Head* head) noexcept { return head->right; }
-        /** Return end() sentinel (same as head). */
-        inline NodeBase* end(Head* head) noexcept { return head; }
+  /** Return root pointer. */
+  inline NodeBase* root(Head* head) noexcept
+  {
+    return head->parent;
+  }
+  /** Return leftmost node. */
+  inline NodeBase* leftmost(Head* head) noexcept
+  {
+    return head->left;
+  }
+  /** Return rightmost node. */
+  inline NodeBase* rightmost(Head* head) noexcept
+  {
+    return head->right;
+  }
+  /** Return end() sentinel (same as head). */
+  inline NodeBase* end(Head* head) noexcept
+  {
+    return head;
+  }
 
-        /**
-         * Inorder successor (like std::_Tree::_Next).
-         */
-        inline NodeBase* next(NodeBase* x, Head* head) noexcept {
-            if (x->right) {
-                x = x->right;
-                while (x->left) x = x->left;
-                return x;
-            }
-            NodeBase* y = x->parent;
-            while (x == y->right) {
-                x = y;
-                y = y->parent;
-            }
-            return (x->right != y) ? y : head; // reach end() == head
+  /**
+   * Inorder successor (like std::_Tree::_Next).
+   */
+  inline NodeBase* next(NodeBase* x, Head* head) noexcept
+  {
+    if (x->right) {
+      x = x->right;
+      while (x->left)
+        x = x->left;
+      return x;
+    }
+    NodeBase* y = x->parent;
+    while (x == y->right) {
+      x = y;
+      y = y->parent;
+    }
+    return (x->right != y) ? y : head; // reach end() == head
+  }
+
+  /**
+   * Reset head to empty state.
+   */
+  inline void reset_empty(Head* head) noexcept
+  {
+    head->parent = head;
+    head->left = head;
+    head->right = head;
+  }
+
+  /**
+   * Erase a half-open range [first,last) by linear succ traversal.
+   *
+   * destroy_node: callback that must deallocate the physical node block.
+   * It is called once per erased node; value destruction is caller's duty if needed.
+   */
+  template <class Destroy> void erase_range(Head* head, NodeBase* first, NodeBase* last, Destroy destroyNode)
+  {
+    for (NodeBase* n = first; n != last;) {
+      NodeBase* nxt = next(n, head); // compute successor before destroying
+      destroyNode(n);
+      n = nxt;
+    }
+  }
+
+  /**
+   * Clear the entire tree: erase [leftmost(), end()) and reset head.
+   *
+   * destroy_node: see erase_range.
+   */
+  template <class Destroy> void clear_all(Head* head, Destroy destroyNode)
+  {
+    if (!head)
+      return;
+    erase_range(head, leftmost(head), end(head), destroyNode);
+    reset_empty(head);
+  }
+
+  /**
+   * Read-only adapter for sentinel-based RB-trees with explicit nil nodes.
+   *
+   * Traits contract:
+   * - static Node* parent(Node*) noexcept;
+   * - static Node* left(Node*) noexcept;
+   * - static Node* right(Node*) noexcept;
+   * - static bool is_sentinel(const Node*) noexcept;
+   */
+  template <class Node, class Traits> class SentinelTreeView
+  {
+  public:
+    explicit SentinelTreeView(Node* head) noexcept :
+        head_(head)
+    {}
+
+    [[nodiscard]] Node* head() const noexcept
+    {
+      return head_;
+    }
+    [[nodiscard]] bool valid() const noexcept
+    {
+      return head_ != nullptr;
+    }
+
+    template <class Key, class NodeLessThanKey>
+    [[nodiscard]] Node* lower_bound(const Key& key, NodeLessThanKey nodeLessThanKey) const noexcept
+    {
+      if (!head_) {
+        return nullptr;
+      }
+
+      Node* candidate = head_;
+      for (Node* node = Traits::parent(head_); !Traits::is_sentinel(node);) {
+        if (nodeLessThanKey(*node, key)) {
+          node = Traits::right(node);
+        } else {
+          candidate = node;
+          node = Traits::left(node);
         }
+      }
 
-        /**
-         * Reset head to empty state.
-         */
-        inline void reset_empty(Head* head) noexcept {
-            head->parent = head;
-            head->left = head;
-            head->right = head;
-        }
+      return candidate;
+    }
 
-        /**
-         * Erase a half-open range [first,last) by linear succ traversal.
-         *
-         * destroy_node: callback that must deallocate the physical node block.
-         * It is called once per erased node; value destruction is caller's duty if needed.
-         */
-        template <class Destroy>
-        void erase_range(Head* head, NodeBase* first, NodeBase* last, Destroy destroyNode) {
-            for (NodeBase* n = first; n != last; ) {
-                NodeBase* nxt = next(n, head); // compute successor before destroying
-                destroyNode(n);
-                n = nxt;
-            }
-        }
+    template <class Key, class NodeLessThanKey>
+    [[nodiscard]] Node* find_equal_or_head(const Key& key, NodeLessThanKey nodeLessThanKey) const noexcept
+    {
+      if (!head_) {
+        return nullptr;
+      }
 
-        /**
-         * Clear the entire tree: erase [leftmost(), end()) and reset head.
-         *
-         * destroy_node: see erase_range.
-         */
-        template <class Destroy>
-        void clear_all(Head* head, Destroy destroyNode) {
-            if (!head) return;
-            erase_range(head, leftmost(head), end(head), destroyNode);
-            reset_empty(head);
-        }
+      Node* const candidate = lower_bound(key, nodeLessThanKey);
+      if (!candidate || candidate == head_) {
+        return head_;
+      }
 
-        /**
-         * Default deleter for nodes allocated with operator new/delete.
-         */
-        struct DefaultNodeDeleter {
-            void operator()(NodeBase* n) const noexcept { operator delete(n); }
-        };
+      return nodeLessThanKey(*candidate, key) ? head_ : candidate;
+    }
 
-        /**
-         * Embedded tree that owns only the sentinel head and deletes all nodes on destruction.
-         * Nodes must begin with NodeBase layout.
-         */
-        template<class NodeDeleter = DefaultNodeDeleter>
-        class EmbeddedTree {
-        public:
-            EmbeddedTree() noexcept { reset_empty(&head_); }
-            ~EmbeddedTree() { clear(); }
+  private:
+    Node* head_;
+  };
 
-            /**
-             * Clear the whole tree by linear successor traversal, then reset head.
-             */
-            void clear() noexcept {
-                // Erase [leftmost, end)
-                for (NodeBase* n = leftmost(&head_); n != end(&head_); ) {
-                    NodeBase* nxt = next(n, &head_);
-                    deleter_(n);
-                    n = nxt;
-                }
-                reset_empty(&head_);
-            }
+  template <
+    class Node,
+    Node* Node::* ParentMember,
+    Node* Node::* LeftMember,
+    Node* Node::* RightMember,
+    auto Node::* SentinelMember>
+  struct MemberSentinelTreeTraits
+  {
+    [[nodiscard]] static Node* parent(Node* node) noexcept
+    {
+      return node ? node->*ParentMember : nullptr;
+    }
+    [[nodiscard]] static Node* left(Node* node) noexcept
+    {
+      return node ? node->*LeftMember : nullptr;
+    }
+    [[nodiscard]] static Node* right(Node* node) noexcept
+    {
+      return node ? node->*RightMember : nullptr;
+    }
+    [[nodiscard]] static bool is_sentinel(const Node* node) noexcept
+    {
+      return node == nullptr || (node->*SentinelMember) != 0;
+    }
+  };
 
-            /** Access to the sentinel head (for advanced ops). */
-            Head* head() noexcept { return &head_; }
-            const Head* head() const noexcept { return &head_; }
+  template <
+    class Node,
+    Node* Node::* ParentMember,
+    Node* Node::* LeftMember,
+    Node* Node::* RightMember,
+    auto Node::* SentinelMember>
+  using MemberSentinelTreeView =
+    SentinelTreeView<Node, MemberSentinelTreeTraits<Node, ParentMember, LeftMember, RightMember, SentinelMember>>;
 
-        private:
-            Head         head_{};
-            NodeDeleter  deleter_{};
-        };
+  template <
+    class Node,
+    Node* Node::* ParentMember,
+    Node* Node::* LeftMember,
+    Node* Node::* RightMember,
+    auto Node::* SentinelMember,
+    class Key,
+    class NodeLessThanKey>
+  [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  {
+    return MemberSentinelTreeView<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}.lower_bound(
+      key, nodeLessThanKey
+    );
+  }
 
-    } // namespace tree
-}
+  template <
+    class Node,
+    Node* Node::* ParentMember,
+    Node* Node::* LeftMember,
+    Node* Node::* RightMember,
+    auto Node::* SentinelMember,
+    class Key,
+    class NodeLessThanKey>
+  [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  {
+    return MemberSentinelTreeView<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}
+      .find_equal_or_head(key, nodeLessThanKey);
+  }
+
+  template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
+  [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  {
+    constexpr auto kParent = static_cast<Node* Node::*>(&msvc8::Tree<Node>::parent);
+    constexpr auto kLeft = static_cast<Node* Node::*>(&msvc8::Tree<Node>::left);
+    constexpr auto kRight = static_cast<Node* Node::*>(&msvc8::Tree<Node>::right);
+    return MemberSentinelTreeView<Node, kParent, kLeft, kRight, SentinelMember>{head}.lower_bound(
+      key,
+      nodeLessThanKey
+    );
+  }
+
+  template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
+  [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  {
+    constexpr auto kParent = static_cast<Node* Node::*>(&msvc8::Tree<Node>::parent);
+    constexpr auto kLeft = static_cast<Node* Node::*>(&msvc8::Tree<Node>::left);
+    constexpr auto kRight = static_cast<Node* Node::*>(&msvc8::Tree<Node>::right);
+    return MemberSentinelTreeView<Node, kParent, kLeft, kRight, SentinelMember>{head}.find_equal_or_head(
+      key,
+      nodeLessThanKey
+    );
+  }
+
+  /**
+   * Default deleter for nodes allocated with operator new/delete.
+   */
+  struct DefaultNodeDeleter
+  {
+    void operator()(NodeBase* n) const noexcept
+    {
+      operator delete(n);
+    }
+  };
+
+  /**
+   * Embedded tree that owns only the sentinel head and deletes all nodes on destruction.
+   * Nodes must begin with NodeBase layout.
+   */
+  template <class NodeDeleter = DefaultNodeDeleter> class EmbeddedTree
+  {
+  public:
+    EmbeddedTree() noexcept
+    {
+      reset_empty(&head_);
+    }
+    ~EmbeddedTree()
+    {
+      clear();
+    }
+
+    /**
+     * Clear the whole tree by linear successor traversal, then reset head.
+     */
+    void clear() noexcept
+    {
+      // Erase [leftmost, end)
+      for (NodeBase* n = leftmost(&head_); n != end(&head_);) {
+        NodeBase* nxt = next(n, &head_);
+        deleter_(n);
+        n = nxt;
+      }
+      reset_empty(&head_);
+    }
+
+    /** Access to the sentinel head (for advanced ops). */
+    Head* head() noexcept
+    {
+      return &head_;
+    }
+    const Head* head() const noexcept
+    {
+      return &head_;
+    }
+
+  private:
+    Head head_{};
+    NodeDeleter deleter_{};
+  };
+
+} // namespace msvc8

@@ -1,109 +1,82 @@
 #pragma once
-#include <list>
+#include <cstddef>
+#include <cstdint>
 #include <map>
-#include <mutex>
 
 #include "boost/mutex.h"
-#include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatList.h"
 
 namespace moho
 {
-    /**
-     * Host entry: intrusive node + cached name + small aux (mVal).
-     */
-    struct Host :
-		TDatListItem<Host, void>
-    {
-        msvc8::string mName;
-        int mVal{ 0 };
-    };
+  struct Host : TDatListItem<Host, void>
+  {
+    // +0x08
+    msvc8::string mName;
+
+    // +0x24
+    // FA/Moho keep a back-link to a map node/iterator for O(1) erase from the tree.
+    // In lifted C++ we keep this as an opaque slot for parity/documentation.
+    void* mMapNodeBackLink{nullptr};
+  };
+
+#if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
+  static_assert(sizeof(Host) == 0x28, "Host size must be 0x28");
+#endif
+
+  struct CHostManager
+  {
+    boost::mutex mLock;
+    std::map<std::uint32_t, Host> mHosts;
+    TDatList<Host, void> mHostList;
 
     /**
-	 * Hostname cache manager: map + intrusive MRU list.
-	 * - mHosts: key = IPv4 (host byte order), value = Host (stable address in std::map)
-	 * - mHostList: MRU order; front = most recent, back = LRU
-	 */
-    struct CHostManager
-    {
-        boost::mutex mLock;
-        std::map<unsigned, Host> mHosts;
-        TDatList<Host, void> mHostList;
-
-        /**
-         * Resolve (or fetch cached) host name for IPv4 address (host byte order).
-         */
-        msvc8::string GetHostName(u_long host);
-
-        /**
-         * Out-parameter variant (drop-in for old code).
-         */
-        msvc8::string& GetHostName(const u_long host, msvc8::string& out) {
-            out = GetHostName(host);
-            return out;
-        }
-
-    private:
-        /** Max entries as in the original binary threshold (0x4C). */
-        static constexpr std::size_t kMaxEntries = 0x4C;
-
-        /**
-         * Move host to MRU front (no-op if already there).
-         */
-        void Touch(Host& h) noexcept;
-
-        /**
-         * Remove LRU entries until <= capacity.
-         */
-        void EvictIfNeeded() noexcept;
-
-        /**
-         * Linear search: map key for a given Host*. O(N), tolerable for N<=0x4C.
-         */
-        auto FindByValue(const Host* h) -> std::map<unsigned, Host>::iterator {
-            for (auto it = mHosts.begin(); it != mHosts.end(); ++it) {
-                if (&it->second == h) return it;
-            }
-            return mHosts.end();
-        }
-
-        /**
-         * Reverse DNS via getnameinfo; fallback to dotted IPv4 on failure.
-         */
-        static msvc8::string ResolveHostName(const u_long host);
-    };
-
-    /**
-     * Address: 0x004801C5
-     * Convert host-order IPv4 (u32) to dotted decimal.
+     * Address: 0x0047FBE0 (FUN_0047FBE0)
      *
-     * @param host 
-     * @return 
-     */
-    msvc8::string NET_GetDottedOctetFromUInt32(u_long host);
-
-    /**
-     * Address: 0x00480200
+     * uint32_t
      *
-     * @param host 
-     * @return 
+     * What it does:
+     * Returns a cached hostname for `host` (host byte order) and updates MRU ordering.
+     * On cache miss, resolves with getnameinfo and inserts into the MRU cache.
      */
-    uint32_t NET_GetUInt32FromDottedOcted(const msvc8::string& host);
+    msvc8::string GetHostName(std::uint32_t host);
 
     /**
-     * Address: 0x0047FF10
-	 * Resolve "host[:port]" to IPv4 address and port using getaddrinfo(AF_INET).
-	 * - If no port in the string, uses defaultPort (2nd argument in the original).
-	 * - Chooses TCP (SOCK_STREAM/IPPROTO_TCP) or UDP (SOCK_DGRAM/IPPROTO_UDP) by isTCP.
-	 * - Writes results in host byte order: addr (u_long), port (u_short).
-	 *
-     * @param str 
-     * @param defaultPort 
-     * @param isTcp 
-     * @param address 
-     * @param port 
-     * @return true on success, false on failure.
+     * Address: <synthetic overload for lifted call sites>
+     *
+     * What it does:
+     * Compatibility overload that forwards to the value-returning variant.
      */
-    bool NET_GetAddrInfo(const char* str, u_short defaultPort, bool isTcp, u_long& address, u_short& port);
-}
+    msvc8::string& GetHostName(std::uint32_t host, msvc8::string& out);
+
+  private:
+    // FA binary: 0x4C entries, Moho binary: 0x0C entries.
+    // FAF runtime follows FA behavior.
+    static constexpr std::size_t kMaxEntriesFA = 0x4C;
+    static constexpr std::size_t kMaxEntriesMoho = 0x0C;
+    static constexpr std::size_t kMaxEntries = kMaxEntriesFA;
+
+    /**
+     * Move host to MRU front (no-op if already there).
+     */
+    void Touch(Host& h) noexcept;
+
+    /**
+     * Remove LRU entries until <= capacity.
+     */
+    void EvictIfNeeded() noexcept;
+
+    /**
+     * Linear search: map key for a given Host*. O(N), tolerable for N<=0x4C.
+     */
+    auto FindByValue(const Host* h) -> std::map<std::uint32_t, Host>::iterator;
+
+    /**
+     * Address: <inlined inside 0x0047FBE0 in FA and 0x1007A1A0 in Moho>
+     *
+     * What it does:
+     * Reverse DNS via getnameinfo; falls back to dotted IPv4 on failure.
+     */
+    static msvc8::string ResolveHostName(std::uint32_t host);
+  };
+} // namespace moho

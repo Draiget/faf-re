@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
@@ -12,6 +13,25 @@
 
 namespace msvc8
 {
+#ifndef MSVC8_CONTAINER_PROXY_DEFINED
+#define MSVC8_CONTAINER_PROXY_DEFINED 1
+    struct _Container_proxy
+    {
+        void* _Myfirstiter;
+    };
+#endif
+
+    // Base that holds the proxy pointer (debug iterator support footprint)
+    struct _Container_base
+    {
+        _Container_proxy* _Myproxy;
+
+        _Container_base()
+            : _Myproxy(0)
+        {
+        }
+    };
+
     /**
      * MSVC8-compatible vector with fixed ABI (16 bytes).
      * Only pointer fields are stored: proxy (opaque), begin, end, capacity-end.
@@ -564,19 +584,411 @@ namespace msvc8
         }
     };
 
-    // Minimal raw list header often seen as 12 bytes for VC8 std::list.
-    // We don't assume node layout here; this is header-only (opaque).
-    template <class T>
-    struct list {
-        void* _Head;     // +0x0 (sentinel/head)
-        void* _TailOrAl; // +0x4 (tail or allocator impl field)
-        uint32_t  _Size;     // +0x8 (element count, observed in this binary)
+    template <class T, class Alloc = std::allocator<T> >
+    class list : public _Container_base
+    {
+    public:
+        typedef T                value_type;
+        typedef Alloc            allocator_type;
+        typedef std::size_t      size_type;
+        typedef std::ptrdiff_t   difference_type;
+        typedef T* pointer;
+        typedef const T* const_pointer;
+        typedef T& reference;
+        typedef const T& const_reference;
 
-        // std-ish
-        [[nodiscard]] bool empty() const { return _Size == 0; }
-        [[nodiscard]] uint32_t size() const { return _Size; }
-        // Iteration over nodes requires node layout; add later when known.
+    private:
+        struct _Node;
+        struct _Node_base
+        {
+            _Node_base* _Next;
+            _Node_base* _Prev;
+        };
+
+        struct _Node : _Node_base
+        {
+            value_type _Value;
+
+            _Node()
+                : _Node_base()
+                , _Value()
+            {
+                this->_Next = this;
+                this->_Prev = this;
+            }
+
+            explicit _Node(const value_type& v)
+                : _Node_base()
+                , _Value(v)
+            {
+                this->_Next = this;
+                this->_Prev = this;
+            }
+        };
+
+        typedef typename std::allocator_traits<Alloc>::template rebind_alloc<_Node> _Node_alloc_type;
+        typedef _Node_base* _Nodeptr;
+
+        _Nodeptr  _Myhead;   // offset +4 from base
+        size_type _Mysize;   // offset +8 from base
+
+    public:
+        class iterator
+        {
+            friend class list;
+            _Nodeptr _Ptr;
+
+            explicit iterator(_Nodeptr p)
+                : _Ptr(p)
+            {
+            }
+
+        public:
+            typedef std::bidirectional_iterator_tag iterator_category;
+            typedef value_type        value_type;
+            typedef difference_type   difference_type;
+            typedef pointer           pointer;
+            typedef reference         reference;
+
+            iterator()
+                : _Ptr(0)
+            {
+            }
+
+            reference operator*() const
+            {
+                return static_cast<_Node*>(_Ptr)->_Value;
+            }
+
+            pointer operator->() const
+            {
+                return &static_cast<_Node*>(_Ptr)->_Value;
+            }
+
+            iterator& operator++()
+            {
+                _Ptr = _Ptr->_Next;
+                return *this;
+            }
+
+            iterator operator++(int)
+            {
+                iterator tmp(*this);
+                ++(*this);
+                return tmp;
+            }
+
+            iterator& operator--()
+            {
+                _Ptr = _Ptr->_Prev;
+                return *this;
+            }
+
+            iterator operator--(int)
+            {
+                iterator tmp(*this);
+                --(*this);
+                return tmp;
+            }
+
+            bool operator==(const iterator& other) const
+            {
+                return _Ptr == other._Ptr;
+            }
+
+            bool operator!=(const iterator& other) const
+            {
+                return _Ptr != other._Ptr;
+            }
+        };
+
+        class const_iterator
+        {
+            friend class list;
+            _Nodeptr _Ptr;
+
+            explicit const_iterator(_Nodeptr p)
+                : _Ptr(p)
+            {
+            }
+
+        public:
+            typedef std::bidirectional_iterator_tag iterator_category;
+            typedef value_type        value_type;
+            typedef difference_type   difference_type;
+            typedef const_pointer     pointer;
+            typedef const_reference   reference;
+
+            const_iterator()
+                : _Ptr(0)
+            {
+            }
+
+            const_iterator(const iterator& it)
+                : _Ptr(it._Ptr)
+            {
+            }
+
+            reference operator*() const
+            {
+                return static_cast<_Node*>(_Ptr)->_Value;
+            }
+
+            pointer operator->() const
+            {
+                return &static_cast<_Node*>(_Ptr)->_Value;
+            }
+
+            const_iterator& operator++()
+            {
+                _Ptr = _Ptr->_Next;
+                return *this;
+            }
+
+            const_iterator operator++(int)
+            {
+                const_iterator tmp(*this);
+                ++(*this);
+                return tmp;
+            }
+
+            const_iterator& operator--()
+            {
+                _Ptr = _Ptr->_Prev;
+                return *this;
+            }
+
+            const_iterator operator--(int)
+            {
+                const_iterator tmp(*this);
+                --(*this);
+                return tmp;
+            }
+
+            bool operator==(const const_iterator& other) const
+            {
+                return _Ptr == other._Ptr;
+            }
+
+            bool operator!=(const const_iterator& other) const
+            {
+                return _Ptr != other._Ptr;
+            }
+        };
+
+        typedef std::reverse_iterator<iterator>       reverse_iterator;
+        typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+
+        list()
+            : _Myhead(0)
+            , _Mysize(0)
+        {
+            _Init();
+        }
+
+        explicit list(const allocator_type&)
+            : _Myhead(0)
+            , _Mysize(0)
+        {
+            _Init();
+        }
+
+        ~list()
+        {
+            _Tidy();
+            _Free_head();
+            _Free_proxy();
+        }
+
+        bool empty() const
+        {
+            return _Mysize == 0;
+        }
+
+        size_type size() const
+        {
+            return _Mysize;
+        }
+
+        iterator begin()
+        {
+            return iterator(_Myhead->_Next);
+        }
+
+        const_iterator begin() const
+        {
+            return const_iterator(_Myhead->_Next);
+        }
+
+        iterator end()
+        {
+            return iterator(_Myhead);
+        }
+
+        const_iterator end() const
+        {
+            return const_iterator(_Myhead);
+        }
+
+        reverse_iterator rbegin()
+        {
+            return reverse_iterator(end());
+        }
+
+        const_reverse_iterator rbegin() const
+        {
+            return const_reverse_iterator(end());
+        }
+
+        reverse_iterator rend()
+        {
+            return reverse_iterator(begin());
+        }
+
+        const_reverse_iterator rend() const
+        {
+            return const_reverse_iterator(begin());
+        }
+
+        reference front()
+        {
+            return *begin();
+        }
+
+        const_reference front() const
+        {
+            return *begin();
+        }
+
+        reference back()
+        {
+            iterator it = end();
+            --it;
+            return *it;
+        }
+
+        const_reference back() const
+        {
+            const_iterator it = end();
+            --it;
+            return *it;
+        }
+
+        void clear()
+        {
+            _Tidy();
+        }
+
+        void push_back(const value_type& v)
+        {
+            insert(end(), v);
+        }
+
+        void push_front(const value_type& v)
+        {
+            insert(begin(), v);
+        }
+
+        iterator insert(const_iterator pos, const value_type& v)
+        {
+            _Node_alloc_type al;
+            _Node* node = al.allocate(1);
+            new (node) _Node(v);
+
+            _Nodeptr where = pos._Ptr;
+            _Nodeptr prev = where->_Prev;
+
+            node->_Next = where;
+            node->_Prev = prev;
+            prev->_Next = node;
+            where->_Prev = node;
+
+            ++_Mysize;
+            return iterator(node);
+        }
+
+        iterator erase(const_iterator pos)
+        {
+            _Nodeptr node = pos._Ptr;
+            _Nodeptr next = node->_Next;
+            _Nodeptr prev = node->_Prev;
+
+            prev->_Next = next;
+            next->_Prev = prev;
+
+            _Node_alloc_type al;
+            _Node* ptr = static_cast<_Node*>(node);
+            ptr->~_Node();
+            al.deallocate(ptr, 1);
+
+            --_Mysize;
+            return iterator(next);
+        }
+
+    private:
+        void _Init()
+        {
+            _Alloc_proxy();
+            _Buy_head();
+        }
+
+        void _Alloc_proxy()
+        {
+            this->_Myproxy = new _Container_proxy();
+            this->_Myproxy->_Myfirstiter = 0;
+        }
+
+        void _Free_proxy()
+        {
+            delete this->_Myproxy;
+            this->_Myproxy = 0;
+        }
+
+        void _Buy_head()
+        {
+            _Node_alloc_type al;
+            _Node* head = al.allocate(1);
+            new (head) _Node();      // sentinel
+            _Myhead = head;
+            _Mysize = 0;
+        }
+
+        void _Free_head()
+        {
+            if (!_Myhead)
+                return;
+
+            _Node_alloc_type al;
+            _Node* head = static_cast<_Node*>(_Myhead);
+            head->~_Node();
+            al.deallocate(head, 1);
+            _Myhead = 0;
+        }
+
+        void _Tidy()
+        {
+            if (!_Myhead)
+                return;
+
+            _Node_alloc_type al;
+            _Nodeptr head = _Myhead;
+            _Nodeptr cur = head->_Next;
+
+            while (cur != head)
+            {
+                _Nodeptr next = cur->_Next;
+                _Node* node = static_cast<_Node*>(cur);
+                node->~_Node();
+                al.deallocate(node, 1);
+                cur = next;
+            }
+
+            head->_Next = head;
+            head->_Prev = head;
+            _Mysize = 0;
+        }
     };
+    static_assert(sizeof(list<int>) == 0xC, "list<int> == 0xC");
 
     template<class T>
 	struct linked_list

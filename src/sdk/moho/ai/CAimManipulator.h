@@ -2,9 +2,16 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace LuaPlus { class LuaObject; class LuaState; } // forward decl
+#include "moho/lua/CScrLuaBinderFwd.h"
 
-namespace moho {
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
+namespace moho
+{
   /**
    * VFTABLE: 0x00E213C0
    * COL:  0x00E7AC30
@@ -27,109 +34,46 @@ namespace moho {
     virtual void AimManip() = 0;
   };
 
-/**
- * VFTABLE: 0x00E21438
- * COL:  0x00E7A9E8
- */
-class CAimManipulatorSetFiringArc_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21438
+   * COL:  0x00E7A9E8
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorSetFiringArc_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E21440
- * COL:  0x00E7A998
- */
-class CAimManipulatorSetResetPoseTime_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21440
+   * COL:  0x00E7A998
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorSetResetPoseTime_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E21448
- * COL:  0x00E7A948
- */
-class CAimManipulatorOnTarget_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21448
+   * COL:  0x00E7A948
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorOnTarget_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E21450
- * COL:  0x00E7A8F8
- */
-class CAimManipulatorSetEnabled_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21450
+   * COL:  0x00E7A8F8
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorSetEnabled_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E21458
- * COL:  0x00E7A8A8
- */
-class CAimManipulatorGetHeadingPitch_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21458
+   * COL:  0x00E7A8A8
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorGetHeadingPitch_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E21460
- * COL:  0x00E7A858
- */
-class CAimManipulatorSetHeadingPitch_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21460
+   * COL:  0x00E7A858
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorSetHeadingPitch_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E21468
- * COL:  0x00E7A808
- */
-class CAimManipulatorSetAimHeadingOffset_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E21468
+   * COL:  0x00E7A808
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAimManipulatorSetAimHeadingOffset_LuaFuncDef = ::moho::CScrLuaBinder;
 
 } // namespace moho

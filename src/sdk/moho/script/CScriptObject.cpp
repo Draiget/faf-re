@@ -1,186 +1,594 @@
-﻿#include "CScriptObject.h"
+#include "CScriptObject.h"
+
+#include <cstdint>
+#include <exception>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+
 using namespace moho;
 
-msvc8::string CScriptObject::GetErrorDescription() {
-	return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<uintptr_t>(this));
+namespace
+{
+  gpg::RType* GetCScriptObjectPointerType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(CScriptObject*));
+    }
+    return cached;
+  }
+
+  gpg::RRef MakeCScriptObjectPointerRef(CScriptObject* scriptObject)
+  {
+    gpg::RRef ref{};
+    ref.mObj = scriptObject;
+    ref.mType = GetCScriptObjectPointerType();
+    return ref;
+  }
+
+  LuaPlus::LuaObject GetScriptObjectMetatable(LuaPlus::LuaState* state)
+  {
+    return CScrLuaMetatableFactory<CScriptObject*>::Instance().Get(state);
+  }
+
+  /**
+   * Address: 0x006B0940 (FUN_006B0940) guard prologue/epilogue pattern
+   *
+   * Mirrors the weak-object intrusive guard chain used by callback wrappers:
+   * - inserts stack marker into owner link slot at (this + 0x04),
+   * - restores the link by searching for that marker on function exit.
+   */
+  class CallbackWeakGuard final
+  {
+  public:
+    explicit CallbackWeakGuard(CScriptObject* obj)
+    {
+      if (!obj) {
+        return;
+      }
+
+      m_ownerLinkSlot = reinterpret_cast<void***>(reinterpret_cast<uint8_t*>(obj) + 0x04u);
+      m_prev = *m_ownerLinkSlot;
+      *m_ownerLinkSlot = Marker();
+    }
+
+    ~CallbackWeakGuard()
+    {
+      Restore();
+    }
+
+    [[nodiscard]]
+    CScriptObject* ResolveObjectForWarning() const
+    {
+      if (!m_ownerLinkSlot) {
+        return nullptr;
+      }
+      return reinterpret_cast<CScriptObject*>(reinterpret_cast<uint8_t*>(m_ownerLinkSlot) - 0x04u);
+    }
+
+  private:
+    [[nodiscard]]
+    void** Marker() const
+    {
+      return reinterpret_cast<void**>(const_cast<void****>(&m_ownerLinkSlot));
+    }
+
+    void Restore()
+    {
+      if (!m_ownerLinkSlot) {
+        return;
+      }
+
+      void*** cursor = m_ownerLinkSlot;
+      while (*cursor != Marker()) {
+        cursor = reinterpret_cast<void***>(reinterpret_cast<uint8_t*>(*cursor) + 0x04u);
+      }
+      *cursor = m_prev;
+    }
+
+  private:
+    void*** m_ownerLinkSlot = nullptr;
+    void** m_prev = nullptr;
+  };
+} // namespace
+
+/**
+ * Address: 0x004C70A0
+ */
+msvc8::string CScriptObject::GetErrorDescription()
+{
+  return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<uintptr_t>(this));
 }
 
+/**
+ * Address: 0x004C70D0
+ */
 void CScriptObject::CreateLuaObject(
-	const LuaPlus::LuaObject& metaOrFactory,
-	const LuaPlus::LuaObject& arg1,
-	const LuaPlus::LuaObject& arg2,
-	const LuaPlus::LuaObject& arg3)
+  const LuaPlus::LuaObject& metaOrFactory,
+  const LuaPlus::LuaObject& arg1,
+  const LuaPlus::LuaObject& arg2,
+  const LuaPlus::LuaObject& arg3
+)
 {
-    /*
-    LuaPlus::LuaState* S = metaOrFactory.GetActiveState();
-    if (!S) return;
+  LuaPlus::LuaState* state = metaOrFactory.GetActiveState();
+  if (!state) {
+    return;
+  }
 
-    LuaPlus::LuaObject meta = metaOrFactory.GetMetaTable();
-    LuaPlus::LuaObject call = meta.GetByName("__call");
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
 
-    LuaPlus::LuaObject result; // a2a в дизасме
+  LuaPlus::LuaObject callObject;
+  metaOrFactory.PushStack(lstate);
+  if (lua_getmetatable(lstate, -1) != 0) {
+    lua_pushstring(lstate, "__call");
+    lua_gettable(lstate, -2);
+    callObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
+  }
+  lua_settop(lstate, stackTop);
 
-    if (call.IsNil()) {
-        // No __call: create empty table and set metatable to metaOrFactory
-        result.AssignNewTable(S, 0, 1); // S, narray, nrec
-        result.SetMetaTable(metaOrFactory);
-    } else {
-	    LuaPlus::lua_State* L = S->m_state;
-        LuaTopGuard top{ L };
+  LuaPlus::LuaObject created;
+  if (callObject.IsNil()) {
+    created.AssignNewTable(state, 0, 1);
+    created.SetMetaTable(metaOrFactory);
+  } else {
+    callObject.PushStack(lstate);
+    const int funcTop = lua_gettop(lstate);
 
-        // Push __call function and arguments
-        call.PushStack(S);
-        const int funcTop = lua_gettop(L); // v9 in asm
-
-        metaOrFactory.PushStack(S);        // first argument to __call (the "self")
-        if (arg1.GetActiveState()) arg1.PushStack(S);
-        if (arg2.GetActiveState()) arg2.PushStack(S);
-        if (arg3.GetActiveState()) arg3.PushStack(S);
-
-        const int afterPush = lua_gettop(L);
-        const int nargs = afterPush - funcTop;
-
-        // lua_call(..., 1)
-        // L, nargs, nresults, errfunc
-        if (lua_pcall(L, nargs, 1, 0)) {
-            // Error path: warn with error string on top
-            LuaPlus::LuaStackObject err{ S, -1 };
-            gpg::Warnf("Error in lua: %s", err.GetString());
-            // LuaTopGuard restores stack
-            return;
-        }
-
-        // Assign result from top of stack
-        LuaPlus::LuaStackObject topObj{ S, -1 };
-        result = topObj;
-        // LuaTopGuard restores stack to previous
+    metaOrFactory.PushStack(lstate);
+    if (arg1.m_state) {
+      const_cast<LuaPlus::LuaObject&>(arg1).PushStack(lstate);
+    }
+    if (arg2.m_state) {
+      const_cast<LuaPlus::LuaObject&>(arg2).PushStack(lstate);
+    }
+    if (arg3.m_state) {
+      const_cast<LuaPlus::LuaObject&>(arg3).PushStack(lstate);
     }
 
-    // Wire result into this object
-    SetLuaObject(result);
-	*/
-}
-
-void CScriptObject::SetLuaObject(const LuaPlus::LuaObject& obj) {
-    /*
-    LuaPlus::LuaState* S = obj.GetActiveState();
-    if (!S || obj.IsNil()) return;
-
-    // Assign table itself
-    Table = obj;
-
-    // Create C++ back-reference userdata (binary used func_CreateLuaScriptObject)
-    // Emulate via a small helper: store 'this' as lightuserdata or proper userdata.
-    // Here we pretend LuaPlus can wrap a pointer:
-    UserData.AssignUserData(this);            // <-- implement in your LuaPlus shim
-    Table.SetObject(kCObjectKey, UserData);   // table["_c_object"] = userdata(this)
-    */
-}
-
-void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, const char* message) {
-    /*
-	const char* where = "<deleted object>";
-    std::string tmp;
-    if (obj) {
-        obj->GetErrorDescription(tmp);
-        where = tmp.c_str();
+    const int nargs = lua_gettop(lstate) - funcTop;
+    if (lua_pcall(lstate, nargs, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      gpg::Warnf("Error in lua: %s", err.GetString());
+      lua_settop(lstate, stackTop);
+      return;
     }
-    gpg::Warnf("Error running %s script in %s: %s", which, where, message);
-    */
+
+    created = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
+    lua_settop(lstate, stackTop);
+  }
+
+  SetLuaObject(created);
 }
 
-LuaPlus::LuaObject CScriptObject::FindScript(LuaPlus::LuaObject* dest, const char* name) {
-    /*
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* S = Table.GetActiveState();
-    if (!S) { out.AssignNil(); return out; }
+/**
+ * Address: 0x004C72D0
+ */
+void CScriptObject::SetLuaObject(const LuaPlus::LuaObject& obj)
+{
+  LuaPlus::LuaState* state = obj.GetActiveState();
+  if (!state || obj.IsNil()) {
+    return;
+  }
 
-    lua_State* L = S->m_state;
-    LuaTopGuard guard{L};
+  mLuaObj = obj;
+  const gpg::RRef ptrRef = MakeCScriptObjectPointerRef(this);
+  cObject.AssignNewUserData(state, ptrRef);
 
-    Table.PushStack(S);
-    lua_pushstring(L, name);
-    lua_gettable(L, -2); // table[name]
-
-    LuaPlus::LuaStackObject topObj{S, -1};
-    out = topObj;
-    return out;
-     */
-    return LuaPlus::LuaObject{};
+  // sub_100BA410: apply metatable from CScrLuaMetatableFactory<CScriptObject*>.
+  LuaPlus::LuaObject meta = GetScriptObjectMetatable(state);
+  if (meta) {
+    cObject.SetMetaTable(meta);
+  }
+  mLuaObj.SetObject("_c_object", cObject);
 }
 
+/**
+ * Address: 0x004C7410
+ */
+void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, const char* message)
+{
+  const char* where = "<deleted object>";
+  msvc8::string description;
+  if (obj) {
+    description = obj->GetErrorDescription();
+    where = description.c_str();
+  }
+
+  gpg::Warnf("Error running %s script in %s: %s", which ? which : "<unknown>", where, message ? message : "");
+}
+
+/**
+ * Address: 0x004C74B0
+ */
+LuaPlus::LuaObject CScriptObject::FindScript(LuaPlus::LuaObject* dest, const char* name)
+{
+  if (!dest) {
+    return {};
+  }
+
+  *dest = LuaPlus::LuaObject{};
+
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return *dest;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  mLuaObj.PushStack(lstate);
+  lua_pushstring(lstate, name ? name : "");
+  lua_gettable(lstate, -2);
+
+  *dest = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
+  lua_settop(lstate, stackTop);
+  return *dest;
+}
+
+/**
+ * Address: 0x004C7580
+ */
 bool CScriptObject::RunScriptMultiRet(
-    const char* funcName, 
-    gpg::core::FastVector<LuaPlus::LuaObject>& out,
-	LuaPlus::LuaObject arg1, 
-    LuaPlus::LuaObject arg2, 
-    LuaPlus::LuaObject arg3, 
-    LuaPlus::LuaObject arg4,
-	LuaPlus::LuaObject arg5)
+  const char* funcName,
+  gpg::core::FastVector<LuaPlus::LuaObject>& out,
+  LuaPlus::LuaObject arg1,
+  LuaPlus::LuaObject arg2,
+  LuaPlus::LuaObject arg3,
+  LuaPlus::LuaObject arg4,
+  LuaPlus::LuaObject arg5
+)
 {
-    /*
-    LuaPlus::LuaState* S = Table.GetActiveState();
-    if (!S) { out.clear(); return false; }
+  out.Clear();
 
-    lua_State* L = S->m_state;
-    LuaTopGuard guard{L};
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return false;
+  }
 
-    // fn = Table[funcName]
-    Table.PushStack(S);
-    lua_pushstring(L, funcName);
-    const int keyTop = lua_gettop(L);
-    lua_gettable(L, -2); // pops key, pushes value
-    if (lua_type(L, keyTop) == LUA_TNIL || lua_isnil(L, -1)) {
-        out.clear();
-        return false;
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  mLuaObj.PushStack(lstate);
+  const int tableIndex = lua_gettop(lstate);
+  lua_pushstring(lstate, funcName ? funcName : "");
+  lua_gettable(lstate, -2);
+  if (lua_isnil(lstate, -1)) {
+    lua_settop(lstate, stackTop);
+    return false;
+  }
+
+  const int funcTop = lua_gettop(lstate);
+  mLuaObj.PushStack(lstate);
+  if (arg1.m_state) {
+    arg1.PushStack(lstate);
+  }
+  if (arg2.m_state) {
+    arg2.PushStack(lstate);
+  }
+  if (arg3.m_state) {
+    arg3.PushStack(lstate);
+  }
+  if (arg4.m_state) {
+    arg4.PushStack(lstate);
+  }
+  if (arg5.m_state) {
+    arg5.PushStack(lstate);
+  }
+
+  const int nargs = lua_gettop(lstate) - funcTop;
+  if (lua_pcall(lstate, nargs, LUA_MULTRET, 0) != 0) {
+    const LuaPlus::LuaStackObject err(state, -1);
+    LogScriptWarning(this, funcName ? funcName : "<unknown>", err.GetString());
+    out.Clear();
+    lua_settop(lstate, stackTop);
+    return false;
+  }
+
+  const int retCount = lua_gettop(lstate) - tableIndex;
+  if (retCount > 0) {
+    out.Reserve(static_cast<size_t>(retCount));
+    for (int i = -retCount; i <= -1; ++i) {
+      LuaPlus::LuaObject value{LuaPlus::LuaStackObject(state, i)};
+      out.PushBack(value);
+    }
+  }
+
+  lua_settop(lstate, stackTop);
+  return true;
+}
+
+/**
+ * Address: 0x00581AA0
+ */
+void CScriptObject::CallbackStr(const char* callback)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, callback);
+  if (!script) {
+    return;
+  }
+
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  try {
+    script.PushStack(lstate);
+    mLuaObj.PushStack(lstate);
+
+    if (lua_pcall(lstate, 1, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
+    }
+    lua_settop(lstate, stackTop);
+  } catch (const std::exception& ex) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+  } catch (...) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+  }
+}
+
+/**
+ * Address: 0x005FCFE0
+ */
+void CScriptObject::CallbackStr(const char* callback, const char** arg0)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, callback);
+  if (!script) {
+    return;
+  }
+
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  try {
+    script.PushStack(lstate);
+    mLuaObj.PushStack(lstate);
+    lua_pushstring(lstate, (arg0 && *arg0) ? *arg0 : nullptr);
+
+    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
+    }
+    lua_settop(lstate, stackTop);
+  } catch (const std::exception& ex) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+  } catch (...) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+  }
+}
+
+/**
+ * Address: 0x0067F450
+ */
+void CScriptObject::CallbackStr(const char* callback, const char** arg0, const char** arg1)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, callback);
+  if (!script) {
+    return;
+  }
+
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  try {
+    script.PushStack(lstate);
+    mLuaObj.PushStack(lstate);
+    lua_pushstring(lstate, (arg0 && *arg0) ? *arg0 : nullptr);
+    lua_pushstring(lstate, (arg1 && *arg1) ? *arg1 : nullptr);
+
+    if (lua_pcall(lstate, 3, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
+    }
+    lua_settop(lstate, stackTop);
+  } catch (const std::exception& ex) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+  } catch (...) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+  }
+}
+
+/**
+ * Address: 0x006B0940
+ */
+void CScriptObject::CallbackInt(const char* callback, const int value)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, callback);
+  if (!script) {
+    return;
+  }
+
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  try {
+    script.PushStack(lstate);
+    mLuaObj.PushStack(lstate);
+    lua_pushnumber(lstate, static_cast<lua_Number>(value));
+
+    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", err.GetString());
+      lua_settop(lstate, stackTop);
+      return;
     }
 
-    const int callTop = lua_gettop(L);
-    // We'll use count relative to (callTop - 1) as sentinel like in asm.
-    // Push self (Table) as first argument
-    Table.PushStack(S);
+    lua_settop(lstate, stackTop);
+  } catch (const std::exception& ex) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", ex.what());
+  } catch (...) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), callback ? callback : "<unknown>", "unknown exception");
+  }
+}
 
-    auto push_if = [&](const LuaPlus::LuaObject& o) {
-        if (o.GetActiveState()) o.PushStack(S);
-    };
-    push_if(a1); push_if(a2); push_if(a3); push_if(a4); push_if(a5);
+/**
+ * Address: 0x006753A0
+ */
+void CScriptObject::LuaPCall(const char* scriptName, const char* const* args, LuaPlus::LuaObject* obj)
+{
+  CallbackWeakGuard weakGuard(this);
 
-    ScriptCallGuard stayAlive{this}; // mirrors the list link/unlink in asm
+  LuaPlus::LuaObject script;
+  FindScript(&script, scriptName);
+  if (!script) {
+    return;
+  }
 
-    const int nargs = lua_gettop(L) - callTop; // args excluding function itself
-    if (lua_pcall(L, nargs, LUA_MULTRET, 0)) {
-        // Error: format object name and log warning
-        LuaPlus::LuaStackObject err{S, -1};
-        LogScriptWarning(this, funcName, err.GetString());
-        out.clear();
-        return false;
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  try {
+    script.PushStack(lstate);
+    mLuaObj.PushStack(lstate);
+    lua_pushstring(lstate, (args && *args) ? *args : nullptr);
+    LuaPush(lstate, obj);
+
+    if (lua_pcall(lstate, 3, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", err.GetString());
     }
+    lua_settop(lstate, stackTop);
+  } catch (const std::exception& ex) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+  } catch (...) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+  }
+}
 
-    // Success: collect multiple returns
-    const int rets = lua_gettop(L) - guard.top;
-    out.clear();
-    out.reserve(static_cast<size_t>(rets));
-    for (int i = -rets; i <= -1; ++i) {
-        LuaPlus::LuaStackObject so{S, i};
-        LuaPlus::LuaObject tmp{so};
-        out.push_back(tmp);
+/**
+ * Address: 0x00581930
+ */
+void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, fileName);
+  if (!script) {
+    return;
+  }
+
+  LuaPlus::LuaState* state = mLuaObj.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
+
+  try {
+    script.PushStack(lstate);
+    mLuaObj.PushStack(lstate);
+    LuaPush(lstate, obj);
+
+    if (lua_pcall(lstate, 2, 1, 0) != 0) {
+      const LuaPlus::LuaStackObject err(state, -1);
+      LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", err.GetString());
     }
-     */
-
-    return true;
+    lua_settop(lstate, stackTop);
+  } catch (const std::exception& ex) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", ex.what());
+  } catch (...) {
+    lua_settop(lstate, stackTop);
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", "unknown exception");
+  }
 }
 
-void CScriptObject::CallbackStr(const char* callback, const char** arg0) {
+/**
+ * Address: 0x007CB940
+ */
+void CScriptObject::RunScriptObj(LuaPlus::LuaObject& out, const char* name)
+{
+  out = LuaPlus::LuaObject{};
+
+  gpg::core::FastVector<LuaPlus::LuaObject> returns;
+  if (!RunScriptMultiRet(
+        name,
+        returns,
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{}
+      )) {
+    return;
+  }
+
+  if (!returns.Empty()) {
+    out = returns[0];
+  }
 }
 
-void CScriptObject::CallbackStr(const char* callback, const char** arg0, const char** arg1) {
-}
+/**
+ * Address: 0x00675CF0
+ */
+void CScriptObject::LuaInvoke3_DiscardReturn(
+  LuaPlus::LuaObject& func, LuaPlus::LuaObject& selfObj, const char* stringArg, LuaPlus::LuaObject& payloadObj
+)
+{
+  LuaPlus::LuaState* state = func.GetActiveState();
+  if (!state) {
+    return;
+  }
 
-void CScriptObject::LuaPCall(const char* fileName, const char** data, LuaPlus::LuaObject* obj) {
-}
+  lua_State* lstate = state->GetCState();
+  const int stackTop = lua_gettop(lstate);
 
-void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj) {
+  func.PushStack(lstate);
+  selfObj.PushStack(lstate);
+  lua_pushstring(lstate, stringArg ? stringArg : "");
+  payloadObj.PushStack(lstate);
+
+  lua_call(lstate, 3, 1);
+  lua_settop(lstate, stackTop);
 }

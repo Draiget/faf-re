@@ -131,6 +131,20 @@ namespace msvc8
         }
 
         /**
+         * Case-insensitive ASCII equality against a string view.
+         */
+        [[nodiscard]]
+        bool equals_no_case(std::string_view rhs) const noexcept;
+
+        /**
+         * Case-insensitive ASCII equality against a C-string (nullptr => empty).
+         */
+        [[nodiscard]]
+        bool equals_no_case(const char* rhs) const noexcept {
+            return equals_no_case(std::string_view(rhs ? rhs : ""));
+        }
+
+        /**
          * clear() - in-place: sets size to 0 and writes terminal NULL
          */
         void clear() noexcept {
@@ -140,6 +154,25 @@ namespace msvc8
             raw_data_mut_unsafe()[0] = '\0';
             mySize = 0;
         }
+
+        /**
+         * VC8 xstring-style end-of-string helper (`_Eos` equivalent).
+         * Writes terminal NUL at `newSize` and updates `mySize`.
+         */
+        void eos(uint32_t newSize = 0U) noexcept;
+
+        /**
+         * VC8 xstring-style storage reset helper (`_Tidy` equivalent).
+         * If `built` is true and the string is in heap mode, releases the heap buffer.
+         */
+        void tidy(bool built = true, uint32_t newSize = 0U) noexcept;
+
+        /**
+         * Owning assignment helper for recovered paths that require VC8-like
+         * "copy into owned storage" semantics.
+         */
+        void assign_owned(std::string_view value);
+        void assign_owned(const char* value);
 
         /**
          * resize(newSize, ch) - in-place only; returns false if not enough capacity
@@ -262,6 +295,8 @@ namespace msvc8
          */
         string& assign(const string& other, std::size_t pos, std::size_t count = npos) noexcept;
 
+        string& assign(const char* data, std::size_t size) noexcept;
+
         /**
 		 * Return substring [from .. from+maxLen) as a new msvc8::string.
 		 * - If length fits SSO (<=15) OR source is SSO, we make an SSO copy.
@@ -370,6 +405,12 @@ namespace msvc8
             return *this;
         }
     private:
+        static unsigned char ascii_tolower_(unsigned char ch) noexcept {
+            return (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z'))
+                ? static_cast<unsigned char>(ch - static_cast<unsigned char>('A') + static_cast<unsigned char>('a'))
+                : ch;
+        }
+
         static bool eq_buf_(
             const char* a,
             const std::size_t an,

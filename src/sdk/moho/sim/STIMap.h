@@ -1,136 +1,583 @@
 #pragma once
-#include <cstdint>
-#include <vector>
 
+#include <cstddef>
+#include <cstdint>
+
+#include "boost/shared_ptr.h"
+#include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Vector.h"
+#include "lua/LuaObject.h"
+#include "moho/sim/SMinMax.h"
+#include "wm3/AABB.h"
 
 namespace moho
 {
-	struct MapData;      // unknown yet
-	struct LuaObject;    // your env type
+  struct CHeightFieldMinMaxGrid
+  {
+    SMinMax<std::uint16_t>* data; // +0x00
+    std::int32_t width;           // +0x04
+    std::int32_t height;          // +0x08
+  };
+
+  struct CHeightFieldI16Grid
+  {
+    std::int16_t* data;  // +0x00
+    std::int32_t width;  // +0x04
+    std::int32_t height; // +0x08
+  };
+
+  struct CHeightFieldTier
+  {
+    CHeightFieldMinMaxGrid data1; // +0x00
+    CHeightFieldI16Grid data2;    // +0x0C
+  };
+
+  struct GeomLine3
+  {
+    Wm3::Vec3f pos; // +0x00
+    Wm3::Vec3f dir; // +0x0C
+    float closest;  // +0x18
+    float farthest; // +0x1C
+  };
+
+  struct VecDist
+  {
+    Wm3::Vec3f dir; // +0x00
+    float dist;     // +0x0C
+  };
+
+  struct CGeomHitResult
+  {
+    float distance; // +0x00
+    float v1;       // +0x04
+  };
+
+  struct CColHitResult : CGeomHitResult
+  {
+    std::int32_t hitKind; // +0x08 (1 = terrain, 3 = synthetic plane/water)
+  };
+
+  static_assert(sizeof(CHeightFieldMinMaxGrid) == 0x0C, "CHeightFieldMinMaxGrid size must be 0x0C");
+  static_assert(sizeof(CHeightFieldI16Grid) == 0x0C, "CHeightFieldI16Grid size must be 0x0C");
+  static_assert(sizeof(CHeightFieldTier) == 0x18, "CHeightFieldTier size must be 0x18");
+  static_assert(sizeof(GeomLine3) == 0x20, "GeomLine3 size must be 0x20");
+  static_assert(sizeof(VecDist) == 0x10, "VecDist size must be 0x10");
+  static_assert(sizeof(CGeomHitResult) == 0x08, "CGeomHitResult size must be 0x08");
+  static_assert(offsetof(CColHitResult, hitKind) == 0x08, "CColHitResult::hitKind offset must be 0x08");
+
+  class CHeightField
+  {
+  public:
+    /**
+     * Address: 0x00476090 (FUN_00476090)
+     *
+     * int width, int height
+     *
+     * IDA signature:
+     * Moho::CHeightField *__stdcall Moho::CHeightField::CHeightField(Moho::CHeightField *this, int width, int height);
+     *
+     * What it does:
+     * Builds the base height sample grid and allocates tiered min/max + aux
+     * subgrids for coarse collision/path queries.
+     */
+    CHeightField(std::int32_t width, std::int32_t height);
 
     /**
-     * Pair of minimum and maximum sample values.
+     * Address: 0x004784F0 (+ chunk 0x00478420 from ctor cleanup island)
+     *
+     * What it does:
+     * Releases all tier subgrid buffers and base height data.
      */
-    template<typename T>
-    struct SMinMax {
-        T min{};
-        T max{};
-    };
+    ~CHeightField();
 
-    struct GridU16
-	{
-        uint16_t* data{ nullptr };
-        int width{ 0 };
-        int height{ 0 };
+    /**
+     * Address: 0x004783D0 (FUN_004783D0)
+     *
+     * int width, int height
+     *
+     * IDA signature:
+     * Moho::CHeightField *__usercall Moho::CHeightField::InitField@<eax>(int width@<eax>, int height@<ecx>,
+     * Moho::CHeightField *this@<esi>);
+     *
+     * What it does:
+     * Allocates `width * height` 16-bit height samples and zero-initializes them.
+     */
+    void InitField(std::int32_t width, std::int32_t height);
 
-        /**
-         * Bounds-checked read with clamping.
-         */
-        [[nodiscard]] uint16_t AtClamped(int x, int y) const {
-            if (width <= 0 || height <= 0 || !data) {
-                return 0;
-            }
-            if (x < 0) {
-                x = 0;
-            } else if (x >= width) {
-                x = width - 1;
-            }
-            if (y < 0) {
-                y = 0;
-            } else if (y >= height) {
-                y = height - 1;
-            }
-            return data[y * width + x];
-        }
-    };
+    /**
+     * Address: 0x00478490
+     *
+     * What it does:
+     * Returns a clamped sample from the base 16-bit height grid.
+     */
+    [[nodiscard]]
+    std::uint16_t GetHeightAt(std::int32_t x, std::int32_t z) const;
 
-    struct GridI16
-	{
-        int16_t* data{ nullptr };
-        int width{ 0 };
-        int height{ 0 };
-    };
+    /**
+     * Address: 0x0044FB90 (FUN_0044FB90)
+     *
+     * float x, float z
+     *
+     * IDA signature:
+     * double __thiscall Moho::CHeightField::GetElevation(Moho::CHeightField *this, float x, float z);
+     *
+     * What it does:
+     * Bilinearly samples scaled terrain elevation at world coordinates.
+     */
+    [[nodiscard]]
+    float GetElevation(float x, float z) const;
 
-    struct MinMaxGridU16 {
-        SMinMax<uint16_t>* data{ nullptr };
-        int width{ 0 };
-        int height{ 0 };
+    /**
+     * Address: 0x00475BF0 (FUN_00475BF0)
+     *
+     * int tier, int x, int z
+     *
+     * IDA signature:
+     * Moho::SMinMax_ushort *__fastcall Moho::CHeightField::GetTierBoundsUWord(int tier, int x, Moho::CHeightField
+     * *this, Moho::SMinMax_ushort *dest, int z);
+     *
+     * What it does:
+     * Returns min/max height word pair for one tier cell (or 2x2 base sample block for tier 0).
+     */
+    [[nodiscard]]
+    SMinMax<std::uint16_t> GetTierBoundsUWord(std::int32_t tier, std::int32_t x, std::int32_t z) const;
 
-        /**
-         * Bounds-checked read with clamping.
-         */
-        [[nodiscard]] SMinMax<uint16_t> AtClamped(int x, int y) const {
-            if (width <= 0 || height <= 0 || !data) {
-                return {};
-            }
-            if (x < 0) {
-                x = 0;
-            } else if (x >= width) {
-                x = width - 1;
-            }
-            if (y < 0) {
-                y = 0;
-            } else if (y >= height) {
-                y = height - 1;
-            }
-            return data[y * width + x];
-        }
-    };
+    /**
+     * Address: 0x00475DF0 (FUN_00475DF0)
+     *
+     * int x, int z, int tier
+     *
+     * IDA signature:
+     * Wm3::AxisAlignedBox3f *__userpurge Moho::CHeightField::GetTierBox@<eax>(int z@<eax>, int x@<ecx>, int tier@<esi>,
+     * Moho::CHeightField *this, Wm3::AxisAlignedBox3f *out);
+     *
+     * What it does:
+     * Builds clamped world-space AABB for one tier cell with min/max sampled heights.
+     */
+    [[nodiscard]]
+    Wm3::AxisAlignedBox3f GetTierBox(std::int32_t x, std::int32_t z, std::int32_t tier) const;
 
-    struct TierLevel {
-        MinMaxGridU16 minmax;
-        GridI16       aux;   // exact purpose unknown here; seen as int16 grid elsewhere
-    };
+    /**
+     * Address: 0x004776E0 (FUN_004776E0)
+     *
+     * Wm3::Vector3<float> const&, Wm3::Vector3<float> const&, float&, float&
+     *
+     * IDA signature:
+     * bool __userpurge Moho::CHeightField::ClipSegmentToWorld@<al>(Wm3::Vector3f *pos@<ebx>, Wm3::Vector3f *dir@<edi>,
+     * Moho::CHeightField *this@<esi>, float *min, float *max);
+     *
+     * What it does:
+     * Clips `[min,max]` segment parameter range to map XY bounds and top-height ceiling.
+     */
+    [[nodiscard]]
+    bool ClipSegmentToWorld(const Wm3::Vec3f& pos, const Wm3::Vec3f& dir, float& min, float& max) const;
 
-    struct CHeightField
+    /**
+     * Address: 0x00476F30 (FUN_00476F30)
+     *
+     * Moho::GeomLine3 const &, Moho::CGeomHitResult *
+     *
+     * IDA signature:
+     * Wm3::Vector3f *__userpurge Moho::CHeightField::Intersection@<eax>(Moho::CHeightField *this@<eax>, Wm3::Vector3f
+     * *dest@<ebx>, Moho::GeomLine3 *line@<esi>, Moho::CGeomHitResult *res);
+     *
+     * What it does:
+     * Intersects segment line with terrain surface and returns hit point or NaN vector.
+     */
+    [[nodiscard]]
+    Wm3::Vec3f Intersection(const GeomLine3& line, CGeomHitResult* res) const;
+
+  private:
+    /**
+     * Address: 0x00477030 (FUN_00477030)
+     *
+     * Wm3::Vector3<float> const &, Wm3::Vector3<float> const &, float, float, Moho::CGeomHitResult *
+     *
+     * IDA signature:
+     * bool __userpurge Moho::CHeightField::DoIntersection@<al>(Wm3::Vector3f *pos@<eax>, Moho::CHeightField *this,
+     * Wm3::Vector3f *dir, float start, float end, Moho::CGeomHitResult *res);
+     *
+     * What it does:
+     * Walks a clipped line segment through terrain cells/subgrids and resolves
+     * the first terrain-triangle intersection distance.
+     */
+    [[nodiscard]]
+    bool
+    DoIntersection(const Wm3::Vec3f& pos, const Wm3::Vec3f& dir, float start, float end, CGeomHitResult* res) const;
+
+    /**
+     * Address: 0x004778F0 (FUN_004778F0)
+     *
+     * Wm3::Vector3<float> const &, Wm3::Vector3<float> const &, Wm3::Vector3<float> const &, Wm3::Vector3<float> const
+     * &, int x, int z, float def, Moho::CGeomHitResult *
+     *
+     * IDA signature:
+     * bool __userpurge Moho::CHeightField::DoIntersectionLL@<al>(Moho::CHeightField *this@<eax>, int x@<edi>,
+     * Wm3::Vector3f *pos, Wm3::Vector3f *dir, Wm3::Vector3f *p1, Wm3::Vector3f *p2, int z, float def,
+     * Moho::CGeomHitResult *res);
+     *
+     * What it does:
+     * Tests line chunk against the lower-left terrain triangle in cell `(x,z)`.
+     */
+    [[nodiscard]]
+    bool DoIntersectionLL(
+      const Wm3::Vec3f& pos,
+      const Wm3::Vec3f& dir,
+      const Wm3::Vec3f& p1,
+      const Wm3::Vec3f& p2,
+      std::int32_t x,
+      std::int32_t z,
+      float def,
+      CGeomHitResult* res
+    ) const;
+
+    /**
+     * Address: 0x00477B80 (FUN_00477B80)
+     *
+     * Wm3::Vector3<float> const &, Wm3::Vector3<float> const &, Wm3::Vector3<float> const &, Wm3::Vector3<float> const
+     * &, int x, int z, float def, Moho::CGeomHitResult *
+     *
+     * IDA signature:
+     * bool __userpurge Moho::CHeightField::DoIntersectionUR@<al>(Moho::CHeightField *this@<eax>, Wm3::Vector3f *pos,
+     * Wm3::Vector3f *dir, Wm3::Vector3f *p1, Wm3::Vector3f *p2, int x, int z, float def, Moho::CGeomHitResult *res);
+     *
+     * What it does:
+     * Tests line chunk against the upper-right terrain triangle in cell `(x,z)`.
+     */
+    [[nodiscard]]
+    bool DoIntersectionUR(
+      const Wm3::Vec3f& pos,
+      const Wm3::Vec3f& dir,
+      const Wm3::Vec3f& p1,
+      const Wm3::Vec3f& p2,
+      std::int32_t x,
+      std::int32_t z,
+      float def,
+      CGeomHitResult* res
+    ) const;
+
+  public:
+    std::uint16_t* data;                    // +0x00
+    std::int32_t width;                     // +0x04
+    std::int32_t height;                    // +0x08
+    msvc8::vector<CHeightFieldTier> mGrids; // +0x0C
+  };
+
+  static_assert(sizeof(CHeightField) == 0x1C, "CHeightField size must be 0x1C");
+
+  /**
+   * Address context:
+   * - 0x005783E0 (FUN_005783E0)
+   * - 0x00578460 (FUN_00578460, func_ConstructTerrainTypes)
+   * - 0x00577AD0 (FUN_00577AD0)
+   *
+   * What it does:
+   * `fastvector_n`-style header for terrain Lua objects with 0x100 inline slots.
+   * Inline storage is raw bytes so element lifetime is managed explicitly by
+   * helper routines (construct/destroy loops), matching binary behavior.
+   */
+  struct TerrainTypesVectorN
+  {
+    static constexpr std::size_t kInlineCount = 0x100;
+
+    LuaPlus::LuaObject* start;                                                                         // +0x0000
+    LuaPlus::LuaObject* finish;                                                                        // +0x0004
+    LuaPlus::LuaObject* capacity;                                                                      // +0x0008
+    LuaPlus::LuaObject* original;                                                                      // +0x000C
+    alignas(LuaPlus::LuaObject) std::uint8_t inlineStorage[sizeof(LuaPlus::LuaObject) * kInlineCount]; // +0x0010
+
+    [[nodiscard]]
+    LuaPlus::LuaObject* InlineBegin() noexcept
     {
-        uint16_t* data{ nullptr }; // +0
-        int       width{ 0 };      // +4
-        int       height{ 0 };     // +8
+      return reinterpret_cast<LuaPlus::LuaObject*>(&inlineStorage[0]);
+    }
 
-        // Higher-level view
-        msvc8::vector<TierLevel> tiers;
+    [[nodiscard]]
+    const LuaPlus::LuaObject* InlineBegin() const noexcept
+    {
+      return reinterpret_cast<const LuaPlus::LuaObject*>(&inlineStorage[0]);
+    }
 
-        [[nodiscard]]
-    	uint16_t GetHeightAt(int x, int z) const {
-            if (!data || width <= 0 || height <= 0) return 0;
-            if (x < 0) x = 0; else if (x >= width)  x = width - 1;
-            if (z < 0) z = 0; else if (z >= height) z = height - 1;
-            return data[z * width + x];
-        } // 0x00478490
+    [[nodiscard]]
+    LuaPlus::LuaObject* begin() noexcept
+    {
+      return start;
+    }
 
-        void InitField(int width, int height); // 0x004783D0
-        //Wm3::AxisAlignedBox3f GetTierBox(int x, int z, char a3); // 0x00475DF0
-        //Moho::SMinMax<unsigned short> GetTierBoundsUWord(int idx, int x, int y); // 0x00475BF0
-    };
+    [[nodiscard]]
+    const LuaPlus::LuaObject* begin() const noexcept
+    {
+      return start;
+    }
 
-	class STIMap
-	{
-	public:
-        MapData* MapData;        // 0x0000
-        CHeightField* HeightField;    // 0x0004
-        uint32_t      unk1[4];        // 0x0008
-        // 0x0018
-        void* beginData;      // 0x0018
-        void* endData;        // 0x001C
-        void* endData2;       // 0x0020
-        void* beginData2;     // 0x0024
+    [[nodiscard]]
+    LuaPlus::LuaObject* end() noexcept
+    {
+      return finish;
+    }
 
-        // 0x0028
-        char*     Data[0x100];    // type desc tables (size of LuaObject TBD)
+    [[nodiscard]]
+    const LuaPlus::LuaObject* end() const noexcept
+    {
+      return finish;
+    }
 
-        uint8_t* TerrainTypes;   // ... + (Y*SizeX + X)
-        int32_t       SizeX;
-        int32_t       SizeY;
+    [[nodiscard]]
+    std::size_t Size() const noexcept
+    {
+      return start ? static_cast<std::size_t>(finish - start) : 0u;
+    }
 
-        uint8_t       unk2[0x100];
+    [[nodiscard]]
+    std::size_t Capacity() const noexcept
+    {
+      return start ? static_cast<std::size_t>(capacity - start) : 0u;
+    }
 
-        // 0x1534
-        int32_t       Water;          // BOOL
-        float         WaterLevel;
-        float         DepthLevel;
-        float         AbyssLevel;
-        uint32_t      unk3;
-	};
-}
+    [[nodiscard]]
+    bool IsInitialized() const noexcept
+    {
+      return start != nullptr;
+    }
+
+    [[nodiscard]]
+    bool Empty() const noexcept
+    {
+      return start == finish;
+    }
+
+    [[nodiscard]]
+    bool UsingInlineStorage() const noexcept
+    {
+      return start == InlineBegin();
+    }
+
+    void BindInlineEmpty() noexcept
+    {
+      auto* const inlineBegin = InlineBegin();
+      start = inlineBegin;
+      finish = inlineBegin;
+      capacity = inlineBegin + kInlineCount;
+      original = inlineBegin;
+    }
+
+    void BindHeapStorage(LuaPlus::LuaObject* buffer, const std::size_t size, const std::size_t cap) noexcept
+    {
+      start = buffer;
+      finish = buffer + size;
+      capacity = buffer + cap;
+      original = InlineBegin();
+    }
+  };
+
+  struct TerrainTypes
+  {
+    TerrainTypesVectorN ttvec; // +0x0000
+  };
+
+  struct TerrainTypeGrid
+  {
+    std::uint8_t* data;  // +0x00
+    std::int32_t width;  // +0x04
+    std::int32_t height; // +0x08
+  };
+
+  static_assert(offsetof(TerrainTypesVectorN, start) == 0x0000, "TerrainTypesVectorN::start offset must be 0x0000");
+  static_assert(offsetof(TerrainTypesVectorN, finish) == 0x0004, "TerrainTypesVectorN::finish offset must be 0x0004");
+  static_assert(
+    offsetof(TerrainTypesVectorN, capacity) == 0x0008, "TerrainTypesVectorN::capacity offset must be 0x0008"
+  );
+  static_assert(
+    offsetof(TerrainTypesVectorN, original) == 0x000C, "TerrainTypesVectorN::original offset must be 0x000C"
+  );
+  static_assert(
+    offsetof(TerrainTypesVectorN, inlineStorage) == 0x0010, "TerrainTypesVectorN::inlineStorage offset must be 0x0010"
+  );
+  static_assert(sizeof(TerrainTypesVectorN) == 0x1410, "TerrainTypesVectorN size must be 0x1410");
+  static_assert(sizeof(TerrainTypes) == 0x1410, "TerrainTypes size must be 0x1410");
+  static_assert(sizeof(TerrainTypeGrid) == 0x0C, "TerrainTypeGrid size must be 0x0C");
+
+  class STIMap
+  {
+  public:
+    /**
+     * Address: 0x005779C0 (FUN_005779C0)
+     *
+     * unsigned int width, unsigned int height
+     *
+     * IDA signature:
+     * Moho::STIMap *__userpurge Moho::STIMap::STIMap@<eax>(int height@<esi>, Moho::STIMap *this, int width);
+     *
+     * What it does:
+     * Initializes playable rect, terrain type bytes, water defaults, and
+     * allocates a new `CHeightField` backing store.
+     */
+    STIMap(std::uint32_t width, std::uint32_t height);
+
+    /**
+     * Address: 0x00577890 (FUN_00577890)
+     *
+     * Moho::STIMap *
+     *
+     * IDA signature:
+     * Moho::STIMap *__thiscall Moho::STIMap::STIMap(Moho::STIMap *src, Moho::STIMap *this);
+     *
+     * What it does:
+     * Creates a new map container from another map's dimensions/height data.
+     */
+    explicit STIMap(STIMap* src);
+
+    /**
+     * Address: 0x00577AD0 (FUN_00577AD0)
+     *
+     * What it does:
+     * Releases terrain type bytes and Lua terrain type entries.
+     */
+    ~STIMap();
+
+    /**
+     * Address: 0x00577DF0 (FUN_00577DF0)
+     *
+     * gpg::Rect2<int> const &
+     *
+     * IDA signature:
+     * char __usercall Moho::STIMap::SetPlayableMapRect@<al>(gpg::Rect2i *rect@<eax>, Moho::STIMap *this@<ebx>);
+     *
+     * What it does:
+     * Clamps the input playable rect to height-field bounds and stores it if non-empty.
+     */
+    bool SetPlayableMapRect(const gpg::Rect2i& rect);
+
+    /**
+     * Address: 0x00577EC0 (FUN_00577EC0)
+     *
+     * unsigned int x, unsigned int z, unsigned char type
+     *
+     * IDA signature:
+     * void __userpurge Moho::STIMap::SetTerrainType(unsigned int z@<ebx>, unsigned int x@<edi>, Moho::STIMap
+     * *this@<esi>, char type);
+     *
+     * What it does:
+     * Writes terrain type byte for one map cell when inside valid map bounds.
+     */
+    void SetTerrainType(std::uint32_t x, std::uint32_t z, std::uint8_t type);
+
+    /**
+     * Address: 0x00577F60 (FUN_00577F60)
+     *
+     * LuaPlus::LuaState *
+     *
+     * IDA signature:
+     * LuaPlus::LuaObject *__thiscall Moho::STIMap::LoadTerrainTypes(LuaPlus::LuaState *state, Moho::STIMap *this);
+     *
+     * What it does:
+     * Loads `/lua/TerrainTypes.lua`, fills 256 terrain-type Lua entries, and
+     * updates per-type blocking flags.
+     */
+    void LoadTerrainTypes(LuaPlus::LuaState* state);
+
+    /**
+     * Address: 0x00758E10 (FUN_00758E10)
+     *
+     * unsigned int x, unsigned int z
+     *
+     * IDA signature:
+     * LuaPlus::LuaObject *__usercall Moho::STIMap::GetTerrainType@<eax>(Moho::STIMap *this@<eax>, LuaPlus::LuaObject
+     * *out@<ebx>, unsigned int z@<edi>, unsigned int x@<esi>);
+     *
+     * What it does:
+     * Returns the Lua terrain-type descriptor for the sampled terrain byte.
+     */
+    [[nodiscard]]
+    LuaPlus::LuaObject GetTerrainType(std::uint32_t x, std::uint32_t z) const;
+
+    /**
+     * Address: 0x006A4C20 (FUN_006A4C20)
+     *
+     * unsigned char typeIndex
+     *
+     * IDA signature:
+     * LuaPlus::LuaObject *__usercall Moho::STIMap::GetTerrainType@<eax>(Moho::STIMap *this@<ecx>, unsigned __int8
+     * typeIndex@<al>, LuaPlus::LuaObject *out@<esi>);
+     *
+     * What it does:
+     * Returns the Lua terrain-type descriptor by raw type index.
+     */
+    [[nodiscard]]
+    LuaPlus::LuaObject GetTerrainType(std::uint8_t typeIndex) const;
+
+    /**
+     * Address: 0x00758E90 (FIND_GetTerrainTypeOffset_exe)
+     *
+     * float x, float z
+     *
+     * IDA signature:
+     * float __userpurge Moho::STIMap::GetTerrainTypeOffset@<xmm0>(Moho::STIMap *this, float x, float z);
+     *
+     * What it does:
+     * Reads optional `HeightOffset` from the sampled terrain-type Lua table.
+     */
+    [[nodiscard]]
+    float GetTerrainTypeOffset(float x, float z) const;
+
+    /**
+     * Address: 0x00577B60 (FUN_00577B60)
+     *
+     * IDA signature:
+     * Wm3::AxisAlignedBox3f *__userpurge Moho::STIMap::GetBounds3D@<eax>(Moho::STIMap *this@<ebx>,
+     * Wm3::AxisAlignedBox3f *out);
+     *
+     * What it does:
+     * Returns map world bounds from the coarsest height tier and lifts top Y to water level when enabled.
+     */
+    [[nodiscard]]
+    Wm3::AxisAlignedBox3f GetBounds3D() const;
+
+    /**
+     * Address: 0x00577BC0 (FUN_00577BC0)
+     *
+     * Wm3::GeomLine3<float> const &, Moho::CColHitResult *
+     *
+     * IDA signature:
+     * Wm3::Vector3f *__userpurge Moho::STIMap::SurfaceIntersection@<eax>(Moho::CGeomHitResult *res@<eax>, Moho::STIMap
+     * *this, Wm3::Vector3f *dest, Moho::GeomLine3 *line);
+     *
+     * What it does:
+     * Intersects segment against terrain/water surface and returns hit point.
+     */
+    [[nodiscard]]
+    Wm3::Vec3f SurfaceIntersection(const GeomLine3& line, CColHitResult* res) const;
+
+    /**
+     * Address: 0x00541A30 (FUN_00541A30), 0x1012F3B0 (FUN_1012F3B0)
+     *
+     * Wm3::Vector3<float> const &
+     *
+     * What it does:
+     * Returns max(terrain elevation, water elevation when water is enabled).
+     */
+    [[nodiscard]]
+    float GetSurface(const Wm3::Vec3f& position) const;
+
+    [[nodiscard]] CHeightField* GetHeightField() const noexcept;
+    [[nodiscard]] bool IsWaterEnabled() const noexcept;
+    [[nodiscard]] float GetWaterElevation() const noexcept;
+
+  public:
+    boost::shared_ptr<CHeightField> mHeightField; // +0x0000
+    gpg::Rect2i mPlayableRect;                    // +0x0008
+    TerrainTypes mTerrainTypes;                   // +0x0018
+    TerrainTypeGrid mTerrainType;                 // +0x1428
+    std::uint8_t mBlocking[0x100];                // +0x1434
+    std::uint8_t mWaterEnabled;                   // +0x1534
+    std::uint8_t pad_1535[3];                     // +0x1535
+    float mWaterElevation;                        // +0x1538
+    float mWaterElevationDeep;                    // +0x153C
+    float mWaterElevationAbyss;                   // +0x1540
+  };
+
+  static_assert(offsetof(STIMap, mTerrainType) == 0x1428, "STIMap::mTerrainType offset must be 0x1428");
+  static_assert(offsetof(STIMap, mBlocking) == 0x1434, "STIMap::mBlocking offset must be 0x1434");
+  static_assert(offsetof(STIMap, mWaterEnabled) == 0x1534, "STIMap::mWaterEnabled offset must be 0x1534");
+  static_assert(sizeof(STIMap) == 0x1544, "STIMap size must be 0x1544");
+} // namespace moho

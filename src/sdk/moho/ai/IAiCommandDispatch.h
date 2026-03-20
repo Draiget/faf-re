@@ -2,7 +2,8 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho {
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1B360
    * COL:  0x00E707D4
@@ -13,8 +14,8 @@ namespace moho {
     /**
      * Address: 0x00598A00
      * Slot: 0
-     * Demangled: sub_598A00
+     * Demangled: (likely scalar deleting destructor thunk)
      */
-    virtual void sub_598A00() = 0;
+    virtual ~IAiCommandDispatch() = default;
   };
 } // namespace moho

@@ -1,0 +1,96 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Column limit - match project's 120-char rule
+ColumnLimit: 120
+
+# Indentation
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 2
+NamespaceIndentation: All
+IndentCaseLabels: false
+
+# Braces — K&R for control statements (same-line {), Allman for functions/classes/namespaces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: Never
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+# Lambda formatting - prevent collapsing lambdas onto one unreadable line
+AllowShortLambdasOnASingleLine: Empty
+LambdaBodyIndentation: OuterScope
+
+# Short statement rules
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Function arguments - one per line when they don't fit (matches copilot-instructions style)
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# Alignment
+# BlockIndent: when args don't fit on one line, break after '(' and put ')' on its own line.
+# Produces:
+#   foo(
+#     arg1,
+#     arg2
+#   );
+AlignAfterOpenBracket: BlockIndent
+AlignOperands: DontAlign
+AlignTrailingComments: true
+
+# Pointer and reference alignment: attach to type (Type* name, Type& name)
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Include sorting
+SortIncludes: CaseInsensitive
+IncludeBlocks: Preserve
+# Ensure windows.h always precedes other Windows SDK headers that depend on it
+IncludeCategories:
+  - Regex:           '^<windows\.h>'
+    Priority:        10
+  - Regex:           '^<(winsock2|winsock|mmsystem|combaseapi|objbase|ole2|shobjidl|shellapi|shlobj|commctrl|richedit|setupapi|cfgmgr32|devguid|initguid|ntddndis|ntddscsi|winioctl|wbemidl|wbemcli|dbghelp|psapi|tlhelp32|pdh|powrprof|powersetting|winreg|winuser|wingdi|winbase|winnls|winnt|wincon|winerror|handleapi|fileapi|ioapiset|synchapi|memoryapi|processthreadsapi|securitybaseapi|errhandlingapi|namedpipeapi|libloaderapi|heapapi|jobapi|processenv|stringapiset|ntsecapi|evntprov|evntrace|strsafe|direct|io|tchar|conio)\.h>'
+    Priority:        11
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyBlock: false
+SpacesInAngles: Never
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Misc
+AccessModifierOffset: -2
+AlwaysBreakTemplateDeclarations: Yes
+BreakConstructorInitializers: BeforeComma
+ConstructorInitializerIndentWidth: 2
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+FixNamespaceComments: true
+MaxEmptyLinesToKeep: 1
+ReflowComments: true
+SortUsingDeclarations: true
+...

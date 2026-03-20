@@ -25,6 +25,6 @@ namespace gpg::gal
 		virtual ~StateCache() = default;
 
     protected:
-        msvc8::tree::EmbeddedTree<> tree_;
+        msvc8::EmbeddedTree<> tree_;
     };
 } 

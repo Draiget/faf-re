@@ -1,6 +1,11 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+#include <cstddef>
+#include <cstdint>
+
+#include "gpg/core/containers/BitArray2D.h"
+#include "gpg/core/containers/Rect2.h"
 
 namespace gpg::HaStar
 {
@@ -17,4 +22,242 @@ namespace gpg::HaStar
          */
         virtual void Unknown() = 0;
     };
+
+    struct OccupationData
+    {
+        std::uint32_t mWords[5];
+    };
+
+    class Cluster
+    {
+    public:
+        struct Data
+        {
+            std::int32_t mRefs;
+            void* mReleaseObject;
+            std::uint32_t mReleaseArg;
+        };
+
+        Data* mData{};
+
+        Cluster() = default;
+
+        /**
+         * Address: 0x00765840 (FUN_00765840, ??0Cluster@HaStar@gpg@@QAE@ABV012@@Z)
+         *
+         * What it does:
+         * Copy-constructs a cluster handle and retains its shared data.
+         */
+        Cluster(const Cluster& other);
+
+        /**
+         * Address: 0x008E3450 (FUN_008E3450, ??4Cluster@HaStar@gpg@@QAEAAV012@ABV012@@Z)
+         *
+         * What it does:
+         * Assigns cluster shared-data with intrusive refcount ownership updates.
+         */
+        Cluster& operator=(const Cluster& other);
+
+        /**
+         * Address: 0x00765860 (FUN_00765860, ??1Cluster@HaStar@gpg@@QAE@XZ)
+         *
+         * What it does:
+         * Releases a cluster shared-data reference and destroys it when refcount hits zero.
+         */
+        ~Cluster();
+    };
+
+    struct SubclusterData
+    {
+        Cluster mClusters[16];
+        std::int32_t mLevel;
+    };
+
+    struct Subcluster
+    {
+        Cluster* mArray;
+        std::int32_t mWidth;
+        std::int32_t mHeight;
+
+        /**
+         * Address: 0x008E3420 (FUN_008E3420, ??0struct_Subcluster@@QAE@@Z)
+         *
+         * What it does:
+         * Initializes an empty subcluster grid.
+         */
+        Subcluster();
+
+        /**
+         * Address: 0x008E36C0 (FUN_008E36C0, ??0struct_Subcluster@@QAE@HH@Z)
+         *
+         * What it does:
+         * Allocates and default-initializes a width x height cluster grid.
+         */
+        Subcluster(int width, int height);
+
+        /**
+         * Address: 0x0076BF30 (FUN_0076BF30, ??1struct_Subcluster@@QAE@@Z)
+         *
+         * What it does:
+         * Destroys all cluster elements and releases the backing array.
+         */
+        ~Subcluster();
+    };
+
+    class IOccupationSource
+    {
+    public:
+        virtual void GetOccupationData(int worldX, int worldY, OccupationData& outData) = 0;
+    };
+
+    struct ClusterCache
+    {
+        void* mCacheTree{};
+        void* mCacheRefs{};
+
+        /**
+         * Address: 0x00931FB0 (FUN_00931FB0, ??1WeakPtr_ClusterCache@Moho@@QAE@@Z)
+         *
+         * What it does:
+         * Releases the shared cache control block reference.
+         */
+        ~ClusterCache();
+
+        /**
+         * Address: 0x00935420 (FUN_00935420,
+         * ?FetchCluster@ClusterCache@HaStar@gpg@@QAE?AVCluster@23@ABUOccupationData@23@@Z)
+         *
+         * What it does:
+         * Returns or builds a cluster from raw occupation data.
+         */
+        [[nodiscard]] Cluster FetchCluster(const OccupationData& occupationData);
+
+        /**
+         * Address: 0x00935450 (FUN_00935450,
+         * ?FetchCluster@ClusterCache@HaStar@gpg@@QAE?AVCluster@23@ABUSubclusterData@23@@Z)
+         *
+         * What it does:
+         * Returns or builds a cluster from 4x4 child clusters at the lower level.
+         */
+        [[nodiscard]] Cluster FetchCluster(const SubclusterData& subclusterData);
+    };
+
+    /**
+     * Address: 0x009552D0 (FUN_009552D0,
+     * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUOccupationData@12@@Z)
+     *
+     * What it does:
+     * Builds a cluster payload from occupancy cell data.
+     */
+    [[nodiscard]] Cluster ClusterBuild(const OccupationData& occupationData);
+
+    /**
+     * Address: 0x009310E0 (FUN_009310E0,
+     * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUSubclusterData@12@@Z)
+     *
+     * What it does:
+     * Builds a cluster payload from 4x4 lower-level child clusters.
+     */
+    [[nodiscard]] Cluster ClusterBuild(const SubclusterData& subclusterData);
+
+    class ClusterMap
+    {
+    public:
+        /**
+         * Address: 0x008E3CD0 (FUN_008E3CD0,
+         * ??0ClusterMap@HaStar@gpg@@QAE@PAUIOccupationSource@12@IIABVClusterCache@12@IABV?$Rect2@H@2@@Z)
+         *
+         * What it does:
+         * Initializes hierarchy levels/check-bit arrays for path-cluster background rebuilds.
+         */
+        ClusterMap(
+            IOccupationSource* source,
+            unsigned int widthM,
+            unsigned int heightM,
+            const ClusterCache& cache,
+            unsigned int numLevels,
+            const gpg::Rect2i& area
+        );
+
+        /**
+         * Address: 0x0076BB60 (FUN_0076BB60, ??1ClusterMap@HaStar@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Releases hierarchy/check-bit resources and cache weak/shared reference state.
+         */
+        ~ClusterMap();
+
+        /**
+         * Address: 0x10035650 (FUN_10035650,
+         * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z_0)
+         *
+         * What it does:
+         * Converts a world-space rectangle into cluster-index coordinates
+         * for the requested path level.
+         */
+        [[nodiscard]] gpg::Rect2i ClusterIndexRect(const gpg::Rect2i& worldRect, std::uint8_t level) const;
+
+        /**
+         * Address: 0x100356F0 (FUN_100356F0,
+         * ?DirtyRect@ClusterMap@HaStar@gpg@@QAEXABV?$Rect2@H@3@@Z_0)
+         *
+         * What it does:
+         * Marks clustered occupancy caches dirty for the supplied world rect.
+         */
+        void DirtyRect(const gpg::Rect2i& worldRect);
+
+        /**
+         * Address: 0x008E3C00 (FUN_008E3C00,
+         * ?BackgroundWork@ClusterMap@HaStar@gpg@@QAEXAAH@Z)
+         *
+         * What it does:
+         * Advances background cluster rebuild work using the caller-provided budget.
+         */
+        void BackgroundWork(int& budget);
+
+        /**
+         * Address: 0x008E37D0 (FUN_008E37D0,
+         * ?WorkOnCluster@ClusterMap@HaStar@gpg@@QAE_NHHHAAH@Z)
+         *
+         * What it does:
+         * Rebuilds one cluster node and updates check/progress bits.
+         */
+        [[nodiscard]] bool WorkOnCluster(int width, int height, int level, int& budget);
+
+        /**
+         * Address: 0x008E3BC0 (FUN_008E3BC0,
+         * ?EnsureClusterExists@ClusterMap@HaStar@gpg@@QAEXHHH@Z)
+         *
+         * What it does:
+         * Forces the requested cluster to be available by repeatedly running background work.
+         */
+        void EnsureClusterExists(int width, unsigned int height, int level);
+
+    public:
+        std::uint32_t mNumLevels;
+        std::int32_t mWidth;
+        std::int32_t mHeight;
+        IOccupationSource* mSrc;
+        ClusterCache mCache;
+        Subcluster mLevels[4];
+        gpg::BitArray2D mCheckLevels[4];
+        std::uint8_t mIsDone;
+        std::uint8_t pad_89[3];
+        std::uint32_t mProgress;
+        gpg::Rect2i mArea;
+    };
+
+    static_assert(sizeof(OccupationData) == 0x14, "OccupationData size must be 0x14");
+    static_assert(sizeof(Cluster) == 0x04, "Cluster size must be 0x04");
+    static_assert(sizeof(SubclusterData) == 0x44, "SubclusterData size must be 0x44");
+    static_assert(sizeof(Subcluster) == 0x0C, "Subcluster size must be 0x0C");
+    static_assert(sizeof(ClusterCache) == 0x08, "ClusterCache size must be 0x08");
+    static_assert(sizeof(ClusterMap) == 0xA0, "ClusterMap size must be 0xA0");
+
+    static_assert(offsetof(ClusterMap, mCache) == 0x10, "ClusterMap::mCache offset must be 0x10");
+    static_assert(offsetof(ClusterMap, mLevels) == 0x18, "ClusterMap::mLevels offset must be 0x18");
+    static_assert(offsetof(ClusterMap, mCheckLevels) == 0x48, "ClusterMap::mCheckLevels offset must be 0x48");
+    static_assert(offsetof(ClusterMap, mIsDone) == 0x88, "ClusterMap::mIsDone offset must be 0x88");
+    static_assert(offsetof(ClusterMap, mProgress) == 0x8C, "ClusterMap::mProgress offset must be 0x8C");
+    static_assert(offsetof(ClusterMap, mArea) == 0x90, "ClusterMap::mArea offset must be 0x90");
 }

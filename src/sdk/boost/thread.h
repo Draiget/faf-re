@@ -183,6 +183,14 @@ namespace boost {
             tidbox_ = 0;
         }
 
+        void abort() {
+            HANDLE h = static_cast<HANDLE>(handle_);
+            ::WaitForSingleObject(h, INFINITE);
+            ::CloseHandle(h);
+            handle_ = 0;
+            tidbox_ = 0;
+        }
+
         void detach() {
             if (!joinable()) return;
             ::CloseHandle(static_cast<HANDLE>(handle_));

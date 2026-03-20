@@ -1,9 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <iterator> // reverse_iterator
 #include <cstddef>  // std::ptrdiff_t
+#include <type_traits>
 
 namespace gpg::core
 {
@@ -122,6 +124,16 @@ namespace gpg::core
         const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(end_); }
         const_reverse_iterator crend() const noexcept { return const_reverse_iterator(start_); }
 
+        // STL-compatible aliases used by recovered runtime code.
+        [[nodiscard]] size_type size() const noexcept { return Size(); }
+        [[nodiscard]] bool empty() const noexcept { return Empty(); }
+        [[nodiscard]] pointer data() noexcept { return Data(); }
+        [[nodiscard]] const_pointer data() const noexcept { return Data(); }
+        reference front() noexcept { return Front(); }
+        const_reference front() const noexcept { return Front(); }
+        reference back() noexcept { return Back(); }
+        const_reference back() const noexcept { return Back(); }
+
         /**
          * Reserve at least n elements; does not shrink.
          */
@@ -150,6 +162,33 @@ namespace gpg::core
                 Reserve(newCap);
             }
             *end_++ = v;
+        }
+
+        void reserve(const size_t n) { Reserve(n); }
+        void push_back(const value_type& v) { PushBack(v); }
+        void clear() noexcept { Clear(); }
+
+        iterator erase(iterator pos)
+        {
+            return erase(pos, pos + 1);
+        }
+
+        iterator erase(iterator first, iterator last)
+        {
+            if (!first || !last || first < start_ || first > end_ || last < first || last > end_) {
+                return end_;
+            }
+            if (first == last) {
+                return first;
+            }
+
+            iterator write = first;
+            iterator read = last;
+            while (read != end_) {
+                *write++ = std::move(*read++);
+            }
+            end_ = write;
+            return first;
         }
 
         /** Clears size to zero without releasing memory. */
@@ -207,6 +246,7 @@ namespace gpg::core
             this->end_ = inlineVec_;
             this->capacity_ = inlineVec_ + N;
             originalVec_ = inlineVec_;
+            SaveInlineCapacity_();
         }
 
         ~FastVectorN() {
@@ -222,6 +262,25 @@ namespace gpg::core
         void Grow(size_t newSize) {
             if (this->Capacity() >= newSize) return;
             GrowToCapacity(newSize);
+        }
+
+        /**
+         * Reserve is overridden for FastVectorN to avoid Base::Reserve deleting inline storage.
+         */
+        void Reserve(size_t n) {
+            if (this->Capacity() >= n) return;
+            GrowToCapacity(n);
+        }
+
+        /**
+         * Append by copy; grows capacity exponentially.
+         */
+        void PushBack(const T& v) {
+            if (this->end_ == this->capacity_) {
+                const size_t newCap = this->Capacity() ? this->Capacity() * 2 : N;
+                Reserve(newCap);
+            }
+            *this->end_++ = v;
         }
 
         /** Resize; fill new elements with 'fill' value. */
@@ -297,15 +356,89 @@ namespace gpg::core
             CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
         }
 
+        /**
+         * Binary-matched fastvector_n reset helper:
+         * if heap-backed -> free heap and restore inline pointers from saved header;
+         * otherwise only reset end to start.
+         */
+        void ResetStorageToInline() noexcept {
+            ResetInline_();
+        }
+
+        /**
+         * Binary-style rebind helper:
+         * reset to inline storage without touching/freeing previous storage.
+         * Mirrors raw layout initialization paths like FUN_00701B70.
+         */
+        void RebindInlineNoFree() noexcept {
+            originalVec_ = inlineVec_;
+            this->start_ = inlineVec_;
+            this->end_ = inlineVec_;
+            this->capacity_ = inlineVec_ + N;
+        }
+
+        /**
+         * Returns true when active storage is the inline buffer.
+         */
+        [[nodiscard]]
+        bool UsingInlineStorage() const noexcept {
+            return this->start_ == originalVec_;
+        }
+
+        /**
+         * Save inline capacity pointer into inline header word.
+         */
+        void SaveInlineCapacityHeader() noexcept {
+            SaveInlineCapacity_();
+        }
+
+        /**
+         * Adopt raw storage pointers without allocating/freeing.
+         * Intended for recovered ABI helpers that manage storage externally.
+         */
+        void AdoptRawBufferNoFree(T* begin, size_t size, size_t capacity) noexcept {
+            this->start_ = begin;
+            this->end_ = begin + size;
+            this->capacity_ = begin + capacity;
+        }
+
+        /**
+         * Set logical size without constructing/destroying elements.
+         */
+        void SetSizeUnchecked(size_t size) noexcept {
+            this->end_ = this->start_ + size;
+        }
+
     private:
         /**
          * Rebind this container to its inline buffer (like func_Reset_fastvector_n prologue)
          */
         void ResetInline_() noexcept {
-            this->start_ = inlineVec_;
-            this->end_ = inlineVec_;
-            this->capacity_ = inlineVec_ + N;
-            originalVec_ = inlineVec_;
+            if (this->start_ != originalVec_) {
+                delete[] this->start_;
+                this->start_ = originalVec_;
+                this->capacity_ = InlineCapacityFromHeader_();
+            }
+            this->end_ = this->start_;
+        }
+
+        /**
+         * Save inline capacity in the first pointer-sized slot of inline storage.
+         * This mirrors FA/Moho fastvector_n grow helpers that write:
+         *   if (start == origin) *origin = capacity;
+         */
+        void SaveInlineCapacity_() noexcept {
+            if (!originalVec_) {
+                return;
+            }
+            *reinterpret_cast<T**>(originalVec_) = this->capacity_;
+        }
+
+        T* InlineCapacityFromHeader_() const noexcept {
+            if (!originalVec_) {
+                return nullptr;
+            }
+            return *reinterpret_cast<T* const*>(originalVec_);
         }
 
         /**
@@ -337,6 +470,8 @@ namespace gpg::core
             // Free previous heap buffer only if not using inline storage
             if (this->start_ && this->start_ != originalVec_) {
                 delete[] this->start_;
+            } else if (this->start_ == originalVec_) {
+                SaveInlineCapacity_();
             }
 
             this->start_ = p;
@@ -357,6 +492,8 @@ namespace gpg::core
 
             if (this->start_ != originalVec_) {
                 delete[] this->start_;
+            } else {
+                SaveInlineCapacity_();
             }
 
             this->start_ = newBuf;
@@ -364,4 +501,18 @@ namespace gpg::core
             this->capacity_ = newBuf + newCap;
         }
     };
+
+    static_assert(sizeof(FastVector<int>) == 0x0C, "FastVector<int> must be 0x0C (start/end/cap)");
+    static_assert(sizeof(FastVectorN<int, 4>) == 0x20, "FastVectorN<int,4> must be 0x20");
+    static_assert(sizeof(FastVectorN<char, 64>) == 0x50, "FastVectorN<char,64> must be 0x50");
+}
+
+namespace gpg
+{
+    // Binary symbols use gpg::fastvector / gpg::fastvector_n.
+    template<class T>
+    using fastvector = core::FastVector<T>;
+
+    template<class T, std::size_t N>
+    using fastvector_n = core::FastVectorN<T, N>;
 }

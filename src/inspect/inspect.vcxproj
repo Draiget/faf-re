@@ -179,6 +179,12 @@
     <ClInclude Include="utils\rtti_dump.h" />
     <ClInclude Include="utils\signatures.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\sdk\sdk.vcxproj">
+      <Project>{A6F8502F-3D49-4578-AC83-D434981AD676}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

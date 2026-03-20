@@ -1,6 +1,6 @@
 #pragma once
 
-namespace moho
+namespace gpg
 {
 	template<class T>
 	struct Rect2
@@ -13,4 +13,13 @@ namespace moho
 
 	using Rect2i = Rect2<int>;
 	using Rect2f = Rect2<float>;
+}
+
+namespace moho
+{
+	template<class T>
+	using Rect2 = gpg::Rect2<T>;
+
+	using Rect2i = gpg::Rect2i;
+	using Rect2f = gpg::Rect2f;
 }

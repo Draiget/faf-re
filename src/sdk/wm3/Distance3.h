@@ -1,0 +1,423 @@
+#pragma once
+
+#include "Box3.h"
+#include "Line3.h"
+#include "Segment3.h"
+#include "Sphere3.h"
+#include "Vector3.h"
+
+namespace Wm3
+{
+  /**
+   * Address: 0x00A45C00 (FUN_00A45C00, Wm3::DistVector3Box3f::GetSquared)
+   *
+   * Wm3::Vector3<float> const&, Wm3::Box3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3f::GetSquared(Wm3::DistVector3Box3f *this);
+   *
+   * What it does:
+   * Computes squared distance from a point to an oriented box and optionally writes closest point on box.
+   * This helper exposes the recovered behavior with explicit args.
+   */
+  float DistVector3Box3fGetSquared(
+    const Vector3<float>& vector, const Box3<float>& box, Vector3<float>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A457E0 (FUN_00A457E0, Wm3::DistVector3Box3f::Get)
+   *
+   * Wm3::Vector3<float> const&, Wm3::Box3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3f::Get(Wm3::DistVector3Box3f *this);
+   *
+   * What it does:
+   * Returns distance from a point to an oriented box.
+   */
+  float DistVector3Box3fGet(
+    const Vector3<float>& vector, const Box3<float>& box, Vector3<float>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A484F0 (FUN_00A484F0, Wm3::DistVector3Segment3f::GetSquared)
+   *
+   * Wm3::Vector3<float> const&, Wm3::Segment3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3f::GetSquared(Wm3::DistVector3Segment3f *this);
+   *
+   * What it does:
+   * Computes squared distance from a point to a segment and optionally writes closest point on segment.
+   */
+  float DistVector3Segment3fGetSquared(
+    const Vector3<float>& vector, const Segment3<float>& segment, Vector3<float>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A480E0 (FUN_00A480E0, Wm3::DistVector3Segment3f::Get)
+   *
+   * Wm3::Vector3<float> const&, Wm3::Segment3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3f::Get(Wm3::DistVector3Segment3f *this);
+   *
+   * What it does:
+   * Returns distance from a point to a segment.
+   */
+  float DistVector3Segment3fGet(
+    const Vector3<float>& vector, const Segment3<float>& segment, Vector3<float>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A48190 (FUN_00A48190, Wm3::DistVector3Segment3f::StaticGet)
+   *
+   * float, Wm3::Vector3<float> const&, Wm3::Segment3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float>
+   * const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3f::StaticGet(Wm3::DistVector3Segment3f *this, float fT, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Moves point/segment forward by time `t` using the provided velocities, then returns point-to-segment distance.
+   */
+  float DistVector3Segment3fStaticGet(
+    float t,
+    const Vector3<float>& vector,
+    const Segment3<float>& segment,
+    const Vector3<float>& vectorVelocity,
+    const Vector3<float>& segmentVelocity,
+    Vector3<float>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A48340 (FUN_00A48340, Wm3::DistVector3Segment3f::StaticGetSquared)
+   *
+   * float, Wm3::Vector3<float> const&, Wm3::Segment3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float>
+   * const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3f::StaticGetSquared(Wm3::DistVector3Segment3f *this, float fT,
+   * Wm3::Vector3f *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Moves point/segment forward by time `t` using the provided velocities, then returns squared point-to-segment
+   * distance.
+   */
+  float DistVector3Segment3fStaticGetSquared(
+    float t,
+    const Vector3<float>& vector,
+    const Segment3<float>& segment,
+    const Vector3<float>& vectorVelocity,
+    const Vector3<float>& segmentVelocity,
+    Vector3<float>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A41560 (FUN_00A41560, Wm3::IntrBox3Sphere3f::Test)
+   *
+   * Wm3::Box3<float> const&, Wm3::Sphere3<float> const&
+   *
+   * IDA signature:
+   * bool __thiscall Wm3::IntrBox3Sphere3f::Test(Wm3::IntrBox3Sphere3f *this);
+   *
+   * What it does:
+   * Tests static overlap between oriented box and sphere.
+   */
+  bool IntrBox3Sphere3fTest(const Box3<float>& box, const Sphere3<float>& sphere) noexcept;
+
+  /**
+   * Address: 0x00A43420 (FUN_00A43420, Wm3::IntrBox3Sphere3f::StaticFind)
+   *
+   * float, Wm3::Box3<float> const&, Wm3::Sphere3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&,
+   * float*, Wm3::Vector3<float>*, int*
+   *
+   * IDA signature:
+   * char __thiscall Wm3::IntrBox3Sphere3f::StaticFind(Wm3::IntrBox3Sphere3f *this, float fTMax, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Sweeps the sphere against the box for relative motion up to `tMax`, producing first-contact time
+   * and point when found.
+   */
+  bool IntrBox3Sphere3fStaticFind(
+    float tMax,
+    const Box3<float>& box,
+    const Sphere3<float>& sphere,
+    const Vector3<float>& velocity0,
+    const Vector3<float>& velocity1,
+    float* contactTime,
+    Vector3<float>* contactPoint,
+    int* intrType
+  ) noexcept;
+
+  /**
+   * Address: 0x00A41740 (FUN_00A41740, Wm3::IntrBox3Sphere3f::GetVertexIntersection)
+   *
+   * float, float, float, float, float, float, float
+   *
+   * IDA signature:
+   * double __cdecl Wm3::IntrBox3Sphere3f::GetVertexIntersection(float a1, float a2, float a3, float a4, float a5, float
+   * a6, float a7);
+   *
+   * What it does:
+   * Solves contact-time root for a vertex-region sweep test against sphere radius.
+   */
+  float IntrBox3Sphere3fGetVertexIntersection(
+    float a1, float a2, float a3, float a4, float a5, float a6, float a7
+  ) noexcept;
+
+  /**
+   * Address: 0x00A41800 (FUN_00A41800, Wm3::IntrBox3Sphere3f::GetEdgeIntersection)
+   *
+   * float, float, float, float, float, float
+   *
+   * IDA signature:
+   * double __cdecl Wm3::IntrBox3Sphere3f::GetEdgeIntersection(float a1, float a2, float a3, float a4, float a5, float
+   * a6);
+   *
+   * What it does:
+   * Solves contact-time root for an edge-region sweep test against sphere radius.
+   */
+  float IntrBox3Sphere3fGetEdgeIntersection(float a1, float a2, float a3, float a4, float a5, float a6) noexcept;
+
+  /**
+   * Address: 0x00A41F50 (FUN_00A41F50, Wm3::IntrBox3Sphere3f::FindEdgeRegionIntersection)
+   *
+   * float, float, float, float, float, float, float, float, float, float*, float*, float*, bool
+   *
+   * IDA signature:
+   * int __thiscall Wm3::IntrBox3Sphere3f::FindEdgeRegionIntersection(int this, float a2, float a3, float a4, float a5,
+   * float a6, float a7, float a8, float a9, float a10, int a11, int a12, int a13, float a14);
+   *
+   * What it does:
+   * Handles edge-region sweep logic and writes local contact coordinates when a candidate is found.
+   * Return codes match binary convention: -1 immediate overlap, 0 no hit, 1 hit.
+   */
+  int IntrBox3Sphere3fFindEdgeRegionIntersection(
+    float sphereRadius,
+    float a2,
+    float a3,
+    float a4,
+    float a5,
+    float a6,
+    float a7,
+    float a8,
+    float a9,
+    float a10,
+    float* a11,
+    float* a12,
+    float* a13,
+    bool a14,
+    float* contactTime = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A421E0 (FUN_00A421E0, Wm3::IntrBox3Sphere3f::FindVertexRegionIntersection)
+   *
+   * float, float, float, float, float, float, float, float, float, float*, float*, float*
+   *
+   * IDA signature:
+   * int __thiscall sub_A421E0(int this, float a2, float a3, float a4, float a5, float a6, float a7, float a8, float a9,
+   * float a10, float *a11, float *a12, float *a13);
+   *
+   * What it does:
+   * Handles vertex-region sweep logic and may recurse into edge-region helper paths.
+   * Return codes match binary convention: -1 immediate overlap, 0 no hit, 1 hit.
+   */
+  int IntrBox3Sphere3fFindVertexRegionIntersection(
+    float sphereRadius,
+    float a2,
+    float a3,
+    float a4,
+    float a5,
+    float a6,
+    float a7,
+    float a8,
+    float a9,
+    float a10,
+    float* a11,
+    float* a12,
+    float* a13,
+    float* contactTime = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A46440 (FUN_00A46440, Wm3::IntrSegment3Box3f::Test)
+   *
+   * Wm3::Segment3<float> const&, Wm3::Box3<float> const&
+   *
+   * IDA signature:
+   * bool __thiscall Wm3::IntrSegment3Box3f::Test(Wm3::IntrSegment3Box3f *this);
+   *
+   * What it does:
+   * Runs SAT overlap test between segment and oriented box.
+   */
+  bool IntrSegment3Box3fTest(const Segment3<float>& segment, const Box3<float>& box) noexcept;
+
+  /**
+   * Address: 0x00A46C80 (FUN_00A46C80, Wm3::IntrSegment3Sphere3f::Test)
+   *
+   * Wm3::Segment3<float> const&, Wm3::Sphere3<float> const&
+   *
+   * IDA signature:
+   * bool __thiscall Wm3::IntrSegment3Sphere3f::Test(Wm3::IntrSegment3Sphere3f *this);
+   *
+   * What it does:
+   * Tests static overlap between a segment and sphere without emitting contact points.
+   */
+  bool IntrSegment3Sphere3fTest(const Segment3<float>& segment, const Sphere3<float>& sphere) noexcept;
+
+  /**
+   * Address: 0x00A4FE60 (FUN_00A4FE60, Wm3::IntrLine3Box3f::Test)
+   *
+   * Wm3::Line3<float> const&, Wm3::Box3<float> const&
+   *
+   * IDA signature:
+   * bool __thiscall Wm3::IntrLine3Box3f::Test(Wm3::IntrLine3Box3f *this);
+   *
+   * What it does:
+   * Runs SAT cross-axis checks for infinite line vs oriented box overlap.
+   */
+  bool IntrLine3Box3fTest(const Line3<float>& line, const Box3<float>& box) noexcept;
+
+  /**
+   * Address: 0x00A4FCC0 (FUN_00A4FCC0, Wm3::IntrLine3Box3f::Clip)
+   *
+   * float, float, float*, float*
+   *
+   * IDA signature:
+   * bool __cdecl Wm3::IntrLine3Box3f::Clip(float fDenom, float fNumer, float *rfT0, float *rfT1);
+   *
+   * What it does:
+   * Clips one parametric slab constraint and tightens [`t0`,`t1`] when possible.
+   */
+  bool IntrLine3Box3fClip(float denom, float numer, float* t0, float* t1) noexcept;
+
+  /**
+   * Address: 0x00A50220 (FUN_00A50220, Wm3::IntrLine3Box3f::DoClipping)
+   *
+   * float, float, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&, Wm3::Box3<float> const&, bool, int*,
+   * Wm3::Vector3<float>*, int*
+   *
+   * IDA signature:
+   * BOOL __cdecl Wm3::IntrLine3Box3f::DoClipping(float fT0, float fT1, Wm3::Vector3f *rkOrigin, Wm3::Vector3f
+   * *rkDirection, const Wm3::Box3f *rkBox, char bSolid, int *riQuantity, Wm3::Vector3f *akPoint, int *riIntrType);
+   *
+   * What it does:
+   * Clips a line interval against an oriented box and emits 0/1/2 intersection points plus type.
+   */
+  bool IntrLine3Box3fDoClipping(
+    float t0,
+    float t1,
+    const Vector3<float>& origin,
+    const Vector3<float>& direction,
+    const Box3<float>& box,
+    bool solid,
+    int* quantity,
+    Vector3<float>* points,
+    int* intrType
+  ) noexcept;
+
+  /**
+   * Address: 0x00A508F0 (FUN_00A508F0, Wm3::IntrLine3Box3f::Find)
+   *
+   * Wm3::Line3<float> const&, Wm3::Box3<float> const&, int*, Wm3::Vector3<float>*, int*
+   *
+   * IDA signature:
+   * BOOL __thiscall Wm3::IntrLine3Box3f::Find(Wm3::IntrLine3Box3f *this);
+   *
+   * What it does:
+   * Wrapper over `DoClipping` that uses full line interval [`-FLT_MAX`, `+FLT_MAX`] and `bSolid=true`.
+   */
+  bool IntrLine3Box3fFind(
+    const Line3<float>& line, const Box3<float>& box, int* quantity, Vector3<float>* points, int* intrType
+  ) noexcept;
+
+  /**
+   * Address: 0x00A462A0 (FUN_00A462A0, Wm3::IntrSegment3Box3f::Find)
+   *
+   * Wm3::Segment3<float> const&, Wm3::Box3<float> const&, bool, int*, Wm3::Vector3<float>*, int*
+   *
+   * IDA signature:
+   * bool __thiscall Wm3::IntrSegment3Box3f::Find(Wm3::IntrSegment3Box3f *this);
+   *
+   * What it does:
+   * Thin wrapper over `DoClipping` that clips `t` in [`-Extent`, `+Extent`] for segment-vs-box queries.
+   */
+  bool IntrSegment3Box3fFind(
+    const Segment3<float>& segment,
+    const Box3<float>& box,
+    bool solid,
+    int* quantity,
+    Vector3<float>* points,
+    int* intrType
+  ) noexcept;
+
+  /**
+   * Address: 0x00A471C0 (FUN_00A471C0, Wm3::IntrSegment3Sphere3f::Find)
+   *
+   * Wm3::Segment3<float> const&, Wm3::Sphere3<float> const&, int*, Wm3::Vector3<float>*, float*, float
+   *
+   * IDA signature:
+   * bool __thiscall Wm3::IntrSegment3Sphere3f::Find(Wm3::IntrSegment3Sphere3f *this);
+   *
+   * What it does:
+   * Finds 0/1/2 static intersection points between a segment and sphere using the recovered threshold branch logic.
+   */
+  bool IntrSegment3Sphere3fFind(
+    const Segment3<float>& segment,
+    const Sphere3<float>& sphere,
+    int* quantity,
+    Vector3<float>* points,
+    float* segmentT,
+    float zeroThreshold = 0.000001f
+  ) noexcept;
+
+  /**
+   * Address: 0x00A46B10 (FUN_00A46B10, Wm3::IntrSegment3Sphere3f::StaticTest)
+   *
+   * float, Wm3::Segment3<float> const&, Wm3::Sphere3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float>
+   * const&
+   *
+   * IDA signature:
+   * char __thiscall Wm3::IntrSegment3Sphere3f::StaticTest(Wm3::IntrSegment3Sphere3f *this, float fTMax, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Dynamic overlap test path: first checks static segment-sphere overlap, then tests the relative sweep as
+   * segment-vs-capsule.
+   */
+  bool IntrSegment3Sphere3fStaticTest(
+    float tMax,
+    const Segment3<float>& segment,
+    const Sphere3<float>& sphere,
+    const Vector3<float>& velocity0,
+    const Vector3<float>& velocity1
+  ) noexcept;
+
+  /**
+   * Address: 0x00A46DB0 (FUN_00A46DB0, Wm3::IntrSegment3Sphere3f::StaticFind)
+   *
+   * float, Wm3::Segment3<float> const&, Wm3::Sphere3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float>
+   * const&, float*, Wm3::Vector3<float>*, int*
+   *
+   * IDA signature:
+   * char __thiscall Wm3::IntrSegment3Sphere3f::StaticFind(Wm3::IntrSegment3Sphere3f *this, float fTMax, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Dynamic find path: resolves first relative sweep hit and computes contact point on the moving segment.
+   */
+  bool IntrSegment3Sphere3fStaticFind(
+    float tMax,
+    const Segment3<float>& segment,
+    const Sphere3<float>& sphere,
+    const Vector3<float>& velocity0,
+    const Vector3<float>& velocity1,
+    float* contactTime,
+    Vector3<float>* contactPoint,
+    int* intrType
+  ) noexcept;
+} // namespace Wm3

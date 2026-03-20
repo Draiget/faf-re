@@ -1,125 +1,246 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/vision/VisionDB.h"
+
 using namespace moho;
 
-void VisionDB::Pool::FreeZoneArraysOnly(ZoneNode* head)
+namespace
 {
-    if (!head) return;
-    for (ZoneNode* it = static_cast<ZoneNode*>(head->mNext); it != head; it = static_cast<ZoneNode*>(it->mNext)) {
-        if (it->items40) {
-            ::operator delete[](it->items40);
-            it->items40 = nullptr;
-        }
+  template <class Entry>
+  void ClearRingAndDeleteHead(Entry*& head, std::uint32_t& count) noexcept
+  {
+    if (!head) {
+      return;
     }
-}
 
+    Entry* node = static_cast<Entry*>(head->mNext);
+    head->mNext = head;
+    head->mPrev = head;
+    count = 0;
+
+    while (node != head) {
+      Entry* next = static_cast<Entry*>(node->mNext);
+      ::operator delete(node);
+      node = next;
+    }
+
+    ::operator delete(head);
+    head = nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x0081ACA0 (FUN_0081ACA0)
+ * Mangled: ??0Pool@VisionDB@Moho@@QAE@@Z
+ *
+ * What it does:
+ * Allocates and self-links zone/free-node list sentinels.
+ */
 VisionDB::Pool::Pool()
 {
-    // Heads are heap-allocated sentinels (as in asm).
-    zones_ = new ZoneNode();
-    zoneCount_ = 0;
-    pad0_ = 0;
-    handlesHead_ = new HandleNode();
-    handleCount_ = 0;
+  zoneBlocksHead_ = new ZoneBlockEntry();
+  zoneBlockCount_ = 0;
 
-    ResetCircle(zones_);
-    ResetCircle(handlesHead_);
+  freeNodeHead_ = new FreeNodeEntry();
+  freeNodeCount_ = 0;
 }
 
+/**
+ * Address: 0x0081AD20 (FUN_0081AD20)
+ * Address: 0x103E3CA0
+ *
+ * What it does:
+ * Releases pooled-node blocks, clears both intrusive lists, and frees sentinels.
+ */
 void VisionDB::Pool::Clear()
 {
-    // sub_81AD20: free arrays in zones first
-    FreeZoneArraysOnly(zones_);
+  FreeZoneBlocks(zoneBlocksHead_);
 
-    // handles list: reset ring, zero count, delete nodes, delete head, null it
-    ResetCircle(handlesHead_);
-    handleCount_ = 0;
-    DeleteRange(handlesHead_);
-    ::operator delete(handlesHead_);
-    handlesHead_ = nullptr;
-
-    // zones list: reset ring, zero count, delete nodes, delete head, null it
-    ResetCircle(zones_);
-    zoneCount_ = 0;
-    DeleteRange(zones_);
-    ::operator delete(zones_);
-    zones_ = nullptr;
+  ClearRingAndDeleteHead(freeNodeHead_, freeNodeCount_);
+  ClearRingAndDeleteHead(zoneBlocksHead_, zoneBlockCount_);
 }
 
+/**
+ * Address: 0x0081AD00 (FUN_0081AD00)
+ * Address: 0x103E3C80
+ *
+ * What it does:
+ * Invokes `Clear()` and optionally deletes the object (scalar deleting dtor).
+ */
 VisionDB::Pool::~Pool()
 {
-    Clear();
+  Clear();
 }
 
-VisionDB::Handle* VisionDB::Handle::Init(
-    Handle* self,
-    const std::uintptr_t linkPtr,
-    const std::uintptr_t ownerPtr)
+void VisionDB::Pool::FreeZoneBlocks(ZoneBlockEntry* head)
 {
-    if (!self) {
-        return nullptr;
+  if (!head) {
+    return;
+  }
+
+  for (ZoneBlockEntry* it = static_cast<ZoneBlockEntry*>(head->mNext); it != head;
+       it = static_cast<ZoneBlockEntry*>(it->mNext)) {
+    if (!it->blockBase) {
+      continue;
     }
-    self->ownerPtr_ = ownerPtr;   // v1 = a3
-    self->linkPtr_ = linkPtr;    // v2 = a2
-    return self;
+
+    // The block is allocated via operator new as: [count dword][count * PooledNode].
+    auto* rawBlock = reinterpret_cast<std::uint32_t*>(it->blockBase) - 1;
+    ::operator delete[](rawBlock);
+    it->blockBase = nullptr;
+  }
 }
 
 /**
- * Raw unlink helper that assumes first two fields are mPrev, mNext pointers.
- */
-void VisionDB::Handle::EraseNode(void* node)
-{
-    if (!node) {
-        return;
-    }
-
-    struct RawLink {
-        RawLink* mPrev;
-        RawLink* mNext;
-    };
-
-    auto* n = static_cast<RawLink*>(node);
-    auto* p = n->mPrev;
-    auto* q = n->mNext;
-
-    if (p && q) {
-        p->mNext = q;
-        q->mPrev = p;
-        n->mPrev = n;
-        n->mNext = n;
-    }
-}
-
-/**
+ * Address: 0x0081AE10 (FUN_0081AE10)
  *
- * Best-effort owner unbind emulation (original calls sub_81ABF0(owner+4, node)).
+ * What it does:
+ * Stores owner and pooled-node pointers for this handle.
  */
-void VisionDB::Handle::UnbindFromOwner(std::uintptr_t /*ownerPlus4*/, void* /*node*/)
+VisionDB::Handle*
+VisionDB::Handle::Init(Handle* self, const std::uintptr_t pooledNodePtr, const std::uintptr_t ownerPtr)
 {
-    // Semantics unknown yet; kept as a stub to match call pattern.
+  if (!self) {
+    return nullptr;
+  }
+
+  self->ownerPtr_ = ownerPtr;
+  self->pooledNodePtr_ = pooledNodePtr;
+  return self;
 }
 
+/**
+ * Address: 0x0081A8C0 (FUN_0081A8C0)
+ * Address: 0x103E38B0
+ *
+ * What it does:
+ * Appends a sibling chain to the tail of another sibling chain.
+ */
+void VisionDB::Handle::AttachSiblingChain(Pool::PooledNode* tailChain, Pool::PooledNode* chainHead)
+{
+  if (!tailChain || !chainHead) {
+    return;
+  }
+
+  while (tailChain->nextSibling != nullptr) {
+    tailChain = tailChain->nextSibling;
+  }
+
+  tailChain->nextSibling = chainHead;
+  chainHead->ownerOrChain = tailChain->ownerOrChain;
+}
+
+/**
+ * Address: 0x0081A8E0 (FUN_0081A8E0)
+ * Address: 0x103E38D0
+ *
+ * What it does:
+ * Unlinks a pooled node from its owner chain and reparents children.
+ */
+void VisionDB::Handle::UnlinkFromOwnerTree(OwnerChainView* ownerChain, Pool::PooledNode* node)
+{
+  if (!node || !ownerChain) {
+    return;
+  }
+
+  Pool::PooledNode*& rootSlot = ownerChain->rootNode;
+  Pool::PooledNode* cursor = rootSlot;
+
+  if (cursor == node) {
+    rootSlot = cursor->nextSibling;
+  } else if (cursor) {
+    while (cursor->nextSibling) {
+      if (cursor->nextSibling == node) {
+        cursor->nextSibling = cursor->nextSibling->nextSibling;
+        break;
+      }
+      cursor = cursor->nextSibling;
+    }
+  }
+
+  if (node->firstChild) {
+    Pool::PooledNode* const ownerRoot = rootSlot;
+    if (ownerRoot) {
+      if (ownerRoot->nextSibling) {
+        AttachSiblingChain(ownerRoot->nextSibling, node->firstChild);
+      } else {
+        ownerRoot->nextSibling = node->firstChild;
+        node->firstChild->ownerOrChain = ownerRoot->ownerOrChain;
+      }
+    } else {
+      rootSlot = node->firstChild;
+      node->firstChild->ownerOrChain = ownerChain;
+    }
+
+    for (Pool::PooledNode* child = node->firstChild; child; child = child->nextSibling) {
+      child->ownerOrChain = ownerChain;
+    }
+  }
+
+  node->ownerOrChain = nullptr;
+  node->firstChild = nullptr;
+  node->nextSibling = nullptr;
+}
+
+/**
+ * Address: 0x0081ABF0 (FUN_0081ABF0)
+ * Address: 0x103E3B70
+ *
+ * What it does:
+ * Clears one pooled node and pushes it back to the pool free-list.
+ */
+void VisionDB::Handle::ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* node)
+{
+  if (!node || !ownerPool || !ownerPool->freeNodeHead_) {
+    return;
+  }
+
+  node->ownerOrChain = nullptr;
+  node->firstChild = nullptr;
+  node->nextSibling = nullptr;
+  node->typeFlag = 0;
+  node->markFlag = 0;
+
+  auto* const entry = static_cast<Pool::FreeNodeEntry*>(::operator new(sizeof(Pool::FreeNodeEntry)));
+  entry->node = node;
+  entry->ListLinkBefore(ownerPool->freeNodeHead_);
+
+  ++ownerPool->freeNodeCount_;
+}
+
+/**
+ * Address: 0x0081AE20 (FUN_0081AE20)
+ * Address: 0x103E3DA0
+ *
+ * What it does:
+ * Unlinks the pooled node from its owner chain and returns it to the pool free-list.
+ */
 VisionDB::Handle::~Handle()
 {
-    // sub_81AE20 pattern: unlink by v2, then unbind by (v1+4, v2)
-    EraseNode(reinterpret_cast<void*>(linkPtr_));
-    if (ownerPtr_) {
-        UnbindFromOwner(ownerPtr_ + 4u, reinterpret_cast<void*>(linkPtr_));
-    }
+  auto* const pooledNode = reinterpret_cast<Pool::PooledNode*>(pooledNodePtr_);
+  auto* const owner = reinterpret_cast<VisionDB*>(ownerPtr_);
+  if (pooledNode && owner) {
+    auto* const ownerChain = static_cast<OwnerChainView*>(pooledNode->ownerOrChain);
+    UnlinkFromOwnerTree(ownerChain, pooledNode);
+    ReturnNodeToFreeList(&owner->pool_, pooledNode);
+  }
 
-    ownerPtr_ = 0;
-    linkPtr_ = 0;
+  ownerPtr_ = 0;
+  pooledNodePtr_ = 0;
 }
 
 VisionDB::VisionDB()
-    : pool_()
-    , unknown_(nullptr)
-{
-    // sub_81AE90: vptr set by compiler, Pool constructed, a1[8] = 0
-}
+  : pool_()
+  , rootNode_(nullptr)
+{}
 
+/**
+ * Address: 0x0081AEB0 (FUN_0081AEB0)
+ * Address: 0x103E3E30
+ *
+ * What it does:
+ * Clears the root pointer then tears down `Pool`.
+ */
 VisionDB::~VisionDB()
 {
-    // 0x0081AEB0: nothing special beyond member destruction
-    unknown_ = nullptr;
+  rootNode_ = nullptr;
 }

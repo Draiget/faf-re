@@ -1,10 +1,9 @@
 #pragma once
-#include "../math/Vector3f.h"
+
+#include "wm3/AABB.h"
 
 namespace moho
 {
-	struct AABB
-	{
-		Vector3f min{}, max{};
-	};
-}
+  using AABB = Wm3::AxisAlignedBox3f;
+  static_assert(sizeof(AABB) == 0x18, "moho::AABB size must be 0x18");
+} // namespace moho

@@ -2,7 +2,8 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho {
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1BE9C
    * COL:  0x00E71C0C
@@ -78,7 +79,7 @@ namespace moho {
      * Slot: 9
      * Demangled: Moho::CAiNavigatorImpl::GetStatus
      */
-    virtual void GetStatus() = 0;
+    virtual int GetStatus() = 0;
 
     /**
      * Address: 0x005A4E50

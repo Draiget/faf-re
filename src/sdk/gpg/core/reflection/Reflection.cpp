@@ -1,7 +1,84 @@
 #include "Reflection.h"
 
+#include <algorithm>
+#include <cctype>
+#include <sstream>
+#include <stdexcept>
+
 #include "gpg/core/containers/String.h"
 using namespace gpg;
+
+RField::RField()
+    : mName(nullptr),
+      mType(nullptr),
+      mOffset(0),
+      v4(0),
+      mDesc(nullptr) {
+}
+
+RField::RField(const char* name, RType* type, const int offset)
+    : mName(name),
+      mType(type),
+      mOffset(offset),
+      v4(0),
+      mDesc(nullptr) {
+}
+
+RField::RField(const char* name, RType* type, const int offset, const int v, const char* desc)
+    : mName(name),
+      mType(type),
+      mOffset(offset),
+      v4(v),
+      mDesc(desc) {
+}
+
+RType* gpg::LookupRType(const std::type_info& typeInfo) {
+    TypeInfoMap& preregistered = GetRTypePreregisteredMap();
+    const TypeInfoMap::iterator it = preregistered.find(&typeInfo);
+    if (it == preregistered.end()) {
+        const msvc8::string msg = STR_Printf(
+            "Attempting to lookup the RType for %s before it is registered.",
+            typeInfo.name());
+        throw std::runtime_error(msg.c_str());
+    }
+
+    RType* type = it->second;
+    if (!type->finished_) {
+        type->finished_ = true;
+        type->Init();
+        type->RegisterType();
+        type->initFinished_ = true;
+    }
+
+    return type;
+}
+
+void gpg::PreRegisterRType(const std::type_info& typeInfo, RType* type) {
+    GetRTypePreregisteredMap().insert(TypeInfoMap::value_type(&typeInfo, type));
+}
+
+void gpg::REF_RegisterAllTypes() {
+    std::stringstream errs;
+
+    for (TypeInfoMap::const_iterator it = GetRTypePreregisteredMap().begin();
+         it != GetRTypePreregisteredMap().end();
+         ++it) {
+        try {
+            (void)LookupRType(*it->first);
+        } catch (const std::exception& ex) {
+            errs << ex.what() << std::endl;
+        }
+    }
+
+    const std::string aggregated = errs.str();
+    if (!aggregated.empty()) {
+        throw std::runtime_error(aggregated);
+    }
+}
+
+const RType* gpg::REF_GetTypeIndexed(const int index) {
+    return GetRTypeVec()[index];
+}
 
 msvc8::string RRef::GetLexical() const {
 	return mType->GetLexical(*this);
@@ -11,15 +88,136 @@ bool RRef::SetLexical(const char* name) const {
     return mType->SetLexical(*this, name);
 }
 
+const char* RRef::GetTypeName() const {
+    if (!mType) {
+        return "null";
+    }
+
+    return mType->GetName();
+}
+
+RRef RRef::operator[](const unsigned int ind) const {
+    const RIndexed* indexed = mType->IsIndexed();
+    return indexed->SubscriptIndex(mObj, static_cast<int>(ind));
+}
+
+size_t RRef::GetCount() const {
+    const RIndexed* indexed = mType->IsIndexed();
+    if (!indexed) {
+        return 0;
+    }
+
+    return indexed->GetCount(mObj);
+}
+
+const RType* RRef::GetRType() const {
+    return mType;
+}
+
+const RIndexed* RRef::IsIndexed() const {
+    return mType->IsIndexed();
+}
+
+const RIndexed* RRef::IsPointer() const {
+    return mType->IsPointer();
+}
+
+int RRef::GetNumBases() const {
+    const RField* first = mType->bases_.begin();
+    if (!first) {
+        return 0;
+    }
+
+    return static_cast<int>(mType->bases_.end() - first);
+}
+
+RRef RRef::GetBase(const int ind) const {
+    const RField* first = mType->bases_.begin();
+    const RField& base = first[ind];
+
+    RRef out{};
+    out.mObj = static_cast<char*>(mObj) + base.mOffset;
+    out.mType = base.mType;
+    return out;
+}
+
+int RRef::GetNumFields() const {
+    const RField* first = mType->fields_.begin();
+    if (!first) {
+        return 0;
+    }
+
+    return static_cast<int>(mType->fields_.end() - first);
+}
+
+RRef RRef::GetField(const int ind) const {
+    const RField* first = mType->fields_.begin();
+    const RField& field = first[ind];
+
+    RRef out{};
+    out.mObj = static_cast<char*>(mObj) + field.mOffset;
+    out.mType = field.mType;
+    return out;
+}
+
+const char* RRef::GetFieldName(const int ind) const {
+    return mType->fields_.begin()[ind].mName;
+}
+
+void RRef::Delete() {
+    if (!mObj) {
+        return;
+    }
+
+    GPG_ASSERT(mType->deleteFunc_);
+    mType->deleteFunc_(mObj);
+}
+
 RType::~RType() = default;
 
-msvc8::string RType::GetLexical(const RRef& ref) {
+RType* RType::GetClass() const {
+    static RType* familyDescriptor = nullptr;
+    if (!familyDescriptor) {
+        familyDescriptor = LookupRType(typeid(RType));
+    }
+    return familyDescriptor;
+}
+
+RRef RType::GetDerivedObjectRef() {
+    RRef out{};
+    out.mObj = this;
+    out.mType = GetClass();
+    return out;
+}
+
+msvc8::string RType::GetLexical(const RRef& ref) const {
     const auto name = GetName();
-    return STR_Printf("%s at 0x%p", name, reinterpret_cast<uintptr_t>(ref.mObj));
+    return STR_Printf("%s at 0x%p", name, ref.mObj);
+}
+
+void RType::Init() {
+}
+
+void RType::Finish() {
+    GPG_ASSERT(!initFinished_);
+
+    RField* first = fields_.begin();
+    if (!first) {
+        return;
+    }
+
+    RField* last = fields_.end();
+    if (first == last) {
+        return;
+    }
+
+    std::sort(first, last, [](const RField& a, const RField& b) {
+        return std::strcmp(a.mName, b.mName) < 0;
+    });
 }
 
 void RType::Version(const int version) {
-    GPG_ASSERT(version_ == version);
+    GPG_ASSERT(version_ == 0 || version_ == version);
     version_ = version;
 }
 
@@ -72,7 +270,7 @@ void RType::RegisterType() {
 }
 
 const RField* RType::GetFieldNamed(const char* name) const {
-    GPG_ASSERT(!initFinished_);
+    GPG_ASSERT(initFinished_);
 
     const RField* start = fields_.begin();
     if (!start) {
@@ -106,18 +304,19 @@ const RField* RType::GetFieldNamed(const char* name) const {
 }
 
 bool RType::IsDerivedFrom(const RType* baseType, int32_t* outOffset) const {
-    // Base case: same type
     if (this == baseType) {
-        if (outOffset) *outOffset = 0;
+        if (outOffset) {
+            *outOffset = 0;
+        }
+
         return true;
     }
 
-    // Null/empty base list - not derived
     const RField* first = bases_.begin();
-    // MSVC8 empty-vector null start
     if (!first) {
         return false;
     }
+
     const RField* last = bases_.end();
     if (first == last) {
         return false;
@@ -125,29 +324,16 @@ bool RType::IsDerivedFrom(const RType* baseType, int32_t* outOffset) const {
 
     bool found = false;
 
-    // Iterate all direct bases
     for (const RField* it = first; it != last; ++it) {
-        const RType* bType = it->mType;
-        const int32_t bOffset = it->mOffset;
-
-        // Recurse into base type; pass same outOffset pointer (as in original)
-        if (!bType) continue;
-
-        // Save current offset to allow safe accumulation after a successful path
-        int32_t subOffset = 0;
-        int32_t* pAccum = outOffset ? &subOffset : nullptr;
-
-        if (bType->IsDerivedFrom(baseType, pAccum)) {
-            // Already have a successful path? -> ambiguous
+        if (it->mType->IsDerivedFrom(baseType, outOffset)) {
             if (found) {
                 throw std::runtime_error("Ambiguous base class");
             }
 
-            // First successful path: accumulate base edge offset
             if (outOffset) {
-                // subOffset contains nested path offset; add current edge
-                *outOffset = subOffset + bOffset;
+                *outOffset += it->mOffset;
             }
+
             found = true;
         }
     }
@@ -156,19 +342,19 @@ bool RType::IsDerivedFrom(const RType* baseType, int32_t* outOffset) const {
 }
 
 
-msvc8::string REnumType::GetLexical(const RRef& ref) {
-    // Guard: if no storage, treat as zero
-    const auto pVal = static_cast<const int*>(ref.mObj);
-    const int val = pVal ? *pVal : 0;
+msvc8::string REnumType::GetLexical(const RRef& ref) const {
+    const int* enumValue = static_cast<const int*>(ref.mObj);
+    const int value = enumValue ? *enumValue : 0;
 
-    // Try to find exact value match
-    for (const auto& [mValue, mName] : mEnumNames) {
-        if (mValue == val) {
-            return msvc8::string(mName ? mName : "");
+    const ROptionValue* it = mEnumNames.begin();
+    const ROptionValue* end = mEnumNames.end();
+    for (; it != end; ++it) {
+        if (it->mValue == value) {
+            return msvc8::string(it->mName ? it->mName : "");
         }
     }
 
-    return RType::GetLexical(ref);
+    return STR_Printf("%d", value);
 }
 
 
