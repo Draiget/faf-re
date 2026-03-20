@@ -119,7 +119,8 @@ DTOR_RE = re.compile(
 def split_params(s: str) -> List[str]:
     """
     Split a raw parameter list string into individual parameter type tokens.
-    Supports '...' (C/C++ varargs) as a standalone token.
+    Supports '...' (C/C++ varargs) as a standalone token and tolerates
+    non-standard 'type name...' forms by turning them into 'type', '...'.
     - Handles nested templates and parenthesis to avoid splitting inside them.
     - Removes parameter names and default values.
     - Leaves pointer-to-function parameters as-is (unsupported for encoding).
@@ -134,28 +135,42 @@ def split_params(s: str) -> List[str]:
         elif ch == '(': par += 1
         elif ch == ')': par = max(0, par-1)
         if ch == ',' and lt == 0 and par == 0:
-            out.append("".join(cur).strip()); cur=[]
+            out.append("".join(cur).strip()); cur = []
         else:
             cur.append(ch)
-    if cur: out.append("".join(cur).strip())
-    # strip names and default values
-    cleaned=[]
+    if cur:
+        out.append("".join(cur).strip())
+
+    cleaned: List[str] = []
     for it in out:
         it = re.sub(r"=\s*[^,]+$", "", it).strip()
+
+        # Handle 'type name...' => 'type', '...'
+        m_va = re.match(r"^(?P<type>.+?)\s+[_A-Za-z]\w*\s*\.\.\.$", it)
+        if m_va:
+            cleaned.append(m_va.group("type").strip())
+            cleaned.append("...")
+            continue
+
         if re.search(r"\(\s*\*\s*.*\)\s*\(", it):  # ptr-to-func — not supported
-            cleaned.append(it); continue
+            cleaned.append(it)
+            continue
         if it == "...":  # keep ellipsis as-is; handled in arglist encoder
-            cleaned.append(it); continue
+            cleaned.append(it)
+            continue
+
         # 1) common case: "... type name"
         m = re.search(r"^(.*\S)\s+([_A-Za-z]\w*)\s*$", it)
         if m:
             cleaned.append(m.group(1).strip())
             continue
+
         # 2) sticky names like "Type*name" / "Type&name" / "Type*&name"
         m2 = re.search(r"^(.*[\*\&])\s*([_A-Za-z]\w*)\s*$", it)
         if m2:
             cleaned.append(m2.group(1).strip())
             continue
+
         cleaned.append(it)
     return cleaned
 
@@ -267,15 +282,69 @@ def pointee_cv_letter(txt: str) -> str:
     return "A"
 
 def encode_type(t: str) -> str:
-    """Encode a (possibly ref/pointer) type into MSVC x86 mangled form."""
-    kind, base = peel_ref_ptr(t)
-    base_no_cv = re.sub(r"\bconst\b|\bvolatile\b", "", base).strip()
-    base_code = encode_base_or_named(base_no_cv)
-    if kind == "&":
-        return "A" + pointee_cv_letter(base) + base_code
-    if kind == "*":
-        return "P" + pointee_cv_letter(base) + base_code
-    return base_code
+    """
+    Encode a (possibly multi-level ref/pointer) type into MSVC x86 mangled form.
+    Supports chains like 'const char**', 'int*&', 'const Foo* const*'.
+    """
+    ts = t.strip()
+    if not ts:
+        raise ValueError("empty type")
+
+    # Normalize spacing around * and & so we can tokenize safely.
+    ts_spaced = re.sub(r"([*&])", r" \1 ", ts)
+    tokens = [tok for tok in ts_spaced.split() if tok]
+
+    # Split into base tokens and pointer/ref levels.
+    base_tokens: List[str] = []
+    levels: List[Dict[str, List[str]]] = []  # each: {"kind": "*"/"&", "cv_tokens": [...]}
+    for tok in tokens:
+        if tok in ("*", "&"):
+            levels.append({"kind": tok, "cv_tokens": []})
+        elif levels:
+            # After we've seen the first * or &, tokens belong to the last level
+            # (its cv-qualifiers such as 'const' / 'volatile').
+            levels[-1]["cv_tokens"].append(tok)
+        else:
+            base_tokens.append(tok)
+
+    # Extract CV from base tokens (e.g. 'const char' -> base='char', cv='const').
+    base_cv_tokens = [t for t in base_tokens if t in ("const", "volatile")]
+    base_type_tokens = [t for t in base_tokens if t not in ("const", "volatile")]
+    if not base_type_tokens:
+        raise ValueError(f"Cannot encode type: '{t}'")
+
+    base_txt = " ".join(base_type_tokens)
+    base_code = encode_base_or_named(base_txt)
+
+    # If there are no pointer/ref levels, top-level CV doesn't affect mangling
+    # for by-value params, so we're done.
+    if not levels:
+        return base_code
+
+    def cv_from_tokens(tokens_list: List[str]) -> str:
+        has_c = any(tok == "const" for tok in tokens_list)
+        has_v = any(tok == "volatile" for tok in tokens_list)
+        if has_c and has_v:
+            return "D"
+        if has_c:
+            return "B"
+        if has_v:
+            return "C"
+        return "A"
+
+    # Apply base-level CV to the *innermost* pointer/reference (closest to the base),
+    # e.g. 'const char**' -> pointer to pointer to const char.
+    levels[0]["cv_tokens"].extend(base_cv_tokens)
+
+    # Build encoding from inner-most level outwards.
+    code = base_code
+    for lvl in levels:
+        cv_letter = cv_from_tokens(lvl["cv_tokens"])
+        if lvl["kind"] == "&":
+            code = "A" + cv_letter + code
+        else:  # '*'
+            code = "P" + cv_letter + code
+    return code
 
 
 def encode_arglist(params: List[str]) -> str:

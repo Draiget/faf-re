@@ -1,0 +1,380 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+#include "gpg/core/containers/String.h"
+#include "wm3/Vector3.h"
+
+namespace moho
+{
+  class AudioEngine;
+  class VTransform;
+  class IXACTCue;
+  class IXACTWaveBank;
+  struct SoundConfiguration;
+
+  class IXACTSoundBank
+  {
+  public:
+    virtual std::int32_t __stdcall Reserved00() = 0; // +0x00
+    virtual std::int32_t __stdcall Reserved04() = 0; // +0x04
+    virtual std::int32_t __stdcall Reserved08() = 0; // +0x08
+
+    /**
+     * VTable slot 3 (+0x0C).
+     */
+    virtual std::int32_t __stdcall
+    Prepare(std::uint16_t cueIndex, std::uint32_t flags, std::uint32_t timeOffset, IXACTCue** outCue) = 0;
+
+    /**
+     * VTable slot 4 (+0x10).
+     */
+    virtual std::int32_t __stdcall
+    Play(std::uint16_t cueIndex, std::uint32_t flags, std::uint32_t timeOffset, IXACTCue** outCue) = 0;
+  };
+
+  class IXACTCue
+  {
+  public:
+    /**
+     * VTable slot 0 (+0x00).
+     */
+    virtual std::int32_t __stdcall Play() = 0;
+
+    /**
+     * VTable slot 1 (+0x04).
+     */
+    virtual void __stdcall Stop(std::int32_t stopFlags) = 0;
+
+    /**
+     * VTable slot 2 (+0x08).
+     */
+    virtual std::int32_t __stdcall GetState(std::int32_t* outState) = 0;
+
+    /**
+     * VTable slot 3 (+0x0C).
+     */
+    virtual std::int32_t __stdcall Destroy() = 0;
+
+    virtual void __stdcall Reserved10() = 0; // +0x10
+    virtual void __stdcall Reserved14() = 0; // +0x14
+    virtual void __stdcall Reserved18() = 0; // +0x18
+    virtual void __stdcall Reserved1C() = 0; // +0x1C
+
+    /**
+     * VTable slot 8 (+0x20).
+     */
+    virtual std::int32_t __stdcall SetMatrixCoefficients(
+      std::uint32_t srcChannelCount, std::uint32_t dstChannelCount, const float* matrixCoefficients
+    ) = 0;
+
+    /**
+     * VTable slot 9 (+0x24).
+     */
+    virtual std::uint16_t __stdcall GetVariableIndex(const char* variableName) = 0;
+
+    /**
+     * VTable slot 10 (+0x28).
+     */
+    virtual std::int32_t __stdcall SetVariable(std::uint16_t variableIndex, float value) = 0;
+  };
+
+  class IXACTEngine
+  {
+  public:
+    /**
+     * Slot map recovered from AudioEngine ctor/dtor, bank loaders, and
+     * CUserSoundManager callsites.
+     */
+    virtual std::int32_t __stdcall QueryInterface(const void* riid, void** outObject) = 0; // +0x00
+    virtual std::uint32_t __stdcall AddRef() = 0;                                          // +0x04
+    virtual std::uint32_t __stdcall Release() = 0;                                         // +0x08
+    virtual std::int32_t __stdcall GetRendererCount(std::uint16_t* outRendererCount) = 0;  // +0x0C
+    virtual std::int32_t __stdcall
+    GetRendererDetails(std::uint16_t rendererIndex, void* outRendererDetails) = 0;       // +0x10
+    virtual std::int32_t __stdcall GetFinalMixFormat(void* outWaveFormatExtensible) = 0; // +0x14
+    virtual std::int32_t __stdcall Initialize(const void* runtimeParams) = 0;            // +0x18
+    virtual void __stdcall ShutDown() = 0;                                               // +0x1C
+    virtual std::int32_t __stdcall DoWork() = 0;                                         // +0x20
+    virtual std::int32_t __stdcall CreateSoundBank(
+      const void* data,
+      std::int32_t sizeBytes,
+      std::uint32_t flags,
+      std::uint32_t allocAttributes,
+      IXACTSoundBank** outSoundBank
+    ) = 0; // +0x24
+    virtual std::int32_t __stdcall CreateInMemoryWaveBank(
+      const void* data,
+      std::int32_t sizeBytes,
+      std::uint32_t flags,
+      std::uint32_t allocAttributes,
+      IXACTWaveBank** outWaveBank
+    ) = 0; // +0x28
+    virtual std::int32_t __stdcall CreateStreamingWaveBank(
+      const void* streamingParams,
+      IXACTWaveBank** outWaveBank
+    ) = 0; // +0x2C
+    virtual std::int32_t __stdcall PrepareWave(
+      std::uint32_t flags,
+      const char* wavePath,
+      std::uint16_t streamingPacketSize,
+      std::uint32_t alignment,
+      std::uint32_t playOffset,
+      std::uint8_t loopCount,
+      void** outWave
+    ) = 0; // +0x30
+    virtual std::int32_t __stdcall PrepareInMemoryWave(
+      std::uint32_t flags,
+      const void* waveBankEntry,
+      std::uint32_t* seekTable,
+      std::uint8_t* waveData,
+      std::uint32_t playOffset,
+      std::uint8_t loopCount,
+      void** outWave
+    ) = 0; // +0x34
+    virtual std::int32_t __stdcall PrepareStreamingWave(
+      std::uint32_t flags,
+      const void* waveBankEntry,
+      const void* streamingParams,
+      std::uint32_t alignment,
+      std::uint32_t* seekTable,
+      std::uint32_t playOffset,
+      std::uint8_t loopCount,
+      void** outWave
+    ) = 0;                                                                                   // +0x38
+    virtual std::int32_t __stdcall RegisterNotification(const void* notificationDesc) = 0;   // +0x3C
+    virtual std::int32_t __stdcall UnRegisterNotification(const void* notificationDesc) = 0; // +0x40
+
+    /**
+     * VTable slot 17 (+0x44).
+     */
+    virtual std::uint16_t __stdcall GetCategory(const char* categoryName) = 0;
+
+    /**
+     * VTable slot 18 (+0x48).
+     */
+    virtual void __stdcall Stop(std::uint16_t category, std::int32_t flags) = 0;
+
+    /**
+     * VTable slot 19 (+0x4C).
+     */
+    virtual std::int32_t __stdcall SetVolume(std::uint16_t category, float volume) = 0;
+
+    virtual std::int32_t __stdcall Pause(std::uint16_t category, std::int32_t pause) = 0; // +0x50
+    virtual std::uint16_t __stdcall GetGlobalVariableIndex(const char* variableName) = 0; // +0x54
+
+    /**
+     * VTable slot 22 (+0x58).
+     */
+    virtual std::int32_t __stdcall SetGlobalVariable(std::uint16_t variableIndex, float value) = 0;
+
+    virtual std::int32_t __stdcall GetGlobalVariable(std::uint16_t variableIndex, float* outValue) = 0; // +0x5C
+  };
+
+  struct AudioPointerVectorStorage
+  {
+    void* mAllocatorCookie; // +0x00
+    void** mStart;          // +0x04
+    void** mFinish;         // +0x08
+    void** mEnd;            // +0x0C
+  };
+
+  struct AudioMapStorage
+  {
+    void* mAllocatorCookie; // +0x00
+    void* mHead;            // +0x04
+    std::uint32_t mSize;    // +0x08
+  };
+
+  struct Audio3DVector
+  {
+    float x; // +0x00
+    float y; // +0x04
+    float z; // +0x08
+  };
+
+  struct Audio3DListener
+  {
+    Audio3DVector mOrientFront; // +0x00
+    Audio3DVector mOrientTop;   // +0x0C
+    Audio3DVector mPosition;    // +0x18
+    Audio3DVector mVelocity;    // +0x24
+    void* mCone;                // +0x30
+  };
+
+  struct Audio3DDspSettings
+  {
+    float* mMatrixCoefficients;       // +0x00
+    float* mDelayTimes;               // +0x04
+    std::uint32_t mSrcChannelCount;   // +0x08
+    std::uint32_t mDstChannelCount;   // +0x0C
+    float mLpfDirectCoefficient;      // +0x10
+    float mLpfReverbCoefficient;      // +0x14
+    float mReverbLevel;               // +0x18
+    float mDopplerFactor;             // +0x1C
+    float mEmitterToListenerAngle;    // +0x20
+    float mEmitterToListenerDistance; // +0x24
+    float mEmitterVelocityComponent;  // +0x28
+    float mListenerVelocityComponent; // +0x2C
+  };
+
+  struct Audio3DEmitter
+  {
+    void* mCone;                 // +0x00
+    Audio3DVector mOrientFront;  // +0x04
+    Audio3DVector mOrientTop;    // +0x10
+    Audio3DVector mPosition;     // +0x1C
+    Audio3DVector mVelocity;     // +0x28
+    float mInnerRadius;          // +0x34
+    float mInnerRadiusAngle;     // +0x38
+    std::uint32_t mChannelCount; // +0x3C
+    float mChannelRadius;        // +0x40
+    float* mChannelAzimuths;     // +0x44
+    void* mVolumeCurve;          // +0x48
+    void* mLfeCurve;             // +0x4C
+    void* mLpfDirectCurve;       // +0x50
+    void* mLpfReverbCurve;       // +0x54
+    void* mReverbCurve;          // +0x58
+    float mCurveDistanceScaler;  // +0x5C
+    float mDopplerScaler;        // +0x60
+  };
+
+  struct AudioEngineImpl
+  {
+    /**
+     * Address: 0x004D9FF0 (FUN_004D9FF0)
+     *
+     * Moho::AudioEngine*, Moho::SoundConfiguration*
+     *
+     * What it does:
+     * Initializes map/vector sentinels, 3D emitter/listener state, and DSP buffers.
+     */
+    AudioEngineImpl(AudioEngine* engine, SoundConfiguration* configuration);
+
+    /**
+     * Address: 0x004DA2A0 (FUN_004DA2A0)
+     *
+     * What it does:
+     * Releases banks/maps/3D buffers and the active XACT engine instance.
+     */
+    ~AudioEngineImpl();
+
+    SoundConfiguration* mConfigs;       // +0x00
+    AudioEngine* mEngine;               // +0x04
+    AudioPointerVectorStorage mBanks;   // +0x08
+    AudioPointerVectorStorage mHandles; // +0x18
+    AudioMapStorage mMap1;              // +0x28
+    IXACTEngine* mInstance;             // +0x34
+    Audio3DListener mListener;          // +0x38
+    AudioMapStorage mMap2;              // +0x6C
+    std::uint32_t mReserved78;          // +0x78
+    Audio3DDspSettings mSettings;       // +0x7C
+    Audio3DEmitter mEmitter;            // +0xAC
+    std::uint8_t mAudioHandle[0x14];    // +0x110
+  };
+
+  static_assert(sizeof(IXACTCue) == sizeof(void*), "IXACTCue interface size must be pointer-sized");
+  static_assert(sizeof(IXACTSoundBank) == sizeof(void*), "IXACTSoundBank interface size must be pointer-sized");
+  static_assert(sizeof(IXACTEngine) == sizeof(void*), "IXACTEngine interface size must be pointer-sized");
+  static_assert(sizeof(AudioPointerVectorStorage) == 0x10, "AudioPointerVectorStorage size must be 0x10");
+  static_assert(sizeof(AudioMapStorage) == 0x0C, "AudioMapStorage size must be 0x0C");
+  static_assert(sizeof(Audio3DVector) == 0x0C, "Audio3DVector size must be 0x0C");
+  static_assert(sizeof(Audio3DListener) == 0x34, "Audio3DListener size must be 0x34");
+  static_assert(sizeof(Audio3DDspSettings) == 0x30, "Audio3DDspSettings size must be 0x30");
+  static_assert(sizeof(Audio3DEmitter) == 0x64, "Audio3DEmitter size must be 0x64");
+  static_assert(offsetof(AudioEngineImpl, mBanks) == 0x08, "AudioEngineImpl::mBanks offset must be 0x08");
+  static_assert(offsetof(AudioEngineImpl, mInstance) == 0x34, "AudioEngineImpl::mInstance offset must be 0x34");
+  static_assert(offsetof(AudioEngineImpl, mListener) == 0x38, "AudioEngineImpl::mListener offset must be 0x38");
+  static_assert(offsetof(AudioEngineImpl, mMap2) == 0x6C, "AudioEngineImpl::mMap2 offset must be 0x6C");
+  static_assert(offsetof(AudioEngineImpl, mSettings) == 0x7C, "AudioEngineImpl::mSettings offset must be 0x7C");
+  static_assert(offsetof(AudioEngineImpl, mEmitter) == 0xAC, "AudioEngineImpl::mEmitter offset must be 0xAC");
+  static_assert(offsetof(AudioEngineImpl, mAudioHandle) == 0x110, "AudioEngineImpl::mAudioHandle offset must be 0x110");
+  static_assert(sizeof(AudioEngineImpl) == 0x124, "AudioEngineImpl size must be 0x124");
+
+  /**
+   * Recovered AudioEngine ABI surface used by CUserSoundManager and sound-bank paths.
+   */
+  class AudioEngine
+  {
+  public:
+    AudioEngineImpl* mImpl; // +0x00
+
+    /**
+     * Address: 0x004D9760 (FUN_004D9760)
+     *
+     * What it does:
+     * Releases the active implementation object when present.
+     */
+    ~AudioEngine();
+
+    /**
+     * Address: 0x004D93F0 (FUN_004D93F0)
+     *
+     * What it does:
+     * Detaches and destroys the current implementation object.
+     */
+    void Shutdown();
+
+    /**
+     * Address: 0x004D9B30 (FUN_004D9B30)
+     *
+     * std::uint16_t bankId, IXACTCue**, AudioEngine*, std::uint16_t cueId, std::int32_t preloadOnly
+     *
+     * What it does:
+     * Dispatches cue playback through the current engine/bank selection.
+     */
+    static int
+    Play(std::uint16_t bankId, IXACTCue** outCue, AudioEngine* engine, std::uint16_t cueId, std::int32_t preloadOnly);
+
+    /**
+     * Address: 0x004D9DB0 (FUN_004D9DB0)
+     *
+     * gpg::StrArg, float
+     *
+     * What it does:
+     * Sets volume scalar for the named sound category.
+     */
+    void SetVolume(gpg::StrArg category, float value);
+
+    /**
+     * Address: 0x004D9E50 (FUN_004D9E50)
+     *
+     * gpg::StrArg
+     *
+     * What it does:
+     * Returns effective volume scalar for a category.
+     */
+    float GetVolume(gpg::StrArg category);
+
+    /**
+     * Address: 0x004D9890 (FUN_004D9890)
+     *
+     * Moho::VTransform const&
+     *
+     * What it does:
+     * Updates listener transform for 3D cue calculations.
+     */
+    void SetListenerTransform(const VTransform& transform);
+
+    /**
+     * Address: 0x004D9780 (FUN_004D9780)
+     *
+     * What it does:
+     * Reconstructs the listener transform from stored 3D listener axes.
+     */
+    [[nodiscard]] VTransform GetListenerTransform();
+
+    /**
+     * Address: 0x004D9A60 (FUN_004D9A60)
+     *
+     * Wm3::Vector3<float> const *, AudioEngine *, IXACTCue *
+     *
+     * What it does:
+     * Applies 3D listener/emitter transform to an active cue.
+     */
+    static void Calculate3D(const Wm3::Vec3f* worldPos, AudioEngine* engine, IXACTCue* cue);
+  };
+
+  static_assert(sizeof(AudioEngine) == sizeof(void*), "AudioEngine size must be pointer-sized");
+} // namespace moho

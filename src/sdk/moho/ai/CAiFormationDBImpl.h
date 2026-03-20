@@ -1,55 +1,64 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho {
+#include <cstddef>
+
+#include "gpg/core/containers/FastVector.h"
+#include "moho/ai/IAiFormationDB.h"
+
+namespace moho
+{
+  class Sim;
+
   /**
    * VFTABLE: 0x00E1B52C
    * COL:  0x00E70A38
    */
-  class CAiFormationDBImpl
+  class CAiFormationDBImpl : public IAiFormationDB
   {
   public:
     /**
-     * Address: 0x0059C340
-     * Slot: 0
-     * Demangled: sub_59C340
+     * Address: 0x0059C340 (FUN_0059C340)
+     *
+     * What it does:
+     * Deleting-destructor thunk for the concrete formation DB implementation.
      */
-    virtual void sub_59C340() = 0;
+    ~CAiFormationDBImpl() override;
 
     /**
-     * Address: 0x0059C0C0
-     * Slot: 1
-     * Demangled: Moho::CAiFormationDBImpl::GetScriptName
+     * Address: 0x0059C0C0 (FUN_0059C0C0)
      */
-    virtual void GetScriptName() = 0;
+    const char* GetScriptName(int scriptIndex, EFormationType formationType) override;
 
     /**
-     * Address: 0x0059C0F0
-     * Slot: 2
-     * Demangled: Moho::CAiFormationDBImpl::GetScriptIndex
+     * Address: 0x0059C0F0 (FUN_0059C0F0)
      */
-    virtual void GetScriptIndex() = 0;
+    int GetScriptIndex(gpg::StrArg scriptName, EFormationType formationType) override;
 
     /**
-     * Address: 0x0059C060
-     * Slot: 3
-     * Demangled: Moho::CAiFormationDBImpl::RemoveFormation
+     * Address: 0x0059C060 (FUN_0059C060)
      */
-    virtual void RemoveFormation() = 0;
+    void RemoveFormation(CAiFormationInstance* formation) override;
 
     /**
-     * Address: 0x0059C030
-     * Slot: 4
-     * Demangled: Moho::CAiFormationDBImpl::Update
+     * Address: 0x0059C030 (FUN_0059C030)
      */
-    virtual void Update() = 0;
+    void Update() override;
 
     /**
-     * Address: 0x0059C120
-     * Slot: 5
-     * Demangled: Moho::CAiFormationDBImpl::NewFormation
+     * Address: 0x0059C120 (FUN_0059C120)
      */
-    virtual void NewFormation() = 0;
+    CAiFormationInstance* NewFormation(
+      int scriptIndex, const char* scriptName, void* unitWeakSet, int arg4, int arg5, int arg6, int arg7, int arg8
+    ) override;
+
+  public:
+    Sim* mSim;                                                   // +0x04
+    gpg::fastvector_n<CAiFormationInstance*, 10> mFormInstances; // +0x08
   };
+
+  static_assert(offsetof(CAiFormationDBImpl, mSim) == 0x04, "CAiFormationDBImpl::mSim offset must be 0x04");
+  static_assert(
+    offsetof(CAiFormationDBImpl, mFormInstances) == 0x08, "CAiFormationDBImpl::mFormInstances offset must be 0x08"
+  );
+  static_assert(sizeof(CAiFormationDBImpl) == 0x40, "CAiFormationDBImpl size must be 0x40");
 } // namespace moho

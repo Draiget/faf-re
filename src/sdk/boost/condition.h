@@ -46,7 +46,8 @@ namespace boost
         /**
          * Block until notified. Releases the associated mutex while waiting and re-acquires it before return.
          */
-        void wait(mutex::scoped_lock& lock) noexcept {
+        template <class Lock>
+        void wait(Lock& lock) noexcept {
 #if defined(_WIN32)
             HANDLE gate = reinterpret_cast<HANDLE>(m_gate);
             HANDLE queue = reinterpret_cast<HANDLE>(m_queue);
@@ -85,7 +86,8 @@ namespace boost
         /**
          * Timed wait until absolute deadline `xt` (TIME_UTC). Returns true if notified, false on timeout.
          */
-        bool timed_wait(mutex::scoped_lock& lock, const xtime& xt) noexcept {
+        template <class Lock>
+        bool timed_wait(Lock& lock, const xtime& xt) noexcept {
 #if defined(_WIN32)
             // Compute milliseconds until deadline
             xtime now{};

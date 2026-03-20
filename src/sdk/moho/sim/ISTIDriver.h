@@ -1,550 +1,199 @@
-﻿#pragma once
+#pragma once
+
 #include <cstdint>
-#include "../../gpg/core/utils/Sync.h"
+
+#include "legacy/containers/Vector.h"
+#include "moho/command/ICommandSink.h"
+#include "moho/render/camera/GeomCamera3.h"
+#include "platform/Platform.h"
+#include "SSyncFilter.h"
 
 namespace moho
 {
-    /**
-	 * Lightweight event slot used at offset +0x74.
-	 * In the binary it is signaled via sub_AC22F0(&slot) and never ResetEvent()'ed here.
-	 * Treat it as an auto-reset "notify" event: one waiter wakes per signal.
-	 */
-    struct EventSlot {
-#if defined(_WIN32)
-        // Auto-reset event handle created elsewhere (engine owns lifetime).
-        HANDLE h{ nullptr };
-
-        /** Signal/wake one waiter (maps to SetEvent). */
-        void signal() { if (h) ::SetEvent(h); }
-
-        /** Optional: explicit reset if engine wants to clear it. */
-        void reset() { if (h) ::ResetEvent(h); }
-#else
-        // Portable fallback: auto-reset semantics using a flag + mutex + condvar.
-        std::mutex              m;
-        std::condition_variable cv;
-        bool                    signaled{ false };
-
-        void signal() {
-            std::lock_guard<std::mutex> lk(m);
-            signaled = true;
-            cv.notify_one();
-        }
-        void reset() {
-            std::lock_guard<std::mutex> lk(m);
-            signaled = false;
-        }
-#endif
-    };
-
-    /** Driver operating mode mirrored from +0x8C. */
-    enum class ISTIMode : int32_t {
-        kUnknown = 0,
-        kStage1 = 1,
-        kStage2 = 2,
-        kStop4 = 4,   // observed terminal states
-        kStop5 = 5,
-    };
-
-	class ISTIDriver
-	{
-        // Primary vftable (40 entries)
-	public:
-        /**
-         * Scalar deleting destructor thunk.
-         * Calls real dtor, then frees memory when requested.
-         *
-         * Address: 0x0073B910
-         * VFTable SLOT: ~0
-         */
-        virtual ~ISTIDriver() = default;
-
-        /**
-         * Prime backend once under lock (+0x30): backend->vfunc(+0x68),
-         * init first stamp at [+0x60] and SetEvent(@+0x48+24).
-         *
-         * Address: 0x73BBF0
-         * VFTable SLOT: 1
-         */
-        virtual void PrimeBackendOnce() = 0;
-
-        /**
-         * Graceful shutdown: stop worker A (flag @+0x58, SetEvent @+0x48+24),
-         * stop worker B (flag @+0x70, signal @+0x74),
-         * wait Mode!=3/4/5 as observed, join/free resources.
-         *
-         * Address: 0x73BC80
-         * VFTable SLOT: 2
-         */
-        virtual void Shutdown() = 0;
-
-        /**
-         * Returns raw backend pointer stored at [+0x08].
-         *
-         * Address: 0x73B190
-         * VFTable SLOT: 3
-         */
-        virtual void* GetBackendRaw() const = 0;
-
-        virtual void sub_73BDE0() = 0; // 0x73BDE0 (slot 4)
-
-        /**
-         * Pump/tick: deliver pending message to listener, recompute active flag,
-         * run small state machine over Mode, signal @+0x74 on transitions.
-         *
-         * Address: 0x73C250
-         * VFTable SLOT: 5
-         */
-        virtual void Pump() = 0;
-
-        virtual void sub_73C410() = 0; // 0x73C410 (slot 6)
-        virtual void sub_73C440() = 0; // 0x73C440 (slot 7)
-
-        /**
-         * Under lock (+0x30), returns (dword@+0xA0)!=0 - pending items/queue non-empty flag.
-         *
-         * Address: 0x73C4F0
-         * VFTable SLOT: 8
-         */
-        virtual bool HasPendingItems() const = 0;
-
-        /**
-         * Dequeue one item (waits until +0xA0!=0), writes first dword of item
-         * into [+0x1C], stamps [+0x60] and SetEvent(@+0x48+24);
-         * ResetEvent(@+0xA4) if queue became empty.
-         * Returns item pointer
-         *
-         * Address: 0x73C520
-         * VFTable SLOT: 9
-         */
-        virtual void* DequeueOne() = 0;
-
-        /**
-         * Returns HANDLE/event stored at [+0xA4] (items-available event).
-         *
-         * Address: 0x73B1A0
-         * VFTable SLOT: 10
-         */
-        virtual void* GetItemsEventHandle() const = 0;
-
-        /**
-         * Returns 0.0 (stub metric).
-         *
-         * Address: 0x73C630
-         * VFTable SLOT: 11
-         */
-        virtual double GetZeroMetric() const = 0;
-
-        /**
-         * Set param at [+0xB0]; if first time-stamp at [+0x60] is zero,
-         * stamp it and SetEvent(@+0x48+24).
-         *
-         * Address: 0x73B1B0
-         * VFTable SLOT: 12
-         */
-        virtual void SetParamB0(int value) = 0;
-
-        /**
-         * Validate that local 712-byte records ring matches external snapshot;
-         * otherwise resync/flush (sub_73F630).
-         *
-         * Address: 0x73B270
-         * VFTable SLOT: 13
-         */
-        virtual bool ValidateSnapshot(const void* extBegin, const void* extEnd) = 0;
-
-        /**
-         * Fast-path submit (sub_401C50) under lock (+0x30). Frees a6 if it differs from a9.
-         *
-         * Address: 0x73B3F0
-         * VFTable SLOT: 14
-         */
-        virtual void SubmitFast(void* a6, void* a9) = 0;
-
-        /**
-         * Slow-path submit if fast path fails: store a4 at [+0x100],
-         * queue payload via sub_4028E0(&a6).
-         * Frees a6 if it differs from a9.
-         *
-         * Address: 0x73B4B0
-         * VFTable SLOT: 15
-         */
-        virtual void SubmitSlow(int a4, void* a6, void* a9) = 0;
-
-        /**
-         * Set single byte flag at [+0xF0] under lock (+0x30).
-         *
-         * Address: 0x73B240
-         * VFTable SLOT: 16
-         */
-        virtual void SetFlagF0(uint8_t v) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+12) 'kick';
-         * if first stamp empty, stamp [+0x60] and SetEvent(@+0x48+24).
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73C660
-         * VFTable SLOT: 17
-         */
-        virtual uint32_t Stream_KickAndGet() = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+16).
-         * Stamps & signals as above.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73C700
-         * VFTable SLOT: 18
-         */
-        virtual uint32_t Stream_Cmd16() = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+20).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73C7A0
-         * VFTable SLOT: 19
-         */
-        virtual uint32_t Stream_Cmd20() = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+24)(a3,a4,a5,a6).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73C840
-         * VFTable SLOT: 20
-         */
-        virtual uint32_t Stream_Cmd24(int a3, int a4, int a5, float a6) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+28)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73C8F0
-         * VFTable SLOT: 21
-         */
-        virtual uint32_t Stream_Cmd28(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+32)(a3).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73C990
-         * VFTable SLOT: 22
-         */
-        virtual uint32_t Stream_Cmd32(int a3) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+36)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CA30
-         * VFTable SLOT: 23
-         */
-        virtual uint32_t Stream_Cmd36(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+40)(a3,a4,a5).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CAD0
-         * VFTable SLOT: 24
-         */
-        virtual uint32_t Stream_Cmd40(int a3, int a4, int a5) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+44)(a3,a4,a5).
-         * Does NOT stamp/signal.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CB70
-         * VFTable SLOT: 25
-         */
-        virtual uint32_t Stream_Cmd44(int a3, int a4, int a5) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+48)(a3,a4,a5).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CC10
-         * VFTable SLOT: 26
-         */
-        virtual uint32_t Stream_Cmd48(int a3, int a4, int a5) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+52)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CCB0
-         * VFTable SLOT: 27
-         */
-        virtual uint32_t Stream_Cmd52(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+56)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CD50
-         * VFTable SLOT: 28
-         */
-        virtual uint32_t Stream_Cmd56(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+60)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CDF0
-         * VFTable SLOT: 29
-         */
-        virtual uint32_t Stream_Cmd60(int a3, int a4) = 0;
-
-        /**
-         * In binary: sub_73CE90
-         * Note: Forwards to internal stream @+0x28: vfunc(+64)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CE90
-         * VFTable SLOT: 30
-         */
-        virtual uint32_t Stream_Cmd64(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+68)(a3,a4,a5).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CF30
-         * VFTable SLOT: 31
-         */
-        virtual uint32_t Stream_Cmd68(int a3, int a4, int a5) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+72)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73CFD0
-         * VFTable SLOT: 32
-         */
-        virtual uint32_t Stream_Cmd72(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+76)(a3,a4).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73D070
-         * VFTable SLOT: 33
-         */
-        virtual uint32_t Stream_Cmd76(int a3, int a4) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+80)(a3,a4,a5).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73D110
-         * VFTable SLOT: 34
-         */
-        virtual uint32_t Stream_Cmd80(int a3, int a4, int a5) = 0;
-
-        /**
-         * Forwards to internal stream @+0x28: vfunc(+84)(a3,a4,a5,a6).
-         * Stamps & signals.
-         * Returns dword at [+0x24].
-         *
-         * Address: 0x73D1B0
-         * VFTable SLOT: 35
-         */
-        virtual uint32_t Stream_Cmd84(int a3, int a4, int a5, int a6) = 0;
-
-        /**
-         * Enter exclusive section for front-end:
-         * ++holdCounter(@+0xAC);
-         * set Active(@+0xA8)=1;
-         * if Mode==3, spin/yield until leaves;
-         * return handle at [+0x04].
-         *
-         * Address: 0x73DEA0
-         * VFTable SLOT: 36
-         */
-        virtual void* EnterExclusiveAndGetHandle() = 0;
-
-        /**
-		 * Decrements the re-entrant hold counter at dword[43] (offset +0xAC).
-		 * Counterpart to the "enter exclusive" path (sub_73DEA0).
-		 * No locking, signaling or other side effects.
-		 *
-		 * Address: 0x73DF50
-		 * VFTable SLOT: 37
-		 */
-        virtual void LeaveExclusive() = 0;
-
-        /**
-         * Under the command lock (+0x30 via sub_AC1AB0(this+12)), writes a new control/queued
-         * parameter to dword[100] (offset +0x190), signals EventB at +0x74 (sub_AC22F0(this+29))
-         * to wake the consumer/worker, and increments the revision counter dword[15] (offset +0x3C).
-         *
-         * Address: 0x73DF60
-         * VFTable SLOT: 38
-         */
-        virtual void SetDesiredSpeed(int value) = 0;
-
-        /**
-         * Renders an on-screen debug overlay (font: "Courier New") with networking/simulation
-         * statistics. Builds lines such as: "ping / maxsp / data / behind / avail",
-         * "inflight: %d, available: %d, queued: %d",
-         * "sim time: %.3f, max speed=%+d",
-         * "desired speed: %+d, actual speed: %+d".
-         * Queries runtime/back-end via the object at [+0x08], iterates per-connection data,
-         * measures text, computes layout and draws using the engine's text APIs
-         * (sub_4478C0/sub_4386A0/sub_426470, etc.). Uses a4/a5 as anchor (bottom-right)
-         * and a6/a7 as scale for pixel-aligned placement (floor() snapping).
-         * No persistent state changes.
-         *
-         * Address: 0x73DFE0
-         * VFTable SLOT: 39
-         */
-        virtual void DrawNetSimOverlay(
-            int pass, 
-            int drawList,
-            float anchorX, 
-            float anchorY,
-            float scaleX, 
-            float scaleY
-        ) = 0;
-
-	private:
-        // Offset: 0x04
-        // Returned by sub_73DEA0; freed in shutdown path
-        void* front_handle_;
-
-        // Offset: 0x08
-        // Backend object (vcall +0x68 etc.)
-        void* backend_;
-
-        // Offset: 0x0C
-        // sub_AC1AB0/AC1AD0(this+0x0C) in queue/validation paths
-        gpg::core::FastMutex lock_queue_;
-
-        // Offset: 0x1C
-        // First dword of dequeued item (set in sub_73C520)
-        uint32_t last_dequeue_key_;
-
-        // Offset: 0x20
-        // Base index/pointer minus 1 (used in HUD math, sub_73DFE0)
-        uint32_t inflight_base_m1_;
-
-        // Offset: 0x24
-        // Value read back by Stream_CmdXX wrappers
-        uint32_t stream_ret_dword_;
-
-        // Offset: 0x28
-        // Object with dense vtable (+0x0C..+0x54, +0x48..+0x54)
-        void* stream_obj_;
-
-        // Offset: 0x30
-        // Primary lock (Pump, Dequeue, most methods use this)
-        gpg::core::FastMutex lock_main_;
-
-        // Offset: 0x38
-        // Worker A handle (start/stop/free in sub_73BC80)
-        void* worker_a_;
-
-        // Offset: 0x48
-        // HANDLE used with SetEvent() after first-stamp
-        void* event_kick_h_;
-
-        // Offset: 0x50
-        // Stamp set in sub_73C520 (low @0x50, high @0x54)
-        uint64_t dequeue_stamp_;
-
-        // Offset: 0x58
-        // Stop flag for worker A
-        uint8_t stop_a_;
-
-        // Offset: 0x60
-        // One-shot stamp written by sub_955700(this+0x40/0x64)
-        uint64_t first_stamp_;
-
-        // Offset: 0x6C
-        // Worker B handle
-        void* worker_b_;
-
-        // Offset: 0x70
-        // Stop flag for worker B
-        uint8_t stop_b_;
-
-        // Offset: 0x74
-        // Signaled via sub_AC22F0(this+0x74)
-        EventSlot event_b_;
-
-        // Offset: 0x8C
-        // State machine mode (seen: 1/2 working, 3 wait, 4/5 stopping)
-        ISTIMode mode_;
-
-        // Offset: 0xA0
-        // Non-zero when queue has items (polled in sub_73C4F0/73C520)
-        uint32_t queue_nonempty_;
-
-        // Offset: 0xA4
-        // HANDLE ResetEvent()'ed when queue becomes empty
-        void* items_event_h_;
-
-        // Offset: 0xA8
-        // Activity flag (set in sub_73DEA0, maintained in Pump)
-        uint8_t active_;
-
-        // Offset: 0xAC
-        // Re-entrant hold counter (++ in sub_73DEA0, -- in sub_73DF50)
-        int32_t hold_counter_;
-
-        // Offset: 0xB0
-        // Control parameter (sub_73B1B0)
-        int32_t param_b0_;
-
-        // Offset: 0xB8
-        // Begin of 712-byte records block (used in sub_73B270)
-        uint8_t* rec_begin_;
-
-        // Offset: 0xBC
-        // End of 712-byte records block (used in sub_73B270)
-        uint8_t* rec_end_;
-
-        // Offset: 0xF0
-        // Byte flag (set by sub_73B240)
-        uint8_t flag_f0_;
-
-        // Offset: 0x100
-        // Stored by slow-path submit (sub_73B4B0: this[64]=a4)
-        int32_t submit_code_;
-
-        // Offset: 0x190
-        // Union-like: message target in Pump / desired speed in sub_73DF60
-        void* msg_target_or_speed_;
-
-        // Offset: 0x194
-        // Pending message flag for Pump
-        uint8_t msg_has_pending_;
-
-        // Offset: 0x198
-        // Message type code for Pump
-        uint8_t msg_type_;            
-
-        // Offset: 0x19C
-        // Message text pointer for Pump
-        char* msg_text_;  
-	};
-}
+  class CClientManagerImpl;
+  class Sim;
+  class CD3DPrimBatcher;
+  class CSaveGameRequestImpl;
+  struct SSyncData;
+
+  /**
+   * Base simulation-thread interface.
+   *
+   * Recovered from CSimDriver vtable (0x00E3350C).
+   */
+  class ISTIDriver
+  {
+  public:
+    // Slot 0. Base: 0x0073B0D0 (FUN_0073B0D0); CSimDriver deleting thunk: 0x0073B910 (FUN_0073B910)
+    // Base scalar-deleting destructor for ISTIDriver.
+    virtual ~ISTIDriver();
+
+    // Slot 1. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073BBF0 (FUN_0073BBF0)
+    // Forces all clients to disconnect from the driver transport.
+    virtual void DisconnectClients() = 0;
+
+    // Slot 2. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073BC80 (FUN_0073BC80)
+    // Stops worker threads and tears down simulation-side state.
+    virtual void ShutDown() = 0;
+
+    // Slot 3. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B190 (FUN_0073B190)
+    // Returns the owning client manager.
+    virtual CClientManagerImpl* GetClientManager() = 0;
+
+    // Slot 4. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073BDE0 (FUN_0073BDE0)
+    // Placeholder virtual in the original vtable (ret-only nullsub/no-op).
+    virtual void NoOp() = 0;
+
+    // Slot 5. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C250 (FUN_0073C250)
+    // Main dispatch tick: save handling, mode transitions, and sim stepping.
+    virtual void Dispatch() = 0;
+
+    // Slot 6. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C410 (FUN_0073C410)
+    // Increments the outstanding driver activity counter.
+    virtual void IncrementOutstandingRequests() = 0;
+
+    // Slot 7. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C440 (FUN_0073C440)
+    // Decrements the activity counter and timestamps completion boundaries.
+    virtual void DecrementOutstandingRequestsAndSignal() = 0;
+
+    // Slot 8. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C4F0 (FUN_0073C4F0)
+    // True when at least one sync packet is queued.
+    virtual bool HasSyncData() = 0;
+
+    // Slot 9. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C520 (FUN_0073C520)
+    // Pops the next sync packet, blocking via event pumping while empty.
+    virtual void GetSyncData(SSyncData*& outSyncData) = 0;
+
+    // Slot 10. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B1A0 (FUN_0073B1A0)
+    // Event signaled when new sync data becomes available.
+    virtual HANDLE GetSyncDataAvailableEvent() = 0;
+
+    // Slot 11. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C630 (FUN_0073C630)
+    // Returns current sim speed metric (stubbed as 0.0 in retail driver).
+    virtual double GetSimSpeed() = 0;
+
+    // Slot 12. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B1B0 (FUN_0073B1B0)
+    // Updates focus army used by sync filtering.
+    virtual void SetArmyIndex(int armyIndex) = 0;
+
+    // Slot 13. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B270 (FUN_0073B270)
+    // Replaces camera list used when preparing sync snapshots.
+    virtual void SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams) = 0;
+
+    // Slot 14. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B3F0 (FUN_0073B3F0)
+    // Retail binary performs compare-only logic for mask block A (no state mutation in this build).
+    virtual void SetSyncFilterMaskA(const SSyncFilterMaskBlock& block) = 0;
+
+    // Slot 15. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B4B0 (FUN_0073B4B0)
+    // Replaces pending sync-filter mask block B.
+    virtual void SetSyncFilterMaskB(const SSyncFilterMaskBlock& block) = 0;
+
+    // Slot 16. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B240 (FUN_0073B240)
+    // Toggles sync-filter option bit used during Sim::Sync.
+    virtual void SetSyncFilterOptionFlag(bool value) = 0;
+
+    // Slot 17. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C660 (FUN_0073C660),
+    // ECmdStreamOp::CMDST_RequestPause (4)
+    virtual void RequestPause() = 0;
+
+    // Slot 18. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C700 (FUN_0073C700), ECmdStreamOp::CMDST_Resume
+    // (5)
+    virtual void Resume() = 0;
+
+    // Slot 19. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C7A0 (FUN_0073C7A0),
+    // ECmdStreamOp::CMDST_SingleStep (6)
+    virtual void SingleStep() = 0;
+
+    // Slot 20. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C840 (FUN_0073C840),
+    // ECmdStreamOp::CMDST_CreateUnit (7)
+    virtual void CreateUnit(uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, float heading) = 0;
+
+    // Slot 21. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C8F0 (FUN_0073C8F0),
+    // ECmdStreamOp::CMDST_CreateProp (8)
+    virtual void CreateProp(const char* id, const Wm3::Vec3f& loc) = 0;
+
+    // Slot 22. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C990 (FUN_0073C990),
+    // ECmdStreamOp::CMDST_DestroyEntity (9)
+    virtual void DestroyEntity(EntId entityId) = 0;
+
+    // Slot 23. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CA30 (FUN_0073CA30),
+    // ECmdStreamOp::CMDST_WarpEntity (10)
+    virtual void WarpEntity(EntId entityId, const VTransform& transform) = 0;
+
+    // Slot 24. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CAD0 (FUN_0073CAD0),
+    // ECmdStreamOp::CMDST_ProcessInfoPair (11)
+    virtual void ProcessInfoPair(void* id, const char* key, const char* val) = 0;
+
+    // Slot 25. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CB70 (FUN_0073CB70),
+    // ECmdStreamOp::CMDST_IssueCommand (12)
+    virtual void
+    IssueCommand(const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear) = 0;
+
+    // Slot 26. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CC10 (FUN_0073CC10),
+    // ECmdStreamOp::CMDST_IssueFactoryCommand (13)
+    virtual void
+    IssueFactoryCommand(const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear) = 0;
+
+    // Slot 27. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CCB0 (FUN_0073CCB0),
+    // ECmdStreamOp::CMDST_IncreaseCommandCount (14)
+    virtual void IncreaseCommandCount(CmdId id, int count) = 0;
+
+    // Slot 28. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CD50 (FUN_0073CD50),
+    // ECmdStreamOp::CMDST_DecreaseCommandCount (15)
+    virtual void DecreaseCommandCount(CmdId id, int count) = 0;
+
+    // Slot 29. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CDF0 (FUN_0073CDF0),
+    // ECmdStreamOp::CMDST_SetCommandTarget (16)
+    virtual void SetCommandTarget(CmdId id, const SSTITarget& target) = 0;
+
+    // Slot 30. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CE90 (FUN_0073CE90),
+    // ECmdStreamOp::CMDST_SetCommandType (17)
+    virtual void SetCommandType(CmdId id, EUnitCommandType type) = 0;
+
+    // Slot 31. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CF30 (FUN_0073CF30),
+    // ECmdStreamOp::CMDST_SetCommandCells (18)
+    virtual void
+    SetCommandCells(CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target) = 0;
+
+    // Slot 32. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073CFD0 (FUN_0073CFD0),
+    // ECmdStreamOp::CMDST_RemoveCommandFromQueue (19)
+    virtual void RemoveCommandFromUnitQueue(CmdId id, EntId unitId) = 0;
+
+    // Slot 33. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073D070 (FUN_0073D070),
+    // ECmdStreamOp::CMDST_ExecuteLuaInSim (21)
+    virtual void ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) = 0;
+
+    // Slot 34. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073D110 (FUN_0073D110),
+    // ECmdStreamOp::CMDST_LuaSimCallback (22)
+    virtual void
+    LuaSimCallback(const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities) = 0;
+
+    // Slot 35. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073D1B0 (FUN_0073D1B0),
+    // ECmdStreamOp::CMDST_DebugCommand (20)
+    virtual void ExecuteDebugCommand(
+      const char* command,
+      const Wm3::Vector3<float>& worldPos,
+      uint32_t focusArmy,
+      const BVSet<EntId, EntIdUniverse>& entities
+    ) = 0;
+
+    // Slot 36. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073DEA0 (FUN_0073DEA0)
+    // Processes pending events while interlocked mode is active.
+    virtual Sim* ProcessEvents() = 0;
+
+    // Slot 37. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073DF50 (FUN_0073DF50)
+    // Decrements interlocked-mode reference counter.
+    virtual void ReleaseInterlockRef() = 0;
+
+    // Slot 38. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073DF60 (FUN_0073DF60)
+    // Enqueues a save-game request to be executed on Dispatch().
+    virtual void RequestSaveGame(CSaveGameRequestImpl* request) = 0;
+
+    // Slot 39. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073DFE0 (FUN_0073DFE0)
+    // Renders network/sync diagnostics overlay.
+    virtual void
+    DrawNetworkStats(CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY) = 0;
+  };
+
+  static_assert(sizeof(ISTIDriver) == 0x4, "ISTIDriver size must be 0x4");
+} // namespace moho

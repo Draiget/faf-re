@@ -79,6 +79,77 @@ bool msvc8::string::basic_sanity() const noexcept {
     return true;
 }
 
+void msvc8::string::eos(const uint32_t newSize) noexcept {
+    const uint32_t boundedSize = (newSize <= myRes) ? newSize : myRes;
+    mySize = boundedSize;
+
+    char* const out = raw_data_mut_unsafe();
+    if (out != nullptr) {
+        out[boundedSize] = '\0';
+    }
+}
+
+void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
+    // Mirrors VC8 xstring _Tidy: optionally free heap storage, then reset to SSO.
+    if (built && myRes >= 0x10U && bx.ptr != nullptr) {
+        ::operator delete(bx.ptr);
+    }
+
+    alVal = nullptr;
+    myRes = 15U;
+    eos(newSize);
+}
+
+void msvc8::string::assign_owned(const std::string_view value) {
+    tidy(true, 0U);
+
+    const std::size_t boundedSize = std::min<std::size_t>(
+        value.size(),
+        static_cast<std::size_t>(std::numeric_limits<uint32_t>::max())
+    );
+
+    if (boundedSize <= 15U) {
+        if (boundedSize != 0U) {
+            std::memcpy(bx.buf, value.data(), boundedSize);
+        }
+        myRes = 15U;
+        eos(static_cast<uint32_t>(boundedSize));
+        return;
+    }
+
+    auto* const ownedBuffer = static_cast<char*>(::operator new(boundedSize + 1U));
+    std::memcpy(ownedBuffer, value.data(), boundedSize);
+    ownedBuffer[boundedSize] = '\0';
+
+    bx.ptr = ownedBuffer;
+    mySize = static_cast<uint32_t>(boundedSize);
+    myRes = static_cast<uint32_t>(boundedSize);
+}
+
+void msvc8::string::assign_owned(const char* const value) {
+    assign_owned(std::string_view(value ? value : ""));
+}
+
+bool msvc8::string::equals_no_case(const std::string_view rhs) const noexcept {
+    const bool sane = basic_sanity();
+    const char* lhs = sane ? raw_data_unsafe() : "";
+    const std::size_t lhsSize = sane ? mySize : 0u;
+
+    if (lhsSize != rhs.size()) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < lhsSize; ++i) {
+        const auto lc = static_cast<unsigned char>(lhs[i]);
+        const auto rc = static_cast<unsigned char>(rhs[i]);
+        if (ascii_tolower_(lc) != ascii_tolower_(rc)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool msvc8::string::resize(const std::size_t newSize, const char ch) noexcept {
     if (!basic_sanity()) {
         return false;
@@ -311,7 +382,7 @@ msvc8::string msvc8::string::adopt(char* buf, const uint32_t len, const uint32_t
     return s;
 }
 
-msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, std::size_t count) noexcept {
+msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const std::size_t count) noexcept {
     // Basic sanity checks: if source is bogus, clear destination.
     if (!other.basic_sanity()) {
         clear();
@@ -338,7 +409,7 @@ msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, std::
         char* d = raw_data_mut_unsafe();
         std::memmove(d, d + pos, len);
         d[len] = '\0';
-        mySize = static_cast<uint32_t>(len);
+        mySize = len;
         return *this;
     }
 
@@ -351,7 +422,7 @@ msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, std::
 
     // Destination pointer and capacity.
     char* dst = raw_data_mut_unsafe();
-    const auto  dstCap = static_cast<std::size_t>(myRes);
+    const auto  dstCap = myRes;
 
     // Source pointer (to substring start).
     const char* src = other.raw_data_unsafe() + pos;
@@ -370,19 +441,41 @@ msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, std::
     return *this;
 }
 
-msvc8::string msvc8::string::operator+(const string& rhs) const noexcept {
-    return msvc8::detail::concat_impl(this->view(), rhs.view());
+msvc8::string& msvc8::string::assign(const char* data, const std::size_t size) noexcept {
+    if (!data || size == 0) {
+        clear();
+        return *this;
+    }
+
+    // Small-String Optimization (≤15): copy into inline buffer and NUL-terminate.
+    if (size <= 15) {
+        std::memcpy(bx.buf, data, size);
+        bx.buf[size] = '\0';
+        mySize = size;
+        myRes = 15;
+        return *this;
+    }
+
+    // Long data: adopt external buffer (non-owning, no guaranteed trailing NUL).
+    bx.ptr = const_cast<char*>(data);
+    mySize = size;
+    myRes = size > maxCapGuard ? maxCapGuard : size;
+    return *this;
 }
 
-msvc8::string msvc8::string::operator+(std::string_view rhs) const noexcept {
-    return msvc8::detail::concat_impl(this->view(), rhs);
+msvc8::string msvc8::string::operator+(const string& rhs) const noexcept {
+    return detail::concat_impl(view(), rhs.view());
+}
+
+msvc8::string msvc8::string::operator+(const std::string_view rhs) const noexcept {
+    return detail::concat_impl(view(), rhs);
 }
 
 msvc8::string msvc8::string::operator+(const char* rhs) const noexcept {
-    return msvc8::detail::concat_impl(this->view(), std::string_view(rhs ? rhs : ""));
+    return detail::concat_impl(view(), std::string_view(rhs ? rhs : ""));
 }
 
-msvc8::string msvc8::string::concat_impl_(std::string_view a, std::string_view b) noexcept {
+msvc8::string msvc8::string::concat_impl_(const std::string_view a, const std::string_view b) noexcept {
     const std::size_t total = a.size() + b.size();
 
     if (total <= 15) {
@@ -393,15 +486,19 @@ msvc8::string msvc8::string::concat_impl_(std::string_view a, std::string_view b
     }
 
     auto [buf, cap] = detail::get_concat_buffer(total + 1 /* NUL */);
-    if (a.size()) std::memcpy(buf, a.data(), a.size());
-    if (b.size()) std::memcpy(buf + a.size(), b.data(), b.size());
+    if (!a.empty()) {
+	    std::memcpy(buf, a.data(), a.size());
+    }
+    if (!b.empty()) {
+	    std::memcpy(buf + a.size(), b.data(), b.size());
+    }
     buf[total] = '\0';
 
-    const uint32_t effCap = (cap > 0) ? static_cast<uint32_t>(cap - 1) : 0u; // cap excludes NUL
-    return string::adopt(buf, static_cast<uint32_t>(total), effCap);
+    const uint32_t effCap = (cap > 0) ? cap - 1 : 0u; // cap excludes NUL
+    return adopt(buf, total, effCap);
 }
 
-msvc8::string msvc8::operator+(std::string_view lhs, const string& rhs) noexcept {
+msvc8::string msvc8::operator+(const std::string_view lhs, const string& rhs) noexcept {
     return detail::concat_impl(lhs, rhs.view());
 }
 

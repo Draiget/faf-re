@@ -5,6 +5,7 @@ using namespace moho;
 // This forces vftable/typeinfo emission for the template specializations on MSVC,
 // yet does NOT add extra slots (still exactly one virtual in the interface).
 template <class TItem>
-void Stats<TItem>::PushLua(lua_State* /*L*/) const {
-	/* no body needed */
+void Stats<TItem>::Delete(const char* /*statPath*/)
+{
+  /* no body needed */
 }

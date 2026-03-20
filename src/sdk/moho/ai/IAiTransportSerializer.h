@@ -2,7 +2,8 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho {
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1F3B8
    * COL:  0x00E766B0
@@ -13,8 +14,8 @@ namespace moho {
     /**
      * Address: 0x005E9530
      * Slot: 0
-     * Demangled: sub_5E9530
+     * Demangled: RegisterSerializeFunctions (binds mSerLoadFunc/mSerSaveFunc)
      */
-    virtual void sub_5E9530() = 0;
+    virtual void RegisterSerializeFunctions() = 0;
   };
 } // namespace moho

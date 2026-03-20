@@ -1,17 +1,17 @@
 #pragma once
 
-/* Minimal drop-in replacement for boost::recursive_mutex and scoped_lock
- * Cross-platform (Win32 CRITICAL_SECTION / POSIX pthread recursive mutex)
- * No dependency on <mutex> to avoid mixing with std::mutex in legacy code.
- */
+// Legacy-size boost::recursive_mutex shim.
+// Important for SDK ABI/layout recovery: this wrapper must stay compact on x86.
 
 #include <cassert>
+#include <cstdint>
+#include <exception>
+#include <new>
 
 #include "platform/Platform.h"
 
 namespace boost
 {
-
     /** Tag type for deferred locking. */
     struct defer_lock_t { explicit defer_lock_t() = default; };
     /** Tag object for deferred locking. */
@@ -28,101 +28,140 @@ namespace boost
     inline constexpr try_to_lock_t try_to_lock{};
 
     /**
-     * Recursive mutex compatible with old Boost.Thread expectations.
+     * Recursive mutex compatible with old Boost.Thread calling style and
+     * compact legacy layout requirements.
      */
-    class recursive_mutex {
+    class recursive_mutex
+    {
     public:
-        /** Default constructor: initializes native recursive mutex. */
-        recursive_mutex() noexcept {
+        recursive_mutex() noexcept
+            : m_mutex(nullptr)
+            , m_critical_section(true)
+            , m_pad0(0)
+            , m_pad1(0)
+            , m_pad2(0)
+        {
 #if defined(_WIN32)
-            // InitializeCriticalSectionEx is Vista+; fall back if unavailable.
-            // Size is fixed; no spin count tuning here to keep behaviour stable.
-            ::InitializeCriticalSection(&cs_);
+            auto* cs = static_cast<LPCRITICAL_SECTION>(::operator new(sizeof(CRITICAL_SECTION), std::nothrow));
+            if (!cs) {
+                std::terminate();
+            }
+            ::InitializeCriticalSection(cs);
+            m_mutex = cs;
 #else
-            pthread_mutexattr_t attr;
+            auto* pm = static_cast<pthread_mutex_t*>(::operator new(sizeof(pthread_mutex_t), std::nothrow));
+            if (!pm) {
+                std::terminate();
+            }
+            pthread_mutexattr_t attr{};
             ::pthread_mutexattr_init(&attr);
             ::pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-            ::pthread_mutex_init(&mtx_, &attr);
+            ::pthread_mutex_init(pm, &attr);
             ::pthread_mutexattr_destroy(&attr);
+            m_mutex = pm;
 #endif
         }
 
-        /** Destructor: destroys native mutex. */
-        ~recursive_mutex() {
+        ~recursive_mutex()
+        {
 #if defined(_WIN32)
-            ::DeleteCriticalSection(&cs_);
+            if (m_critical_section) {
+                auto* cs = static_cast<LPCRITICAL_SECTION>(m_mutex);
+                if (cs) {
+                    ::DeleteCriticalSection(cs);
+                    ::operator delete(cs);
+                }
+            } else if (m_mutex) {
+                ::CloseHandle(static_cast<HANDLE>(m_mutex));
+            }
 #else
-            ::pthread_mutex_destroy(&mtx_);
+            auto* pm = static_cast<pthread_mutex_t*>(m_mutex);
+            if (pm) {
+                ::pthread_mutex_destroy(pm);
+                ::operator delete(pm);
+            }
 #endif
+            m_mutex = nullptr;
+            m_critical_section = false;
+            m_pad0 = 0;
+            m_pad1 = 0;
+            m_pad2 = 0;
         }
 
         recursive_mutex(const recursive_mutex&) = delete;
         recursive_mutex& operator=(const recursive_mutex&) = delete;
 
-        /**
-         * Acquire the mutex, blocking until success.
-         */
-        void lock() noexcept {
+        void lock() noexcept
+        {
 #if defined(_WIN32)
-            ::EnterCriticalSection(&cs_);
+            if (m_critical_section) {
+                ::EnterCriticalSection(static_cast<LPCRITICAL_SECTION>(m_mutex));
+            } else {
+                ::WaitForSingleObject(static_cast<HANDLE>(m_mutex), INFINITE);
+            }
 #else
-            ::pthread_mutex_lock(&mtx_);
+            ::pthread_mutex_lock(static_cast<pthread_mutex_t*>(m_mutex));
+#endif
+        }
+
+        bool try_lock() noexcept
+        {
+#if defined(_WIN32)
+            if (m_critical_section) {
+                return ::TryEnterCriticalSection(static_cast<LPCRITICAL_SECTION>(m_mutex)) != 0;
+            }
+            const DWORD result = ::WaitForSingleObject(static_cast<HANDLE>(m_mutex), 0);
+            return result == WAIT_OBJECT_0;
+#else
+            const int result = ::pthread_mutex_trylock(static_cast<pthread_mutex_t*>(m_mutex));
+            return result == 0;
+#endif
+        }
+
+        void unlock() noexcept
+        {
+#if defined(_WIN32)
+            if (m_critical_section) {
+                ::LeaveCriticalSection(static_cast<LPCRITICAL_SECTION>(m_mutex));
+            } else {
+                ::ReleaseMutex(static_cast<HANDLE>(m_mutex));
+            }
+#else
+            ::pthread_mutex_unlock(static_cast<pthread_mutex_t*>(m_mutex));
 #endif
         }
 
         /**
-         * Try to acquire the mutex without blocking.
-         * @returns true if lock was acquired, false otherwise.
+         * RAII scoped lock compatible with boost::recursive_mutex::scoped_lock.
          */
-        bool try_lock() noexcept {
-#if defined(_WIN32)
-            return ::TryEnterCriticalSection(&cs_) != 0;
-#else
-            const int rc = ::pthread_mutex_trylock(&mtx_);
-            return rc == 0;
-#endif
-        }
-
-        /**
-         * Release one level of ownership.
-         */
-        void unlock() noexcept {
-#if defined(_WIN32)
-            ::LeaveCriticalSection(&cs_);
-#else
-            ::pthread_mutex_unlock(&mtx_);
-#endif
-        }
-
-        /**
-         * RAII scoped lock compatible with old boost::recursive_mutex::scoped_lock.
-         */
-        class scoped_lock {
+        class scoped_lock
+        {
         public:
-            /** Construct and lock. */
             explicit scoped_lock(recursive_mutex& m) noexcept
-                : m_(&m), owns_(false) {
+                : m_(&m)
+                , owns_(false)
+            {
                 m_->lock();
                 owns_ = true;
             }
 
-            /** Construct but do not lock (deferred). */
             scoped_lock(recursive_mutex& m, defer_lock_t) noexcept
-                : m_(&m), owns_(false) {
-            }
+                : m_(&m)
+                , owns_(false)
+            {}
 
-            /** Construct and try to lock (non-blocking). */
             scoped_lock(recursive_mutex& m, try_to_lock_t) noexcept
-                : m_(&m), owns_(m.try_lock()) {
-            }
+                : m_(&m)
+                , owns_(m.try_lock())
+            {}
 
-            /** Construct assuming mutex is already locked by this thread. */
             scoped_lock(recursive_mutex& m, adopt_lock_t) noexcept
-                : m_(&m), owns_(true) {
-            }
+                : m_(&m)
+                , owns_(true)
+            {}
 
-            /** Destructor: unlock if owning. */
-            ~scoped_lock() {
+            ~scoped_lock()
+            {
                 if (owns_ && m_) {
                     m_->unlock();
                 }
@@ -131,54 +170,35 @@ namespace boost
             scoped_lock(const scoped_lock&) = delete;
             scoped_lock& operator=(const scoped_lock&) = delete;
 
-            /**
-             * Lock now (if not already locked).
-             */
-            void lock() noexcept {
+            void lock() noexcept
+            {
                 assert(m_ && "null mutex");
                 assert(!owns_ && "lock already owned");
                 m_->lock();
                 owns_ = true;
             }
 
-            /**
-             * Try to lock now (if not already locked).
-             * @returns true on success, false otherwise.
-             */
-            bool try_lock() noexcept {
+            bool try_lock() noexcept
+            {
                 assert(m_ && "null mutex");
                 assert(!owns_ && "lock already owned");
                 owns_ = m_->try_lock();
                 return owns_;
             }
 
-            /**
-             * Unlock one recursion level.
-             */
-            void unlock() noexcept {
+            void unlock() noexcept
+            {
                 assert(m_ && "null mutex");
                 assert(owns_ && "unlock without ownership");
                 m_->unlock();
                 owns_ = false;
             }
 
-            /**
-             * Check ownership.
-             * @returns true if this guard currently owns the lock.
-             */
             [[nodiscard]] bool owns_lock() const noexcept { return owns_; }
-
-            /**
-             * Get associated mutex pointer.
-             * @returns pointer to the wrapped mutex or nullptr.
-             */
             [[nodiscard]] recursive_mutex* mutex() const noexcept { return m_; }
 
-            /**
-             * Release ownership without unlocking (rarely needed).
-             * @returns mutex pointer and sets internal state to non-owning.
-             */
-            recursive_mutex* release() noexcept {
+            recursive_mutex* release() noexcept
+            {
                 auto* tmp = m_;
                 m_ = nullptr;
                 owns_ = false;
@@ -187,14 +207,43 @@ namespace boost
 
         private:
             recursive_mutex* m_;
-            bool             owns_;
+            bool owns_;
         };
 
-    private:
+        /**
+         * Construct as kernel mutex handle (rare legacy branch).
+         */
+        struct use_kernel_handle_t
+        {
+            explicit use_kernel_handle_t() = default;
+        };
+
+        static constexpr use_kernel_handle_t use_kernel_handle{};
+
+        explicit recursive_mutex(use_kernel_handle_t) noexcept
+            : m_mutex(nullptr)
+            , m_critical_section(false)
+            , m_pad0(0)
+            , m_pad1(0)
+            , m_pad2(0)
+        {
 #if defined(_WIN32)
-        CRITICAL_SECTION cs_{};
+            m_mutex = ::CreateMutexA(nullptr, FALSE, nullptr);
 #else
-        pthread_mutex_t  mtx_{};
+            new (this) recursive_mutex();
 #endif
+        }
+
+    private:
+        // 8-byte legacy wrapper on x86: pointer + flag + padding.
+        void* m_mutex;
+        bool m_critical_section;
+        std::uint8_t m_pad0;
+        std::uint8_t m_pad1;
+        std::uint8_t m_pad2;
     };
+
+#if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
+    static_assert(sizeof(recursive_mutex) == 0x8, "boost::recursive_mutex size must be 0x8 on Win32 x86");
+#endif
 } // namespace boost

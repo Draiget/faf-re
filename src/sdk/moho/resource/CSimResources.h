@@ -1,35 +1,113 @@
 #pragma once
 
-#include "ISimResources.h"
+#include <cstddef>
+#include <type_traits>
+
+#include "boost/mutex.h"
+#include "gpg/core/containers/FastVector.h"
 #include "IResources.h"
+#include "ISimResources.h"
+#include "legacy/containers/Vector.h"
 #include "ResourceDeposit.h"
 #include "util/Build.h"
-#include "legacy/containers/Vector.h"
-#include "gpg/core/utils/Sync.h"
 
 namespace moho
 {
-	class CSimResources : public ISimResources, public IResources
-	{
-	public:
-        virtual void sub_546A00(); // 0x546A00 (slot 0)
-        virtual void sub_545F10(); // 0x545F10 (slot 1)
-        virtual void sub_545E80(); // 0x545E80 (slot 2)
-        virtual void sub_545FC0(); // 0x545FC0 (slot 3)
-        virtual void sub_545FB0(); // 0x545FB0 (slot 4)
-        virtual void sub_546060(); // 0x546060 (slot 5)
-        virtual void sub_545FD0(); // 0x545FD0 (slot 6)
-        virtual void sub_546470(); // 0x546470 (slot 7)
-        virtual void sub_546650(); // 0x546650 (slot 8)
-        virtual void sub_5465C0(); // 0x5465C0 (slot 9)
-        virtual void sub_546760(); // 0x546760 (slot 10)
-        virtual void sub_546860(); // 0x546860 (slot 11)
+  class CSimResources : public ISimResources, public IResources
+  {
+  public:
+    /**
+     * Address: 0x00545DC0 (??0CSimResources@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes the resource mutex and clears the deposit vector.
+     */
+    CSimResources();
 
-	public:
-        gpg::core::Mutex lock_;
-        msvc8::vector<ResourceDeposit> deposits_; // at 0x0C
-	};
+    /**
+     * Address: 0x00546A00 (Moho::CSimResources::dtr)
+     *
+     * What it does:
+     * Releases mutex/vector storage and optionally deletes `this` via deleting
+     * destructor thunk.
+     */
+    ~CSimResources() override;
 
-	static_assert(!std::is_polymorphic<ISimResources>::value, "ISimResources must be non-polymorphic");
-    ABI_SIZE_MUST_BE(CSimResources, 0x1C);
-}
+    /**
+     * Address: 0x00545F10 (Moho::CSimResources::AddDeposit)
+     */
+    void AddDeposit(EDepositType type, gpg::Rect2i* pos) override;
+
+    /**
+     * Address: 0x00545E80 (Moho::CSimResources::AddDepositPoint)
+     */
+    void AddDepositPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) override;
+
+    /**
+     * Address: 0x00545FC0 (Moho::CSimResources::GetDeposits1)
+     */
+    const msvc8::vector<ResourceDeposit>& GetDeposits() const override;
+
+    /**
+     * Address: 0x00545FB0 (Moho::CSimResources::GetDeposits2)
+     */
+    msvc8::vector<ResourceDeposit>& GetDeposits() override;
+
+    /**
+     * Address: 0x00546060 (Moho::CSimResources::IsDepositAt)
+     */
+    bool IsDepositAt(gpg::Rect2i* pos, EDepositType type) override;
+
+    /**
+     * Address: 0x00545FD0 (Moho::CSimResources::IsDepositAtPoint)
+     */
+    bool IsDepositAtPoint(Wm3::Vec3f* pos, Wm3::Vec2i* size, EDepositType type) override;
+
+    /**
+     * Address: 0x00546470 (Moho::CSimResources::DepositCollides)
+     */
+    void DepositCollides(
+      CGeomSolid3* solid, CHeightField* field, gpg::fastvector<ResourceDeposit>* outDeposits, EDepositType type
+    ) override;
+
+    /**
+     * Address: 0x00546650 (Moho::CSimResources::DepositIsInArea)
+     */
+    bool DepositIsInArea(EDepositType type, gpg::Rect2i* area) override;
+
+    /**
+     * Address: 0x005465C0 (Moho::CSimResources::DepositIsInAreaPoint)
+     */
+    bool DepositIsInAreaPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) override;
+
+    /**
+     * Address: 0x00546760 (Moho::CSimResources::FindClosestDespoit)
+     */
+    bool FindClosestDeposit(GridPos* from, GridPos* outPos, float radius, EDepositType type) override;
+
+    /**
+     * Address: 0x00546860 (Moho::CSimResources::AreaHasDeposit)
+     */
+    bool AreaHasDeposit(EDepositType type, gpg::Rect2f* area) override;
+
+    /**
+     * Source parity: FAF binary patch helper `SimGetDepositsAroundPoint`.
+     *
+     * What it does:
+     * Collects deposits whose centers are within `radius` from (`x`, `z`),
+     * optionally filtered by `type` (`kNone` means any type), and records
+     * distance as `sqrt(dx*dx + dz*dz)`.
+     */
+    void GetDepositsAroundPoint(
+      float x, float z, float radius, EDepositType type, gpg::fastvector<ResourceDepositDistance>* outDeposits
+    ) const;
+
+  public:
+    boost::mutex lock_;                       // +0x04
+    msvc8::vector<ResourceDeposit> deposits_; // +0x0C
+  };
+
+  static_assert(!std::is_polymorphic<ISimResources>::value, "ISimResources must be non-polymorphic");
+  static_assert(offsetof(CSimResources, deposits_) == 0x0C, "CSimResources::deposits_ offset must be 0x0C");
+  ABI_SIZE_MUST_BE(CSimResources, 0x1C);
+} // namespace moho

@@ -1,5 +1,10 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <map>
+#include <type_traits>
+#include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -28,8 +33,22 @@ namespace gpg
 		}
 	};
 
+	/**
+	 * type_info comparator used by the preregistration map.
+	 * Mirrors the binary's use of type_info::before.
+	 */
+	struct TypeInfoLess {
+		bool operator()(const std::type_info* a, const std::type_info* b) const noexcept {
+			if (a == b) return false;
+			if (!a) return b != nullptr;
+			if (!b) return false;
+			return a->before(*b) != 0;
+		}
+	};
+
 	using TypeMap = std::map<const char*, RType*, CStrLess>;
 	using TypeVec = msvc8::vector<RType*>;
+	using TypeInfoMap = std::map<const std::type_info*, RType*, TypeInfoLess>;
 
 	class RObject
 	{
@@ -80,6 +99,7 @@ namespace gpg
 		const char* GetFieldName(int ind) const; // gpgcore.dll
 		void Delete(); // 0x008D8800
 	};
+    static_assert(sizeof(RRef) == 0x08, "RRef must be 0x08");
 
     /**
 	 * Global registries (original: func_GetRTypeMap / func_GetRTypeVec).
@@ -94,6 +114,50 @@ namespace gpg
 		return gVec;
 	}
 
+	inline TypeInfoMap& GetRTypePreregisteredMap() {
+		static TypeInfoMap gMap;
+		return gMap;
+	}
+
+	/**
+	 * Address: 0x008E0750 (FA), 0x1001CDC0 (gpgcore.dll)
+	 *
+	 * type_info const &
+	 *
+	 * What it does:
+	 * Resolves a preregistered type descriptor by RTTI and lazily finalizes
+	 * registration (`Init` + `RegisterType`) on first lookup.
+	 */
+	RType* LookupRType(const std::type_info& typeInfo);
+
+	/**
+	 * Address: 0x1001BBC0 (gpgcore.dll)
+	 *
+	 * type_info const &, gpg::RType *
+	 *
+	 * What it does:
+	 * Adds a type descriptor to the RTTI preregistration map.
+	 */
+	void PreRegisterRType(const std::type_info& typeInfo, RType* type);
+
+	/**
+	 * Address: 0x1001CEB0 (gpgcore.dll)
+	 *
+	 * What it does:
+	 * Forces lazy registration for all preregistered RTTI entries.
+	 */
+	void REF_RegisterAllTypes();
+
+	/**
+	 * Address: 0x10018CB0 (gpgcore.dll)
+	 *
+	 * int
+	 *
+	 * What it does:
+	 * Returns the type descriptor at an index in the global registration vector.
+	 */
+	const RType* REF_GetTypeIndexed(int index);
+
     class RField
     {
     public:
@@ -103,9 +167,11 @@ namespace gpg
         int v4;
         const char* mDesc;
 
+        RField();
         RField(const char* name, RType* type, int offset);
         RField(const char* name, RType* type, int offset, int v, const char* desc);
     };
+    static_assert(sizeof(RField) == 0x14, "RField must be 0x14");
 
     class RType : public RObject
     {
@@ -129,7 +195,7 @@ namespace gpg
          * SLOT: 0
          */
         [[nodiscard]]
-        virtual RType* GetClass() const = 0;
+        virtual RType* GetClass() const;
 
         /**
          * Packs { this, GetFamilyDescriptor() } into the provided handle.
@@ -138,7 +204,7 @@ namespace gpg
          * SLOT: 1
          */
         [[nodiscard]]
-        virtual RRef GetDerivedObjectRef() = 0;
+        virtual RRef GetDerivedObjectRef();
 
         /**
          * Destructor.
@@ -155,7 +221,7 @@ namespace gpg
          * Address: 0x00A82547
          * SLOT: 3
          */
-        virtual const char* GetName() = 0;
+        virtual const char* GetName() const = 0;
 
         /**
          * Default stringification: "<label> at 0x<ptr>".
@@ -164,7 +230,7 @@ namespace gpg
          * Address: 0x008DB100
          * SLOT: 4
          */
-        virtual msvc8::string GetLexical(const RRef&);
+        virtual msvc8::string GetLexical(const RRef&) const;
 
         /**
          * Unknown (base: no-op/false).
@@ -183,7 +249,7 @@ namespace gpg
          * SLOT: 6
          */
         [[nodiscard]]
-        virtual RIndexed* IsIndexed() {
+        virtual const RIndexed* IsIndexed() const {
             return nullptr;
         }
 
@@ -194,7 +260,7 @@ namespace gpg
          * SLOT: 7
          */
         [[nodiscard]]
-        virtual RIndexed* IsPointer() {
+        virtual const RIndexed* IsPointer() const {
             return nullptr;
         }
 
@@ -205,7 +271,7 @@ namespace gpg
          * SLOT: 8
          */
         [[nodiscard]]
-        virtual REnumType* IsEnumType() {
+        virtual const REnumType* IsEnumType() const {
             return nullptr;
         }
 
@@ -215,7 +281,7 @@ namespace gpg
          * Address: 0x008D8680
          * SLOT: 9
          */
-        virtual void Init() = 0;
+        virtual void Init();
 
         /**
          * Finalization: builds indices over 20-byte member records.
@@ -223,7 +289,7 @@ namespace gpg
          * Address: 0x008DF4A0
          * SLOT: 10
          */
-        virtual void Finish() = 0;
+        virtual void Finish();
 
         /**
          * Address: 0x008D8640
@@ -293,25 +359,36 @@ namespace gpg
         bool v24;
 
     public:
+        template<class T, class B>
+        static int BaseSubobjectOffset() {
+            static_assert(std::is_base_of<B, T>::value, "B must be a base of T");
+
+            const auto* t = reinterpret_cast<const T*>(0x1000);
+            const auto* b = static_cast<const B*>(t);
+            return static_cast<int>(
+                reinterpret_cast<std::uintptr_t>(b) -
+                reinterpret_cast<std::uintptr_t>(t));
+        }
+
         template<class T>
         RField* AddField(const char* name, int offset) {
             GPG_ASSERT(!initFinished_); // if (this->mInitFinished) { gpg::HandleAssertFailure("!mInitFinished", 734, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/reflection.h"); }
-            RField f{ T::StaticGetClass(), name, offset };
+            RField f{ name, const_cast<RType*>(T::StaticGetClass()), offset };
             this->fields_.push_back(f);
             return &this->fields_.back();
         }
 
         template<class T, class B>
         void AddBase() {
-            RType* type = B::StaticGetClass();
+            RType* type = const_cast<RType*>(B::StaticGetClass());
             this->AddBase(RField{
                 type->GetName(),
                 type,
-                offsetof(T, B) // !
+                BaseSubobjectOffset<T, B>()
             });
         }
     };
-    static_assert(sizeof(RType) == 100, "RType must be 100 bytes on x86");
+    static_assert(sizeof(RType) == 0x64, "RType must be 0x64 bytes on x86");
 
     /**
      * VFTABLE: 0x00D48CA0
@@ -342,7 +419,7 @@ namespace gpg
          * VFTable SLOT: 4
          */
         [[nodiscard]]
-        msvc8::string GetLexical(const RRef& ref) override;
+        msvc8::string GetLexical(const RRef& ref) const override;
 
         /**
          * In binary:
@@ -358,11 +435,11 @@ namespace gpg
          * Address: 0x004180F0
          * VFTable SLOT: 8
          */
-        REnumType* IsEnumType() override {
+        const REnumType* IsEnumType() const override {
             return this;
         }
 
-        const msvc8::vector<ROptionValue>& GetEnumOptions() {
+        const msvc8::vector<ROptionValue>& GetEnumOptions() const {
             return mEnumNames;
         }
 
@@ -386,7 +463,7 @@ namespace gpg
         const char* mPrefix;
         msvc8::vector<ROptionValue> mEnumNames;
     };
-    static_assert(sizeof(REnumType) == 120, "REnumType must be 120 bytes on x86");
+    static_assert(sizeof(REnumType) == 0x78, "REnumType must be 0x78 bytes on x86");
 
     class RIndexed
     {

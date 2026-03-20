@@ -104,10 +104,10 @@ int __stdcall EntityCreateUnit_Hook(int a1, int** a2)
 
     auto casted = reinterpret_cast<moho::Unit*>(unit);
 
-    DebugPrintf("[inspect] Entity::CreateUnit[{:p}, id={}, name={}]\n", 
+    DebugPrintf("[inspect] Entity::CreateUnit[{:p}, id={}, name={}]\n",
         reinterpret_cast<void*>(unit),
         casted->id_,
-        casted->Name);
+        casted->GetCustomName().c_str());
 
     // Post-process, wrap, track, etc.
     return unit;

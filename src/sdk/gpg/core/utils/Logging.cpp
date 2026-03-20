@@ -1,9 +1,93 @@
 #include "Logging.h"
 
+#include <algorithm>
 #include <cstdarg>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 using namespace gpg;
+
+namespace
+{
+constexpr std::size_t kInitialContextCapacity = 4;
+
+void EnsureThreadContextCapacity(gpg::ThreadState* const tls, const std::size_t wantedCount)
+{
+    if (!tls) {
+        return;
+    }
+
+    const std::size_t currentCount = (tls->begin && tls->end)
+                                         ? static_cast<std::size_t>(tls->end - tls->begin)
+                                         : 0;
+    const std::size_t currentCapacity = (tls->begin && tls->cap)
+                                            ? static_cast<std::size_t>(tls->cap - tls->begin)
+                                            : 0;
+    if (currentCapacity >= wantedCount) {
+        return;
+    }
+
+    std::size_t newCapacity = currentCapacity ? currentCapacity : kInitialContextCapacity;
+    while (newCapacity < wantedCount) {
+        newCapacity *= 2;
+    }
+
+    auto** const newBuffer = new gpg::ThreadCtxEntry*[newCapacity]{};
+    if (tls->begin && currentCount > 0) {
+        std::copy(tls->begin, tls->begin + currentCount, newBuffer);
+        delete[] tls->begin;
+    }
+
+    tls->begin = newBuffer;
+    tls->end = newBuffer + currentCount;
+    tls->cap = newBuffer + newCapacity;
+}
+
+gpg::ThreadState* EnsureThreadState()
+{
+    std::call_once(gpg::g_LogOnce, &gpg::InitLogSingleton);
+    if (!gpg::g_LogCtx) {
+        return nullptr;
+    }
+
+    gpg::ThreadState* tls = gpg::g_LogCtx->tss.get();
+    if (!tls) {
+        tls = new gpg::ThreadState{};
+        gpg::g_LogCtx->tss.reset(tls);
+    }
+    return tls;
+}
+
+void PushThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const entry)
+{
+    if (!tls || !entry) {
+        return;
+    }
+
+    const std::size_t count = (tls->begin && tls->end)
+                                  ? static_cast<std::size_t>(tls->end - tls->begin)
+                                  : 0;
+    EnsureThreadContextCapacity(tls, count + 1);
+    tls->begin[count] = entry;
+    tls->end = tls->begin + count + 1;
+}
+
+void RemoveThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const entry)
+{
+    if (!tls || !entry || !tls->begin || tls->end == tls->begin) {
+        return;
+    }
+
+    gpg::ThreadCtxEntry** const found = std::find(tls->begin, tls->end, entry);
+    if (found == tls->end) {
+        return;
+    }
+
+    std::move(found + 1, tls->end, found);
+    --tls->end;
+    *tls->end = nullptr;
+}
+} // namespace
 
 void LogContext::Dispatch(const int level, const msvc8::string& msg) {
     // Shared traversal over targets
@@ -62,6 +146,37 @@ void LogContext::Dispatch(const int level, const msvc8::string& msg) {
     }
 
     rw.unlock_shared();
+}
+
+ScopedLogContext::ScopedLogContext(const msvc8::string& text)
+{
+    mTls = EnsureThreadState();
+    if (!mTls) {
+        return;
+    }
+
+    mEntry = new ThreadCtxEntry{};
+    mEntry->text = text;
+    PushThreadContext(mTls, mEntry);
+}
+
+ScopedLogContext::ScopedLogContext(const char* const text)
+    : ScopedLogContext(msvc8::string(text ? text : ""))
+{
+}
+
+ScopedLogContext::~ScopedLogContext()
+{
+    if (!mEntry) {
+        return;
+    }
+
+    if (mTls) {
+        RemoveThreadContext(mTls, mEntry);
+    }
+    delete mEntry;
+    mEntry = nullptr;
+    mTls = nullptr;
 }
 
 // 0x00937CB0

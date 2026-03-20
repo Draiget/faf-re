@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+#include <memory>
 #include <stdexcept>
 
 #include "legacy/containers/String.h"
@@ -35,12 +37,10 @@ namespace gpg
         void ReadString(msvc8::string* out) const;
 
         /**
-         * Read exactly sizeof(T) bytes into POD-like T.
-         * Requires T to be trivially copyable.
+         * Read exactly sizeof(T) bytes into T's object storage.
          */
         template<class T>
         void ReadExact(T& out) const {
-            static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
             Read(reinterpret_cast<char*>(std::addressof(out)), sizeof(T));
         }
 
@@ -50,9 +50,7 @@ namespace gpg
         template <class T>
         void ReadExactArray(T* out, std::size_t count) const
         {
-            static_assert(std::is_trivially_copyable_v<T>,
-                "ReadExactArray requires trivially copyable T");
-            Read(out, sizeof(T) * count);
+            Read(reinterpret_cast<char*>(out), sizeof(T) * count);
         }
 
         /**

@@ -3,6 +3,8 @@
 #include <cstdarg>
 using namespace gpg;
 
+msvc8::string gpg::sWhitespaceChars{ " \n\t\r" };
+
 // 0x009380A0
 int gpg::STR_Utf8ByteOffset(const StrArg str, const int pos) {
     const char* itr = str;

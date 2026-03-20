@@ -2,7 +2,8 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho {
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1BD9C
    * COL:  0x00E71FA8
@@ -78,7 +79,7 @@ namespace moho {
      * Slot: 9
      * Demangled: _purecall
      */
-    virtual void purecall9() = 0;
+    virtual int GetStatus() = 0;
 
     /**
      * Address: 0x00A82547

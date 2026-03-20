@@ -2,7 +2,8 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho {
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1EA88
    * COL:  0x00E759EC
@@ -13,15 +14,15 @@ namespace moho {
     /**
      * Address: 0x005D5FD0
      * Slot: 0
-     * Demangled: sub_5D5FD0
+     * Demangled: Moho::LAiAttackerImpl::GetClass
      */
-    virtual void sub_5D5FD0() = 0;
+    virtual void GetClass() = 0;
 
     /**
      * Address: 0x005D5FB0
      * Slot: 1
-     * Demangled: sub_5D5FB0
+     * Demangled: Moho::LAiAttackerImpl::GetDerivedObjectRef
      */
-    virtual void sub_5D5FB0() = 0;
+    virtual void GetDerivedObjectRef() = 0;
   };
 } // namespace moho

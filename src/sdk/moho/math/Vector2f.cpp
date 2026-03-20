@@ -1,2 +1,3 @@
 #include "Vector2f.h"
-using namespace moho;
+
+// Compatibility TU retained intentionally; Vector2f is now an alias to Wm3::Vector2f.

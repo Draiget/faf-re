@@ -3,6 +3,7 @@
 #include <utility>
 #include <typeinfo>
 #include <exception>
+#include <type_traits>
 
 #include "platform/Platform.h"
 
@@ -467,8 +468,8 @@ namespace boost
 
         /** Observers. */
         T* get() const noexcept { return px_; }
-        T& operator*() const noexcept { return *px_; }
-        T* operator->() const noexcept { return px_; }
+        std::add_lvalue_reference_t<T> operator*() const noexcept requires (!std::is_void_v<T>) { return *px_; }
+        T* operator->() const noexcept requires (!std::is_void_v<T>) { return px_; }
         explicit operator bool() const noexcept { return px_ != nullptr; }
 
         long use_count() const noexcept { return pi_ ? pi_->use_count() : 0; }

@@ -2,9 +2,16 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace LuaPlus { class LuaObject; class LuaState; } // forward decl
+#include "moho/lua/CScrLuaBinderFwd.h"
 
-namespace moho {
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1BF14
    * COL:  0x00E71BD0
@@ -15,9 +22,9 @@ namespace moho {
     /**
      * Address: 0x005A37B0
      * Slot: 0
-     * Demangled: sub_5A37B0
+     * Demangled: (likely scalar deleting destructor thunk)
      */
-    virtual void sub_5A37B0() = 0;
+    virtual ~CAiNavigatorImpl() = default;
 
     /**
      * Address: 0x005A3600
@@ -80,7 +87,7 @@ namespace moho {
      * Slot: 9
      * Demangled: Moho::CAiNavigatorImpl::GetStatus
      */
-    virtual void GetStatus() = 0;
+    virtual int GetStatus() = 0;
 
     /**
      * Address: 0x00A82547
@@ -153,214 +160,88 @@ namespace moho {
     virtual void NavigatorMakeIdle() = 0;
   };
 
-/**
- * VFTABLE: 0x00E1C160
- * COL:  0x00E71374
- */
-class CAiNavigatorImplSetGoal_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C160
+   * COL:  0x00E71374
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplSetGoal_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C168
- * COL:  0x00E71324
- */
-class CAiNavigatorImplSetDestUnit_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C168
+   * COL:  0x00E71324
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplSetDestUnit_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C170
- * COL:  0x00E712D4
- */
-class CAiNavigatorImplAbortMove_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C170
+   * COL:  0x00E712D4
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplAbortMove_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C178
- * COL:  0x00E71284
- */
-class CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C178
+   * COL:  0x00E71284
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C180
- * COL:  0x00E71234
- */
-class CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C180
+   * COL:  0x00E71234
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C188
- * COL:  0x00E711E4
- */
-class CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C188
+   * COL:  0x00E711E4
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C190
- * COL:  0x00E71194
- */
-class CAiNavigatorImplGetGoalPos_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C190
+   * COL:  0x00E71194
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplGetGoalPos_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C198
- * COL:  0x00E71144
- */
-class CAiNavigatorImplGetStatus_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C198
+   * COL:  0x00E71144
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplGetStatus_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C1A0
- * COL:  0x00E710F4
- */
-class CAiNavigatorImplHasGoodPath_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C1A0
+   * COL:  0x00E710F4
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplHasGoodPath_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C1A8
- * COL:  0x00E710A4
- */
-class CAiNavigatorImplFollowingLeader_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C1A8
+   * COL:  0x00E710A4
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplFollowingLeader_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C1B0
- * COL:  0x00E71054
- */
-class CAiNavigatorImplIgnoreFormation_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C1B0
+   * COL:  0x00E71054
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplIgnoreFormation_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C1B8
- * COL:  0x00E71004
- */
-class CAiNavigatorImplIsIgnorningFormation_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C1B8
+   * COL:  0x00E71004
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplIsIgnorningFormation_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C1C0
- * COL:  0x00E70FB4
- */
-class CAiNavigatorImplAtGoal_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C1C0
+   * COL:  0x00E70FB4
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplAtGoal_LuaFuncDef = ::moho::CScrLuaBinder;
 
-/**
- * VFTABLE: 0x00E1C1C8
- * COL:  0x00E70F64
- */
-class CAiNavigatorImplCanPathToGoal_LuaFuncDef
-{
-public:
   /**
-   * Address: 0x004CD3A0
-   * Slot: 0
-   * Demangled: protected: virtual void __thiscall Moho::CScrLuaBinder::Run(class LuaPlus::LuaState near *)
+   * VFTABLE: 0x00E1C1C8
+   * COL:  0x00E70F64
    */
-  virtual void Run(LuaPlus::LuaState *) = 0;
-};
+  using CAiNavigatorImplCanPathToGoal_LuaFuncDef = ::moho::CScrLuaBinder;
 
 } // namespace moho

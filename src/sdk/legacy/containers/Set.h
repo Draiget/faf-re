@@ -20,7 +20,10 @@
 namespace msvc8
 {
     // Minimal stub to match MSVC8 containers ABI when needed.
+#ifndef MSVC8_CONTAINER_PROXY_DEFINED
+#define MSVC8_CONTAINER_PROXY_DEFINED 1
     struct _Container_proxy { void* _Myfirstiter; };
+#endif
 
     template<class Key, class Less = std::less<Key>>
     class set
@@ -121,7 +124,7 @@ namespace msvc8
 
         // -------- ctor/dtor --------
         set() MSVC8_SET_NOEXCEPT
-            : _Myproxy(nullptr), _Myhead(alloc_header_()), _Mysize(0), _Tag(nullptr)
+            : _Myproxy(nullptr), _Myhead(alloc_header_()), _Mysize(0)
         {
             init_header_(_Myhead);
         }
@@ -155,10 +158,6 @@ namespace msvc8
         // -------- capacity --------
         bool empty() const MSVC8_SET_NOEXCEPT { return _Mysize == 0; }
         size_type size() const MSVC8_SET_NOEXCEPT { return _Mysize; }
-
-        // Optional: expose the 4th slot for engine-like policy
-        void set_reserved_tag(void* tag) MSVC8_SET_NOEXCEPT { _Tag = tag; }
-        void* reserved_tag() const MSVC8_SET_NOEXCEPT { return _Tag; }
 
         // -------- lookup --------
         iterator find(const key_type& k) const {
@@ -281,7 +280,6 @@ namespace msvc8
             std::swap(_Myproxy, other._Myproxy);
             std::swap(_Myhead, other._Myhead);
             std::swap(_Mysize, other._Mysize);
-            std::swap(_Tag, other._Tag);
         }
 
     private:
@@ -526,7 +524,6 @@ namespace msvc8
             _Myproxy = o._Myproxy;  o._Myproxy = nullptr;
             _Myhead = o._Myhead;   o._Myhead = alloc_header_(); init_header_(o._Myhead);
             _Mysize = o._Mysize;   o._Mysize = 0;
-            _Tag = o._Tag;      o._Tag = nullptr;
         }
 
     private:
@@ -534,11 +531,10 @@ namespace msvc8
         _Container_proxy* _Myproxy; // 0x0
         rb_base* _Myhead;  // 0x4 (sentinel)
         size_type         _Mysize;  // 0x8
-        void* _Tag;     // 0xC (reserved/policy)
     };
 
     // Size check (x86)
-    static_assert(sizeof(set<int>) == 16, "msvc8::set must be 16 bytes on x86");
+    static_assert(sizeof(set<int>) == 12, "msvc8::set must be 12 bytes on x86");
 
 } // namespace msvc8
 

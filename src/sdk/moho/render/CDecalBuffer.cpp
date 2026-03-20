@@ -1,0 +1,490 @@
+#include "moho/render/CDecalBuffer.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <new>
+
+#include "gpg/core/containers/Rect2.h"
+#include "moho/ai/CAiReconDBImpl.h"
+#include "moho/containers/BVIntSet.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/Sim.h"
+
+using namespace moho;
+
+namespace
+{
+  struct DecalBucketNode
+  {
+    DecalBucketNode* left;
+    DecalBucketNode* parent;
+    DecalBucketNode* right;
+    CDecalHandle* handle;
+    std::uint8_t color;
+    std::uint8_t isNil;
+    std::uint8_t reserved12[2];
+  };
+  static_assert(sizeof(DecalBucketNode) == 0x14, "DecalBucketNode size must be 0x14");
+
+  struct DecalMapNode
+  {
+    DecalMapNode* left;
+    DecalMapNode* parent;
+    DecalMapNode* right;
+    std::uint32_t startTick;
+    void* bucketAllocatorCookie;
+    DecalBucketNode* bucketHead;
+    std::uint32_t bucketSize;
+    std::uint8_t color;
+    std::uint8_t isNil;
+    std::uint8_t reserved1E[2];
+  };
+  static_assert(sizeof(DecalMapNode) == 0x20, "DecalMapNode size must be 0x20");
+
+  class CDecalHandleRuntime
+  {
+  public:
+    virtual void Slot0() = 0;
+    virtual void Slot1() = 0;
+    virtual void Delete(int deleteFlags) = 0;
+
+  public:
+    std::uint8_t scriptObjectPad[0x30];
+    CDecalHandleListNode listNode;
+    SDecalInfo decalInfo;
+    std::uint32_t armyVisibilityFlags;
+    std::uint8_t visibleInFocus;
+    std::uint8_t reservedD1[3];
+    std::uint32_t createdAtTick;
+  };
+  static_assert(offsetof(CDecalHandleRuntime, listNode) == 0x34, "CDecalHandleRuntime::listNode offset must be 0x34");
+  static_assert(offsetof(CDecalHandleRuntime, decalInfo) == 0x3C, "CDecalHandleRuntime::decalInfo offset must be 0x3C");
+  static_assert(
+    offsetof(CDecalHandleRuntime, armyVisibilityFlags) == 0xCC,
+    "CDecalHandleRuntime::armyVisibilityFlags offset must be 0xCC"
+  );
+  static_assert(
+    offsetof(CDecalHandleRuntime, visibleInFocus) == 0xD0, "CDecalHandleRuntime::visibleInFocus offset must be 0xD0"
+  );
+  static_assert(
+    offsetof(CDecalHandleRuntime, createdAtTick) == 0xD4, "CDecalHandleRuntime::createdAtTick offset must be 0xD4"
+  );
+  static_assert(sizeof(CDecalHandleRuntime) == 0xD8, "CDecalHandleRuntime size must be 0xD8");
+
+  static_assert(
+    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex), "SimSubRes3/BVIntSet offset mismatch"
+  );
+  static_assert(
+    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord), "SimSubRes3/BVIntSet offset mismatch"
+  );
+  static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
+  static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
+
+  [[nodiscard]]
+  BVIntSet& AsBitSet(SimSubRes3& slot) noexcept
+  {
+    return *reinterpret_cast<BVIntSet*>(&slot);
+  }
+
+  [[nodiscard]]
+  const BVIntSet& AsBitSet(const SimSubRes3& slot) noexcept
+  {
+    return *reinterpret_cast<const BVIntSet*>(&slot);
+  }
+
+  void ResetSlotBitSet(SimSubRes3& slot)
+  {
+    auto& set = AsBitSet(slot);
+    set.mFirstWordIndex = 0;
+    set.mReservedMetaWord = 0;
+    set.mWords.ResetStorageToInline();
+  }
+
+  [[nodiscard]]
+  bool BitSetContains(const BVIntSet& set, const unsigned int value)
+  {
+    const unsigned int wordIndex = value >> 5;
+    if (wordIndex < set.mFirstWordIndex) {
+      return false;
+    }
+
+    const unsigned int* const wordsBegin = set.mWords.start_;
+    const unsigned int* const wordsEnd = set.mWords.end_;
+    if (!wordsBegin) {
+      return false;
+    }
+
+    const std::size_t rel = static_cast<std::size_t>(wordIndex - set.mFirstWordIndex);
+    const std::size_t wordsCount = static_cast<std::size_t>(wordsEnd - wordsBegin);
+    if (rel >= wordsCount) {
+      return false;
+    }
+
+    return ((wordsBegin[rel] >> (value & 0x1Fu)) & 1u) != 0u;
+  }
+
+  [[nodiscard]]
+  DecalMapNode* AllocateMapHeadNode()
+  {
+    auto* const node = static_cast<DecalMapNode*>(::operator new(sizeof(DecalMapNode)));
+    node->left = node;
+    node->parent = node;
+    node->right = node;
+    node->startTick = 0;
+    node->bucketAllocatorCookie = nullptr;
+    node->bucketHead = nullptr;
+    node->bucketSize = 0;
+    node->color = 1;
+    node->isNil = 1;
+    node->reserved1E[0] = 0;
+    node->reserved1E[1] = 0;
+    return node;
+  }
+
+  [[nodiscard]]
+  CDecalHandleRuntime* RuntimeHandleFromNode(CDecalHandleListNode* const node) noexcept
+  {
+    return reinterpret_cast<CDecalHandleRuntime*>(
+      reinterpret_cast<std::uint8_t*>(node) - offsetof(CDecalHandleRuntime, listNode)
+    );
+  }
+
+  [[nodiscard]]
+  CDecalHandle* PublicHandleFromRuntime(CDecalHandleRuntime* const handle) noexcept
+  {
+    return reinterpret_cast<CDecalHandle*>(handle);
+  }
+
+  [[nodiscard]]
+  bool HasDeleteSlot(CDecalHandleRuntime* const handle) noexcept
+  {
+    if (handle == nullptr) {
+      return false;
+    }
+
+    void** const vtable = *reinterpret_cast<void***>(handle);
+    return vtable != nullptr && vtable[2] != nullptr;
+  }
+
+  void DestroyBucketTreeNodes(DecalBucketNode* node, const DecalBucketNode* const head)
+  {
+    if (!node || node == head) {
+      return;
+    }
+
+    DestroyBucketTreeNodes(node->left, head);
+    DestroyBucketTreeNodes(node->right, head);
+    ::operator delete(node);
+  }
+
+  void DestroyBucketHead(DecalBucketNode* const head)
+  {
+    if (!head) {
+      return;
+    }
+
+    DestroyBucketTreeNodes(head->left, head);
+    ::operator delete(head);
+  }
+
+  void DestroyMapNodes(DecalMapNode* node, const DecalMapNode* const head)
+  {
+    if (!node || node == head) {
+      return;
+    }
+
+    DestroyMapNodes(node->left, head);
+    DestroyMapNodes(node->right, head);
+    DestroyBucketHead(node->bucketHead);
+    ::operator delete(node);
+  }
+} // namespace
+
+/**
+ * Address: 0x00779170 (FUN_00779170)
+ *
+ * What it does:
+ * Initializes decal runtime storage (id pool, handle list, start-tick buckets).
+ */
+CDecalBuffer::CDecalBuffer()
+  : CDecalBuffer(nullptr)
+{}
+
+/**
+ * Address: 0x00779170 (FUN_00779170)
+ *
+ * What it does:
+ * Initializes decal runtime storage bound to a Sim owner.
+ */
+CDecalBuffer::CDecalBuffer(Sim* const sim)
+  : mSim(sim)
+  , mReserved04(0)
+  , mPool()
+  , mHandleListHead{}
+  , mStartTickBuckets{}
+  , mVisibleDecals()
+  , mPendingHideObjectIds()
+  , mPendingHideObjectIdsAux(0)
+{
+  mHandleListHead.next = &mHandleListHead;
+  mHandleListHead.prev = &mHandleListHead;
+
+  mStartTickBuckets.allocatorCookie = nullptr;
+  mStartTickBuckets.head = AllocateMapHeadNode();
+  mStartTickBuckets.size = 0;
+}
+
+/**
+ * Address: 0x00779270 (FUN_00779270)
+ *
+ * What it does:
+ * Destroys live decal handles and releases container backing storage.
+ */
+CDecalBuffer::~CDecalBuffer()
+{
+  while (mHandleListHead.next != &mHandleListHead) {
+    CDecalHandleListNode* const node = mHandleListHead.next;
+    auto* const handle = RuntimeHandleFromNode(node);
+    if (!HasDeleteSlot(handle)) {
+      break;
+    }
+    handle->Delete(1);
+  }
+
+  auto* const mapHead = static_cast<DecalMapNode*>(mStartTickBuckets.head);
+  if (mapHead) {
+    DestroyMapNodes(mapHead->left, mapHead);
+    ::operator delete(mapHead);
+  }
+
+  mStartTickBuckets.head = nullptr;
+  mStartTickBuckets.size = 0;
+  mStartTickBuckets.allocatorCookie = nullptr;
+  mHandleListHead.next = &mHandleListHead;
+  mHandleListHead.prev = &mHandleListHead;
+}
+
+/**
+ * Address: 0x00779680 (FUN_00779680, sub_779680)
+ *
+ * What it does:
+ * Removes one handle from active tracking, queues object-id retirement, and deletes the handle.
+ */
+void CDecalBuffer::DestroyHandle(CDecalHandle* const handleOpaque)
+{
+  if (!handleOpaque) {
+    return;
+  }
+
+  auto* const handle = reinterpret_cast<CDecalHandleRuntime*>(handleOpaque);
+
+  // Start-tick tree removal is deferred until map mutation helpers are fully lifted.
+  if (handle->visibleInFocus != 0u) {
+    mPendingHideObjectIds.push_back(handle->decalInfo.scriptObjectId);
+  }
+
+  SimSubRes3& retireSlot = mPool.mSubRes2.mData[(mPool.mSubRes2.mEnd + 99) % 100];
+  AsBitSet(retireSlot).Add(handle->decalInfo.scriptObjectId);
+
+  if (HasDeleteSlot(handle)) {
+    handle->Delete(1);
+  }
+}
+
+/**
+ * Address: 0x00403A30 (FUN_00403A30, sub_403A30)
+ * Address: 0x00403D20 (FUN_00403D20, sub_403D20)
+ *
+ * What it does:
+ * Advances the IdPool rolling recycle window by one tick, including oldest-slot pop.
+ */
+void CDecalBuffer::AdvanceIdPoolWindow()
+{
+  SimSubRes2& history = mPool.mSubRes2;
+  const std::int32_t nextEnd = (history.mEnd + 1) % 100;
+
+  if (nextEnd == history.mStart) {
+    SimSubRes3& oldestSlot = history.mData[history.mStart];
+    BVIntSet& oldestSet = AsBitSet(oldestSlot);
+
+    const unsigned int oldestMax = oldestSet.Max();
+    const unsigned int firstSet = oldestSet.GetNext(static_cast<unsigned int>(-1));
+    if (firstSet != oldestMax) {
+      mPool.mReleasedLows.AddFrom(&oldestSet, firstSet, oldestMax);
+
+      unsigned int newNextLowId = static_cast<unsigned int>(mPool.mNextLowId);
+      while (newNextLowId > 0 && BitSetContains(mPool.mReleasedLows, newNextLowId - 1u)) {
+        --newNextLowId;
+      }
+
+      if (newNextLowId != static_cast<unsigned int>(mPool.mNextLowId)) {
+        BVIntSetIndex lower{&mPool.mReleasedLows, newNextLowId};
+        BVIntSetIndex upper{&mPool.mReleasedLows, mPool.mReleasedLows.Max()};
+        mPool.mReleasedLows.ClearRange(lower, upper);
+        mPool.mNextLowId = static_cast<std::int32_t>(newNextLowId);
+      }
+    }
+
+    ResetSlotBitSet(oldestSlot);
+    history.mStart = (history.mStart + 1) % 100;
+  }
+
+  ResetSlotBitSet(history.mData[history.mEnd]);
+  history.mEnd = (history.mEnd + 1) % 100;
+}
+
+/**
+ * Address: 0x00778730 (FUN_00778730, sub_778730)
+ *
+ * What it does:
+ * Computes world-space XZ AABB bounds for a rotated decal quad.
+ */
+void CDecalBuffer::ProjectDecalToBoundsXZ(const SDecalInfo& info, Wm3::Vec2f& outMax, Wm3::Vec2f& outMin)
+{
+  const float c = std::cos(info.rotationRadians);
+  const float s = std::sin(info.rotationRadians);
+
+  const float xAxisX = info.worldSize.x * c;
+  const float xAxisZ = info.worldSize.x * s;
+  const float zAxisX = -(info.worldSize.z * s);
+  const float zAxisZ = info.worldSize.z * c;
+
+  const float minXOffset = std::min({0.0f, xAxisX, zAxisX, xAxisX + zAxisX});
+  const float minZOffset = std::min({0.0f, xAxisZ, zAxisZ, xAxisZ + zAxisZ});
+  const float maxXOffset = std::max({0.0f, xAxisX, zAxisX, xAxisX + zAxisX});
+  const float maxZOffset = std::max({0.0f, xAxisZ, zAxisZ, xAxisZ + zAxisZ});
+
+  outMin.x = info.worldOrigin.x + minXOffset;
+  outMin.y = info.worldOrigin.z + minZOffset;
+  outMax.x = info.worldOrigin.x + maxXOffset;
+  outMax.y = info.worldOrigin.z + maxZOffset;
+}
+
+/**
+ * Address: 0x00779040 (FUN_00779040, sub_779040)
+ *
+ * What it does:
+ * Tests whether an observer army may currently detect a decal owned by `sourceArmy`.
+ */
+bool CDecalBuffer::IsDecalVisibleForArmy(
+  const CArmyImpl* const sourceArmy, const SDecalInfo& info, CArmyImpl* const observerArmy
+) const
+{
+  if (!observerArmy) {
+    return false;
+  }
+
+  if (sourceArmy && observerArmy->Allies.Contains(static_cast<std::uint32_t>(sourceArmy->ArmyId))) {
+    return true;
+  }
+
+  Wm3::Vec2f maxBounds{};
+  Wm3::Vec2f minBounds{};
+  ProjectDecalToBoundsXZ(info, maxBounds, minBounds);
+
+  const moho::Rect2<int> queryRect{
+    static_cast<int>(std::floor(minBounds.x)),
+    static_cast<int>(std::floor(minBounds.y)),
+    static_cast<int>(std::ceil(maxBounds.x)),
+    static_cast<int>(std::ceil(maxBounds.y)),
+  };
+
+  const CAiReconDBImpl* const reconDb = observerArmy->GetReconDB();
+  if (!reconDb) {
+    return false;
+  }
+
+  return reconDb->ReconCanDetect(queryRect, info.worldOrigin.y, 8) != 0;
+}
+
+/**
+ * Address: 0x00779710 (FUN_00779710)
+ *
+ * What it does:
+ * Advances decal lifetime queues and performs per-tick decal cleanup.
+ */
+void CDecalBuffer::CleanupTick()
+{
+  if (!mSim) {
+    AdvanceIdPoolWindow();
+    return;
+  }
+
+  const std::uint32_t curTick = mSim->mCurTick;
+
+  // Pass 1: expire handles whose start tick has elapsed.
+  for (CDecalHandleListNode* node = mHandleListHead.next; node != &mHandleListHead;) {
+    CDecalHandleListNode* const next = node->next;
+    auto* const handle = RuntimeHandleFromNode(node);
+    if (handle->decalInfo.startTick != 0u && handle->decalInfo.startTick <= curTick) {
+      handle->decalInfo.startTick = 0u;
+      DestroyHandle(PublicHandleFromRuntime(handle));
+    }
+    node = next;
+  }
+
+  CArmyImpl** const armiesBegin = mSim->mArmiesList.begin();
+  CArmyImpl** const armiesEnd = mSim->mArmiesList.end();
+  const std::size_t armyCount = armiesBegin ? static_cast<std::size_t>(armiesEnd - armiesBegin) : 0u;
+
+  if (armyCount != 0u) {
+    const std::uint32_t rotatingArmyIndex = curTick % static_cast<std::uint32_t>(armyCount);
+    CArmyImpl* const rotatingArmy = armiesBegin[rotatingArmyIndex];
+
+    if (rotatingArmy && rotatingArmy->IsCivilian == 0u) {
+      const std::int32_t focusArmy = mSim->mSyncFilter.focusArmy;
+      const std::uint32_t rotatingArmyMask = rotatingArmyIndex < 32u ? (1u << rotatingArmyIndex) : 0u;
+
+      for (CDecalHandleListNode* node = mHandleListHead.next; node != &mHandleListHead; node = node->next) {
+        auto* const handle = RuntimeHandleFromNode(node);
+
+        if (rotatingArmyMask != 0u && (handle->armyVisibilityFlags & rotatingArmyMask) == 0u) {
+          const bool bypassRecon = handle->decalInfo.requiresRecon == 0u;
+          const bool graceWindow = handle->decalInfo.startTick != 0u && (handle->createdAtTick + 10u > curTick);
+
+          if (bypassRecon || graceWindow) {
+            CArmyImpl* sourceArmy = nullptr;
+            if (handle->decalInfo.sourceArmyIndex < armyCount) {
+              sourceArmy = armiesBegin[handle->decalInfo.sourceArmyIndex];
+            }
+
+            if (!sourceArmy || IsDecalVisibleForArmy(sourceArmy, handle->decalInfo, rotatingArmy)) {
+              for (std::size_t i = 0; i < armyCount; ++i) {
+                CArmyImpl* const army = armiesBegin[i];
+                if (!army) {
+                  continue;
+                }
+
+                if (army->Allies.Contains(rotatingArmyIndex)) {
+                  const std::uint32_t armyIndex = static_cast<std::uint32_t>(army->ArmyId);
+                  if (armyIndex < 32u) {
+                    handle->armyVisibilityFlags |= (1u << armyIndex);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        bool shouldBeVisible = focusArmy == -1;
+        if (!shouldBeVisible && focusArmy >= 0 && focusArmy < 32) {
+          shouldBeVisible = (handle->armyVisibilityFlags & (1u << focusArmy)) != 0u;
+        }
+
+        if (shouldBeVisible) {
+          if (handle->visibleInFocus == 0u) {
+            mVisibleDecals.push_back(handle->decalInfo);
+            handle->visibleInFocus = 1u;
+          }
+        } else if (handle->visibleInFocus != 0u) {
+          mPendingHideObjectIds.push_back(handle->decalInfo.scriptObjectId);
+          handle->visibleInFocus = 0u;
+        }
+      }
+    }
+  }
+
+  AdvanceIdPoolWindow();
+}

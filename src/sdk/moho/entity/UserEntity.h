@@ -1,113 +1,271 @@
-﻿#pragma once
-#include "../misc/WeakObject.h"
-#include "../math/Vector4f.h"
-#include "../math/Vector3f.h"
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+#include "boost/shared_ptr.h"
+#include "legacy/containers/String.h"
+#include "moho/entity/SSTIEntityVariableData.h"
+#include "moho/misc/WeakObject.h"
+#include "moho/render/camera/VTransform.h"
 
 namespace moho
 {
-	class UserEntity : public WeakObject
-	{
-		// Primary vftable (17 entries)
-	public:
-        /**
-         * In binary: dtor
-         *
-         * PDB address: 0x8B8760
-         * VFTable SLOT: 0
-         */
-        virtual void ~UserEntity() = default;
+  class CWldSession;
+  class UserUnit;
+  class UserCommandQueue;
+  class CAniPose;
+  class MeshInstance;
+  class UserArmy;
+  class CSndParams;
+  struct REntityBlueprint;
 
-        /**
-         * In binary: nullsub
-         *
-         * PDB address: 0x8B8CD0
-         * VFTable SLOT: 1
-         */
-        virtual void sub_8B8CD0() = 0; 
+  struct SCreateEntityParams
+  {
+    std::uint32_t mEntityId;            // 0x00
+    const REntityBlueprint* mBlueprint; // 0x04
+    std::uint32_t mUnknown08;           // 0x08
+  };
+  static_assert(sizeof(SCreateEntityParams) == 0x0C, "SCreateEntityParams size must be 0x0C");
 
-        /**
-         * In binary:
-         *
-         * PDB address: 0x8B84D0
-         * VFTable SLOT: 2
-         */
-        virtual int sub_8B84D0() {
-            return 0;
-        }
+  struct UserEntityLinkNode
+  {
+    UserEntityLinkNode* prev;
+    UserEntityLinkNode* next;
+  };
+  static_assert(sizeof(UserEntityLinkNode) == 0x08, "UserEntityLinkNode size must be 0x08");
 
-        virtual void sub_8B84C0() = 0; // 0x8B84C0 (slot 3)
-        virtual void sub_8B84E0() = 0; // 0x8B84E0 (slot 4)
-        virtual void sub_8B8510() = 0; // 0x8B8510 (slot 5)
-        virtual void sub_8B84F0() = 0; // 0x8B84F0 (slot 6)
-        virtual void sub_8B8520() = 0; // 0x8B8520 (slot 7)
-        virtual void sub_8B8500() = 0; // 0x8B8500 (slot 8)
-        virtual void sub_8B8EB0() = 0; // 0x8B8EB0 (slot 9)
-        virtual void sub_8B9580() = 0; // 0x8B9580 (slot 10)
-        virtual void sub_8B8530() = 0; // 0x8B8530 (slot 11)
-        virtual void sub_8B8540() = 0; // 0x8B8540 (slot 12)
-        virtual void sub_8B85C0() = 0; // 0x8B85C0 (slot 13)
-        virtual void sub_8B85D0() = 0; // 0x8B85D0 (slot 14)
-        virtual void sub_8B88D0() = 0; // 0x8B88D0 (slot 15)
-        virtual void sub_8B8B10() = 0; // 0x8B8B10 (slot 16)
+  struct UserEntitySpatialDbEntry
+  {
+    void* mSpatialDb;      // 0x00
+    std::int32_t mEntryId; // 0x04
+  };
+  static_assert(sizeof(UserEntitySpatialDbEntry) == 0x08, "UserEntitySpatialDbEntry size must be 0x08");
 
-	public:
-        // From +0x08 (after cookie) to +0x44 (entityID) we need 0x3C bytes of padding.
-        std::uint8_t  pad_0008_0044[0x44 - 0x08]{};       // 0x08..0x43
+  class UserEntityAuxHandle
+  {
+  public:
+    virtual ~UserEntityAuxHandle() = default;
+    virtual void Release(std::int32_t destroyNow) = 0;
+  };
 
-        // 0x44
-        int           entityID;                           // replicated id / low bits of packed key
+  class UserEntity : public WeakObject
+  {
+  public:
+    /**
+     * Address: 0x008B85E0 (FUN_008B85E0, ??0UserEntity@Moho@@QAE@AAVCWldSession@1@ABUSCreateEntityParams@1@@Z)
+     *
+     * What it does:
+     * Initializes runtime links/state, copies create params, seeds variable data,
+     * derives owner army/category mask from entity id, then registers in session spatial DB.
+     */
+    UserEntity(CWldSession& session, const SCreateEntityParams& createParams);
 
-        // 0x48
-        class RPropBlueprint* blueprint;                        // for units: actually RUnitBlueprint*
+    /**
+     * Address: 0x008B87A0 (FUN_008B87A0, ??1UserEntity@Moho@@UAE@XZ)
+     *
+     * What it does:
+     * Tears down mesh/pose/runtime links and detaches this user-entity from
+     * spatial/auxiliary runtime systems.
+     */
+    virtual ~UserEntity();
 
-        // 0x4C..0x57 — unknown (ctor zeroes several dwords)
-        std::uint8_t  pad_004C_0058[0x58 - 0x4C]{};
+    /**
+     * Address: 0x008B8CD0 (FUN_008B8CD0, ?Tick@UserEntity@Moho@@UAEXVCSeqNo@2@@Z)
+     *
+     * What it does:
+     * Base user-entity tick hook; default implementation is a no-op.
+     */
+    virtual void Tick(std::int32_t seqNo);
 
-        // 0x58
-        class RMeshBlueprint* mesh;
+    /**
+     * Address: 0x008B84D0 (FUN_008B84D0, ?IsUserUnit@UserEntity@Moho@@UBEPBVUserUnit@2@XZ)
+     *
+     * What it does:
+     * Returns typed const unit view when this entity is a user-unit.
+     */
+    [[nodiscard]] virtual const UserUnit* IsUserUnit() const;
 
-        // 0x5C..0x67 — prev position cache etc. (engine uses in snapshot path)
-        std::uint8_t  pad_005C_0068[0x68 - 0x5C]{};
+    /**
+     * Address: 0x008B84C0 (FUN_008B84C0, ?IsUserUnit@UserEntity@Moho@@UAEPAVUserUnit@2@XZ)
+     *
+     * What it does:
+     * Returns typed mutable unit view when this entity is a user-unit.
+     */
+    [[nodiscard]] virtual UserUnit* IsUserUnit();
 
-        // 0x68 / 0x6C
-        float         curHealth;
-        float         maxHealth;
+    /**
+     * Address: 0x008B84E0 (FUN_008B84E0, ?GetUniformScale@UserEntity@Moho@@UBEMXZ)
+     *
+     * What it does:
+     * Returns model uniform-scale multiplier.
+     */
+    [[nodiscard]] virtual float GetUniformScale() const;
 
-        // 0x70
-        bool          isBeingBuilt;
-        std::uint8_t  pad_0071_0074[0x74 - 0x71]{};
+    /**
+     * Address: 0x008B8510 (FUN_008B8510, ?GetCommandQueue@UserEntity@Moho@@UBEPBVUserCommandQueue@2@XZ)
+     *
+     * What it does:
+     * Returns read-only command queue for this entity.
+     */
+    [[nodiscard]] virtual const UserCommandQueue* GetCommandQueue() const;
 
-        // 0x74..0x8F
-        Vector4f      rot1;                               // current rotation
-        Vector3f      pos1;                               // current position
+    /**
+     * Address: 0x008B84F0 (FUN_008B84F0, ?GetCommandQueue@UserEntity@Moho@@UAEPAVUserCommandQueue@2@XZ)
+     *
+     * What it does:
+     * Returns mutable command queue for this entity.
+     */
+    [[nodiscard]] virtual UserCommandQueue* GetCommandQueue();
 
-        // 0x90..0xAF
-        Vector4f      rot2;                               // previous rotation
-        Vector4f      pos2;                               // previous position as v4 (SIMD-friendly)
+    /**
+     * Address: 0x008B8520 (FUN_008B8520, ?GetFactoryCommandQueue@UserEntity@Moho@@UBEPBVUserCommandQueue@2@XZ)
+     *
+     * What it does:
+     * Returns read-only factory command queue for this entity.
+     */
+    [[nodiscard]] virtual const UserCommandQueue* GetFactoryCommandQueue() const;
 
-        // 0xB0
-        float         fractionComplete;                   // build progress of this entity (0..1)
+    /**
+     * Address: 0x008B8500 (FUN_008B8500, ?GetFactoryCommandQueue@UserEntity@Moho@@UAEPAVUserCommandQueue@2@XZ)
+     *
+     * What it does:
+     * Returns mutable factory command queue for this entity.
+     */
+    [[nodiscard]] virtual UserCommandQueue* GetFactoryCommandQueue();
 
-        // 0xB4..0xCF — scratch / normalization / proxy scalars
-        std::uint8_t  pad_00B4_00D0[0xD0 - 0xB4]{};
+    /**
+     * Address: 0x008B8EB0 (FUN_008B8EB0, ?UpdateEntityData@UserEntity@Moho@@UAEXABUSSTIEntityVariableData@2@@Z)
+     *
+     * What it does:
+     * Applies replicated variable snapshot data to the user-entity.
+     */
+    virtual void UpdateEntityData(const SSTIEntityVariableData& variableData) = 0;
 
-        // 0xD0..0xDF — rectangle or extra floats (observed comment from guys)
-        float         rect_x1{ 0 }, rect_y1{ 0 }, rect_x2{ 0 }, rect_y2{ 0 };
+    /**
+     * Address: 0x008B9580 (FUN_008B9580, ?UpdateVisibility@UserEntity@Moho@@UAEXXZ)
+     *
+     * What it does:
+     * Updates render visibility state against active intel/view rules.
+     */
+    virtual void UpdateVisibility();
 
-        // 0xE0..0xFF — more scratch
-        std::uint8_t  pad_00E0_0100[0x100 - 0xE0]{};
+    /**
+     * Address: 0x008B8530 (FUN_008B8530, ?RequiresUIRefresh@UserEntity@Moho@@UBE_NXZ)
+     *
+     * What it does:
+     * Returns whether UI refresh is requested by replicated state.
+     */
+    [[nodiscard]] virtual bool RequiresUIRefresh() const;
 
-        // 0x100..0x11F
-        class UnitIntel     unitIntel;                          // replicated intel/visibility for UI
+    /**
+     * Address: 0x008B8540 (FUN_008B8540, ?IsSelectable@UserEntity@Moho@@UBE_NXZ)
+     *
+     * What it does:
+     * Returns whether this entity belongs to the SELECTABLE category.
+     */
+    [[nodiscard]] virtual bool IsSelectable() const;
 
-        // 0x120
-        class UserArmy* owner;                              // resolved army pointer
+    /**
+     * Address: 0x008B85C0 (FUN_008B85C0, ?IsBeingBuilt@UserEntity@Moho@@UBE_NXZ)
+     *
+     * What it does:
+     * Returns replicated "being built" state.
+     */
+    [[nodiscard]] virtual bool IsBeingBuilt() const;
 
-        // 0x124..0x143 — extra transforms for FX / smoothing
-        Vector4f      rot3;                               // working rotation for FX
-        Vector4f      pos3;                               // working position for FX
+    /**
+     * Address: 0x008B85D0 (FUN_008B85D0, ?NotifyFocusArmyUnitDamaged@UserEntity@Moho@@UAEXXZ)
+     *
+     * What it does:
+     * Hook fired when focused army unit damage is detected.
+     */
+    virtual void NotifyFocusArmyUnitDamaged();
 
-        // 0x144..0x147 — tiny flags / alignment tail
-        std::uint8_t  pad_0144_0148[0x148 - 0x144]{};
-	};
-}
+    /**
+     * Address: 0x008B88D0 (FUN_008B88D0, ?CreateMeshInstance@UserEntity@Moho@@MAEX_N@Z)
+     *
+     * What it does:
+     * Creates/initializes render mesh instance and animation pose chain.
+     */
+    virtual void CreateMeshInstance(bool forUnitPose);
+
+    /**
+     * Address: 0x008B8B10 (FUN_008B8B10, ?DestroyMeshInstance@UserEntity@Moho@@MAEXXZ)
+     *
+     * What it does:
+     * Releases mesh instance and animation pose resources.
+     */
+    virtual void DestroyMeshInstance();
+
+    /**
+     * Address: 0x008B97C0 (FUN_008B97C0,
+     * ?IsInCategory@UserEntity@Moho@@QBE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     *
+     * What it does:
+     * Resolves category bitset and tests membership for this entity category id.
+     */
+    [[nodiscard]] bool IsInCategory(const msvc8::string& category) const;
+
+    /**
+     * Address: 0x008B8CF0 (FUN_008B8CF0, ?GetInterpolatedTransform@UserEntity@Moho@@QBE?AVVTransform@2@M@Z)
+     *
+     * What it does:
+     * Updates cached interpolated transform for `interpolationAlpha` and
+     * returns the cached transform by value.
+     */
+    [[nodiscard]] VTransform GetInterpolatedTransform(float interpolationAlpha) const;
+
+  public:
+    void* mWeakObjectRuntimeHead;               // 0x04
+    UserEntityLinkNode* mIUnitChainHead;        // 0x08
+    CWldSession* mSession;                      // 0x0C
+    UserEntitySpatialDbEntry mSpatialDbEntry;   // 0x10
+    UserEntityAuxHandle* mAuxRuntimeHandle;     // 0x18
+    boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
+    boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24
+    MeshInstance* mMeshInstance;                // 0x2C
+    UserEntityLinkNode* mRuntimeLinkHead;       // 0x30
+    std::int32_t mRuntimeSelectionToken;        // 0x34
+    CSndParams* mCachedAmbientSound;            // 0x38
+    void* mRumbleSoundBinding;                  // 0x3C
+    std::int32_t mLastFocusDamageGameTick;      // 0x40
+    SCreateEntityParams mParams;                // 0x44
+    SSTIEntityVariableData mVariableData;       // 0x50
+    std::uint8_t pad_00FC_0120[0x24]{};
+    UserArmy* mArmy;                // 0x120
+    VTransform mTransform;          // 0x124
+    float mLastInterpAmt;           // 0x140
+    std::uint8_t mHasInitialUpdate; // 0x144
+    std::uint8_t mHasRuntimePose;   // 0x145
+    std::uint8_t pad_0146_0147[0x02]{};
+  };
+
+#if defined(MOHO_STRICT_LAYOUT_ASSERTS)
+  static_assert(sizeof(UserEntity) == 0x148, "UserEntity size must be 0x148");
+  static_assert(offsetof(UserEntity, mSession) == 0x0C, "UserEntity::mSession offset must be 0x0C");
+  static_assert(offsetof(UserEntity, mIUnitChainHead) == 0x08, "UserEntity::mIUnitChainHead offset must be 0x08");
+  static_assert(offsetof(UserEntity, mSpatialDbEntry) == 0x10, "UserEntity::mSpatialDbEntry offset must be 0x10");
+  static_assert(offsetof(UserEntity, mAuxRuntimeHandle) == 0x18, "UserEntity::mAuxRuntimeHandle offset must be 0x18");
+  static_assert(offsetof(UserEntity, mPosePrimary) == 0x1C, "UserEntity::mPosePrimary offset must be 0x1C");
+  static_assert(offsetof(UserEntity, mPoseSecondary) == 0x24, "UserEntity::mPoseSecondary offset must be 0x24");
+  static_assert(offsetof(UserEntity, mMeshInstance) == 0x2C, "UserEntity::mMeshInstance offset must be 0x2C");
+  static_assert(offsetof(UserEntity, mRuntimeLinkHead) == 0x30, "UserEntity::mRuntimeLinkHead offset must be 0x30");
+  static_assert(
+    offsetof(UserEntity, mRuntimeSelectionToken) == 0x34, "UserEntity::mRuntimeSelectionToken offset must be 0x34"
+  );
+  static_assert(
+    offsetof(UserEntity, mRumbleSoundBinding) == 0x3C, "UserEntity::mRumbleSoundBinding offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(UserEntity, mLastFocusDamageGameTick) == 0x40, "UserEntity::mLastFocusDamageGameTick offset must be 0x40"
+  );
+  static_assert(offsetof(UserEntity, mParams) == 0x44, "UserEntity::mParams offset must be 0x44");
+  static_assert(offsetof(UserEntity, mVariableData) == 0x50, "UserEntity::mVariableData offset must be 0x50");
+  static_assert(offsetof(UserEntity, mArmy) == 0x120, "UserEntity::mArmy offset must be 0x120");
+  static_assert(offsetof(UserEntity, mTransform) == 0x124, "UserEntity::mTransform offset must be 0x124");
+  static_assert(offsetof(UserEntity, mLastInterpAmt) == 0x140, "UserEntity::mLastInterpAmt offset must be 0x140");
+  static_assert(offsetof(UserEntity, mHasInitialUpdate) == 0x144, "UserEntity::mHasInitialUpdate offset must be 0x144");
+  static_assert(offsetof(UserEntity, mHasRuntimePose) == 0x145, "UserEntity::mHasRuntimePose offset must be 0x145");
+#endif
+} // namespace moho

@@ -9,6 +9,9 @@ namespace msvc8
 }
 
 namespace gpg {
+	class RType;
+	class RRef;
+
     /**
      * VFTABLE: 0x00D48DDC
      * COL:  0x00E53B98
@@ -125,6 +128,15 @@ namespace gpg {
          * Demangled: _purecall
          */
         virtual void WriteMarker(int) = 0;
+
+		/**
+		 * Address: 0x00953CA0
+		 * Demangled: public: void __thiscall gpg::WriteArchive::Write(class gpg::RType const *,void const *,class gpg::RRef const &)
+		 *
+		 * What it does:
+		 * Writes a typed object payload using reflection serializer callbacks.
+		 */
+		void Write(const gpg::RType* type, const void* object, const gpg::RRef& ownerRef);
 
     public:
         std::map<void*, void*> mMap1;

@@ -30,6 +30,6 @@ namespace gpg::gal
         /**0x00948190
          * Embedded VC8-like tree sentinel + clear-on-destruction.
          */
-        msvc8::tree::EmbeddedTree<> tree_;
+        msvc8::EmbeddedTree<> tree_;
     };
 }

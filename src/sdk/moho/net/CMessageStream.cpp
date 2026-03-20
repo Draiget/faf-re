@@ -1,137 +1,182 @@
 #include "CMessageStream.h"
 
+#include <cstddef>
+#include <cstring>
+#include <stdexcept>
+
 #include "CMessage.h"
 using namespace moho;
 
+namespace
+{
+  constexpr std::size_t kHeaderSize = 3;
+}
+
+/**
+ * Address: 0x0047C030 (FUN_0047C030)
+ * Address: 0x10076630 (sub_10076630)
+ *
+ * What it does:
+ * Destroys stream wrapper; backing message remains owned externally.
+ */
 CMessageStream::~CMessageStream() = default;
 
-size_t CMessageStream::VirtTell(Mode mode) {
-	throw UnsupportedOperation();
-}
-
-size_t CMessageStream::VirtSeek(Mode mode, SeekOrigin orig, size_t pos) {
-	throw UnsupportedOperation();
-}
-
-size_t CMessageStream::VirtRead(char* buff, size_t len) {
-    if (len > CanRead()) {
-        len = CanRead();
-    }
-    memcpy(buff, mReadHead, len);
-    mReadHead += len;
-    return len;
-}
-
-size_t CMessageStream::VirtReadNonBlocking(char* buf, const size_t len) {
-    if (!buf || len == 0) {
-        return 0;
-    }
-    return VirtRead(buf, len);
-}
-
-void CMessageStream::VirtUnGetByte(int i) {
-	throw UnsupportedOperation();
-}
-
-bool CMessageStream::VirtAtEnd() {
-    return !CanRead();
-}
-
-void CMessageStream::VirtWrite(const char* data, const size_t size) {
-    if (!mWriteStart) {
-        throw std::logic_error("Can't write to a read-only message.");
-    }
-    if (!data || size == 0) {
-	    return;
-    }
-
-    // In-place write within current window
-    const size_t windowLeft = static_cast<size_t>(mWriteEnd - mWriteHead);
-    const size_t inPlace = std::min(windowLeft, size);
-    if (inPlace) {
-        std::memcpy(mWriteHead, data, inPlace);
-        mWriteHead += inPlace;
-    }
-
-    // Overflow => append + rebind
-    const size_t overflow = size - inPlace;
-    if (overflow == 0) {
-	    return;
-    }
-
-    // preserve offsets
-    const size_t readOff = static_cast<size_t>(mReadHead - mReadStart);
-    const size_t writeOff = static_cast<size_t>(mWriteHead - mWriteStart);
-
-    // Append remainder to message (original signature uses (char*, int))
-    // Assumes Append updates header size and possibly reallocates mBuf
-    msg_->Append(data + inPlace, static_cast<int>(overflow));
-
-    // Rebind to the (possibly) new buffer; write head gets +overflow
-    RebindToMessagePreserve(readOff, writeOff + overflow);
-}
-
-CMessageStream::CMessageStream(CMessage& msg, const Access access) :
-	Stream(),
-	msg_(&msg)
+/**
+ * Address: 0x0047C0F0 (FUN_0047C0F0)
+ * Address: 0x100766F0 (sub_100766F0)
+ *
+ * What it does:
+ * Copies at most `len` bytes from read window and advances `mReadHead`.
+ */
+size_t CMessageStream::VirtRead(char* buff, size_t len)
 {
-    auto [start, end] = PayloadWindow(*msg_);
+  const size_t readable = static_cast<size_t>(mReadEnd - mReadHead);
+  if (len > readable) {
+    len = readable;
+  }
 
-    mReadStart = start;
-    mReadHead = start;
-    mReadEnd = end;
-
-    if (access == Access::kReadWrite) {
-        mWriteStart = start;
-        mWriteHead = start;
-        mWriteEnd = end;
-    }
+  std::memcpy(buff, mReadHead, len);
+  mReadHead += len;
+  return len;
 }
 
-CMessageStream::CMessageStream(CMessage* msg, const Access access) :
-	Stream(),
-	msg_(msg)
+/**
+ * Address: 0x0047C120 (FUN_0047C120)
+ * Address: 0x10076720 (sub_10076720)
+ *
+ * What it does:
+ * Returns whether stream read cursor reached payload end.
+ */
+bool CMessageStream::VirtAtEnd()
 {
-    auto [start, end] = PayloadWindow(*msg_);
-
-    mReadStart = start;
-    mReadHead = start;
-    mReadEnd = end;
-
-    if (access == Access::kReadWrite) {
-        mWriteStart = start;
-        mWriteHead = start;
-        mWriteEnd = end;
-    }
+  return mReadHead == mReadEnd;
 }
 
-std::pair<char*, char*> CMessageStream::PayloadWindow(CMessage& m) noexcept {
-    // base pointer to entire message buffer
-    // safe even for SBO: &mBuf[0] is contiguous storage
-    char* base = &m.mBuff[0];
+/**
+ * Address: 0x0047C130 (FUN_0047C130)
+ * Address: 0x10076730 (sub_10076730)
+ *
+ * What it does:
+ * Writes into payload window, appends overflow into message buffer, then rebinds pointers.
+ */
+void CMessageStream::VirtWrite(const char* data, const size_t size)
+{
+  if (mWriteStart == nullptr) {
+    throw std::logic_error("Can't write to a read-only message.");
+  }
 
-    // total size from header (LE), consistent with your GetSize()
-    const unsigned total = m.GetSize();
-    const unsigned payload = (total >= 3u) ? (total - 3u) : 0u;
+  size_t writeSize = static_cast<size_t>(mWriteEnd - mWriteHead);
+  if (writeSize > size) {
+    writeSize = size;
+  }
 
-    char* beg = base + 3;
-    char* end = beg + payload;
-    return { beg, end };
+  if (writeSize != 0) {
+    std::memcpy(mWriteHead, data, writeSize);
+    mWriteHead += writeSize;
+  }
+
+  const size_t overflowSize = size - writeSize;
+  if (overflowSize == 0) {
+    return;
+  }
+
+  const std::ptrdiff_t readOffset = mReadHead - mReadStart;
+  const std::ptrdiff_t writeOffset = mWriteHead - mWriteStart;
+
+  mMessage->Append(data + writeSize, overflowSize);
+  RebindToPayloadUnchecked(readOffset, writeOffset + static_cast<std::ptrdiff_t>(overflowSize));
 }
 
-void CMessageStream::RebindToMessagePreserve(const size_t readOff, const size_t writeOffPlus) noexcept {
-    auto [beg, end] = PayloadWindow(*msg_);
+/**
+ * Address: 0x0047BFE0 (FUN_0047BFE0)
+ * Address: 0x100765E0 (sub_100765E0)
+ *
+ * What it does:
+ * Constructs a read/write stream over message payload bytes.
+ */
+CMessageStream::CMessageStream(CMessage& msg)
+  : Stream()
+  , mMessage(&msg)
+{
+  auto [begin, end] = PayloadWindow(*mMessage);
 
-    mReadStart = beg;
-    mWriteStart = beg;
-    mReadEnd = end;
-    mWriteEnd = end;
+  mReadStart = begin;
+  mReadHead = begin;
+  mReadEnd = end;
+  mWriteStart = begin;
+  mWriteHead = begin;
+  mWriteEnd = end;
+}
 
-    // clamp offsets to bounds defensively
-    const size_t payloadSize = static_cast<size_t>(end - beg);
-    const size_t clampedRead = std::min(readOff, payloadSize);
-    const size_t clampedWrite = std::min(writeOffPlus, payloadSize);
+/**
+ * Address: 0x0047C060 (FUN_0047C060)
+ * Address: 0x10076660 (sub_10076660)
+ *
+ * What it does:
+ * Constructs a read-only stream over message payload bytes.
+ */
+CMessageStream::CMessageStream(CMessage* msg)
+  : Stream()
+  , mMessage(msg)
+{
+  auto [begin, end] = PayloadWindow(*mMessage);
 
-    mReadHead = beg + clampedRead;
-    mWriteHead = beg + clampedWrite;
+  mReadStart = begin;
+  mReadHead = begin;
+  mReadEnd = end;
+  mWriteStart = nullptr;
+  mWriteHead = nullptr;
+  mWriteEnd = nullptr;
+}
+
+/**
+ * Address: <synthetic host-build helper>
+ *
+ * What it does:
+ * Optional access-mode wrapper over the binary read/write ctor.
+ */
+CMessageStream::CMessageStream(CMessage& msg, const Access access)
+  : CMessageStream(msg)
+{
+  if (access == Access::kReadOnly) {
+    mWriteStart = nullptr;
+    mWriteHead = nullptr;
+    mWriteEnd = nullptr;
+  }
+}
+
+/**
+ * Address: <synthetic host-build helper>
+ *
+ * What it does:
+ * Optional access-mode wrapper over the binary read-only ctor.
+ */
+CMessageStream::CMessageStream(CMessage* msg, const Access access)
+  : CMessageStream(msg)
+{
+  if (access == Access::kReadWrite) {
+    mWriteStart = mReadStart;
+    mWriteHead = mReadStart;
+    mWriteEnd = mReadEnd;
+  }
+}
+
+std::pair<char*, char*> CMessageStream::PayloadWindow(CMessage& m) noexcept
+{
+  char* const payloadBegin = m.mBuff.start_ + kHeaderSize;
+  const std::size_t messageSize = m.GetSize();
+  const std::size_t payloadSize = (messageSize >= kHeaderSize) ? (messageSize - kHeaderSize) : 0;
+  return {payloadBegin, payloadBegin + payloadSize};
+}
+
+void CMessageStream::RebindToPayloadUnchecked(const std::ptrdiff_t readOff, const std::ptrdiff_t writeOffPlus) noexcept
+{
+  auto [begin, end] = PayloadWindow(*mMessage);
+
+  mReadHead = begin + readOff;
+  mReadStart = begin;
+  mWriteStart = begin;
+  mReadEnd = end;
+  mWriteHead = begin + writeOffPlus;
+  mWriteEnd = end;
 }

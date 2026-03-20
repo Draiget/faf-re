@@ -2,9 +2,13 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace moho { class ETaskStatus; } // forward decl
+namespace moho
+{
+  class ETaskStatus;
+} // namespace moho
 
-namespace moho {
+namespace moho
+{
   /**
    * VFTABLE: 0x00E1B3AC
    * COL:  0x00E70540
@@ -15,9 +19,9 @@ namespace moho {
     /**
      * Address: 0x005990F0
      * Slot: 0
-     * Demangled: sub_5990F0
+     * Demangled: (likely scalar deleting destructor thunk)
      */
-    virtual void sub_5990F0() = 0;
+    virtual ~IAiCommandDispatchImpl() = default;
 
     /**
      * Address: 0x00598E80

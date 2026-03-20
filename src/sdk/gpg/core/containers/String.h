@@ -8,7 +8,7 @@ namespace gpg
 	using StrArg = const char*;
 	using WStrArg = const wchar_t*;
 
-	static msvc8::string sWhitespaceChars{ " \n\t\r" }; // 0x00F32308
+	extern msvc8::string sWhitespaceChars; // 0x00F32308
 
 	int STR_Utf8ByteOffset(StrArg str, int pos); // 0x009380A0
 	int STR_Utf8Len(char const*); // 0x00938070

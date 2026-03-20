@@ -107,6 +107,8 @@ namespace gpg
         char mBuff[1024]{};
         bool mEnded{ false };
         bool mClosed{ false };
-
     };
-} // namespace gpg
+
+    // 0x00486067
+    static_assert(sizeof(ZLibOutputFilterStream) == 0x460, "ZLibOutputFilterStream size must be 0x460");
+}

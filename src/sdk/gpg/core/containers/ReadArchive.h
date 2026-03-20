@@ -8,6 +8,9 @@ namespace msvc8
 }
 
 namespace gpg {
+	class RType;
+	class RRef;
+
     /**
      * VFTABLE: 0x00D48D14
      * COL:  0x00E53B84
@@ -116,5 +119,14 @@ namespace gpg {
          * Demangled: _purecall
          */
         virtual int NextMarker() = 0;
+
+		/**
+		 * Address: 0x00953DA0
+		 * Demangled: public: void __thiscall gpg::ReadArchive::Read(class gpg::RType const *,void *,class gpg::RRef const &)
+		 *
+		 * What it does:
+		 * Reads a typed object payload using reflection serializer callbacks.
+		 */
+		void Read(const gpg::RType* type, void* object, const gpg::RRef& ownerRef);
     };
 } // namespace gpg
