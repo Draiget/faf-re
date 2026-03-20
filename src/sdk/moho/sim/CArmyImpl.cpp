@@ -264,15 +264,12 @@ namespace
     set.mVec.ResetStorageToInline();
 
     if (set.mNext != nullptr && set.mPrev != nullptr) {
-      auto* const next = reinterpret_cast<IntrusiveListNode*>(set.mNext);
-      auto* const prev = reinterpret_cast<IntrusiveListNode*>(set.mPrev);
-      next->prev = prev;
-      prev->next = next;
+      set.ListUnlink();
+      return;
     }
 
-    auto* const self = reinterpret_cast<IntrusiveListNode*>(&set);
-    self->next = self;
-    self->prev = self;
+    set.mNext = &set;
+    set.mPrev = &set;
   }
 
   void DestroyArmyCategorySets(moho::CArmyImpl& army)

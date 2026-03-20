@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "../../gpg/core/containers/FastVector.h"
+#include "moho/containers/TDatList.h"
 
 namespace moho
 {
@@ -17,12 +18,10 @@ namespace moho
    * - 0x00700E70 (FUN_00700E70)
    *
    * What it does:
-   * Per-category unit/entity set with intrusive links and sorted inline-vector storage.
+   * Per-category unit/entity set with intrusive links (TDatList base) and sorted inline-vector storage.
    */
-  struct SEntitySetTemplateUnit
+  struct SEntitySetTemplateUnit : TDatList<SEntitySetTemplateUnit, void>
   {
-    void* mNext;                        // +0x00
-    void* mPrev;                        // +0x04
     gpg::fastvector_n<Entity*, 4> mVec; // +0x08
   };
 

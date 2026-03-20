@@ -826,7 +826,6 @@
     <ClInclude Include="moho\misc\CountedObject.h" />
     <ClInclude Include="moho\misc\CVirtualFileSystem.h" />
     <ClInclude Include="moho\misc\IConOutputHandler.h" />
-    <ClInclude Include="moho\misc\IntrusiveListNode.h" />
     <ClInclude Include="moho\misc\InstanceCounter.h" />
     <ClInclude Include="moho\misc\RangeExtractor.h" />
     <ClInclude Include="moho\misc\BVSetRTypeclass_Moho_RBlueprint_const_near_struct_Moho_EntityCategoryHelper.h" />

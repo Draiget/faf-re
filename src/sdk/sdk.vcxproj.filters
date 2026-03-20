@@ -1094,9 +1094,6 @@
     <ClInclude Include="moho\misc\InstanceCounter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\misc\IntrusiveListNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\math\Vector3f.h">
       <Filter>Header Files</Filter>
     </ClInclude>
