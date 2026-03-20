@@ -13,12 +13,14 @@
 #include <initializer_list>
 #include <limits>
 #include <new>
+#include <string>
 #include <typeinfo>
 #include <vector>
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/containers/Map.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
@@ -73,7 +75,7 @@ namespace
 {
   constexpr CommandSourceId kInvalidCommandSource = 0xFF;
   constexpr std::uintptr_t kReleaseCommandIdEa = 0x006E0EC0u;
-  constexpr std::uintptr_t kLegacyTryParseSimCommandEa = 0x00734870u;
+  constexpr std::uintptr_t kSimConRegistryEa = 0x010A63DCu;
 
   void CopySyncMaskBlock(SSyncFilterMaskBlock& dst, const SSyncFilterMaskBlock& src)
   {
@@ -221,7 +223,232 @@ namespace
     set.mVec.PushBack(entity);
   }
 
-  void InvokeLegacyTryParseSimCommand(
+  class CSimConCommandView
+  {
+  public:
+    /**
+     * Address: 0x00A82547 (_purecall in base CSimConCommand vtable)
+     *
+     * IDA signature:
+     * int __thiscall Moho::CSimConCommand::Run(
+     *   Moho::Sim *sim,
+     *   std::vector<std::string> *commandArgs,
+     *   Wm3::Vector3<float> *worldPos,
+     *   Moho::CArmyImpl *focusArmy,
+     *   Moho::SEntitySetTemplateUnit *selectedUnits);
+     *
+     * What it does:
+     * Executes one parsed sim-console command payload.
+     */
+    virtual int Run(
+      Sim* sim,
+      std::vector<std::string>* commandArgs,
+      Wm3::Vector3<float>* worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit* selectedUnits
+    ) = 0;
+
+    /**
+     * Address: 0x005BE350 (FUN_005BE350, sub_5BE350)
+     *
+     * What it does:
+     * Base identity virtual for CSimConCommand-family objects.
+     */
+    virtual CSimConCommandView* Identity() = 0;
+
+    const char* mName;           // 0x04
+    std::uint8_t mRequiresCheat; // 0x08
+    std::uint8_t mPad09[3];      // 0x09
+  };
+
+  static_assert(sizeof(CSimConCommandView) == 0x0C, "CSimConCommandView size must be 0x0C");
+  static_assert(offsetof(CSimConCommandView, mName) == 0x04, "CSimConCommandView::mName offset must be 0x04");
+  static_assert(
+    offsetof(CSimConCommandView, mRequiresCheat) == 0x08, "CSimConCommandView::mRequiresCheat offset must be 0x08"
+  );
+
+  struct SimConCommandNameLess
+  {
+    [[nodiscard]]
+    bool operator()(const std::string& lhs, const std::string& rhs) const noexcept
+    {
+      return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
+    }
+  };
+
+  using SimConCommandRegistry = msvc8::map<std::string, CSimConCommandView*, SimConCommandNameLess>;
+
+  SimConCommandRegistry* GetSimConCommandRegistry()
+  {
+    auto registrySlot = reinterpret_cast<SimConCommandRegistry**>(kSimConRegistryEa);
+    return registrySlot != nullptr ? *registrySlot : nullptr;
+  }
+
+  CSimConCommandView* FindSimConCommand(const std::string& commandName)
+  {
+    if (commandName.empty()) {
+      return nullptr;
+    }
+
+    SimConCommandRegistry* registry = GetSimConCommandRegistry();
+    if (!registry || !registry->header_ptr()) {
+      return nullptr;
+    }
+
+    const auto it = registry->find(commandName);
+    if (it == registry->end()) {
+      return nullptr;
+    }
+
+    return it->second;
+  }
+
+  [[nodiscard]]
+  bool IsSimCommandWhitespace(const char ch) noexcept
+  {
+    return std::isspace(static_cast<unsigned char>(ch)) != 0;
+  }
+
+  enum class SimCommandTerminator
+  {
+    None,
+    NextCommand,
+    Comment,
+  };
+
+  void ParseOneSimCommand(const std::string& input, std::vector<std::string>& outTokens, std::string& outRemainder)
+  {
+    outTokens.clear();
+    outRemainder.clear();
+
+    std::string token;
+    token.reserve(input.size());
+
+    bool inQuotes = false;
+    bool escaping = false;
+    SimCommandTerminator terminator = SimCommandTerminator::None;
+    std::size_t splitIndex = input.size();
+
+    for (std::size_t i = 0; i < input.size(); ++i) {
+      const char ch = input[i];
+
+      if (escaping) {
+        token.push_back(ch);
+        escaping = false;
+        continue;
+      }
+
+      if (inQuotes && ch == '\\') {
+        escaping = true;
+        continue;
+      }
+
+      if (ch == '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (!inQuotes && ch == ';') {
+        terminator = SimCommandTerminator::NextCommand;
+        splitIndex = i;
+        break;
+      }
+
+      if (!inQuotes && ch == '#') {
+        terminator = SimCommandTerminator::Comment;
+        splitIndex = i;
+        break;
+      }
+
+      if (!inQuotes && IsSimCommandWhitespace(ch)) {
+        if (!token.empty()) {
+          outTokens.push_back(token);
+          token.clear();
+        }
+        continue;
+      }
+
+      token.push_back(ch);
+    }
+
+    if (escaping) {
+      token.push_back('\\');
+    }
+
+    if (!token.empty()) {
+      outTokens.push_back(token);
+    }
+
+    if (terminator == SimCommandTerminator::NextCommand && splitIndex + 1u <= input.size()) {
+      outRemainder.assign(input, splitIndex + 1u, std::string::npos);
+      return;
+    }
+
+    outRemainder.clear();
+  }
+
+  [[nodiscard]]
+  bool SimCommandTokenNeedsQuotes(const std::string& token)
+  {
+    if (token.empty()) {
+      return true;
+    }
+
+    for (const char ch : token) {
+      if (IsSimCommandWhitespace(ch) || ch == ';' || ch == '#') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  [[nodiscard]]
+  std::string UnparseSimCommand(const std::vector<std::string>& tokens)
+  {
+    std::string text;
+
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+      if (i != 0u) {
+        text.push_back(' ');
+      }
+
+      const std::string& token = tokens[i];
+      if (!SimCommandTokenNeedsQuotes(token)) {
+        text.append(token);
+        continue;
+      }
+
+      text.push_back('"');
+      for (const char ch : token) {
+        if (ch == '\\' || ch == '"') {
+          text.push_back('\\');
+        }
+        text.push_back(ch);
+      }
+      text.push_back('"');
+    }
+
+    return text;
+  }
+
+  /**
+   * Address: 0x00734870 (FUN_00734870, func_TryParseSimCommand)
+   *
+   * IDA signature:
+   * void __cdecl func_TryParseSimCommand(
+   *   Moho::Sim *sim,
+   *   char *commandText,
+   *   Wm3::Vector3<float> *worldPos,
+   *   Moho::CArmyImpl *focusArmy,
+   *   Moho::SEntitySetTemplateUnit *selectedUnits);
+   *
+   * What it does:
+   * Parses one or more sim debug command segments, resolves each segment through
+   * the global `simcons` registry, applies cheat gating, and dispatches through
+   * CSimConCommand virtual handlers.
+   */
+  void TryParseSimCommand(
     Sim* sim,
     const char* command,
     const Wm3::Vector3<float>& worldPos,
@@ -229,16 +456,51 @@ namespace
     SEntitySetTemplateUnit& selectedUnits
   )
   {
-    // Parser core at 0x00734870 remains unrecovered in native C++.
-    using Fn = void(__cdecl*)(Sim*, char*, Wm3::Vector3<float>*, CArmyImpl*, SEntitySetTemplateUnit*);
-    const auto fn = reinterpret_cast<Fn>(kLegacyTryParseSimCommandEa);
-    fn(
-      sim,
-      const_cast<char*>(command ? command : ""),
-      const_cast<Wm3::Vector3<float>*>(&worldPos),
-      focusArmy,
-      &selectedUnits
-    );
+    if (!sim) {
+      return;
+    }
+
+    const char* const rawCommandText = command ? command : "";
+    std::string remaining = rawCommandText;
+    Wm3::Vector3<float>* const mutableWorldPos = const_cast<Wm3::Vector3<float>*>(&worldPos);
+
+    while (!remaining.empty()) {
+      std::vector<std::string> parsedCommand;
+      std::string nextCommandChain;
+      ParseOneSimCommand(remaining, parsedCommand, nextCommandChain);
+
+      if (!parsedCommand.empty()) {
+        CSimConCommandView* const simCommand = FindSimConCommand(parsedCommand.front());
+        if (!simCommand) {
+          sim->Printf(
+            "Unknown sim command '%s' [invoked by %s]", parsedCommand.front().c_str(), sim->GetCurrentCommandSourceName()
+          );
+        } else {
+          const bool requiresCheat = simCommand->mRequiresCheat != 0;
+          if (requiresCheat && !sim->CheatsEnabled()) {
+            return;
+          }
+
+          if (requiresCheat) {
+            const std::string commandText = UnparseSimCommand(parsedCommand);
+            sim->Printf("%s: %s", sim->GetCurrentCommandSourceName(), commandText.c_str());
+          }
+
+          try {
+            (void)simCommand->Run(sim, &parsedCommand, mutableWorldPos, focusArmy, &selectedUnits);
+          } catch (const std::exception& ex) {
+            const char* const errorText = ex.what() ? ex.what() : "<unknown>";
+            gpg::Warnf("error running sim console command %s: %s", rawCommandText, errorText);
+
+            if (!requiresCheat) {
+              sim->Printf("error running sim console command %s: %s", rawCommandText, errorText);
+            }
+          }
+        }
+      }
+
+      remaining = nextCommandChain;
+    }
   }
 
   void ReleaseCommandIdIfUnconsumed(CCommandDb* commandDb, const CmdId cmdId)
@@ -2033,8 +2295,8 @@ void Sim::ExecuteDebugCommand(
     focusArmyPtr = mArmiesList[focusArmy];
   }
 
-  // Parser body 0x00734870 is still called through legacy gateway; native C++ recovery is in progress.
-  InvokeLegacyTryParseSimCommand(this, command, worldPos, focusArmyPtr, selectedUnits);
+  // 0x00734870 parser chain is now lifted in native C++ via TryParseSimCommand().
+  TryParseSimCommand(this, command, worldPos, focusArmyPtr, selectedUnits);
   DestroySimDebugEntitySet(selectedUnits);
 }
 
