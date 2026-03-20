@@ -73,7 +73,7 @@ namespace
 {
   constexpr CommandSourceId kInvalidCommandSource = 0xFF;
   constexpr std::uintptr_t kReleaseCommandIdEa = 0x006E0EC0u;
-  constexpr std::uintptr_t kTryParseSimCommandEa = 0x00734870u;
+  constexpr std::uintptr_t kLegacyTryParseSimCommandEa = 0x00734870u;
 
   void CopySyncMaskBlock(SSyncFilterMaskBlock& dst, const SSyncFilterMaskBlock& src)
   {
@@ -177,41 +177,32 @@ namespace
     return nullptr;
   }
 
-  struct IntrusiveSetNode
-  {
-    IntrusiveSetNode* mNext;
-    IntrusiveSetNode* mPrev;
-  };
+  static_assert(sizeof(SEntitySetTemplateUnit) == 0x28, "SEntitySetTemplateUnit size must be 0x28");
+  static_assert(
+    sizeof(TDatList<SEntitySetTemplateUnit, void>) == 0x08, "SEntitySetTemplateUnit link-node size must be 0x08"
+  );
 
-  static_assert(sizeof(IntrusiveSetNode) == 0x08, "IntrusiveSetNode size must be 0x08");
-
-  using SimDebugEntitySet = SEntitySetTemplateUnit;
-
-  static_assert(sizeof(SimDebugEntitySet) == 0x28, "SimDebugEntitySet size must be 0x28");
-
-  void InitSimDebugEntitySet(SimDebugEntitySet& outSet)
+  void InitSimDebugEntitySet(SEntitySetTemplateUnit& outSet)
   {
     outSet.mNext = &outSet;
     outSet.mPrev = &outSet;
     outSet.mVec.RebindInlineNoFree();
   }
 
-  void DestroySimDebugEntitySet(SimDebugEntitySet& set)
+  void DestroySimDebugEntitySet(SEntitySetTemplateUnit& set)
   {
     set.mVec.ResetStorageToInline();
 
-    auto* const next = static_cast<IntrusiveSetNode*>(set.mNext);
-    auto* const prev = static_cast<IntrusiveSetNode*>(set.mPrev);
-    if (next != nullptr && prev != nullptr) {
-      next->mPrev = prev;
-      prev->mNext = next;
+    if (set.mNext != nullptr && set.mPrev != nullptr) {
+      set.ListUnlink();
+      return;
     }
 
     set.mNext = &set;
     set.mPrev = &set;
   }
 
-  bool ContainsEntity(const SimDebugEntitySet& set, Entity* entity)
+  bool ContainsEntity(const SEntitySetTemplateUnit& set, Entity* entity)
   {
     for (Entity* const* it = set.mVec.begin(); it != set.mVec.end(); ++it) {
       if (*it == entity) {
@@ -222,7 +213,7 @@ namespace
     return false;
   }
 
-  void AppendUniqueEntity(SimDebugEntitySet& set, Entity* entity)
+  void AppendUniqueEntity(SEntitySetTemplateUnit& set, Entity* entity)
   {
     if (!entity || ContainsEntity(set, entity)) {
       return;
@@ -230,22 +221,23 @@ namespace
     set.mVec.PushBack(entity);
   }
 
-  void TryParseSimCommand(
+  void InvokeLegacyTryParseSimCommand(
     Sim* sim,
     const char* command,
     const Wm3::Vector3<float>& worldPos,
     CArmyImpl* focusArmy,
-    SimDebugEntitySet& selectedUnits
+    SEntitySetTemplateUnit& selectedUnits
   )
   {
-    using Fn = void(__cdecl*)(Sim*, char*, int, int, int);
-    auto fn = reinterpret_cast<Fn>(kTryParseSimCommandEa);
+    // Parser core at 0x00734870 remains unrecovered in native C++.
+    using Fn = void(__cdecl*)(Sim*, char*, Wm3::Vector3<float>*, CArmyImpl*, SEntitySetTemplateUnit*);
+    const auto fn = reinterpret_cast<Fn>(kLegacyTryParseSimCommandEa);
     fn(
       sim,
       const_cast<char*>(command ? command : ""),
-      static_cast<int>(reinterpret_cast<std::uintptr_t>(const_cast<Wm3::Vector3<float>*>(&worldPos))),
-      static_cast<int>(reinterpret_cast<std::uintptr_t>(focusArmy)),
-      static_cast<int>(reinterpret_cast<std::uintptr_t>(&selectedUnits))
+      const_cast<Wm3::Vector3<float>*>(&worldPos),
+      focusArmy,
+      &selectedUnits
     );
   }
 
@@ -2015,7 +2007,7 @@ void Sim::ExecuteDebugCommand(
   const BVSet<EntId, EntIdUniverse>& entities
 )
 {
-  SimDebugEntitySet selectedUnits{};
+  SEntitySetTemplateUnit selectedUnits{};
   InitSimDebugEntitySet(selectedUnits);
 
   auto appendSelectedUnit = [this, &selectedUnits](const EntId entId) {
@@ -2041,8 +2033,8 @@ void Sim::ExecuteDebugCommand(
     focusArmyPtr = mArmiesList[focusArmy];
   }
 
-  // Parser body 0x00734870 is now wired; command table recovery remains in progress.
-  TryParseSimCommand(this, command, worldPos, focusArmyPtr, selectedUnits);
+  // Parser body 0x00734870 is still called through legacy gateway; native C++ recovery is in progress.
+  InvokeLegacyTryParseSimCommand(this, command, worldPos, focusArmyPtr, selectedUnits);
   DestroySimDebugEntitySet(selectedUnits);
 }
 
