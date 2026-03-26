@@ -6,16 +6,22 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 
-namespace gpg
-{
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-}
-
 namespace
 {
-  constexpr std::uintptr_t kLuaBindingStateOffset = 0x44;
   constexpr const char* kAddConOutputReceiverHelp = "AddConsoleOutputReciever";
   constexpr const char* kRemoveConOutputReceiverHelp = "RemoveConsoleOutputReciever";
+
+  /**
+   * Address: 0x0041EB00 (FUN_0041EB00, context unwrap)
+   * Address: 0x0041ED00 (FUN_0041ED00, context unwrap)
+   *
+   * What it does:
+   * Resolves LuaPlus wrapper state from the native Lua callback context.
+   */
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
 
   gpg::RType* CachedCLuaConOutputHandlerType()
   {
@@ -284,10 +290,9 @@ moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus:
 /**
  * Address: 0x0041EB00 (FUN_0041EB00, cfunc_AddConsoleOutputReciever)
  */
-int moho::cfunc_AddConsoleOutputReciever(const int luaContext)
+int moho::cfunc_AddConsoleOutputReciever(lua_State* const luaContext)
 {
-  auto* const state =
-    *reinterpret_cast<LuaPlus::LuaState**>(static_cast<std::uintptr_t>(luaContext) + kLuaBindingStateOffset);
+  auto* const state = ResolveBindingState(luaContext);
   return cfunc_AddConsoleOutputRecieverL(state);
 }
 
@@ -317,10 +322,9 @@ int moho::cfunc_AddConsoleOutputRecieverL(LuaPlus::LuaState* const state)
 /**
  * Address: 0x0041ED00 (FUN_0041ED00, cfunc_RemoveConsoleOutputReciever)
  */
-int moho::cfunc_RemoveConsoleOutputReciever(const int luaContext)
+int moho::cfunc_RemoveConsoleOutputReciever(lua_State* const luaContext)
 {
-  auto* const state =
-    *reinterpret_cast<LuaPlus::LuaState**>(static_cast<std::uintptr_t>(luaContext) + kLuaBindingStateOffset);
+  auto* const state = ResolveBindingState(luaContext);
   return cfunc_RemoveConsoleOutputRecieverL(state);
 }
 

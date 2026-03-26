@@ -6,6 +6,20 @@
 
 using namespace moho;
 
+namespace moho
+{
+  struct WeaponExtraRefSubobject
+  {
+    std::uint8_t pad_00[0x64];
+    std::int32_t extraValue; // +0x64 (subobject-relative payload word)
+  };
+
+  static_assert(
+    offsetof(WeaponExtraRefSubobject, extraValue) == 0x64,
+    "WeaponExtraRefSubobject::extraValue offset must be 0x64"
+  );
+} // namespace moho
+
 namespace
 {
   constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
@@ -15,22 +29,13 @@ namespace
     std::uint8_t pad_00[0xA8];
     std::int32_t extraKey; // +0xA8
     std::uint8_t pad_AC[0x24];
-    void* extraRef; // +0xD0
+    WeaponExtraRefSubobject* extraRef; // +0xD0 (secondary-subobject pointer)
   };
   static_assert(
     offsetof(WeaponEmitterEntryView, extraKey) == 0xA8, "WeaponEmitterEntryView::extraKey offset must be 0xA8"
   );
   static_assert(
     offsetof(WeaponEmitterEntryView, extraRef) == 0xD0, "WeaponEmitterEntryView::extraRef offset must be 0xD0"
-  );
-
-  struct ExtraDataRefHeaderView
-  {
-    std::uint8_t pad_00[0x68];
-    std::int32_t extraValue; // +0x68
-  };
-  static_assert(
-    offsetof(ExtraDataRefHeaderView, extraValue) == 0x68, "ExtraDataRefHeaderView::extraValue offset must be 0x68"
   );
 } // namespace
 
@@ -64,12 +69,11 @@ bool CAiAttackerImpl::TryGetWeaponExtraData(const int index, WeaponExtraData& ou
   return true;
 }
 
-std::int32_t CAiAttackerImpl::ReadExtraDataValue(void* ref)
+std::int32_t CAiAttackerImpl::ReadExtraDataValue(const WeaponExtraRefSubobject* const ref)
 {
   if (!ref) {
     return kExtraDataMissingValue;
   }
 
-  const auto* header = reinterpret_cast<const ExtraDataRefHeaderView*>(reinterpret_cast<const std::uint8_t*>(ref) - 4);
-  return header->extraValue;
+  return ref->extraValue;
 }

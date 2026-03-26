@@ -28,17 +28,27 @@ namespace gpg
 	bool STR_StartsWith(StrArg str, StrArg start); // 0x00938210
 	bool STR_EndsWithNoCase(StrArg str, StrArg end); // 0x00938250
 	bool STR_StartsWithNoCase(StrArg str, StrArg start); // 0x009382B0
+	bool STR_EqualsNoCaseN(StrArg lhs, StrArg rhs, std::size_t count);
+	int STR_CompareNoCase(StrArg lhs, StrArg rhs);
+	bool STR_ContainsNoCase(StrArg str, StrArg needle);
+	bool STR_EqualsNoCase(StrArg lhs, StrArg rhs);
 	bool STR_IsIdent(StrArg str); // 0x009382F0
 	int STR_Replace(msvc8::string& str, StrArg what, StrArg with, unsigned int unk); // 0x00938B40
 	int STR_ParseUInt32(StrArg str); // 0x00938150
 	int STR_Xtoi(StrArg str); // 0x009380F0
+	bool STR_IsAsciiWhitespace(char ch);
 	bool STR_MatchWildcard(StrArg, StrArg); // 0x00938450
+	bool STR_MatchWildcard(StrArg, StrArg, bool caseSensitive);
 	bool STR_WildcardValidPrefix(StrArg, StrArg); // 0x00938470
+	bool STR_WildcardValidPrefix(StrArg, StrArg, bool caseSensitive);
 
 	msvc8::string STR_GetWhitespaceCharacters(); // 0x00938C80
 	msvc8::string STR_Chop(StrArg str, char chr); // 0x00938BF0
 	msvc8::string STR_ToLower(StrArg str); // 0x00938A80
 	msvc8::string STR_ToUpper(StrArg str); // 0x009389C0
+	void STR_NormalizeFilenameLowerSlash(msvc8::string& inOut);
+	void STR_NormalizeFilenameLowerSlash(std::string& inOut);
+	void STR_CanonizeFilename(msvc8::string* out, StrArg in);
 	msvc8::string STR_TrimWhitespace(StrArg str); // 0x009388C0
 	msvc8::string STR_Printf(const char* args...); // 0x00938F10
 	msvc8::string STR_Va(const char*& fmt, va_list va); // 0x00938E00

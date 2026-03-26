@@ -1,21 +1,22 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace gpg {
-namespace gal {
+namespace gpg::gal
+{
     /**
      * VFTABLE: 0x00D47B30
-     * COL:  0x00E53080
+     * COL:     0x00E53080
      */
-    class DrawContext {
+    class DrawContext
+    {
     public:
-      /**
-       * Address: 0x0093F140
-       * Slot: 0
-       * Demangled: sub_93F140
-       */
-      virtual void sub_93F140() = 0;
+        /**
+         * Address: 0x0093F140 (FUN_0093F140)
+         *
+         * What it does:
+         * Owns the scalar-deleting destructor thunk for draw-context interface instances.
+         */
+        virtual ~DrawContext();
     };
-} // namespace gal
-} // namespace gpg
+
+    static_assert(sizeof(DrawContext) == 0x4, "DrawContext size must be 0x4");
+}

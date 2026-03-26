@@ -6,13 +6,9 @@
 
 #include "UnitAttributes.h"
 #include "gpg/core/containers/String.h"
+#include "lua/LuaObject.h"
 #include "moho/misc/WeakObject.h"
 #include "wm3/Vector3.h"
-
-namespace LuaPlus
-{
-  class LuaObject;
-}
 
 namespace moho
 {

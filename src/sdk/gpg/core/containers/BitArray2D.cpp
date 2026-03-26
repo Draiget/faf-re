@@ -1,5 +1,7 @@
 #include "BitArray2D.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 namespace gpg
@@ -124,5 +126,71 @@ bool BitArray2D::AnyBitSet(unsigned int* storeWidth, unsigned int* storeHeight, 
         *progress = curProgress;
     }
     return true;
+}
+
+/**
+ * Address: 0x008D8460 (FUN_008D8460, ?GetRectOr@BitArray2D@gpg@@QBE_NHHHH_N@Z)
+ */
+bool BitArray2D::GetRectOr(int x0, int z0, const int w, const int h, const bool disallowNegative) const
+{
+    int x1 = x0 + w;
+    int z1 = z0 + h;
+
+    if (x0 < 0 || z0 < 0 || x1 >= width || z1 >= height) {
+        if (disallowNegative && x0 < x1 && z0 < z1) {
+            return true;
+        }
+
+        if (x0 < 0) {
+            x0 = 0;
+        }
+        if (z0 < 0) {
+            z0 = 0;
+        }
+        if (x1 >= width) {
+            x1 = width;
+        }
+        if (z1 >= height) {
+            z1 = height;
+        }
+    }
+
+    if (x1 <= x0 || z1 <= z0) {
+        return false;
+    }
+
+    const int endWord = (z1 - 1) >> 5;
+    int word = z0 >> 5;
+    int rectMask = -1 << (z0 & 0x1F);
+    int orBits = 0;
+
+    while (word <= endWord) {
+        if (word == endWord && (z1 & 0x1F) != 0) {
+            rectMask &= ~(-1 << (z1 & 0x1F));
+        }
+
+        int* rowBits = &ptr[x0 + word * width];
+        for (int x = x0; x < x1; ++x, ++rowBits) {
+            orBits |= rectMask & *rowBits;
+        }
+
+        ++word;
+        rectMask = -1;
+    }
+
+    return orBits != 0;
+}
+
+bool BitArray2D::IsBitSetOrOutOfBounds(const int x, const int z) const
+{
+    if (!ptr || x < 0 || z < 0 || x >= width || z >= height) {
+        return true;
+    }
+
+    const std::size_t index =
+      static_cast<std::size_t>(x) + static_cast<std::size_t>(width) * static_cast<std::size_t>(z >> 5);
+    const std::uint32_t word = static_cast<std::uint32_t>(ptr[index]);
+    const std::uint32_t bitMask = 1u << (z & 0x1F);
+    return (word & bitMask) != 0u;
 }
 }

@@ -1,6 +1,7 @@
 __pycache__/
 .vscode/
 .vs/
+.tmp/
 bin/
 output/
 decomp/
@@ -10,3 +11,4 @@ dependencies/zlib-1.2.3/**/*
 AGENTS.md
 skills/
 out/
+dependencies/lua-lang/**/*

@@ -2,75 +2,20 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <typeinfo>
 
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 
 namespace
 {
-  struct StatIntrusiveNode
-  {
-    StatIntrusiveNode* prev;
-    StatIntrusiveNode* next;
-    moho::StatItem* parent;
-    moho::StatItem* owner;
-  };
-
-  [[nodiscard]] StatIntrusiveNode* AsSelfNode(moho::StatItem* item)
-  {
-    return reinterpret_cast<StatIntrusiveNode*>(reinterpret_cast<std::uint8_t*>(item) + 0x04);
-  }
-
-  [[nodiscard]] StatIntrusiveNode* AsChildHead(moho::StatItem* item)
-  {
-    return reinterpret_cast<StatIntrusiveNode*>(reinterpret_cast<std::uint8_t*>(item) + 0x14);
-  }
-
-  void DetachSelfNode(moho::StatItem* item)
-  {
-    StatIntrusiveNode* const selfNode = AsSelfNode(item);
-    if (selfNode->next != nullptr && selfNode->prev != nullptr) {
-      selfNode->next->prev = selfNode->prev;
-      selfNode->prev->next = selfNode->next;
-    }
-    selfNode->prev = selfNode;
-    selfNode->next = selfNode;
-    selfNode->parent = nullptr;
-  }
-
-  void AttachChild(moho::StatItem* parent, moho::StatItem* child)
-  {
-    DetachSelfNode(child);
-
-    StatIntrusiveNode* const childNode = AsSelfNode(child);
-    childNode->parent = parent;
-    if (parent == nullptr) {
-      return;
-    }
-
-    StatIntrusiveNode* const parentHead = AsChildHead(parent);
-    childNode->prev = parentHead->prev;
-    childNode->next = parentHead;
-    parentHead->prev = childNode;
-    childNode->prev->next = childNode;
-  }
-
   [[nodiscard]] moho::CArmyStatItem* FindArmyChildByName(moho::CArmyStatItem* parent, const msvc8::string& token)
   {
     if (parent == nullptr) {
       return nullptr;
     }
 
-    for (StatIntrusiveNode* node = AsChildHead(parent)->next; node != nullptr; node = node->next) {
-      moho::StatItem* const child = node->owner;
-      if (child == nullptr) {
-        break;
-      }
-      if (child->mName == token) {
-        return static_cast<moho::CArmyStatItem*>(child);
-      }
-    }
-    return nullptr;
+    return static_cast<moho::CArmyStatItem*>(parent->FindDirectChildByName(token));
   }
 
   [[nodiscard]] moho::ArmyBlueprintStatNode* CreateBlueprintTreeSentinel()
@@ -370,6 +315,26 @@ namespace
 
 namespace moho
 {
+  gpg::RType* Stats<CArmyStatItem>::sType = nullptr;
+  gpg::RType* CArmyStatItem::sType = nullptr;
+  gpg::RType* CArmyStats::sType = nullptr;
+
+  gpg::RType* CArmyStatItem::StaticGetClass()
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CArmyStatItem));
+    }
+    return sType;
+  }
+
+  gpg::RType* CArmyStats::StaticGetClass()
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CArmyStats));
+    }
+    return sType;
+  }
+
   /**
    * Address: 0x00585B30 (FUN_00585B30, Moho::CArmyStatItem::CArmyStatItem)
    */
@@ -493,7 +458,7 @@ namespace moho
     CArmyStatItem* lastCreated = nullptr;
     for (; index < tokenCount; ++index) {
       auto* const child = new CArmyStatItem(tokens[index].c_str());
-      AttachChild(parent, child);
+      parent->AttachChild(child);
       parent = child;
       lastCreated = child;
     }

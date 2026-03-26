@@ -50,7 +50,7 @@ namespace moho
   struct NetSpeeds
   {
     float vals[25]{};
-    int v1{0};
+    int mReserved0{0};
     int head{0};
     int tail{0};
 
@@ -74,27 +74,28 @@ namespace moho
 
   struct SSendStamp
   {
-    uint32_t direction{0};
-    uint32_t v1{0};
-    uint64_t time{0}; // used as 64-bit tick container in the binary
-    uint32_t size{0};
-    uint32_t v4{0};
+    uint32_t direction{0};        // 0 = outbound, 1 = inbound (producer callsites)
+    uint32_t reserved0{0};        // carried in records; semantics unresolved
+    uint64_t timestampUs{0};      // microsecond timestamp
+    uint32_t payloadSizeBytes{0}; // packet/message payload size in bytes
+    uint32_t reserved1{0};        // carried in records; semantics unresolved
   };
+  static_assert(sizeof(SSendStamp) == 0x18, "SSendStamp size must be 0x18");
 
   struct SSendStampView
   {
-    msvc8::vector<SSendStamp> items; // contiguous vector of copies
-    uint64_t from{0};                // threshold = now - window
-    uint64_t to{0};                  // now
+    msvc8::vector<SSendStamp> items; // contiguous vector of copied stamps
+    uint64_t windowDurationUs{0};    // (endTimeUs - startTimeUs)
+    uint64_t windowEndTimeUs{0};     // end of requested window
 
     /**
      * Address: 0x0047D1D0
      * NOTE: Inlined
      *
-     * @param start
-     * @param end
+     * @param durationUs
+     * @param endTimeUs
      */
-    SSendStampView(uint64_t start, uint64_t end);
+    SSendStampView(uint64_t durationUs, uint64_t endTimeUs);
   };
 
   struct SSendStampBuffer
@@ -102,15 +103,15 @@ namespace moho
     static constexpr uint32_t cap = 4096;
 
     SSendStamp mDat[cap]{};
-    uint32_t mEnd{0};   // oldest
-    uint32_t mStart{0}; // next write
+    uint32_t mOldestIndex{0};    // oldest readable stamp
+    uint32_t mNextWriteIndex{0}; // next write slot
 
     /**
      * Address: 0x0047D110
      *
      * lower-bound in circular buffer, copy window into out
      */
-    SSendStampView GetBetween(uint64_t startTime, uint64_t endTime);
+    SSendStampView GetBetween(uint64_t endTimeUs, uint64_t startTimeUs);
 
     /**
      * Address: 0x0047D990
@@ -120,17 +121,17 @@ namespace moho
     /**
      * Address: 0x0047D0A0
      */
-    uint32_t Push(int dir, LONGLONG timeUs, int size) noexcept;
+    uint32_t Push(int direction, LONGLONG timeUs, int payloadSizeBytes) noexcept;
 
     /**
      * Address: 0x0047D0A0
      */
-    void Add(int direction, LONGLONG time, int size);
+    void Add(int direction, LONGLONG timeUs, int payloadSizeBytes);
 
     /**
      * Address: 0x0047D630
      */
-    void Append(const SSendStamp* s);
+    void Append(const SSendStamp* stamp);
 
     [[nodiscard]]
     bool empty() const noexcept;
@@ -140,15 +141,16 @@ namespace moho
 
     void push(const SSendStamp& s) noexcept;
 
-    SSendStamp& Get(size_t index) noexcept;
+    SSendStamp& Get(size_t logicalIndex) noexcept;
 
   private:
     /**
-     * Place entry at mStart and advance mStart by 1 (mod 4096).
+     * Place entry at `mNextWriteIndex` and advance by one (mod 4096).
      * Address: <synthetic helper, shared by Push/Add paths>
      */
-    uint32_t EmplaceAndAdvance(const SSendStamp& s) noexcept;
+    uint32_t EmplaceAndAdvance(const SSendStamp& stamp) noexcept;
   };
+  static_assert(sizeof(SSendStampBuffer) == 0x18008, "SSendStampBuffer size must be 0x18008");
 
   /**
    * Address: 0x0047F5A0

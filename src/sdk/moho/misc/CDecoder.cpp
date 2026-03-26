@@ -1,6 +1,5 @@
 #include "CDecoder.h"
 
-#include <cctype>
 #include <cstring>
 #include <stdexcept>
 
@@ -624,10 +623,7 @@ namespace moho
    */
   void CDecoder::NormalizeFilenameLowerSlash(msvc8::string& inOut)
   {
-    for (std::size_t i = 0; i < inOut.size(); ++i) {
-      const auto lowered = static_cast<char>(std::tolower(static_cast<unsigned char>(inOut[i])));
-      inOut[i] = (lowered == '\\') ? '/' : lowered;
-    }
+    gpg::STR_NormalizeFilenameLowerSlash(inOut);
   }
 
   /**

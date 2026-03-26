@@ -14,6 +14,8 @@ namespace LuaPlus
 
 namespace moho
 {
+  struct WeaponExtraRefSubobject;
+
   /**
    * VFTABLE: 0x00E1E9CC
    * COL:  0x00E75AF8
@@ -228,7 +230,7 @@ namespace moho
     struct WeaponExtraData
     {
       std::int32_t key;
-      void* ref;
+      WeaponExtraRefSubobject* ref;
     };
 
     /**
@@ -239,7 +241,7 @@ namespace moho
     /**
      * Decodes packed value from a weapon extra-data ref (returns 0xF0000000 when missing).
      */
-    [[nodiscard]] static std::int32_t ReadExtraDataValue(void* ref);
+    [[nodiscard]] static std::int32_t ReadExtraDataValue(const WeaponExtraRefSubobject* ref);
   };
 
   /**

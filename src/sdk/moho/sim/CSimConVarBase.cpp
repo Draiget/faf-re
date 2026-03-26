@@ -14,7 +14,13 @@ using namespace moho;
  * Resolves this convar's per-Sim instance and forwards command args to the
  * instance handler virtual (slot +0x04).
  */
-int CSimConVarBase::DispatchToSimVar(Sim* sim, int, void* commandArgs, int, int)
+int CSimConVarBase::Run(
+  Sim* const sim,
+  ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f*,
+  CArmyImpl*,
+  SEntitySetTemplateUnit*
+)
 {
   CSimConVarInstanceBase* const simVar = sim->GetSimVar(this);
   return simVar->HandleConsoleCommand(commandArgs);

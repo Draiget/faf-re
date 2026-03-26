@@ -173,7 +173,7 @@ namespace moho
    * What it does:
    * Unwraps Lua binding context and dispatches to LuaState overload.
    */
-  int cfunc_AddConsoleOutputReciever(int luaContext);
+  int cfunc_AddConsoleOutputReciever(lua_State* luaContext);
 
   /**
    * Address: 0x0041EB80 (FUN_0041EB80, cfunc_AddConsoleOutputRecieverL)
@@ -189,7 +189,7 @@ namespace moho
    * What it does:
    * Unwraps Lua binding context and dispatches to LuaState overload.
    */
-  int cfunc_RemoveConsoleOutputReciever(int luaContext);
+  int cfunc_RemoveConsoleOutputReciever(lua_State* luaContext);
 
   /**
    * Address: 0x0041ED80 (FUN_0041ED80, cfunc_RemoveConsoleOutputRecieverL)

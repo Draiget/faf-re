@@ -477,6 +477,16 @@ namespace moho
     return cbegin() + localWordIndex;
   }
 
+  bool CategoryWordRangeView::ContainsBit(const std::uint32_t categoryBitIndex) const noexcept
+  {
+    const CategoryWordRangeView::const_iterator wordIt = FindWord(categoryBitIndex >> 5u);
+    if (wordIt == cend()) {
+      return false;
+    }
+
+    return (((*wordIt) >> (categoryBitIndex & 0x1Fu)) & 1u) != 0u;
+  }
+
   /**
    * Address: 0x0052B1E0 (FUN_0052B1E0)
    *

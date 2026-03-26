@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
 namespace moho

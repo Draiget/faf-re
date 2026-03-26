@@ -11,6 +11,11 @@
 #include "wm3/Vector2.h"
 #include "wm3/Vector3.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class Sim;
@@ -28,6 +33,9 @@ namespace moho
   class IArmy
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Binary evidence summary:
      * - Address: 0x00550B20 (FUN_00550B20): IArmy typeinfo size is 0x1E0.

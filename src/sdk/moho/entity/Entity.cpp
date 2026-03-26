@@ -1,7 +1,6 @@
 ﻿#include "Entity.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -9,14 +8,16 @@
 #include <stdexcept>
 #include <string>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityMotor.h"
-#include "moho/entity/EntityPositionWatchEntry.h"
 #include "moho/entity/EntityTransformPayload.h"
+#include "moho/entity/intel/CIntel.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -25,56 +26,6 @@
 
 namespace
 {
-  [[nodiscard]] LuaPlus::LuaObject
-  GetLuaTableField(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const char* fieldName)
-  {
-    if (!state || !fieldName || !*fieldName || !tableObj) {
-      return {};
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return {};
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObj).PushStack(lstate);
-    lua_pushstring(lstate, fieldName);
-    lua_gettable(lstate, -2);
-    LuaPlus::LuaObject result{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(lstate, savedTop);
-    return result;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* state, const char* modulePath)
-  {
-    if (!state || !modulePath || !*modulePath) {
-      return {};
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return {};
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    lua_getglobal(lstate, "import");
-    if (!lua_isfunction(lstate, -1)) {
-      lua_settop(lstate, savedTop);
-      return {};
-    }
-
-    lua_pushstring(lstate, modulePath);
-    if (lua_pcall(lstate, 1, 1, 0) != 0) {
-      lua_settop(lstate, savedTop);
-      return {};
-    }
-
-    LuaPlus::LuaObject moduleObj{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(lstate, savedTop);
-    return moduleObj;
-  }
-
   enum class BlueprintKind : std::uint8_t
   {
     Unknown = 0,
@@ -83,36 +34,6 @@ namespace
     Prop
   };
 
-  [[nodiscard]] bool ContainsCaseInsensitive(const std::string& text, const char* needle)
-  {
-    if (!needle || !*needle) {
-      return true;
-    }
-
-    const std::string needleStr{needle};
-    return std::search(
-             text.begin(), text.end(), needleStr.begin(), needleStr.end(), [](const char lhs, const char rhs) {
-      return std::tolower(static_cast<unsigned char>(lhs)) == std::tolower(static_cast<unsigned char>(rhs));
-    }
-           ) != text.end();
-  }
-
-  [[nodiscard]] bool EqualsCaseInsensitive(const std::string& text, const char* needle)
-  {
-    if (!needle) {
-      return text.empty();
-    }
-
-    const std::string needleStr{needle};
-    if (text.size() != needleStr.size()) {
-      return false;
-    }
-
-    return std::equal(text.begin(), text.end(), needleStr.begin(), [](const char lhs, const char rhs) {
-      return std::tolower(static_cast<unsigned char>(lhs)) == std::tolower(static_cast<unsigned char>(rhs));
-    });
-  }
-
   [[nodiscard]] BlueprintKind GuessBlueprintKind(const moho::REntityBlueprint* blueprint)
   {
     if (!blueprint) {
@@ -120,35 +41,35 @@ namespace
     }
 
     const std::string scriptModule = blueprint->mScriptModule.to_std();
-    if (ContainsCaseInsensitive(scriptModule, "projectile")) {
+    if (gpg::STR_ContainsNoCase(scriptModule.c_str(), "projectile")) {
       return BlueprintKind::Projectile;
     }
-    if (ContainsCaseInsensitive(scriptModule, "unit")) {
+    if (gpg::STR_ContainsNoCase(scriptModule.c_str(), "unit")) {
       return BlueprintKind::Unit;
     }
-    if (ContainsCaseInsensitive(scriptModule, "prop")) {
+    if (gpg::STR_ContainsNoCase(scriptModule.c_str(), "prop")) {
       return BlueprintKind::Prop;
     }
 
     const std::string scriptClass = blueprint->mScriptClass.to_std();
-    if (EqualsCaseInsensitive(scriptClass, "Projectile")) {
+    if (gpg::STR_EqualsNoCase(scriptClass.c_str(), "Projectile")) {
       return BlueprintKind::Projectile;
     }
-    if (EqualsCaseInsensitive(scriptClass, "Unit")) {
+    if (gpg::STR_EqualsNoCase(scriptClass.c_str(), "Unit")) {
       return BlueprintKind::Unit;
     }
-    if (EqualsCaseInsensitive(scriptClass, "Prop")) {
+    if (gpg::STR_EqualsNoCase(scriptClass.c_str(), "Prop")) {
       return BlueprintKind::Prop;
     }
 
     const std::string id = blueprint->mBlueprintId.to_std();
-    if (ContainsCaseInsensitive(id, "/projectiles/")) {
+    if (gpg::STR_ContainsNoCase(id.c_str(), "/projectiles/")) {
       return BlueprintKind::Projectile;
     }
-    if (ContainsCaseInsensitive(id, "/units/")) {
+    if (gpg::STR_ContainsNoCase(id.c_str(), "/units/")) {
       return BlueprintKind::Unit;
     }
-    if (ContainsCaseInsensitive(id, "/props/")) {
+    if (gpg::STR_ContainsNoCase(id.c_str(), "/props/")) {
       return BlueprintKind::Prop;
     }
 
@@ -186,10 +107,7 @@ namespace
       return {};
     }
 
-    std::replace(id.begin(), id.end(), '\\', '/');
-    std::transform(id.begin(), id.end(), id.begin(), [](const unsigned char ch) {
-      return static_cast<char>(std::tolower(ch));
-    });
+    gpg::STR_NormalizeFilenameLowerSlash(id);
 
     std::size_t start = 0;
     if (!id.empty() && id.front() == '/') {
@@ -235,9 +153,10 @@ namespace
     }
 
     if (requestedModule && *requestedModule) {
-      LuaPlus::LuaObject requestedModuleObj = ImportLuaModule(sim->mLuaState, requestedModule);
+      LuaPlus::LuaObject requestedModuleObj = moho::SCR_ImportLuaModule(sim->mLuaState, requestedModule);
       if (requestedModuleObj) {
-        LuaPlus::LuaObject factoryObj = GetLuaTableField(sim->mLuaState, requestedModuleObj, requestedClass);
+        LuaPlus::LuaObject factoryObj =
+          moho::SCR_GetLuaTableField(sim->mLuaState, requestedModuleObj, requestedClass);
         if (factoryObj) {
           return factoryObj;
         }
@@ -259,9 +178,10 @@ namespace
       }
     }
 
-    LuaPlus::LuaObject fallbackModuleObj = ImportLuaModule(sim->mLuaState, fallback.module);
+    LuaPlus::LuaObject fallbackModuleObj = moho::SCR_ImportLuaModule(sim->mLuaState, fallback.module);
     if (fallbackModuleObj) {
-      LuaPlus::LuaObject fallbackFactory = GetLuaTableField(sim->mLuaState, fallbackModuleObj, fallback.className);
+      LuaPlus::LuaObject fallbackFactory =
+        moho::SCR_GetLuaTableField(sim->mLuaState, fallbackModuleObj, fallback.className);
       if (fallbackFactory) {
         return fallbackFactory;
       }
@@ -794,73 +714,6 @@ namespace
     }
   }
 
-  void RefreshWatchEntry(const float* probePosition, moho::EntityPositionWatchEntry* entry)
-  {
-    if (!probePosition || !entry) {
-      return;
-    }
-
-    if (probePosition[0] == entry->lastX && probePosition[1] == entry->lastY && probePosition[2] == entry->lastZ) {
-      return;
-    }
-
-    const std::uint32_t savedRangeWord = entry->rangeWord;
-    entry->SubViz();
-    entry->lastX = probePosition[0];
-    entry->lastY = probePosition[1];
-    entry->lastZ = probePosition[2];
-    entry->rangeWord = savedRangeWord;
-    entry->AddViz();
-  }
-
-  int ProcessWatchEntry(
-    const std::int32_t frameCounter, moho::EntityPositionWatchEntry* entry, const float* probePosition
-  )
-  {
-    if (!entry || !probePosition) {
-      return frameCounter;
-    }
-
-    if (entry->isArmed != 0u) {
-      const float dx = probePosition[0] - entry->lastX;
-      const float dy = probePosition[1] - entry->lastY;
-      const float dz = probePosition[2] - entry->lastZ;
-      const float distanceSquared = dx * dx + dy * dy + dz * dz;
-      const float range = static_cast<float>(static_cast<double>(entry->rangeWord) * 0.333);
-      const float rangeSquared = range * range;
-
-      if (distanceSquared >= rangeSquared || (frameCounter - entry->lastTick) > 5) {
-        entry->lastTick = frameCounter;
-        RefreshWatchEntry(probePosition, entry);
-        return frameCounter;
-      }
-    } else {
-      entry->lastX = probePosition[0];
-      entry->lastY = probePosition[1];
-      entry->lastZ = probePosition[2];
-    }
-
-    return frameCounter;
-  }
-
-  void TouchProximityWatchers(
-    moho::EntityPositionWatchEntry* const* watchers, const std::int32_t frameCounter, const float* probePosition
-  )
-  {
-    if (!watchers || !probePosition) {
-      return;
-    }
-
-    for (std::size_t i = 0; i < 9; ++i) {
-      moho::EntityPositionWatchEntry* entry = watchers[i];
-      if (!entry) {
-        continue;
-      }
-
-      (void)ProcessWatchEntry(frameCounter, entry, probePosition);
-    }
-  }
-
   [[nodiscard]] std::uint32_t ReadBlueprintCategoryBitIndex(const moho::REntityBlueprint* blueprint) noexcept
   {
     return blueprint ? blueprint->mCategoryBitIndex : 0u;
@@ -1144,7 +997,7 @@ namespace moho
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
-    mProximityWatchers = nullptr;
+    mIntelManager = nullptr;
     mVisibilityLayerFriendly = 2;
     mVisibilityLayerEnemy = 2;
     mVisibilityLayerNeutral = 4;
@@ -1484,7 +1337,7 @@ namespace moho
    * Address: 0x00679210 (FUN_00679210)
    *
    * What it does:
-   * Writes pending transform, advances twice, then refreshes proximity watchers.
+   * Writes pending transform, advances twice, then updates entity intel manager.
    */
   void Entity::Warp(const VTransform& transform)
   {
@@ -1493,14 +1346,14 @@ namespace moho
     AdvanceCoords();
     AdvanceCoords();
 
-    if (mProximityWatchers && SimulationRef) {
+    if (mIntelManager && SimulationRef) {
       const EntityTransformPayload current = ReadEntityTransformPayload(Orientation, Position);
-      float probePosition[3] = {
+      const Wm3::Vec3f probePosition{
         current.posX,
         current.posY + 1.0f,
         current.posZ,
       };
-      TouchProximityWatchers(mProximityWatchers, static_cast<std::int32_t>(SimulationRef->mCurTick), probePosition);
+      mIntelManager->Update(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
     }
   }
 
@@ -1968,11 +1821,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00678800 (FUN_00678800, ?InitPositionHistory@Entity@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Rebuilds the rolling position-history ring with identity/default samples.
+   */
+  void Entity::InitPositionHistory()
+  {
+    PositionHistory* const rebuiltHistory = new (std::nothrow) PositionHistory;
+    if (rebuiltHistory) {
+      InitializePositionHistory(*rebuiltHistory);
+    }
+
+    delete mPositionHistory;
+    mPositionHistory = rebuiltHistory;
+  }
+
+  /**
    * Address: 0x00678F10 (FUN_00678F10, ?AdvanceCoords@Entity@Moho@@QAEXXZ)
    *
    * What it does:
    * Commits pending transform to current, archives previous/current snapshots,
-   * updates collision when movement changed, processes proximity watchers,
+   * updates collision when movement changed, runs intel force-update pass,
    * then relinks coord node into Sim's coord-entities list when needed.
    */
   void Entity::AdvanceCoords()
@@ -1993,13 +1863,13 @@ namespace moho
       UpdateCollision();
     }
 
-    if (mProximityWatchers && SimulationRef) {
-      float probePosition[3] = {
+    if (mIntelManager && SimulationRef) {
+      const Wm3::Vec3f probePosition{
         current.posX,
         current.posY + 1.0f,
         current.posZ,
       };
-      TouchProximityWatchers(mProximityWatchers, static_cast<std::int32_t>(SimulationRef->mCurTick), probePosition);
+      mIntelManager->ForceUpdate(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
     }
 
     if (SimulationRef && mCoordNode.ListIsSingleton()) {

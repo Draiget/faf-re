@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 
 namespace moho
@@ -14,6 +15,27 @@ namespace moho
    * Creates a table metatable and sets __index = self.
    */
   LuaPlus::LuaObject SCR_CreateSimpleMetatable(LuaPlus::LuaState* state);
+
+  /**
+   * Imports a Lua module by calling global `import(modulePath)`.
+   * Returns nil object on lookup/call failure.
+   */
+  [[nodiscard]] LuaPlus::LuaObject SCR_ImportLuaModule(LuaPlus::LuaState* state, const char* modulePath);
+
+  /**
+   * Reads one table field via raw stack gettable flow.
+   * Returns nil object when table/state/field are invalid.
+   */
+  [[nodiscard]] LuaPlus::LuaObject
+  SCR_GetLuaTableField(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const char* fieldName);
+
+  /**
+   * Address: 0x004D2F70 (FUN_004D2F70, ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
+   *
+   * What it does:
+   * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `msvc8::string`.
+   */
+  [[nodiscard]] msvc8::string SCR_ToString(const LuaPlus::LuaObject& object);
 
   class CScrLuaObjectFactory
   {

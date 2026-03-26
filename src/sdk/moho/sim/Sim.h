@@ -19,6 +19,7 @@
 #include "moho/task/CTaskThread.h"
 #include "SDesyncInfo.h"
 #include "SSyncFilter.h"
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 
@@ -53,6 +54,7 @@ namespace moho
   class CArmyImpl;
   class CEffectManagerImpl;
   class CSimSoundManager;
+  struct SEntitySetTemplateUnit;
 
   class Sim final : public ICommandSink
   {
@@ -250,6 +252,22 @@ namespace moho
     LuaPlus::LuaState* GetLuaState() const noexcept;
 
     /**
+     * Address: 0x00746280 (FUN_00746280, ?Logf@Sim@Moho@@QAAXPBDZZ)
+     *
+     * What it does:
+     * Writes formatted text to the current sim log file when logging is enabled.
+     */
+    std::FILE* Logf(const char* fmt, ...);
+
+    /**
+     * Address: 0x00746720 (FUN_00746720, ?GetDebugCanvas@Sim@Moho@@QAEPAVCDebugCanvas@2@XZ)
+     *
+     * What it does:
+     * Returns the active beat debug canvas, allocating it lazily on first use.
+     */
+    CDebugCanvas* GetDebugCanvas();
+
+    /**
      * Address: 0x007474B0 (FUN_007474B0)
      *
      * What it does:
@@ -260,6 +278,14 @@ namespace moho
      * publishes minimal beat packet data until full sync-body recovery.
      */
     void Sync(const SSyncFilter& filter, SSyncData*& outSyncData);
+
+    /**
+     * Address: 0x0074AFB0 (FUN_0074AFB0, ?SaveState@Sim@Moho@@QAEXAAVWriteArchive@gpg@@@Z)
+     *
+     * What it does:
+     * Verifies save mode is allowed and serializes this `Sim` into the provided write archive.
+     */
+    void SaveState(gpg::WriteArchive* archive);
 
   private:
     /**
@@ -277,11 +303,6 @@ namespace moho
     Unit* CreateUnit(const SUnitConstructionParams& params, bool doCallback);
 
     /**
-     * Address: 0x00746280
-     */
-    std::FILE* Logf(const char* fmt, ...);
-
-    /**
      * Address: 0x00747180
      */
     bool CheatsEnabled();
@@ -295,6 +316,21 @@ namespace moho
      * Address: 0x007491C0
      */
     bool ValidateNewCommandId(CmdId cmdId, const char* callsiteName) const;
+
+    /**
+     * Address: 0x00734870 (FUN_00734870, func_TryParseSimCommand)
+     *
+     * What it does:
+     * Parses one or more sim debug command segments, resolves each segment
+     * through the sim-console registry, applies cheat gating, and dispatches
+     * command handlers.
+     */
+    void TryParseSimCommand(
+      const char* command,
+      const Wm3::Vector3<float>& worldPos,
+      CArmyImpl* focusArmy,
+      SEntitySetTemplateUnit& selectedUnits
+    );
 
     /**
      * Address: 0x005C3710 (FUN_005C3710)
@@ -334,6 +370,8 @@ namespace moho
     friend void SimSerializerSaveThunk(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*);
 
   public:
+    static gpg::RType* sType;
+
     msvc8::string mLogFilePrefix;
     std::FILE* mLog;
     msvc8::string mDesyncLogLine;
@@ -394,16 +432,27 @@ namespace moho
     SPhysConstants* mPhysConstants;
     msvc8::list<Shield*> mShields;
     msvc8::deque<void*> mDeletionQueue;
-    TDatList<void*, void> mCoordEntities;
-    bool mRequestXMLArmyStatsSubmit;
-    int32_t mSyncArmy;
-    bool mDidSync;
+    // 0x0A5C..0x0A63 intrusive list head (`mPrev` @ 0x0A5C, `mNext` @ 0x0A60).
+    TDatList<Entity, void> mCoordEntities;
+    bool mRequestXMLArmyStatsSubmit; // 0x0A64
+    // 0x0A65..0x0A67: padding (int32 alignment)
+    int32_t mSyncArmy; // 0x0A68
+    bool mDidSync;     // 0x0A6C
+    // 0x0A6D..0x0A6F: padding (int32 alignment)
     // Sync packing reservation counters captured from the previous frame.
     // Used by helper calls from Sim::Sync (0x00560A00 / 0x00560940).
-    int32_t mSyncReserveCounts[5]; // 0x0A70..0x0A80
+    int32_t mSyncReserveCounts[5]; // 0x0A70..0x0A83 (elements at +0x0A70,+0x0A74,+0x0A78,+0x0A7C,+0x0A80)
     int32_t mSyncReserveUnused;    // 0x0A84 (observed initialized, not yet referenced)
-    SSyncFilter mSyncFilter;
+    SSyncFilter mSyncFilter;       // 0x0A88..0x0AF7
   };
+
+  /**
+   * Address: 0x010A6395 (ren_Steering)
+   *
+   * What it does:
+   * Enables steering debug overlay rendering during `CAiSteeringImpl::Execute`.
+   */
+  extern std::uint8_t ren_Steering;
 
   /**
    * VFTABLE: 0x00E3481C
@@ -472,6 +521,15 @@ namespace moho
   static_assert(sizeof(SimSerializer) == 0x14, "SimSerializer size must be 0x14");
   static_assert(sizeof(SimTypeInfo) == 0x64, "SimTypeInfo size must be 0x64");
   static_assert(sizeof(CRandomStream) == 0x9CC, "CRandomStream size must be 0x9CC");
+  static_assert(offsetof(Sim, mCoordEntities) == 0x0A5C, "Sim::mCoordEntities offset must be 0x0A5C");
+  static_assert(
+    offsetof(Sim, mRequestXMLArmyStatsSubmit) == 0x0A64, "Sim::mRequestXMLArmyStatsSubmit offset must be 0x0A64"
+  );
+  static_assert(offsetof(Sim, mSyncArmy) == 0x0A68, "Sim::mSyncArmy offset must be 0x0A68");
+  static_assert(offsetof(Sim, mDidSync) == 0x0A6C, "Sim::mDidSync offset must be 0x0A6C");
+  static_assert(offsetof(Sim, mSyncReserveCounts) == 0x0A70, "Sim::mSyncReserveCounts offset must be 0x0A70");
+  static_assert(offsetof(Sim, mSyncReserveUnused) == 0x0A84, "Sim::mSyncReserveUnused offset must be 0x0A84");
+  static_assert(offsetof(Sim, mSyncFilter) == 0x0A88, "Sim::mSyncFilter offset must be 0x0A88");
   static_assert(sizeof(Sim) == 0xAF8, "Sim size must be 0xAF8");
 #endif
 } // namespace moho

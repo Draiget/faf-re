@@ -3,11 +3,14 @@
 
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
+#include "moho/containers/SCoordsVec2.h"
 
 namespace moho
 {
   class CAiFormationInstance;
+  class Unit;
 
   /**
    * Formation script bucket type used by `/lua/formations.lua`.
@@ -18,6 +21,25 @@ namespace moho
     Surface = 0,
     Air = 1,
   };
+
+  /**
+   * 32-bit intrusive weak-unit slot word used by the formation creation path.
+   *
+   * Evidence:
+   * - `FUN_0059C120` walks source entries as 4-byte words and re-links through
+   *   owner-chain slot heads before passing a temporary linked view to
+   *   `CFormationInstance` ctor (`FUN_005694B0`).
+   */
+  struct SFormationUnitWeakRef
+  {
+    std::uint32_t ownerLinkSlotWord;
+
+    [[nodiscard]] static SFormationUnitWeakRef FromUnit(Unit* unit) noexcept;
+    [[nodiscard]] std::uint32_t* DecodeOwnerChainHead() const noexcept;
+  };
+  using SFormationUnitWeakRefSet = gpg::fastvector_n<SFormationUnitWeakRef, 10>;
+  static_assert(sizeof(SFormationUnitWeakRef) == 0x04, "SFormationUnitWeakRef size must be 0x04");
+  static_assert(sizeof(SFormationUnitWeakRefSet) == 0x38, "SFormationUnitWeakRefSet size must be 0x38");
 
   /**
    * VFTABLE: 0x00E1B45C
@@ -72,14 +94,20 @@ namespace moho
 
     /**
      * Address: 0x0059C120 (FUN_0059C120)
-     * Mangled:
-     * ?NewFormation@CAiFormationDBImpl@Moho@@UAEPAVCAiFormationInstance@2@HPBDPAV?$fastvector_n@V?$weak_ptr@VUnit@Moho@@@boost@@$09@gpg@@MMMMM@Z
      *
      * What it does:
-     * Allocates/builds a new formation instance and appends it to this DB.
+     * Builds a temporary linked weak-unit view, constructs a new formation
+     * instance, then appends it to this DB.
      */
     virtual CAiFormationInstance* NewFormation(
-      int scriptIndex, const char* scriptName, void* unitWeakSet, int arg4, int arg5, int arg6, int arg7, int arg8
+      const SFormationUnitWeakRefSet* unitWeakSet,
+      const char* scriptName,
+      const SCoordsVec2* formationCenter,
+      float orientX,
+      float orientY,
+      float orientZ,
+      float orientW,
+      int commandType
     ) = 0;
   };
 

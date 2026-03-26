@@ -6,13 +6,17 @@
 #include "IMessageReceiver.h"
 #include "legacy/containers/Vector.h"
 
+namespace gpg
+{
+  class Stream;
+}
+
 namespace moho
 {
   class INetConnector;
   class INetConnection;
   struct BVIntSet;
   class IClient;
-  class LaunchInfoBase;
 
   /**
    * VFTABLE: 0x00E16AF4
@@ -33,7 +37,7 @@ namespace moho
      * Slot: 1
      * Demangled: _purecall
      */
-    virtual IClient* CreateLocalClient(const char* name, int idx, LaunchInfoBase* info, unsigned int sourceId) = 0;
+    virtual IClient* CreateLocalClient(const char* name, int idx, int32_t ownerId, unsigned int sourceId) = 0;
 
     /**
      * Address: 0x00A82547
@@ -41,7 +45,7 @@ namespace moho
      * Demangled: _purecall
      */
     virtual IClient* CreateNetClient(
-      const char* name, int idx, LaunchInfoBase* info, unsigned int sourceId, INetConnection* connection
+      const char* name, int idx, int32_t ownerId, unsigned int sourceId, INetConnection* connection
     ) = 0;
 
     /**
@@ -49,14 +53,14 @@ namespace moho
      * Slot: 3
      * Demangled: _purecall
      */
-    virtual IClient* CreateReplayClient(int*, BVIntSet*) = 0;
+    virtual IClient* CreateReplayClient(gpg::Stream**, BVIntSet*) = 0;
 
     /**
      * Address: 0x00A82547
      * Slot: 4
      * Demangled: _purecall
      */
-    virtual IClient* CreateNullClient(const char* name, int idx, LaunchInfoBase* info, unsigned int sourceId) = 0;
+    virtual IClient* CreateNullClient(const char* name, int idx, int32_t ownerId, unsigned int sourceId) = 0;
 
     /**
      * Address: 0x00A82547
@@ -84,7 +88,7 @@ namespace moho
      * Slot: 8
      * Demangled: _purecall
      */
-    virtual IClient* GetClientWithData(LaunchInfoBase* info) = 0;
+    virtual IClient* GetClientWithData(int32_t ownerId) = 0;
 
     /**
      * Address: 0x00A82547

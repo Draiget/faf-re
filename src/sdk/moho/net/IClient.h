@@ -7,7 +7,6 @@
 
 namespace moho
 {
-  class LaunchInfoBase;
   struct BVIntSet;
 
   /**
@@ -109,24 +108,24 @@ namespace moho
     /**
      * Address: 0x0053B5E0 (FUN_0053B5E0)
      */
-    IClient(const char* name, int index, LaunchInfoBase* launchInfo);
+    IClient(const char* name, int index, int32_t ownerId);
 
     /**
      * Address: <synthetic host-build helper>
      *
      * What it does:
-     * Exposes the launch-info pointer tracked by the client base object.
+     * Exposes the per-owner id lane tracked by this client record.
      */
     [[nodiscard]]
-    LaunchInfoBase* GetLaunchInfo() const
+    int32_t GetOwnerId() const
     {
-      return mLaunchInfo;
+      return mOwnerId;
     }
 
   protected:
     msvc8::string mNickname;
     int mIndex{0};
-    LaunchInfoBase* mLaunchInfo{nullptr};
+    int32_t mOwnerId{0};
   };
   static_assert(sizeof(IClient) == 0x28, "IClient size must be 0x28");
 } // namespace moho

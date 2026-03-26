@@ -18,13 +18,13 @@ namespace gpg::gal
 		 * Address: 0x00945620 (FUN_00945620, scalar deleting destructor thunk)
 		 * Slot: 0
 		 */
-		MeshFormatter* Destroy(std::uint8_t deleteFlags) override = 0;
+		MeshFormatter* Destroy(std::uint8_t deleteFlags) override;
 
 		/**
 		 * Address: 0x009453A0 (FUN_009453A0)
 		 * Slot: 1
 		 */
-		[[nodiscard]] bool AllowMeshInstancing() override = 0;
+		[[nodiscard]] bool AllowMeshInstancing() override;
 
 		/**
 		 * Address: 0x00945640 (FUN_00945640)
@@ -32,7 +32,7 @@ namespace gpg::gal
 		 */
 		[[nodiscard]] std::uintptr_t SelectVertexFormatToken(
 			std::uintptr_t streamToken,
-			std::int32_t layoutVariant) override = 0;
+			std::int32_t layoutVariant) override;
 
 		/**
 		 * Address: 0x009453C0 (FUN_009453C0)
@@ -40,7 +40,7 @@ namespace gpg::gal
 		 */
 		[[nodiscard]] std::uint32_t GetVertexStride(
 			std::int32_t streamClass,
-			std::int32_t sizeVariant) override = 0;
+			std::int32_t sizeVariant) override;
 
 		/**
 		 * Address: 0x009453F0 (FUN_009453F0)
@@ -50,7 +50,7 @@ namespace gpg::gal
 			std::int32_t streamClass,
 			void* destinationVertex,
 			const void* sourceVertex,
-			std::int32_t writeVariant) override = 0;
+			std::int32_t writeVariant) override;
 	};
 
 	static_assert(

@@ -1,0 +1,141 @@
+#include "moho/script/CUnitScriptTaskTypeInfo.h"
+
+#include <new>
+#include <typeinfo>
+
+#include "moho/script/CUnitScriptTask.h"
+
+using namespace moho;
+
+namespace
+{
+  [[nodiscard]] gpg::RType* CachedCUnitScriptTaskType()
+  {
+    gpg::RType* type = CUnitScriptTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CUnitScriptTask));
+      CUnitScriptTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(CCommandTask));
+      CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
+  {
+    return CScriptObject::StaticGetClass();
+  }
+
+  [[nodiscard]] gpg::RType* CachedCommandEventListenerType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Listener<ECommandEvent>));
+    }
+    return type;
+  }
+
+  void AddBaseIfPresent(gpg::RType* const typeInfo, gpg::RType* const baseType, const int offset)
+  {
+    if (!baseType) {
+      return;
+    }
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = offset;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  [[nodiscard]] gpg::RRef MakeCUnitScriptTaskRef(CUnitScriptTask* object)
+  {
+    gpg::RRef ref{};
+    ref.mObj = object;
+    ref.mType = CachedCUnitScriptTaskType();
+    return ref;
+  }
+
+  /**
+   * Address: 0x00623CB0 (FUN_00623CB0, CUnitScriptTaskTypeInfo::newRefFunc_)
+   */
+  [[nodiscard]] gpg::RRef CreateCUnitScriptTaskRefOwned()
+  {
+    return MakeCUnitScriptTaskRef(new CUnitScriptTask());
+  }
+
+  /**
+   * Address: 0x00623D30 (FUN_00623D30, CUnitScriptTaskTypeInfo::deleteFunc_)
+   */
+  void DeleteCUnitScriptTaskOwned(void* object)
+  {
+    delete static_cast<CUnitScriptTask*>(object);
+  }
+
+  /**
+   * Address: 0x00623D50 (FUN_00623D50, CUnitScriptTaskTypeInfo::ctorRefFunc_)
+   */
+  [[nodiscard]] gpg::RRef ConstructCUnitScriptTaskRefInPlace(void* storage)
+  {
+    auto* const task = static_cast<CUnitScriptTask*>(storage);
+    if (task) {
+      new (task) CUnitScriptTask();
+    }
+    return MakeCUnitScriptTaskRef(task);
+  }
+
+  /**
+   * Address: 0x00623DC0 (FUN_00623DC0, CUnitScriptTaskTypeInfo::dtrFunc_)
+   */
+  void DestroyCUnitScriptTaskInPlace(void* object)
+  {
+    auto* const task = static_cast<CUnitScriptTask*>(object);
+    if (task) {
+      task->~CUnitScriptTask();
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x00622DE0 (FUN_00622DE0, scalar deleting thunk)
+ */
+CUnitScriptTaskTypeInfo::~CUnitScriptTaskTypeInfo() = default;
+
+/**
+ * Address: 0x00622DD0 (FUN_00622DD0, ?GetName@CUnitScriptTaskTypeInfo@Moho@@UBEPBDXZ)
+ */
+const char* CUnitScriptTaskTypeInfo::GetName() const
+{
+  return "CUnitScriptTask";
+}
+
+/**
+ * Address: 0x00622D80 (FUN_00622D80, ?Init@CUnitScriptTaskTypeInfo@Moho@@UAEXXZ)
+ */
+void CUnitScriptTaskTypeInfo::Init()
+{
+  size_ = sizeof(CUnitScriptTask);
+  newRefFunc_ = &CreateCUnitScriptTaskRefOwned;
+  ctorRefFunc_ = &ConstructCUnitScriptTaskRefInPlace;
+  deleteFunc_ = &DeleteCUnitScriptTaskOwned;
+  dtrFunc_ = &DestroyCUnitScriptTaskInPlace;
+
+  gpg::RType::Init();
+  version_ = 1;
+
+  AddBaseIfPresent(this, CachedCCommandTaskType(), 0x00);
+  AddBaseIfPresent(this, CachedCScriptObjectType(), 0x30);
+  AddBaseIfPresent(this, CachedCommandEventListenerType(), 0x64);
+
+  Finish();
+}

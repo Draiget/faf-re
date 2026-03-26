@@ -31,6 +31,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* CSimResources::sType = nullptr;
+
   /**
    * Address: 0x00545DC0 (??0CSimResources@Moho@@QAE@@Z)
    *

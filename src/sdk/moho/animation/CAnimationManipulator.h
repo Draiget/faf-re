@@ -5,31 +5,12 @@
 
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/containers/BitStorage32.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 
 namespace moho
 {
-  struct SAniManipBitStorage
-  {
-    std::uint32_t mBitCount;          // +0x00
-    std::uint32_t mReservedWordBase;  // +0x04
-    std::uint32_t* mWords;            // +0x08
-    std::uint32_t* mWordsEnd;         // +0x0C
-    std::uint32_t* mWordsCapacityEnd; // +0x10
-  };
-
-  static_assert(offsetof(SAniManipBitStorage, mBitCount) == 0x00, "SAniManipBitStorage::mBitCount offset must be 0x00");
-  static_assert(
-    offsetof(SAniManipBitStorage, mReservedWordBase) == 0x04,
-    "SAniManipBitStorage::mReservedWordBase offset must be 0x04"
-  );
-  static_assert(offsetof(SAniManipBitStorage, mWords) == 0x08, "SAniManipBitStorage::mWords offset must be 0x08");
-  static_assert(offsetof(SAniManipBitStorage, mWordsEnd) == 0x0C, "SAniManipBitStorage::mWordsEnd offset must be 0x0C");
-  static_assert(
-    offsetof(SAniManipBitStorage, mWordsCapacityEnd) == 0x10,
-    "SAniManipBitStorage::mWordsCapacityEnd offset must be 0x10"
-  );
-  static_assert(sizeof(SAniManipBitStorage) == 0x14, "SAniManipBitStorage size must be 0x14");
+  using SAniManipBitStorage = SBitStorage32;
 
   struct SAniManipOwnerLink
   {

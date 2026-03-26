@@ -1,23 +1,31 @@
 #include "CUnitCommandQueue.h"
 
-#include <algorithm>
 #include <cstddef>
-#include <cstdint>
-#include <iterator>
+
+#include "moho/unit/core/Unit.h"
 
 using namespace moho;
 
 namespace
 {
-  constexpr std::ptrdiff_t kUnitQueueHeadClearLatchOffset = 0x0A2;
+  void RefreshQueueHeadType(CUnitCommandQueue& queue)
+  {
+    if (queue.mCommandVec.empty()) {
+      queue.mCommandType = EUnitCommandType::UNITCOMMAND_None;
+      return;
+    }
 
-  [[nodiscard]] bool IsHeadCommandRepeatLatchType(const CUnitCommandQueue& queue)
+    CUnitCommand* const headCommand = queue.mCommandVec.front().GetObjectPtr();
+    queue.mCommandType = headCommand ? headCommand->mVarDat.mCmdType : EUnitCommandType::UNITCOMMAND_None;
+  }
+
+  [[nodiscard]] bool ShouldMarkOwnerSyncStateForQueueHead(const CUnitCommandQueue& queue)
   {
     if (queue.mCommandVec.empty()) {
       return false;
     }
 
-    const CUnitCommand* const headCommand = queue.mCommandVec.front().get();
+    const CUnitCommand* const headCommand = queue.mCommandVec.front().GetObjectPtr();
     if (!headCommand) {
       return false;
     }
@@ -41,32 +49,21 @@ namespace
     }
   }
 
-  void MarkOwningUnitQueueClearLatch(Unit* const unit)
+  void MarkOwningUnitSyncDirty(Unit* const unit)
   {
     if (!unit) {
       return;
     }
-
-    // TODO(layout): this byte is still an unresolved Unit base-field in current SDK layouts.
-    auto* const raw = reinterpret_cast<std::uint8_t*>(unit);
-    raw[kUnitQueueHeadClearLatchOffset] = 1;
+    unit->MarkNeedsSyncGameData();
   }
 
-  void ReleaseCommandVectorStorage(gpg::core::FastVector<boost::shared_ptr<CUnitCommand>>& commandVec)
+  void ReleaseCommandVectorStorage(msvc8::vector<WeakPtr<CUnitCommand>>& commandVec)
   {
-    commandVec = gpg::core::FastVector<boost::shared_ptr<CUnitCommand>>{};
-  }
-
-  void UnlinkBroadcasterNode(Broadcaster& node)
-  {
-    if (node.unk0) {
-      node.unk0->unk1 = node.unk1;
+    while (!commandVec.empty()) {
+      commandVec.back().ResetFromObject(nullptr);
+      commandVec.pop_back();
     }
-    if (node.unk1) {
-      node.unk1->unk0 = node.unk0;
-    }
-    node.unk1 = &node;
-    node.unk0 = &node;
+    commandVec = msvc8::vector<WeakPtr<CUnitCommand>>{};
   }
 } // namespace
 
@@ -78,15 +75,14 @@ namespace
  */
 int CUnitCommandQueue::FindCommandIndex(const CmdId cmdId) const
 {
-  const auto it =
-    std::find_if(mCommandVec.begin(), mCommandVec.end(), [cmdId](const boost::shared_ptr<CUnitCommand>& command) {
-    return command && command->mConstDat.cmd == cmdId;
-  });
-  if (it == mCommandVec.end()) {
-    return -1;
+  for (std::size_t i = 0; i < mCommandVec.size(); ++i) {
+    const CUnitCommand* const command = mCommandVec[i].GetObjectPtr();
+    if (command && command->mConstDat.cmd == cmdId) {
+      return static_cast<int>(i);
+    }
   }
 
-  return static_cast<int>(std::distance(mCommandVec.begin(), it));
+  return -1;
 }
 
 /**
@@ -97,21 +93,13 @@ int CUnitCommandQueue::FindCommandIndex(const CmdId cmdId) const
  */
 bool CUnitCommandQueue::RemoveCommandFromQueue(const CUnitCommand* command)
 {
-  if (!command) {
-    return false;
+  for (std::size_t i = 0; i < mCommandVec.size(); ++i) {
+    if (mCommandVec[i].GetObjectPtr() == command) {
+      return RemoveCommandFromQueue(static_cast<int>(i));
+    }
   }
 
-  const auto it = std::find_if(
-    mCommandVec.begin(), mCommandVec.end(), [command](const boost::shared_ptr<CUnitCommand>& queuedCommand) {
-    return queuedCommand.get() == command;
-  }
-  );
-  if (it == mCommandVec.end()) {
-    return false;
-  }
-
-  const int index = static_cast<int>(std::distance(mCommandVec.begin(), it));
-  return RemoveCommandFromQueue(index);
+  return false;
 }
 
 /**
@@ -126,11 +114,19 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const int index)
     return false;
   }
 
-  if (index == 0 && IsHeadCommandRepeatLatchType(*this)) {
-    MarkOwningUnitQueueClearLatch(mUnit);
+  const std::size_t queueIndex = static_cast<std::size_t>(index);
+  if (queueIndex == 0u && ShouldMarkOwnerSyncStateForQueueHead(*this)) {
+    MarkOwningUnitSyncDirty(mUnit);
   }
 
-  mCommandVec.erase(mCommandVec.begin() + index);
+  CUnitCommand* const command = mCommandVec[queueIndex].GetObjectPtr();
+  if (command) {
+    command->RemoveUnit(mUnit, mCommandVec);
+  } else {
+    EraseWeakVectorEntry(mCommandVec, queueIndex);
+  }
+
+  RefreshQueueHeadType(*this);
   mNeedsRefresh = true;
   return true;
 }
@@ -139,18 +135,25 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const int index)
  * Address: 0x006EE2D0 (FUN_006EE2D0)
  *
  * What it does:
- * Clears queued commands in reverse order and resets queue-local cleanup state.
+ * Clears queued commands in reverse order, marks owner sync dirty when needed,
+ * and resets queue-local cleanup state.
  */
 void CUnitCommandQueue::ClearCommandQueue()
 {
-  if (IsHeadCommandRepeatLatchType(*this)) {
-    MarkOwningUnitQueueClearLatch(mUnit);
+  if (ShouldMarkOwnerSyncStateForQueueHead(*this)) {
+    MarkOwningUnitSyncDirty(mUnit);
   }
 
-  for (int i = static_cast<int>(mCommandVec.size()) - 1; i >= 0; --i) {
-    RemoveCommandFromQueue(i);
+  while (!mCommandVec.empty()) {
+    CUnitCommand* const command = mCommandVec.back().GetObjectPtr();
+    if (command) {
+      command->RemoveUnit(mUnit, mCommandVec);
+    } else {
+      EraseWeakVectorEntry(mCommandVec, mCommandVec.size() - 1u);
+    }
   }
 
+  mCommandType = EUnitCommandType::UNITCOMMAND_None;
   unk0 = 0;
   mNeedsRefresh = true;
 }
@@ -176,5 +179,5 @@ void CUnitCommandQueue::DestroyForUnitKillCleanup()
 {
   ClearCommandQueue();
   ReleaseCommandVectorStorage(mCommandVec);
-  UnlinkBroadcasterNode(*this);
+  ListUnlink();
 }

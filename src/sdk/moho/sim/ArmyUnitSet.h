@@ -8,6 +8,9 @@
 namespace moho
 {
   class Entity;
+  class Unit;
+  template <class T>
+  class EntitySetTemplate;
 
   /**
    * Address context:
@@ -22,6 +25,25 @@ namespace moho
    */
   struct SEntitySetTemplateUnit : TDatList<SEntitySetTemplateUnit, void>
   {
+    [[nodiscard]] static Unit* UnitFromEntry(Entity* entity) noexcept;
+    [[nodiscard]] static const Unit* UnitFromEntry(const Entity* entity) noexcept;
+
+    [[nodiscard]] bool Empty() const noexcept;
+    [[nodiscard]] std::size_t Size() const noexcept;
+    void Clear() noexcept;
+
+    [[nodiscard]] bool ContainsEntity(const Entity* entity) const noexcept;
+    void AppendUniqueEntity(Entity* entity);
+
+    [[nodiscard]] bool ContainsUnit(const Unit* unit) const noexcept;
+    [[nodiscard]] bool AddUnit(Unit* unit);
+    [[nodiscard]] bool RemoveUnit(Unit* unit);
+
+    void AddUnits(const EntitySetTemplate<Unit>& source);
+    void CopyTo(EntitySetTemplate<Unit>& out) const;
+    [[nodiscard]] unsigned int CountLiveUnits() const;
+    void CopyLiveUnitsTo(EntitySetTemplate<Unit>& out) const;
+
     gpg::fastvector_n<Entity*, 4> mVec; // +0x08
   };
 

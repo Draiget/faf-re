@@ -49,10 +49,15 @@ namespace moho
   /**
    * Address: 0x00651920 (FUN_00651920)
    */
-  void RDebugOverlayClass::RegisterOverlayClassToken(const char* const overlayToken)
+  void RDebugOverlayClass::RegisterOverlayClass(const char* const overlayDescription, const char* const overlayToken)
   {
     mOverlayToken = overlayToken ? overlayToken : "";
-    mOverlayTypeName = GetName();
+    mOverlayDescription = overlayDescription ? overlayDescription : "";
     mOverlayClassLink.ListLinkAfter(&GlobalDebugOverlayClassList());
+  }
+
+  void RDebugOverlayClass::RegisterOverlayClassToken(const char* const overlayToken)
+  {
+    RegisterOverlayClass(GetName(), overlayToken);
   }
 } // namespace moho

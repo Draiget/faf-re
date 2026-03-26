@@ -7,6 +7,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
+#include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/CSndParams.h"
 #include "moho/audio/CSndVar.h"
@@ -31,16 +32,16 @@ namespace moho
 
   struct SoundHandleRecord
   {
-    std::uint32_t mHandleId;         // +0x00
-    std::uint32_t mFlags;            // +0x04
-    IXACTCue* mCue;                  // +0x08
-    CSndParams* mParams;             // +0x0C
-    void* mEntityLoopState;          // +0x10
-    std::int32_t mLoopIndex;         // +0x14 (-1 when inactive)
-    void* mEntitySetRoot;            // +0x18
-    void* mEntitySetSentinel;        // +0x1C
-    std::uint32_t mRpcVariableValue; // +0x20
-    float mPlayingSeconds;           // +0x24
+    std::uint32_t mHandleId = 0;         // +0x00
+    std::uint32_t mFlags = 0;            // +0x04
+    IXACTCue* mCue = nullptr;            // +0x08
+    CSndParams* mParams = nullptr;       // +0x0C
+    void* mEntityLoopState = nullptr;    // +0x10
+    std::int32_t mLoopIndex = -1;        // +0x14 (-1 when inactive)
+    void* mEntitySetRoot = nullptr;      // +0x18
+    void* mEntitySetSentinel = nullptr;  // +0x1C
+    std::uint32_t mRpcVariableValue = 0; // +0x20
+    float mPlayingSeconds = 0.0f;        // +0x24
   };
 
   struct ListenerArmyHook
@@ -62,6 +63,7 @@ namespace moho
   );
 
   static_assert(sizeof(ListenerArmyHook) == 0x08, "ListenerArmyHook size must be 0x08");
+  static_assert(sizeof(msvc8::set<IXACTCue*>) == 0x0C, "msvc8::set<IXACTCue*> size must be 0x0C");
 
   /**
    * VFTABLE: 0x00E4C444
@@ -77,6 +79,24 @@ namespace moho
       DistanceCulled = 2,
       LosCulled = 3,
     };
+
+    /**
+     * Address: 0x008AA800 (FUN_008AA800, ??0CUserSoundManager@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes default sound-handle pools, per-category vars, and primary
+     * voice-engine ownership for user audio playback.
+     */
+    CUserSoundManager();
+
+    /**
+     * Address: 0x008AAA10 (FUN_008AAA10, ??1CUserSoundManager@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Unhooks intrusive listener/list entries and releases owned user-audio
+     * resources.
+     */
+    ~CUserSoundManager();
 
     /**
      * Address: 0x008AC0B0 (FUN_008AC0B0)
@@ -98,7 +118,7 @@ namespace moho
      * Address: 0x008AB770 (FUN_008AB770)
      * Slot: 1
      *
-     * float frameSeconds, float simSeconds
+     * float simDeltaSeconds, float frameSeconds
      *
      * IDA signature:
      * int __thiscall Moho::CUserSoundManager::Frame(Moho::CUserSoundManager *this, float a2, float a3);
@@ -107,7 +127,7 @@ namespace moho
      * Updates listener transform and active handles, runs ducking updates, and
      * destroys finished cues.
      */
-    void Frame(float frameSeconds, float simSeconds) override;
+    void Frame(float simDeltaSeconds, float frameSeconds) override;
 
     /**
      * Address: 0x008AAF30 (FUN_008AAF30)
@@ -244,11 +264,9 @@ namespace moho
     std::uint32_t mReserved13C;                              // +0x13C
     gpg::fastvector_n<SoundHandleRecord, 256> mSoundHandles; // +0x140
 
-    std::uint32_t mReserved2950;           // +0x2950
-    void* mPendingDestroyCueTree;          // +0x2954
-    std::uint32_t mPendingDestroyCueCount; // +0x2958
-    ListenerArmyHook mListenerArmyHook;    // +0x295C
-    TDatList<HSound, void> mActiveLoops;   // +0x2964
+    msvc8::set<IXACTCue*> mPendingDestroyCues; // +0x2950
+    ListenerArmyHook mListenerArmyHook;        // +0x295C
+    TDatList<HSound, void> mActiveLoops;       // +0x2964
 
     boost::shared_ptr<AudioEngine> mAmbientEngine;  // +0x296C
     boost::shared_ptr<AudioEngine> mTutorialEngine; // +0x2974
@@ -257,7 +275,7 @@ namespace moho
     CSndVar mCameraDistanceVar;         // +0x2984
     CSndVar mZoomPercentVar;            // +0x29A4
     float mCurrentCameraDistanceMetric; // +0x29C4
-    std::uint8_t mEnableCameraMetrics;  // +0x29C8
+    std::uint8_t mWorldSoundsEnabled;   // +0x29C8
     std::uint8_t mReserved29C9[0x03];   // +0x29C9
     msvc8::string mLanguageTag;         // +0x29CC
 
@@ -279,11 +297,8 @@ namespace moho
     offsetof(CUserSoundManager, mSoundHandles) == 0x140, "CUserSoundManager::mSoundHandles offset must be 0x140"
   );
   static_assert(
-    offsetof(CUserSoundManager, mReserved2950) == 0x2950, "CUserSoundManager::mReserved2950 offset must be 0x2950"
-  );
-  static_assert(
-    offsetof(CUserSoundManager, mPendingDestroyCueTree) == 0x2954,
-    "CUserSoundManager::mPendingDestroyCueTree offset must be 0x2954"
+    offsetof(CUserSoundManager, mPendingDestroyCues) == 0x2950,
+    "CUserSoundManager::mPendingDestroyCues offset must be 0x2950"
   );
   static_assert(
     offsetof(CUserSoundManager, mListenerArmyHook) == 0x295C,

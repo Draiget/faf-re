@@ -6,6 +6,7 @@
 #include "Entity.h"
 #include "legacy/containers/Tree.h"
 #include "moho/containers/BVIntSet.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
@@ -39,6 +40,36 @@ namespace
       return node.key < key;
     }
     );
+  }
+
+  [[nodiscard]] moho::CEntityDbAllUnitsNode*
+  NextNodeInAllUnitsTree(moho::CEntityDbAllUnitsNode* node) noexcept
+  {
+    if (node == nullptr || node->isNil != 0u) {
+      return node;
+    }
+
+    moho::CEntityDbAllUnitsNode* childOrParent = node->right;
+    if (childOrParent == nullptr) {
+      return nullptr;
+    }
+
+    if (childOrParent->isNil != 0u) {
+      for (moho::CEntityDbAllUnitsNode* next = node->parent; next != nullptr && next->isNil == 0u; next = next->parent) {
+        if (node != next->right) {
+          return next;
+        }
+        node = next;
+      }
+      return (node != nullptr) ? node->parent : nullptr;
+    }
+
+    moho::CEntityDbAllUnitsNode* next = childOrParent->left;
+    while (next != nullptr && next->isNil == 0u) {
+      childOrParent = next;
+      next = next->left;
+    }
+    return childOrParent;
   }
 
   [[nodiscard]] bool
@@ -133,6 +164,27 @@ namespace moho
   CEntityDbAllUnitsNode* CEntityDb::AllUnitsEnd() const
   {
     return TreeLowerBound(mAllUnits, kAllUnitsUnitTypeBoundaryKey);
+  }
+
+  /**
+   * Address: 0x005C87A0 (FUN_005C87A0, Moho::CUnitIterAllArmies::Next)
+   */
+  CEntityDbAllUnitsNode* CEntityDb::NextAllUnitsNode(CEntityDbAllUnitsNode* node) noexcept
+  {
+    return NextNodeInAllUnitsTree(node);
+  }
+
+  /**
+   * Address: 0x005C87A0 callsite shape (Moho::CUnitIterAllArmies payload)
+   */
+  Unit* CEntityDb::UnitFromAllUnitsNode(const CEntityDbAllUnitsNode* const node) noexcept
+  {
+    if (node == nullptr || node->unitListNode == nullptr) {
+      return nullptr;
+    }
+
+    auto* const entitySubobject = reinterpret_cast<Entity*>(node->unitListNode);
+    return static_cast<Unit*>(entitySubobject);
   }
 
   /**

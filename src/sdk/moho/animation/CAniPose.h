@@ -22,6 +22,15 @@ namespace moho
 
     ~CAniPose() = default;
 
+    /**
+     * Address: 0x005E3B10 (FUN_005E3B10, ?GetSkeleton@CAniPose@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+     *
+     * What it does:
+     * Returns a retained copy of this pose's skeleton shared handle.
+     */
+    [[nodiscard]]
+    boost::shared_ptr<const CAniSkel> GetSkeleton() const;
+
   public:
     boost::shared_ptr<const CAniSkel> mSkeleton; // +0x00
     float mScale;                                // +0x08

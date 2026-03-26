@@ -1,105 +1,40 @@
-﻿// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-#include "legacy/containers/String.h"
+#include <cstddef>
 
-namespace gpg
-{
-  class REnumType;
-  class RIndexed;
-  class RRef;
-  class RType;
-} // namespace gpg
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
   /**
    * VFTABLE: 0x00E1B70C
    * COL:  0x00E70ECC
-   * Source hints:
-   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
    */
-  class IAiBuilderTypeInfo
+  class IAiBuilderTypeInfo : public gpg::RType
   {
   public:
     /**
-     * Address: 0x00401370
-     * Slot: 0
-     * Demangled: public: virtual class gpg::RType near * __thiscall gpg::RType::GetClass(void)const
+     * Address: 0x0059EE20 (FUN_0059EE20, scalar deleting thunk)
+     *
+     * VFTable SLOT: 2
      */
-    virtual gpg::RType* GetClass() const = 0;
+    ~IAiBuilderTypeInfo() override;
 
     /**
-     * Address: 0x00401390
-     * Slot: 1
-     * Demangled: public: virtual class gpg::RRef __thiscall gpg::RType::GetDerivedObjectRef(void)
+     * Address: 0x0059EE10 (FUN_0059EE10, ?GetName@IAiBuilderTypeInfo@Moho@@UBEPBDXZ)
+     *
+     * VFTable SLOT: 3
      */
-    virtual gpg::RRef GetDerivedObjectRef() = 0;
+    [[nodiscard]]
+    const char* GetName() const override;
 
     /**
-     * Address: 0x0059EE20
-     * Slot: 2
-     * Demangled: (likely scalar deleting destructor thunk)
+     * Address: 0x0059EDF0 (FUN_0059EDF0, ?Init@IAiBuilderTypeInfo@Moho@@UAEXXZ)
+     *
+     * VFTable SLOT: 9
      */
-    virtual ~IAiBuilderTypeInfo() = default;
-
-    /**
-     * Address: 0x0059EE10
-     * Slot: 3
-     * Demangled: Moho::IAiBuilderTypeInfo::GetName
-     */
-    virtual const char* GetName() const = 0;
-
-    /**
-     * Address: 0x008DB100
-     * Slot: 4
-     * Demangled: public: virtual class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char>>
-     * __thiscall gpg::RType::GetLexical(class gpg::RRef const near &)const
-     */
-    virtual msvc8::string GetLexical(gpg::RRef const&) const = 0;
-
-    /**
-     * Address: 0x008D86E0
-     * Slot: 5
-     * Demangled: public: virtual bool __thiscall gpg::RType::SetLexical(class gpg::RRef const near &,char const near
-     * *)const
-     */
-    virtual bool SetLexical(gpg::RRef const&, char const*) const = 0;
-
-    /**
-     * Address: 0x004013B0
-     * Slot: 6
-     * Demangled: public: virtual struct gpg::RIndexed const near * __thiscall gpg::RType::IsIndexed(void)const
-     */
-    virtual gpg::RIndexed const* IsIndexed() const = 0;
-
-    /**
-     * Address: 0x004013C0
-     * Slot: 7
-     * Demangled: public: virtual struct gpg::RIndexed const near * __thiscall gpg::RType::IsPointer(void)const
-     */
-    virtual gpg::RIndexed const* IsPointer() const = 0;
-
-    /**
-     * Address: 0x004013D0
-     * Slot: 8
-     * Demangled: public: virtual class gpg::REnumType const near * __thiscall gpg::RType::IsEnumType(void)const
-     */
-    virtual gpg::REnumType const* IsEnumType() const = 0;
-
-    /**
-     * Address: 0x0059EDF0
-     * Slot: 9
-     * Demangled: Moho::IAiBuilderTypeInfo::Init
-     */
-    virtual void Init() = 0;
-
-    /**
-     * Address: 0x008DF4A0
-     * Slot: 10
-     * Demangled: protected: virtual void __thiscall gpg::RType::Finish(void)
-     */
-    virtual void Finish() = 0;
+    void Init() override;
   };
+
+  static_assert(sizeof(IAiBuilderTypeInfo) == 0x64, "IAiBuilderTypeInfo size must be 0x64");
 } // namespace moho

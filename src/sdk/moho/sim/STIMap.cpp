@@ -8,6 +8,10 @@
 #include <limits>
 #include <new>
 
+#include "moho/sim/COGrid.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/sim/Sim.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaTableIterator.h"
@@ -189,56 +193,6 @@ namespace
     out = tmp;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject
-  GetLuaTableField(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const char* fieldName)
-  {
-    if (!state || !fieldName || !*fieldName || !tableObj || !tableObj.IsTable()) {
-      return {};
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return {};
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObj).PushStack(lstate);
-    lua_pushstring(lstate, fieldName);
-    lua_gettable(lstate, -2);
-    LuaPlus::LuaObject result{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(lstate, savedTop);
-    return result;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* state, const char* modulePath)
-  {
-    if (!state || !modulePath || !*modulePath) {
-      return {};
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return {};
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    lua_getglobal(lstate, "import");
-    if (!lua_isfunction(lstate, -1)) {
-      lua_settop(lstate, savedTop);
-      return {};
-    }
-
-    lua_pushstring(lstate, modulePath);
-    if (lua_pcall(lstate, 1, 1, 0) != 0) {
-      lua_settop(lstate, savedTop);
-      return {};
-    }
-
-    LuaPlus::LuaObject moduleObj{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(lstate, savedTop);
-    return moduleObj;
-  }
-
   [[nodiscard]] bool
   DoScriptIntoEnv(LuaPlus::LuaState* state, const char* scriptPath, const LuaPlus::LuaObject& envTable)
   {
@@ -316,17 +270,6 @@ namespace
     return value;
   }
 
-  [[nodiscard]] bool IsVec3NotNaN(const Wm3::Vec3f& value) noexcept
-  {
-    return !std::isnan(value.x) && !std::isnan(value.y) && !std::isnan(value.z);
-  }
-
-  [[nodiscard]] Wm3::Vec3f GetNaNVec() noexcept
-  {
-    const float qnan = std::numeric_limits<float>::quiet_NaN();
-    return {qnan, qnan, qnan};
-  }
-
   [[nodiscard]] Wm3::Vec3f PointOnLine(const moho::GeomLine3& line, const float t) noexcept
   {
     return {line.pos.x + line.dir.x * t, line.pos.y + line.dir.y * t, line.pos.z + line.dir.z * t};
@@ -344,13 +287,13 @@ namespace
   {
     const float dotDen = line.dir.x * plane.dir.x + line.dir.y * plane.dir.y + line.dir.z * plane.dir.z;
     if (dotDen == 0.0f) {
-      return GetNaNVec();
+      return Wm3::Vec3f::NaN();
     }
 
     const float dotPos = line.pos.x * plane.dir.x + line.pos.y * plane.dir.y + line.pos.z * plane.dir.z;
     const float t = (plane.dist - dotPos) / dotDen;
     if (t < line.closest || line.farthest < t) {
-      return GetNaNVec();
+      return Wm3::Vec3f::NaN();
     }
 
     if (outHit) {
@@ -361,6 +304,29 @@ namespace
   }
 
   constexpr float kHeightWordScale = 0.0078125f;
+  constexpr float kNoWaterElevation = -10000.0f;
+
+  [[nodiscard]] constexpr std::uint8_t OccupancyMask(const moho::EOccupancyCaps caps) noexcept
+  {
+    return static_cast<std::uint8_t>(caps);
+  }
+
+  [[nodiscard]] constexpr moho::EOccupancyCaps ToOccupancyCaps(const std::uint8_t mask) noexcept
+  {
+    return static_cast<moho::EOccupancyCaps>(mask);
+  }
+
+  constexpr std::uint8_t kOccLand = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_LAND);
+  constexpr std::uint8_t kOccSeabed = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED);
+  constexpr std::uint8_t kOccSub = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SUB);
+  constexpr std::uint8_t kOccWater = static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_WATER);
+  constexpr std::uint8_t kOccLandSeabed = static_cast<std::uint8_t>(kOccLand | kOccSeabed);
+  constexpr std::uint8_t kOccWaterSubSeabed = static_cast<std::uint8_t>(kOccWater | kOccSub | kOccSeabed);
+
+  [[nodiscard]] constexpr std::uint8_t RemoveCaps(const std::uint8_t mask, const std::uint8_t bitsToClear) noexcept
+  {
+    return static_cast<std::uint8_t>(mask & static_cast<std::uint8_t>(~bitsToClear));
+  }
 
   struct GridTraversalLine
   {
@@ -1222,7 +1188,7 @@ namespace moho
 
     CGeomHitResult* const hit = res ? res : &temp;
     if (!DoIntersection(line.pos, line.dir, line.closest, line.farthest, hit)) {
-      return GetNaNVec();
+      return Wm3::Vec3f::NaN();
     }
 
     return PointOnLine(line, hit->distance);
@@ -1440,6 +1406,80 @@ namespace moho
   }
 
   /**
+   * Address: 0x00577F20 (FUN_00577F20)
+   *
+   * unsigned int z, unsigned int x
+   *
+   * IDA signature:
+   * bool __usercall Moho::STIMap::IsBlockingTerrain@<al>(Moho::STIMap *this@<ecx>, unsigned int x@<edi>, unsigned int y@<esi>);
+   *
+   * What it does:
+   * Returns whether terrain cell `(x,z)` is blocked by map terrain-type flags.
+   */
+  bool STIMap::IsBlockingTerrain(const std::uint32_t z, const std::uint32_t x) const
+  {
+    const CHeightField* const field = mHeightField.get();
+    return x >= static_cast<std::uint32_t>(field->width - 1) ||
+           z >= static_cast<std::uint32_t>(field->height - 1) ||
+           mBlocking[mTerrainType.data[static_cast<std::size_t>(z) * static_cast<std::size_t>(mTerrainType.width) + x]] != 0u;
+  }
+
+  /**
+   * Address: 0x00564DF0 (FUN_00564DF0)
+   *
+   * Moho::SOCellPos const &, Moho::SFootprint const &
+   *
+   * IDA signature:
+   * Moho::EOccupancyCaps callcnv_F3 Moho::STIMap::OccupancyCapsOfFootprintAt@<al>(Moho::SOCellPos *pos@<eax>, Moho::STIMap *map@<ecx>, const Moho::SFootprint *fp);
+   *
+   * What it does:
+   * Computes terrain/water/slope occupancy caps for one footprint origin.
+   */
+  EOccupancyCaps STIMap::OccupancyCapsOfFootprintAt(const SOCellPos& pos, const SFootprint& footprint) const
+  {
+    const CHeightField* const field = mHeightField.get();
+    const std::uint32_t x = static_cast<std::uint32_t>(static_cast<std::int32_t>(pos.x));
+    const std::uint32_t z = static_cast<std::uint32_t>(static_cast<std::int32_t>(pos.z));
+    if (x >= static_cast<std::uint32_t>(field->width - 1) ||
+        z >= static_cast<std::uint32_t>(field->height - 1) ||
+        IsBlockingTerrain(z, x)) {
+      return static_cast<EOccupancyCaps>(0u);
+    }
+
+    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    const std::size_t row0 = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
+    const std::size_t row1 = static_cast<std::size_t>(z + 1u) * static_cast<std::size_t>(field->width);
+
+    const std::uint16_t h00 = field->data[row0 + x];
+    const std::uint16_t h10 = field->data[row0 + x + 1u];
+    const std::uint16_t h01 = field->data[row1 + x];
+    const std::uint16_t h11 = field->data[row1 + x + 1u];
+
+    const std::uint16_t minHeight = std::min(std::min(h00, h10), std::min(h01, h11));
+    const std::uint16_t maxHeight = std::max(std::max(h00, h10), std::max(h01, h11));
+
+    std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);
+    if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
+      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+    }
+    if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
+      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    }
+
+    if ((capsMask & kOccLandSeabed) != 0u && footprint.mMaxSlope != 0.0f) {
+      int maxDelta = std::abs(static_cast<int>(h11) - static_cast<int>(h01));
+      maxDelta = std::max(maxDelta, std::abs(static_cast<int>(h11) - static_cast<int>(h10)));
+      maxDelta = std::max(maxDelta, std::abs(static_cast<int>(h01) - static_cast<int>(h00)));
+      maxDelta = std::max(maxDelta, std::abs(static_cast<int>(h10) - static_cast<int>(h00)));
+      if (static_cast<float>(maxDelta) * kHeightWordScale > footprint.mMaxSlope) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+      }
+    }
+
+    return ToOccupancyCaps(capsMask);
+  }
+
+  /**
    * Address: 0x00577F60 (FUN_00577F60)
    *
    * LuaPlus::LuaState *
@@ -1463,7 +1503,7 @@ namespace moho
 
     bool loaded = DoScriptIntoEnv(state, "/lua/TerrainTypes.lua", scriptEnv);
     if (!loaded) {
-      LuaPlus::LuaObject imported = ImportLuaModule(state, "/lua/TerrainTypes.lua");
+      LuaPlus::LuaObject imported = moho::SCR_ImportLuaModule(state, "/lua/TerrainTypes.lua");
       if (imported) {
         scriptEnv = imported;
         loaded = true;
@@ -1475,7 +1515,7 @@ namespace moho
       return;
     }
 
-    LuaPlus::LuaObject terrainTypesTable = GetLuaTableField(state, scriptEnv, "TerrainTypes");
+    LuaPlus::LuaObject terrainTypesTable = moho::SCR_GetLuaTableField(state, scriptEnv, "TerrainTypes");
     if (!terrainTypesTable || !terrainTypesTable.IsTable()) {
       scriptEnv.Reset();
       return;
@@ -1488,7 +1528,7 @@ namespace moho
         continue;
       }
 
-      LuaPlus::LuaObject typeCodeObj = GetLuaTableField(state, entry, "TypeCode");
+      LuaPlus::LuaObject typeCodeObj = moho::SCR_GetLuaTableField(state, entry, "TypeCode");
       if (typeCodeObj.IsNil()) {
         continue;
       }
@@ -1500,11 +1540,11 @@ namespace moho
     ConstructTerrainTypes(mTerrainTypes, static_cast<std::uint32_t>(kTerrainTypeCount), defaultTerrainType);
 
     for (LuaPlus::LuaObject* it = parsedEntries.begin(); it != parsedEntries.end(); ++it) {
-      LuaPlus::LuaObject typeCodeObj = GetLuaTableField(state, *it, "TypeCode");
+      LuaPlus::LuaObject typeCodeObj = moho::SCR_GetLuaTableField(state, *it, "TypeCode");
       const std::uint8_t typeCode = static_cast<std::uint8_t>(static_cast<int>(typeCodeObj.GetNumber()));
       mTerrainTypes.ttvec.begin()[typeCode] = *it;
 
-      LuaPlus::LuaObject blockingObj = GetLuaTableField(state, *it, "Blocking");
+      LuaPlus::LuaObject blockingObj = moho::SCR_GetLuaTableField(state, *it, "Blocking");
       if (!blockingObj.IsNil() && blockingObj.GetBoolean()) {
         mBlocking[typeCode] = 1u;
       }
@@ -1578,7 +1618,7 @@ namespace moho
     LuaPlus::LuaObject terrainType = GetTerrainType(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(z));
     if (terrainType.IsTable()) {
       LuaPlus::LuaState* const state = terrainType.GetActiveState();
-      LuaPlus::LuaObject heightOffset = GetLuaTableField(state, terrainType, "HeightOffset");
+      LuaPlus::LuaObject heightOffset = moho::SCR_GetLuaTableField(state, terrainType, "HeightOffset");
       if (!heightOffset.IsNil()) {
         value = static_cast<float>(heightOffset.GetNumber());
       }
@@ -1631,7 +1671,7 @@ namespace moho
   {
     CHeightField* const field = mHeightField.get();
     if (!field) {
-      return GetNaNVec();
+      return Wm3::Vec3f::NaN();
     }
 
     if (mWaterEnabled == 0u) {
@@ -1640,11 +1680,11 @@ namespace moho
       const Wm3::AxisAlignedBox3f terrainBounds = field->GetTierBox(0, 0, tierCount);
       const Wm3::Vec3f terrainHit = field->Intersection(line, reinterpret_cast<CGeomHitResult*>(res));
 
-      if (res && IsVec3NotNaN(terrainHit)) {
+      if (res && Wm3::Vec3f::IsntNaN(terrainHit)) {
         res->hitKind = 1;
       }
 
-      if (IsVec3NotNaN(terrainHit) && terrainHit.y > terrainBounds.Min.y) {
+      if (Wm3::Vec3f::IsntNaN(terrainHit) && terrainHit.y > terrainBounds.Min.y) {
         return terrainHit;
       }
 
@@ -1670,11 +1710,11 @@ namespace moho
     }
 
     const Wm3::Vec3f terrainHit = field->Intersection(line, reinterpret_cast<CGeomHitResult*>(res));
-    if (res && IsVec3NotNaN(terrainHit)) {
+    if (res && Wm3::Vec3f::IsntNaN(terrainHit)) {
       res->hitKind = 1;
     }
 
-    if (terrainHit.y < mWaterElevation || !IsVec3NotNaN(terrainHit)) {
+    if (terrainHit.y < mWaterElevation || !Wm3::Vec3f::IsntNaN(terrainHit)) {
       VecDist plane{};
       plane.dir.x = 0.0f;
       plane.dir.y = 1.0f;
@@ -1711,6 +1751,194 @@ namespace moho
     }
 
     return mWaterElevation > terrainElevation ? mWaterElevation : terrainElevation;
+  }
+
+  /**
+   * Address: 0x00564AB0 (FUN_00564AB0, ?OCCUPY_MobileCheck@Moho@@YA?AW4ELayer@1@ABUSFootprint@1@ABUSOCellPos@1@PBVSTIMap@1@@Z)
+   *
+   * Moho::SFootprint const &, Moho::STIMap const &, Moho::SOCellPos const &
+   *
+   * IDA signature:
+   * Moho::EOccupancyCaps callcnv_F3 Moho::OCCUPY_MobileCheck@<al>(const Moho::SFootprint *a1, Moho::STIMap *map, Moho::SOCellPos *v1@<ecx>);
+   *
+   * What it does:
+   * Computes dynamic occupancy caps for multi-cell footprints using terrain,
+   * blocking-map, depth, and slope checks.
+   */
+  EOccupancyCaps OCCUPY_MobileCheck(const SFootprint& footprint, const STIMap& map, const SOCellPos& pos)
+  {
+    const int x0 = static_cast<int>(pos.x);
+    const int z0 = static_cast<int>(pos.z);
+    const int x1 = x0 + static_cast<int>(footprint.mSizeX);
+    const int z1 = z0 + static_cast<int>(footprint.mSizeZ);
+    if (x0 < 0 || z0 < 0) {
+      return static_cast<EOccupancyCaps>(0u);
+    }
+
+    const CHeightField* const field = map.mHeightField.get();
+    if (static_cast<std::uint32_t>(x1) > static_cast<std::uint32_t>(field->width - 1) ||
+        static_cast<std::uint32_t>(z1) > static_cast<std::uint32_t>(field->height - 1)) {
+      return static_cast<EOccupancyCaps>(0u);
+    }
+
+    const float waterElevation = map.mWaterEnabled != 0u ? map.mWaterElevation : kNoWaterElevation;
+
+    std::uint32_t maxHeight = 0u;
+    std::uint32_t minHeight = std::numeric_limits<std::uint32_t>::max();
+    for (int z = z0; z <= z1; ++z) {
+      const std::size_t row = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
+      for (int x = x0; x <= x1; ++x) {
+        const std::uint32_t sample = static_cast<std::uint32_t>(field->data[row + static_cast<std::size_t>(x)]);
+        if (sample < minHeight) {
+          minHeight = sample;
+        }
+        if (sample > maxHeight) {
+          maxHeight = sample;
+        }
+
+        if (map.IsBlockingTerrain(static_cast<std::uint32_t>(z), static_cast<std::uint32_t>(x))) {
+          return static_cast<EOccupancyCaps>(0u);
+        }
+      }
+    }
+
+    std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);
+    if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
+      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+    }
+    if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
+      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    }
+
+    if ((capsMask & kOccLandSeabed) != 0u && footprint.mMaxSlope != 0.0f) {
+      int maxDelta = 0;
+
+      for (int z = z0; z <= z1; ++z) {
+        const std::size_t row = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
+        int previous = static_cast<int>(field->data[row + static_cast<std::size_t>(x0)]);
+        for (int x = x0 + 1; x <= x1; ++x) {
+          const int current = static_cast<int>(field->data[row + static_cast<std::size_t>(x)]);
+          maxDelta = std::max(maxDelta, std::abs(current - previous));
+          previous = current;
+        }
+      }
+
+      for (int x = x0; x <= x1; ++x) {
+        std::size_t row = static_cast<std::size_t>(z0) * static_cast<std::size_t>(field->width);
+        int previous = static_cast<int>(field->data[row + static_cast<std::size_t>(x)]);
+        for (int z = z0 + 1; z <= z1; ++z) {
+          row = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
+          const int current = static_cast<int>(field->data[row + static_cast<std::size_t>(x)]);
+          maxDelta = std::max(maxDelta, std::abs(current - previous));
+          previous = current;
+        }
+      }
+
+      if (static_cast<float>(maxDelta) * kHeightWordScale > footprint.mMaxSlope) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+      }
+    }
+
+    return ToOccupancyCaps(capsMask);
+  }
+
+  /**
+   * Address: 0x00720AA0 (FUN_00720AA0, Moho::SFootprint::FitsAt)
+   *
+   * Moho::SCoordsVec2 const &, Moho::COGrid const &
+   *
+   * What it does:
+   * Computes footprint origin cell from world-space center coordinates and
+   * forwards to `OCCUPY_FootprintFits(..., OC_ANY)`.
+   */
+  EOccupancyCaps SFootprint::FitsAt(const SCoordsVec2& worldPos, const COGrid& grid) const
+  {
+    const float originZ = worldPos.z - static_cast<float>(mSizeZ) * 0.5f;
+
+    SOCellPos cellPos{};
+    cellPos.x = static_cast<std::int16_t>(static_cast<int>(worldPos.x - static_cast<float>(mSizeX) * 0.5f));
+    cellPos.z = static_cast<std::int16_t>(static_cast<int>(originZ));
+    return OCCUPY_FootprintFits(grid, cellPos, *this, EOccupancyCaps::OC_ANY);
+  }
+
+  /**
+   * Address: 0x00720920 (FUN_00720920)
+   *
+   * Moho::SFootprint const &, Moho::COGrid const &, Moho::SOCellPos const &, Moho::EOccupancyCaps
+   *
+   * IDA signature:
+   * Moho::EOccupancyCaps __userpurge Moho::OCCUPY_Filter@<al>(const Moho::SFootprint *fp@<ecx>, Moho::COGrid *a2@<esi>, Moho::SOCellPos *pos, Moho::EOccupancyCaps a4);
+   *
+   * What it does:
+   * Applies single-cell occupancy filtering against terrain/water occupation bitmaps.
+   */
+  EOccupancyCaps OCCUPY_Filter(
+    const SFootprint& footprint, const COGrid& grid, const SOCellPos& pos, EOccupancyCaps occupancyCaps
+  )
+  {
+    EOccupancyCaps caps = occupancyCaps;
+    if (caps == EOccupancyCaps::OC_ANY) {
+      caps = grid.sim->mMapData->OccupancyCapsOfFootprintAt(pos, footprint);
+    }
+
+    std::uint8_t capsMask = OccupancyMask(caps);
+    const int footprintX = static_cast<int>(pos.x);
+    const int footprintZ = static_cast<int>(pos.z);
+    const std::uint8_t footprintFlags = static_cast<std::uint8_t>(footprint.mFlags);
+    if ((footprintFlags & static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) == 0u &&
+        (capsMask & kOccLandSeabed) != 0u &&
+        grid.terrainOccupation.IsBitSetOrOutOfBounds(footprintX, footprintZ)) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    }
+
+    if ((capsMask & kOccWater) != 0u && grid.waterOccupation.IsBitSetOrOutOfBounds(footprintX, footprintZ)) {
+      capsMask = RemoveCaps(capsMask, kOccWater);
+    }
+
+    return ToOccupancyCaps(capsMask);
+  }
+
+  /**
+   * Address: 0x007209E0 (FUN_007209E0)
+   *
+   * Moho::COGrid const &, Moho::SOCellPos const &, Moho::SFootprint const &, Moho::EOccupancyCaps
+   *
+   * IDA signature:
+   * Moho::EOccupancyCaps callcnv_E3 Moho::OCCUPY_FootprintFits@<al>(Moho::COGrid *eax0@<eax>, Moho::SOCellPos *a2@<edi>, const Moho::SFootprint *a1, Moho::EOccupancyCaps a4);
+   *
+   * What it does:
+   * Returns occupancy-fit caps for a footprint at one origin using mobile
+   * terrain checks plus terrain/water occupation bit arrays.
+   */
+  EOccupancyCaps OCCUPY_FootprintFits(
+    const COGrid& grid, const SOCellPos& pos, const SFootprint& footprint, const EOccupancyCaps occupancyCaps
+  )
+  {
+    const std::uint8_t sizeX = footprint.mSizeX;
+    const std::uint8_t sizeZ = footprint.mSizeZ;
+    const std::uint8_t sizeMax = sizeX > sizeZ ? sizeX : sizeZ;
+    if (sizeMax == 1u) {
+      return OCCUPY_Filter(footprint, grid, pos, occupancyCaps);
+    }
+
+    EOccupancyCaps caps = occupancyCaps;
+    if (caps == EOccupancyCaps::OC_ANY) {
+      caps = OCCUPY_MobileCheck(footprint, *grid.sim->mMapData, pos);
+    }
+
+    std::uint8_t capsMask = OccupancyMask(caps);
+    const std::uint8_t footprintFlags = static_cast<std::uint8_t>(footprint.mFlags);
+    if ((footprintFlags & static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) == 0u &&
+        (capsMask & kOccLandSeabed) != 0u &&
+        grid.terrainOccupation.GetRectOr(pos.x, pos.z, sizeX, sizeZ, true)) {
+      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    }
+
+    if ((capsMask & kOccWater) != 0u && grid.waterOccupation.GetRectOr(pos.x, pos.z, sizeX, sizeZ, true)) {
+      capsMask = RemoveCaps(capsMask, kOccWater);
+    }
+
+    return ToOccupancyCaps(capsMask);
   }
 
   CHeightField* STIMap::GetHeightField() const noexcept

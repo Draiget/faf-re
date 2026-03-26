@@ -16,6 +16,8 @@ namespace moho
   class CTaskThread : public TDatListItem<CTaskThread, void>, InstanceCounter<CTaskThread>
   {
   public:
+    static gpg::RType* sType;
+
     // Head of intrusive weak-link chain (owner slot at +0x08 in CTaskThread).
     WeakPtr<CTaskThread>* mEventLinkHead; // 0x08
     CTaskStage* mStage;                   // 0x0C
@@ -144,6 +146,13 @@ namespace moho
      */
     void UserFrame();
   };
+
+  /**
+   * Address context:
+   * - `0x008D1B57` (`CScApp::Main`) loads this global and dispatches one
+   *   per-frame user task-stage update.
+   */
+  extern CTaskStage* sUserStage;
 
   class CTaskStageSerializer
   {

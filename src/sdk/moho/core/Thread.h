@@ -9,8 +9,8 @@
 #endif
 #include "boost/function.h"
 #include "wm3/AABB.h"
-#include <Windows.h>
 #include <winsock2.h>
+#include <Windows.h>
 
 namespace moho
 {

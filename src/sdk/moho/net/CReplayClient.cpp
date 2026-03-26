@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <mutex>
 #include <new>
-#include <stdexcept>
 
 #include "CClientManagerImpl.h"
 #include "EClientMsg.h"
@@ -16,45 +15,6 @@ using namespace moho;
 
 namespace
 {
-  bool IsCommandSourceAllowed(const BVIntSet& commandSources, const std::uint8_t sourceId)
-  {
-    const std::size_t wordIndex = static_cast<std::size_t>(sourceId >> 5);
-    if (wordIndex < commandSources.mFirstWordIndex) {
-      return false;
-    }
-
-    const std::size_t localWordIndex = wordIndex - commandSources.mFirstWordIndex;
-    if (localWordIndex >= commandSources.mWords.Size()) {
-      return false;
-    }
-
-    const unsigned int word = commandSources.mWords.start_[localWordIndex];
-    const unsigned int bit = static_cast<unsigned int>(sourceId & 0x1Fu);
-    return ((word >> bit) & 1u) != 0u;
-  }
-
-  /**
-   * Address: 0x004CCC10 (FUN_004CCC10)
-   *
-   * What it does:
-   * Performs checked single-byte unget against stream read buffer, falling back
-   * to virtual unget when local read-head is already at read-start.
-   */
-  void UnGetByteChecked(gpg::Stream& stream, const int value)
-  {
-    if (stream.mReadHead == stream.mReadStart) {
-      stream.VirtUnGetByte(value);
-      return;
-    }
-
-    const int previous = static_cast<signed char>(*(stream.mReadHead - 1));
-    if (previous != value) {
-      throw std::invalid_argument("Invalid argument to Stream::UnGetByte()");
-    }
-
-    --stream.mReadHead;
-  }
-
   /**
    * Address: 0x004134A0 (FUN_004134A0)
    *
@@ -87,7 +47,7 @@ namespace
  * Address: 0x0053BA50 (FUN_0053BA50)
  */
 CReplayClient::CReplayClient(CClientManagerImpl* const manager, BVIntSet& commandSources, gpg::Stream*& replayStream)
-  : CClientBase(0, manager, "Replay", nullptr, commandSources, 0xFFu)
+  : CClientBase(0, manager, "Replay", -1, commandSources, 0xFFu)
   , mReplayStream(replayStream)
 {
   replayStream = nullptr;
@@ -113,8 +73,10 @@ void CReplayClient::DestroyNonDeleting()
       mReplayWorkerCondition.notify_all();
     }
 
-    if (mReplayThread->joinable()) {
+    try {
       mReplayThread->join();
+    } catch (...) {
+      // Boost 1.34 does not expose joinable(); preserve best-effort shutdown.
     }
   }
 
@@ -221,7 +183,7 @@ void CReplayClient::Start()
 
       std::uint8_t sourceId = 0;
       reader.ReadExact(sourceId);
-      mCurrentSourceAllowed = IsCommandSourceAllowed(mValidCommandSources, sourceId);
+      mCurrentSourceAllowed = mValidCommandSources.Contains(sourceId);
     }
 
     if (replayType != static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
@@ -298,12 +260,12 @@ void CReplayClient::ReplayThreadMain(CReplayClient* const self)
       if (stream->mReadHead != stream->mReadEnd) {
         const int byteValue = static_cast<signed char>(*stream->mReadHead);
         ++stream->mReadHead;
-        UnGetByteChecked(*stream, byteValue);
+        gpg::UnGetByteChecked(*stream, byteValue);
         hasReplayData = true;
       } else {
         char byteValue = 0;
         if (stream->ReadNonBlocking(&byteValue, 1u) == 1u) {
-          UnGetByteChecked(*stream, static_cast<signed char>(byteValue));
+          gpg::UnGetByteChecked(*stream, static_cast<signed char>(byteValue));
           hasReplayData = true;
         } else if (stream->mReadHead == stream->mReadEnd && stream->VirtAtEnd()) {
           hasReplayData = true;

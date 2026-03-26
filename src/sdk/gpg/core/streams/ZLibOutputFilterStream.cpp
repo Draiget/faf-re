@@ -1,169 +1,200 @@
-﻿// Auto-generated from IDA VFTABLE/RTTI scan.
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
 
+#include <cstring>
+
 #include "gpg/core/utils/Global.h"
+
 using namespace gpg;
 
-ZLibOutputFilterStream::~ZLibOutputFilterStream() {
-    try {
-        if (!mClosed) {
-	        ZLibOutputFilterStream::VirtClose(ModeSend);
-        }
-    } catch (...) {
-        // no-throw
-    }
-
-    if (this->mOperation == 0) {
-        inflateEnd(&this->mZStream);
-    } else if (this->mOperation == 1) {
-        deflateEnd(&this->mZStream);
-    }
-}
-
-size_t ZLibOutputFilterStream::VirtTell(Mode mode) {
-    throw UnsupportedOperation{};
-}
-
-size_t ZLibOutputFilterStream::VirtSeek(Mode mode, SeekOrigin origin, size_t size) {
-    throw UnsupportedOperation{};
-}
-
-size_t ZLibOutputFilterStream::VirtRead(char* buffer, unsigned int size) {
-    throw UnsupportedOperation{};
-}
-
-size_t ZLibOutputFilterStream::VirtReadNonBlocking(char* buffer, const unsigned int size) {
-	return Stream::VirtRead(buffer, size);
-}
-
-void ZLibOutputFilterStream::VirtUnGetByte(int size) {
-    throw UnsupportedOperation{};
-}
-
-bool ZLibOutputFilterStream::VirtAtEnd() {
-    return false;
-}
-
-void ZLibOutputFilterStream::VirtWrite(char const* data, const size_t size) {
-    if (mClosed) {
-        throw std::runtime_error{ std::string{"ZLibOutputFilterStream: stream closed."} };
-    }
-
-    if (this->BytesRead()) {
-        this->DoWrite(this->mWriteStart, this->BytesRead(), Z_NO_FLUSH);
-        this->mWriteHead = this->mWriteStart;
-    }
-
-    this->DoWrite(data, size, Z_NO_FLUSH);
-}
-
-void ZLibOutputFilterStream::VirtFlush() {
-    if (mClosed) {
-        throw std::runtime_error{ std::string{"ZLibOutputFilterStream: stream closed."} };
-    }
-
-    this->DoWrite(this->mWriteStart, this->BytesRead(), Z_SYNC_FLUSH);
-    this->mWriteStart = this->mWriteHead;
-}
-
-void ZLibOutputFilterStream::VirtClose(const Mode mode) {
-    if ((mode & ModeSend) && !mClosed) {
-        this->DoWrite(this->mWriteStart, this->BytesRead(), Z_FINISH);
-        if (this->mOperation == 0 && !this->mEnded) {
-            this->mClosed = true;
-            throw std::runtime_error{
-            	std::string{
-					"ZLibOutputFilterStream: stream closed before end."
-				}
-            };
-        }
-        this->mClosed = true;
-    }
-}
-
-ZLibOutputFilterStream::ZLibOutputFilterStream(PipeStream* str, const EFilterOperation operation) :
-	Stream(),
-	mPipeStream(str)
+namespace
 {
-	// small inline input cache lives in mBuff
-	mWriteHead = mBuff;
-	mWriteStart = mBuff;
-	mWriteEnd = mBuff + sizeof(mBuff);
+    constexpr const char* kClosedStreamMessage = "ZLibOutputFilterStream: stream closed.";
+    constexpr const char* kInvalidOperationMessage = "invalid operation";
+    constexpr const char* kInflateInitFailedMessage = "ZLibOutputFilterStream: inflateInit2() failed.";
+    constexpr const char* kDeflateInitFailedMessage = "ZLibOutputFilterStream: deflateInit2() failed.";
+    constexpr const char* kExcessDataAfterEndMessage = "ZLibOutputFilterStream: excess data after stream end.";
+    constexpr const char* kExcessDataAfterEndUpperMessage = "ZLibOutputFilterStream: Excess data after stream end.";
+    constexpr const char* kClosedBeforeEndMessage = "ZLibOutputFilterStream: stream closed before end.";
+    constexpr const char* kDeflateWriteFailedMessage = "CDeflateOutputFilter::BufWrite(): call to deflate() failed.";
 
-	std::memset(&mZStream, 0, sizeof(mZStream));
-
-	// inflateInit2_(&mZStream, -14, "1.2.3", 56);
-	// deflateInit2_(&mZStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -14, 8, 0, "1.2.3", 56);
-	if (operation == FLOP_Inflate) {
-		if (inflateInit2_(&mZStream, -14, "1.2.3", sizeof(z_stream)) != Z_OK) {
-			throw std::runtime_error{std::string{"ZLibOutputFilterStream: inflateInit2() failed."}};
-		}
-	} else if (operation == FLOP_Deflate) {
-		if (deflateInit2_(&mZStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -14, 8, 0, "1.2.3", sizeof(z_stream)) != Z_OK) {
-			throw std::runtime_error{std::string{"ZLibOutputFilterStream: deflateInit2() failed."}};
-		}
-	} else {
-		throw std::logic_error{std::string{"invalid operation"}};
-	}
+    constexpr const char* kAvailInAssertExpr = "mZStream.avail_in == 0";
+    constexpr int kAvailInAssertLine = 157;
+    constexpr const char* kAvailInAssertSource = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\streams\\ZLibStream.cpp";
 }
 
-void ZLibOutputFilterStream::DoWrite(const char* data, const size_t len, const int flush) {
-	if (mEnded) {
+/**
+ * Address: 0x009572C0 (FUN_009572C0)
+ * Deleting owner: 0x00957340 (FUN_00957340)
+ * Demangled: gpg::ZLibOutputFilterStream::dtr
+ *
+ * What it does:
+ * Closes send/receive lanes with no-throw semantics, finalizes inflate/deflate state, then tears down Stream base.
+ */
+ZLibOutputFilterStream::~ZLibOutputFilterStream()
+{
+    CloseNoThrow(ModeBoth);
+
+    if (mOperation == FLOP_Inflate) {
+        inflateEnd(&mZStream);
+    } else if (mOperation == FLOP_Deflate) {
+        deflateEnd(&mZStream);
+    }
+}
+
+/**
+ * Address: 0x00957360 (FUN_00957360)
+ *
+ * What it does:
+ * Initializes zlib stream state for inflate/deflate mode and configures the 1024-byte inline write buffer.
+ */
+ZLibOutputFilterStream::ZLibOutputFilterStream(PipeStream* const str, const EFilterOperation operation)
+    : Stream(),
+      mPipeStream(str),
+      mOperation(operation)
+{
+    mEnded = false;
+    mClosed = false;
+
+    mWriteStart = mBuff;
+    mWriteHead = mBuff;
+    mWriteEnd = mBuff + sizeof(mBuff);
+
+    std::memset(&mZStream, 0, sizeof(mZStream));
+
+    if (operation == FLOP_Inflate) {
+        if (inflateInit2_(&mZStream, -14, "1.2.3", sizeof(z_stream)) != Z_OK) {
+            throw std::runtime_error(kInflateInitFailedMessage);
+        }
+        return;
+    }
+
+    if (operation == FLOP_Deflate) {
+        if (deflateInit2_(&mZStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -14, 8, 0, "1.2.3", sizeof(z_stream)) != Z_OK) {
+            throw std::runtime_error(kDeflateInitFailedMessage);
+        }
+        return;
+    }
+
+    throw std::invalid_argument(kInvalidOperationMessage);
+}
+
+/**
+ * Address: 0x00957500 (FUN_00957500)
+ *
+ * What it does:
+ * Feeds input into inflate/deflate, forwards produced chunks to `mPipeStream`, and tracks stream-end/error lanes.
+ */
+void ZLibOutputFilterStream::DoWrite(const char* const data, const size_t len, const int flush)
+{
+    if (mEnded) {
         if (len == 0) {
             return;
         }
-        throw std::runtime_error{ std::string{"ZLibOutputFilterStream: excess data after stream end."} };
+        throw std::runtime_error(kExcessDataAfterEndMessage);
     }
 
-    mZStream.next_in = reinterpret_cast<unsigned char*>(const_cast<char*>(data));
+    mZStream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data));
     mZStream.avail_in = static_cast<uInt>(len);
 
-    while (true) {
-	    char out[1024];
-	    int res;
-        while (true) {
-            mZStream.next_out = reinterpret_cast<unsigned char*>(out);
-            mZStream.avail_out = sizeof(out);
+    for (;;)
+    {
+        unsigned char out[1024]{};
+        int result = Z_STREAM_ERROR;
 
-            res = Z_STREAM_ERROR;
-            if (mOperation == 0) {
-                res = inflate(&mZStream, flush);
-            } else if (mOperation == 1) {
-                res = deflate(&mZStream, flush);
+        for (;;)
+        {
+            mZStream.next_out = out;
+            mZStream.avail_out = static_cast<uInt>(sizeof(out));
+
+            if (mOperation == FLOP_Inflate) {
+                result = inflate(&mZStream, flush);
+            } else if (mOperation == FLOP_Deflate) {
+                result = deflate(&mZStream, flush);
             }
 
-            if (res != Z_OK) break;
-
-            // write produced so far
-            mPipeStream->Write(out, static_cast<unsigned>(mZStream.next_out
-                - reinterpret_cast<unsigned char*>(out)));
-        }
-
-        if (res == Z_BUF_ERROR) {
-            throw std::runtime_error{ std::string{
-                "CDeflateOutputFilter::BufWrite(): call to deflate() failed."
-            } };
-        }
-
-        if (res == Z_STREAM_END) {
-            mEnded = true;
-            mPipeStream->Write(out, static_cast<unsigned>(mZStream.next_out
-                - reinterpret_cast<unsigned char*>(out)));
-            if (mZStream.avail_in != 0) {
-                return;
+            if (result != Z_OK) {
+                break;
             }
-            throw std::runtime_error{ std::string{
-                "ZLibOutputFilterStream: Excess data after stream end."
-            } };
+
+            const size_t produced = static_cast<size_t>(mZStream.next_out - out);
+            mPipeStream->Write(reinterpret_cast<const char*>(out), produced);
         }
 
-        if (mZStream.next_out == reinterpret_cast<unsigned char*>(out)) {
-            break; // no new output produced
+        if (result != Z_BUF_ERROR) {
+            if (result == Z_STREAM_END) {
+                mEnded = true;
+                const size_t produced = static_cast<size_t>(mZStream.next_out - out);
+                mPipeStream->Write(reinterpret_cast<const char*>(out), produced);
+                if (mZStream.avail_in == 0) {
+                    return;
+                }
+                throw std::runtime_error(kExcessDataAfterEndUpperMessage);
+            }
+            throw std::runtime_error(kDeflateWriteFailedMessage);
         }
 
-        mPipeStream->Write(out, static_cast<unsigned>(mZStream.next_out
-            - reinterpret_cast<unsigned char*>(out)));
+        if (mZStream.next_out == out) {
+            break;
+        }
+
+        const size_t produced = static_cast<size_t>(mZStream.next_out - out);
+        mPipeStream->Write(reinterpret_cast<const char*>(out), produced);
     }
 
-    GPG_ASSERT(mZStream.avail_in == 0);
+    if (mZStream.avail_in != 0) {
+        HandleAssertFailure(kAvailInAssertExpr, kAvailInAssertLine, kAvailInAssertSource);
+    }
+}
+
+/**
+ * Address: 0x00957760 (FUN_00957760)
+ *
+ * What it does:
+ * Rejects closed stream writes, drains pending inline bytes, then sends caller data through zlib pump.
+ */
+void ZLibOutputFilterStream::VirtWrite(const char* const data, const size_t size)
+{
+    if (mClosed) {
+        throw std::runtime_error(kClosedStreamMessage);
+    }
+
+    if (mWriteHead != mWriteStart) {
+        DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart), Z_NO_FLUSH);
+        mWriteHead = mWriteStart;
+    }
+
+    DoWrite(data, size, Z_NO_FLUSH);
+}
+
+/**
+ * Address: 0x00957810 (FUN_00957810)
+ *
+ * What it does:
+ * Rejects closed stream flushes, pumps buffered bytes with `Z_SYNC_FLUSH`, then resets inline write head.
+ */
+void ZLibOutputFilterStream::VirtFlush()
+{
+    if (mClosed) {
+        throw std::runtime_error(kClosedStreamMessage);
+    }
+
+    DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart), Z_SYNC_FLUSH);
+    mWriteHead = mWriteStart;
+}
+
+/**
+ * Address: 0x009578B0 (FUN_009578B0)
+ *
+ * What it does:
+ * On send close, pumps buffered bytes with `Z_FINISH`, validates inflate-end state, then marks stream closed.
+ */
+void ZLibOutputFilterStream::VirtClose(const Mode mode)
+{
+    if ((mode & ModeSend) != 0 && !mClosed) {
+        DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart), Z_FINISH);
+        if (mOperation == FLOP_Inflate && !mEnded) {
+            throw std::runtime_error(kClosedBeforeEndMessage);
+        }
+        mClosed = true;
+    }
 }

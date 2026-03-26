@@ -1,9 +1,21 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstdint>
+
+#include "wm3/Vector3.h"
+
+namespace gpg
+{
+  class RType;
+}
 
 namespace moho
 {
+  class CUnitMotion;
+  class CAiPathSpline;
+  struct SCollisionInfo;
+  enum ECollisionType : std::int32_t;
+
   /**
    * VFTABLE: 0x00E1E064
    * COL:  0x00E74F9C
@@ -12,87 +24,125 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005D1F10
-     * Slot: 0
-     * Demangled: (likely scalar deleting destructor thunk)
+     * Address: 0x005D1F10 (FUN_005D1F10, scalar deleting thunk)
+     *
+     * VFTable SLOT: 0
      */
-    virtual ~IAiSteering() = default;
+    virtual ~IAiSteering();
 
     /**
-     * Address: 0x00A82547
-     * Slot: 1
-     * Demangled: _purecall
+     * Address: 0x005D29C0 (FUN_005D29C0)
+     *
+     * What it does:
+     * Replaces active steering waypoints and refreshes path-follow state.
+     *
+     * VFTable SLOT: 1
      */
-    virtual void purecall1() = 0;
+    virtual CUnitMotion* SetWaypoints(const Wm3::Vector3f* waypoints, int waypointCount) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 2
-     * Demangled: _purecall
+     * Address: 0x005D2110 (FUN_005D2110)
+     *
+     * What it does:
+     * Copies the current waypoint buffer into `outWaypoints` and returns count.
+     *
+     * VFTable SLOT: 2
      */
-    virtual void purecall2() = 0;
+    virtual int GetWaypoints(Wm3::Vector3f* outWaypoints) const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 3
-     * Demangled: _purecall
+     * Address: 0x005D2170 (FUN_005D2170)
+     *
+     * What it does:
+     * Returns the active target waypoint (or zero vector when no waypoints).
+     *
+     * VFTable SLOT: 3
      */
-    virtual void purecall3() = 0;
+    virtual Wm3::Vector3f GetWaypoint() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 4
-     * Demangled: _purecall
+     * Address: 0x005D21B0 (FUN_005D21B0)
+     *
+     * What it does:
+     * Returns true when steering consumed all queued waypoints.
+     *
+     * VFTable SLOT: 4
      */
-    virtual void purecall4() = 0;
+    virtual bool IsDone() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 5
-     * Demangled: _purecall
+     * Address: 0x005D21C0 (FUN_005D21C0)
+     *
+     * What it does:
+     * Returns mutable collision-avoidance state used by steering tick logic.
+     *
+     * VFTable SLOT: 5
      */
-    virtual void purecall5() = 0;
+    virtual SCollisionInfo* GetColInfo() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 6
-     * Demangled: _purecall
+     * Address: 0x005D3B40 (FUN_005D3B40)
+     *
+     * What it does:
+     * Stores the latest collision reaction type and steering target position.
+     *
+     * VFTable SLOT: 6
      */
-    virtual void purecall6() = 0;
+    virtual void SetCol(ECollisionType type, const Wm3::Vector3f& position) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 7
-     * Demangled: _purecall
+     * Address: 0x005D21D0 (FUN_005D21D0)
+     *
+     * What it does:
+     * Returns the current path-spline object.
+     *
+     * VFTable SLOT: 7
      */
-    virtual void purecall7() = 0;
+    virtual CAiPathSpline* GetPath() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 8
-     * Demangled: _purecall
+     * Address: 0x005D2390 (FUN_005D2390)
+     *
+     * What it does:
+     * Updates "top-speed source #1" flag and applies composed top-speed policy.
+     *
+     * VFTable SLOT: 8
      */
-    virtual void purecall8() = 0;
+    virtual void CalcAtTopSpeed1(bool enabled) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 9
-     * Demangled: _purecall
+     * Address: 0x005D23E0 (FUN_005D23E0)
+     *
+     * What it does:
+     * Updates "top-speed source #2" flag and applies composed top-speed policy.
+     *
+     * VFTable SLOT: 9
      */
-    virtual void purecall9() = 0;
+    virtual void CalcAtTopSpeed2(bool enabled) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 10
-     * Demangled: _purecall
+     * Address: 0x005D2430 (FUN_005D2430)
+     *
+     * What it does:
+     * Selects whether top-speed policy comes from source #1 or source #2 flag.
+     *
+     * VFTable SLOT: 10
      */
-    virtual void purecall10() = 0;
+    virtual void UseTopSpeed(bool enabled) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 11
-     * Demangled: _purecall
+     * Address: 0x005D35E0 (FUN_005D35E0)
+     *
+     * What it does:
+     * Stops active path-following and clears movement state.
+     *
+     * VFTable SLOT: 11
      */
-    virtual void purecall11() = 0;
+    virtual void Stop() = 0;
+
+  public:
+    static gpg::RType* sType;
   };
+
+  static_assert(sizeof(IAiSteering) == 0x04, "IAiSteering size must be 0x04");
 } // namespace moho

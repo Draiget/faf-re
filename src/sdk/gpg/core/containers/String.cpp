@@ -267,6 +267,68 @@ bool gpg::STR_StartsWithNoCase(const StrArg str, const StrArg start) {
     return _strnicmp(str, start, strlen(start)) == 0;
 }
 
+bool gpg::STR_EqualsNoCaseN(const StrArg lhs, const StrArg rhs, const std::size_t count) {
+    if (count == 0u) {
+        return true;
+    }
+    if (lhs == nullptr || rhs == nullptr) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < count; ++i) {
+        unsigned char a = static_cast<unsigned char>(lhs[i]);
+        unsigned char b = static_cast<unsigned char>(rhs[i]);
+        if (a == '\0' || b == '\0') {
+            return a == b;
+        }
+
+        if (a >= 'A' && a <= 'Z') {
+            a = static_cast<unsigned char>(a + ('a' - 'A'));
+        }
+        if (b >= 'A' && b <= 'Z') {
+            b = static_cast<unsigned char>(b + ('a' - 'A'));
+        }
+        if (a != b) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+int gpg::STR_CompareNoCase(const StrArg lhs, const StrArg rhs) {
+    if (lhs == rhs) {
+        return 0;
+    }
+    if (lhs == nullptr) {
+        return -1;
+    }
+    if (rhs == nullptr) {
+        return 1;
+    }
+    return _stricmp(lhs, rhs);
+}
+
+bool gpg::STR_ContainsNoCase(const StrArg str, const StrArg needle) {
+    if (needle == nullptr || needle[0] == '\0') {
+        return true;
+    }
+    if (str == nullptr) {
+        return false;
+    }
+
+    const msvc8::string haystackLower = STR_ToLower(str);
+    const msvc8::string needleLower = STR_ToLower(needle);
+    return haystackLower.find(needleLower.data(), 0, needleLower.size()) != msvc8::string::npos;
+}
+
+bool gpg::STR_EqualsNoCase(const StrArg lhs, const StrArg rhs) {
+    if (lhs == nullptr || rhs == nullptr) {
+        return lhs == rhs;
+    }
+    return _stricmp(lhs, rhs) == 0;
+}
+
 // 0x009382F0
 bool gpg::STR_IsIdent(StrArg str) {
     char c = *str++;
@@ -329,6 +391,112 @@ int gpg::STR_Xtoi(StrArg str) {
     return res;
 }
 
+bool gpg::STR_IsAsciiWhitespace(const char ch) {
+    switch (ch) {
+    case ' ':
+    case '\t':
+    case '\n':
+    case '\r':
+    case '\f':
+    case '\v':
+        return true;
+    default:
+        return false;
+    }
+}
+
+namespace {
+char FoldWildcardChar(const char c, const bool caseSensitive) {
+    if (caseSensitive) {
+        return c;
+    }
+    if (c >= 'A' && c <= 'Z') {
+        return static_cast<char>(c + ('a' - 'A'));
+    }
+    return c;
+}
+}
+
+bool gpg::STR_MatchWildcard(StrArg text, StrArg pattern) {
+    return STR_MatchWildcard(text, pattern, true);
+}
+
+bool gpg::STR_MatchWildcard(StrArg text, StrArg pattern, const bool caseSensitive) {
+    if (text == nullptr || pattern == nullptr) {
+        return false;
+    }
+
+    const char* starPattern = nullptr;
+    const char* starText = nullptr;
+
+    while (*text != '\0') {
+        if (*pattern == '*') {
+            starPattern = pattern++;
+            starText = text;
+            continue;
+        }
+
+        const bool charsMatch =
+          (*pattern == '?') || (FoldWildcardChar(*pattern, caseSensitive) == FoldWildcardChar(*text, caseSensitive));
+        if (charsMatch) {
+            ++pattern;
+            ++text;
+            continue;
+        }
+
+        if (starPattern == nullptr) {
+            return false;
+        }
+
+        pattern = starPattern + 1;
+        text = ++starText;
+    }
+
+    while (*pattern == '*') {
+        ++pattern;
+    }
+
+    return *pattern == '\0';
+}
+
+bool gpg::STR_WildcardValidPrefix(StrArg prefix, StrArg pattern) {
+    return STR_WildcardValidPrefix(prefix, pattern, true);
+}
+
+bool gpg::STR_WildcardValidPrefix(StrArg prefix, StrArg pattern, const bool caseSensitive) {
+    if (prefix == nullptr || pattern == nullptr) {
+        return false;
+    }
+
+    const char* starPattern = nullptr;
+    const char* starPrefix = nullptr;
+
+    while (*prefix != '\0') {
+        if (*pattern == '*') {
+            starPattern = pattern++;
+            starPrefix = prefix;
+            continue;
+        }
+
+        const bool charsMatch =
+          (*pattern == '?') || (FoldWildcardChar(*pattern, caseSensitive) == FoldWildcardChar(*prefix, caseSensitive));
+        if (charsMatch) {
+            ++pattern;
+            ++prefix;
+            continue;
+        }
+
+        if (starPattern == nullptr) {
+            return false;
+        }
+
+        pattern = starPattern + 1;
+        prefix = ++starPrefix;
+    }
+
+    return true;
+}
+
 // 0x00938C80
 msvc8::string gpg::STR_GetWhitespaceCharacters() {
     return msvc8::string{ sWhitespaceChars };
@@ -371,6 +539,41 @@ msvc8::string gpg::STR_ToUpper(StrArg str) {
         builder.append(1, c);
     }
     return builder;
+}
+
+void gpg::STR_NormalizeFilenameLowerSlash(msvc8::string& inOut) {
+    for (std::size_t i = 0; i < inOut.size(); ++i) {
+        char ch = inOut[i];
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch + ('a' - 'A'));
+        }
+        if (ch == '\\') {
+            ch = '/';
+        }
+        inOut[i] = ch;
+    }
+}
+
+void gpg::STR_NormalizeFilenameLowerSlash(std::string& inOut) {
+    for (std::size_t i = 0; i < inOut.size(); ++i) {
+        char ch = inOut[i];
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch + ('a' - 'A'));
+        }
+        if (ch == '\\') {
+            ch = '/';
+        }
+        inOut[i] = ch;
+    }
+}
+
+void gpg::STR_CanonizeFilename(msvc8::string* const out, const StrArg in) {
+    if (out == nullptr) {
+        return;
+    }
+
+    out->assign_owned(in ? in : "");
+    STR_NormalizeFilenameLowerSlash(*out);
 }
 
 // 0x009388C0

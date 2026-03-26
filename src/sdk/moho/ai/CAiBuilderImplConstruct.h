@@ -1,6 +1,13 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstddef>
+
+#include "gpg/core/reflection/Reflection.h"
+
+namespace gpg
+{
+  struct SerHelperBase;
+} // namespace gpg
 
 namespace moho
 {
@@ -12,10 +19,33 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005A0650
-     * Slot: 0
-     * Demangled: RegisterConstructFunction (binds mSerConstructFunc)
+     * Address: 0x005A0650 (FUN_005A0650)
+     *
+     * What it does:
+     * Binds construct/delete callbacks into CAiBuilderImpl RTTI.
      */
-    virtual void RegisterConstructFunction() = 0;
+    virtual void RegisterConstructFunction();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::construct_func_t mConstructCallback;
+    gpg::RType::delete_func_t mDeleteCallback;
   };
+
+  static_assert(
+    offsetof(CAiBuilderImplConstruct, mHelperNext) == 0x04, "CAiBuilderImplConstruct::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CAiBuilderImplConstruct, mHelperPrev) == 0x08, "CAiBuilderImplConstruct::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CAiBuilderImplConstruct, mConstructCallback) == 0x0C,
+    "CAiBuilderImplConstruct::mConstructCallback offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CAiBuilderImplConstruct, mDeleteCallback) == 0x10,
+    "CAiBuilderImplConstruct::mDeleteCallback offset must be 0x10"
+  );
+  static_assert(sizeof(CAiBuilderImplConstruct) == 0x14, "CAiBuilderImplConstruct size must be 0x14");
 } // namespace moho

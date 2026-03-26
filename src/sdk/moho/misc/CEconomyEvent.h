@@ -248,7 +248,7 @@ namespace moho
   /**
    * Address: 0x00775630 (FUN_00775630, cfunc_CreateEconomyEvent)
    */
-  int cfunc_CreateEconomyEvent(int luaContext);
+  int cfunc_CreateEconomyEvent(lua_State* luaContext);
 
   /**
    * Address: 0x007756B0 (FUN_007756B0, cfunc_CreateEconomyEventL)
@@ -258,7 +258,7 @@ namespace moho
   /**
    * Address: 0x00775910 (FUN_00775910, cfunc_RemoveEconomyEvent)
    */
-  int cfunc_RemoveEconomyEvent(int luaContext);
+  int cfunc_RemoveEconomyEvent(lua_State* luaContext);
 
   /**
    * Address: 0x00775990 (FUN_00775990, cfunc_RemoveEconomyEventL)
@@ -268,7 +268,7 @@ namespace moho
   /**
    * Address: 0x00775A40 (FUN_00775A40, cfunc_EconomyEventIsDone)
    */
-  int cfunc_EconomyEventIsDone(int luaContext);
+  int cfunc_EconomyEventIsDone(lua_State* luaContext);
 
   /**
    * Address: 0x00775AC0 (FUN_00775AC0, cfunc_EconomyEventIsDoneL)

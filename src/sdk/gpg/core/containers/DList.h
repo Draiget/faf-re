@@ -60,6 +60,9 @@ namespace gpg
 
         /**
          * Unlink this node from its current list, making it a singleton.
+         *
+         * Address: 0x00956560 (FUN_00956560) [PipeStreamBuffer specialization lane]
+         *
          * Assembly pattern matches the decompiled code: write neighbor links first,
          * then self-links (prev/next -> self).
          */

@@ -1,7 +1,6 @@
 #include "CDiskWatch.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -16,47 +15,30 @@ namespace
   std::mutex gDiskWatchInitMutex;
   CDiskWatch* gDiskWatch = nullptr;
 
-  char NormalizeWildcardChar(const char c, const bool caseSensitive)
+  [[nodiscard]]
+  CDiskWatch::DiskWatchMapNode* NextWatchMapNode(
+    CDiskWatch::DiskWatchMapNode* node, const CDiskWatch::DiskWatchMapNode* const head
+  )
   {
-    if (caseSensitive) {
-      return c;
-    }
-    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-
-  bool MatchWildcardInternal(const char* text, const char* pattern, const bool caseSensitive)
-  {
-    const char* starPattern = nullptr;
-    const char* starText = nullptr;
-
-    while (*text) {
-      if (*pattern == '*') {
-        starPattern = pattern++;
-        starText = text;
-        continue;
-      }
-
-      const char pat = NormalizeWildcardChar(*pattern, caseSensitive);
-      const char src = NormalizeWildcardChar(*text, caseSensitive);
-      if (*pattern == '?' || pat == src) {
-        ++pattern;
-        ++text;
-        continue;
-      }
-
-      if (!starPattern) {
-        return false;
-      }
-
-      pattern = starPattern + 1;
-      text = ++starText;
+    if (node == nullptr || head == nullptr) {
+      return nullptr;
     }
 
-    while (*pattern == '*') {
-      ++pattern;
+    if (node->mRight != nullptr && node->mRight->mIsSentinel == 0u) {
+      node = node->mRight;
+      while (node->mLeft != nullptr && node->mLeft->mIsSentinel == 0u) {
+        node = node->mLeft;
+      }
+      return node;
     }
 
-    return *pattern == '\0';
+    CDiskWatch::DiskWatchMapNode* parent = node->mParent;
+    while (parent != nullptr && parent->mIsSentinel == 0u && node == parent->mRight) {
+      node = parent;
+      parent = parent->mParent;
+    }
+
+    return parent;
   }
 
   /**
@@ -93,7 +75,7 @@ bool moho::
   if (!path || !pattern) {
     return false;
   }
-  return MatchWildcardInternal(path, pattern, caseSensitive);
+  return gpg::STR_MatchWildcard(path, pattern, caseSensitive);
 }
 
 /**
@@ -201,6 +183,7 @@ CDiskWatch::CDiskWatch()
   , mUnknown08(nullptr)
   , mLock()
   , mOpaque10{}
+  , mDirWatchMap{}
 {
   mListeners.mPrev = &mListeners;
   mListeners.mNext = &mListeners;
@@ -263,6 +246,26 @@ bool CDiskWatch::EnablePrivileges() const
 }
 
 /**
+ * Address: 0x004629B0 (FUN_004629B0, ?WatchQuery@CDiskWatch@Moho@@QAEXXZ)
+ */
+void CDiskWatch::WatchQuery()
+{
+  gpg::core::func_LockShared(&mLock);
+
+  DiskWatchMapNode* const head = mDirWatchMap.mHead;
+  if (head != nullptr) {
+    for (DiskWatchMapNode* node = head->mLeft; node != nullptr && node != head; node = NextWatchMapNode(node, head)) {
+      CDiskDirWatch* const dirWatch = node->mDirWatch;
+      if (dirWatch != nullptr) {
+        dirWatch->Update();
+      }
+    }
+  }
+
+  gpg::core::func_UnlockShared(&mLock);
+}
+
+/**
  * Address: 0x00463310 (?DISK_AddWatchListener@Moho@@YAXPAVCDiskWatchListener@1@@Z)
  */
 void moho::DISK_AddWatchListener(CDiskWatchListener* const listener)
@@ -286,6 +289,17 @@ void moho::DISK_RemoveWatchListener(CDiskWatchListener* const listener)
 
   EnsureDiskWatchInitialized();
   gDiskWatch->RemoveListener(listener);
+}
+
+/**
+ * Address: 0x004633A0 (FUN_004633A0, ?DISK_UpdateWatcher@Moho@@YAXXZ)
+ */
+void moho::DISK_UpdateWatcher()
+{
+  EnsureDiskWatchInitialized();
+  if (gDiskWatch != nullptr) {
+    gDiskWatch->WatchQuery();
+  }
 }
 
 /**

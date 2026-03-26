@@ -493,7 +493,10 @@ namespace msvc8
             const std::size_t n = size();
 
             // Move or copy existing elements
-            if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
+            if constexpr (
+                std::is_move_constructible_v<T> &&
+                (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>)
+            ) {
                 // Prefer move if nothrow or copy is unavailable
                 std::size_t i = 0;
                 try {
@@ -506,7 +509,10 @@ namespace msvc8
                     ::operator delete(static_cast<void*>(newBuf));
                     throw;
                 }
-            } else if constexpr (std::is_trivially_copyable_v<T>) {
+            } else if constexpr (
+                std::is_trivially_copyable_v<T> ||
+                (!std::is_move_constructible_v<T> && !std::is_copy_constructible_v<T>)
+            ) {
                 std::memcpy(newFirst, first_, n * sizeof(T));
                 newLast = newFirst + n;
             } else {
@@ -540,6 +546,37 @@ namespace msvc8
         }
     };
     static_assert(sizeof(vector<int>) == 16, "msvc8::set must be 16 bytes on x86");
+
+    /**
+     * Non-owning runtime view for legacy MSVC8 vector layout.
+     *
+     * Layout:
+     *   +0x00: proxy pointer
+     *   +0x04: begin
+     *   +0x08: end
+     *   +0x0C: capacity end
+     */
+    template <class T>
+    struct vector_runtime_view
+    {
+        void* proxy;   // +0x00
+        T* begin;      // +0x04
+        T* end;        // +0x08
+        T* capacityEnd;// +0x0C
+    };
+    static_assert(sizeof(vector_runtime_view<void>) == 0x10, "vector_runtime_view<T> must be 0x10");
+
+    template <class T>
+    [[nodiscard]] inline vector_runtime_view<T>& AsVectorRuntimeView(vector<T>& vec) noexcept
+    {
+        return *reinterpret_cast<vector_runtime_view<T>*>(&vec);
+    }
+
+    template <class T>
+    [[nodiscard]] inline const vector_runtime_view<T>& AsVectorRuntimeView(const vector<T>& vec) noexcept
+    {
+        return *reinterpret_cast<const vector_runtime_view<T>*>(&vec);
+    }
 
     /**
 	 * Small-vector with inline storage and heap fallback (non-owning SDK view).

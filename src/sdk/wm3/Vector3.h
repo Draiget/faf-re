@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <limits>
 #include <type_traits>
 
 namespace Wm3
@@ -121,6 +122,36 @@ namespace Wm3
       return {v.x * scale, v.y * scale, v.z * scale};
     }
 
+    static constexpr Vector3 Zero() noexcept
+    {
+      return {T(0), T(0), T(0)};
+    }
+
+    static Vector3 NaN() noexcept
+    {
+      if constexpr (std::is_floating_point_v<T>) {
+        const T qnan = std::numeric_limits<T>::quiet_NaN();
+        return {qnan, qnan, qnan};
+      } else {
+        return Zero();
+      }
+    }
+
+    static constexpr T DistanceSqXZ(const Vector3& a, const Vector3& b) noexcept
+    {
+      const T dx = a.x - b.x;
+      const T dz = a.z - b.z;
+      return (dx * dx) + (dz * dz);
+    }
+
+    static constexpr T DistanceSq3D(const Vector3& a, const Vector3& b) noexcept
+    {
+      const T dx = a.x - b.x;
+      const T dy = a.y - b.y;
+      const T dz = a.z - b.z;
+      return (dx * dx) + (dy * dy) + (dz * dz);
+    }
+
     static constexpr T Dot(const Vector3& a, const Vector3& b) noexcept
     {
       return a.x * b.x + a.y * b.y + a.z * b.z;
@@ -140,6 +171,20 @@ namespace Wm3
     {
       using std::sqrt;
       return sqrt(LengthSq(v));
+    }
+
+    static void LimitLengthTo(Vector3& v, const T maxLen, const T eps = T(1e-6)) noexcept
+    {
+      const T lenSq = LengthSq(v);
+      if (lenSq <= (maxLen * maxLen) || lenSq <= (eps * eps)) {
+        return;
+      }
+
+      using std::sqrt;
+      const T invLen = maxLen / sqrt(lenSq);
+      v.x *= invLen;
+      v.y *= invLen;
+      v.z *= invLen;
     }
 
     static T Normalize(Vector3& v, const T eps = T(1e-6)) noexcept
@@ -177,6 +222,17 @@ namespace Wm3
       }
 
       return Normalize(*v, eps);
+    }
+
+    static Vector3 NormalizeOrZero(const Vector3& v, const T minLenSq = T(1e-6)) noexcept
+    {
+      if (LengthSq(v) <= minLenSq) {
+        return Zero();
+      }
+
+      Vector3 out = v;
+      Normalize(out);
+      return out;
     }
 
     static Vector3* NormalizeInto(const Vector3& source, Vector3* const dest) noexcept
@@ -255,6 +311,16 @@ namespace Wm3
       return Vector3::Normalize(*this, eps);
     }
 
+    T Length() const noexcept
+    {
+      return Vector3::Length(*this);
+    }
+
+    void LimitLengthTo(const T maxLen, const T eps = T(1e-6)) noexcept
+    {
+      Vector3::LimitLengthTo(*this, maxLen, eps);
+    }
+
     static constexpr Vector3 Abs(const Vector3& v) noexcept
     {
       using std::abs;
@@ -297,6 +363,25 @@ namespace Wm3
     static bool IsntNaN(const Vector3& value) noexcept
     {
       return IsntNaN(&value);
+    }
+
+    static bool Compare(const Vector3* const lhs, const Vector3* const rhs, const T eps = T(1e-5)) noexcept
+    {
+      if (lhs == nullptr || rhs == nullptr) {
+        return lhs != rhs;
+      }
+
+      if constexpr (std::is_floating_point_v<T>) {
+        using std::fabs;
+        return fabs(lhs->x - rhs->x) > eps || fabs(lhs->y - rhs->y) > eps || fabs(lhs->z - rhs->z) > eps;
+      }
+
+      return lhs->x != rhs->x || lhs->y != rhs->y || lhs->z != rhs->z;
+    }
+
+    static bool IsInvalid(const Vector3& value) noexcept
+    {
+      return !IsntNaN(value);
     }
 
     bool IsntNaN() const noexcept

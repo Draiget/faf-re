@@ -1,0 +1,381 @@
+--- a/boost/thread/mutex.hpp
++++ b/boost/thread/mutex.hpp
+@@ -33,13 +33,16 @@
+ class BOOST_THREAD_DECL mutex
+     : private noncopyable
+ {
+-public:
+-    friend class detail::thread::lock_ops<mutex>;
+-
+-    typedef detail::thread::scoped_lock<mutex> scoped_lock;
+-
+-    mutex();
+-    ~mutex();
++public:
++    friend class detail::thread::lock_ops<mutex>;
++
++    typedef detail::thread::scoped_lock<mutex> scoped_lock;
++
++    mutex();
++    ~mutex();
++
++    void lock() { do_lock(); }
++    void unlock() { do_unlock(); }
+ 
+ private:
+ #if defined(BOOST_HAS_WINTHREADS)
+@@ -73,14 +76,18 @@
+ class BOOST_THREAD_DECL try_mutex
+     : private noncopyable
+ {
+-public:
+-    friend class detail::thread::lock_ops<try_mutex>;
++public:
++    friend class detail::thread::lock_ops<try_mutex>;
+ 
+     typedef detail::thread::scoped_lock<try_mutex> scoped_lock;
+     typedef detail::thread::scoped_try_lock<try_mutex> scoped_try_lock;
+ 
+-    try_mutex();
+-    ~try_mutex();
++    try_mutex();
++    ~try_mutex();
++
++    void lock() { do_lock(); }
++    bool try_lock() { return do_trylock(); }
++    void unlock() { do_unlock(); }
+ 
+ private:
+ #if defined(BOOST_HAS_WINTHREADS)
+@@ -115,15 +122,19 @@
+ class BOOST_THREAD_DECL timed_mutex
+     : private noncopyable
+ {
+-public:
+-    friend class detail::thread::lock_ops<timed_mutex>;
++public:
++    friend class detail::thread::lock_ops<timed_mutex>;
+ 
+     typedef detail::thread::scoped_lock<timed_mutex> scoped_lock;
+     typedef detail::thread::scoped_try_lock<timed_mutex> scoped_try_lock;
+     typedef detail::thread::scoped_timed_lock<timed_mutex> scoped_timed_lock;
+ 
+-    timed_mutex();
+-    ~timed_mutex();
++    timed_mutex();
++    ~timed_mutex();
++
++    void lock() { do_lock(); }
++    bool try_lock() { return do_trylock(); }
++    void unlock() { do_unlock(); }
+ 
+ private:
+ #if defined(BOOST_HAS_WINTHREADS)
+--- a/boost/thread/recursive_mutex.hpp
++++ b/boost/thread/recursive_mutex.hpp
+@@ -32,13 +32,16 @@
+ class BOOST_THREAD_DECL recursive_mutex
+     : private noncopyable
+ {
+-public:
+-    friend class detail::thread::lock_ops<recursive_mutex>;
+-
+-    typedef detail::thread::scoped_lock<recursive_mutex> scoped_lock;
+-
+-    recursive_mutex();
+-    ~recursive_mutex();
++public:
++    friend class detail::thread::lock_ops<recursive_mutex>;
++
++    typedef detail::thread::scoped_lock<recursive_mutex> scoped_lock;
++
++    recursive_mutex();
++    ~recursive_mutex();
++
++    void lock() { do_lock(); }
++    void unlock() { do_unlock(); }
+ 
+ private:
+ #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
+@@ -77,15 +80,19 @@
+ class BOOST_THREAD_DECL recursive_try_mutex
+     : private noncopyable
+ {
+-public:
+-    friend class detail::thread::lock_ops<recursive_try_mutex>;
++public:
++    friend class detail::thread::lock_ops<recursive_try_mutex>;
+ 
+     typedef detail::thread::scoped_lock<recursive_try_mutex> scoped_lock;
+     typedef detail::thread::scoped_try_lock<
+         recursive_try_mutex> scoped_try_lock;
+ 
+-    recursive_try_mutex();
+-    ~recursive_try_mutex();
++    recursive_try_mutex();
++    ~recursive_try_mutex();
++
++    void lock() { do_lock(); }
++    bool try_lock() { return do_trylock(); }
++    void unlock() { do_unlock(); }
+ 
+ private:
+ #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
+@@ -125,8 +132,8 @@
+ class BOOST_THREAD_DECL recursive_timed_mutex
+     : private noncopyable
+ {
+-public:
+-    friend class detail::thread::lock_ops<recursive_timed_mutex>;
++public:
++    friend class detail::thread::lock_ops<recursive_timed_mutex>;
+ 
+     typedef detail::thread::scoped_lock<recursive_timed_mutex> scoped_lock;
+     typedef detail::thread::scoped_try_lock<
+@@ -134,8 +141,12 @@
+     typedef detail::thread::scoped_timed_lock<
+         recursive_timed_mutex> scoped_timed_lock;
+ 
+-    recursive_timed_mutex();
+-    ~recursive_timed_mutex();
++    recursive_timed_mutex();
++    ~recursive_timed_mutex();
++
++    void lock() { do_lock(); }
++    bool try_lock() { return do_trylock(); }
++    void unlock() { do_unlock(); }
+ 
+ private:
+ #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
+--- a/boost/thread/xtime.hpp
++++ b/boost/thread/xtime.hpp
+@@ -7,11 +7,17 @@
+ #ifndef BOOST_XTIME_WEK070601_HPP
+ #define BOOST_XTIME_WEK070601_HPP
+ 
+-#include <boost/thread/detail/config.hpp>
+-
+-#include <boost/cstdint.hpp>
+-
+-namespace boost {
++#include <boost/thread/detail/config.hpp>
++
++#include <boost/cstdint.hpp>
++
++// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
++// Boost.Thread's TIME_UTC enum constant.
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++namespace boost {
+ 
+ enum xtime_clock_types
+ {
+--- a/libs/thread/src/condition.cpp
++++ b/libs/thread/src/condition.cpp
+@@ -21,16 +21,22 @@
+ #   include <windows.h>
+ #elif defined(BOOST_HAS_PTHREADS)
+ #   include <errno.h>
+-#elif defined(BOOST_HAS_MPTASKS)
+-#   include <MacErrors.h>
+-#   include "mac/init.hpp"
+-#   include "mac/safe.hpp"
+-#endif
+-
+-// The following include can be removed after the bug on QNX
+-// has been tracked down. I need this only for debugging
+-//#if !defined(NDEBUG) && defined(BOOST_HAS_PTHREADS)
+-#include <iostream>
++#elif defined(BOOST_HAS_MPTASKS)
++#   include <MacErrors.h>
++#   include "mac/init.hpp"
++#   include "mac/safe.hpp"
++#endif
++
++// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
++// Boost.Thread's TIME_UTC enum constant.
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++// The following include can be removed after the bug on QNX
++// has been tracked down. I need this only for debugging
++//#if !defined(NDEBUG) && defined(BOOST_HAS_PTHREADS)
++#include <iostream>
+ //#endif
+ 
+ namespace boost {
+--- a/libs/thread/src/mutex.cpp
++++ b/libs/thread/src/mutex.cpp
+@@ -24,13 +24,19 @@
+ #   include "mutex.inl"
+ #elif defined(BOOST_HAS_PTHREADS)
+ #   include <errno.h>
+-#elif defined(BOOST_HAS_MPTASKS)
+-#    include <MacErrors.h>
+-#    include "mac/init.hpp"
+-#    include "mac/safe.hpp"
+-#endif
+-
+-namespace boost {
++#elif defined(BOOST_HAS_MPTASKS)
++#    include <MacErrors.h>
++#    include "mac/init.hpp"
++#    include "mac/safe.hpp"
++#endif
++
++// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
++// Boost.Thread's TIME_UTC enum constant.
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++namespace boost {
+ 
+ #if defined(BOOST_HAS_WINTHREADS)
+ 
+--- a/libs/thread/src/once.cpp
++++ b/libs/thread/src/once.cpp
+@@ -111,19 +111,23 @@
+ 
+ // The friendly form of InterlockedCompareExchange that defers
+ // according to the above function type wrappers.
+-inline LONG compare_exchange(volatile LPLONG dest, LONG exch, LONG cmp)
+-{
+-#ifdef _WIN64
+-    // Original patch from Anthony Williams.
+-    // I (Roland Schwarz) am trying this for RC_1_34_0, since x64 regressions are
+-    // currently not run on x64 platforms for HEAD
+-    return InterlockedCompareExchange(dest, exch,cmp);
+-#else    
+-    return ice_wrapper(&InterlockedCompareExchange, dest, exch, cmp);
+-#endif
+-}
+-}
+-#endif
++inline LONG compare_exchange(volatile LONG* dest, LONG exch, LONG cmp)
++{
++#ifdef _WIN64
++    // Original patch from Anthony Williams.
++    // I (Roland Schwarz) am trying this for RC_1_34_0, since x64 regressions are
++    // currently not run on x64 platforms for HEAD
++    return InterlockedCompareExchange(dest, exch,cmp);
++#else    
++#   if defined(BOOST_MSVC)
++    return _InterlockedCompareExchange(dest, exch, cmp);
++#   else
++    return ice_wrapper(&InterlockedCompareExchange, dest, exch, cmp);
++#   endif
++#endif
++}
++}
++#endif
+ 
+ namespace boost {
+ 
+--- a/libs/thread/src/recursive_mutex.cpp
++++ b/libs/thread/src/recursive_mutex.cpp
+@@ -23,12 +23,18 @@
+ #   include "mutex.inl"
+ #elif defined(BOOST_HAS_PTHREADS)
+ #   include <errno.h>
+-#elif defined(BOOST_HAS_MPTASKS)
+-#   include <MacErrors.h>
+-#   include "safe.hpp"
+-#endif
+-
+-namespace boost {
++#elif defined(BOOST_HAS_MPTASKS)
++#   include <MacErrors.h>
++#   include "safe.hpp"
++#endif
++
++// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
++// Boost.Thread's TIME_UTC enum constant.
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++namespace boost {
+ 
+ #if defined(BOOST_HAS_WINTHREADS)
+ 
+--- a/libs/thread/src/thread.cpp
++++ b/libs/thread/src/thread.cpp
+@@ -26,11 +26,17 @@
+ 
+ #include "timeconv.inl"
+ 
+-#if defined(BOOST_HAS_WINTHREADS)
+-#   include "boost/thread/detail/tss_hooks.hpp"
+-#endif
+-
+-namespace {
++#if defined(BOOST_HAS_WINTHREADS)
++#   include "boost/thread/detail/tss_hooks.hpp"
++#endif
++
++// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
++// Boost.Thread's TIME_UTC enum constant.
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++namespace {
+ 
+ #if defined(BOOST_HAS_WINTHREADS) && defined(BOOST_NO_THREADEX)
+ // Windows CE doesn't define _beginthreadex
+--- a/libs/thread/src/timeconv.inl
++++ b/libs/thread/src/timeconv.inl
+@@ -4,12 +4,16 @@
+ //  Distributed under the Boost Software License, Version 1.0. (See accompanying 
+ //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+ 
+-// boostinspect:nounnamed
+-
+-namespace {
+-const int MILLISECONDS_PER_SECOND = 1000;
+-const int NANOSECONDS_PER_SECOND = 1000000000;
+-const int NANOSECONDS_PER_MILLISECOND = 1000000;
++// boostinspect:nounnamed
++
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++namespace {
++const int MILLISECONDS_PER_SECOND = 1000;
++const int NANOSECONDS_PER_SECOND = 1000000000;
++const int NANOSECONDS_PER_MILLISECOND = 1000000;
+ 
+ const int MICROSECONDS_PER_SECOND = 1000000;
+ const int NANOSECONDS_PER_MICROSECOND = 1000;
+--- a/libs/thread/src/xtime.cpp
++++ b/libs/thread/src/xtime.cpp
+@@ -17,12 +17,18 @@
+ #   include <boost/cstdint.hpp>
+ #elif defined(BOOST_HAS_GETTIMEOFDAY)
+ #   include <sys/time.h>
+-#elif defined(BOOST_HAS_MPTASKS)
+-#   include <DriverServices.h>
+-#   include <boost/thread/detail/force_cast.hpp>
+-#endif
+-
+-#include <cassert>
++#elif defined(BOOST_HAS_MPTASKS)
++#   include <DriverServices.h>
++#   include <boost/thread/detail/force_cast.hpp>
++#endif
++
++// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
++// Boost.Thread's TIME_UTC enum constant.
++#ifdef TIME_UTC
++#   undef TIME_UTC
++#endif
++
++#include <cassert>
+ 
+ namespace boost {
+ 

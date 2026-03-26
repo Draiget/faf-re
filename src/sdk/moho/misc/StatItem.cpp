@@ -8,30 +8,10 @@
 #include <stdexcept>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
-
-namespace gpg
-{
-  enum class TrackedPointerState : int
-  {
-    Unowned = 1,
-    Owned = 2,
-  };
-
-  struct TrackedPointerInfo
-  {
-    void* object;
-    gpg::RType* type;
-  };
-
-  TrackedPointerInfo ReadRawPointer(ReadArchive* archive, const gpg::RRef& ownerRef);
-  void WriteRawPointer(
-    WriteArchive* archive, const gpg::RRef& objectRef, TrackedPointerState state, const gpg::RRef& ownerRef
-  );
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-} // namespace gpg
 
 namespace
 {
@@ -212,76 +192,14 @@ namespace
     }
   }
 
-  [[nodiscard]] StatIntrusiveNode* AsSelfNode(moho::StatItem* item)
+  [[nodiscard]] StatIntrusiveNode* AsSelfNode(moho::StatItem* item) noexcept
   {
-    return reinterpret_cast<StatIntrusiveNode*>(reinterpret_cast<std::uint8_t*>(item) + 0x04);
+    return reinterpret_cast<StatIntrusiveNode*>(&item->head1Prev);
   }
 
-  [[nodiscard]] StatIntrusiveNode* AsChildHead(moho::StatItem* item)
+  [[nodiscard]] StatIntrusiveNode* AsChildHead(moho::StatItem* item) noexcept
   {
-    return reinterpret_cast<StatIntrusiveNode*>(reinterpret_cast<std::uint8_t*>(item) + 0x14);
-  }
-
-  void ResetTreeLinks(moho::StatItem* item)
-  {
-    StatIntrusiveNode* const selfNode = AsSelfNode(item);
-    selfNode->prev = selfNode;
-    selfNode->next = selfNode;
-    selfNode->parent = nullptr;
-    selfNode->owner = item;
-
-    StatIntrusiveNode* const childHead = AsChildHead(item);
-    childHead->prev = childHead;
-    childHead->next = childHead;
-    item->owner2 = item;
-    item->mTreeMeta = 0;
-  }
-
-  void DetachSelfNode(moho::StatItem* item)
-  {
-    StatIntrusiveNode* const selfNode = AsSelfNode(item);
-    if (selfNode->next != nullptr && selfNode->prev != nullptr) {
-      selfNode->next->prev = selfNode->prev;
-      selfNode->prev->next = selfNode->next;
-    }
-    selfNode->prev = selfNode;
-    selfNode->next = selfNode;
-    selfNode->parent = nullptr;
-  }
-
-  void AttachChild(moho::StatItem* parent, moho::StatItem* child)
-  {
-    DetachSelfNode(child);
-
-    StatIntrusiveNode* const childNode = AsSelfNode(child);
-    childNode->parent = parent;
-    if (parent == nullptr) {
-      return;
-    }
-
-    StatIntrusiveNode* const parentHead = AsChildHead(parent);
-    childNode->prev = parentHead->prev;
-    childNode->next = parentHead;
-    parentHead->prev = childNode;
-    childNode->prev->next = childNode;
-  }
-
-  [[nodiscard]] moho::StatItem* FindChildByName(moho::StatItem* parent, const msvc8::string& token)
-  {
-    if (parent == nullptr) {
-      return nullptr;
-    }
-
-    for (StatIntrusiveNode* node = AsChildHead(parent)->next; node != nullptr; node = node->next) {
-      moho::StatItem* const child = node->owner;
-      if (child == nullptr) {
-        break;
-      }
-      if (child->mName == token) {
-        return child;
-      }
-    }
-    return nullptr;
+    return reinterpret_cast<StatIntrusiveNode*>(&item->head2Prev);
   }
 
   [[nodiscard]] moho::StatItem* WalkStatPath(
@@ -303,7 +221,7 @@ namespace
     moho::StatItem* current = root;
     std::size_t index = 0u;
     for (; index < tokenCount; ++index) {
-      moho::StatItem* const found = FindChildByName(current, tokens[index]);
+      moho::StatItem* const found = current->FindDirectChildByName(tokens[index]);
       if (found == nullptr) {
         break;
       }
@@ -325,7 +243,7 @@ namespace
     moho::StatItem* lastCreated = nullptr;
     for (; index < tokenCount; ++index) {
       moho::StatItem* const child = new moho::StatItem(tokens[index].c_str());
-      AttachChild(parent, child);
+      parent->AttachChild(child);
       parent = child;
       lastCreated = child;
     }
@@ -358,6 +276,25 @@ namespace
 #endif
   }
 
+  [[nodiscard]] std::int32_t AtomicExchangeI32(volatile std::int32_t* value, const std::int32_t wanted)
+  {
+#if defined(_WIN32)
+    for (;;) {
+      const std::int32_t observed = ReadAtomicI32(value);
+      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
+        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
+      ));
+      if (exchanged == observed) {
+        return exchanged;
+      }
+    }
+#else
+    const std::int32_t previous = *value;
+    *value = wanted;
+    return previous;
+#endif
+  }
+
   [[nodiscard]] std::int32_t ReadNumericSlot(moho::StatItem* item, const bool useRealtimeValue)
   {
     volatile std::int32_t* const slot = useRealtimeValue ? &item->mRealtimeValueBits : &item->mPrimaryValueBits;
@@ -376,6 +313,7 @@ namespace moho
 {
   gpg::RType* StatItem::sType = nullptr;
   gpg::RType* Stats<StatItem>::sType = nullptr;
+  EngineStats* sEngineStats = nullptr;
 
   void StatHeapBlock::Reset() noexcept
   {
@@ -390,6 +328,65 @@ namespace moho
   StatHeapBlock::~StatHeapBlock() noexcept
   {
     Reset();
+  }
+
+  void StatItem::ResetTreeLinks()
+  {
+    StatIntrusiveNode* const selfNode = AsSelfNode(this);
+    selfNode->prev = selfNode;
+    selfNode->next = selfNode;
+    selfNode->parent = nullptr;
+    selfNode->owner = this;
+
+    StatIntrusiveNode* const childHead = AsChildHead(this);
+    childHead->prev = childHead;
+    childHead->next = childHead;
+    owner2 = this;
+    mTreeMeta = 0;
+  }
+
+  void StatItem::DetachSelfNode()
+  {
+    StatIntrusiveNode* const selfNode = AsSelfNode(this);
+    if (selfNode->next != nullptr && selfNode->prev != nullptr) {
+      selfNode->next->prev = selfNode->prev;
+      selfNode->prev->next = selfNode->next;
+    }
+    selfNode->prev = selfNode;
+    selfNode->next = selfNode;
+    selfNode->parent = nullptr;
+  }
+
+  void StatItem::AttachChild(StatItem* const child)
+  {
+    if (child == nullptr) {
+      return;
+    }
+
+    child->DetachSelfNode();
+
+    StatIntrusiveNode* const childNode = AsSelfNode(child);
+    childNode->parent = this;
+
+    StatIntrusiveNode* const parentHead = AsChildHead(this);
+    childNode->prev = parentHead->prev;
+    childNode->next = parentHead;
+    parentHead->prev = childNode;
+    childNode->prev->next = childNode;
+  }
+
+  StatItem* StatItem::FindDirectChildByName(const msvc8::string& token)
+  {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr; node = node->next) {
+      StatItem* const child = node->owner;
+      if (child == nullptr) {
+        break;
+      }
+      if (child->mName == token) {
+        return child;
+      }
+    }
+    return nullptr;
   }
 
   /**
@@ -481,6 +478,76 @@ namespace moho
   }
 
   /**
+   * Address: 0x00436290 (FUN_00436290, Moho::EngineStats::GetItem2)
+   */
+  StatItem* Stats<StatItem>::GetIntItem(const gpg::StrArg statPath)
+  {
+    return GetItem(statPath, true);
+  }
+
+  /**
+   * Address: 0x004088C0 (FUN_004088C0, Moho::EngineStats::EngineStats)
+   */
+  EngineStats::EngineStats()
+    : Stats<StatItem>()
+    , mLogFileName("stats.log")
+    , mResolvedLogFilePath()
+    , mLogFrameCount(0)
+    , mIsLogging(0)
+    , mPad4D{0, 0, 0}
+  {}
+
+  /**
+   * Address: 0x00407DC0 (FUN_00407DC0, Moho::EngineStats::~EngineStats)
+   */
+  EngineStats::~EngineStats() = default;
+
+  /**
+   * Address: 0x00417B60 (FUN_00417B60, Moho::EngineStats::GetItem3)
+   */
+  StatItem* EngineStats::GetItem3(const gpg::StrArg statPath)
+  {
+    return GetFloatItem(statPath);
+  }
+
+  /**
+   * Address: 0x00417C50 (FUN_00417C50, Moho::EngineStats::GetItem_0)
+   */
+  StatItem* EngineStats::GetItem_0(const gpg::StrArg statPath)
+  {
+    return GetStringItem(statPath);
+  }
+
+  /**
+   * Address: 0x00436290 (FUN_00436290, Moho::EngineStats::GetItem2)
+   */
+  StatItem* EngineStats::GetItem2(const gpg::StrArg statPath)
+  {
+    return GetIntItem(statPath);
+  }
+
+  /**
+   * Address: 0x00408940 (FUN_00408940, Moho::GetEngineStats)
+   */
+  EngineStats* GetEngineStats()
+  {
+    EngineStats* result = sEngineStats;
+    if (result != nullptr) {
+      return result;
+    }
+
+    EngineStats* const candidate = new (std::nothrow) EngineStats();
+    EngineStats* const previous = sEngineStats;
+    sEngineStats = candidate;
+    if (previous != nullptr) {
+      delete previous;
+      return sEngineStats;
+    }
+
+    return candidate;
+  }
+
+  /**
    * Address: 0x00408730 (FUN_00408730, Moho::StatItem::StatItem)
    */
   StatItem::StatItem(const char* name)
@@ -494,7 +561,7 @@ namespace moho
     , mUseRealtimeSlot(0)
     , mLock()
   {
-    ResetTreeLinks(this);
+    ResetTreeLinks();
   }
 
   /**
@@ -514,8 +581,8 @@ namespace moho
       node = next;
     }
 
-    DetachSelfNode(this);
-    ResetTreeLinks(this);
+    DetachSelfNode();
+    ResetTreeLinks();
   }
 
   /**
@@ -525,6 +592,23 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
     outValue->assign(mValue, 0, msvc8::string::npos);
+  }
+
+  /**
+   * Address: 0x00415220 (FUN_00415220, Moho::StatItem::SetValue)
+   */
+  void StatItem::SetValue(const msvc8::string& value)
+  {
+    boost::mutex::scoped_lock lock(mLock);
+    mValue.assign(value, 0, msvc8::string::npos);
+  }
+
+  /**
+   * Address: 0x004151E0 (FUN_004151E0, Moho::StatItem::Release)
+   */
+  std::int32_t StatItem::Release(const std::int32_t value)
+  {
+    return AtomicExchangeI32(&mUseRealtimeSlot, value);
   }
 
   /**

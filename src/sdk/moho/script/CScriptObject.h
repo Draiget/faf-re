@@ -11,6 +11,8 @@
 
 namespace moho
 {
+  class Unit;
+
   class MOHO_EMPTY_BASES CScriptObject : public gpg::RObject,
                                          public WeakObject,
                                          public boost::noncopyable_::noncopyable,
@@ -23,7 +25,34 @@ namespace moho
     MOHO_EBO_PADDING_FIELD(1);
 #endif
 
+  protected:
+    /**
+     * Address: 0x004C6F70 (??0CScriptObject@Moho@@IAE@XZ)
+     *
+     * What it does:
+     * Initializes base CScriptObject storage without binding a Lua object yet.
+     */
+    CScriptObject();
+
+    /**
+     * Address: 0x004C7010 (??0CScriptObject@Moho@@IAE@ABVLuaObject@LuaPlus@@000@Z)
+     *
+     * What it does:
+     * Initializes base storage and immediately binds script-side Lua object metadata.
+     */
+    CScriptObject(
+      const LuaPlus::LuaObject& metaOrFactory,
+      const LuaPlus::LuaObject& arg1,
+      const LuaPlus::LuaObject& arg2,
+      const LuaPlus::LuaObject& arg3
+    );
+
   public:
+    static gpg::RType* sType;
+
+    [[nodiscard]]
+    static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0xA82547
      * VFTable SLOT: 0
@@ -85,6 +114,15 @@ namespace moho
     );
 
     /**
+     * Address: 0x00623F10 (FUN_00623F10, Moho::CScriptObject::TaskTick)
+     *
+     * What it does:
+     * Calls script callback `TaskTick(self)` and returns integer result.
+     */
+    [[nodiscard]]
+    int TaskTick();
+
+    /**
      * Address: 0x00581AA0
      *
      * @param callback
@@ -136,11 +174,28 @@ namespace moho
     void LuaPCall(const char* scriptName, const char* const* args, LuaPlus::LuaObject* obj);
 
     /**
+     * Address: 0x005EBED0 (FUN_005EBED0, Moho::CScriptObject::RunScript_Unit_Bool)
+     *
+     * What it does:
+     * Executes one script callback with a `Unit*` argument and returns bool result.
+     */
+    [[nodiscard]]
+    bool RunScriptUnitBool(const char* scriptName, Unit* unitArg);
+
+    /**
      * Address: 0x00581930
      * @param fileName
      * @param obj
      */
     void LuaCall(const char* fileName, LuaPlus::LuaObject* obj);
+
+    /**
+     * Address: 0x005EC040 (FUN_005EC040, Moho::CScriptObject::RunScript_UnitOnDamage)
+     *
+     * What it does:
+     * Invokes `OnDamage(unit, amount, canTakeDamage, "Damage")` on this script object.
+     */
+    void RunScriptUnitOnDamage(Unit* sourceUnit, int amount, bool canTakeDamageFlag);
 
     /**
      * Address: 0x007CB940

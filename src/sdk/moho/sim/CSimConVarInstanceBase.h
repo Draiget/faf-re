@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/String.h"
 
 namespace moho
 {
@@ -54,4 +56,32 @@ namespace moho
 
   static_assert(sizeof(CSimConVarInstanceBase) == 0x08, "CSimConVarInstanceBase size must be 0x08");
   static_assert(offsetof(CSimConVarInstanceBase, mName) == 0x04, "CSimConVarInstanceBase::mName offset must be 0x04");
+
+  template <typename T>
+  class TSimConVarInstance : public CSimConVarInstanceBase
+  {
+  public:
+    T mValue; // +0x08
+  };
+
+  static_assert(
+    offsetof(TSimConVarInstance<bool>, mValue) == 0x08, "TSimConVarInstance<bool>::mValue offset must be 0x08"
+  );
+  static_assert(offsetof(TSimConVarInstance<int>, mValue) == 0x08, "TSimConVarInstance<int>::mValue offset must be 0x08");
+  static_assert(
+    offsetof(TSimConVarInstance<float>, mValue) == 0x08, "TSimConVarInstance<float>::mValue offset must be 0x08"
+  );
+  static_assert(
+    offsetof(TSimConVarInstance<std::uint8_t>, mValue) == 0x08,
+    "TSimConVarInstance<uint8_t>::mValue offset must be 0x08"
+  );
+  static_assert(
+    offsetof(TSimConVarInstance<msvc8::string>, mValue) == 0x08,
+    "TSimConVarInstance<string>::mValue offset must be 0x08"
+  );
+  static_assert(sizeof(TSimConVarInstance<bool>) == 0x0C, "TSimConVarInstance<bool> size must be 0x0C");
+  static_assert(sizeof(TSimConVarInstance<int>) == 0x0C, "TSimConVarInstance<int> size must be 0x0C");
+  static_assert(sizeof(TSimConVarInstance<float>) == 0x0C, "TSimConVarInstance<float> size must be 0x0C");
+  static_assert(sizeof(TSimConVarInstance<std::uint8_t>) == 0x0C, "TSimConVarInstance<uint8_t> size must be 0x0C");
+  static_assert(sizeof(TSimConVarInstance<msvc8::string>) == 0x24, "TSimConVarInstance<string> size must be 0x24");
 } // namespace moho

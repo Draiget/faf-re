@@ -1,41 +1,65 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace gpg {
-namespace gal {
+#include <cstddef>
+#include <cstdint>
+
+#include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/IndexBufferContext.hpp"
+
+namespace gpg::gal
+{
     /**
      * VFTABLE: 0x00D42DAC
      * COL:  0x00E509CC
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\IndexBufferD3D9.cpp
      */
-    class IndexBufferD3D9 {
+    class IndexBufferD3D9
+    {
     public:
-      /**
-       * Address: 0x008F4D80
-       * Slot: 0
-       * Demangled: sub_8F4D80
-       */
-      virtual void sub_8F4D80() = 0;
-      /**
-       * Address: 0x008F4BE0
-       * Slot: 1
-       * Demangled: gpg::gal::IndexBufferD3D9::GetContextBuffer
-       */
-      virtual void GetContextBuffer() = 0;
-      /**
-       * Address: 0x008F4E10
-       * Slot: 2
-       * Demangled: gpg::gal::IndexBufferD3D9::Lock
-       */
-      virtual void Lock() = 0;
-      /**
-       * Address: 0x008F4FF0
-       * Slot: 3
-       * Demangled: gpg::gal::IndexBufferD3D9::Unlock
-       */
-      virtual void Unlock() = 0;
+        /**
+         * Address: 0x008F4D80 (FUN_008F4D80)
+         *
+         * What it does:
+         * Owns the deleting-destructor path and delegates to `FUN_008F4C80` body semantics.
+         */
+        virtual ~IndexBufferD3D9();
+
+        /**
+         * Address: 0x008F4BE0 (FUN_008F4BE0)
+         *
+         * What it does:
+         * Returns the embedded index-buffer context block at `this+0x04`.
+         */
+        virtual IndexBufferContext* GetContextBuffer();
+
+        /**
+         * Address: 0x008F4E10 (FUN_008F4E10)
+         *
+         * What it does:
+         * Locks the underlying D3D9 index buffer and returns mapped index data.
+         */
+        virtual std::int16_t* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags);
+
+        /**
+         * Address: 0x008F4FF0 (FUN_008F4FF0)
+         *
+         * What it does:
+         * Unlocks the underlying D3D9 index buffer and clears lock-tracking state.
+         */
+        virtual HRESULT Unlock();
+
+    public:
+        IndexBufferContext context_{};        // +0x04
+        void* d3dIndexBuffer_ = nullptr;      // +0x14
+        bool locked_ = false;                 // +0x18
+        std::uint8_t lockPadding_[3]{};       // +0x19
+        std::int16_t* indexData_ = nullptr;   // +0x1C
     };
-} // namespace gal
-} // namespace gpg
+
+    static_assert(offsetof(IndexBufferD3D9, context_) == 0x04, "IndexBufferD3D9::context_ offset must be 0x04");
+    static_assert(offsetof(IndexBufferD3D9, d3dIndexBuffer_) == 0x14, "IndexBufferD3D9::d3dIndexBuffer_ offset must be 0x14");
+    static_assert(offsetof(IndexBufferD3D9, locked_) == 0x18, "IndexBufferD3D9::locked_ offset must be 0x18");
+    static_assert(offsetof(IndexBufferD3D9, indexData_) == 0x1C, "IndexBufferD3D9::indexData_ offset must be 0x1C");
+    static_assert(sizeof(IndexBufferD3D9) == 0x20, "IndexBufferD3D9 size must be 0x20");
+}

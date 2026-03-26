@@ -6,6 +6,7 @@
 #include <exception>
 #include <new>
 
+#include "moho/app/WxAppRuntime.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "Sim.h"
@@ -15,6 +16,7 @@ using namespace moho;
 namespace
 {
   bool gSimInterlocked = false;
+  ISTIDriver* gActiveSimDriver = nullptr;
 
   bool AreGeomCameraVectorsEqual(const msvc8::vector<GeomCamera3>& lhs, const msvc8::vector<GeomCamera3>& rhs)
   {
@@ -24,21 +26,6 @@ namespace
 
     for (std::size_t i = 0; i < lhs.size(); ++i) {
       if (std::memcmp(&lhs[i], &rhs[i], sizeof(GeomCamera3)) != 0) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  bool AreMaskVectorsEqual(const gpg::core::FastVector<uint32_t>& lhs, const gpg::core::FastVector<uint32_t>& rhs)
-  {
-    if (lhs.Size() != rhs.Size()) {
-      return false;
-    }
-
-    for (std::size_t i = 0; i < lhs.Size(); ++i) {
-      if (lhs[i] != rhs[i]) {
         return false;
       }
     }
@@ -59,6 +46,11 @@ namespace
     return static_cast<int>(std::lround(sample));
   }
 } // namespace
+
+void SSyncData::QueuePendingCommandEventRemoval(const CmdId commandId)
+{
+  mPendingCommandEventRemovals.push_back(commandId);
+}
 
 SSyncDataQueue::~SSyncDataQueue()
 {
@@ -123,38 +115,6 @@ void SSyncDataQueue::ClearAndDelete()
   while (!Empty()) {
     delete PopFront();
   }
-}
-
-/**
- * Address: 0x00401C50 (FUN_00401C50)
- * Compares sync-filter mask blocks by rawWord and full vector payload.
- */
-bool CSimDriver::IsSameMaskBlock(const SSyncFilterMaskBlock& lhs, const SSyncFilterMaskBlock& rhs)
-{
-  return lhs.rawWord == rhs.rawWord && AreMaskVectorsEqual(lhs.masks, rhs.masks);
-}
-
-/**
- * Address: 0x004028E0 (FUN_004028E0) helper usage in FUN_0073DD10
- * Copies the binary-significant mask payload (rawWord + masks vector).
- */
-void CSimDriver::CopyMaskBlock(SSyncFilterMaskBlock& dst, const SSyncFilterMaskBlock& src)
-{
-  dst.rawWord = src.rawWord;
-  dst.masks.ResetFrom(src.masks);
-}
-
-/**
- * Address: 0x0073DD10 (FUN_0073DD10)
- * Copies the entire SSyncFilter layout used by dispatch transitions.
- */
-void CSimDriver::CopySyncFilter(SSyncFilter& dst, const SSyncFilter& src)
-{
-  dst.focusArmy = src.focusArmy;
-  dst.geoCams = src.geoCams;
-  CopyMaskBlock(dst.maskA, src.maskA);
-  dst.optionFlag = src.optionFlag;
-  CopyMaskBlock(dst.maskB, src.maskB);
 }
 
 /**
@@ -239,6 +199,10 @@ CSimDriver::CSimDriver(
  */
 CSimDriver::~CSimDriver()
 {
+  if (gActiveSimDriver == this) {
+    gActiveSimDriver = nullptr;
+  }
+
   ShutDown();
 
   if (mConnectionEvent) {
@@ -278,8 +242,10 @@ void CSimDriver::JoinAndDeleteThread(boost::thread*& thread)
     return;
   }
 
-  if (thread->joinable()) {
+  try {
     thread->join();
+  } catch (...) {
+    // Boost 1.34 does not expose joinable(); preserve best-effort shutdown.
   }
 
   delete thread;
@@ -302,25 +268,31 @@ void CSimDriver::MarkFirstConnectionActivityLocked()
 
 /**
  * Address: 0x0073DD70 (FUN_0073DD70), plus exception branch at 0x0073DDF9..0x0073DE2B
- * Pulls request name under lock, marks save pending, decrements outstanding counter, and signals waiters.
+ *
+ * What it does:
+ * Unlocks the driver mutex, serializes Sim state into the request archive,
+ * records success/failure completion payload, then relocks and signals waiters.
  */
-void CSimDriver::PreparePendingSaveRequestLocked()
+void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock)
 {
   if (!mSaveGameRequest) {
     return;
   }
 
+  lock.unlock();
   try {
-    const char* requestedName = mSaveGameRequest->GetSaveName();
-    mPendingSaveName = requestedName ? requestedName : "";
+    gpg::WriteArchive* const archive = mSaveGameRequest->GetArchive();
+    mSim->SaveState(archive);
+    mPendingSaveName.clear();
     mSaveRequestUsesSuggestedName = true;
   } catch (const std::exception& ex) {
     mPendingSaveName = ex.what();
     mSaveRequestUsesSuggestedName = false;
   } catch (...) {
-    mPendingSaveName = "";
+    mPendingSaveName.clear();
     mSaveRequestUsesSuggestedName = false;
   }
+  lock.lock();
 
   mWantsToSave = true;
   if (--mOutstandingRequests == 0) {
@@ -346,7 +318,7 @@ void CSimDriver::ForwardCommandResultLocked()
  */
 void CSimDriver::FinalizeSyncDispatchLocked(const int32_t beatToDispatch)
 {
-  CopySyncFilter(mActiveSyncFilter, mPendingSyncFilter);
+  mActiveSyncFilter.CopyFrom(mPendingSyncFilter);
 
   if (!mSim) {
     return;
@@ -469,7 +441,7 @@ void CSimDriver::SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams)
 void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
 {
   boost::mutex::scoped_lock lock(mLock.lock);
-  (void)IsSameMaskBlock(mPendingSyncFilter.maskA, block);
+  (void)SSyncFilterMaskBlock::Equals(mPendingSyncFilter.maskA, block);
 }
 
 /**
@@ -479,11 +451,11 @@ void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
 void CSimDriver::SetSyncFilterMaskB(const SSyncFilterMaskBlock& block)
 {
   boost::mutex::scoped_lock lock(mLock.lock);
-  if (IsSameMaskBlock(mPendingSyncFilter.maskB, block)) {
+  if (SSyncFilterMaskBlock::Equals(mPendingSyncFilter.maskB, block)) {
     return;
   }
 
-  CopyMaskBlock(mPendingSyncFilter.maskB, block);
+  mPendingSyncFilter.maskB.CopyFrom(block);
 }
 
 /**
@@ -583,7 +555,7 @@ void CSimDriver::Dispatch()
     }
 
     if (mSaveGameRequest && !mWantsToSave && (mState == EDriverState::Dispatching || mState == EDriverState::Ready)) {
-      PreparePendingSaveRequestLocked();
+      PreparePendingSaveRequestLocked(lock);
       continue;
     }
 
@@ -983,9 +955,21 @@ DWORD CSimDriver::PerformNextEvent()
     mClientManager->DoBeat();
   }
 
-  // The original function loops over wxTheApp->Pending/Dispatch and
-  // wxTheApp->ProcessIdle (vtable +0x4C/+0x50/+0x58) until no more idle work.
-  // wx type surfaces are not reconstructed in this sdk project yet.
+  bool keepIdle = true;
+  for (;;) {
+    if (moho::WxAppRuntime::Pending()) {
+      moho::WxAppRuntime::Dispatch();
+      keepIdle = true;
+      continue;
+    }
+
+    if (!keepIdle) {
+      break;
+    }
+
+    keepIdle = moho::WxAppRuntime::ProcessIdle();
+  }
+
   return SleepEx(100, TRUE);
 }
 
@@ -1006,5 +990,22 @@ ISTIDriver* moho::SIM_CreateDriver(
 {
   msvc8::auto_ptr<CClientManagerImpl> clientOwner(clientManager);
   msvc8::auto_ptr<gpg::Stream> streamOwner(stream);
-  return new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
+  CSimDriver* const created = new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
+  gActiveSimDriver = created;
+  return created;
+}
+
+/**
+ * Address context: process-global `sSimDriver` ownership lane used by world/app frame code.
+ */
+ISTIDriver* moho::SIM_GetActiveDriver()
+{
+  return gActiveSimDriver;
+}
+
+ISTIDriver* moho::SIM_DetachActiveDriver()
+{
+  ISTIDriver* const detached = gActiveSimDriver;
+  gActiveSimDriver = nullptr;
+  return detached;
 }

@@ -7,10 +7,15 @@
 #include "legacy/containers/Vector.h"
 #include "moho/render/camera/VTransform.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class CAniDefaultSkel;
-  class CAniResourceSkel;
+  struct SScmFile;
 
   struct SAniSkelBoneNameIndex
   {
@@ -67,6 +72,8 @@ namespace moho
   class CAniSkel
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0054A370 (FUN_0054A370, scalar deleting destructor thunk)
      * Mangled: ??_GCAniSkel@Moho@@UAEPAXI@Z
@@ -112,22 +119,23 @@ namespace moho
 
     /**
      * Address: 0x0054A540 (FUN_0054A540)
+     * Mangled: ?UpdateBoneBounds@CAniSkel@Moho@@AAEXXZ
      *
      * What it does:
-     * Rebuilds per-bone min/max bounds from source mapping data.
+     * Rebuilds per-bone min/max bounds from SCM sample mapping data.
      */
-    void RebuildBoneBounds();
+    void UpdateBoneBounds();
 
   public:
-    boost::shared_ptr<const CAniResourceSkel> mSourceSkeleton; // +0x04
-    msvc8::vector<SAniSkelBone> mBones;                        // +0x0C
-    msvc8::vector<SAniSkelBoneNameIndex> mBoneNameToIndex;     // +0x1C
+    boost::shared_ptr<const SScmFile> mFile;               // +0x04
+    msvc8::vector<SAniSkelBone> mBones;                    // +0x0C
+    msvc8::vector<SAniSkelBoneNameIndex> mBoneNameToIndex; // +0x1C
 
   protected:
     CAniSkel() = default;
   };
 
-  static_assert(offsetof(CAniSkel, mSourceSkeleton) == 0x04, "CAniSkel::mSourceSkeleton offset must be 0x04");
+  static_assert(offsetof(CAniSkel, mFile) == 0x04, "CAniSkel::mFile offset must be 0x04");
   static_assert(offsetof(CAniSkel, mBones) == 0x0C, "CAniSkel::mBones offset must be 0x0C");
   static_assert(offsetof(CAniSkel, mBoneNameToIndex) == 0x1C, "CAniSkel::mBoneNameToIndex offset must be 0x1C");
   static_assert(sizeof(CAniSkel) == 0x2C, "CAniSkel size must be 0x2C");

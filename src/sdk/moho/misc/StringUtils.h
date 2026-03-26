@@ -2,6 +2,7 @@
 
 #include <locale>
 
+#include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
 
 namespace msvc8
@@ -32,4 +33,22 @@ namespace moho
    * Returns true if 'name' equals any trimmed token in 'ignoreList'.
    */
   inline bool IsNameIgnored(const msvc8::string& ignoreList, const char* name);
+
+  /**
+   * Address: 0x0048E0C0 (FUN_0048E0C0, Moho::URI_Split)
+   *
+   * gpg::StrArg,std::basic_string<char,std::char_traits<char>,std::allocator<char>> &,...
+   *
+   * What it does:
+   * Splits one URI into `scheme`, `authority`, `path`, `query`, and `fragment`
+   * lanes using the original URI parser rules.
+   */
+  bool URI_Split(
+    gpg::StrArg uri,
+    msvc8::string* scheme,
+    msvc8::string* authority,
+    msvc8::string* path,
+    msvc8::string* query,
+    msvc8::string* fragment
+  );
 } // namespace moho

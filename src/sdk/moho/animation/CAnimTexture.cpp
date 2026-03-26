@@ -6,32 +6,6 @@
 
 namespace
 {
-  template <typename T>
-  void RetainSharedRaw(boost::SharedPtrRaw<T>& value) noexcept
-  {
-    if (value.pi != nullptr) {
-      value.pi->add_ref_copy();
-    }
-  }
-
-  template <typename T>
-  void ReleaseSharedRaw(boost::SharedPtrRaw<T>& value) noexcept
-  {
-    if (value.pi != nullptr) {
-      value.pi->release();
-      value.pi = nullptr;
-    }
-    value.px = nullptr;
-  }
-
-  template <typename T>
-  void ReleaseSharedRawVector(msvc8::vector<boost::SharedPtrRaw<T>>& values) noexcept
-  {
-    for (auto* frame = values.begin(); frame != values.end(); ++frame) {
-      ReleaseSharedRaw(*frame);
-    }
-  }
-
   [[nodiscard]] std::int32_t FloorToIndex(const float value) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value));
@@ -103,7 +77,9 @@ namespace moho
       }
     }
 
-    ReleaseSharedRawVector(mFrames);
+    for (FrameRef* frame = mFrames.begin(); frame != mFrames.end(); ++frame) {
+      frame->release();
+    }
     mFrames.clear();
     mBaseTextureName.tidy(true, 0U);
   }
@@ -163,7 +139,7 @@ namespace moho
     }
 
     outFrame = mFrames[static_cast<std::size_t>(index)];
-    RetainSharedRaw(outFrame);
+    outFrame.add_ref_copy();
   }
 
   void CAnimTexture::SetFrameResolver(const FrameResolver resolver)
@@ -184,7 +160,9 @@ namespace moho
    */
   void CAnimTexture::LoadFramesFromBaseName(const char* const baseTextureName)
   {
-    ReleaseSharedRawVector(mFrames);
+    for (FrameRef* frame = mFrames.begin(); frame != mFrames.end(); ++frame) {
+      frame->release();
+    }
     mFrames.clear();
     mBaseTextureName.assign_owned(baseTextureName);
 
@@ -199,7 +177,7 @@ namespace moho
       }
 
       AppendFrameRef(loadedFrame);
-      ReleaseSharedRaw(loadedFrame);
+      loadedFrame.release();
 
       if (!IncrementFrameNameSuffix(frameName)) {
         break;
@@ -267,7 +245,7 @@ namespace moho
   void CAnimTexture::AppendFrameRef(const FrameRef& frame)
   {
     FrameRef retainedFrame = frame;
-    RetainSharedRaw(retainedFrame);
+    retainedFrame.add_ref_copy();
     mFrames.push_back(retainedFrame);
   }
 } // namespace moho

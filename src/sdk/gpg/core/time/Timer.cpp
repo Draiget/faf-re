@@ -25,7 +25,12 @@ void time::Timer::Reset() {
     this->mTime = GetTime();
 }
 
-// 0x00955710
+/**
+ * Address: 0x00955710 (FUN_00955710)
+ *
+ * What it does:
+ * Returns elapsed cycle count since last stored timestamp and updates the timer baseline.
+ */
 LONGLONG time::Timer::ElapsedCyclesAndReset() {
 	const LONGLONG curTime = GetTime();
 	const LONGLONG diff = curTime - this->mTime;
@@ -33,7 +38,12 @@ LONGLONG time::Timer::ElapsedCyclesAndReset() {
     return diff;
 }
 
-// 0x00955700
+/**
+ * Address: 0x00955700 (FUN_00955700)
+ *
+ * What it does:
+ * Returns elapsed cycle count since the timer baseline without mutating state.
+ */
 LONGLONG time::Timer::ElapsedCycles() const {
     return GetTime() - this->mTime;
 }
@@ -87,7 +97,12 @@ float time::CyclesToSeconds(const LONGLONG cycles) {
     return cycles * TimerCycleToSeconds;
 }
 
-// 0x00955730
+/**
+ * Address: 0x00955730 (FUN_00955730)
+ *
+ * What it does:
+ * Returns process-wide system timer singleton with one-time baseline initialization.
+ */
 time::Timer const& time::GetSystemTimer() {
     static int guard = 0; // 0x00F8ED80
     if ((guard & 1) == 0) {

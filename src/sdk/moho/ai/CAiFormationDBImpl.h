@@ -48,7 +48,14 @@ namespace moho
      * Address: 0x0059C120 (FUN_0059C120)
      */
     CAiFormationInstance* NewFormation(
-      int scriptIndex, const char* scriptName, void* unitWeakSet, int arg4, int arg5, int arg6, int arg7, int arg8
+      const SFormationUnitWeakRefSet* unitWeakSet,
+      const char* scriptName,
+      const SCoordsVec2* formationCenter,
+      float orientX,
+      float orientY,
+      float orientZ,
+      float orientW,
+      int commandType
     ) override;
 
   public:

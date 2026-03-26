@@ -48,8 +48,14 @@ namespace moho
      * Address: 0x00651920 (FUN_00651920)
      *
      * What it does:
-     * Stores overlay category/type labels and links this descriptor into the
-     * process-global debug-overlay-class registry list.
+     * Stores overlay description/token labels and links this descriptor into
+     * the process-global debug-overlay-class registry list.
+     */
+    void RegisterOverlayClass(const char* overlayDescription, const char* overlayToken);
+
+    /**
+     * Recovery helper:
+     * Compatibility wrapper for older callsites that only recovered token.
      */
     void RegisterOverlayClassToken(const char* overlayToken);
 
@@ -57,7 +63,7 @@ namespace moho
     std::uint32_t mOverlayClassPad0064;                       // +0x64 (observed gap before intrusive link base)
     TDatListItem<RDebugOverlayClass, void> mOverlayClassLink; // +0x68
     msvc8::string mOverlayToken;                              // +0x70
-    msvc8::string mOverlayTypeName;                           // +0x8C
+    msvc8::string mOverlayDescription;                        // +0x8C
   };
 
   static_assert(
@@ -71,7 +77,8 @@ namespace moho
     offsetof(RDebugOverlayClass, mOverlayToken) == 0x70, "RDebugOverlayClass::mOverlayToken offset must be 0x70"
   );
   static_assert(
-    offsetof(RDebugOverlayClass, mOverlayTypeName) == 0x8C, "RDebugOverlayClass::mOverlayTypeName offset must be 0x8C"
+    offsetof(RDebugOverlayClass, mOverlayDescription) == 0x8C,
+    "RDebugOverlayClass::mOverlayDescription offset must be 0x8C"
   );
   static_assert(sizeof(RDebugOverlayClass) == 0xA8, "RDebugOverlayClass size must be 0xA8");
 } // namespace moho

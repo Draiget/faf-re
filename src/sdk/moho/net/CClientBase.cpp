@@ -20,17 +20,6 @@ using namespace moho;
 namespace
 {
   constexpr std::size_t kMessageHeaderSize = 3;
-
-  gpg::MemBuffer<const char> MakeConstMemBufferCopy(const char* source, const std::size_t size)
-  {
-    auto copy = gpg::AllocMemBuffer(size);
-    if (size != 0) {
-      std::memcpy(copy.mBegin, source, size);
-    }
-
-    const boost::shared_ptr<const char> constOwner(copy.mData);
-    return gpg::MemBuffer<const char>(constOwner, copy.mBegin, copy.mEnd);
-  }
 } // namespace
 
 /**
@@ -219,7 +208,7 @@ void CClientBase::Process(CMessage& msg)
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_ReceiveChat): {
     const auto payloadBytes = static_cast<size_t>(msg.GetMessageSize());
-    const auto payload = MakeConstMemBufferCopy(msg.mBuff.start_ + kMessageHeaderSize, payloadBytes);
+    const auto payload = gpg::CopyMemBuffer(msg.mBuff.start_ + kMessageHeaderSize, payloadBytes);
     mManager->mInterface->ReceiveChat(this, payload);
     return;
   }
@@ -401,11 +390,11 @@ CClientBase::CClientBase(
   int clientIndex,
   CClientManagerImpl* manager,
   const char* name,
-  LaunchInfoBase* launchInfo,
+  const int32_t ownerId,
   BVIntSet& commandSources,
   uint32_t sourceId
 )
-  : IClient(name, clientIndex, launchInfo)
+  : IClient(name, clientIndex, ownerId)
   , mManager(manager)
   , mUnknown2C(0)
   , mValidCommandSources(commandSources)

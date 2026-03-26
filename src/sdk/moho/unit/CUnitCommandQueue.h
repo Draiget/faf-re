@@ -2,12 +2,12 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
 #include "Broadcaster.h"
 #include "CUnitCommand.h"
-#include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/Vector.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/misc/WeakPtr.h"
 
 namespace moho
 {
@@ -35,8 +35,8 @@ namespace moho
      * Address: 0x006EE2D0 (FUN_006EE2D0)
      *
      * What it does:
-     * Clears queued commands in reverse order and applies the repeat-queue
-     * latch for specific head command families.
+     * Clears queued commands in reverse order and marks owner sync state dirty
+     * for specific head command families.
      */
     void ClearCommandQueue();
 
@@ -56,10 +56,9 @@ namespace moho
 
   public:
     Unit* mUnit;
-    gpg::core::FastVector<boost::shared_ptr<CUnitCommand>> mCommandVec;
-    EUnitCommandType mCommandType;
+    msvc8::vector<WeakPtr<CUnitCommand>> mCommandVec;
+    EUnitCommandType mCommandType; // mirrors queue head command family
     int32_t unk0;
-    int32_t unk1;
     bool mNeedsRefresh;
     std::uint8_t pad_25[3];
   };
@@ -67,10 +66,9 @@ namespace moho
   static_assert(offsetof(CUnitCommandQueue, mUnit) == 0x08, "CUnitCommandQueue::mUnit offset must be 0x08");
   static_assert(offsetof(CUnitCommandQueue, mCommandVec) == 0x0C, "CUnitCommandQueue::mCommandVec offset must be 0x0C");
   static_assert(
-    offsetof(CUnitCommandQueue, mCommandType) == 0x18, "CUnitCommandQueue::mCommandType offset must be 0x18"
+    offsetof(CUnitCommandQueue, mCommandType) == 0x1C, "CUnitCommandQueue::mCommandType offset must be 0x1C"
   );
-  static_assert(offsetof(CUnitCommandQueue, unk0) == 0x1C, "CUnitCommandQueue::unk0 offset must be 0x1C");
-  static_assert(offsetof(CUnitCommandQueue, unk1) == 0x20, "CUnitCommandQueue::unk1 offset must be 0x20");
+  static_assert(offsetof(CUnitCommandQueue, unk0) == 0x20, "CUnitCommandQueue::unk0 offset must be 0x20");
   static_assert(
     offsetof(CUnitCommandQueue, mNeedsRefresh) == 0x24, "CUnitCommandQueue::mNeedsRefresh offset must be 0x24"
   );

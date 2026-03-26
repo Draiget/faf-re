@@ -74,6 +74,9 @@ namespace moho
   class CArmyStatItem : public StatItem
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x00585B30 (FUN_00585B30, Moho::CArmyStatItem::CArmyStatItem)
      */
@@ -106,6 +109,9 @@ namespace moho
   class CArmyStats : public Stats<CArmyStatItem>, public boost::noncopyable_::noncopyable
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x006FD7C0 (FUN_006FD7C0, CArmyStats constructor)
      */

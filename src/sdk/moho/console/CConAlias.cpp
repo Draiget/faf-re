@@ -1,9 +1,10 @@
 #include "moho/console/CConAlias.h"
 
-#include <cctype>
 #include <new>
 #include <string>
 #include <string_view>
+
+#include "gpg/core/containers/String.h"
 
 namespace
 {
@@ -20,7 +21,7 @@ namespace
       if (ch == '#' || ch == ';' || ch == '"') {
         return true;
       }
-      if (std::isspace(static_cast<unsigned char>(ch)) != 0) {
+      if (gpg::STR_IsAsciiWhitespace(ch)) {
         return true;
       }
     }

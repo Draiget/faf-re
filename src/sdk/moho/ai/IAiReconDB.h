@@ -1,9 +1,52 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstdint>
+
+#include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/Rect2.h"
+#include "gpg/core/utils/BoostWrappers.h"
+#include "legacy/containers/Vector.h"
+#include "wm3/Box3.h"
+#include "wm3/Vector3.h"
+
+namespace gpg
+{
+  class RType;
+}
 
 namespace moho
 {
+  class CIntelGrid;
+  class Entity;
+  class ReconBlip;
+  class Unit;
+  template <class T>
+  class EntitySetTemplate;
+
+  /**
+   * Address family:
+   * - 0x005C64550 (`CAiReconDBImpl::GetReconFlags` lexical helper chain)
+   *
+   * What it does:
+   * Bitmask describing current reconnaissance knowledge for one contact.
+   */
+  enum EReconFlags : std::int32_t
+  {
+    RECON_None = 0x00,
+    RECON_Radar = 0x01,
+    RECON_Sonar = 0x02,
+    RECON_Omni = 0x04,
+    RECON_LOSNow = 0x08,
+    RECON_LOSEver = 0x10,
+    RECON_KnownFake = 0x20,
+    RECON_MaybeDead = 0x40,
+
+    RECON_RadarSonar = RECON_Radar | RECON_Sonar,
+    RECON_AnyPing = RECON_Radar | RECON_Sonar | RECON_Omni,
+    RECON_Exposed = RECON_Omni | RECON_LOSNow | RECON_LOSEver,
+    RECON_AnySense = RECON_Radar | RECON_Sonar | RECON_Omni | RECON_LOSNow,
+  };
+
   /**
    * VFTABLE: 0x00E1D7C4
    * COL:  0x00E74750
@@ -12,157 +55,176 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005BE020
-     * Slot: 0
-     * Demangled: public: __thiscall Moho::IAiReconDB::IAiReconDB(void)
+     * Address: 0x005BE010 (??1IAiReconDB@Moho@@UAE@XZ)
+     *
+     * VFTable SLOT: 0
      */
-    IAiReconDB() = default;
+    virtual ~IAiReconDB();
 
     /**
-     * Address: 0x00A82547
-     * Slot: 1
-     * Demangled: _purecall
+     * Address: 0x005C0C40 (FUN_005C0C40)
+     *
+     * VFTable SLOT: 1
      */
-    virtual void purecall1() = 0;
+    virtual void ReconTick(int dTicks) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 2
-     * Demangled: _purecall
+     * Address: 0x005C14E0 (FUN_005C14E0)
+     *
+     * VFTable SLOT: 2
      */
-    virtual void purecall2() = 0;
+    virtual void ReconRefresh() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 3
-     * Demangled: _purecall
+     * Address: 0x005C18A0 (FUN_005C18A0)
+     *
+     * VFTable SLOT: 3
      */
-    virtual void purecall3() = 0;
+    [[nodiscard]]
+    virtual EReconFlags ReconCanDetect(const moho::Rect2<int>& rect, float y, int oldFlags) const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 4
-     * Demangled: _purecall
+     * Address: 0x005C1850 (FUN_005C1850)
+     *
+     * VFTable SLOT: 4
      */
-    virtual void purecall4() = 0;
+    [[nodiscard]]
+    virtual EReconFlags ReconCanDetect(const Wm3::Vec3f& pos, int oldFlags) const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 5
-     * Demangled: _purecall
+     * Address: 0x005C1720 (FUN_005C1720)
+     *
+     * VFTable SLOT: 5
      */
-    virtual void purecall5() = 0;
+    virtual void ReconGetBlips(const Wm3::Box3f& box, gpg::core::FastVector<Entity*>* outBlips) const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 6
-     * Demangled: _purecall
+     * Address: 0x005C1640 (FUN_005C1640)
+     *
+     * VFTable SLOT: 6
      */
-    virtual void purecall6() = 0;
+    virtual void ReconGetBlips(const Wm3::Vec3f& center, float radius, gpg::core::FastVector<Entity*>* outBlips) const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 7
-     * Demangled: _purecall
+     * Address: 0x005C1590 (FUN_005C1590)
+     *
+     * VFTable SLOT: 7
      */
-    virtual void purecall7() = 0;
+    [[nodiscard]]
+    virtual const msvc8::vector<ReconBlip*>& ReconGetBlips() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 8
-     * Demangled: _purecall
+     * Address: 0x005C1A10 (FUN_005C1A10)
+     *
+     * VFTable SLOT: 8
      */
-    virtual void purecall8() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetVisionGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 9
-     * Demangled: _purecall
+     * Address: 0x005C1A40 (FUN_005C1A40)
+     *
+     * VFTable SLOT: 9
      */
-    virtual void purecall9() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetWaterGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 10
-     * Demangled: _purecall
+     * Address: 0x005C1A70 (FUN_005C1A70)
+     *
+     * VFTable SLOT: 10
      */
-    virtual void purecall10() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetRadarGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 11
-     * Demangled: _purecall
+     * Address: 0x005C1AA0 (FUN_005C1AA0)
+     *
+     * VFTable SLOT: 11
      */
-    virtual void purecall11() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetSonarGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 12
-     * Demangled: _purecall
+     * Address: 0x005C1AD0 (FUN_005C1AD0)
+     *
+     * VFTable SLOT: 12
      */
-    virtual void purecall12() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetOmniGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 13
-     * Demangled: _purecall
+     * Address: 0x005C1B00 (FUN_005C1B00)
+     *
+     * VFTable SLOT: 13
      */
-    virtual void purecall13() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetRCIGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 14
-     * Demangled: _purecall
+     * Address: 0x005C1B30 (FUN_005C1B30)
+     *
+     * VFTable SLOT: 14
      */
-    virtual void purecall14() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetSCIGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 15
-     * Demangled: _purecall
+     * Address: 0x005C1B60 (FUN_005C1B60)
+     *
+     * VFTable SLOT: 15
      */
-    virtual void purecall15() = 0;
+    [[nodiscard]]
+    virtual boost::SharedPtrRaw<CIntelGrid> ReconGetVCIGrid() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 16
-     * Demangled: _purecall
+     * Address: 0x005C08F0 (FUN_005C08F0)
+     *
+     * VFTable SLOT: 16
      */
-    virtual void purecall16() = 0;
+    virtual void ReconSetFogOfWar(bool enabled) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 17
-     * Demangled: _purecall
+     * Address: 0x005C0910 (FUN_005C0910)
+     *
+     * VFTable SLOT: 17
      */
-    virtual void purecall17() = 0;
+    [[nodiscard]]
+    virtual bool ReconGetFogOfWar() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 18
-     * Demangled: _purecall
+     * Address: 0x005C29C0 (FUN_005C29C0, nullsub_1553)
+     *
+     * VFTable SLOT: 18
      */
-    virtual void purecall18() = 0;
+    virtual void UpdateSimChecksum() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 19
-     * Demangled: _purecall
+     * Address: 0x005C15A0 (FUN_005C15A0)
+     *
+     * VFTable SLOT: 19
      */
-    virtual void purecall19() = 0;
+    [[nodiscard]]
+    virtual ReconBlip* ReconGetBlip(Unit* unit) const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 20
-     * Demangled: _purecall
+     * Address: 0x005C20C0 (FUN_005C20C0)
+     *
+     * VFTable SLOT: 20
      */
-    virtual void purecall20() = 0;
+    [[nodiscard]]
+    virtual EntitySetTemplate<Entity> ReconGetJamingBlips(Unit* unit) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 21
-     * Demangled: _purecall
+     * Address: 0x005C05A0 (FUN_005C05A0)
+     *
+     * VFTable SLOT: 21
      */
-    virtual void purecall21() = 0;
+    virtual void ReconFlushBlipsInRect(const moho::Rect2<int>& rect) = 0;
+
+  public:
+    static gpg::RType* sType;
   };
+
+  static_assert(sizeof(IAiReconDB) == 0x04, "IAiReconDB size must be 0x04");
 } // namespace moho

@@ -5,20 +5,11 @@
 #include <new>
 #include <typeinfo>
 
+#include "moho/animation/CAniActor.h"
+
 namespace
 {
   constexpr std::uint16_t kWatchBoneActiveFlag = 0x8000;
-
-  struct CAniActorManipulatorListView
-  {
-    std::uint8_t mUnknown00[0x10];
-    moho::TDatList<moho::IAniManipulator, void> mManipulatorsByPrecedence;
-  };
-
-  static_assert(
-    offsetof(CAniActorManipulatorListView, mManipulatorsByPrecedence) == 0x10,
-    "CAniActor manipulator-order list offset must be 0x10"
-  );
 
   [[nodiscard]] moho::SAniManipBinding* InlineWatchBoneStorage(moho::IAniManipulator* const manipulator) noexcept
   {
@@ -132,10 +123,9 @@ namespace
    */
   void RegisterWithOwnerActorOrderList(moho::CAniActor* const ownerActor, moho::IAniManipulator* const manipulator)
   {
-    auto* const actorView = reinterpret_cast<CAniActorManipulatorListView*>(ownerActor);
     auto* const listHead =
-      static_cast<moho::TDatListItem<moho::IAniManipulator, void>*>(&actorView->mManipulatorsByPrecedence);
-    auto* insertBefore = actorView->mManipulatorsByPrecedence.mNext;
+      static_cast<moho::TDatListItem<moho::IAniManipulator, void>*>(&ownerActor->mManipulatorsByPrecedence);
+    auto* insertBefore = ownerActor->mManipulatorsByPrecedence.mNext;
     while (insertBefore != listHead) {
       auto* const current = reinterpret_cast<moho::IAniManipulator*>(
         reinterpret_cast<std::uintptr_t>(insertBefore) - offsetof(moho::IAniManipulator, mActorOrderLink)

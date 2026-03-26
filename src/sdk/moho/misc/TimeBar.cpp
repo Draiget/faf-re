@@ -13,38 +13,16 @@
 
 #include "boost/mutex.h"
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/time/Timer.h"
 #include "legacy/containers/Vector.h"
 #include "moho/math/Vector3f.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
 
 namespace moho
 {
   // Address: 0x00F57E5C (ren_FrameTimeSeconds)
   extern float ren_FrameTimeSeconds;
-
-  class CD3DBatchTexture
-  {
-  public:
-    static boost::shared_ptr<CD3DBatchTexture> FromSolidColor(std::uint32_t color);
-  };
-
-  class CD3DPrimBatcher
-  {
-  public:
-    struct Vertex
-    {
-      float mX;
-      float mY;
-      float mZ;
-      std::uint32_t mColor;
-      float mU;
-      float mV;
-    };
-
-    void SetTexture(const boost::shared_ptr<CD3DBatchTexture>& texture);
-    void DrawQuad(const Vertex& topLeft, const Vertex& topRight, const Vertex& bottomRight, const Vertex& bottomLeft);
-    void DrawLine(const Vertex& start, const Vertex& end);
-  };
 
   class CD3DFont
   {
@@ -109,7 +87,7 @@ namespace moho
         if (!rhs) {
           return false;
         }
-        return _stricmp(lhs, rhs) < 0;
+        return gpg::STR_CompareNoCase(lhs, rhs) < 0;
       }
     };
 

@@ -1,52 +1,118 @@
 #pragma once
 
+#include <cstdint>
+
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
-  enum class SiloType : int;
+  struct SEconValue;
+
+  enum ESiloType : std::int32_t
+  {
+    SILOTYPE_Tactical = 0,
+    SILOTYPE_Nuke = 1,
+  };
 
   class IAiSiloBuild
   {
-    // Primary vftable (12 entries)
   public:
     /**
-     * In binary: dtor
+     * Address: 0x005CE860 (FUN_005CE860, scalar deleting thunk)
      *
-     * Address: 0x5CE860
      * VFTable SLOT: 0
      */
-    virtual ~IAiSiloBuild() = default;
+    virtual ~IAiSiloBuild();
 
-    // Slot 1. Refreshes cached stockpile slots from owner weapon records.
-    virtual void RefreshSlotsFromOwner() = 0; // 0xA82547
+    /**
+     * Address: 0x005CEE40 (FUN_005CEE40)
+     *
+     * VFTable SLOT: 1
+     */
+    virtual void SiloUpdateProjectileBlueprint() = 0;
 
-    // Slot 2. Returns true if active queue/type matches the requested silo type.
-    virtual bool IsActiveType(SiloType type) const = 0; // 0xA82547
+    /**
+     * Address: 0x005CEF00 (FUN_005CEF00, ?SiloIsBusy@CAiSiloBuildImpl@Moho@@UBE_NW4ESiloType@2@@Z)
+     *
+     * VFTable SLOT: 2
+     */
+    [[nodiscard]]
+    virtual bool SiloIsBusy(ESiloType type) const = 0;
 
-    // Slot 3. Returns true when built + queued has reached desired count.
-    virtual bool IsSufficient(SiloType type) const = 0; // 0xA82547
+    /**
+     * Address: 0x005CEF20 (FUN_005CEF20, ?SiloIsFull@CAiSiloBuildImpl@Moho@@UBE_NW4ESiloType@2@@Z)
+     *
+     * VFTable SLOT: 3
+     */
+    [[nodiscard]]
+    virtual bool SiloIsFull(ESiloType type) const = 0;
 
-    // Slot 4. Counts queued entries for the given silo type.
-    virtual int GetQueuedCount(SiloType type) const = 0; // 0xA82547
+    /**
+     * Address: 0x005CEF50 (FUN_005CEF50, ?SiloGetBuildCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
+     *
+     * VFTable SLOT: 4
+     */
+    [[nodiscard]]
+    virtual std::int32_t SiloGetBuildCount(ESiloType type) const = 0;
 
-    // Slot 5. Returns stockpiled built count for the given silo type.
-    virtual int GetBuiltCount(SiloType type) const = 0; // 0xA82547
+    /**
+     * Address: 0x005CEF80 (FUN_005CEF80, ?SiloGetStorageCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
+     *
+     * VFTable SLOT: 5
+     */
+    [[nodiscard]]
+    virtual std::int32_t SiloGetStorageCount(ESiloType type) const = 0;
 
-    // Slot 6. Returns desired target count for the given silo type.
-    virtual int GetDesiredCount(SiloType type) const = 0; // 0xA82547
+    /**
+     * Address: 0x005CEF90 (FUN_005CEF90, ?SiloGetMaxStorageCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
+     *
+     * VFTable SLOT: 6
+     */
+    [[nodiscard]]
+    virtual std::int32_t SiloGetMaxStorageCount(ESiloType type) const = 0;
 
-    // Slot 7. Adjusts built counter for the given silo type.
-    virtual void AddToBuilt(SiloType type, int delta) = 0; // 0xA82547
+    /**
+     * Address: 0x005CEFA0 (FUN_005CEFA0, ?SiloAdjustStorageCount@CAiSiloBuildImpl@Moho@@UAEXW4ESiloType@2@H@Z)
+     *
+     * VFTable SLOT: 7
+     */
+    virtual void SiloAdjustStorageCount(ESiloType type, std::int32_t delta) = 0;
 
-    // Slot 8. Attempts to enqueue another stockpile build.
-    virtual bool TryEnqueue(SiloType type) = 0; // 0xA82547
+    /**
+     * Address: 0x005CEFC0 (FUN_005CEFC0, ?SiloAddBuild@CAiSiloBuildImpl@Moho@@UAE_NW4ESiloType@2@@Z)
+     *
+     * VFTable SLOT: 8
+     */
+    [[nodiscard]]
+    virtual bool SiloAddBuild(ESiloType type) = 0;
 
-    // Slot 9. Silo build state-machine tick.
-    virtual bool Tick() = 0; // 0xA82547
+    /**
+     * Address: 0x005CF1E0 (FUN_005CF1E0, ?SiloTick@CAiSiloBuildImpl@Moho@@UAEXXZ)
+     *
+     * VFTable SLOT: 9
+     */
+    virtual void SiloTick() = 0;
 
-    // Slot 10. SSE-heavy helper used by Tick.
-    virtual int EvalVectorHelperA(int arg) = 0; // 0xA82547
+    /**
+     * Address: 0x005CF030 (FUN_005CF030, ?SiloAssistWithResource@CAiSiloBuildImpl@Moho@@UAEXABUSEconValue@2@@Z)
+     *
+     * VFTable SLOT: 10
+     */
+    virtual void SiloAssistWithResource(const SEconValue& value) = 0;
 
-    // Slot 11. SSE-heavy helper used by Tick.
-    virtual int EvalVectorHelperB(int arg) = 0; // 0xA82547
+    /**
+     * Address: 0x005CF130 (FUN_005CF130, ?SiloStopBuild@CAiSiloBuildImpl@Moho@@UAEXXZ)
+     *
+     * VFTable SLOT: 11
+     */
+    virtual void SiloStopBuild() = 0;
+
+  public:
+    static gpg::RType* sType;
   };
+
+  static_assert(sizeof(IAiSiloBuild) == 0x04, "IAiSiloBuild size must be 0x04");
 } // namespace moho

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "lua/LuaObject.h"
 #include "moho/animation/IAniManipulator.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"

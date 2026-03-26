@@ -1,9 +1,11 @@
 #include "Sim.h"
+#include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "SimDriver.h"
 
 #include <algorithm>
-#include <cctype>
+#include <array>
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -13,18 +15,22 @@
 #include <initializer_list>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <string>
 #include <typeinfo>
 #include <vector>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
+#include "legacy/containers/Vector.h"
+#include "moho/ai/IAiBuilder.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
-#include "moho/ai/CAiTransportCommandOps.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/entity/Entity.h"
@@ -35,6 +41,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/CDecalBuffer.h"
 #include "moho/render/CEffectManagerImpl.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
@@ -50,47 +57,12 @@
 using namespace moho;
 using EntId = std::int32_t;
 
-namespace gpg
-{
-  enum class TrackedPointerState : int
-  {
-    Unowned = 1,
-    Owned = 2,
-  };
-
-  struct TrackedPointerInfo
-  {
-    void* object;
-    gpg::RType* type;
-  };
-
-  TrackedPointerInfo ReadRawPointer(ReadArchive* archive, const gpg::RRef& ownerRef);
-  void WriteRawPointer(
-    WriteArchive* archive, const gpg::RRef& objectRef, TrackedPointerState state, const gpg::RRef& ownerRef
-  );
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-} // namespace gpg
+std::uint8_t moho::ren_Steering = 0;
 
 namespace
 {
   constexpr CommandSourceId kInvalidCommandSource = 0xFF;
-  constexpr std::uintptr_t kReleaseCommandIdEa = 0x006E0EC0u;
   constexpr std::uintptr_t kSimConRegistryEa = 0x010A63DCu;
-
-  void CopySyncMaskBlock(SSyncFilterMaskBlock& dst, const SSyncFilterMaskBlock& src)
-  {
-    dst.rawWord = src.rawWord;
-    dst.masks.ResetFrom(src.masks);
-  }
-
-  void CopySyncFilter(SSyncFilter& dst, const SSyncFilter& src)
-  {
-    dst.focusArmy = src.focusArmy;
-    dst.geoCams = src.geoCams;
-    CopySyncMaskBlock(dst.maskA, src.maskA);
-    dst.optionFlag = src.optionFlag;
-    CopySyncMaskBlock(dst.maskB, src.maskB);
-  }
 
   struct PropCreateTransformWords
   {
@@ -105,23 +77,14 @@ namespace
 
   static_assert(sizeof(PropCreateTransformWords) == 0x1C, "PropCreateTransformWords size must be 0x1C");
 
-  bool EqualsIgnoreCase(const char* lhs, const char* rhs)
-  {
-    if (!lhs || !rhs) {
-      return false;
-    }
-
-    return _stricmp(lhs, rhs) == 0;
-  }
-
   bool ParseBoolLiteral(const char* text, bool& outValue)
   {
-    if (EqualsIgnoreCase(text, "true")) {
+    if (gpg::STR_EqualsNoCase(text, "true")) {
       outValue = true;
       return true;
     }
 
-    if (EqualsIgnoreCase(text, "false")) {
+    if (gpg::STR_EqualsNoCase(text, "false")) {
       outValue = false;
       return true;
     }
@@ -147,6 +110,352 @@ namespace
 
     outValue = static_cast<int>(parsed);
     return true;
+  }
+
+  struct CommandDbMapNodeView
+  {
+    CommandDbMapNodeView* left;   // +0x00
+    CommandDbMapNodeView* parent; // +0x04
+    CommandDbMapNodeView* right;  // +0x08
+    std::uint32_t key;            // +0x0C
+    CUnitCommand* value;          // +0x10
+    std::uint8_t color;           // +0x14 (0 = red, 1 = black)
+    std::uint8_t isNil;           // +0x15 (1 = head/sentinel)
+    std::uint8_t reserved16[2];   // +0x16
+  };
+  static_assert(sizeof(CommandDbMapNodeView) == 0x18, "CommandDbMapNodeView size must be 0x18");
+  static_assert(offsetof(CommandDbMapNodeView, key) == 0x0C, "CommandDbMapNodeView::key offset must be 0x0C");
+  static_assert(offsetof(CommandDbMapNodeView, value) == 0x10, "CommandDbMapNodeView::value offset must be 0x10");
+  static_assert(offsetof(CommandDbMapNodeView, color) == 0x14, "CommandDbMapNodeView::color offset must be 0x14");
+  static_assert(offsetof(CommandDbMapNodeView, isNil) == 0x15, "CommandDbMapNodeView::isNil offset must be 0x15");
+
+  struct CommandDbMapStorageView
+  {
+    void* proxy;                 // +0x00
+    CommandDbMapNodeView* head;  // +0x04
+    std::uint32_t size;          // +0x08
+  };
+  static_assert(sizeof(CommandDbMapStorageView) == 0x0C, "CommandDbMapStorageView size must be 0x0C");
+
+  struct CCommandDbRuntimeView
+  {
+    // Binary-faithful view used by FUN_006E0EC0 lift:
+    // map at +0x04, IdPool at +0x10, pending released-id vector at +0xCC0.
+    Sim* sim;                                   // +0x0000
+    CommandDbMapStorageView map;                // +0x0004
+    IdPool pool;                                // +0x0010
+    msvc8::vector<CmdId> pendingReleasedCmdIds; // +0x0CC0
+  };
+  static_assert(sizeof(msvc8::vector<CmdId>) == 0x10, "msvc8::vector<CmdId> size must be 0x10");
+  static_assert(offsetof(CCommandDbRuntimeView, map) == 0x04, "CCommandDbRuntimeView::map offset must be 0x04");
+  static_assert(offsetof(CCommandDbRuntimeView, pool) == 0x10, "CCommandDbRuntimeView::pool offset must be 0x10");
+  static_assert(
+    offsetof(CCommandDbRuntimeView, pendingReleasedCmdIds) == 0xCC0,
+    "CCommandDbRuntimeView::pendingReleasedCmdIds offset must be 0xCC0"
+  );
+  static_assert(sizeof(CCommandDbRuntimeView) == 0xCD0, "CCommandDbRuntimeView size must be 0xCD0");
+
+  static_assert(
+    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex), "SimSubRes3/BVIntSet offset mismatch"
+  );
+  static_assert(
+    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord), "SimSubRes3/BVIntSet offset mismatch"
+  );
+  static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
+  static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
+
+  constexpr std::uint8_t kTreeRed = 0;
+  constexpr std::uint8_t kTreeBlack = 1;
+
+  [[nodiscard]]
+  BVIntSet& AsBitSet(SimSubRes3& slot) noexcept
+  {
+    return *reinterpret_cast<BVIntSet*>(&slot);
+  }
+
+  [[nodiscard]]
+  CommandDbMapNodeView* TreeMinNode(CommandDbMapNodeView* node, CommandDbMapNodeView* head) noexcept
+  {
+    while (node->left != head) {
+      node = node->left;
+    }
+    return node;
+  }
+
+  [[nodiscard]]
+  CommandDbMapNodeView* TreeMaxNode(CommandDbMapNodeView* node, CommandDbMapNodeView* head) noexcept
+  {
+    while (node->right != head) {
+      node = node->right;
+    }
+    return node;
+  }
+
+  [[nodiscard]]
+  std::uint8_t NodeColor(const CommandDbMapNodeView* node, const CommandDbMapNodeView* head) noexcept
+  {
+    if (!node || node == head) {
+      return kTreeBlack;
+    }
+    return node->color;
+  }
+
+  void RotateLeft(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    CommandDbMapNodeView* const pivot = node->right;
+
+    node->right = pivot->left;
+    if (pivot->left != head) {
+      pivot->left->parent = node;
+    }
+
+    pivot->parent = node->parent;
+    if (node->parent == head) {
+      head->parent = pivot;
+    } else if (node == node->parent->left) {
+      node->parent->left = pivot;
+    } else {
+      node->parent->right = pivot;
+    }
+
+    pivot->left = node;
+    node->parent = pivot;
+  }
+
+  void RotateRight(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    CommandDbMapNodeView* const pivot = node->left;
+
+    node->left = pivot->right;
+    if (pivot->right != head) {
+      pivot->right->parent = node;
+    }
+
+    pivot->parent = node->parent;
+    if (node->parent == head) {
+      head->parent = pivot;
+    } else if (node == node->parent->right) {
+      node->parent->right = pivot;
+    } else {
+      node->parent->left = pivot;
+    }
+
+    pivot->right = node;
+    node->parent = pivot;
+  }
+
+  void ReplaceTreeNode(CommandDbMapStorageView& map, CommandDbMapNodeView* oldNode, CommandDbMapNodeView* newNode)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    if (oldNode->parent == head) {
+      head->parent = newNode;
+    } else if (oldNode == oldNode->parent->left) {
+      oldNode->parent->left = newNode;
+    } else {
+      oldNode->parent->right = newNode;
+    }
+
+    if (newNode != head) {
+      newNode->parent = oldNode->parent;
+    }
+  }
+
+  void RefreshTreeBounds(CommandDbMapStorageView& map)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    if (!head) {
+      return;
+    }
+
+    CommandDbMapNodeView* const root = head->parent;
+    if (!root || root == head || root->isNil != 0u) {
+      head->parent = head;
+      head->left = head;
+      head->right = head;
+      return;
+    }
+
+    head->left = TreeMinNode(root, head);
+    head->right = TreeMaxNode(root, head);
+  }
+
+  void EraseFixup(
+    CommandDbMapStorageView& map, CommandDbMapNodeView* node, CommandDbMapNodeView* nodeParent
+  )
+  {
+    CommandDbMapNodeView* const head = map.head;
+
+    while (node != head->parent && NodeColor(node, head) == kTreeBlack) {
+      if (node == nodeParent->left) {
+        CommandDbMapNodeView* sibling = nodeParent->right;
+        if (NodeColor(sibling, head) == kTreeRed) {
+          sibling->color = kTreeBlack;
+          nodeParent->color = kTreeRed;
+          RotateLeft(map, nodeParent);
+          sibling = nodeParent->right;
+        }
+
+        if (sibling == head) {
+          node = nodeParent;
+          nodeParent = nodeParent->parent;
+          continue;
+        }
+
+        if (NodeColor(sibling->left, head) == kTreeBlack && NodeColor(sibling->right, head) == kTreeBlack) {
+          sibling->color = kTreeRed;
+          node = nodeParent;
+          nodeParent = nodeParent->parent;
+          continue;
+        }
+
+        if (NodeColor(sibling->right, head) == kTreeBlack) {
+          if (sibling->left != head) {
+            sibling->left->color = kTreeBlack;
+          }
+          sibling->color = kTreeRed;
+          RotateRight(map, sibling);
+          sibling = nodeParent->right;
+        }
+
+        sibling->color = nodeParent->color;
+        nodeParent->color = kTreeBlack;
+        if (sibling->right != head) {
+          sibling->right->color = kTreeBlack;
+        }
+        RotateLeft(map, nodeParent);
+      } else {
+        CommandDbMapNodeView* sibling = nodeParent->left;
+        if (NodeColor(sibling, head) == kTreeRed) {
+          sibling->color = kTreeBlack;
+          nodeParent->color = kTreeRed;
+          RotateRight(map, nodeParent);
+          sibling = nodeParent->left;
+        }
+
+        if (sibling == head) {
+          node = nodeParent;
+          nodeParent = nodeParent->parent;
+          continue;
+        }
+
+        if (NodeColor(sibling->right, head) == kTreeBlack && NodeColor(sibling->left, head) == kTreeBlack) {
+          sibling->color = kTreeRed;
+          node = nodeParent;
+          nodeParent = nodeParent->parent;
+          continue;
+        }
+
+        if (NodeColor(sibling->left, head) == kTreeBlack) {
+          if (sibling->right != head) {
+            sibling->right->color = kTreeBlack;
+          }
+          sibling->color = kTreeRed;
+          RotateLeft(map, sibling);
+          sibling = nodeParent->left;
+        }
+
+        sibling->color = nodeParent->color;
+        nodeParent->color = kTreeBlack;
+        if (sibling->left != head) {
+          sibling->left->color = kTreeBlack;
+        }
+        RotateRight(map, nodeParent);
+      }
+
+      node = head->parent;
+      break;
+    }
+
+    if (node != head) {
+      node->color = kTreeBlack;
+    }
+  }
+
+  /**
+   * Address: 0x006E1670 (FUN_006E1670, sub_6E1670)
+   *
+   * What it does:
+   * Removes one command-id node from the command DB map and rebalances the RB-tree.
+   */
+  void EraseCommandNode(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    CommandDbMapNodeView* y = node;
+    CommandDbMapNodeView* x = head;
+    CommandDbMapNodeView* xParent = head;
+    std::uint8_t yColor = y->color;
+
+    if (node->left == head) {
+      x = node->right;
+      xParent = node->parent;
+      ReplaceTreeNode(map, node, node->right);
+    } else if (node->right == head) {
+      x = node->left;
+      xParent = node->parent;
+      ReplaceTreeNode(map, node, node->left);
+    } else {
+      y = TreeMinNode(node->right, head);
+      yColor = y->color;
+      x = y->right;
+      if (y->parent == node) {
+        xParent = y;
+      } else {
+        xParent = y->parent;
+        ReplaceTreeNode(map, y, y->right);
+        y->right = node->right;
+        y->right->parent = y;
+      }
+
+      ReplaceTreeNode(map, node, y);
+      y->left = node->left;
+      y->left->parent = y;
+      y->color = node->color;
+    }
+
+    if (yColor == kTreeBlack) {
+      EraseFixup(map, x, xParent);
+    }
+
+    ::operator delete(node);
+    if (map.size != 0u) {
+      --map.size;
+    }
+    RefreshTreeBounds(map);
+  }
+
+  /**
+   * Address: 0x006E1940 (FUN_006E1940, sub_6E1940)
+   *
+   * What it does:
+   * Returns the exact command-id node in the command DB map, or the head/sentinel when absent.
+   */
+  [[nodiscard]]
+  CommandDbMapNodeView* FindCommandNode(CCommandDbRuntimeView& commandDb, const CmdId cmdId)
+  {
+    CommandDbMapNodeView* const head = commandDb.map.head;
+    if (!head) {
+      return nullptr;
+    }
+
+    const std::uint32_t key = static_cast<std::uint32_t>(cmdId);
+    CommandDbMapNodeView* result = head;
+    CommandDbMapNodeView* node = head->parent;
+    while (node != nullptr && node != head && node->isNil == 0u) {
+      if (node->key >= key) {
+        result = node;
+        node = node->left;
+      } else {
+        node = node->right;
+      }
+    }
+
+    if (result == head || key < result->key) {
+      return head;
+    }
+
+    return result;
   }
 
   CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
@@ -204,79 +513,16 @@ namespace
     set.mPrev = &set;
   }
 
-  bool ContainsEntity(const SEntitySetTemplateUnit& set, Entity* entity)
-  {
-    for (Entity* const* it = set.mVec.begin(); it != set.mVec.end(); ++it) {
-      if (*it == entity) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void AppendUniqueEntity(SEntitySetTemplateUnit& set, Entity* entity)
-  {
-    if (!entity || ContainsEntity(set, entity)) {
-      return;
-    }
-    set.mVec.PushBack(entity);
-  }
-
-  class CSimConCommandView
-  {
-  public:
-    /**
-     * Address: 0x00A82547 (_purecall in base CSimConCommand vtable)
-     *
-     * IDA signature:
-     * int __thiscall Moho::CSimConCommand::Run(
-     *   Moho::Sim *sim,
-     *   std::vector<std::string> *commandArgs,
-     *   Wm3::Vector3<float> *worldPos,
-     *   Moho::CArmyImpl *focusArmy,
-     *   Moho::SEntitySetTemplateUnit *selectedUnits);
-     *
-     * What it does:
-     * Executes one parsed sim-console command payload.
-     */
-    virtual int Run(
-      Sim* sim,
-      std::vector<std::string>* commandArgs,
-      Wm3::Vector3<float>* worldPos,
-      CArmyImpl* focusArmy,
-      SEntitySetTemplateUnit* selectedUnits
-    ) = 0;
-
-    /**
-     * Address: 0x005BE350 (FUN_005BE350, sub_5BE350)
-     *
-     * What it does:
-     * Base identity virtual for CSimConCommand-family objects.
-     */
-    virtual CSimConCommandView* Identity() = 0;
-
-    const char* mName;           // 0x04
-    std::uint8_t mRequiresCheat; // 0x08
-    std::uint8_t mPad09[3];      // 0x09
-  };
-
-  static_assert(sizeof(CSimConCommandView) == 0x0C, "CSimConCommandView size must be 0x0C");
-  static_assert(offsetof(CSimConCommandView, mName) == 0x04, "CSimConCommandView::mName offset must be 0x04");
-  static_assert(
-    offsetof(CSimConCommandView, mRequiresCheat) == 0x08, "CSimConCommandView::mRequiresCheat offset must be 0x08"
-  );
-
   struct SimConCommandNameLess
   {
     [[nodiscard]]
     bool operator()(const std::string& lhs, const std::string& rhs) const noexcept
     {
-      return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
+      return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }
   };
 
-  using SimConCommandRegistry = msvc8::map<std::string, CSimConCommandView*, SimConCommandNameLess>;
+  using SimConCommandRegistry = msvc8::map<std::string, CSimConCommand*, SimConCommandNameLess>;
 
   SimConCommandRegistry* GetSimConCommandRegistry()
   {
@@ -284,7 +530,7 @@ namespace
     return registrySlot != nullptr ? *registrySlot : nullptr;
   }
 
-  CSimConCommandView* FindSimConCommand(const std::string& commandName)
+  CSimConCommand* FindSimConCommand(const std::string& commandName)
   {
     if (commandName.empty()) {
       return nullptr;
@@ -306,7 +552,7 @@ namespace
   [[nodiscard]]
   bool IsSimCommandWhitespace(const char ch) noexcept
   {
-    return std::isspace(static_cast<unsigned char>(ch)) != 0;
+    return gpg::STR_IsAsciiWhitespace(ch);
   }
 
   enum class SimCommandTerminator
@@ -433,76 +679,17 @@ namespace
   }
 
   /**
-   * Address: 0x00734870 (FUN_00734870, func_TryParseSimCommand)
+   * Address: 0x006E0EC0 (FUN_006E0EC0, sub_6E0EC0)
    *
    * IDA signature:
-   * void __cdecl func_TryParseSimCommand(
-   *   Moho::Sim *sim,
-   *   char *commandText,
-   *   Wm3::Vector3<float> *worldPos,
-   *   Moho::CArmyImpl *focusArmy,
-   *   Moho::SEntitySetTemplateUnit *selectedUnits);
+   * int __stdcall sub_6E0EC0(Moho::CCommandDB *commandDb, int cmdId);
    *
    * What it does:
-   * Parses one or more sim debug command segments, resolves each segment through
-   * the global `simcons` registry, applies cheat gating, and dispatches through
-   * CSimConCommand virtual handlers.
+   * Releases an unconsumed command id from the command DB:
+   * removes the map entry when present, records recycled low-24 ids in the
+   * rolling IdPool history slot, and queues the id into the pending-release vector
+   * (matching `FUN_006E1A10` append semantics).
    */
-  void TryParseSimCommand(
-    Sim* sim,
-    const char* command,
-    const Wm3::Vector3<float>& worldPos,
-    CArmyImpl* focusArmy,
-    SEntitySetTemplateUnit& selectedUnits
-  )
-  {
-    if (!sim) {
-      return;
-    }
-
-    const char* const rawCommandText = command ? command : "";
-    std::string remaining = rawCommandText;
-    Wm3::Vector3<float>* const mutableWorldPos = const_cast<Wm3::Vector3<float>*>(&worldPos);
-
-    while (!remaining.empty()) {
-      std::vector<std::string> parsedCommand;
-      std::string nextCommandChain;
-      ParseOneSimCommand(remaining, parsedCommand, nextCommandChain);
-
-      if (!parsedCommand.empty()) {
-        CSimConCommandView* const simCommand = FindSimConCommand(parsedCommand.front());
-        if (!simCommand) {
-          sim->Printf(
-            "Unknown sim command '%s' [invoked by %s]", parsedCommand.front().c_str(), sim->GetCurrentCommandSourceName()
-          );
-        } else {
-          const bool requiresCheat = simCommand->mRequiresCheat != 0;
-          if (requiresCheat && !sim->CheatsEnabled()) {
-            return;
-          }
-
-          if (requiresCheat) {
-            const std::string commandText = UnparseSimCommand(parsedCommand);
-            sim->Printf("%s: %s", sim->GetCurrentCommandSourceName(), commandText.c_str());
-          }
-
-          try {
-            (void)simCommand->Run(sim, &parsedCommand, mutableWorldPos, focusArmy, &selectedUnits);
-          } catch (const std::exception& ex) {
-            const char* const errorText = ex.what() ? ex.what() : "<unknown>";
-            gpg::Warnf("error running sim console command %s: %s", rawCommandText, errorText);
-
-            if (!requiresCheat) {
-              sim->Printf("error running sim console command %s: %s", rawCommandText, errorText);
-            }
-          }
-        }
-      }
-
-      remaining = nextCommandChain;
-    }
-  }
-
   void ReleaseCommandIdIfUnconsumed(CCommandDb* commandDb, const CmdId cmdId)
   {
     if (!commandDb) {
@@ -513,9 +700,22 @@ namespace
       return;
     }
 
-    using Fn = int(__stdcall*)(CCommandDb*, CmdId);
-    auto fn = reinterpret_cast<Fn>(kReleaseCommandIdEa);
-    (void)fn(commandDb, cmdId);
+    auto* const runtime = reinterpret_cast<CCommandDbRuntimeView*>(commandDb);
+    if (runtime->map.head != nullptr) {
+      CommandDbMapNodeView* const node = FindCommandNode(*runtime, cmdId);
+      if (node != nullptr && node != runtime->map.head) {
+        EraseCommandNode(runtime->map, node);
+      }
+    }
+
+    const std::uint32_t commandType = static_cast<std::uint32_t>(cmdId) & 0xFF000000u;
+    if (commandType == 0x80000000u) {
+      const std::int32_t retireIndex = (runtime->pool.mSubRes2.mEnd + 99) % 100;
+      SimSubRes3& retireSlot = runtime->pool.mSubRes2.mData[retireIndex];
+      AsBitSet(retireSlot).Add(static_cast<std::uint32_t>(cmdId) & 0x00FFFFFFu);
+    }
+
+    runtime->pendingReleasedCmdIds.push_back(cmdId);
   }
 
   // 0x00748AA0 resolves unit blueprints from RResId via RRuleGameRules::GetUnitBlueprint.
@@ -537,23 +737,6 @@ namespace
   }
 
   /**
-   * Address: 0x004A92A0 (FUN_004A92A0, func_StringSetFilename)
-   *
-   * What it does:
-   * Lowercases a filename/id string and canonicalizes separators ('\\' -> '/').
-   */
-  void NormalizeFilenameLowerSlash(std::string& inOut)
-  {
-    for (std::size_t i = 0; i < inOut.size(); ++i) {
-      const unsigned char ch = static_cast<unsigned char>(inOut[i]);
-      inOut[i] = static_cast<char>(std::tolower(ch));
-      if (inOut[i] == '\\') {
-        inOut[i] = '/';
-      }
-    }
-  }
-
-  /**
    * Address: 0x006FB420 (FUN_006FB420)
    *
    * IDA signature:
@@ -572,7 +755,7 @@ namespace
     // - 0x0051E2E0 func_StringInitFilename
     // - 0x004A92A0 func_StringSetFilename
     std::string normalizedBlueprintId = blueprintId;
-    NormalizeFilenameLowerSlash(normalizedBlueprintId);
+    gpg::STR_NormalizeFilenameLowerSlash(normalizedBlueprintId);
 
     const msvc8::string normalizedArg(normalizedBlueprintId.c_str());
     return rules->GetPropBlueprint(normalizedArg);
@@ -631,7 +814,7 @@ namespace
       return false;
     }
 
-    return unit->AiSiloBuild->TryEnqueue(static_cast<SiloType>(modeIndex));
+    return unit->AiSiloBuild->SiloAddBuild(static_cast<ESiloType>(modeIndex));
   }
 
   // 0x00748CD0 applies orientation+position in one call via Entity::Warp.
@@ -713,12 +896,64 @@ namespace
     return type;
   }
 
+  gpg::RType* CachedSimType()
+  {
+    if (!Sim::sType) {
+      Sim::sType = gpg::LookupRType(typeid(Sim));
+    }
+    return Sim::sType;
+  }
+
+  gpg::RType* LookupRTypeWithTinyThreadCache(const std::type_info& dynamicTypeInfo)
+  {
+    struct CachedTypeInfoEntry
+    {
+      const std::type_info* typeInfo;
+      gpg::RType* type;
+    };
+
+    thread_local std::array<CachedTypeInfoEntry, 3> cache{};
+
+    for (std::size_t i = 0; i < cache.size(); ++i) {
+      const CachedTypeInfoEntry& entry = cache[i];
+      if (entry.typeInfo == nullptr || entry.type == nullptr) {
+        continue;
+      }
+
+      if (entry.typeInfo == &dynamicTypeInfo || *entry.typeInfo == dynamicTypeInfo) {
+        if (i != 0u) {
+          const CachedTypeInfoEntry hit = entry;
+          for (std::size_t j = i; j > 0u; --j) {
+            cache[j] = cache[j - 1u];
+          }
+          cache[0] = hit;
+        }
+        return cache[0].type;
+      }
+    }
+
+    gpg::RType* const resolved = gpg::LookupRType(dynamicTypeInfo);
+    for (std::size_t i = cache.size() - 1u; i > 0u; --i) {
+      cache[i] = cache[i - 1u];
+    }
+    cache[0] = CachedTypeInfoEntry{&dynamicTypeInfo, resolved};
+    return resolved;
+  }
+
+  /**
+   * Address: 0x00585690 (FUN_00585690, func_RRefSim)
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl func_RRefSim(gpg::RRef *outRef, Moho::Sim *sim);
+   *
+   * What it does:
+   * Builds owner `RRef` for Sim serializer paths. Exact `Sim` pointers keep
+   * static type; derived runtime types are resolved and back-adjusted to the
+   * complete object start.
+   */
   gpg::RRef MakeSimOwnerRef(Sim* sim)
   {
-    static gpg::RType* simType = nullptr;
-    if (!simType) {
-      simType = gpg::LookupRType(typeid(Sim));
-    }
+    gpg::RType* const simType = CachedSimType();
 
     gpg::RRef out{};
     out.mObj = sim;
@@ -727,19 +962,23 @@ namespace
       return out;
     }
 
-    gpg::RType* dynamicType = simType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*sim));
-    } catch (...) {
-      dynamicType = simType;
+    const std::type_info& dynamicTypeInfo = typeid(*sim);
+    if (dynamicTypeInfo == typeid(Sim)) {
+      return out;
     }
 
+    gpg::RType* const dynamicType = LookupRTypeWithTinyThreadCache(dynamicTypeInfo);
+
     std::int32_t baseOffset = 0;
-    if (dynamicType && simType && dynamicType->IsDerivedFrom(simType, &baseOffset)) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(sim) - static_cast<std::uintptr_t>(baseOffset));
-      out.mType = dynamicType;
+    const bool isDerived = dynamicType && simType && dynamicType->IsDerivedFrom(simType, &baseOffset);
+    GPG_ASSERT(isDerived);
+    if (!isDerived) {
+      out.mType = dynamicType ? dynamicType : simType;
+      return out;
     }
+
+    out.mObj = static_cast<void*>(reinterpret_cast<char*>(sim) - baseOffset);
+    out.mType = dynamicType;
     return out;
   }
 
@@ -1245,7 +1484,7 @@ CSimConVarInstanceBase* Sim::GetSimVar(CSimConVarBase* var)
  */
 void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 {
-  CopySyncFilter(mSyncFilter, filter);
+  mSyncFilter.CopyFrom(filter);
 
   delete outSyncData;
   outSyncData = new SSyncData{};
@@ -1407,6 +1646,78 @@ void Sim::UpdateChecksum()
   }
 }
 
+/**
+ * Address: 0x00452070 (FUN_00452070, Moho::CDebugCanvas::DebugDrawLine)
+ */
+void CDebugCanvas::DebugDrawLine(const SDebugLine& line)
+{
+  lines.push_back(line);
+}
+
+/**
+ * Address: 0x006531D0 (FUN_006531D0, helper used by Moho::RDebugWeapons::OnTick)
+ */
+void CDebugCanvas::AddWorldText(const SDebugWorldText& text)
+{
+  worldText.push_back(text);
+}
+
+/**
+ * Address: 0x00450030 (FUN_00450030, ?AddWireCircle@CDebugCanvas@Moho@@QAEXABV?$Vector3@M@Wm3@@0MII@Z)
+ */
+void CDebugCanvas::AddWireCircle(
+  const Wm3::Vector3f& normal,
+  const Wm3::Vector3f& center,
+  const float radius,
+  const std::uint32_t depth,
+  std::uint32_t precision
+)
+{
+  if (radius <= 0.0f) {
+    return;
+  }
+
+  if (precision < 3u) {
+    precision = 3u;
+  }
+
+  Wm3::Vector3f axis = normal;
+  if (Wm3::Vector3f::LengthSq(axis) <= 1.0e-6f) {
+    axis = {0.0f, 1.0f, 0.0f};
+  } else {
+    Wm3::Vector3f::Normalize(axis);
+  }
+
+  Wm3::Vector3f tangent = Wm3::Vector3f::Cross(axis, {1.0f, 0.0f, 0.0f});
+  if (Wm3::Vector3f::LengthSq(tangent) <= 1.0e-6f) {
+    tangent = Wm3::Vector3f::Cross(axis, {0.0f, 0.0f, 1.0f});
+  }
+  Wm3::Vector3f::Normalize(tangent);
+
+  Wm3::Vector3f bitangent = Wm3::Vector3f::Cross(axis, tangent);
+  Wm3::Vector3f::Normalize(bitangent);
+
+  constexpr float kTwoPi = 6.28318530717958647692f;
+  const float angleStep = kTwoPi / static_cast<float>(precision);
+  Wm3::Vector3f prev = center + (tangent * radius);
+
+  for (std::uint32_t i = 1; i <= precision; ++i) {
+    const float angle = angleStep * static_cast<float>(i);
+    const float cosAngle = std::cos(angle);
+    const float sinAngle = std::sin(angle);
+    const Wm3::Vector3f curr = center + ((tangent * cosAngle + bitangent * sinAngle) * radius);
+
+    SDebugLine line{};
+    line.p0 = prev;
+    line.p1 = curr;
+    line.depth0 = static_cast<std::int32_t>(depth);
+    line.depth1 = static_cast<std::int32_t>(depth);
+    DebugDrawLine(line);
+
+    prev = curr;
+  }
+}
+
 // 0x00746280
 std::FILE* Sim::Logf(const char* fmt, ...)
 {
@@ -1419,6 +1730,17 @@ std::FILE* Sim::Logf(const char* fmt, ...)
 
   va_end(args);
   return mLog;
+}
+
+/**
+ * Address: 0x00746720 (FUN_00746720, ?GetDebugCanvas@Sim@Moho@@QAEPAVCDebugCanvas@2@XZ)
+ */
+CDebugCanvas* Sim::GetDebugCanvas()
+{
+  if (!mDebugCanvas1) {
+    mDebugCanvas1.reset(new CDebugCanvas());
+  }
+  return mDebugCanvas1.get();
 }
 
 // 0x007466F0
@@ -1851,54 +2173,54 @@ void Sim::ProcessInfoPair(void* id, const char* key, const char* val)
 
   bool boolValue = false;
 
-  if (EqualsIgnoreCase(key, "SetAutoMode")) {
+  if (gpg::STR_EqualsNoCase(key, "SetAutoMode")) {
     if (ParseBoolLiteral(val, boolValue)) {
       unit->SetAutoMode(boolValue);
     }
     return;
   }
 
-  if (EqualsIgnoreCase(key, "SetAutoSurfaceMode")) {
+  if (gpg::STR_EqualsNoCase(key, "SetAutoSurfaceMode")) {
     if (ParseBoolLiteral(val, boolValue)) {
       unit->SetAutoSurfaceMode(boolValue);
     }
     return;
   }
 
-  if (EqualsIgnoreCase(key, "CustomName")) {
+  if (gpg::STR_EqualsNoCase(key, "CustomName")) {
     unit->SetCustomName(std::string(val ? val : ""));
     return;
   }
 
-  if (EqualsIgnoreCase(key, "SiloBuildTactical")) {
-    if (EqualsIgnoreCase(val, "add")) {
+  if (gpg::STR_EqualsNoCase(key, "SiloBuildTactical")) {
+    if (gpg::STR_EqualsNoCase(val, "add")) {
       QueueSiloBuildRequest(unit, 0);
     }
     return;
   }
 
-  if (EqualsIgnoreCase(key, "SiloBuildNuke")) {
-    if (EqualsIgnoreCase(val, "add")) {
+  if (gpg::STR_EqualsNoCase(key, "SiloBuildNuke")) {
+    if (gpg::STR_EqualsNoCase(val, "add")) {
       QueueSiloBuildRequest(unit, 1);
     }
     return;
   }
 
-  if (EqualsIgnoreCase(key, "SetRepeatQueue")) {
+  if (gpg::STR_EqualsNoCase(key, "SetRepeatQueue")) {
     if (ParseBoolLiteral(val, boolValue)) {
       unit->SetRepeatQueue(boolValue);
     }
     return;
   }
 
-  if (EqualsIgnoreCase(key, "SetPaused")) {
+  if (gpg::STR_EqualsNoCase(key, "SetPaused")) {
     if (ParseBoolLiteral(val, boolValue)) {
       unit->SetPaused(boolValue);
     }
     return;
   }
 
-  if (EqualsIgnoreCase(key, "SetFireState")) {
+  if (gpg::STR_EqualsNoCase(key, "SetFireState")) {
     int fireState = 0;
     if (ParseIntLiteral(val, fireState) && fireState >= 0 && fireState <= 2) {
       unit->SetFireState(fireState);
@@ -1906,7 +2228,7 @@ void Sim::ProcessInfoPair(void* id, const char* key, const char* val)
     return;
   }
 
-  if (EqualsIgnoreCase(key, "ToggleScriptBit")) {
+  if (gpg::STR_EqualsNoCase(key, "ToggleScriptBit")) {
     int bitIndex = 0;
     if (ParseIntLiteral(val, bitIndex)) {
       unit->ToggleScriptBit(bitIndex);
@@ -1914,12 +2236,12 @@ void Sim::ProcessInfoPair(void* id, const char* key, const char* val)
     return;
   }
 
-  if (EqualsIgnoreCase(key, "PlayNoStagingPlatformsVO")) {
+  if (gpg::STR_EqualsNoCase(key, "PlayNoStagingPlatformsVO")) {
     static_cast<CScriptObject*>(unit)->CallbackStr("OnPlayNoStagingPlatformsVO");
     return;
   }
 
-  if (EqualsIgnoreCase(key, "PlayBusyStagingPlatformsVO")) {
+  if (gpg::STR_EqualsNoCase(key, "PlayBusyStagingPlatformsVO")) {
     static_cast<CScriptObject*>(unit)->CallbackStr("OnPlayBusyStagingPlatformsVO");
     return;
   }
@@ -2073,13 +2395,8 @@ void Sim::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
     return;
   }
 
-  command->mVarDat.mTarget1 = target;
-
   CAiTarget aiTarget{};
-  aiTarget.targetType = target.mType;
-  aiTarget.position = target.mPos;
-  aiTarget.targetPoint = -1;
-  aiTarget.targetIsMobile = false;
+  aiTarget.DecodeFromSSTITarget(target, this);
   command->SetTarget(aiTarget);
 }
 
@@ -2114,7 +2431,7 @@ void Sim::SetCommandCells(
 
   CAiTarget aiTarget{};
   aiTarget.targetType = EAiTargetType::AITARGET_Ground;
-  std::memcpy(&aiTarget.position, &targetPosition, sizeof(aiTarget.position));
+  aiTarget.position = targetPosition;
   aiTarget.targetPoint = -1;
   aiTarget.targetIsMobile = false;
   command->SetTarget(aiTarget);
@@ -2157,13 +2474,13 @@ void Sim::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId unitId)
     return;
   }
 
-  CAiTransportCommandOps* transport = unit->AiTransport;
-  if (!transport) {
+  IAiBuilder* const builder = unit->AiBuilder;
+  if (!builder) {
     return;
   }
 
-  if (transport->TransportAssignSlot(command)) {
-    transport->TransportDetachUnit(command);
+  if (builder->BuilderContainsCommand(command)) {
+    builder->BuilderRemoveFactoryCommand(command);
   }
 }
 
@@ -2256,6 +2573,70 @@ void Sim::LuaSimCallback(
 }
 
 /**
+ * Address: 0x00734870 (FUN_00734870, func_TryParseSimCommand)
+ *
+ * IDA signature:
+ * void __cdecl func_TryParseSimCommand(
+ *   Moho::Sim *sim,
+ *   char *commandText,
+ *   Wm3::Vector3<float> *worldPos,
+ *   Moho::CArmyImpl *focusArmy,
+ *   Moho::SEntitySetTemplateUnit *selectedUnits);
+ *
+ * What it does:
+ * Parses one or more sim debug command segments, resolves each segment through
+ * the global `simcons` registry, applies cheat gating, and dispatches through
+ * CSimConCommand virtual handlers.
+ */
+void Sim::TryParseSimCommand(
+  const char* command,
+  const Wm3::Vector3<float>& worldPos,
+  CArmyImpl* focusArmy,
+  SEntitySetTemplateUnit& selectedUnits
+)
+{
+  const char* const rawCommandText = command ? command : "";
+  std::string remaining = rawCommandText;
+  Wm3::Vector3<float>* const mutableWorldPos = const_cast<Wm3::Vector3<float>*>(&worldPos);
+
+  while (!remaining.empty()) {
+    std::vector<std::string> parsedCommand;
+    std::string nextCommandChain;
+    ParseOneSimCommand(remaining, parsedCommand, nextCommandChain);
+
+    if (!parsedCommand.empty()) {
+      CSimConCommand* const simCommand = FindSimConCommand(parsedCommand.front());
+      if (!simCommand) {
+        Logf("Unknown sim command '%s' [invoked by %s]\n", parsedCommand.front().c_str(), GetCurrentCommandSourceName());
+      } else {
+        const bool requiresCheat = simCommand->mRequiresCheat != 0;
+        if (requiresCheat && !CheatsEnabled()) {
+          return;
+        }
+
+        if (requiresCheat) {
+          const std::string commandText = UnparseSimCommand(parsedCommand);
+          Logf("%s: %s\n", GetCurrentCommandSourceName(), commandText.c_str());
+        }
+
+        try {
+          (void)simCommand->Run(this, &parsedCommand, mutableWorldPos, focusArmy, &selectedUnits);
+        } catch (const std::exception& ex) {
+          const char* const errorText = ex.what() ? ex.what() : "<unknown>";
+          gpg::Warnf("error running sim console command %s: %s", rawCommandText, errorText);
+
+          if (!requiresCheat) {
+            Logf("error running sim console command %s: %s\n", rawCommandText, errorText);
+          }
+        }
+      }
+    }
+
+    remaining = nextCommandChain;
+  }
+}
+
+/**
  * Address: 0x00749DA0 (FUN_00749DA0)
  *
  * What it does:
@@ -2283,7 +2664,7 @@ void Sim::ExecuteDebugCommand(
       return;
     }
 
-    AppendUniqueEntity(selectedUnits, static_cast<Entity*>(unit));
+    selectedUnits.AppendUniqueEntity(static_cast<Entity*>(unit));
   };
 
   entities.ForEachValue([&appendSelectedUnit](const unsigned int value) {
@@ -2296,7 +2677,7 @@ void Sim::ExecuteDebugCommand(
   }
 
   // 0x00734870 parser chain is now lifted in native C++ via TryParseSimCommand().
-  TryParseSimCommand(this, command, worldPos, focusArmyPtr, selectedUnits);
+  TryParseSimCommand(command, worldPos, focusArmyPtr, selectedUnits);
   DestroySimDebugEntitySet(selectedUnits);
 }
 
@@ -2411,11 +2792,51 @@ void Sim::AdvanceBeat(const int amt)
   mDidProcess = true;
 }
 
+/**
+ * Address: 0x0074AFB0 (FUN_0074AFB0, ?SaveState@Sim@Moho@@QAEXAAVWriteArchive@gpg@@@Z)
+ *
+ * What it does:
+ * Checks NIS-state save gate through `/lua/cinematics.lua::IsOpEnded`,
+ * then writes this `Sim` object to the supplied archive.
+ */
+void Sim::SaveState(gpg::WriteArchive* const archive)
+{
+  bool isNisMode = false;
+  if (mLuaState) {
+    LuaPlus::LuaObject cinematicsModule = SCR_ImportLuaModule(mLuaState, "/lua/cinematics.lua");
+    LuaPlus::LuaObject isOpEndedFn = SCR_GetLuaTableField(mLuaState, cinematicsModule, "IsOpEnded");
+
+    lua_State* const state = mLuaState->GetCState();
+    if (state && !isOpEndedFn.IsNil()) {
+      const int savedTop = lua_gettop(state);
+      isOpEndedFn.PushStack(state);
+      if (lua_isfunction(state, -1) && lua_pcall(state, 0, 1, 0) == 0) {
+        isNisMode = lua_toboolean(state, -1) != 0;
+      }
+      lua_settop(state, savedTop);
+    }
+  }
+
+  if (isNisMode) {
+    throw std::runtime_error("Attemped Save in NIS mode");
+  }
+
+  gpg::RRef ownerRef{};
+  if (!Sim::sType) {
+    Sim::sType = gpg::LookupRType(typeid(Sim));
+  }
+
+  archive->Write(Sim::sType, this, ownerRef);
+  archive->EndSection(false);
+}
+
 // 0x0074B100
 void Sim::EndGame()
 {
   mGameEnded = true;
 }
+
+gpg::RType* Sim::sType = nullptr;
 
 /**
  * Address: 0x0074CFB0 (FUN_0074CFB0, sub_74CFB0)

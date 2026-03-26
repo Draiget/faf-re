@@ -3,16 +3,27 @@
 #include "../../gpg/core/utils/BoostWrappers.h"
 #include <type_traits>
 
+#include "IResources.h"
+
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class ISimResources;
   class CSimResources;
   using SimResourcesHandle = boost::BorrowedSharedPtr<ISimResources>;
 
-  class ISimResources
+  class ISimResources : public IResources
   {
+  public:
+    static gpg::RType* sType;
+
   protected:
-    ~ISimResources() = default;
+    ISimResources() = default;
+    ~ISimResources() override = default;
   };
 
   namespace detail
@@ -46,6 +57,7 @@ namespace moho
     void AssignSharedISimResources(boost::SharedPtrRaw<ISimResources>& outHandle, CSimResources* resources);
   } // namespace detail
 
-  static_assert(sizeof(ISimResources) == 0x1, "ISimResources size must be 0x1");
-  static_assert(!std::is_polymorphic<ISimResources>::value, "ISimResources must be non-polymorphic");
+  static_assert(sizeof(ISimResources) == 0x4, "ISimResources size must be 0x4");
+  static_assert(std::is_polymorphic<ISimResources>::value, "ISimResources must remain polymorphic");
+  static_assert(std::is_abstract<ISimResources>::value, "ISimResources must remain abstract");
 } // namespace moho

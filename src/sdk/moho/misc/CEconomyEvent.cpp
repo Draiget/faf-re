@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
@@ -13,30 +14,8 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
-namespace gpg
-{
-  enum class TrackedPointerState : int
-  {
-    Unowned = 1,
-    Owned = 2,
-  };
-
-  struct TrackedPointerInfo
-  {
-    void* object;
-    gpg::RType* type;
-  };
-
-  TrackedPointerInfo ReadRawPointer(ReadArchive* archive, const gpg::RRef& ownerRef);
-  void WriteRawPointer(
-    WriteArchive* archive, const gpg::RRef& objectRef, TrackedPointerState state, const gpg::RRef& ownerRef
-  );
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-} // namespace gpg
-
 namespace
 {
-  constexpr std::uintptr_t kLuaBindingStateOffset = 0x44u;
   constexpr const char* kCreateEconomyEventHelp = "CreateEconomyEvent";
   constexpr const char* kRemoveEconomyEventHelp = "RemoveEconomyEvent";
   constexpr const char* kEconomyEventIsDoneHelp = "EconomyEventIsDone";
@@ -44,6 +23,19 @@ namespace
   constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
+
+  /**
+   * Address: 0x00775630 (FUN_00775630, context unwrap)
+   * Address: 0x00775910 (FUN_00775910, context unwrap)
+   * Address: 0x00775A40 (FUN_00775A40, context unwrap)
+   *
+   * What it does:
+   * Resolves LuaPlus wrapper state from native Lua callback context.
+   */
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
 
   [[nodiscard]] gpg::RType* CachedCEconomyEventType()
   {
@@ -653,10 +645,9 @@ void moho::CEconomyEventTypeInfo::Init()
 /**
  * Address: 0x00775630 (FUN_00775630, cfunc_CreateEconomyEvent)
  */
-int moho::cfunc_CreateEconomyEvent(const int luaContext)
+int moho::cfunc_CreateEconomyEvent(lua_State* const luaContext)
 {
-  auto* const state =
-    *reinterpret_cast<LuaPlus::LuaState**>(static_cast<std::uintptr_t>(luaContext) + kLuaBindingStateOffset);
+  auto* const state = ResolveBindingState(luaContext);
   return cfunc_CreateEconomyEventL(state);
 }
 
@@ -690,10 +681,9 @@ int moho::cfunc_CreateEconomyEventL(LuaPlus::LuaState* const state)
 /**
  * Address: 0x00775910 (FUN_00775910, cfunc_RemoveEconomyEvent)
  */
-int moho::cfunc_RemoveEconomyEvent(const int luaContext)
+int moho::cfunc_RemoveEconomyEvent(lua_State* const luaContext)
 {
-  auto* const state =
-    *reinterpret_cast<LuaPlus::LuaState**>(static_cast<std::uintptr_t>(luaContext) + kLuaBindingStateOffset);
+  auto* const state = ResolveBindingState(luaContext);
   return cfunc_RemoveEconomyEventL(state);
 }
 
@@ -716,10 +706,9 @@ int moho::cfunc_RemoveEconomyEventL(LuaPlus::LuaState* const state)
 /**
  * Address: 0x00775A40 (FUN_00775A40, cfunc_EconomyEventIsDone)
  */
-int moho::cfunc_EconomyEventIsDone(const int luaContext)
+int moho::cfunc_EconomyEventIsDone(lua_State* const luaContext)
 {
-  auto* const state =
-    *reinterpret_cast<LuaPlus::LuaState**>(static_cast<std::uintptr_t>(luaContext) + kLuaBindingStateOffset);
+  auto* const state = ResolveBindingState(luaContext);
   return cfunc_EconomyEventIsDoneL(state);
 }
 

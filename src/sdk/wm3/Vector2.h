@@ -46,6 +46,11 @@ namespace Wm3
       return {v.x * scale, v.y * scale};
     }
 
+    static constexpr Vector2 Zero() noexcept
+    {
+      return {T(0), T(0)};
+    }
+
     static constexpr T Dot(const Vector2& a, const Vector2& b) noexcept
     {
       return a.x * b.x + a.y * b.y;
@@ -102,6 +107,17 @@ namespace Wm3
       return Normalize(*v, eps);
     }
 
+    static Vector2 NormalizeOrZero(const Vector2& v, const T minLenSq = T(1e-8)) noexcept
+    {
+      if (LengthSq(v) <= minLenSq) {
+        return Zero();
+      }
+
+      Vector2 out = v;
+      Normalize(out);
+      return out;
+    }
+
     T Normalize(const T eps = T(1e-6)) noexcept
     {
       return Vector2::Normalize(*this, eps);
@@ -145,6 +161,11 @@ namespace Wm3
     static bool IsntNaN(const Vector2& v) noexcept
     {
       return IsntNaN(&v);
+    }
+
+    static bool IsInvalid(const Vector2& v) noexcept
+    {
+      return !IsntNaN(v);
     }
 
     bool IsntNaN() const noexcept

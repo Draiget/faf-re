@@ -1,6 +1,7 @@
 // ReSharper disable CppTooWideScope
 #pragma once
 
+#include "StateCache.h"
 #include "D3D9Utils.h"
 #include "legacy/containers/Tree.h"
 
@@ -18,13 +19,18 @@ namespace gpg::gal
         using value_type = unsigned int;
 
         /**
-         * Address: 0x00948230
+         * Address: 0x00948230 (FUN_00948230)
+         *
          * Slot: 0
          * Demangled: sub_948230
+         *
+         * What it does:
+         * Clears the texture-stage cache tree and releases owned nodes.
          */
-        virtual ~StateCache() = default;
+        virtual ~StateCache();
 
     protected:
         msvc8::EmbeddedTree<> tree_;
     };
+
 }

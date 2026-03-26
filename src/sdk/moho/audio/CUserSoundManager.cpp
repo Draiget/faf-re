@@ -1,10 +1,18 @@
 #include "moho/audio/CUserSoundManager.h"
 
+#include <Windows.h>
+
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
 #include "gpg/core/utils/Logging.h"
 #include "moho/audio/AudioEngine.h"
+#include "moho/misc/StartupHelpers.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
+#include "moho/render/RCamManager.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/UserArmy.h"
 
@@ -28,8 +36,20 @@ namespace
   using ListenerArmyHook = moho::ListenerArmyHook;
 
   constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
+  constexpr int kCueStatePlaying = 16;
+  constexpr int kCueStateStopped = 32;
+  constexpr float kHalfPi = 1.5707964f;
+  constexpr float kRadToDeg = 57.29578f;
   constexpr moho::ELayer kLayerSeabed = static_cast<moho::ELayer>(2);
   constexpr moho::ELayer kLayerSub = static_cast<moho::ELayer>(4);
+  constexpr const char* kWorldCameraName = "WorldCamera";
+  constexpr const char* kAngleVariableName = "Angle";
+
+  moho::CUserSoundManager* gUserSoundManager = nullptr;
+  moho::StatItem* gEngineStatSoundLimitedLoop = nullptr;
+  moho::StatItem* gEngineStatSoundStartEntityLoop = nullptr;
+  moho::StatItem* gEngineStatSoundStopEntityLoop = nullptr;
+  moho::StatItem* gEngineStatSoundPendingDestroy = nullptr;
 
   moho::HSound* LoopOwnerFromNode(LoopNode* node)
   {
@@ -108,10 +128,380 @@ namespace
       *head = &hook;
     }
   }
+
+  void EnsureSoundCounterStat(moho::StatItem*& slot, const char* const statPath)
+  {
+    if (slot != nullptr) {
+      return;
+    }
+
+    moho::EngineStats* const engineStats = moho::GetEngineStats();
+    if (engineStats == nullptr) {
+      return;
+    }
+
+    slot = engineStats->GetIntItem(statPath);
+    if (slot != nullptr) {
+      (void)slot->Release(0);
+    }
+  }
+
+  void StoreSoundCounter(moho::StatItem* const slot, const std::int32_t value)
+  {
+    if (slot == nullptr) {
+      return;
+    }
+
+    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
+    long observed = 0;
+    do {
+      observed = ::InterlockedCompareExchange(counter, 0, 0);
+    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+  }
+
+  [[nodiscard]] float ComputePitchRadians(const Wm3::Vec3f& value)
+  {
+    const float horizontal = std::sqrt((value.x * value.x) + (value.y * value.y));
+    return std::atan2(value.z, horizontal);
+  }
+
+  [[nodiscard]] float ComputeCueAngleDegrees(const Wm3::Vec3f& worldPos, const Wm3::Vec3f& listenerPos)
+  {
+    const Wm3::Vec3f delta{
+      worldPos.x - listenerPos.x,
+      worldPos.y - listenerPos.y,
+      worldPos.z - listenerPos.z,
+    };
+    return (kHalfPi - ComputePitchRadians(delta)) * kRadToDeg;
+  }
+
+  [[nodiscard]] int DrainFinishedPendingCues(
+    msvc8::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
+  )
+  {
+    const bool canQueryCueState =
+      voiceEngine != nullptr && voiceEngine->mImpl != nullptr && voiceEngine->mImpl->mInstance != nullptr;
+
+    int pendingCount = 0;
+    for (auto cueIt = pendingCues.begin(); cueIt != pendingCues.end();) {
+      moho::IXACTCue* const cue = *cueIt;
+      if (!canQueryCueState || cue == nullptr) {
+        ++pendingCount;
+        ++cueIt;
+        continue;
+      }
+
+      std::int32_t cueState = 0;
+      const int stateResult = cue->GetState(&cueState);
+      if (stateResult < 0) {
+        gpg::Warnf("SND: %s", moho::func_SoundErrorCodeToMsg(stateResult));
+      }
+
+      if (cueState == kCueStateStopped) {
+        cue->Destroy();
+        cueIt = pendingCues.erase(cueIt);
+        continue;
+      }
+
+      ++pendingCount;
+      ++cueIt;
+    }
+
+    return pendingCount;
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x008AA800 (FUN_008AA800, ??0CUserSoundManager@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Initializes user-audio runtime containers, cue vars, and the primary
+   * voice engine.
+   */
+  CUserSoundManager::CUserSoundManager()
+    : mReserved04(0u)
+    , mRecentOneShotKeys()
+    , mLoopHandleIdPool()
+    , mReserved13C(0u)
+    , mSoundHandles()
+    , mPendingDestroyCues()
+    , mListenerArmyHook{nullptr, nullptr}
+    , mActiveLoops()
+    , mAmbientEngine()
+    , mTutorialEngine()
+    , mVoiceEngine(AudioEngine::Create("/sounds"))
+    , mCameraDistanceVar("CameraDistance")
+    , mZoomPercentVar("ZoomPercent")
+    , mCurrentCameraDistanceMetric(0.0f)
+    , mWorldSoundsEnabled(1u)
+    , mReserved29C9{0u, 0u, 0u}
+    , mLanguageTag()
+    , mDuckLengthVar("DuckLength")
+    , mDuckVar("Duck")
+    , mDuckMode(0)
+    , mDuckElapsedSeconds(0.0f)
+    , mActiveDuckingSounds(0)
+    , mReserved2A34(0u)
+  {
+    mLoopHandleIdPool.mNextId = 0u;
+    mSoundHandles.Resize(0x100u, SoundHandleRecord{});
+    snd_SpewSound = CFG_GetArgOption("/spewsound", 0, nullptr);
+  }
+
+  /**
+   * Address: 0x008AAA10 (FUN_008AAA10, ??1CUserSoundManager@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Detaches intrusive list/hook links before member-owned container teardown.
+   */
+  CUserSoundManager::~CUserSoundManager()
+  {
+    mActiveLoops.mPrev->mNext = mActiveLoops.mNext;
+    mActiveLoops.mNext->mPrev = mActiveLoops.mPrev;
+    mActiveLoops.ListResetLinks();
+    UnlinkArmyHook(mListenerArmyHook);
+  }
+
+  /**
+   * Address: 0x008AB220 (FUN_008AB220, ?USER_GetSound@Moho@@YAPAVIUserSoundManager@1@XZ)
+   *
+   * What it does:
+   * Returns the process-global user sound manager and lazily creates it.
+   */
+  IUserSoundManager* USER_GetSound()
+  {
+    if (gUserSoundManager == nullptr) {
+      CUserSoundManager* const created = new CUserSoundManager();
+      if (created != gUserSoundManager) {
+        CUserSoundManager* const previous = gUserSoundManager;
+        if (previous != nullptr) {
+          previous->~CUserSoundManager();
+          operator delete(previous);
+        }
+      }
+      gUserSoundManager = created;
+    }
+
+    return gUserSoundManager;
+  }
+
+  /**
+   * Address: 0x008AC0B0 (FUN_008AC0B0)
+   *
+   * gpg::fastvector<Moho::SAudioRequest> const&
+   *
+   * IDA signature:
+   * void __thiscall Moho::CUserSoundManager::UpdateSoundRequests(Moho::CUserSoundManager *this,
+   * gpg::fastvector_SAudioRequest const *requests);
+   *
+   * What it does:
+   * Consumes audio requests, updates camera-linked global sound vars, plays
+   * one-shot/loop cues, and schedules transient cues for deferred destroy.
+   */
+  void CUserSoundManager::UpdateSoundRequests(const gpg::fastvector<SAudioRequest>& requests)
+  {
+    EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
+    EnsureSoundCounterStat(gEngineStatSoundStartEntityLoop, "Sound_StartEntityLoop");
+    EnsureSoundCounterStat(gEngineStatSoundStopEntityLoop, "Sound_StopEntityLoop");
+    StoreSoundCounter(gEngineStatSoundLimitedLoop, 0);
+    StoreSoundCounter(gEngineStatSoundStartEntityLoop, 0);
+    StoreSoundCounter(gEngineStatSoundStopEntityLoop, 0);
+
+    if (mWorldSoundsEnabled == 0u) {
+      return;
+    }
+
+    mRecentOneShotKeys.Clear();
+
+    if (RCamManager* const camManager = CAM_GetManager(); camManager != nullptr) {
+      if (CameraImpl* const camera = camManager->GetCamera(kWorldCameraName); camera != nullptr) {
+        if (IsSndVarReady(mCameraDistanceVar)) {
+          const float lodMetric = camera->LODMetric(camera->CameraGetOffset());
+          if (lodMetric != mCurrentCameraDistanceMetric) {
+            mCurrentCameraDistanceMetric = lodMetric;
+            SND_SetGlobalFloat(mCameraDistanceVar.mState, lodMetric);
+          }
+        }
+
+        if (IsSndVarReady(mZoomPercentVar)) {
+          const float maxZoom = camera->GetMaxZoom();
+          if (maxZoom > 0.0f) {
+            const float zoomPercent = (camera->CameraGetTargetZoom() / maxZoom) * 100.0f;
+            SND_SetGlobalFloat(mZoomPercentVar.mState, zoomPercent);
+          }
+        }
+      }
+    }
+
+    AudioEngine* const voiceEngine = mVoiceEngine.get();
+    const std::size_t requestCount = requests.Size();
+    for (std::size_t requestIndex = 0; requestIndex < requestCount; ++requestIndex) {
+      const SAudioRequest& request = requests.start_[requestIndex];
+
+      switch (request.requestType) {
+      case EAudioRequestType::StartLoop: {
+        HSound* const sound = request.sound;
+        CSndParams* params = request.params;
+        if (params == nullptr && sound != nullptr) {
+          params = static_cast<CSndParams*>(sound->mLoopOwnerContext);
+        }
+
+        if (sound == nullptr || params == nullptr || voiceEngine == nullptr) {
+          break;
+        }
+        if (!ParamsHasResolvedEngine(*params)) {
+          break;
+        }
+
+        IXACTCue* cue = nullptr;
+        if (AudioEngine::Play(params->mBankId, &cue, voiceEngine, params->mCueId, 0) >= 0 && cue != nullptr) {
+          sound->mLoopCue = cue;
+          AudioEngine::Calculate3D(&request.position, voiceEngine, cue);
+        }
+        break;
+      }
+
+      case EAudioRequestType::StopLoop: {
+        HSound* const sound = request.sound;
+        IXACTCue* const cue = sound != nullptr ? sound->mLoopCue : nullptr;
+        if (cue == nullptr) {
+          gpg::Warnf("SND: No cue for stop loop request.");
+          break;
+        }
+
+        cue->Stop(0);
+        mPendingDestroyCues.insert(cue);
+        break;
+      }
+
+      case EAudioRequestType::EntitySound: {
+        const CSndParams* const params = request.params;
+        if (params == nullptr || voiceEngine == nullptr) {
+          break;
+        }
+        if (!ParamsHasResolvedEngine(*params)) {
+          break;
+        }
+        if (FilterSound(params, request.layer, &request.position) != EFilterType::Pass) {
+          break;
+        }
+
+        const std::uint32_t cueKey =
+          static_cast<std::uint32_t>(params->mCueId) | (static_cast<std::uint32_t>(params->mBankId) << 16u);
+
+        bool seenCueKey = false;
+        const std::size_t recentKeyCount = mRecentOneShotKeys.Size();
+        for (std::size_t keyIndex = 0; keyIndex < recentKeyCount; ++keyIndex) {
+          if (mRecentOneShotKeys.start_[keyIndex] == cueKey) {
+            seenCueKey = true;
+            break;
+          }
+        }
+        if (seenCueKey) {
+          break;
+        }
+
+        mRecentOneShotKeys.PushBack(cueKey);
+
+        if (snd_SpewSound) {
+          gpg::Debugf("SND: 1shot   [Cue: %s] [Bank: %s] %i", params->mCue.c_str(), params->mBank.c_str(), snd_index);
+        }
+
+        IXACTCue* cue = nullptr;
+        if (AudioEngine::Play(params->mBankId, &cue, voiceEngine, params->mCueId, 0) < 0 || cue == nullptr) {
+          break;
+        }
+
+        mPendingDestroyCues.insert(cue);
+        AudioEngine::Calculate3D(&request.position, voiceEngine, cue);
+
+        const std::uint16_t angleVariable = cue->GetVariableIndex(kAngleVariableName);
+        if (angleVariable != 0xFFFFu) {
+          const VTransform listenerTransform = voiceEngine->GetListenerTransform();
+          const float angleDegrees = ComputeCueAngleDegrees(request.position, listenerTransform.pos_);
+          cue->SetVariable(angleVariable, angleDegrees);
+        }
+        break;
+      }
+
+      default:
+        break;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x008AB770 (FUN_008AB770)
+   *
+   * float simDeltaSeconds, float frameSeconds
+   *
+   * IDA signature:
+   * int __thiscall Moho::CUserSoundManager::Frame(Moho::CUserSoundManager *this, float a2, float a3);
+   *
+   * What it does:
+   * Updates listener transform and active loop handles, runs duck interpolation,
+   * and destroys transient cues that reached stopped state.
+   */
+  void CUserSoundManager::Frame(const float simDeltaSeconds, const float frameSeconds)
+  {
+    if (RCamManager* const camManager = CAM_GetManager(); camManager != nullptr) {
+      if (CameraImpl* const camera = camManager->GetCamera(kWorldCameraName); camera != nullptr) {
+        VTransform listenerTransform = camera->CameraGetView().tranform;
+        const float targetZoom = camera->CameraGetTargetZoom();
+        const Wm3::Vec3f& cameraOffset = camera->CameraGetOffset();
+        listenerTransform.pos_.x = cameraOffset.x;
+        listenerTransform.pos_.y = cameraOffset.y + targetZoom;
+        listenerTransform.pos_.z = cameraOffset.z;
+        SetListenerTransform(listenerTransform);
+      }
+    }
+
+    if (mDuckMode != 0) {
+      UpdateDuck(frameSeconds);
+    }
+
+    (void)simDeltaSeconds; // Used by unresolved entity-loop helper lane (0x008AA4E0).
+
+    const AudioEngine* const voiceEngine = mVoiceEngine.get();
+    const std::size_t handleCount = mSoundHandles.Size();
+    for (std::size_t handleIndex = 0; handleIndex < handleCount; ++handleIndex) {
+      SoundHandleRecord& record = mSoundHandles.start_[handleIndex];
+      if (record.mLoopIndex == -1) {
+        continue;
+      }
+
+      if (voiceEngine == nullptr || voiceEngine->mImpl == nullptr || voiceEngine->mImpl->mInstance == nullptr) {
+        continue;
+      }
+      if (record.mCue == nullptr) {
+        continue;
+      }
+
+      std::int32_t cueState = 0;
+      const int firstStateResult = record.mCue->GetState(&cueState);
+      if (firstStateResult < 0) {
+        gpg::Warnf("SND: %s", func_SoundErrorCodeToMsg(firstStateResult));
+      }
+
+      if (cueState == kCueStateStopped) {
+        SND_DestroyEntityLoop(&record);
+        continue;
+      }
+
+      cueState = 0;
+      record.mCue->GetState(&cueState);
+      if (cueState == kCueStatePlaying) {
+        record.mPlayingSeconds += frameSeconds;
+      }
+    }
+
+    const int pendingDestroyCount = DrainFinishedPendingCues(mPendingDestroyCues, mVoiceEngine.get());
+    EnsureSoundCounterStat(gEngineStatSoundPendingDestroy, "Sound_PendingDestroy");
+    StoreSoundCounter(gEngineStatSoundPendingDestroy, pendingDestroyCount);
+  }
+
   /**
    * Address: 0x008AAC50 (FUN_008AAC50)
    *
@@ -195,7 +585,9 @@ namespace moho
    */
   void CUserSoundManager::SetListenerTransform(const VTransform& transform)
   {
-    mVoiceEngine.get()->SetListenerTransform(transform);
+    if (AudioEngine* const voiceEngine = mVoiceEngine.get(); voiceEngine != nullptr) {
+      voiceEngine->SetListenerTransform(transform);
+    }
   }
 
   /**
@@ -278,7 +670,9 @@ namespace moho
       SND_SetGlobalFloat(mDuckVar.mState, 0.0f);
     }
 
-    mVoiceEngine.get()->SetVolume(category, value);
+    if (AudioEngine* const voiceEngine = mVoiceEngine.get(); voiceEngine != nullptr) {
+      voiceEngine->SetVolume(category, value);
+    }
 
     if (AudioEngine* const tutorialEngine = mTutorialEngine.get(); tutorialEngine != nullptr) {
       tutorialEngine->SetVolume(category, value);
@@ -301,7 +695,11 @@ namespace moho
    */
   float CUserSoundManager::GetVolume(const gpg::StrArg category)
   {
-    return mVoiceEngine.get()->GetVolume(category);
+    if (AudioEngine* const voiceEngine = mVoiceEngine.get(); voiceEngine != nullptr) {
+      return voiceEngine->GetVolume(category);
+    }
+
+    return 1.0f;
   }
 
   /**

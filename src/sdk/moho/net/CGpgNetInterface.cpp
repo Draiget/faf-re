@@ -1,6 +1,7 @@
 #include "CGpgNetInterface.h"
 
 #include <cstring>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -17,6 +18,9 @@ using namespace moho;
 
 namespace
 {
+  std::mutex gGpgNetStateLock;
+  boost::shared_ptr<CGpgNetInterface> gGpgNet;
+
   int32_t ExpectIntArg(CGpgNetInterface& owner, const SNetCommandArg* arg)
   {
     if (!arg || arg->mType != SNetCommandArg::NETARG_Num) {
@@ -84,6 +88,54 @@ namespace
     throw std::runtime_error(gpg::STR_Printf("Unknown GPGNET command \"%s\".", commandName.c_str()).c_str());
   }
 } // namespace
+
+void moho::GPGNET_SetPtr(const boost::shared_ptr<CGpgNetInterface>& ptr)
+{
+  std::lock_guard<std::mutex> lock(gGpgNetStateLock);
+  gGpgNet = ptr;
+}
+
+boost::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
+{
+  std::lock_guard<std::mutex> lock(gGpgNetStateLock);
+  return gGpgNet;
+}
+
+/**
+ * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
+ *
+ * What it does:
+ * Creates and connects the process-global GPGNet interface.
+ */
+void moho::GPGNET_Attach(const u_long addr, const u_short port)
+{
+  if (GPGNET_GetPtr()) {
+    throw std::runtime_error("Can't attach to a gpg.net if we already are.");
+  }
+
+  boost::shared_ptr<CGpgNetInterface> created(new CGpgNetInterface{});
+  created->Connect(addr, port);
+  GPGNET_SetPtr(created);
+}
+
+/**
+ * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ)
+ *
+ * What it does:
+ * Shuts down and clears the process-global GPGNet interface pointer.
+ */
+void moho::GPGNET_Shutdown()
+{
+  boost::shared_ptr<CGpgNetInterface> active;
+  {
+    std::lock_guard<std::mutex> lock(gGpgNetStateLock);
+    active.swap(gGpgNet);
+  }
+
+  if (active) {
+    (void)active->Shutdown();
+  }
+}
 
 /**
  * Address: 0x007B6800 (FUN_007B6800)

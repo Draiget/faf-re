@@ -103,6 +103,14 @@ namespace moho
     [[nodiscard]] unsigned int Count() const;
 
     /**
+     * Address: <lifted helper from FUN_0053D360 command-source gate>
+     *
+     * What it does:
+     * Returns whether `val` bit is present in this set.
+     */
+    [[nodiscard]] bool Contains(unsigned int val) const;
+
+    /**
      * Address: 0x004017B0 (FUN_004017B0)
      * Address: 0x100014C0
      *

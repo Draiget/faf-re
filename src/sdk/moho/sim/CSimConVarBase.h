@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "legacy/containers/String.h"
+#include "moho/sim/CSimConCommand.h"
 
 namespace moho
 {
@@ -14,7 +15,7 @@ namespace moho
    * VFTABLE: 0x00E198DC
    * COL:  0x00E6EB08
    */
-  class CSimConVarBase
+  class CSimConVarBase : public CSimConCommand
   {
   public:
     /**
@@ -26,7 +27,7 @@ namespace moho
      * What it does:
      * Resolves the per-Sim convar instance and forwards command args to instance handler slot.
      */
-    virtual int DispatchToSimVar(Sim* sim, int unknownA3, void* commandArgs, int unknownA5, int unknownA6);
+    int Run(Sim* sim, ParsedCommandArgs* commandArgs, Wm3::Vector3f*, CArmyImpl*, SEntitySetTemplateUnit*) override;
 
     /**
      * Address: 0x00579790 (FUN_00579790, sub_579790)
@@ -34,7 +35,7 @@ namespace moho
      * What it does:
      * Identity virtual used by base vtable; returns `this`.
      */
-    virtual CSimConVarBase* Identity();
+    CSimConVarBase* Identity() override;
 
     /**
      * Address: 0x00A82547 (_purecall in base)
@@ -42,16 +43,15 @@ namespace moho
      * What it does:
      * Allocates and initializes a typed `CSimConVarInstanceBase` for this convar definition.
      */
-    virtual CSimConVarInstanceBase* CreateInstance() = 0;
+    virtual CSimConVarInstanceBase* CreateInstance() = 0; // slot 2
 
   public:
-    const char* mName;         // 0x04
-    std::uint32_t mReserved08; // 0x08
-    std::uint32_t mIndex;      // 0x0C
+    std::uint32_t mIndex; // +0x0C
   };
 
   static_assert(sizeof(CSimConVarBase) == 0x10, "CSimConVarBase size must be 0x10");
   static_assert(offsetof(CSimConVarBase, mName) == 0x04, "CSimConVarBase::mName offset must be 0x04");
+  static_assert(offsetof(CSimConVarBase, mRequiresCheat) == 0x08, "CSimConVarBase::mRequiresCheat offset must be 0x08");
   static_assert(offsetof(CSimConVarBase, mIndex) == 0x0C, "CSimConVarBase::mIndex offset must be 0x0C");
 
   template <typename T>

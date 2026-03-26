@@ -30,7 +30,7 @@ namespace moho
      * Address: 0x00A82547 (_purecall)
      * Slot: 1
      */
-    virtual void Frame(float frameSeconds, float simSeconds) = 0;
+    virtual void Frame(float simDeltaSeconds, float frameSeconds) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -74,6 +74,14 @@ namespace moho
      */
     virtual float GetVolume(gpg::StrArg category) = 0;
   };
+
+  /**
+   * Address: 0x008AB220 (FUN_008AB220, ?USER_GetSound@Moho@@YAPAVIUserSoundManager@1@XZ)
+   *
+   * What it does:
+   * Returns the process-global user sound manager, creating/replacing it on first use.
+   */
+  [[nodiscard]] IUserSoundManager* USER_GetSound();
 
   static_assert(sizeof(IUserSoundManager) == 0x4, "IUserSoundManager size must be 0x4");
   static_assert(std::is_polymorphic<IUserSoundManager>::value, "IUserSoundManager must remain polymorphic");

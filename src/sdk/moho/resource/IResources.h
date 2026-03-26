@@ -11,6 +11,11 @@
 #include "wm3/Vector2.h"
 #include "wm3/Vector3.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class CGeomSolid3;
@@ -19,6 +24,9 @@ namespace moho
   class IResources : public boost::noncopyable_::noncopyable
   {
     // ==== Primary vftable (12 entries) ====
+  public:
+    static gpg::RType* sType;
+
   protected:
     /**
      * Address: 0x00546E80 (loc_00546E80, shared constructor/destructor helper chunk)

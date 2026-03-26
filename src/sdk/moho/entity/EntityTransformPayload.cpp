@@ -9,6 +9,37 @@
 namespace moho
 {
   /**
+   * Address: 0x006770F0 (FUN_006770F0, struct_QuatBVec::struct_QuatBVec)
+   *
+   * What it does:
+   * Initializes one history sample to identity orientation and zero position.
+   */
+  void InitializePositionHistorySample(EntityTransformPayload& sample) noexcept
+  {
+    sample.quatW = 1.0f;
+    sample.quatX = 0.0f;
+    sample.quatY = 0.0f;
+    sample.quatZ = 0.0f;
+    sample.posX = 0.0f;
+    sample.posY = 0.0f;
+    sample.posZ = 0.0f;
+  }
+
+  /**
+   * Address: 0x00678800 (FUN_00678800, Moho::Entity::InitPositionHistory dependency)
+   *
+   * What it does:
+   * Initializes all position-history samples and resets cursor to `0`.
+   */
+  void InitializePositionHistory(PositionHistory& history) noexcept
+  {
+    for (EntityTransformPayload& sample : history.samples) {
+      InitializePositionHistorySample(sample);
+    }
+    history.cursor = 0;
+  }
+
+  /**
    * Address: 0x00678E90 (FUN_00678E90), 0x00678F10 (FUN_00678F10)
    *
    * What it does:

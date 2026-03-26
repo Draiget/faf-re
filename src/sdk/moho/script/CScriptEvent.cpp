@@ -6,11 +6,6 @@
 
 #include "gpg/core/utils/Global.h"
 
-namespace gpg
-{
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-}
-
 using namespace moho;
 
 namespace

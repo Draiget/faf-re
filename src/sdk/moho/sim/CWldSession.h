@@ -23,6 +23,7 @@ namespace moho
 {
   class UserArmy;
   class EntityCategoryLookupResolver;
+  class LaunchInfoBase;
   class RRuleGameRules;
   class RRuleGameRulesImpl;
   class UserEntity;
@@ -273,6 +274,15 @@ namespace moho
     void SessionFrame(float deltaSeconds);
 
     /**
+     * Address: 0x00896900 (FUN_00896900, ?GetDelayToNextBeat@CWldSession@Moho@@QBEMXZ)
+     *
+     * What it does:
+     * Returns the delay until the next beat in seconds, or `+inf` while replay
+     * pause is holding on a tick boundary.
+     */
+    [[nodiscard]] float GetDelayToNextBeat() const;
+
+    /**
      * Address: 0x00896F00 (FUN_00896F00,
      * ?GetSaveData@CWldSession@Moho@@QBE?AV?$shared_ptr@USSessionSaveData@Moho@@@boost@@XZ)
      *
@@ -362,8 +372,7 @@ namespace moho
     CTaskStage* mCurThread;                                 // 0x0014
     RRuleGameRulesImpl* mRules;                             // 0x0018
     CWldMap* mWldMap;                                       // 0x001C
-    uint32_t mCanRestart;                                   // 0x0020
-    void* mUnknownOwnerToken24;                             // 0x0024
+    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;          // 0x0020
     msvc8::string mMapName;                                 // 0x0028
     void* mUnknownOwner44;                                  // 0x0044
     void* mSaveSourceTreeHead;                              // 0x0048
@@ -389,14 +398,14 @@ namespace moho
     void* mVizUpdateHead;                                   // 0x043C
     std::uint32_t mVizUpdateSize;                           // 0x0440
     LuaPlus::LuaObject mScenarioInfo;                       // 0x0444
-    int32_t GameTimeSeconds;                                // 0x0458
-    int32_t IsRunning;                                      // 0x045C
-    float GameTimeMilliSeconds;                             // 0x0460
-    uint8_t IsPaused;                                       // 0x0464
+    std::int32_t mGameTick;                                 // 0x0458
+    std::int32_t mLastBeatWasTick;                          // 0x045C
+    float mTimeSinceLastTick;                               // 0x0460
+    std::uint8_t mSessionPauseStateA;                       // 0x0464
     uint8_t N00001903;                                      // 0x0465
-    uint8_t IsPausedB;                                      // 0x0466
+    uint8_t mSessionPauseStateB;                            // 0x0466
     char pad_0467[5];                                       // 0x0467
-    uint8_t N0000315B;                                      // 0x046C
+    std::uint8_t mReplayIsPaused;                           // 0x046C
     char pad_046D[3];                                       // 0x046D
     msvc8::vector<SSTICommandSource> cmdSources;            // 0x0470
     int32_t ourCmdSource;                                   // 0x0480
@@ -425,6 +434,7 @@ namespace moho
 
   static_assert(sizeof(CWldSession) == 0x508, "CWldSession size must be 0x508");
   static_assert(offsetof(CWldSession, mWldMap) == 0x1C, "CWldSession::mWldMap offset must be 0x1C");
+  static_assert(offsetof(CWldSession, mLaunchInfo) == 0x20, "CWldSession::mLaunchInfo offset must be 0x20");
   static_assert(
     offsetof(CWldSession, mSaveSourceTreeHead) == 0x48, "CWldSession::mSaveSourceTreeHead offset must be 0x48"
   );
@@ -437,5 +447,95 @@ namespace moho
   );
   static_assert(offsetof(CWldSession, mVizUpdateRoot) == 0x438, "CWldSession::mVizUpdateRoot offset must be 0x438");
   static_assert(offsetof(CWldSession, mScenarioInfo) == 0x444, "CWldSession::mScenarioInfo offset must be 0x444");
+  static_assert(offsetof(CWldSession, mGameTick) == 0x458, "CWldSession::mGameTick offset must be 0x458");
+  static_assert(
+    offsetof(CWldSession, mLastBeatWasTick) == 0x45C, "CWldSession::mLastBeatWasTick offset must be 0x45C"
+  );
+  static_assert(
+    offsetof(CWldSession, mTimeSinceLastTick) == 0x460, "CWldSession::mTimeSinceLastTick offset must be 0x460"
+  );
+  static_assert(
+    offsetof(CWldSession, mReplayIsPaused) == 0x46C, "CWldSession::mReplayIsPaused offset must be 0x46C"
+  );
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
+
+  enum class EWldFrameAction : std::int32_t
+  {
+    Inactive = 0,
+    Preload = 1,
+    Loading = 2,
+    Initialize = 3,
+    PostInitialize = 4,
+    Waiting = 5,
+    Playing = 6,
+    CreateSession = 7,
+    Exit = 8,
+  };
+
+  static_assert(sizeof(EWldFrameAction) == 0x4, "EWldFrameAction size must be 0x4");
+
+  /**
+   * Address context:
+   * - process-global world-frame action lane (`sWldFrameAction`) consumed by
+   *   `WLD_Frame`.
+   */
+  [[nodiscard]] EWldFrameAction WLD_GetFrameAction();
+
+  /**
+   * Address context:
+   * - process-global world-frame action lane (`sWldFrameAction`) consumed by
+   *   `WLD_Frame`.
+   */
+  void WLD_SetFrameAction(EWldFrameAction action);
+
+  /**
+   * Address: 0x0088CAE0 (FUN_0088CAE0, ?WLD_Frame@Moho@@YA_NM@Z)
+   *
+   * What it does:
+   * Dispatches world-frame state transitions and per-state frame handlers.
+   */
+  [[nodiscard]] bool WLD_Frame(float deltaSeconds);
+
+  /**
+   * Address: 0x0088C860 (FUN_0088C860, ?WLD_Teardown@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Tears down world-session runtime ownership and returns frame action to
+   * `Inactive`.
+   */
+  void WLD_Teardown();
+
+  /**
+   * Address: 0x0088BD40 (FUN_0088BD40, ?WLD_LoadScenarioInfo@Moho@@YA?AVLuaObject@LuaPlus@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Executes `dataInit.lua` plus scenario script into one environment table and returns `ScenarioInfo`.
+   */
+  [[nodiscard]] LuaPlus::LuaObject WLD_LoadScenarioInfo(const msvc8::string& scenarioFile, LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0088D060 (FUN_0088D060, ?WLD_BeginSession@Moho@@YAXV?$auto_ptr@USWldSessionInfo@Moho@@@std@@@Z)
+   *
+   * What it does:
+   * Replaces pending world-session bootstrap info and schedules preload.
+   */
+  void WLD_BeginSession(msvc8::auto_ptr<SWldSessionInfo> sessionInfo);
+
+  /**
+   * Address: 0x0088D0B0 (FUN_0088D0B0, ?WLD_GetSimRate@Moho@@YAMXZ)
+   *
+   * What it does:
+   * Returns current world sim-rate scale based on client-requested rate and
+   * skew-rate adjustment limits.
+   */
+  [[nodiscard]] float WLD_GetSimRate();
+
+  /**
+   * Address context:
+   * - global `Moho::sWldSession` consumed by save/load request paths.
+   *
+   * What it does:
+   * Returns the current active world-session pointer, or nullptr.
+   */
+  [[nodiscard]] CWldSession* WLD_GetActiveSession();
 } // namespace moho
