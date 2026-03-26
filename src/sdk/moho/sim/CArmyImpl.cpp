@@ -4,9 +4,12 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <typeinfo>
 
 #include "CArmyStats.h"
+#include "CInfluenceMap.h"
 #include "CSimArmyEconomyInfo.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
@@ -43,15 +46,6 @@ namespace
     }
 
     pool.platoons.ResetStorageToInline();
-  }
-
-  void ReleaseSharedRaw(boost::SharedPtrRaw<void>& value)
-  {
-    if (value.pi != nullptr) {
-      value.pi->release();
-    }
-    value.px = nullptr;
-    value.pi = nullptr;
   }
 
   struct IntrusiveListNode
@@ -518,111 +512,6 @@ namespace
     statItem->mValue.assign(value, 0, msvc8::string::npos);
   }
 
-  template <typename T>
-  void AssignSharedRawWithRetain(boost::SharedPtrRaw<T>& target, const boost::SharedPtrRaw<T>& value)
-  {
-    // Matches the VC8-era shared_ptr raw assignment pattern used in recovered code:
-    // copy px first, then transfer control-block refcount if the block pointer changed.
-    target.px = value.px;
-    if (value.pi != target.pi) {
-      if (value.pi != nullptr) {
-        value.pi->add_ref_copy();
-      }
-      if (target.pi != nullptr) {
-        target.pi->release();
-      }
-      target.pi = value.pi;
-    }
-  }
-
-  template <typename T>
-  void CopySharedRawOutWithRetain(boost::SharedPtrRaw<T>& outValue, const boost::SharedPtrRaw<T>& value)
-  {
-    outValue.px = value.px;
-    outValue.pi = value.pi;
-    if (outValue.pi != nullptr) {
-      outValue.pi->add_ref_copy();
-    }
-  }
-
-  [[nodiscard]] std::uint32_t GetEntityIdForSort(const moho::Entity* entity)
-  {
-    if (entity == nullptr) {
-      return 0;
-    }
-
-    return static_cast<std::uint32_t>(entity->id_);
-  }
-
-  [[nodiscard]] moho::Entity* AsEntitySubobject(moho::Unit* unit)
-  {
-    return (unit != nullptr) ? static_cast<moho::Entity*>(unit) : nullptr;
-  }
-
-  [[nodiscard]] const moho::Entity* AsEntitySubobject(const moho::Unit* unit)
-  {
-    return (unit != nullptr) ? static_cast<const moho::Entity*>(unit) : nullptr;
-  }
-
-  using EntitySetVector = gpg::fastvector_n<moho::Entity*, 4>;
-  using EntitySetIterator = EntitySetVector::iterator;
-
-  [[nodiscard]] EntitySetIterator
-  LowerBoundByEntityId(EntitySetIterator begin, EntitySetIterator end, const moho::Unit* unit)
-  {
-    const std::uint32_t key = GetEntityIdForSort(AsEntitySubobject(unit));
-    return std::lower_bound(begin, end, key, [](const moho::Entity* candidate, const std::uint32_t targetId) -> bool {
-      return GetEntityIdForSort(candidate) < targetId;
-    });
-  }
-
-  void AddUnitToEntitySet(moho::SEntitySetTemplateUnit& set, moho::Unit* unit)
-  {
-    const EntitySetIterator end = set.mVec.end();
-    const EntitySetIterator spot = LowerBoundByEntityId(set.mVec.begin(), end, unit);
-    moho::Entity* const entity = AsEntitySubobject(unit);
-    if (spot != end && *spot == entity) {
-      return;
-    }
-
-    set.mVec.InsertAt(spot, &entity, &entity + 1);
-  }
-
-  [[nodiscard]] bool ConsumeUnitFromEntitySet(moho::SEntitySetTemplateUnit& set, moho::Unit* unit)
-  {
-    const EntitySetIterator end = set.mVec.end();
-    const EntitySetIterator spot = LowerBoundByEntityId(set.mVec.begin(), end, unit);
-    const moho::Entity* const entity = AsEntitySubobject(unit);
-    if (spot == end || *spot != entity) {
-      return false;
-    }
-
-    if (spot != end) {
-      const std::size_t tailCount = static_cast<std::size_t>(end - (spot + 1));
-      if (tailCount > 0u) {
-        memmove_s(spot, tailCount * sizeof(moho::Entity*), spot + 1, tailCount * sizeof(moho::Entity*));
-      }
-      set.mVec.end_ = spot + tailCount;
-    }
-
-    return true;
-  }
-
-  [[nodiscard]] moho::Unit* GetUnitFromSetEntry(moho::Entity* entity)
-  {
-    if (entity == nullptr) {
-      return nullptr;
-    }
-
-    // Evidence:
-    // - FUN_0057DDD0 inserts &unit->Moho::Unit_base_Entity into EntitySetTemplate_Unit.
-    // - FUN_00700A00 consumes entries as Unit owner objects.
-    //
-    // Keep the same ownership assumption, but express it as a typed base->derived cast
-    // instead of raw pointer subtraction.
-    return static_cast<moho::Unit*>(entity);
-  }
-
   [[nodiscard]] moho::SEntitySetTemplateUnit* ResolveCategorySetForUnit(moho::CArmyImpl* army, moho::Unit* unit)
   {
     if (army == nullptr || unit == nullptr) {
@@ -667,117 +556,20 @@ namespace
     return blueprint->General.CapCost;
   }
 
-  [[nodiscard]] moho::Unit* GetUnitFromAllUnitsTreeNode(const moho::CEntityDbAllUnitsNode* node)
-  {
-    if (node == nullptr || node->unitListNode == nullptr) {
-      return nullptr;
-    }
-
-    auto* const entitySubobject = reinterpret_cast<moho::Entity*>(node->unitListNode);
-    return static_cast<moho::Unit*>(entitySubobject);
-  }
-
-  /**
-   * Address: 0x005C87A0 (FUN_005C87A0, Moho::CUnitIterAllArmies::Next)
-   *
-   * What it does:
-   * Advances a red-black tree iterator node to its in-order successor.
-   */
-  void AdvanceAllUnitsNode(moho::CEntityDbAllUnitsNode*& node)
-  {
-    if (node == nullptr || node->isNil != 0u) {
-      return;
-    }
-
-    moho::CEntityDbAllUnitsNode* childOrParent = node->right;
-    if (childOrParent == nullptr) {
-      node = nullptr;
-      return;
-    }
-    if (childOrParent->isNil != 0u) {
-      for (moho::CEntityDbAllUnitsNode* next = node->parent; next != nullptr && next->isNil == 0u;
-           next = next->parent) {
-        if (node != next->right) {
-          node = next;
-          return;
-        }
-        node = next;
-      }
-      node = (node != nullptr) ? node->parent : nullptr;
-      return;
-    }
-
-    moho::CEntityDbAllUnitsNode* next = childOrParent->left;
-    if (childOrParent->isNil == 0u) {
-      do {
-        childOrParent = next;
-        if (childOrParent == nullptr) {
-          node = nullptr;
-          return;
-        }
-        next = next->left;
-      } while (next != nullptr && next->isNil == 0u);
-    }
-    node = childOrParent;
-  }
-
-  class ArmyUnitsRange
-  {
-  public:
-    class iterator
-    {
-    public:
-      iterator(moho::CEntityDbAllUnitsNode* node, moho::CEntityDbAllUnitsNode* endNode) noexcept
-        : node_(node)
-        , endNode_(endNode)
-      {}
-
-      [[nodiscard]] moho::Unit* operator*() const noexcept
-      {
-        return GetUnitFromAllUnitsTreeNode(node_);
-      }
-
-      iterator& operator++() noexcept
-      {
-        if (node_ != endNode_) {
-          AdvanceAllUnitsNode(node_);
-        }
-        return *this;
-      }
-
-      [[nodiscard]] bool operator!=(const iterator& other) const noexcept
-      {
-        return node_ != other.node_;
-      }
-
-    private:
-      moho::CEntityDbAllUnitsNode* node_;
-      moho::CEntityDbAllUnitsNode* endNode_;
-    };
-
-    ArmyUnitsRange(const moho::CEntityDb& entityDb, const std::uint32_t armyIndex) noexcept
-      : beginNode_(entityDb.AllUnitsEnd(armyIndex))
-      , endNode_(entityDb.AllUnitsEnd(armyIndex + 1u))
-    {}
-
-    [[nodiscard]] iterator begin() const noexcept
-    {
-      return iterator(beginNode_, endNode_);
-    }
-
-    [[nodiscard]] iterator end() const noexcept
-    {
-      return iterator(endNode_, endNode_);
-    }
-
-  private:
-    moho::CEntityDbAllUnitsNode* beginNode_;
-    moho::CEntityDbAllUnitsNode* endNode_;
-  };
 } // namespace
 
 namespace moho
 {
+  gpg::RType* CArmyImpl::sType = nullptr;
+
+  gpg::RType* CArmyImpl::StaticGetClass()
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CArmyImpl));
+    }
+    return sType;
+  }
+
   /**
    * Address: 0x006FE670 (FUN_006FE670, Moho::CArmyImpl::~CArmyImpl)
    *
@@ -790,11 +582,10 @@ namespace moho
     DestroyPlatoonPool(PlatoonPool);
     DestroyArmyCategorySets(*this);
     DestroyPlatoonPool(PlatoonPool);
-    ReleaseSharedRaw(UnknownShared220);
+    UnknownShared220.release();
     DestroyPathFinder(PathFinder);
 
-    // Outstanding blocker:
-    // - InfluenceMap (+0x218) still requires typed lift of CInfluenceMap helper chain.
+    delete InfluenceMap;
     InfluenceMap = nullptr;
 
     if (Stats != nullptr) {
@@ -1030,7 +821,10 @@ namespace moho
     const std::uint32_t armyIndex = static_cast<std::uint32_t>(ArmyId);
 
     float currentCap = 0.0f;
-    for (Unit* const unit : ArmyUnitsRange(*Simulation->mEntityDB, armyIndex)) {
+    CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
+    CEntityDbAllUnitsNode* const endNode = Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
+    while (node != endNode) {
+      Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
       if (unit == nullptr) {
         break;
       }
@@ -1038,6 +832,8 @@ namespace moho
       if (!unit->IsUnitState(UNITSTATE_NoCost)) {
         currentCap += GetUnitCapCost(unit);
       }
+
+      node = CEntityDb::NextAllUnitsNode(node);
     }
 
     return currentCap;
@@ -1060,7 +856,7 @@ namespace moho
       return nullptr;
     }
 
-    AssignSharedRawWithRetain(UnknownShared220, *value);
+    UnknownShared220.assign_retain(*value);
 
     return value;
   }
@@ -1074,7 +870,7 @@ namespace moho
       return nullptr;
     }
 
-    CopySharedRawOutWithRetain(*outValue, UnknownShared220);
+    *outValue = UnknownShared220.clone_retained();
 
     return outValue;
   }
@@ -1115,7 +911,7 @@ namespace moho
   {
     int count = 0;
     for (Entity* const* it = unitSet.mVec.start_; it != unitSet.mVec.end_; ++it) {
-      Unit* const unit = GetUnitFromSetEntry(*it);
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
       if (unit == nullptr) {
         continue;
       }
@@ -1171,7 +967,7 @@ namespace moho
       return;
     }
 
-    AddUnitToEntitySet(*set, unit);
+    (void)set->AddUnit(unit);
   }
 
   /**
@@ -1184,7 +980,7 @@ namespace moho
       return false;
     }
 
-    return ConsumeUnitFromEntitySet(*set, unit);
+    return set->RemoveUnit(unit);
   }
 
   /**

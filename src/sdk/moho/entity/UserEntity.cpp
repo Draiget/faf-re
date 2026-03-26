@@ -365,7 +365,7 @@ namespace moho
   void UserEntity::CreateMeshInstance(const bool forUnitPose)
   {
     mMeshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
-      mSession->GameTimeSeconds,
+      mSession->mGameTick,
       -1,
       static_cast<const RMeshBlueprint*>(mVariableData.mMeshBlueprint),
       mVariableData.mScale,

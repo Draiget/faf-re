@@ -28,7 +28,7 @@ namespace moho
       int32_t index,
       CClientManagerImpl* manager,
       const char* name,
-      LaunchInfoBase* launchInfo,
+      int32_t ownerId,
       BVIntSet& commandSources,
       uint32_t sourceId
     );
@@ -77,7 +77,7 @@ namespace moho
      * CMessage &
      *
      * IDA signature (FA):
-     * void __thiscall Moho::CLocalClient::Process(Moho::CLocalClient *this, struct_NetworkStruct2 *a2);
+     * void __thiscall Moho::CLocalClient::Process(Moho::CLocalClient *this, CMessage *msg);
      *
      * IDA signature (MohoEngine):
      * void __thiscall sub_1012A920(_DWORD *this, int a2);

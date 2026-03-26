@@ -10,6 +10,12 @@
 namespace LuaPlus
 {
   class LuaState;
+  class LuaObject;
+}
+
+namespace gpg
+{
+  class RType;
 }
 
 namespace moho
@@ -99,6 +105,9 @@ namespace moho
   class RRuleGameRules
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x00528080
      * Slot: 0
@@ -267,6 +276,9 @@ namespace moho
   class RRuleGameRulesImpl : public RRuleGameRules
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x00529510 (FUN_00529510)
      */
@@ -461,4 +473,12 @@ namespace moho
     "RRuleGameRulesImpl::mPendingBlueprintReloadNext offset must be 0xC8"
   );
   static_assert(sizeof(RRuleGameRulesImpl) == 0xD0, "RRuleGameRulesImpl size must be 0xD0");
+
+  /**
+   * Address: 0x0052B960 (FUN_0052B960, ?RULE_GetDefaultPlayerOptions@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Imports `/lua/ui/lobby/lobbyComm.lua` and returns `GetDefaultPlayerOptions()` result.
+   */
+  [[nodiscard]] LuaPlus::LuaObject RULE_GetDefaultPlayerOptions(LuaPlus::LuaState* state);
 } // namespace moho

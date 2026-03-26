@@ -146,6 +146,32 @@ unsigned int BVIntSet::Count() const
 }
 
 /**
+ * Address: <lifted helper from FUN_0053D360 command-source gate>
+ *
+ * What it does:
+ * Returns whether `val` bit is set in this set.
+ */
+bool BVIntSet::Contains(const unsigned int val) const
+{
+  if (mWords.start_ == mWords.end_) {
+    return false;
+  }
+
+  const unsigned int wordIndex = (val >> kWordShift);
+  if (wordIndex < mFirstWordIndex) {
+    return false;
+  }
+
+  const std::size_t relativeWord = static_cast<std::size_t>(wordIndex - mFirstWordIndex);
+  if (relativeWord >= Buckets()) {
+    return false;
+  }
+
+  const unsigned int word = mWords[relativeWord];
+  return ((word >> (val & kWordBitMask)) & 1u) != 0u;
+}
+
+/**
  * Address: 0x004017B0 (FUN_004017B0)
  * Address: 0x100014C0
  *

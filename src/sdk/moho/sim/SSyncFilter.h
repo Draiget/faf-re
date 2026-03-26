@@ -21,6 +21,22 @@ namespace moho
     // +0x04 is preserved per-instance and intentionally not copied by FUN_0073DD10.
     uint32_t maskVectorAuxWord = 0;            // +0x04
     gpg::core::FastVectorN<uint32_t, 2> masks; // +0x08
+
+    /**
+     * Address: 0x00401C50 (FUN_00401C50)
+     *
+     * What it does:
+     * Compares the binary-significant mask payload (`rawWord` + full vector data).
+     */
+    static bool Equals(const SSyncFilterMaskBlock& lhs, const SSyncFilterMaskBlock& rhs);
+
+    /**
+     * Address: 0x004028E0 (FUN_004028E0 helper usage in FUN_0073DD10)
+     *
+     * What it does:
+     * Copies the binary-significant mask payload (`rawWord` + vector data).
+     */
+    void CopyFrom(const SSyncFilterMaskBlock& source);
   };
   static_assert(sizeof(SSyncFilterMaskBlock) == 0x20, "SSyncFilterMaskBlock size must be 0x20");
   static_assert(offsetof(SSyncFilterMaskBlock, rawWord) == 0x00, "rawWord offset mismatch");
@@ -43,6 +59,15 @@ namespace moho
     // +0x41..+0x4F are not copied by FUN_0073DD10 / sub_1030E200.
     uint8_t optionFlagAuxBytes[0x0F]{}; // +0x41
     SSyncFilterMaskBlock maskB;         // +0x50
+
+    /**
+     * Address: 0x0073DD10 (FUN_0073DD10)
+     *
+     * What it does:
+     * Copies the binary-significant sync-filter payload:
+     * focus army, geom-camera vector, both mask blocks, and option flag.
+     */
+    void CopyFrom(const SSyncFilter& source);
   };
 
   static_assert(sizeof(SSyncFilter) == 0x70, "SSyncFilter size must be 0x70");

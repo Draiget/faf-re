@@ -6,43 +6,6 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/UserUnit.h"
 
-namespace
-{
-  [[nodiscard]] bool StoreRangeAtCenter(
-    moho::SRangeExtractionPayload* const outRange, const Wm3::Vec3f& center, const float radius
-  ) noexcept
-  {
-    if (radius <= 0.0f) {
-      return false;
-    }
-
-    outRange->centerX = center.x;
-    outRange->centerZ = center.z;
-    outRange->centerY = 0.0f;
-    outRange->radius = radius;
-    return true;
-  }
-
-  [[nodiscard]] bool StoreRangeAtEntity(
-    moho::SRangeExtractionPayload* const outRange,
-    const moho::UserEntity& userEntity,
-    const float interpolationAlpha,
-    const float radius
-  )
-  {
-    if (radius <= 0.0f) {
-      return false;
-    }
-
-    const moho::VTransform transform = userEntity.GetInterpolatedTransform(interpolationAlpha);
-    outRange->centerX = transform.pos_.x;
-    outRange->centerZ = transform.pos_.z;
-    outRange->centerY = 0.0f;
-    outRange->radius = radius;
-    return true;
-  }
-} // namespace
-
 namespace moho
 {
   /**
@@ -89,13 +52,9 @@ namespace moho
     SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
   ) const
   {
-    const UserUnit* const userUnit = userEntity->IsUserUnit();
-    if (!userUnit) {
-      return false;
-    }
-
     float maxCounterIntelRange = 0.0f;
-    if (!userUnit->GetMaxCounterIntel(&maxCounterIntelRange)) {
+    const UserUnit* const userUnit = userEntity ? userEntity->IsUserUnit() : nullptr;
+    if (!userUnit || !userUnit->GetMaxCounterIntel(&maxCounterIntelRange)) {
       return false;
     }
 

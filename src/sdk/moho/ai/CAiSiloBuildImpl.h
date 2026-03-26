@@ -1,223 +1,183 @@
-﻿#pragma once
-#include <array>
-#include <optional>
+#pragma once
 
-#include "../../gpg/core/containers/IntrusiveLink.h"
-#include "IAiSiloBuild.h"
+#include <cstddef>
+#include <cstdint>
+
+#include "moho/ai/IAiSiloBuild.h"
+#include "moho/misc/CEconomyEvent.h"
+
+namespace gpg
+{
+  class RType;
+}
 
 namespace moho
 {
   class Unit;
-  struct EconReservationHandle; // engine ticket for reserving economy
+  class UnitWeapon;
 
-  /** Per-slot info for stockpiled munitions (e.g., Nuke / AntiNuke). */
-  struct SiloSlot
+  enum ESiloBuildStage : std::int32_t
   {
-    class UnitWeapon* entry{nullptr}; // points to a blueprint/record
-    int builtCount{0};                // how many already stockpiled
-    int desiredCount{0};              // target amount to keep
+    SBS_Idle = 0,
+    SBS_Prepare = 1,
+    SBS_Active = 2,
+    SBS_Finish = 3,
   };
 
-  enum class SiloType : int
+  struct SSiloBuildInfo
   {
-    kNuke = 0,
-    kAntiNuke = 1
+    UnitWeapon* mWeapon;           // +0x00
+    std::int32_t mAmmo;            // +0x04
+    std::int32_t mMaxStorageCount; // +0x08
   };
 
-  enum class BuildState : int
+  struct SSiloTypeListNode
   {
-    kIdle = 0,
-    kPrepare = 1,
-    kActive = 2,
-    kFinish = 3
+    SSiloTypeListNode* mNext; // +0x00
+    SSiloTypeListNode* mPrev; // +0x04
+    ESiloType mValue;         // +0x08
   };
 
+  struct SSiloTypeList
+  {
+    void* mProxyOrUnused;     // +0x00
+    SSiloTypeListNode* mHead; // +0x04
+    std::int32_t mSize;       // +0x08
+  };
+
+  /**
+   * VFTABLE: 0x00E1DDD4
+   * COL:  0x00E7498C
+   */
   class CAiSiloBuildImpl : public IAiSiloBuild
   {
-    // Primary vftable (12 entries)
   public:
     /**
-     * dtor
+     * Address: 0x005CED30 (FUN_005CED30, ??0CAiSiloBuildImpl@Moho@@QAE@PAVUnit@1@@Z)
      *
-     * Address: 0x5CF640
+     * Moho::Unit *
+     *
+     * What it does:
+     * Initializes silo slots/queue state and refreshes linked weapon info.
+     */
+    explicit CAiSiloBuildImpl(Unit* unit);
+
+    /**
+     * Address: 0x005CF640 (FUN_005CF640, scalar deleting thunk)
+     * Address: 0x005CEDF0 (FUN_005CEDF0, core dtor)
+     *
      * VFTable SLOT: 0
      */
-    virtual ~CAiSiloBuildImpl() = default;
+    ~CAiSiloBuildImpl() override;
 
     /**
-     * Re-scan owner's weapon/stockpile records and (re)bind two slots:
-     * slot[0] = "nuke", slot[1] = "anti-nuke" (heuristic by flags).
-     * Resets counters and marks owner as "dirty" for econ/UI refresh.
+     * Address: 0x005CEE40 (FUN_005CEE40, ?SiloUpdateProjectileBlueprint@CAiSiloBuildImpl@Moho@@UAEXXZ)
      *
-     * Address: 0x5CEE40
      * VFTable SLOT: 1
      */
-    virtual void RefreshSlotsFromOwner() = 0;
+    void SiloUpdateProjectileBlueprint() override;
 
     /**
-     * Check whether currently active queue/category equals the given type.
-     * Returns true if matches.
+     * Address: 0x005CEF00 (FUN_005CEF00, ?SiloIsBusy@CAiSiloBuildImpl@Moho@@UBE_NW4ESiloType@2@@Z)
      *
-     * Address: 0x5CEF00
      * VFTable SLOT: 2
      */
-    [[nodiscard]] virtual bool IsActiveType(SiloType type) const = 0;
+    [[nodiscard]]
+    bool SiloIsBusy(ESiloType type) const override;
 
     /**
-     * Test "built + queued >= desired" for the given type.
-     * Caller uses it to decide if more should be scheduled.
+     * Address: 0x005CEF20 (FUN_005CEF20, ?SiloIsFull@CAiSiloBuildImpl@Moho@@UBE_NW4ESiloType@2@@Z)
      *
-     * Address: 0x5CEF20
      * VFTable SLOT: 3
      */
-    [[nodiscard]] virtual bool IsSufficient(SiloType type) const = 0;
+    [[nodiscard]]
+    bool SiloIsFull(ESiloType type) const override;
 
     /**
-     * Count how many entries of a given type are in the pending queue.
-     * Implementation walks an intrusive ring list.
+     * Address: 0x005CEF50 (FUN_005CEF50, ?SiloGetBuildCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
      *
-     * Address: 0x5CEF50
      * VFTable SLOT: 4
      */
-    [[nodiscard]] virtual int GetQueuedCount(SiloType type) const = 0;
+    [[nodiscard]]
+    std::int32_t SiloGetBuildCount(ESiloType type) const override;
 
     /**
-     * Return how many are already stockpiled for the given type.
+     * Address: 0x005CEF80 (FUN_005CEF80, ?SiloGetStorageCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
      *
-     * Address: 0x5CEF80
      * VFTable SLOT: 5
      */
-    [[nodiscard]] virtual int GetBuiltCount(SiloType type) const = 0;
+    [[nodiscard]]
+    std::int32_t SiloGetStorageCount(ESiloType type) const override;
 
     /**
-     * Return desired target count for the given type.
+     * Address: 0x005CEF90 (FUN_005CEF90, ?SiloGetMaxStorageCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
      *
-     * Address: 0x5CEF90
      * VFTable SLOT: 6
      */
-    [[nodiscard]] virtual int GetDesiredCount(SiloType type) const = 0;
+    [[nodiscard]]
+    std::int32_t SiloGetMaxStorageCount(ESiloType type) const override;
 
     /**
-     * Adjust built counter (e.g., on completion/consumption) and mark owner dirty.
+     * Address: 0x005CEFA0 (FUN_005CEFA0, ?SiloAdjustStorageCount@CAiSiloBuildImpl@Moho@@UAEXW4ESiloType@2@H@Z)
      *
-     * Address: 0x5CEFA0
      * VFTable SLOT: 7
      */
-    virtual void AddToBuilt(SiloType type, int delta) = 0;
+    void SiloAdjustStorageCount(ESiloType type, std::int32_t delta) override;
 
     /**
-     * Try enqueueing a new stockpile build of the given type.
-     * Validates blueprint flags; rejects if not allowed or already "busy".
-     * Returns true on success.
+     * Address: 0x005CEFC0 (FUN_005CEFC0, ?SiloAddBuild@CAiSiloBuildImpl@Moho@@UAE_NW4ESiloType@2@@Z)
      *
-     * Address: 0x5CEFC0
      * VFTable SLOT: 8
      */
-    virtual bool TryEnqueue(SiloType type) = 0;
+    [[nodiscard]]
+    bool SiloAddBuild(ESiloType type) override;
 
     /**
-     * Main state-machine tick:
-     *  - Performs gating checks (paused, power off, etc.),
-     *  - PREPARE: pulls blueprint, computes rates using
-     *    GetEconomyBuildRate / GetEnergyBuildAdjMod / GetMassBuildAdjMod,
-     *    creates econ reservation and fires OnSiloBuildStart,
-     *  - ACTIVE: advances work (engine-side helper),
-     *  - FINISH: clears owner hooks/flags, fires OnSiloBuildEnd & OnNukeArmed,
-     *    pops the queue and resets.
-     * Returns true if it did any meaningful work this tick.
+     * Address: 0x005CF1E0 (FUN_005CF1E0, ?SiloTick@CAiSiloBuildImpl@Moho@@UAEXXZ)
      *
-     * Address: 0x5CF1E0
      * VFTable SLOT: 9
      */
-    virtual bool Tick() = 0;
+    void SiloTick() override;
 
     /**
-     * Small SSE-heavy helper used by the state machine (details unknown).
-     * Likely computes smoothed progress/time-left for UI/economy.
+     * Address: 0x005CF030 (FUN_005CF030, ?SiloAssistWithResource@CAiSiloBuildImpl@Moho@@UAEXABUSEconValue@2@@Z)
      *
-     * Address: 0x5CF030
      * VFTable SLOT: 10
      */
-    virtual int EvalVectorHelperA(int arg) = 0;
+    void SiloAssistWithResource(const SEconValue& value) override;
 
     /**
-     * Another SSE helper from the same blob (details unknown).
+     * Address: 0x005CF130 (FUN_005CF130, ?SiloStopBuild@CAiSiloBuildImpl@Moho@@UAEXXZ)
      *
-     * Address: 0x5CF130 (points into the 0x5CF038 blob)
      * VFTable SLOT: 11
      */
-    virtual int EvalVectorHelperB(int arg) = 0; // slot 11
+    void SiloStopBuild() override;
 
   public:
-    /** Convenience: true if we still need more for this type. */
-    [[nodiscard]] bool NeedsMore(SiloType t) const noexcept
-    {
-      return !IsSufficient(t);
-    }
+    static gpg::RType* sType;
 
-    /** Return suggested next type to build (simple heuristic). */
-    [[nodiscard]] std::optional<SiloType> SuggestNextType() const noexcept
-    {
-      if (!IsSufficient(SiloType::kNuke))
-        return SiloType::kNuke;
-      if (!IsSufficient(SiloType::kAntiNuke))
-        return SiloType::kAntiNuke;
-      return std::nullopt;
-    }
-
-  public:
-    // --------- Observed fields (semantic sketch, not ABI-accurate) ---------
-    // observed at this[1]
-    // Offset: 0x04
-    Unit* owner_{nullptr};
-
-    // entry/built/desired for [0]=nuke,[1]=anti (sub_5CEE40)
-    // Offset: 0x08
-    std::array<SiloSlot, 2> slots_{};
-
-    // 0x08 - slots_[0].entry (Nuke)
-    // 0x0C - slots_[0].builtCount
-    // 0x10 - slots_[0].desiredCount
-    // 0x14 - slots_[1].entry(AntiNuke)
-    // 0x18 - slots_[1].builtCount
-    // 0x1C - slots_[1].desiredCount
-
-    // node used when enqueuing (sub_5CEFC0)
-    void* qPrev; // 0x20
-    void* qNext; // 0x24
-
-    int32_t activeTypeId; // 0x28  // 0=AntiNuke, 1=Nuke
-
-    // intrusive ring head at this[9]
-    // Offset: 0x2C
-    void* queueHead_{nullptr};
-
-    // used as a gate in Idle→Prepare
-    // Offset: 0x30
-    BuildState state_{BuildState::kIdle};
-
-    // nominal 500.0
-    // Offset: 0x34
-    float workUnitsBase;
-
-    // Economy/reservation bookkeeping (created during Prepare, freed on Finish)
-    // Offset: 0x38
-    EconReservationHandle* econ_{nullptr};
-
-    // computed via GetEnergyBuildAdjMod
-    // Offset: 0x3C
-    float energyPerSec_{0.f};
-
-    // computed via GetMassBuildAdjMod
-    // Offset: 0x40
-    float massPerSec_{0.f};
-
-    // based on GetEconomyBuildRate and blueprint time
-    // Offset: 0x44
-    float maxProgress{0.f};
-
-    // transient progress (reset on Finish)
-    // Offset: 0x48
-    float progress_{0.f};
+    Unit* mUnit;                  // +0x04
+    SSiloBuildInfo mSiloInfo[2];  // +0x08
+    SSiloTypeList mSiloTypes;     // +0x20
+    CEconRequest* mRequest;       // +0x2C
+    ESiloBuildStage mState;       // +0x30
+    SEconValue mSegmentCost;      // +0x34
+    SEconValue mSegmentSpent;     // +0x3C
+    float mSegments;              // +0x44
+    std::int32_t mCurSegments;    // +0x48
   };
+
+  static_assert(sizeof(SSiloBuildInfo) == 0x0C, "SSiloBuildInfo size must be 0x0C");
+  static_assert(sizeof(SSiloTypeListNode) == 0x0C, "SSiloTypeListNode size must be 0x0C");
+  static_assert(sizeof(SSiloTypeList) == 0x0C, "SSiloTypeList size must be 0x0C");
+  static_assert(offsetof(CAiSiloBuildImpl, mUnit) == 0x04, "CAiSiloBuildImpl::mUnit offset must be 0x04");
+  static_assert(offsetof(CAiSiloBuildImpl, mSiloInfo) == 0x08, "CAiSiloBuildImpl::mSiloInfo offset must be 0x08");
+  static_assert(offsetof(CAiSiloBuildImpl, mSiloTypes) == 0x20, "CAiSiloBuildImpl::mSiloTypes offset must be 0x20");
+  static_assert(offsetof(CAiSiloBuildImpl, mRequest) == 0x2C, "CAiSiloBuildImpl::mRequest offset must be 0x2C");
+  static_assert(offsetof(CAiSiloBuildImpl, mState) == 0x30, "CAiSiloBuildImpl::mState offset must be 0x30");
+  static_assert(offsetof(CAiSiloBuildImpl, mSegmentCost) == 0x34, "CAiSiloBuildImpl::mSegmentCost offset must be 0x34");
+  static_assert(offsetof(CAiSiloBuildImpl, mSegmentSpent) == 0x3C, "CAiSiloBuildImpl::mSegmentSpent offset must be 0x3C");
+  static_assert(offsetof(CAiSiloBuildImpl, mSegments) == 0x44, "CAiSiloBuildImpl::mSegments offset must be 0x44");
+  static_assert(offsetof(CAiSiloBuildImpl, mCurSegments) == 0x48, "CAiSiloBuildImpl::mCurSegments offset must be 0x48");
+  static_assert(sizeof(CAiSiloBuildImpl) == 0x4C, "CAiSiloBuildImpl size must be 0x4C");
 } // namespace moho

@@ -167,7 +167,7 @@ namespace moho
       int clientIndex,
       CClientManagerImpl* manager,
       const char* name,
-      LaunchInfoBase* launchInfo,
+      int32_t ownerId,
       BVIntSet& commandSources,
       uint32_t sourceId
     );

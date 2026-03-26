@@ -20,88 +20,58 @@ namespace gpg
     {
     public:
         /**
-         * Address: 0x00957340
-         * Slot: 0
+         * Address: 0x009572C0 (FUN_009572C0)
+         * Deleting owner: 0x00957340 (FUN_00957340)
          * Demangled: gpg::ZLibOutputFilterStream::dtr
+         *
+         * What it does:
+         * Closes send/receive lanes with no-throw semantics, finalizes inflate/deflate state, then tears down Stream base.
          */
         ~ZLibOutputFilterStream() override;
 
         /**
-         * Address: 0x00956F50
-         * Slot: 1
-         * Demangled: protected: virtual uint64_t __thiscall gpg::Stream::VirtTell(enum gpg::Stream::Mode)
+         * Address: 0x00957760 (FUN_00957760)
+         *
+         * What it does:
+         * Rejects closed stream writes, drains pending inline bytes, then sends caller data through zlib pump.
          */
-        size_t VirtTell(Mode mode) override;
+        void VirtWrite(const char* data, size_t size) override;
 
         /**
-         * Address: 0x00956F90
-         * Slot: 2
-         * Demangled: protected: virtual uint64_t __thiscall gpg::Stream::VirtSeek(enum gpg::Stream::Mode,enum gpg::Stream::SeekOrigin,int64_t)
-         */
-        size_t VirtSeek(Mode mode, SeekOrigin origin, size_t size) override;
-
-        /**
-         * Address: 0x00956FB0
-         * Slot: 3
-         * Demangled: protected: virtual unsigned int __thiscall gpg::Stream::VirtRead(char near *,unsigned int)
-         */
-        size_t VirtRead(char* buffer, unsigned int size) override;
-
-        /**
-         * Address: 0x00956DE0
-         * Slot: 4
-         * Demangled: protected: virtual unsigned int __thiscall gpg::Stream::VirtReadNonBlocking(char near *,unsigned int)
-         */
-        size_t VirtReadNonBlocking(char* buffer, unsigned int size) override;
-
-        /**
-         * Address: 0x00956FD0
-         * Slot: 5
-         * Demangled: protected: virtual void __thiscall gpg::Stream::VirtUnGetByte(int)
-         */
-        void VirtUnGetByte(int size) override;
-
-        /**
-         * Address: 0x00956DF0
-         * Slot: 6
-         * Demangled: protected: virtual bool __thiscall gpg::Stream::VirtAtEnd(void)
-         */
-        bool VirtAtEnd() override;
-
-        /**
-         * Address: 0x00957760
-         * Slot: 7
-         * Demangled: private: virtual void __thiscall gpg::ZLibOutputFilterStream::VirtWrite(char const near *,unsigned int)
-         */
-        void VirtWrite(char const* data, size_t size) override;
-
-        /**
-         * Address: 0x00957810
-         * Slot: 8
-         * Demangled: private: virtual void __thiscall gpg::ZLibOutputFilterStream::VirtFlush(void)
+         * Address: 0x00957810 (FUN_00957810)
+         *
+         * What it does:
+         * Rejects closed stream flushes, pumps buffered bytes with `Z_SYNC_FLUSH`, then resets inline write head.
          */
         void VirtFlush() override;
 
         /**
-         * Address: 0x009578B0
-         * Slot: 9
-         * Demangled: private: virtual void __thiscall gpg::ZLibOutputFilterStream::VirtClose(enum gpg::Stream::Mode)
+         * Address: 0x009578B0 (FUN_009578B0)
+         *
+         * What it does:
+         * On send close, pumps buffered bytes with `Z_FINISH`, validates inflate-end state, then marks stream closed.
          */
         void VirtClose(Mode mode) override;
 
         /**
-         * Address: 0x00957360
+         * Address: 0x00957360 (FUN_00957360)
+         *
+         * What it does:
+         * Initializes zlib stream state for inflate/deflate mode and configures the 1024-byte inline write buffer.
          */
         ZLibOutputFilterStream(PipeStream* str, EFilterOperation operation);
 
     private:
         /**
-         * Core write path used by Write/Flush/Close with a zlib flush code.
+         * Address: 0x00957500 (FUN_00957500)
+         *
+         * What it does:
+         * Feeds input into inflate/deflate, forwards produced chunks to `mPipeStream`, and tracks stream-end/error lanes.
          */
-        void DoWrite(char const* data, size_t len, int flush);
+        void DoWrite(const char* data, size_t len, int flush);
 
     public:
-        PipeStream* mPipeStream;
+        PipeStream* mPipeStream{ nullptr };
         int mOperation{ Z_OK };
         z_stream mZStream{};
         char mBuff[1024]{};

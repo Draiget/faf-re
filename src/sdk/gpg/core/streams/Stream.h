@@ -1,6 +1,7 @@
 #pragma once
 #include <stdexcept>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/containers/FastVector.h"
 #include "moho/net/INetConnection.h"
 
@@ -15,7 +16,13 @@ namespace gpg
         class UnsupportedOperation : public std::logic_error
         {
         public:
-            UnsupportedOperation(); // 0x00956E40
+            /**
+             * Address: 0x00956E40 (FUN_00956E40)
+             *
+             * What it does:
+             * Constructs the standard "unsupported stream operation" logic_error payload.
+             */
+            UnsupportedOperation();
         };
 
         enum Mode
@@ -42,92 +49,100 @@ namespace gpg
         char* mWriteEnd;
 
         /**
-         * Address: 0x00956E20
+         * Address: 0x00956E20 (FUN_00956E20)
 		 * Slot: 0
+         *
+         * What it does:
+         * Owns deleting-destructor lane for Stream base and conditionally frees `this`.
          */
-        virtual ~Stream() = default;
+        virtual ~Stream();
 
         /**
-         * Address: 0x00956DB0
+         * Address: 0x00956DB0 (FUN_00956DB0)
+         *
+         * What it does:
+         * Initializes stream read/write window pointers to null.
          */
-        Stream() = default;
+        Stream();
 
         /**
-         * Address: 0x00956F50
+         * Address: 0x00956F50 (FUN_00956F50)
 		 * Slot: 1
 		 *
-         * @param mode 
-         * @return 
+         * What it does:
+         * Default seek-position query lane throws UnsupportedOperation.
          */
         virtual size_t VirtTell(Mode mode);
 
         /**
-         * Address: 0x00956F90
+         * Address: 0x00956F90 (FUN_00956F90)
          * Slot: 2
-         * 
-         * @param mode 
-         * @param orig 
-         * @param pos 
-         * @return 
+         *
+         * What it does:
+         * Default seek lane throws UnsupportedOperation.
          */
         virtual size_t VirtSeek(Mode mode, SeekOrigin orig, size_t pos);
 
         /**
-         * Address: 0x00956FB0
+         * Address: 0x00956FB0 (FUN_00956FB0)
          * Slot: 3
          *
-         * @param buff 
-         * @param len 
-         * @return 
+         * What it does:
+         * Default read lane throws UnsupportedOperation.
          */
         virtual size_t VirtRead(char* buff, size_t len);
 
         /**
-         * Address: 0x00956DE0
+         * Address: 0x00956DE0 (FUN_00956DE0)
          * Slot: 4
          *
-         * @param buf 
-         * @param len 
-         * @return 
+         * What it does:
+         * Default non-blocking read forwards to VirtRead.
          */
         virtual size_t VirtReadNonBlocking(char* buf, size_t len);
 
         /**
-         * Address: 0x00956FD0
+         * Address: 0x00956FD0 (FUN_00956FD0)
          * Slot: 5
          *
-         * @param unknown
+         * What it does:
+         * Default unget lane throws UnsupportedOperation.
          */
         virtual void VirtUnGetByte(int unknown);
 
         /**
-         * Address: 0x00956DF0
+         * Address: 0x00956DF0 (FUN_00956DF0)
          * Slot: 6
          *
-         * @return 
+         * What it does:
+         * Default end-of-stream query returns false.
          */
         virtual bool VirtAtEnd();
 
         /**
-         * Address: 0x00956FF0
+         * Address: 0x00956FF0 (FUN_00956FF0)
          * Slot: 7
          *
-         * @param data 
-         * @param size 
+         * What it does:
+         * Default write lane throws UnsupportedOperation.
          */
         virtual void VirtWrite(const char* data, size_t size);
 
         /**
-         * Address: 0x00956E00
+         * Address: 0x00956E00 (FUN_00956E00)
          * Slot: 8
+         *
+         * What it does:
+         * Default flush lane is a no-op.
          */
         virtual void VirtFlush();
 
         /**
-         * Address: 0x00956E10
+         * Address: 0x00956E10 (FUN_00956E10)
          * Slot: 9
          *
-         * @param mode 
+         * What it does:
+         * Default close lane is a no-op.
          */
         virtual void VirtClose(Mode mode);
 
@@ -177,24 +192,26 @@ namespace gpg
         }
 
         /**
-         * Address: 0x006E5A10
+         * Address: 0x006E5A10 (FUN_006E5A10)
          *
-         * @param str 
+         * What it does:
+         * Writes string bytes including trailing NUL through inline-buffer fast path or virtual write fallback.
          */
         void Write(const msvc8::string& str);
 
         /**
-         * Address: 0x0043D130
+         * Address: 0x0043D130 (FUN_0043D130)
          *
-         * @param buf 
-         * @param size 
+         * What it does:
+         * Writes one byte span through inline-buffer fast path or virtual write fallback.
          */
         void Write(const char* buf, size_t size);
 
         /**
-         * Address: 0x004CCD80
+         * Address: 0x004CCD80 (FUN_004CCD80)
          *
-         * @param buf 
+         * What it does:
+         * Writes one NUL-terminated C-string including terminator.
          */
         void Write(const char* buf); 
 
@@ -240,21 +257,35 @@ namespace gpg
         }
 
         /**
-         * Address: 0x00955760
+         * Address: 0x00955760 (FUN_00955760)
          *
-         * @param access 
-         * @return 
+         * What it does:
+         * Calls `VirtClose(mode)` and returns `false` instead of throwing on any exception.
+         */
+        bool CloseNoThrow(Mode access);
+
+        /**
+         * NOTE: helper wrapper (no stable standalone symbol mapping).
+         *
+         * Calls `VirtClose(mode)` and returns true when no exception is thrown.
          */
         bool Close(Mode access);
 
         /**
-         * Address: 0x0043D100
+         * Address: 0x0043D100 (FUN_0043D100)
          *
-         * @param buf 
-         * @param size 
-         * @return 
+         * What it does:
+         * Reads one byte span from inline read window or virtual read fallback.
          */
         size_t Read(char* buf, size_t size); 
+
+        /**
+         * Address: 0x004CCC10 (FUN_004CCC10)
+         *
+         * What it does:
+         * Rewinds one previously-read byte with validation, or delegates to virtual unget when at read window start.
+         */
+        void UnGetByte(int value);
 
         /**
          * NOTE: Inlined (e.g. - 0x0047BF13)
@@ -274,12 +305,78 @@ namespace gpg
         }
 
         /**
-         * Address: 0x004CCDEC
+         * NOTE: helper method (no stable standalone symbol mapping yet).
          *
-         * NOTE: Inlined
-         * @return byte (int8_t)
+         * Returns one byte from read window or virtual read fallback; returns -1 on EOF.
          */
         int8_t GetByte();
     };
     static_assert(sizeof(Stream) == 0x1C, "gpg::Stream size must be 0x1C");
+
+    /**
+     * Note: helper wrapper (no stable standalone symbol mapping).
+     *
+     * Performs checked single-byte unget via `Stream::UnGetByte`.
+     */
+    void UnGetByteChecked(Stream& stream, int value);
+
+    class TextWriter
+    {
+    public:
+        /**
+         * Address: 0x00957040 (FUN_00957040)
+         *
+         * What it does:
+         * Initializes writer state around a target stream and line-ending mode.
+         */
+        TextWriter(Stream* stream, int mode);
+
+        /**
+         * Address: 0x00957060 (FUN_00957060)
+         *
+         * What it does:
+         * Emits one logical newline according to configured line-ending mode.
+         */
+        void WriteNewline();
+
+        /**
+         * Address: 0x00957130 (FUN_00957130)
+         *
+         * What it does:
+         * Writes one character with optional CR/LF normalization.
+         */
+        void WriteChar(char value);
+
+        /**
+         * Address: 0x009571B0 (FUN_009571B0)
+         *
+         * What it does:
+         * Writes one NUL-terminated C-string through WriteChar normalization.
+         */
+        void WriteCString(const char* value);
+
+        /**
+         * Address: 0x00957210 (FUN_00957210)
+         *
+         * What it does:
+         * Writes one msvc8::string payload through WriteChar normalization.
+         */
+        void WriteString(const msvc8::string& value);
+
+        /**
+         * Address: 0x00957250 (FUN_00957250)
+         *
+         * What it does:
+         * Formats one vararg message with STR_Va and writes it through this TextWriter.
+         */
+        void Printf(const char* format, ...);
+
+    private:
+        void WriteByte(char value);
+
+        Stream* mStream{};
+        int mMode{};
+        bool mSawCarriageReturn{};
+    };
+    static_assert(sizeof(TextWriter) == 0x0C, "gpg::TextWriter size must be 0x0C");
 }

@@ -2,6 +2,8 @@
 
 namespace moho
 {
+  gpg::RType* IResources::sType = nullptr;
+
   /**
    * Address: 0x00546E80 (loc_00546E80, shared constructor/destructor helper chunk)
    *

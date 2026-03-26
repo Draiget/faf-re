@@ -80,6 +80,16 @@ namespace moho
     void SetValueCopy(msvc8::string* outValue);
 
     /**
+     * Address: 0x00415220 (FUN_00415220, Moho::StatItem::SetValue)
+     */
+    void SetValue(const msvc8::string& value);
+
+    /**
+     * Address: 0x004151E0 (FUN_004151E0, Moho::StatItem::Release)
+     */
+    [[nodiscard]] std::int32_t Release(std::int32_t value);
+
+    /**
      * Address: 0x0040D2D0 (FUN_0040D2D0, Moho::StatItem::Synchronize2)
      */
     void SynchronizeAsInt();
@@ -89,7 +99,15 @@ namespace moho
      */
     void SynchronizeAsFloat();
 
+    // Shared intrusive-tree helpers used by stat-path recovery code.
+    void AttachChild(StatItem* child);
+    [[nodiscard]] StatItem* FindDirectChildByName(const msvc8::string& token);
+
     static gpg::RType* sType;
+
+  private:
+    void ResetTreeLinks();
+    void DetachSelfNode();
 
   public:
     std::uint32_t mTreeMeta; // +0x20

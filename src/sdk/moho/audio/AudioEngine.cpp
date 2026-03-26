@@ -1,5 +1,6 @@
 #include "moho/audio/AudioEngine.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -9,43 +10,14 @@
 #include "legacy/containers/String.h"
 #include "moho/render/camera/VTransform.h"
 
-namespace moho
-{
-  struct SoundConfiguration
-  {
-    std::uint8_t mReserved00[0x08]; // +0x00
-    std::uint8_t mEngines[0x20];    // +0x08
-    std::uint8_t mNoSound;          // +0x28
-    std::uint8_t mReserved29[0x03]; // +0x29
-    std::uint32_t mConfiguration;   // +0x2C
-    std::uint8_t mReserved30[0x04]; // +0x30
-    std::uint32_t mRuntimeParam0;   // +0x34
-    const void* mStart;             // +0x38
-    std::uint32_t mLen;             // +0x3C
-    std::uint8_t mReserved40[0x18]; // +0x40
-    std::uint8_t mAudition;         // +0x58
-    std::uint8_t mReserved59[0x07]; // +0x59
-    std::uint8_t mReserved60[0x08]; // +0x60
-  };
-
-  static_assert(offsetof(SoundConfiguration, mEngines) == 0x08, "SoundConfiguration::mEngines offset must be 0x08");
-  static_assert(offsetof(SoundConfiguration, mNoSound) == 0x28, "SoundConfiguration::mNoSound offset must be 0x28");
-  static_assert(
-    offsetof(SoundConfiguration, mConfiguration) == 0x2C, "SoundConfiguration::mConfiguration offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(SoundConfiguration, mRuntimeParam0) == 0x34, "SoundConfiguration::mRuntimeParam0 offset must be 0x34"
-  );
-  static_assert(offsetof(SoundConfiguration, mStart) == 0x38, "SoundConfiguration::mStart offset must be 0x38");
-  static_assert(offsetof(SoundConfiguration, mLen) == 0x3C, "SoundConfiguration::mLen offset must be 0x3C");
-  static_assert(offsetof(SoundConfiguration, mAudition) == 0x58, "SoundConfiguration::mAudition offset must be 0x58");
-} // namespace moho
+moho::SoundConfiguration* moho::sSoundConfiguration = nullptr;
 
 namespace
 {
   constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
   constexpr std::uint16_t kInvalidCategoryId = 0xFFFFu;
   constexpr float kDefaultCategoryVolume = 1.0f;
+  constexpr const char* kGlobalCategoryName = "Global";
 
   struct AudioSoundBankLoader
   {
@@ -233,7 +205,7 @@ namespace
       return 2;
     }
 
-    switch (configuration->mConfiguration) {
+    switch (configuration->mSpeakerConfiguration) {
     case 0x3F:
       return 6;
     case 0x0B:
@@ -245,7 +217,7 @@ namespace
     case 0x107:
       return 2;
     default:
-      gpg::Warnf("Invalid speaker configuration supplied: %i", configuration->mConfiguration);
+      gpg::Warnf("Invalid speaker configuration supplied: %i", configuration->mSpeakerConfiguration);
       return 2;
     }
   }
@@ -266,14 +238,71 @@ namespace
     map.mHead = head;
   }
 
-  [[nodiscard]] float VecLengthSq(const Wm3::Vec3f& value)
+  [[nodiscard]] moho::SoundConfiguration* EnsureSoundConfigurationForCreate()
   {
-    return (value.x * value.x) + (value.y * value.y) + (value.z * value.z);
+    if (moho::sSoundConfiguration != nullptr) {
+      return moho::sSoundConfiguration;
+    }
+
+    auto* const configuration = new moho::SoundConfiguration{};
+    configuration->mEngines.mAllocatorCookie = nullptr;
+    configuration->mEngines.mStart = nullptr;
+    configuration->mEngines.mFinish = nullptr;
+    configuration->mEngines.mCapacity = nullptr;
+    configuration->mNoSound = 1u;
+    configuration->mSpeakerConfiguration = 0x03u;
+    configuration->mLookAheadTimeMs = 250u;
+    configuration->mGlobalSettingsStart = nullptr;
+    configuration->mGlobalSettingsLength = 0u;
+    configuration->mRuntimeFlags = 0u;
+    configuration->mHandleSoundEvent = nullptr;
+    configuration->mAudition = 0u;
+    moho::sSoundConfiguration = configuration;
+    return configuration;
+  }
+
+  void ReserveEngineRefCapacity(moho::AudioEngineRefVector& engines, const std::size_t requiredCount)
+  {
+    const std::size_t currentCount =
+      engines.mStart == nullptr || engines.mFinish == nullptr ? 0u : static_cast<std::size_t>(engines.mFinish - engines.mStart);
+    const std::size_t currentCapacity = engines.mStart == nullptr || engines.mCapacity == nullptr
+      ? 0u
+      : static_cast<std::size_t>(engines.mCapacity - engines.mStart);
+    if (requiredCount <= currentCapacity) {
+      return;
+    }
+
+    const std::size_t targetCapacity = (std::max)(requiredCount, currentCapacity == 0u ? 4u : currentCapacity * 2u);
+    auto* const newStorage = static_cast<moho::AudioEngineRef*>(operator new[](targetCapacity * sizeof(moho::AudioEngineRef)));
+    if (currentCount != 0u) {
+      std::memcpy(newStorage, engines.mStart, currentCount * sizeof(moho::AudioEngineRef));
+    }
+
+    operator delete[](engines.mStart);
+    engines.mStart = newStorage;
+    engines.mFinish = newStorage + currentCount;
+    engines.mCapacity = newStorage + targetCapacity;
+  }
+
+  void RegisterEngineRef(moho::SoundConfiguration& configuration, moho::AudioEngine* const engine)
+  {
+    if (engine == nullptr) {
+      return;
+    }
+
+    moho::AudioEngineRefVector& engines = configuration.mEngines;
+    const std::size_t currentCount =
+      engines.mStart == nullptr || engines.mFinish == nullptr ? 0u : static_cast<std::size_t>(engines.mFinish - engines.mStart);
+    ReserveEngineRefCapacity(engines, currentCount + 1u);
+
+    engines.mFinish->mEngine = engine;
+    engines.mFinish->mControl = nullptr;
+    ++engines.mFinish;
   }
 
   [[nodiscard]] Wm3::Vec3f NormalizeOrDefault(Wm3::Vec3f value, const Wm3::Vec3f& fallback)
   {
-    if (VecLengthSq(value) <= 1.0e-8f) {
+    if (Wm3::Vec3f::LengthSq(value) <= 1.0e-8f) {
       return fallback;
     }
 
@@ -383,6 +412,121 @@ namespace moho
     const void* audioHandle
   );
 
+  std::uint32_t SoundConfiguration::EngineCount() const
+  {
+    if (mEngines.mStart == nullptr || mEngines.mFinish == nullptr) {
+      return 0u;
+    }
+
+    return static_cast<std::uint32_t>(mEngines.mFinish - mEngines.mStart);
+  }
+
+  AudioEngineImpl* SoundConfiguration::EngineImplAt(const std::uint32_t index) const
+  {
+    const std::uint32_t engineCount = EngineCount();
+    if (index >= engineCount) {
+      return nullptr;
+    }
+
+    AudioEngine* const engine = mEngines.mStart[index].mEngine;
+    if (engine == nullptr) {
+      return nullptr;
+    }
+
+    return engine->mImpl;
+  }
+
+  /**
+   * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Advances XACT engine work queues for each configured audio engine and
+   * resets the global sound-configuration frame timer.
+   */
+  void SND_Frame()
+  {
+    SoundConfiguration* configuration = sSoundConfiguration;
+    for (std::uint32_t index = 0;; ++index) {
+      if (index >= configuration->EngineCount()) {
+        break;
+      }
+
+      if (AudioEngineImpl* const impl = configuration->EngineImplAt(index);
+          impl != nullptr && impl->mInstance != nullptr) {
+        impl->mInstance->DoWork();
+        configuration = sSoundConfiguration;
+      }
+    }
+
+    configuration->mTime.Reset();
+  }
+
+  /**
+   * Address: 0x004D8FC0 (FUN_004D8FC0, ?SND_Mute@Moho@@YAX_N@Z)
+   *
+   * What it does:
+   * Stores/restores per-engine "Global" category volume while applying
+   * process-wide mute transitions.
+   */
+  void SND_Mute(const bool doMute)
+  {
+    SoundConfiguration* configuration = sSoundConfiguration;
+    for (std::uint32_t index = 0;; ++index) {
+      if (index >= configuration->EngineCount()) {
+        break;
+      }
+
+      AudioEngineImpl* const impl = configuration->EngineImplAt(index);
+      if (impl == nullptr || impl->mInstance == nullptr) {
+        continue;
+      }
+
+      const float volume = doMute
+        ? (impl->mGlobalCategoryVolume = impl->mEngine->GetVolume(kGlobalCategoryName), 0.0f)
+        : impl->mGlobalCategoryVolume;
+      impl->mEngine->SetVolume(kGlobalCategoryName, volume);
+      configuration = sSoundConfiguration;
+    }
+  }
+
+  /**
+   * Address: 0x004D9340 (FUN_004D9340, ?Create@AudioEngine@Moho@@SA?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@VStrArg@gpg@@@Z)
+   *
+   * gpg::StrArg voicePath
+   *
+   * What it does:
+   * Ensures global audio configuration exists, creates one `AudioEngine`
+   * object with a typed `AudioEngineImpl`, and registers it into the
+   * process-global engine lane used by `SND_Frame`/`SND_Mute`.
+   */
+  boost::shared_ptr<AudioEngine> AudioEngine::Create(const gpg::StrArg voicePath)
+  {
+    (void)voicePath;
+
+    SoundConfiguration* const configuration = EnsureSoundConfigurationForCreate();
+    AudioEngine* createdEngine = nullptr;
+
+    auto* const rawEngine = new AudioEngine{};
+    if (rawEngine != nullptr) {
+      rawEngine->mImpl = nullptr;
+
+      auto* const impl = new AudioEngineImpl(rawEngine, configuration);
+      if (impl != nullptr) {
+        rawEngine->mImpl = impl;
+        createdEngine = rawEngine;
+      } else {
+        delete rawEngine;
+      }
+    }
+
+    boost::shared_ptr<AudioEngine> result(createdEngine);
+    if (configuration != nullptr && createdEngine != nullptr) {
+      RegisterEngineRef(*configuration, createdEngine);
+    }
+
+    return result;
+  }
+
   /**
    * Address: 0x004D93F0 (FUN_004D93F0)
    *
@@ -454,7 +598,7 @@ namespace moho
     , mInstance(nullptr)
     , mListener{}
     , mMap2{}
-    , mReserved78(0u)
+    , mGlobalCategoryVolume(0.0f)
     , mSettings{}
     , mEmitter{}
     , mAudioHandle{}
@@ -471,7 +615,7 @@ namespace moho
 
     InitMap1Head(mMap1);
     InitCategoryMap(mMap2);
-    mReserved78 = 0u;
+    mGlobalCategoryVolume = 0.0f;
 
     std::memset(&mSettings, 0, sizeof(mSettings));
     mSettings.mSrcChannelCount = 1u;

@@ -4,44 +4,6 @@
 
 #include "moho/entity/UserEntity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/unit/core/UserUnit.h"
-
-namespace
-{
-  [[nodiscard]] bool StoreRangeAtCenter(
-    moho::SRangeExtractionPayload* const outRange, const Wm3::Vec3f& center, const float radius
-  ) noexcept
-  {
-    if (radius <= 0.0f) {
-      return false;
-    }
-
-    outRange->centerX = center.x;
-    outRange->centerZ = center.z;
-    outRange->centerY = 0.0f;
-    outRange->radius = radius;
-    return true;
-  }
-
-  [[nodiscard]] bool StoreRangeAtEntity(
-    moho::SRangeExtractionPayload* const outRange,
-    const moho::UserEntity& userEntity,
-    const float interpolationAlpha,
-    const float radius
-  )
-  {
-    if (radius <= 0.0f) {
-      return false;
-    }
-
-    const moho::VTransform transform = userEntity.GetInterpolatedTransform(interpolationAlpha);
-    outRange->centerX = transform.pos_.x;
-    outRange->centerZ = transform.pos_.z;
-    outRange->centerY = 0.0f;
-    outRange->radius = radius;
-    return true;
-  }
-} // namespace
 
 namespace moho
 {
@@ -86,15 +48,12 @@ namespace moho
     SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
   ) const
   {
-    const UserUnit* const userUnit = userEntity->IsUserUnit();
-    if (!userUnit) {
-      return false;
-    }
-
     float omniRange = 0.0f;
     float radarRange = 0.0f;
     float sonarRange = 0.0f;
-    userUnit->GetIntelRanges(&omniRange, &radarRange, &sonarRange);
+    if (!TryGetIntelRanges(userEntity, &omniRange, &radarRange, &sonarRange)) {
+      return false;
+    }
 
     const float range = std::max(std::max(omniRange, radarRange), sonarRange);
     return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, range);

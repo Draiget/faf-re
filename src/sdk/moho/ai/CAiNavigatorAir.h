@@ -1,6 +1,10 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+#include "moho/ai/CAiNavigatorImpl.h"
+#include "moho/misc/WeakPtr.h"
 
 namespace moho
 {
@@ -8,147 +12,180 @@ namespace moho
    * VFTABLE: 0x00E1BE9C
    * COL:  0x00E71C0C
    */
-  class CAiNavigatorAir
+  class CAiNavigatorAir : public CAiNavigatorImpl
   {
   public:
     /**
-     * Address: 0x005A53F0
-     * Slot: 0
-     * Demangled: public: __thiscall Moho::CAiNavigatorAir::~CAiNavigatorAir()
+     * Address: 0x005A5390 (FUN_005A5390, default ctor)
      */
-    virtual ~CAiNavigatorAir();
+    CAiNavigatorAir();
 
     /**
-     * Address: 0x005A3600
-     * Slot: 1
-     * Demangled: Moho::CAiNavigatorImpl::GetUnit
+     * Address: 0x005A4880 (FUN_005A4880, unit ctor)
      */
-    virtual void GetUnit() = 0;
+    explicit CAiNavigatorAir(Unit* unit);
 
     /**
-     * Address: 0x005A4C60
-     * Slot: 2
-     * Demangled: Moho::CAiNavigatorAir::SetGoal
+     * Address: 0x005A53F0 (FUN_005A53F0, scalar deleting thunk/core dtor)
+     *
+     * VFTable SLOT: 0
      */
-    virtual void SetGoal() = 0;
+    ~CAiNavigatorAir() override;
 
     /**
-     * Address: 0x005A4A70
-     * Slot: 3
-     * Demangled: Moho::CAiNavigatorAir::SetDestUnit
+     * Address: 0x005A4C60 (FUN_005A4C60)
+     *
+     * VFTable SLOT: 2
      */
-    virtual void SetDestUnit() = 0;
+    void SetGoal(const SAiNavigatorGoal& goal) override;
 
     /**
-     * Address: 0x005A4F00
-     * Slot: 4
-     * Demangled: Moho::CAiNavigatorAir::AbortMove
+     * Address: 0x005A4A70 (FUN_005A4A70)
+     *
+     * VFTable SLOT: 3
      */
-    virtual void AbortMove() = 0;
+    void SetDestUnit(Unit* destinationUnit) override;
 
     /**
-     * Address: 0x005A3730
-     * Slot: 5
-     * Demangled: Moho::CAiNavigatorImpl::BroadcastResumeTaskEvent
+     * Address: 0x005A4F00 (FUN_005A4F00)
+     *
+     * VFTable SLOT: 4
      */
-    virtual void BroadcastResumeTaskEvent() = 0;
+    void AbortMove() override;
 
     /**
-     * Address: 0x005A5080
-     * Slot: 6
-     * Demangled: Moho::CAiNavigatorAir::SetSpeedThroughGoal
+     * Address: 0x005A5080 (FUN_005A5080)
+     *
+     * VFTable SLOT: 6
      */
-    virtual void SetSpeedThroughGoal() = 0;
+    void SetSpeedThroughGoal(bool enabled) override;
 
     /**
-     * Address: 0x005A50B0
-     * Slot: 7
-     * Demangled: Moho::CAiNavigatorAir::GetCurrentTargetPos
+     * Address: 0x005A50B0 (FUN_005A50B0)
+     *
+     * VFTable SLOT: 7
      */
-    virtual void GetCurrentTargetPos() = 0;
+    [[nodiscard]]
+    Wm3::Vector3f GetCurrentTargetPos() const override;
 
     /**
-     * Address: 0x005A49F0
-     * Slot: 8
-     * Demangled: Moho::CAiNavigatorAir::GetGoalPos
+     * Address: 0x005A49F0 (FUN_005A49F0)
+     *
+     * VFTable SLOT: 8
      */
-    virtual void GetGoalPos() = 0;
+    [[nodiscard]]
+    Wm3::Vector3f GetGoalPos() const override;
 
     /**
-     * Address: 0x005A37A0
-     * Slot: 9
-     * Demangled: Moho::CAiNavigatorImpl::GetStatus
+     * Address: 0x005A4E50 (FUN_005A4E50)
+     *
+     * VFTable SLOT: 10
      */
-    virtual int GetStatus() = 0;
+    [[nodiscard]]
+    bool HasGoodPath() const override;
 
     /**
-     * Address: 0x005A4E50
-     * Slot: 10
-     * Demangled: Moho::CAiNavigatorAir::HasGoodPath
+     * Address: 0x005A4E60 (FUN_005A4E60)
+     *
+     * VFTable SLOT: 11
      */
-    virtual void HasGoodPath() = 0;
+    [[nodiscard]]
+    bool FollowingLeader() const override;
 
     /**
-     * Address: 0x005A4E60
-     * Slot: 11
-     * Demangled: Moho::CAiNavigatorAir::FollowingLeader
+     * Address: 0x005A4A40 (FUN_005A4A40)
+     *
+     * VFTable SLOT: 12
      */
-    virtual void FollowingLeader() = 0;
+    void IgnoreFormation(bool ignore) override;
 
     /**
-     * Address: 0x005A4A40
-     * Slot: 12
-     * Demangled: Moho::CAiNavigatorAir::IgnoreFormation
+     * Address: 0x005A4A60 (FUN_005A4A60)
+     *
+     * VFTable SLOT: 13
      */
-    virtual void IgnoreFormation() = 0;
+    [[nodiscard]]
+    bool IsIgnoringFormation() const override;
 
     /**
-     * Address: 0x005A4A60
-     * Slot: 13
-     * Demangled: Moho::CAiNavigatorAir::IsIgnorningFormation
+     * Address: 0x005A48E0 (FUN_005A48E0)
+     *
+     * VFTable SLOT: 14
      */
-    virtual void IsIgnorningFormation() = 0;
+    [[nodiscard]]
+    bool AtGoal() const override;
 
     /**
-     * Address: 0x005A48E0
-     * Slot: 14
-     * Demangled: Moho::CAiNavigatorAir::AtGoal
+     * Address: 0x005A49E0 (FUN_005A49E0)
+     *
+     * VFTable SLOT: 15
      */
-    virtual void AtGoal() = 0;
+    [[nodiscard]]
+    bool CanPathTo(const SAiNavigatorGoal& goal) const override;
 
     /**
-     * Address: 0x005A49E0
-     * Slot: 15
-     * Demangled: Moho::CAiNavigatorAir::CanPathTo
+     * Address: 0x005A50D0 (FUN_005A50D0, CAiNavigatorAir::Execute)
+     *
+     * VFTable SLOT (`CTask`): 1
      */
-    virtual void CanPathTo() = 0;
+    int Execute() override;
+
+  private:
+    /**
+     * Address: 0x005A4B00 (FUN_005A4B00, helper used by FUN_005A4C60)
+     *
+     * What it does:
+     * Chooses best perimeter cell in goal rectangle and converts to world target.
+     */
+    [[nodiscard]]
+    Wm3::Vector3f BuildGoalWorldPos(const SAiNavigatorGoal& goal) const;
 
     /**
-     * Address: 0x005A2D10
-     * Slot: 16
-     * Demangled: Moho::CAiNavigatorImpl::Func1
+     * Address: 0x005A4A90 (FUN_005A4A90, helper chain)
+     *
+     * What it does:
+     * Sends `mCurrentTargetPos` to unit motion with layer fallback logic.
      */
-    virtual void Func1() = 0;
+    void ApplyCurrentTargetToMotion();
 
     /**
-     * Address: 0x005A2D20
-     * Slot: 17
-     * Demangled: Moho::CAiNavigatorImpl::GetNavPath
+     * Address: 0x005A4EA0 (FUN_005A4EA0)
+     *
+     * What it does:
+     * Retargets motion to destination weak-link unit, or aborts when link is missing.
      */
-    virtual void GetNavPath() = 0;
+    void UpdateCurrentTargetFromDestinationEntity();
 
     /**
-     * Address: 0x005A36F0
-     * Slot: 18
-     * Demangled: Moho::CAiNavigatorImpl::PushStack
+     * Address: 0x005A4D80 (FUN_005A4D80)
+     *
+     * What it does:
+     * Updates leader-follow target when formation-tracking is active.
      */
-    virtual void PushStack() = 0;
+    void UpdateCurrentTargetFromFormation();
 
-    /**
-     * Address: 0x005A3710
-     * Slot: 19
-     * Demangled: Moho::CAiNavigatorAir::NavigatorMakeIdle
-     */
-    virtual void NavigatorMakeIdle() = 0;
+  public:
+    static gpg::RType* sType;
+
+    WeakPtr<Unit> mDestinationUnitLink;  // +0x68
+    Wm3::Vector3f mCurrentTargetPos;     // +0x70
+    Wm3::Vector3f mGoalPos;              // +0x7C
+    std::uint8_t mTrackFormationTarget;  // +0x88
+    std::uint8_t mPad89[3];              // +0x89
   };
+
+  static_assert(sizeof(CAiNavigatorAir) == 0x8C, "CAiNavigatorAir size must be 0x8C");
+  static_assert(
+    offsetof(CAiNavigatorAir, mDestinationUnitLink) == 0x68,
+    "CAiNavigatorAir::mDestinationUnitLink offset must be 0x68"
+  );
+  static_assert(
+    offsetof(CAiNavigatorAir, mCurrentTargetPos) == 0x70, "CAiNavigatorAir::mCurrentTargetPos offset must be 0x70"
+  );
+  static_assert(offsetof(CAiNavigatorAir, mGoalPos) == 0x7C, "CAiNavigatorAir::mGoalPos offset must be 0x7C");
+  static_assert(
+    offsetof(CAiNavigatorAir, mTrackFormationTarget) == 0x88,
+    "CAiNavigatorAir::mTrackFormationTarget offset must be 0x88"
+  );
 } // namespace moho
+

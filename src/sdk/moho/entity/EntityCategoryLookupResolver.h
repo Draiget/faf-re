@@ -44,6 +44,7 @@ namespace moho
     [[nodiscard]] const_iterator cbegin() const noexcept;
     [[nodiscard]] const_iterator cend() const noexcept;
     [[nodiscard]] const_iterator FindWord(std::uint32_t absoluteWordIndex) const noexcept;
+    [[nodiscard]] bool ContainsBit(std::uint32_t categoryBitIndex) const noexcept;
   };
 
   static_assert(sizeof(CategoryWordRangeView) == 0x28, "CategoryWordRangeView size must be 0x28");

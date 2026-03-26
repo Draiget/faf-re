@@ -1,9 +1,134 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+#include "moho/containers/TDatList.h"
+#include "moho/sim/SOCellPos.h"
+#include "wm3/Vector3.h"
+
+namespace gpg
+{
+  class RType;
+}
+
+namespace LuaPlus
+{
+  class LuaState;
+}
 
 namespace moho
 {
+  class Unit;
+  class CAiPathNavigator;
+
+  enum EAiNavigatorStatus : std::int32_t
+  {
+    AINAVSTATUS_Idle = 0,
+    AINAVSTATUS_Thinking = 1,
+    AINAVSTATUS_Steering = 2,
+  };
+
+  enum EAiNavigatorEvent : std::int32_t
+  {
+    AINAVEVENT_Failed = 0,
+    AINAVEVENT_Aborted = 1,
+    AINAVEVENT_Succeeded = 2,
+    AINAVEVENT_ResumeTask = 3,
+  };
+
+  /**
+   * Intrusive listener payload linked from IAiNavigator::mListenerNode.
+   *
+   * Evidence:
+   * - FUN_005A6C50 re-links each listener node, resolves owner at `node - 0x04`,
+   *   then invokes vtable slot 0 with one event code integer.
+   */
+  class IAiNavigatorEventListener
+  {
+  public:
+    /**
+     * Address: 0x005A6C50 (FUN_005A6C50 callback callsite)
+     *
+     * What it does:
+     * Receives one navigator event code from IAiNavigator listener dispatch.
+     */
+    virtual void OnNavigatorEvent(std::int32_t eventCode) = 0;
+
+    TDatListItem<void, void> mLink; // +0x04
+  };
+
+  static_assert(sizeof(IAiNavigatorEventListener) == 0x0C, "IAiNavigatorEventListener size must be 0x0C");
+  static_assert(
+    offsetof(IAiNavigatorEventListener, mLink) == 0x04, "IAiNavigatorEventListener::mLink offset must be 0x04"
+  );
+
+  /**
+   * Recovered goal rectangle payload passed to land/air navigator goal evaluators.
+   *
+   * Evidence:
+   * - CAiNavigatorLand::SetGoal (0x005A3ED0) writes/copies 9 dwords.
+   * - CAiNavigatorAir::SetGoal (0x005A4C60) consumes rectangle bounds from this payload.
+   */
+  struct SAiNavigatorGoal
+  {
+    std::int32_t minX;
+    std::int32_t minZ;
+    std::int32_t maxX;
+    std::int32_t maxZ;
+    std::int32_t aux0;
+    std::int32_t aux1;
+    std::int32_t aux2;
+    std::int32_t aux3;
+    std::int32_t aux4;
+  };
+
+  static_assert(sizeof(SAiNavigatorGoal) == 0x24, "SAiNavigatorGoal size must be 0x24");
+  static_assert(offsetof(SAiNavigatorGoal, minX) == 0x00, "SAiNavigatorGoal::minX offset must be 0x00");
+  static_assert(offsetof(SAiNavigatorGoal, minZ) == 0x04, "SAiNavigatorGoal::minZ offset must be 0x04");
+  static_assert(offsetof(SAiNavigatorGoal, maxX) == 0x08, "SAiNavigatorGoal::maxX offset must be 0x08");
+  static_assert(offsetof(SAiNavigatorGoal, maxZ) == 0x0C, "SAiNavigatorGoal::maxZ offset must be 0x0C");
+  static_assert(offsetof(SAiNavigatorGoal, aux0) == 0x10, "SAiNavigatorGoal::aux0 offset must be 0x10");
+  static_assert(offsetof(SAiNavigatorGoal, aux1) == 0x14, "SAiNavigatorGoal::aux1 offset must be 0x14");
+  static_assert(offsetof(SAiNavigatorGoal, aux2) == 0x18, "SAiNavigatorGoal::aux2 offset must be 0x18");
+  static_assert(offsetof(SAiNavigatorGoal, aux3) == 0x1C, "SAiNavigatorGoal::aux3 offset must be 0x1C");
+  static_assert(offsetof(SAiNavigatorGoal, aux4) == 0x20, "SAiNavigatorGoal::aux4 offset must be 0x20");
+
+  /**
+   * Packed grid-cell path payload used by land navigation callbacks.
+   *
+   * Evidence:
+   * - CAiPathNavigator constructor initializes this 3-pointer span at +0x14.
+   * - CAiNavigatorLand::GetNavPath (0x005A3EA0) returns `mPathNavigator + 0x14`.
+   */
+  struct SNavPath
+  {
+    std::uint32_t reserved0;
+    SOCellPos* start;
+    SOCellPos* finish;
+    SOCellPos* capacity;
+
+    [[nodiscard]] std::size_t Count() const noexcept;
+    [[nodiscard]] std::int32_t CountInt() const noexcept;
+    [[nodiscard]] std::size_t CapacityCount() const noexcept;
+
+    void ClearContent() noexcept;
+    void FreeStorage() noexcept;
+    void EnsureCapacity(std::size_t requiredCount);
+    void AssignCopy(const SNavPath& src);
+    void AppendCells(const SOCellPos* begin, const SOCellPos* end);
+    void PrependCells(const SOCellPos* begin, const SOCellPos* end);
+    void AppendCell(const SOCellPos& cell);
+    void EraseFrontCell() noexcept;
+    void EraseFrontCells(std::int32_t count) noexcept;
+  };
+
+  static_assert(sizeof(SNavPath) == 0x10, "SNavPath size must be 0x10");
+  static_assert(offsetof(SNavPath, reserved0) == 0x00, "SNavPath::reserved0 offset must be 0x00");
+  static_assert(offsetof(SNavPath, start) == 0x04, "SNavPath::start offset must be 0x04");
+  static_assert(offsetof(SNavPath, finish) == 0x08, "SNavPath::finish offset must be 0x08");
+  static_assert(offsetof(SNavPath, capacity) == 0x0C, "SNavPath::capacity offset must be 0x0C");
+
   /**
    * VFTABLE: 0x00E1BD9C
    * COL:  0x00E71FA8
@@ -12,136 +137,174 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005A2D30
-     * Slot: 0
-     * Demangled: public: __thiscall Moho::IAiNavigator::~IAiNavigator()
+     * Address: 0x005A2D30 (FUN_005A2D30, scalar deleting thunk)
+     *
+     * VFTable SLOT: 0
      */
     virtual ~IAiNavigator();
 
     /**
-     * Address: 0x00A82547
-     * Slot: 1
-     * Demangled: _purecall
+     * Address: 0x005A3600 (FUN_005A3600)
+     *
+     * VFTable SLOT: 1
      */
-    virtual void purecall1() = 0;
+    virtual Unit* GetUnit() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 2
-     * Demangled: _purecall
+     * Address: 0x005A3ED0 (FUN_005A3ED0, CAiNavigatorLand::SetGoal)
+     * Address: 0x005A4C60 (FUN_005A4C60, CAiNavigatorAir::SetGoal)
+     *
+     * VFTable SLOT: 2
      */
-    virtual void purecall2() = 0;
+    virtual void SetGoal(const SAiNavigatorGoal& goal) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 3
-     * Demangled: _purecall
+     * Address: 0x005A4180 (FUN_005A4180, CAiNavigatorLand::SetDestUnit)
+     * Address: 0x005A4A70 (FUN_005A4A70, CAiNavigatorAir::SetDestUnit)
+     *
+     * VFTable SLOT: 3
      */
-    virtual void purecall3() = 0;
+    virtual void SetDestUnit(Unit* destinationUnit) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 4
-     * Demangled: _purecall
+     * Address: 0x005A3750 (FUN_005A3750, CAiNavigatorImpl::AbortMove)
+     * Address: 0x005A4F00 (FUN_005A4F00, CAiNavigatorAir::AbortMove)
+     *
+     * VFTable SLOT: 4
      */
-    virtual void purecall4() = 0;
+    virtual void AbortMove() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 5
-     * Demangled: _purecall
+     * Address: 0x005A3730 (FUN_005A3730)
+     *
+     * VFTable SLOT: 5
      */
-    virtual void purecall5() = 0;
+    virtual void BroadcastResumeTaskEvent() = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 6
-     * Demangled: _purecall
+     * Address: 0x005A4240 (FUN_005A4240, CAiNavigatorLand::SetSpeedThroughGoal)
+     * Address: 0x005A5080 (FUN_005A5080, CAiNavigatorAir::SetSpeedThroughGoal)
+     *
+     * VFTable SLOT: 6
      */
-    virtual void purecall6() = 0;
+    virtual void SetSpeedThroughGoal(bool enabled) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 7
-     * Demangled: _purecall
+     * Address: 0x005A4260 (FUN_005A4260, CAiNavigatorLand::GetCurrentTargetPos)
+     * Address: 0x005A50B0 (FUN_005A50B0, CAiNavigatorAir::GetCurrentTargetPos)
+     *
+     * VFTable SLOT: 7
      */
-    virtual void purecall7() = 0;
+    [[nodiscard]]
+    virtual Wm3::Vector3f GetCurrentTargetPos() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 8
-     * Demangled: _purecall
+     * Address: 0x005A3D80 (FUN_005A3D80, CAiNavigatorLand::GetGoalPos)
+     * Address: 0x005A49F0 (FUN_005A49F0, CAiNavigatorAir::GetGoalPos)
+     *
+     * VFTable SLOT: 8
      */
-    virtual void purecall8() = 0;
+    [[nodiscard]]
+    virtual Wm3::Vector3f GetGoalPos() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 9
-     * Demangled: _purecall
+     * Address: 0x005A37A0 (FUN_005A37A0)
+     *
+     * VFTable SLOT: 9
      */
-    virtual int GetStatus() = 0;
+    [[nodiscard]]
+    virtual EAiNavigatorStatus GetStatus() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 10
-     * Demangled: _purecall
+     * Address: 0x005A3EB0 (FUN_005A3EB0, CAiNavigatorLand::HasGoodPath)
+     * Address: 0x005A4E50 (FUN_005A4E50, CAiNavigatorAir::HasGoodPath)
+     *
+     * VFTable SLOT: 10
      */
-    virtual void purecall10() = 0;
+    [[nodiscard]]
+    virtual bool HasGoodPath() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 11
-     * Demangled: _purecall
+     * Address: 0x005A3EC0 (FUN_005A3EC0, CAiNavigatorLand::FollowingLeader)
+     * Address: 0x005A4E60 (FUN_005A4E60, CAiNavigatorAir::FollowingLeader)
+     *
+     * VFTable SLOT: 11
      */
-    virtual void purecall11() = 0;
+    [[nodiscard]]
+    virtual bool FollowingLeader() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 12
-     * Demangled: _purecall
+     * Address: 0x005A3D60 (FUN_005A3D60, CAiNavigatorLand::IgnoreFormation)
+     * Address: 0x005A4A40 (FUN_005A4A40, CAiNavigatorAir::IgnoreFormation)
+     *
+     * VFTable SLOT: 12
      */
-    virtual void purecall12() = 0;
+    virtual void IgnoreFormation(bool ignore) = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 13
-     * Demangled: _purecall
+     * Address: 0x005A3D70 (FUN_005A3D70, CAiNavigatorLand::IsIgnoringFormation)
+     * Address: 0x005A4A60 (FUN_005A4A60, CAiNavigatorAir::IsIgnoringFormation)
+     *
+     * VFTable SLOT: 13
      */
-    virtual void purecall13() = 0;
+    [[nodiscard]]
+    virtual bool IsIgnoringFormation() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 14
-     * Demangled: _purecall
+     * Address: 0x005A3BD0 (FUN_005A3BD0, CAiNavigatorLand::AtGoal)
+     * Address: 0x005A48E0 (FUN_005A48E0, CAiNavigatorAir::AtGoal)
+     *
+     * VFTable SLOT: 14
      */
-    virtual void purecall14() = 0;
+    [[nodiscard]]
+    virtual bool AtGoal() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 15
-     * Demangled: _purecall
+     * Address: 0x005A3CD0 (FUN_005A3CD0, CAiNavigatorLand::CanPathTo)
+     * Address: 0x005A49E0 (FUN_005A49E0, CAiNavigatorAir::CanPathTo)
+     *
+     * VFTable SLOT: 15
      */
-    virtual void purecall15() = 0;
+    [[nodiscard]]
+    virtual bool CanPathTo(const SAiNavigatorGoal& goal) const = 0;
 
     /**
-     * Address: 0x005A2D10
-     * Slot: 16
-     * Demangled: Moho::CAiNavigatorImpl::Func1
+     * Address: 0x005A2D10 (FUN_005A2D10)
+     *
+     * VFTable SLOT: 16
      */
     virtual void Func1() = 0;
 
     /**
-     * Address: 0x005A2D20
-     * Slot: 17
-     * Demangled: Moho::CAiNavigatorImpl::GetNavPath
+     * Address: 0x005A2D20 (FUN_005A2D20)
+     *
+     * VFTable SLOT: 17
      */
-    virtual void GetNavPath() = 0;
+    [[nodiscard]]
+    virtual SNavPath* GetNavPath() const = 0;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 18
-     * Demangled: _purecall
+     * Address: 0x005A36F0 (FUN_005A36F0)
+     *
+     * VFTable SLOT: 18
      */
-    virtual void purecall18() = 0;
+    virtual void PushStack(LuaPlus::LuaState* luaState) = 0;
+
+    /**
+     * Address: 0x005A3710 (FUN_005A3710)
+     *
+     * VFTable SLOT: 19
+     */
+    [[nodiscard]]
+    virtual bool NavigatorMakeIdle() = 0;
+
+  public:
+    static gpg::RType* sType;
+
+    TDatListItem<void, void> mListenerNode; // +0x04
   };
+
+  static_assert(sizeof(IAiNavigator) == 0x0C, "IAiNavigator size must be 0x0C");
+  static_assert(offsetof(IAiNavigator, mListenerNode) == 0x04, "IAiNavigator::mListenerNode offset must be 0x04");
 } // namespace moho
+

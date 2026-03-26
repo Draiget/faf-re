@@ -1,164 +1,201 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-#include "moho/lua/CScrLuaBinderFwd.h"
+#include <cstddef>
+#include <cstdint>
 
-namespace LuaPlus
-{
-  class LuaObject;
-  class LuaState;
-} // namespace LuaPlus
+#include "lua/LuaObject.h"
+#include "moho/ai/IAiNavigator.h"
+#include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/script/CScriptObject.h"
+#include "moho/task/CTask.h"
 
 namespace moho
 {
   /**
+   * Legacy 4-byte ownership slot between IAiNavigator and CTask subobjects.
+   *
+   * Evidence:
+   * - CAiNavigatorImpl type-info adds CTask base at +0x10 and CScriptObject base at +0x28 (0x005A38E0).
+   * - IAiNavigator size is 0x0C (0x005A31F0), so +0x0C..+0x0F is a distinct subobject slot.
+   */
+  struct CAiNavigatorImplLegacyPadBase
+  {
+    std::uint32_t mLegacyPadWord{0};
+  };
+  static_assert(
+    sizeof(CAiNavigatorImplLegacyPadBase) == 0x04, "CAiNavigatorImplLegacyPadBase size must be 0x04"
+  );
+
+  /**
    * VFTABLE: 0x00E1BF14
    * COL:  0x00E71BD0
    */
-  class CAiNavigatorImpl
+  class CAiNavigatorImpl : public IAiNavigator,
+                           private CAiNavigatorImplLegacyPadBase,
+                           public CTask,
+                           public CScriptObject
   {
   public:
     /**
-     * Address: 0x005A37B0
-     * Slot: 0
-     * Demangled: (likely scalar deleting destructor thunk)
+     * Address: 0x005A3550 (FUN_005A3550, default ctor)
      */
-    virtual ~CAiNavigatorImpl() = default;
+    CAiNavigatorImpl();
 
     /**
-     * Address: 0x005A3600
-     * Slot: 1
-     * Demangled: Moho::CAiNavigatorImpl::GetUnit
+     * Address: 0x005A33E0 (FUN_005A33E0, unit ctor)
      */
-    virtual void GetUnit() = 0;
+    explicit CAiNavigatorImpl(Unit* unit);
 
     /**
-     * Address: 0x00A82547
-     * Slot: 2
-     * Demangled: _purecall
+     * Address: 0x005A37B0 (FUN_005A37B0, scalar deleting thunk)
+     * Address: 0x005A37E0 (FUN_005A37E0, core dtor)
+     *
+     * VFTable SLOT: 0
      */
-    virtual void purecall2() = 0;
+    ~CAiNavigatorImpl() override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 3
-     * Demangled: _purecall
+     * Address: 0x005A33A0 (FUN_005A33A0, ?GetClass@CAiNavigatorImpl@Moho@@UBEPAVRType@gpg@@XZ)
+     *
+     * VFTable SLOT (`CScriptObject`): 0
      */
-    virtual void purecall3() = 0;
+    [[nodiscard]]
+    gpg::RType* GetClass() const override;
 
     /**
-     * Address: 0x005A3750
-     * Slot: 4
-     * Demangled: Moho::CAiNavigatorImpl::AbortMove
+     * Address: 0x005A33C0 (FUN_005A33C0, ?GetDerivedObjectRef@CAiNavigatorImpl@Moho@@UAE?AVRRef@gpg@@XZ)
+     *
+     * VFTable SLOT (`CScriptObject`): 1
      */
-    virtual void AbortMove() = 0;
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
-     * Address: 0x005A3730
-     * Slot: 5
-     * Demangled: Moho::CAiNavigatorImpl::BroadcastResumeTaskEvent
+     * Address: 0x005A3600 (FUN_005A3600)
+     *
+     * VFTable SLOT: 1
      */
-    virtual void BroadcastResumeTaskEvent() = 0;
+    [[nodiscard]]
+    Unit* GetUnit() override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 6
-     * Demangled: _purecall
+     * Address: 0x005A3750 (FUN_005A3750)
+     *
+     * VFTable SLOT: 4
      */
-    virtual void purecall6() = 0;
+    void AbortMove() override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 7
-     * Demangled: _purecall
+     * Address: 0x005A3730 (FUN_005A3730)
+     *
+     * VFTable SLOT: 5
      */
-    virtual void purecall7() = 0;
+    void BroadcastResumeTaskEvent() override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 8
-     * Demangled: _purecall
+     * Address: 0x005A37A0 (FUN_005A37A0)
+     *
+     * VFTable SLOT: 9
      */
-    virtual void purecall8() = 0;
+    [[nodiscard]]
+    EAiNavigatorStatus GetStatus() const override;
 
     /**
-     * Address: 0x005A37A0
-     * Slot: 9
-     * Demangled: Moho::CAiNavigatorImpl::GetStatus
+     * Address: 0x005A2D10 (FUN_005A2D10)
+     *
+     * VFTable SLOT: 16
      */
-    virtual int GetStatus() = 0;
+    void Func1() override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 10
-     * Demangled: _purecall
+     * Address: 0x005A2D20 (FUN_005A2D20)
+     *
+     * VFTable SLOT: 17
      */
-    virtual void purecall10() = 0;
+    [[nodiscard]]
+    SNavPath* GetNavPath() const override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 11
-     * Demangled: _purecall
+     * Address: 0x005A36F0 (FUN_005A36F0)
+     *
+     * VFTable SLOT: 18
      */
-    virtual void purecall11() = 0;
+    void PushStack(LuaPlus::LuaState* luaState) override;
 
     /**
-     * Address: 0x00A82547
-     * Slot: 12
-     * Demangled: _purecall
+     * Address: 0x005A3710 (FUN_005A3710)
+     *
+     * VFTable SLOT: 19
      */
-    virtual void purecall12() = 0;
+    [[nodiscard]]
+    bool NavigatorMakeIdle() override;
 
+  protected:
     /**
-     * Address: 0x00A82547
-     * Slot: 13
-     * Demangled: _purecall
+     * Address: 0x005A3610 (FUN_005A3610, ?GetMetatable@CAiNavigatorImpl@Moho@@QAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     *
+     * What it does:
+     * Loads `/lua/sim/Navigator.lua`, resolves `Navigator` table, then falls back
+     * to CAiNavigatorImpl Lua metatable factory when needed.
      */
-    virtual void purecall13() = 0;
+    [[nodiscard]]
+    LuaPlus::LuaObject GetMetatable(LuaPlus::LuaState* luaState);
 
+  protected:
     /**
-     * Address: 0x00A82547
-     * Slot: 14
-     * Demangled: _purecall
+     * Address: 0x005A6C50 (FUN_005A6C50 helper call chain)
+     *
+     * What it does:
+     * Dispatches one event code to all registered navigator listeners.
      */
-    virtual void purecall14() = 0;
+    void DispatchNavigatorEvent(std::int32_t eventCode);
 
-    /**
-     * Address: 0x00A82547
-     * Slot: 15
-     * Demangled: _purecall
-     */
-    virtual void purecall15() = 0;
+  public:
+    static gpg::RType* sType;
 
-    /**
-     * Address: 0x005A2D10
-     * Slot: 16
-     * Demangled: Moho::CAiNavigatorImpl::Func1
-     */
-    virtual void Func1() = 0;
-
-    /**
-     * Address: 0x005A2D20
-     * Slot: 17
-     * Demangled: Moho::CAiNavigatorImpl::GetNavPath
-     */
-    virtual void GetNavPath() = 0;
-
-    /**
-     * Address: 0x005A36F0
-     * Slot: 18
-     * Demangled: Moho::CAiNavigatorImpl::PushStack
-     */
-    virtual void PushStack() = 0;
-
-    /**
-     * Address: 0x005A3710
-     * Slot: 19
-     * Demangled: Moho::CAiNavigatorAir::NavigatorMakeIdle
-     */
-    virtual void NavigatorMakeIdle() = 0;
+    Unit* mUnit;                     // +0x5C
+    std::uint8_t mIgnoreFormation;   // +0x60
+    std::uint8_t mPad61[3];          // +0x61
+    EAiNavigatorStatus mStatus;      // +0x64
   };
+
+  static_assert(sizeof(CAiNavigatorImpl) == 0x68, "CAiNavigatorImpl size must be 0x68");
+  static_assert(offsetof(CAiNavigatorImpl, mUnit) == 0x5C, "CAiNavigatorImpl::mUnit offset must be 0x5C");
+  static_assert(
+    offsetof(CAiNavigatorImpl, mIgnoreFormation) == 0x60, "CAiNavigatorImpl::mIgnoreFormation offset must be 0x60"
+  );
+  static_assert(offsetof(CAiNavigatorImpl, mStatus) == 0x64, "CAiNavigatorImpl::mStatus offset must be 0x64");
+
+  /**
+   * VFTABLE: 0x00E1C0B8
+   * COL:  0x00E71714
+   */
+  template <>
+  class CScrLuaMetatableFactory<CAiNavigatorImpl> final : public CScrLuaObjectFactory
+  {
+  public:
+    /**
+     * Address: 0x1001FDE0 (MohoEngine.dll constructor shape)
+     */
+    CScrLuaMetatableFactory();
+
+    [[nodiscard]]
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    /**
+     * Address: 0x005A7310 (FUN_005A7310, ?Create@?$CScrLuaMetatableFactory@VCAiNavigatorImpl@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     */
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CAiNavigatorImpl>) == 0x08,
+    "CScrLuaMetatableFactory<CAiNavigatorImpl> size must be 0x08"
+  );
 
   /**
    * VFTABLE: 0x00E1C160
@@ -243,5 +280,5 @@ namespace moho
    * COL:  0x00E70F64
    */
   using CAiNavigatorImplCanPathToGoal_LuaFuncDef = ::moho::CScrLuaBinder;
-
 } // namespace moho
+

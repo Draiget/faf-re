@@ -2,12 +2,16 @@
 
 #include <cstdint>
 #include <exception>
+#include <typeinfo>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/WeakPtr.h"
 
 using namespace moho;
+
+gpg::RType* CScriptObject::sType = nullptr;
 
 namespace
 {
@@ -33,66 +37,81 @@ namespace
     return CScrLuaMetatableFactory<CScriptObject*>::Instance().Get(state);
   }
 
+  [[nodiscard]] bool LuaValueToBool(const LuaPlus::LuaObject& value) noexcept
+  {
+    if (!value) {
+      return false;
+    }
+    if (value.IsBoolean()) {
+      return value.GetBoolean();
+    }
+    if (value.IsNumber()) {
+      return value.GetNumber() != 0.0;
+    }
+    return false;
+  }
+
   /**
    * Address: 0x006B0940 (FUN_006B0940) guard prologue/epilogue pattern
    *
-   * Mirrors the weak-object intrusive guard chain used by callback wrappers:
-   * - inserts stack marker into owner link slot at (this + 0x04),
-   * - restores the link by searching for that marker on function exit.
+   * Mirrors the weak-object intrusive guard chain used by callback wrappers.
+   * Shared guard mechanics live in WeakObject so callback helpers do not
+   * duplicate owner-link traversal logic.
    */
   class CallbackWeakGuard final
   {
   public:
-    explicit CallbackWeakGuard(CScriptObject* obj)
-    {
-      if (!obj) {
-        return;
-      }
-
-      m_ownerLinkSlot = reinterpret_cast<void***>(reinterpret_cast<uint8_t*>(obj) + 0x04u);
-      m_prev = *m_ownerLinkSlot;
-      *m_ownerLinkSlot = Marker();
-    }
-
-    ~CallbackWeakGuard()
-    {
-      Restore();
-    }
+    explicit CallbackWeakGuard(CScriptObject* obj) : m_guard(static_cast<WeakObject*>(obj)) {}
 
     [[nodiscard]]
     CScriptObject* ResolveObjectForWarning() const
     {
-      if (!m_ownerLinkSlot) {
+      const WeakObject::WeakLinkSlot* const ownerLinkSlot = m_guard.OwnerLinkSlotAddress();
+      if (!ownerLinkSlot) {
         return nullptr;
       }
-      return reinterpret_cast<CScriptObject*>(reinterpret_cast<uint8_t*>(m_ownerLinkSlot) - 0x04u);
+      return WeakPtr<CScriptObject>::DecodeOwnerObject(
+        reinterpret_cast<void*>(const_cast<WeakObject::WeakLinkSlot*>(ownerLinkSlot))
+      );
     }
 
   private:
-    [[nodiscard]]
-    void** Marker() const
-    {
-      return reinterpret_cast<void**>(const_cast<void****>(&m_ownerLinkSlot));
-    }
-
-    void Restore()
-    {
-      if (!m_ownerLinkSlot) {
-        return;
-      }
-
-      void*** cursor = m_ownerLinkSlot;
-      while (*cursor != Marker()) {
-        cursor = reinterpret_cast<void***>(reinterpret_cast<uint8_t*>(*cursor) + 0x04u);
-      }
-      *cursor = m_prev;
-    }
-
-  private:
-    void*** m_ownerLinkSlot = nullptr;
-    void** m_prev = nullptr;
+    WeakObject::ScopedWeakLinkGuard m_guard;
   };
 } // namespace
+
+/**
+ * Address: 0x004C6F70 (??0CScriptObject@Moho@@IAE@XZ)
+ *
+ * What it does:
+ * Default-initializes CScriptObject storage without Lua factory binding.
+ */
+CScriptObject::CScriptObject() = default;
+
+/**
+ * Address: 0x004C7010 (??0CScriptObject@Moho@@IAE@ABVLuaObject@LuaPlus@@000@Z)
+ *
+ * What it does:
+ * Initializes base storage then creates/attaches Lua object state.
+ */
+CScriptObject::CScriptObject(
+  const LuaPlus::LuaObject& metaOrFactory,
+  const LuaPlus::LuaObject& arg1,
+  const LuaPlus::LuaObject& arg2,
+  const LuaPlus::LuaObject& arg3
+)
+  : CScriptObject()
+{
+  CreateLuaObject(metaOrFactory, arg1, arg2, arg3);
+}
+
+gpg::RType* CScriptObject::StaticGetClass()
+{
+  if (!sType) {
+    sType = gpg::LookupRType(typeid(CScriptObject));
+  }
+  return sType;
+}
 
 /**
  * Address: 0x004C70A0
@@ -301,6 +320,21 @@ bool CScriptObject::RunScriptMultiRet(
 }
 
 /**
+ * Address: 0x00623F10 (FUN_00623F10, Moho::CScriptObject::TaskTick)
+ */
+int CScriptObject::TaskTick()
+{
+  LuaPlus::LuaObject taskTickCallback;
+  FindScript(&taskTickCallback, "TaskTick");
+  if (!taskTickCallback) {
+    return 0;
+  }
+
+  LuaPlus::LuaFunction<int> taskTick{taskTickCallback};
+  return taskTick(mLuaObj);
+}
+
+/**
  * Address: 0x00581AA0
  */
 void CScriptObject::CallbackStr(const char* callback)
@@ -505,6 +539,32 @@ void CScriptObject::LuaPCall(const char* scriptName, const char* const* args, Lu
 }
 
 /**
+ * Address: 0x005EBED0 (FUN_005EBED0, Moho::CScriptObject::RunScript_Unit_Bool)
+ */
+bool CScriptObject::RunScriptUnitBool(const char* const scriptName, Unit* const unitArg)
+{
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, scriptName);
+  if (!script) {
+    return false;
+  }
+
+  try {
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
+    const LuaPlus::LuaObject result = fn(mLuaObj, unitArg);
+    return LuaValueToBool(result);
+  } catch (const std::exception& ex) {
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
+  } catch (...) {
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", "unknown exception");
+  }
+
+  return false;
+}
+
+/**
  * Address: 0x00581930
  */
 void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj)
@@ -541,6 +601,31 @@ void CScriptObject::LuaCall(const char* fileName, LuaPlus::LuaObject* obj)
   } catch (...) {
     lua_settop(lstate, stackTop);
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), fileName ? fileName : "<unknown>", "unknown exception");
+  }
+}
+
+/**
+ * Address: 0x005EC040 (FUN_005EC040, Moho::CScriptObject::RunScript_UnitOnDamage)
+ */
+void CScriptObject::RunScriptUnitOnDamage(Unit* const sourceUnit, const int amount, const bool canTakeDamageFlag)
+{
+  constexpr const char* kOnDamage = "OnDamage";
+
+  CallbackWeakGuard weakGuard(this);
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, kOnDamage);
+  if (!script) {
+    return;
+  }
+
+  try {
+    LuaPlus::LuaFunction<void> fn{script};
+    fn(mLuaObj, sourceUnit, amount, canTakeDamageFlag, "Damage");
+  } catch (const std::exception& ex) {
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnDamage, ex.what());
+  } catch (...) {
+    LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnDamage, "unknown exception");
   }
 }
 

@@ -108,6 +108,72 @@ CMarshaller::CMarshaller(CClientManagerImpl* manager)
 {}
 
 /**
+ * Address: 0x0053B680 (FUN_0053B680)
+ *
+ * What it does:
+ * Runs interface-base teardown for `IClientManager`.
+ */
+IClientManager::~IClientManager() = default;
+
+/**
+ * Address: 0x0053DF20 (FUN_0053DF20)
+ *
+ * What it does:
+ * Initializes client-manager runtime state, client vector storage, and
+ * timing/connectivity lanes.
+ */
+CClientManagerImpl::CClientManagerImpl(
+  const std::size_t clientCount,
+  INetConnector* const connector,
+  const int gameSpeed,
+  const bool adjustableGameSpeed
+)
+  : mLock()
+  , mInterface(nullptr)
+  , mClients()
+  , mConnector(connector)
+  , mLocalClient(nullptr)
+  , mWeAreReady(false)
+  , mEveryoneIsReady(false)
+  , mDispatchedBeat(0)
+  , mAvailableBeat(0)
+  , mFullyQueuedBeat(0)
+  , mPartiallyQueuedBeat(0)
+  , mGameSpeedClock(0)
+  , mGameSpeedRequester(0)
+  , mGameSpeed(gameSpeed)
+  , mAdjustableGameSpeed(adjustableGameSpeed)
+  , mCurrentEvent(nullptr)
+  , gap(0)
+  , mTimer3()
+  , mStampBuffer()
+  , mStream()
+  , mMarshaller()
+  , mDispatchedTimer()
+  , mTimer2()
+{
+  ListResetLinks();
+  std::memset(mReceivers, 0, sizeof(mReceivers));
+  mClients.resize(clientCount, nullptr);
+}
+
+/**
+ * Address: 0x0053FAF0 (FUN_0053FAF0)
+ *
+ * What it does:
+ * Allocates and constructs one `CClientManagerImpl`.
+ */
+CClientManagerImpl* moho::CLIENT_CreateClientManager(
+  const std::size_t clientCount,
+  INetConnector* const connector,
+  const int gameSpeed,
+  const bool adjustableGameSpeed
+)
+{
+  return new CClientManagerImpl(clientCount, connector, gameSpeed, adjustableGameSpeed);
+}
+
+/**
  * Address: 0x006E5A90 (FUN_006E5A90)
  * Address: 0x102C0F90
  */
@@ -519,21 +585,42 @@ void CMarshaller::WriteCells(CMessageStream& stream, const gpg::core::FastVector
 }
 
 /**
- * Address: 0x0053E050 (FUN_0053E050)
+ * Address: 0x0053E050 (FUN_0053E050, scalar deleting dtor thunk)
+ * Address: 0x0053E090 (FUN_0053E090, non-deleting destructor core)
+ *
+ * What it does:
+ * Destroys owned clients, tears down connector ownership, and leaves
+ * remaining member/base teardown to C++ destruction order.
  */
-CClientManagerImpl::~CClientManagerImpl() {}
+CClientManagerImpl::~CClientManagerImpl()
+{
+  mMarshaller.mClientManager = nullptr;
+
+  for (CClientBase*& client : mClients) {
+    delete client;
+    client = nullptr;
+  }
+  mLocalClient = nullptr;
+
+  if (mConnector != nullptr) {
+    mConnector->Destroy();
+    mConnector = nullptr;
+  }
+
+  mClients.clear();
+}
 
 /**
  * Address: 0x0053E180 (FUN_0053E180)
  */
 IClient* CClientManagerImpl::CreateLocalClient(
-  const char* name, const int32_t index, LaunchInfoBase* launchInfo, const uint32_t sourceId
+  const char* name, const int32_t index, const int32_t ownerId, const uint32_t sourceId
 )
 {
   BVIntSet commandSources{};
   commandSources.Add(sourceId);
 
-  const auto client = new CLocalClient(index, this, name, launchInfo, commandSources, sourceId);
+  const auto client = new CLocalClient(index, this, name, ownerId, commandSources, sourceId);
   mLocalClient = client;
   mClients[index] = client;
   return client;
@@ -543,13 +630,17 @@ IClient* CClientManagerImpl::CreateLocalClient(
  * Address: 0x0053E260 (FUN_0053E260)
  */
 IClient* CClientManagerImpl::CreateNetClient(
-  const char* name, const int32_t index, LaunchInfoBase* info, const uint32_t sourceId, INetConnection* connection
+  const char* name,
+  const int32_t index,
+  const int32_t ownerId,
+  const uint32_t sourceId,
+  INetConnection* connection
 )
 {
   BVIntSet commandSources{};
   commandSources.Add(sourceId);
 
-  const auto client = new CNetClient(index, this, name, info, commandSources, sourceId, connection);
+  const auto client = new CNetClient(index, this, name, ownerId, commandSources, sourceId, connection);
   mClients[index] = client;
   return client;
 }
@@ -558,13 +649,13 @@ IClient* CClientManagerImpl::CreateNetClient(
  * Address: 0x0053E330 (FUN_0053E330)
  */
 IClient* CClientManagerImpl::CreateNullClient(
-  const char* name, const int32_t index, LaunchInfoBase* info, const uint32_t sourceId
+  const char* name, const int32_t index, const int32_t ownerId, const uint32_t sourceId
 )
 {
   BVIntSet commandSources{};
   commandSources.Add(sourceId);
 
-  const auto client = new CNullClient(index, this, name, info, commandSources, sourceId);
+  const auto client = new CNullClient(index, this, name, ownerId, commandSources, sourceId);
   mClients[index] = client;
   return client;
 }
@@ -572,10 +663,9 @@ IClient* CClientManagerImpl::CreateNullClient(
 /**
  * Address: 0x0053E400 (FUN_0053E400)
  */
-IClient* CClientManagerImpl::CreateReplayClient(int* replayStreamStorage, BVIntSet* set)
+IClient* CClientManagerImpl::CreateReplayClient(gpg::Stream** replayStreamStorage, BVIntSet* set)
 {
-  auto* replayStream = reinterpret_cast<gpg::Stream**>(replayStreamStorage);
-  const auto client = new CReplayClient(this, *set, *replayStream);
+  const auto client = new CReplayClient(this, *set, *replayStreamStorage);
   if (mClients.empty()) {
     mClients.resize(1, nullptr);
   }
@@ -616,11 +706,11 @@ IClient* CClientManagerImpl::GetClient(const int idx)
 /**
  * Address: 0x0053E470 (FUN_0053E470)
  */
-IClient* CClientManagerImpl::GetClientWithData(LaunchInfoBase* info)
+IClient* CClientManagerImpl::GetClientWithData(const int32_t ownerId)
 {
   std::scoped_lock lock(mLock);
   for (CClientBase* const client : mClients) {
-    if (client != nullptr && client->GetLaunchInfo() == info) {
+    if (client != nullptr && client->GetOwnerId() == ownerId) {
       return client;
     }
   }

@@ -5,12 +5,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #include "gpg/core/utils/Logging.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/net/CClientManagerImpl.h"
 #include "moho/resource/RResId.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/ui/IUIManager.h"
 
 namespace moho
 {
@@ -230,6 +237,43 @@ namespace moho
 
   namespace
   {
+    CWldSession* gActiveWldSession = nullptr;
+    SWldSessionInfo* gPendingWldSessionInfo = nullptr;
+    EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
+
+    [[nodiscard]] bool RunLuaScriptWithEnv(
+      LuaPlus::LuaState* const state, const char* const scriptPath, const LuaPlus::LuaObject& environment
+    )
+    {
+      if (!state || !scriptPath || !*scriptPath) {
+        return false;
+      }
+
+      lua_State* const lstate = state->GetCState();
+      if (!lstate) {
+        return false;
+      }
+
+      const int savedTop = lua_gettop(lstate);
+      lua_getglobal(lstate, "doscript");
+      if (!lua_isfunction(lstate, -1)) {
+        lua_settop(lstate, savedTop);
+        return false;
+      }
+
+      lua_pushstring(lstate, scriptPath);
+      const_cast<LuaPlus::LuaObject&>(environment).PushStack(lstate);
+      if (lua_pcall(lstate, 2, 0, 0) != 0) {
+        const char* const errorText = lua_tostring(lstate, -1);
+        gpg::Warnf("WLD_LoadScenarioInfo: doscript(%s) failed: %s", scriptPath, errorText ? errorText : "<unknown>");
+        lua_settop(lstate, savedTop);
+        return false;
+      }
+
+      lua_settop(lstate, savedTop);
+      return true;
+    }
+
     struct VizUpdateNode
     {
       VizUpdateNode* left;          // +0x00
@@ -277,23 +321,13 @@ namespace moho
       }
     }
 
-    template <typename T>
-    void ReleaseSharedRaw(boost::SharedPtrRaw<T>& value)
-    {
-      if (value.pi) {
-        value.pi->release();
-      }
-      value.px = nullptr;
-      value.pi = nullptr;
-    }
-
     [[nodiscard]] boost::detail::sp_counted_base* CreateBoostControlForUICommandGraph(UICommandGraph* const graph)
     {
       if (!graph) {
         return nullptr;
       }
 
-      auto* const control = new (std::nothrow) boost::detail::sp_counted_impl_p<UICommandGraph*>(graph);
+      auto* const control = new (std::nothrow) boost::detail::sp_counted_impl_p<UICommandGraph>(graph);
       if (!control) {
         delete graph;
         return nullptr;
@@ -308,13 +342,12 @@ namespace moho
         return {};
       }
 
-      if (!control->add_ref_lock()) {
-        return {};
-      }
-
       boost::SharedPtrRaw<UICommandGraph> out{};
       out.px = px;
       out.pi = control;
+      if (!out.add_ref_lock()) {
+        return {};
+      }
       return out;
     }
 
@@ -323,9 +356,7 @@ namespace moho
       boost::detail::sp_counted_base* const newControl = CreateBoostControlForUICommandGraph(graph);
       UICommandGraph* const ownedGraph = newControl ? graph : nullptr;
 
-      if (out.pi) {
-        out.pi->release();
-      }
+      out.release();
 
       out.px = ownedGraph;
       out.pi = newControl;
@@ -337,9 +368,7 @@ namespace moho
       boost::detail::sp_counted_base*& weakControl
     )
     {
-      if (shared.pi) {
-        shared.pi->weak_add_ref();
-      }
+      shared.weak_add_ref();
 
       if (weakControl) {
         weakControl->weak_release();
@@ -654,7 +683,7 @@ namespace moho
 
     boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(10, "Andale Mono");
     AssignIntrusive(mDebugFont, createdFont.px);
-    ReleaseSharedRaw(createdFont);
+    createdFont.release();
 
     LoadPathParams();
     LoadWaypointParams();
@@ -1002,56 +1031,6 @@ namespace moho
       return (dragMask != 0xFF000000u) ? COMMOD_Reclaim : COMMOD_Move;
     }
 
-    [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* state, const char* modulePath)
-    {
-      if (!state || !modulePath || !*modulePath) {
-        return {};
-      }
-
-      lua_State* const lstate = state->GetCState();
-      if (!lstate) {
-        return {};
-      }
-
-      const int savedTop = lua_gettop(lstate);
-      lua_getglobal(lstate, "import");
-      if (!lua_isfunction(lstate, -1)) {
-        lua_settop(lstate, savedTop);
-        return {};
-      }
-
-      lua_pushstring(lstate, modulePath);
-      if (lua_pcall(lstate, 1, 1, 0) != 0) {
-        lua_settop(lstate, savedTop);
-        return {};
-      }
-
-      LuaPlus::LuaObject moduleObj{LuaPlus::LuaStackObject(state, -1)};
-      lua_settop(lstate, savedTop);
-      return moduleObj;
-    }
-
-    [[nodiscard]] LuaPlus::LuaObject
-    GetLuaField(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const char* fieldName)
-    {
-      if (!state || !fieldName || !*fieldName || !tableObj || !tableObj.IsTable()) {
-        return {};
-      }
-
-      lua_State* const lstate = state->GetCState();
-      if (!lstate) {
-        return {};
-      }
-
-      const int savedTop = lua_gettop(lstate);
-      const_cast<LuaPlus::LuaObject&>(tableObj).PushStack(lstate);
-      lua_pushstring(lstate, fieldName);
-      lua_gettable(lstate, -2);
-      LuaPlus::LuaObject result{LuaPlus::LuaStackObject(state, -1)};
-      lua_settop(lstate, savedTop);
-      return result;
-    }
-
     [[nodiscard]] LuaPlus::LuaObject
     GetLuaIndex(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const std::int32_t index)
     {
@@ -1100,12 +1079,12 @@ namespace moho
 
     [[nodiscard]] bool TryGetUICommandMode(LuaPlus::LuaState* state, UICommandModeData& out)
     {
-      LuaPlus::LuaObject module = ImportLuaModule(state, "/lua/ui/game/commandmode.lua");
+      LuaPlus::LuaObject module = moho::SCR_ImportLuaModule(state, "/lua/ui/game/commandmode.lua");
       if (!module || !module.IsTable()) {
         return false;
       }
 
-      LuaPlus::LuaObject getCommandMode = GetLuaField(state, module, "GetCommandMode");
+      LuaPlus::LuaObject getCommandMode = moho::SCR_GetLuaTableField(state, module, "GetCommandMode");
       if (!IsLuaFunction(state, getCommandMode)) {
         return false;
       }
@@ -1457,9 +1436,8 @@ namespace moho
     mCurThread = nullptr;
     mRules = static_cast<RRuleGameRulesImpl*>(rulesOwner.release());
     mWldMap = wldMap.release();
+    mLaunchInfo = sessionInfo.mLaunchInfo;
 
-    mCanRestart = 0;
-    mUnknownOwnerToken24 = nullptr;
     mMapName = sessionInfo.mMapName;
     mUnknownOwner44 = nullptr;
     mSaveSourceTreeHead = nullptr;
@@ -1491,13 +1469,13 @@ namespace moho
     mVizUpdateHead = nullptr;
     mVizUpdateSize = 0;
 
-    GameTimeSeconds = 0;
-    IsRunning = 0;
-    GameTimeMilliSeconds = 0.0f;
-    IsPaused = 0;
+    mGameTick = 0;
+    mLastBeatWasTick = 0;
+    mTimeSinceLastTick = 0.0f;
+    mSessionPauseStateA = 0;
     N00001903 = 0;
-    IsPausedB = 0;
-    N0000315B = 0;
+    mSessionPauseStateB = 0;
+    mReplayIsPaused = 0;
 
     ourCmdSource = static_cast<std::int32_t>(sessionInfo.mSourceId);
     IsReplay = sessionInfo.mIsReplay;
@@ -1524,6 +1502,7 @@ namespace moho
     mTeamColorMode = false;
 
     ClearBuildTemplates();
+    gActiveWldSession = this;
   }
 
   /**
@@ -1533,10 +1512,10 @@ namespace moho
   {
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
     ReleaseWeakCommandGraph(mUICommandGraphPx, mUICommandGraphControl);
-    ReleaseSharedRaw(mSimResources);
-    ReleaseSharedRaw(mUnknownShared41C);
-    ReleaseSharedRaw(mDebugCanvas);
-    ReleaseSharedRaw(mUnknownShared40C);
+    mSimResources.release();
+    mUnknownShared41C.release();
+    mDebugCanvas.release();
+    mUnknownShared40C.release();
     ClearBuildTemplates();
 
     if (mRules) {
@@ -1553,11 +1532,16 @@ namespace moho
       delete mState;
       mState = nullptr;
     }
+    mLaunchInfo.reset();
 
     head0.prev = this;
     head0.next = this;
     head1.prev = this;
     head1.next = this;
+
+    if (gActiveWldSession == this) {
+      gActiveWldSession = nullptr;
+    }
   }
 
   /**
@@ -1719,23 +1703,39 @@ namespace moho
       static_cast<RRuleGameRules*>(mRules)->UpdateLuaState(mState);
     }
 
-    if (!IsRunning) {
-      GameTimeMilliSeconds = 1.0f;
+    if (mLastBeatWasTick == 0) {
+      mTimeSinceLastTick = 1.0f;
     } else {
-      GameTimeMilliSeconds += deltaSeconds * 10.0f;
+      mTimeSinceLastTick += deltaSeconds * 10.0f;
     }
 
-    GameTimeMilliSeconds = std::max(0.0f, std::min(GameTimeMilliSeconds, 1.0f));
+    mTimeSinceLastTick = std::max(0.0f, std::min(mTimeSinceLastTick, 1.0f));
 
-    const std::int32_t targetTick = GameTimeSeconds + static_cast<std::int32_t>(std::floor(GameTimeMilliSeconds));
+    const std::int32_t targetTick = mGameTick + static_cast<std::int32_t>(std::floor(mTimeSinceLastTick));
     (void)targetTick; // Full sync-driver beat drain still depends on recovered `sSimDriver` ownership path.
 
     boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false);
-    ReleaseSharedRaw(commandGraph);
+    commandGraph.release();
 
     if (mCurThread) {
       mCurThread->UserFrame();
     }
+  }
+
+  /**
+   * Address: 0x00896900 (FUN_00896900, ?GetDelayToNextBeat@CWldSession@Moho@@QBEMXZ)
+   */
+  float CWldSession::GetDelayToNextBeat() const
+  {
+    if (mReplayIsPaused != 0u && mLastBeatWasTick != 0) {
+      return (std::numeric_limits<float>::infinity)();
+    }
+
+    if (mTimeSinceLastTick < 1.0f) {
+      return (1.0f - mTimeSinceLastTick) / (WLD_GetSimRate() * 10.0f);
+    }
+
+    return 0.0f;
   }
 
   /**
@@ -1811,7 +1811,7 @@ namespace moho
                 resolvedByUi = true;
                 mode.mMode = COMMOD_Order;
 
-                LuaPlus::LuaObject commandName = GetLuaField(mState, uiMode.obj, "name");
+                LuaPlus::LuaObject commandName = moho::SCR_GetLuaTableField(mState, uiMode.obj, "name");
                 if (commandName && commandName.IsString()) {
                   const char* const commandCapsName = commandName.GetString();
                   if (commandCapsName && std::strcmp(commandCapsName, "Transport") == 0) {
@@ -1822,7 +1822,7 @@ namespace moho
                 }
               } else if (uiMode.mode == "build" || uiMode.mode == "buildanchored") {
                 resolvedByUi = true;
-                LuaPlus::LuaObject blueprintNameField = GetLuaField(mState, uiMode.obj, "name");
+                LuaPlus::LuaObject blueprintNameField = moho::SCR_GetLuaTableField(mState, uiMode.obj, "name");
                 if (blueprintNameField && blueprintNameField.IsString()) {
                   const char* const blueprintName = blueprintNameField.GetString();
                   RResId blueprintId{};
@@ -1952,5 +1952,291 @@ namespace moho
     // Deep lift blockers:
     // IResources::DepositCollides typed contract, CD3DBatchTexture/CD3DPrimBatcher full API,
     // and transient fastvector wrappers used by collision query output.
+  }
+
+  namespace
+  {
+    void WLD_DoPreload()
+    {
+      // `FUN_0088BEE0` starts preload by tearing down any active world/session
+      // runtime before moving to the loading action.
+      WLD_Teardown();
+
+      if (CWldSessionLoaderImpl* const loader = GetWldSessionLoader(); loader != nullptr) {
+        loader->SetCreated();
+      }
+
+      gWldFrameAction = EWldFrameAction::Loading;
+    }
+
+    void WLD_DoLoading(bool* const outContinue)
+    {
+      if (outContinue != nullptr) {
+        *outContinue = false;
+      }
+
+      CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
+      if (loader == nullptr) {
+        gWldFrameAction = EWldFrameAction::Exit;
+        return;
+      }
+
+      if (loader->IsLoaded()) {
+        gWldFrameAction = EWldFrameAction::CreateSession;
+        if (outContinue != nullptr) {
+          *outContinue = true;
+        }
+      }
+    }
+
+    void WLD_DoInitializing(bool* const outContinue)
+    {
+      if (outContinue != nullptr) {
+        *outContinue = false;
+      }
+
+      ISTIDriver* const simDriver = SIM_GetActiveDriver();
+      if (simDriver == nullptr) {
+        gWldFrameAction = EWldFrameAction::Exit;
+        return;
+      }
+
+      simDriver->Dispatch();
+      if (simDriver->HasSyncData()) {
+        gWldFrameAction = EWldFrameAction::PostInitialize;
+      }
+    }
+
+    void WLD_DoPostInitializing(bool* const outContinue)
+    {
+      if (outContinue != nullptr) {
+        *outContinue = false;
+      }
+
+      ISTIDriver* const simDriver = SIM_GetActiveDriver();
+      if (simDriver == nullptr) {
+        gWldFrameAction = EWldFrameAction::Exit;
+        return;
+      }
+
+      simDriver->Dispatch();
+      CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+      if (clientManager != nullptr && clientManager->IsEveryoneReady()) {
+        simDriver->DecrementOutstandingRequestsAndSignal();
+        gWldFrameAction = EWldFrameAction::Playing;
+        if (outContinue != nullptr) {
+          *outContinue = true;
+        }
+      } else {
+        gWldFrameAction = EWldFrameAction::Waiting;
+      }
+    }
+
+    void WLD_DoWaiting(bool* const outContinue)
+    {
+      if (outContinue != nullptr) {
+        *outContinue = false;
+      }
+
+      ISTIDriver* const simDriver = SIM_GetActiveDriver();
+      if (simDriver == nullptr) {
+        gWldFrameAction = EWldFrameAction::Exit;
+        return;
+      }
+
+      simDriver->Dispatch();
+      CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+      if (clientManager != nullptr && clientManager->IsEveryoneReady()) {
+        simDriver->DecrementOutstandingRequestsAndSignal();
+        gWldFrameAction = EWldFrameAction::Playing;
+        if (outContinue != nullptr) {
+          *outContinue = true;
+        }
+      }
+    }
+
+    void WLD_DoPlayingAction(const float deltaSeconds)
+    {
+      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+        simDriver->Dispatch();
+      }
+
+      if (CWldSession* const activeSession = WLD_GetActiveSession(); activeSession != nullptr) {
+        activeSession->SessionFrame(deltaSeconds);
+      }
+
+      if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+        simDriver->NoOp();
+      }
+    }
+
+    void WLD_CreateSessionInfo()
+    {
+      // Full `FUN_0088C9D0` session-info recreation still depends on
+      // unrecovered LaunchInfoNew/session bootstrap ownership lanes.
+      gWldFrameAction = EWldFrameAction::Preload;
+    }
+  } // namespace
+
+  EWldFrameAction WLD_GetFrameAction()
+  {
+    return gWldFrameAction;
+  }
+
+  void WLD_SetFrameAction(const EWldFrameAction action)
+  {
+    gWldFrameAction = action;
+  }
+
+  /**
+   * Address: 0x0088CAE0 (FUN_0088CAE0, ?WLD_Frame@Moho@@YA_NM@Z)
+   */
+  bool WLD_Frame(const float deltaSeconds)
+  {
+    if (CWldSessionLoaderImpl* const loader = GetWldSessionLoader(); loader != nullptr) {
+      loader->Update();
+    }
+
+    for (;;) {
+      bool continueDispatch = false;
+      switch (gWldFrameAction) {
+        case EWldFrameAction::Inactive:
+          if (CWldSessionLoaderImpl* const loader = GetWldSessionLoader(); loader != nullptr) {
+            loader->SetCreated();
+          }
+          return true;
+        case EWldFrameAction::Preload:
+          WLD_DoPreload();
+          return true;
+        case EWldFrameAction::Loading:
+          WLD_DoLoading(&continueDispatch);
+          break;
+        case EWldFrameAction::Initialize:
+          WLD_DoInitializing(&continueDispatch);
+          break;
+        case EWldFrameAction::PostInitialize:
+          WLD_DoPostInitializing(&continueDispatch);
+          break;
+        case EWldFrameAction::Waiting:
+          WLD_DoWaiting(&continueDispatch);
+          break;
+        case EWldFrameAction::Playing:
+          WLD_DoPlayingAction(deltaSeconds);
+          return true;
+        case EWldFrameAction::CreateSession:
+          WLD_CreateSessionInfo();
+          return true;
+        case EWldFrameAction::Exit:
+          WLD_Teardown();
+          (void)UI_StartFrontEnd();
+          return true;
+        default:
+          return true;
+      }
+
+      if (continueDispatch) {
+        continue;
+      }
+
+      return true;
+    }
+  }
+
+  /**
+   * Address: 0x0088C860 (FUN_0088C860, ?WLD_Teardown@Moho@@YAXXZ)
+   */
+  void WLD_Teardown()
+  {
+    if (ISTIDriver* const simDriver = SIM_DetachActiveDriver(); simDriver != nullptr) {
+      simDriver->ShutDown();
+      delete simDriver;
+    }
+
+    if (IUIManager* const uiManager = UI_GetManager(); uiManager != nullptr) {
+      (void)uiManager->SetNewLuaState(nullptr);
+    }
+
+    if (CWldSession* const activeSession = WLD_GetActiveSession(); activeSession != nullptr) {
+      delete activeSession;
+    }
+
+    gWldFrameAction = EWldFrameAction::Inactive;
+  }
+
+  /**
+   * Address: 0x0088BD40 (FUN_0088BD40)
+   */
+  LuaPlus::LuaObject WLD_LoadScenarioInfo(const msvc8::string& scenarioFile, LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr) {
+      return {};
+    }
+
+    LuaPlus::LuaObject scenarioEnv(state);
+    if (FILE_GetFileInfo(scenarioFile.c_str(), nullptr, false)) {
+      scenarioEnv.AssignNewTable(state, 0, 0);
+      (void)RunLuaScriptWithEnv(state, "/lua/dataInit.lua", scenarioEnv);
+      (void)RunLuaScriptWithEnv(state, scenarioFile.c_str(), scenarioEnv);
+    }
+
+    if (scenarioEnv.IsNil()) {
+      return scenarioEnv;
+    }
+
+    return scenarioEnv["ScenarioInfo"];
+  }
+
+  /**
+   * Address: 0x0088D060 (FUN_0088D060, ?WLD_BeginSession@Moho@@YAXV?$auto_ptr@USWldSessionInfo@Moho@@@std@@@Z)
+   *
+   * What it does:
+   * Replaces pending world-session bootstrap info and schedules preload.
+   */
+  void WLD_BeginSession(msvc8::auto_ptr<SWldSessionInfo> sessionInfo)
+  {
+    SWldSessionInfo* const nextSessionInfo = sessionInfo.release();
+    if (nextSessionInfo != gPendingWldSessionInfo && gPendingWldSessionInfo != nullptr) {
+      delete gPendingWldSessionInfo;
+    }
+
+    gPendingWldSessionInfo = nextSessionInfo;
+    gWldFrameAction = EWldFrameAction::Preload;
+  }
+
+  /**
+   * Address: 0x0088D0B0 (FUN_0088D0B0, ?WLD_GetSimRate@Moho@@YAMXZ)
+   */
+  float WLD_GetSimRate()
+  {
+    extern float wld_SkewRateAdjustBase;
+    extern float wld_SkewRateAdjustMax;
+
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    if (simDriver == nullptr) {
+      return 1.0f;
+    }
+
+    CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+    if (clientManager == nullptr) {
+      return 1.0f;
+    }
+
+    const float requestedSimScale =
+      static_cast<float>(std::pow(10.0, static_cast<double>(clientManager->GetSimRate()) * 0.1));
+
+    const float skewRateMin = 1.0f / wld_SkewRateAdjustMax;
+    const float skewRateSample =
+      static_cast<float>(std::pow(static_cast<double>(wld_SkewRateAdjustBase), -simDriver->GetSimSpeed()));
+    const float clampedSkewRate = std::max(skewRateMin, std::min(wld_SkewRateAdjustMax, skewRateSample));
+    return clampedSkewRate * requestedSimScale;
+  }
+
+  /**
+   * Address context:
+   * - global `Moho::sWldSession` consumed by save/load request paths.
+   */
+  CWldSession* WLD_GetActiveSession()
+  {
+    return gActiveWldSession;
   }
 } // namespace moho

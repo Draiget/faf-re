@@ -29,6 +29,15 @@ namespace moho
     {}
 
     /**
+     * Reset links to singleton without patching neighboring nodes.
+     */
+    void ListResetLinks() noexcept
+    {
+      mNext = this;
+      mPrev = this;
+    }
+
+    /**
      * Unlink this node and return next.
      */
     item_t* ListUnlink() noexcept
@@ -36,8 +45,7 @@ namespace moho
       item_t* const nxt = mNext;
       mPrev->mNext = mNext;
       mNext->mPrev = mPrev;
-      mNext = this;
-      mPrev = this;
+      ListResetLinks();
       return nxt;
     }
 
@@ -258,6 +266,24 @@ namespace moho
     }
 
     /**
+     * Move all nodes from this list head into pending and reset this head.
+     * The destination head is unlinked/reset first.
+     */
+    void move_nodes_to(TDatList& pending) noexcept
+    {
+      pending.ListResetLinks();
+      if (this->ListIsSingleton()) {
+        return;
+      }
+
+      pending.mPrev = this->mPrev;
+      pending.mNext = this->mNext;
+      pending.mPrev->mNext = &pending;
+      pending.mNext->mPrev = &pending;
+      this->ListResetLinks();
+    }
+
+    /**
      * Iterator that yields owner (T*) instead of node.
      */
     struct owner_iterator
@@ -412,6 +438,29 @@ namespace moho
     static const Owner* owner_from_member_node(const item_t* node) noexcept
     {
       return owner_from_member_node<Owner, Member>(const_cast<item_t*>(node));
+    }
+
+    template <class Owner, class MemberNode, MemberNode Owner::* Member>
+    static Owner* owner_from_member(MemberNode* node) noexcept
+    {
+      static_assert(std::is_base_of_v<item_t, MemberNode>, "MemberNode must derive from TDatList item_t");
+      if (!node) {
+        return nullptr;
+      }
+
+      const auto* const memberPtr = &(reinterpret_cast<Owner const volatile*>(0)->*Member);
+      const auto memberOffset = static_cast<std::ptrdiff_t>(reinterpret_cast<std::uintptr_t>(memberPtr));
+      return reinterpret_cast<Owner*>(reinterpret_cast<char*>(node) - memberOffset);
+    }
+
+    template <class Owner, class MemberNode, MemberNode Owner::* Member>
+    static const Owner* owner_from_member(const MemberNode* node) noexcept
+    {
+      static_assert(std::is_base_of_v<item_t, MemberNode>, "MemberNode must derive from TDatList item_t");
+      if (!node) {
+        return nullptr;
+      }
+      return owner_from_member<Owner, MemberNode, Member>(const_cast<MemberNode*>(node));
     }
 
     template <class Owner, item_t Owner::* Member, bool IsConst>

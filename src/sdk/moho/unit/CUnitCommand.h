@@ -1,20 +1,25 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 #include "boost/weak_ptr.h"
 #include "Broadcaster.h"
 #include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/Vector.h"
+#include "lua/LuaObject.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandVariableData.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
 
 namespace moho
 {
+  class Unit;
   class CAiFormationInstance;
   class Sim;
-  class Unit;
+  struct SSyncData;
 
   struct SCommandUnitSet
   {
@@ -26,12 +31,46 @@ namespace moho
       return scriptObject != nullptr && reinterpret_cast<std::uintptr_t>(scriptObject) != kErasedEntryTag;
     }
 
+    [[nodiscard]] static CScriptObject* EntryFromUnit(Unit* unit) noexcept;
+    [[nodiscard]] static Unit* UnitFromEntry(CScriptObject* entry) noexcept;
+    [[nodiscard]] static const Unit* UnitFromEntry(const CScriptObject* entry) noexcept;
+    [[nodiscard]] static EntId EntryEntityId(const CScriptObject* entry) noexcept;
+    [[nodiscard]] std::size_t LowerBoundByEntityId(EntId targetId) const noexcept;
+    [[nodiscard]] bool InsertUnitSorted(Unit* unit);
+    [[nodiscard]] bool RemoveUnitSorted(Unit* unit);
+
     gpg::core::FastVector<CScriptObject*> mVec;
   };
 
   class CUnitCommand : public Broadcaster
   {
   public:
+    /**
+     * Address: 0x006E8B40 (FUN_006E8B40)
+     *
+     * What it does:
+     * Adds `unit` into the command's unit-set and inserts this command weak-ref
+     * into `queue` at `index` (negative index means append-relative insertion).
+     */
+    void AddUnit(Unit* unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue, int index);
+
+    /**
+     * Address: 0x006E8C20 (FUN_006E8C20)
+     *
+     * What it does:
+     * Removes `unit` from the command's unit-set and erases this command
+     * from the provided command queue.
+     */
+    void RemoveUnit(Unit* unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue);
+
+    /**
+     * Address: 0x006E8D10 (FUN_006E8D10)
+     *
+     * What it does:
+     * Removes `unit` from the command's unit-set without touching queue links.
+     */
+    void RemoveUnit(Unit* unit);
+
     /**
      * Address: 0x006F1650
      * @param amount
@@ -70,7 +109,7 @@ namespace moho
      *
      * Rebuilds cached unit/event payload state when pending updates exist.
      */
-    void RefreshPublishedCommandEvent(bool forceRefresh, int callbackContext);
+    void RefreshPublishedCommandEvent(bool forceRefresh, SSyncData* syncData);
 
     /**
      * Address: 0x006E9000 (FUN_006E9000)
@@ -96,8 +135,7 @@ namespace moho
     bool mNeedsUpdate;
     bool mUnknownFlag142;
     bool mUnknownFlag143;
-    // TODO(binary-layout): element type is still under investigation.
-    msvc8::vector<boost::shared_ptr<CUnitCommand>> mCoordinatingOrders;
+    msvc8::vector<WeakPtr<CUnitCommand>> mCoordinatingOrders;
     bool mUnknownFlag154;
     boost::weak_ptr<Unit> mUnit;
     LuaPlus::LuaObject mArgs;

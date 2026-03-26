@@ -5,6 +5,12 @@
 
 #include "gpg/core/time/Timer.h"
 #include "moho/app/IWinApp.h"
+#include "moho/app/WxRuntimeTypes.h"
+
+namespace gpg::gal
+{
+  class DeviceContext;
+} // namespace gpg::gal
 
 class CScApp final : public moho::IWinApp
 {
@@ -82,6 +88,32 @@ public:
   void Destroy() override;
 
   /**
+   * Address: 0x008D0370 (FUN_008D0370)
+   * Mangled: ?CreateDevice@CScApp@@AAE_NXZ
+   *
+   * What it does:
+   * Builds gal::DeviceContext heads from command-line/preferences and
+   * drives startup adapter/fidelity initialization.
+   */
+  bool CreateDevice();
+
+  /**
+   * Address: 0x008CF8C0 (FUN_008CF8C0)
+   * Mangled:
+   * ?CreateAppFrame@CScApp@@AAE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_NABVwxPoint@@AAVDeviceContext@gal@gpg@@@Z
+   *
+   * What it does:
+   * Creates primary/secondary frame windows, viewport bindings, and D3D
+   * bootstrap handoff for the startup render path.
+   */
+  bool CreateAppFrame(
+    const msvc8::string& title,
+    bool maximized,
+    const wxPoint& position,
+    gpg::gal::DeviceContext& context
+  );
+
+  /**
    * Address: 0x008CE1D0 (FUN_008CE1D0, CScApp::HasFrame)
    * Mangled: ?AppDoSuppressWindowsKeys@CScApp@@UBE_NXZ
    *
@@ -103,9 +135,9 @@ public:
   // +0x4A..+0x4B
   std::uint8_t reserved4A[2];
   // +0x4C
-  void* supcomFrame;
+  WSupComFrame* supcomFrame;
   // +0x50
-  void* frame;
+  wxWindowBase* frame;
   // +0x54 (first-frame timing gate)
   std::uint8_t firstFramePending;
   // +0x55..+0x57

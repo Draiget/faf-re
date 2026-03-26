@@ -1,11 +1,15 @@
 #include "CLobby.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <format>
+#include <vector>
 #include <typeinfo>
 
+#include "CClientManagerImpl.h"
 #include "CMessageStream.h"
 #include "CNetUDPConnection.h"
 #include "ELobbyMsg.h"
@@ -17,8 +21,15 @@
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StringUtils.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTICommandSource.h"
+#include "moho/sim/WldSessionInfo.h"
+#include "moho/ui/UiRuntimeTypes.h"
+#include "lua/LuaTableIterator.h"
 using namespace moho;
 
 namespace moho
@@ -44,7 +55,56 @@ namespace moho
 
 namespace
 {
+  struct LaunchPlayerOptionEntry
+  {
+    int32_t mSlotIndex{-1};
+    LuaPlus::LuaObject mOptions;
+  };
+
   bool sLobbyIgnoreNamesConVarRegistered = false;
+
+  [[nodiscard]] bool TryRemoveReceiverLinkage(
+    CMessageDispatcher& dispatcher,
+    const unsigned int lower,
+    const unsigned int upper,
+    const IMessageReceiver* const receiver
+  )
+  {
+    using LinkNode = TDatListItem<SMsgReceiverLinkage, void>;
+    auto* const head = static_cast<LinkNode*>(&dispatcher);
+    for (LinkNode* node = head->mNext; node != head; node = node->mNext) {
+      auto* const linkage = static_cast<SMsgReceiverLinkage*>(node);
+      if (linkage->mLower == lower && linkage->mUpper == upper &&
+          linkage->mReceiver == const_cast<IMessageReceiver*>(receiver)) {
+        dispatcher.RemoveLinkage(linkage);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void DetachLobbyReceiverRanges(INetConnection* const connection, const IMessageReceiver* const receiver)
+  {
+    GPG_ASSERT(connection != nullptr);
+    auto& dispatcher = *static_cast<CMessageDispatcher*>(connection);
+
+    const bool removedLobbyBase = TryRemoveReceiverLinkage(dispatcher, MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, receiver);
+    if (!removedLobbyBase) {
+      GPG_UNREACHABLE("Reached the supposably unreachable.");
+    }
+
+    const bool removedLobbyJoin =
+      TryRemoveReceiverLinkage(dispatcher, MSGTYPE_LobbyMsgStart, MSGTYPE_LobbyMsgEnd, receiver);
+    if (!removedLobbyJoin) {
+      GPG_UNREACHABLE("Reached the supposably unreachable.");
+    }
+  }
+
+  [[nodiscard]] int32_t ParseOwnerId(const LuaPlus::LuaObject& ownerIdObject)
+  {
+    const char* const ownerIdStr = ownerIdObject.GetString();
+    return std::atoi(ownerIdStr ? ownerIdStr : "");
+  }
 
   /**
    * Address: 0x00C03930 (sub_C03930)
@@ -87,119 +147,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x007C05C0 (FUN_007C05C0)
- *
- * msvc8::string const &,int,unsigned long,unsigned short,INetConnection *,ENetworkPlayerState
- *
- * What it does:
- * Initializes peer identity/address fields and sentinel ids used by command/client mapping paths.
- */
-SPeer::SPeer(
-  const msvc8::string& playerName_,
-  const int32_t uid_,
-  const u_long address_,
-  const u_short port_,
-  INetConnection* connection_,
-  const ENetworkPlayerState state_
-)
-  : playerName(playerName_)
-  , uid(uid_)
-  , address(address_)
-  , port(port_)
-  , state(state_)
-  , mReserved0x34(0)
-  , peerConnection(connection_)
-  , establishedUids()
-  , mCmdSource(0xFF)
-  , mClientIndex(-1)
-{}
-
-/**
- * Address: 0x007C1340 (FUN_007C1340)
- *
- * What it does:
- * Unlinks the peer node before member destruction, matching binary list-detach behavior.
- */
-SPeer::~SPeer()
-{
-  ListUnlink();
-}
-
-/**
- * Address: 0x007C0690 (FUN_007C0690)
- *
- * What it does:
- * Formats this peer into `"name" [host:port, uid=n]`.
- */
-msvc8::string SPeer::ToString() const
-{
-  const auto hostname = NET_GetHostName(address);
-  return gpg::STR_Printf("\"%s\" [%s:%d, uid=%d]", playerName.c_str(), hostname.c_str(), port, uid);
-}
-
-/**
- * Address: 0x007C2950 (FUN_007C2950)
- *
- * LuaPlus::LuaState *,SPeer const *
- *
- * What it does:
- * Builds the Lua peer descriptor including command-link/ping metadata.
- */
-LuaPlus::LuaObject SPeer::ToLua(LuaPlus::LuaState* state, const SPeer* peer)
-{
-  LuaPlus::LuaObject tmp;
-  tmp.AssignNewTable(state, 0, 0);
-  tmp.SetString("name", peer->playerName.c_str());
-
-  char idBuf[kPlayerUidBufSize]{};
-  std::to_chars(idBuf, idBuf + kPlayerUidBufSize, peer->uid);
-
-  tmp.SetString("id", idBuf);
-
-  msvc8::string peerStatus;
-  ENetworkPlayerStateToStr(peer->state, peerStatus);
-  tmp.SetString("status", peerStatus.c_str());
-
-  tmp.SetNumber("ping", peer->peerConnection->GetPing());
-  tmp.SetNumber("quiet", peer->peerConnection->GetTime());
-
-  LuaPlus::LuaObject establishedPeersTable;
-  establishedPeersTable.AssignNewTable(state, 0, 0);
-  int index = 1;
-  for (const int32_t establishedUid : peer->establishedUids) {
-    std::to_chars(idBuf, idBuf + kPlayerUidBufSize, establishedUid);
-    establishedPeersTable.SetString(index++, idBuf);
-  }
-
-  tmp.SetObject("establishedPeers", &establishedPeersTable);
-  return tmp;
-}
-
-/**
- * Address: 0x007C8070 (FUN_007C8070)
- *
- * INetConnection *
- *
- * What it does:
- * Serializes this peer as `LOBMSG_NewPeer` and writes it to `connection`.
- */
-void SPeer::SendInfoTo(INetConnection* connection) const
-{
-  const auto connectionStr = connection->ToString();
-  const auto peerStr = ToString();
-  gpg::Logf("LOBBY: sending info on peer %s to %s", peerStr.c_str(), connectionStr.c_str());
-
-  CMessage msg(ELobbyMsg::LOBMSG_NewPeer);
-  CMessageStream s(msg, CMessageStream::Access::kReadWrite);
-
-  s.Write(playerName);
-  s.Write(address);
-  s.Write(port);
-  s.Write(uid);
-  connection->Write(s);
-}
-
-/**
  * Address: 0x007C0780 (FUN_007C0780)
  *
  * What it does:
@@ -226,6 +173,47 @@ gpg::RRef CLobby::GetDerivedObjectRef()
   ref.mObj = this;
   ref.mType = GetClass();
   return ref;
+}
+
+/**
+ * Address: 0x007C0970 (FUN_007C0970)
+ * Mangled: ??0CLobby@Moho@@QAE@ABVLuaObject@LuaPlus@@PAVINetConnector@1@H_NVStrArg@gpg@@H@Z
+ *
+ * LuaPlus::LuaObject const &,Moho::INetConnector *,int,bool,gpg::StrArg,int
+ *
+ * What it does:
+ * Initializes Lua lobby object state, seeds local lobby identity fields, then
+ * wires one manual-reset event to connector select + wait-handle dispatch.
+ */
+CLobby::CLobby(
+  const LuaPlus::LuaObject& clazz,
+  INetConnector* const connectorArg,
+  const int32_t maxConnectionsArg,
+  const bool hasNAT,
+  const gpg::StrArg playerName,
+  const int32_t localUidArg
+)
+  : CScriptObject(clazz, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
+  , connector(connectorArg)
+  , maxConnections(maxConnectionsArg)
+  , mHasNAT(hasNAT)
+  , localUid(localUidArg)
+{
+  if (localUidArg != -1) {
+    gpg::Logf("LOBBY: starting with local uid of %d [%s]", localUidArg, playerName);
+  }
+
+  const gpg::StrArg requestedPlayerName = playerName ? playerName : "";
+  this->playerName = MakeValidPlayerName(msvc8::string(requestedPlayerName), localUidArg);
+
+  event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  if (event == nullptr) {
+    const msvc8::string errorText = WIN_GetLastError();
+    throw std::runtime_error(gpg::STR_Printf("CreateEvent() call failed: %s", errorText.c_str()).c_str());
+  }
+
+  this->connector->SelectEvent(event);
+  WIN_GetWaitHandleSet()->AddHandle(event);
 }
 
 /**
@@ -269,6 +257,26 @@ CLobby::~CLobby()
 msvc8::string CLobby::GetErrorDescription()
 {
   return CScriptObject::GetErrorDescription();
+}
+
+SPeer* CLobby::FindPeerByConnection(const INetConnection* connection)
+{
+  for (SPeer* peer : peers.owners()) {
+    if (peer->peerConnection == connection) {
+      return peer;
+    }
+  }
+  return nullptr;
+}
+
+SPeer* CLobby::FindPeerByUid(const int32_t uid)
+{
+  for (SPeer* peer : peers.owners()) {
+    if (peer->uid == uid) {
+      return peer;
+    }
+  }
+  return nullptr;
 }
 
 /**
@@ -390,13 +398,7 @@ void CLobby::OnJoin(CMessage* message, INetConnection* connection)
   std::uint32_t requestedUid = 0;
   br.ReadExact(requestedUid);
 
-  SPeer* player = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      player = it;
-      break;
-    }
-  }
+  SPeer* player = FindPeerByConnection(connection);
 
   if (player == nullptr) {
     gpg::Logf("LOBBY: ignoring unexpected join (no player for conn=%p)", connection);
@@ -495,13 +497,7 @@ void CLobby::OnRejected(CMessage* message, [[maybe_unused]] INetConnection* conn
  */
 void CLobby::OnWelcome(CMessage* message, const INetConnection* connection)
 {
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByConnection(connection);
 
   if (peer == nullptr || peer->state != ENetworkPlayerState::kConnected) {
     gpg::Logf("LOBBY: ignoring unexpected welcome message.");
@@ -623,13 +619,7 @@ void CLobby::OnDeletePeer(CMessage* message, INetConnection* connection)
  */
 void CLobby::OnEstablishedPeers(CMessage* message, INetConnection* connection)
 {
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByConnection(connection);
 
   if (peer == nullptr) {
     const msvc8::string connStr = connection->ToString();
@@ -689,13 +679,7 @@ void CLobby::OnScriptData(CMessage* message, INetConnection* connection)
   LuaPlus::LuaObject script;
   mLuaObj.SCR_FromByteStream(script, mLuaObj.m_state, &br);
 
-  const SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      peer = it;
-      break;
-    }
-  }
+  const SPeer* peer = FindPeerByConnection(connection);
 
   char idBuf[kPlayerUidBufSize]{};
   if (peer != nullptr) {
@@ -726,13 +710,7 @@ void CLobby::OnConnectionFailed([[maybe_unused]] CMessage* message, INetConnecti
     return;
   }
 
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByConnection(connection);
 
   const auto peerStr = peer->ToString();
   gpg::Logf("LOBBY: connection to %s failed, retrying...", peerStr.c_str());
@@ -751,13 +729,7 @@ void CLobby::OnConnectionFailed([[maybe_unused]] CMessage* message, INetConnecti
  */
 void CLobby::OnConnectionMade([[maybe_unused]] const CMessage* message, INetConnection* connection)
 {
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByConnection(connection);
 
   msvc8::string peerStateStr;
   ENetworkPlayerStateToStr(peer->state, peerStateStr);
@@ -801,13 +773,7 @@ void CLobby::OnConnectionLost(CMessage* message, INetConnection* connection)
     return;
   }
 
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->peerConnection == connection) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByConnection(connection);
 
   switch (peer->state) {
   case ENetworkPlayerState::kConnecting:
@@ -937,7 +903,7 @@ msvc8::string CLobby::MakeValidPlayerName(msvc8::string joiningName, const int32
       break;
     }
 
-    if (_stricmp(playerName.c_str(), joiningName.c_str()) == 0) {
+    if (gpg::STR_CompareNoCase(playerName.c_str(), joiningName.c_str()) == 0) {
       msvc8::string num = gpg::STR_Printf("%d", suffix++);
       const std::size_t keep = (num.size() < maxLen) ? (maxLen - num.size()) : 0;
       joiningName = desired.substr(0, keep) + num;
@@ -950,7 +916,7 @@ msvc8::string CLobby::MakeValidPlayerName(msvc8::string joiningName, const int32
         continue;
       }
 
-      if (_stricmp(it->playerName.c_str(), joiningName.c_str()) == 0) {
+      if (gpg::STR_CompareNoCase(it->playerName.c_str(), joiningName.c_str()) == 0) {
         msvc8::string num = gpg::STR_Printf("%d", suffix++);
         const std::size_t keep = (num.size() < maxLen) ? (maxLen - num.size()) : 0;
         joiningName = desired.substr(0, keep) + num;
@@ -1082,11 +1048,10 @@ void CLobby::DisconnectFromPeer(const int32_t uid)
     return;
   }
 
-  for (SPeer* it : peers.owners()) {
-    if (it->uid == uid) {
-      PeerDisconnected(it);
-      return;
-    }
+  SPeer* peer = FindPeerByUid(uid);
+  if (peer != nullptr) {
+    PeerDisconnected(peer);
+    return;
   }
 
   gpg::Logf("LOBBY: deleting unknown peer uid %d.", uid);
@@ -1266,11 +1231,10 @@ void CLobby::SendScriptData(int32_t id, LuaPlus::LuaObject& dat)
     throw std::runtime_error(std::format("CLobby::SendScriptData(): failed to encode message to UID {}", id));
   }
 
-  for (SPeer* it : peers.owners()) {
-    if (it->uid == id) {
-      it->peerConnection->Write(s);
-      return;
-    }
+  SPeer* peer = FindPeerByUid(id);
+  if (peer != nullptr) {
+    peer->peerConnection->Write(s);
+    return;
   }
 
   throw std::runtime_error(std::format("CLobby::SendScriptData(): sending to unknown UID {}?", id));
@@ -1294,7 +1258,257 @@ LuaPlus::LuaObject CLobby::GetPeers(LuaPlus::LuaState* state)
 /**
  * Address: 0x007C38C0 (FUN_007C38C0)
  */
-void CLobby::LaunchGame(const LuaPlus::LuaObject& dat) {}
+void CLobby::LaunchGame(const LuaPlus::LuaObject& dat)
+{
+  LuaPlus::LuaObject gameOptions = dat["GameOptions"];
+
+  const LuaPlus::LuaObject scenarioFileObject = gameOptions["ScenarioFile"];
+  const char* const scenarioFileText = scenarioFileObject.GetString();
+  const msvc8::string scenarioFile{scenarioFileText ? scenarioFileText : ""};
+
+  LuaPlus::LuaObject scenarioInfo = WLD_LoadScenarioInfo(scenarioFile, USER_GetLuaState());
+  if (scenarioInfo.IsNil()) {
+    const char* reason = "";
+    CallbackStr("LaunchFailed", &reason);
+    return;
+  }
+  scenarioInfo.SetObject("Options", gameOptions);
+
+  boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
+  launchInfo->mGameMods = SCR_ToString(dat["GameMods"]);
+  launchInfo->mScenarioInfo = SCR_ToString(scenarioInfo);
+  launchInfo->mInitSeed = hostedTime;
+
+  const LuaPlus::LuaObject cheatsEnabled = gameOptions["CheatsEnabled"];
+  if (cheatsEnabled && cheatsEnabled.IsString()) {
+    const char* const enabledStr = cheatsEnabled.GetString();
+    if (enabledStr != nullptr && std::strcmp(enabledStr, "true") == 0) {
+      launchInfo->mCheatsEnabled = true;
+    }
+  }
+
+  LuaPlus::LuaObject teamsConfig = scenarioInfo.Lookup("Configurations.standard.teams");
+  if (teamsConfig.IsNil()) {
+    const char* reason = "NoConfig";
+    CallbackStr("LaunchFailed", &reason);
+    return;
+  }
+
+  msvc8::vector<msvc8::string> ffaArmies;
+  {
+    LuaPlus::LuaTableIterator teamIt(&teamsConfig, 1);
+    while (!teamIt.m_isDone) {
+      LuaPlus::LuaObject teamObject = teamIt.GetValue();
+      const LuaPlus::LuaObject teamNameObject = teamObject["name"];
+      const char* const teamName = teamNameObject.GetString();
+      if (teamName != nullptr && _stricmp(teamName, "FFA") == 0) {
+        LuaPlus::LuaObject teamArmies = teamObject["armies"];
+        LuaPlus::LuaTableIterator armyIt(&teamArmies, 1);
+        while (!armyIt.m_isDone) {
+          LuaPlus::LuaObject armyNameObject = armyIt.GetValue();
+          const char* const armyName = armyNameObject.GetString();
+          if (armyName != nullptr) {
+            ffaArmies.push_back(msvc8::string(armyName));
+          }
+          armyIt.Next();
+        }
+        break;
+      }
+      teamIt.Next();
+    }
+  }
+
+  msvc8::vector<LaunchPlayerOptionEntry> playerOptions;
+  LuaPlus::LuaObject playerOptionsTable = dat["PlayerOptions"];
+  if (!playerOptionsTable.IsNil()) {
+    LuaPlus::LuaTableIterator optionIt(&playerOptionsTable, 1);
+    while (!optionIt.m_isDone) {
+      LuaPlus::LuaObject keyObject = optionIt.GetKey();
+      LuaPlus::LuaObject optionObject = optionIt.GetValue();
+      const int32_t slotIndex = keyObject.GetInteger() - 1;
+      if (slotIndex >= 0 && static_cast<std::size_t>(slotIndex) < ffaArmies.size()) {
+        optionObject.SetString("ArmyName", ffaArmies[static_cast<std::size_t>(slotIndex)].c_str());
+      }
+
+      LaunchPlayerOptionEntry entry{};
+      entry.mSlotIndex = slotIndex;
+      entry.mOptions = optionObject;
+      playerOptions.push_back(entry);
+      optionIt.Next();
+    }
+  }
+
+  if (playerOptions.size() > ffaArmies.size()) {
+    const char* reason = "StartSpots";
+    CallbackStr("LaunchFailed", &reason);
+    return;
+  }
+
+  if (!playerOptions.empty()) {
+    std::sort(playerOptions.begin(), playerOptions.end(), [](const LaunchPlayerOptionEntry& lhs, const LaunchPlayerOptionEntry& rhs) {
+      return lhs.mSlotIndex < rhs.mSlotIndex;
+    });
+  }
+
+  auto sessionInfo = msvc8::auto_ptr<SWldSessionInfo>(new SWldSessionInfo());
+  sessionInfo->mIsBeingRecorded = true;
+  sessionInfo->mIsReplay = false;
+  sessionInfo->mIsMultiplayer = connector->GetProtocol() != ENetProtocolType::kNone;
+  sessionInfo->mSourceId = 0xFFu;
+  launchInfo->mCommandSources.mOriginalSource = -1;
+
+  int32_t timeouts = -1;
+  if (sessionInfo->mIsMultiplayer) {
+    const LuaPlus::LuaObject timeoutObj = gameOptions["Timeouts"];
+    if (timeoutObj.IsString()) {
+      const char* const timeoutStr = timeoutObj.GetString();
+      timeouts = std::atoi(timeoutStr ? timeoutStr : "");
+    }
+  }
+
+  if (playerOptions.empty()) {
+    LuaPlus::LuaObject defaultOptions = RULE_GetDefaultPlayerOptions(USER_GetLuaState());
+    defaultOptions.SetString("PlayerName", "default");
+    defaultOptions.SetString("ArmyName", "default");
+    defaultOptions.SetBoolean("Human", false);
+
+    LaunchPlayerOptionEntry entry{};
+    entry.mSlotIndex = 0;
+    entry.mOptions = defaultOptions;
+    playerOptions.push_back(entry);
+  }
+
+  LuaPlus::LuaObject civilianAlliance = gameOptions["CivilianAlliance"];
+  if (civilianAlliance && civilianAlliance.IsString()) {
+    const char* const civilianText = civilianAlliance.GetString();
+    if (civilianText != nullptr && _stricmp(civilianText, "none") != 0) {
+      LuaPlus::LuaObject extraArmiesObject = scenarioInfo.Lookup("Configurations.standard.customprops.ExtraArmies");
+      if (extraArmiesObject.IsString()) {
+        const char* const extraArmiesText = extraArmiesObject.GetString();
+        msvc8::vector<msvc8::string> extraArmies;
+        gpg::STR_GetTokens(extraArmiesText ? extraArmiesText : "", " ", extraArmies);
+        for (const msvc8::string& extraArmyName : extraArmies) {
+          LuaPlus::LuaObject civilianOptions = RULE_GetDefaultPlayerOptions(USER_GetLuaState());
+          civilianOptions.SetString("PlayerName", "civilian");
+          civilianOptions.SetString("ArmyName", extraArmyName.c_str());
+          civilianOptions.SetBoolean("Civilian", true);
+          civilianOptions.SetBoolean("Human", false);
+
+          LaunchPlayerOptionEntry entry{};
+          entry.mSlotIndex = -1;
+          entry.mOptions = civilianOptions;
+          playerOptions.push_back(entry);
+        }
+      }
+    }
+  }
+
+  int32_t clientIndex = 0;
+  int32_t localClientIndex = -1;
+  for (std::size_t playerIndex = 0; playerIndex < playerOptions.size(); ++playerIndex) {
+    const LuaPlus::LuaObject& option = playerOptions[playerIndex].mOptions;
+    BVIntSet commandSourceSet{};
+
+    const LuaPlus::LuaObject isHumanObject = option["Human"];
+    if (isHumanObject.GetBoolean()) {
+      const LuaPlus::LuaObject ownerIdObject = option["OwnerID"];
+      const int32_t ownerId = ParseOwnerId(ownerIdObject);
+      if (ownerId == localUid) {
+        launchInfo->mCommandSources.mOriginalSource = static_cast<int32_t>(playerIndex);
+      }
+
+      const LuaPlus::LuaObject playerNameObject = option["PlayerName"];
+      const char* const optionPlayerName = playerNameObject.GetString();
+      AssignClientIndex(clientIndex, ownerId, optionPlayerName ? optionPlayerName : "", localClientIndex);
+
+      const uint32_t sourceId = AssignCommandSource(timeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
+      if (sourceId != 0xFFu) {
+        (void)commandSourceSet.Add(sourceId);
+      }
+    }
+
+    launchInfo->mStrVec.push_back(SCR_ToString(option));
+    launchInfo->mArmyLaunchInfo.push_back(commandSourceSet);
+  }
+
+  LuaPlus::LuaObject observersTable = dat["Observers"];
+  LuaPlus::LuaTableIterator observerIt(&observersTable, 1);
+  while (!observerIt.m_isDone) {
+    LuaPlus::LuaObject observer = observerIt.GetValue();
+    const int32_t ownerId = ParseOwnerId(observer["OwnerID"]);
+    const LuaPlus::LuaObject observerNameObject = observer["PlayerName"];
+    const char* const observerName = observerNameObject.GetString();
+    AssignClientIndex(clientIndex, ownerId, observerName ? observerName : "", localClientIndex);
+
+    const int32_t observerTimeouts = sessionInfo->mIsMultiplayer ? 0 : -1;
+    (void)AssignCommandSource(observerTimeouts, ownerId, launchInfo->mCommandSources.mSrcs, sessionInfo->mSourceId);
+    observerIt.Next();
+  }
+
+  int gameSpeed = 0;
+  bool adjustableGameSpeed = false;
+  const LuaPlus::LuaObject gameSpeedObject = gameOptions["GameSpeed"];
+  if (gameSpeedObject.IsString()) {
+    const char* const gameSpeedName = gameSpeedObject.GetString();
+    if (gameSpeedName != nullptr) {
+      if (_stricmp(gameSpeedName, "fast") == 0) {
+        gameSpeed = 4;
+      } else if (_stricmp(gameSpeedName, "adjustable") == 0) {
+        adjustableGameSpeed = true;
+      }
+    }
+  }
+
+  connector->SelectEvent(nullptr);
+  sessionInfo->mClientManager =
+    CLIENT_CreateClientManager(static_cast<std::size_t>(clientIndex), connector, gameSpeed, adjustableGameSpeed);
+  connector = nullptr;
+
+  sessionInfo->mClientManager->CreateLocalClient(playerName.c_str(), localClientIndex, localUid, sessionInfo->mSourceId);
+
+  for (SPeer* peer : peers.owners()) {
+    if (peer->mClientInd == -1) {
+      continue;
+    }
+
+    if (peer->state == ENetworkPlayerState::kEstablished) {
+      DetachLobbyReceiverRanges(peer->peerConnection, this);
+      sessionInfo->mClientManager->CreateNetClient(
+        peer->playerName.c_str(),
+        peer->mClientInd,
+        peer->uid,
+        peer->mCmdSource,
+        peer->peerConnection
+      );
+      peer->peerConnection = nullptr;
+    } else {
+      sessionInfo->mClientManager->CreateNullClient(peer->playerName.c_str(), peer->mClientInd, peer->uid, peer->mCmdSource);
+    }
+  }
+
+  while (!peers.empty()) {
+    SPeer* const peer = static_cast<SPeer*>(peers.mNext);
+    if (peer->mClientInd != -1 && peer->state != ENetworkPlayerState::kEstablished) {
+      IClient* const client = sessionInfo->mClientManager->GetClient(peer->mClientInd);
+      if (client != nullptr) {
+        client->Eject();
+      }
+    }
+
+    if (peer->peerConnection != nullptr) {
+      peer->peerConnection->ScheduleDestroy();
+    }
+    delete peer;
+  }
+
+  const LuaPlus::LuaObject mapObject = scenarioInfo["map"];
+  const char* const mapName = mapObject.GetString();
+  sessionInfo->mMapName = mapName ? mapName : "";
+  sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
+
+  RunScript("GameLaunched");
+  WLD_BeginSession(sessionInfo);
+}
 
 /**
  * Address: 0x007C4E80 (FUN_007C4E80)
@@ -1311,19 +1525,13 @@ void CLobby::AssignClientIndex(int32_t& clientIndex, const int32_t ownerId, cons
     return;
   }
 
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->uid == ownerId) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByUid(ownerId);
   if (peer == nullptr) {
     peer = new SPeer(msvc8::string(plyName), ownerId, 0, 0, nullptr, ENetworkPlayerState::kDisconnected);
     peer->ListLinkBefore(&peers);
   }
-  if (peer->mClientIndex == -1) {
-    peer->mClientIndex = clientIndex++;
+  if (peer->mClientInd == -1) {
+    peer->mClientInd = clientIndex++;
   }
 }
 
@@ -1344,20 +1552,14 @@ uint32_t CLobby::AssignCommandSource(
       const uint32_t newId = static_cast<uint32_t>(commandSources.size());
       sourceId = newId;
 
-      const SSTICommandSource entry{static_cast<uint8_t>(sourceId), playerName, timeouts};
+      const SSTICommandSource entry{static_cast<std::uint32_t>(sourceId), playerName, timeouts};
       commandSources.push_back(entry);
     }
 
     return sourceId;
   }
 
-  SPeer* peer = nullptr;
-  for (SPeer* it : peers.owners()) {
-    if (it->uid == ownerId) {
-      peer = it;
-      break;
-    }
-  }
+  SPeer* peer = FindPeerByUid(ownerId);
 
   if (peer == nullptr) {
     // Binary path assumes ownership uid resolves to an existing SPeer.
@@ -1368,7 +1570,7 @@ uint32_t CLobby::AssignCommandSource(
   if (peer->mCmdSource == kInvalidCommandSourceId) {
     peer->mCmdSource = static_cast<uint32_t>(commandSources.size());
 
-    const SSTICommandSource entry{static_cast<uint8_t>(peer->mCmdSource), peer->playerName, timeouts};
+    const SSTICommandSource entry{static_cast<std::uint32_t>(peer->mCmdSource), peer->playerName, timeouts};
     commandSources.push_back(entry);
   }
 

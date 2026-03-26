@@ -3,7 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/entity/EntityPositionWatchEntry.h"
+
+namespace gpg
+{
+  class ReadArchive;
+  class RType;
+} // namespace gpg
 
 namespace moho
 {
@@ -18,6 +25,52 @@ namespace moho
   class CIntelPosHandle : public EntityPositionWatchEntry
   {
   public:
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0076D810 (FUN_0076D810, Moho::CIntelPosHandle::CIntelPosHandle)
+     *
+     * What it does:
+     * Initializes intel-position handle state and retains one shared reference
+     * to the bound intel-grid owner.
+     */
+    CIntelPosHandle(std::uint32_t radius, const boost::SharedPtrRaw<CIntelGrid>& intelGrid);
+
+    /**
+     * Address: 0x0076D860 (FUN_0076D860, Moho::CIntelPosHandle::~CIntelPosHandle)
+     *
+     * What it does:
+     * Removes active circle coverage from the bound grid and releases the
+     * retained grid shared-pointer reference.
+     */
+    ~CIntelPosHandle();
+
+    /**
+     * Address: 0x0076F1E0 (FUN_0076F1E0, Moho::CIntelPosHandle::UpdatePos)
+     *
+     * What it does:
+     * Updates stored world position and refreshes grid coverage when movement
+     * exceeds threshold or periodic refresh timeout is reached.
+     */
+    std::int32_t UpdatePos(std::int32_t curTick, const Wm3::Vec3f& newPos);
+
+    /**
+     * Address: 0x00770000 (FUN_00770000, Moho::CIntelPosHandle::MemberDeserialize)
+     *
+     * gpg::ReadArchive *
+     *
+     * IDA signature:
+     * void __usercall Moho::CIntelPosHandle::MemberDeserialize(
+     *   Moho::CIntelPosHandle *this@<eax>, gpg::ReadArchive *archive@<esi>);
+     *
+     * What it does:
+     * Deserializes base position-watch fields (`mLastPos`, `mRadius`,
+     * `mEnabled`, `mGrid`, `mLastTickUpdated`) from archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     /**
      * Address: 0x0076F180 (FUN_0076F180)
      *
@@ -35,15 +88,20 @@ namespace moho
      */
     void SubViz() override;
 
-    CIntelGrid* mIntelGrid; // +0x1C
-    void* mIntelGridOwner;  // +0x20
+    /**
+     * Address: 0x0076D9D0 (FUN_0076D9D0, Moho::CIntelPosHandle::dtr)
+     *
+     * What it does:
+     * Runs non-virtual destructor body and conditionally frees the object
+     * allocation when `shouldDelete & 1` is set.
+     */
+    void Destroy(int shouldDelete) override;
+
+    boost::SharedPtrRaw<CIntelGrid> mGrid; // +0x1C (px, pi)
   };
 
 #if defined(_M_IX86)
   static_assert(sizeof(CIntelPosHandle) == 0x24, "CIntelPosHandle size must be 0x24");
-  static_assert(offsetof(CIntelPosHandle, mIntelGrid) == 0x1C, "CIntelPosHandle::mIntelGrid offset must be 0x1C");
-  static_assert(
-    offsetof(CIntelPosHandle, mIntelGridOwner) == 0x20, "CIntelPosHandle::mIntelGridOwner offset must be 0x20"
-  );
+  static_assert(offsetof(CIntelPosHandle, mGrid) == 0x1C, "CIntelPosHandle::mGrid offset must be 0x1C");
 #endif
 } // namespace moho

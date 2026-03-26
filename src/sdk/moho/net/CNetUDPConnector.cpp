@@ -339,7 +339,9 @@ void CNetUDPConnector::Debug()
 SSendStampView CNetUDPConnector::SnapshotSendStamps(const int32_t since)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
-  return mSendStampBuffer.GetBetween(static_cast<uint64_t>(1000LL * since), GetTime());
+  const uint64_t endTimeUs = static_cast<uint64_t>(GetTime());
+  const uint64_t startTimeUs = static_cast<uint64_t>(1000LL * since);
+  return mSendStampBuffer.GetBetween(endTimeUs, startTimeUs);
 }
 
 int64_t CNetUDPConnector::GetTime()

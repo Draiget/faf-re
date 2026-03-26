@@ -14,8 +14,21 @@ namespace gpg
 	public:
         struct PrematureEOF : std::runtime_error
         {
-            PrematureEOF() : std::runtime_error("Premature EOF") {}
-            ~PrematureEOF() noexcept override = default;
+            /**
+             * Address: 0x0043D180 (FUN_0043D180)
+             *
+             * What it does:
+             * Constructs PrematureEOF runtime_error payload ("Premature EOF").
+             */
+            PrematureEOF();
+            /**
+             * Address: 0x0043D270 (FUN_0043D270)
+             * Demangled: gpg::BinaryReader::PrematureEOF::dtr
+             *
+             * What it does:
+             * Destroys PrematureEOF exception payload.
+             */
+            ~PrematureEOF() noexcept override;
         };
 
         BinaryReader() = default;
@@ -24,17 +37,28 @@ namespace gpg
         }
 
         /**
-         * Address: 0x0043D210
-         * @param buf 
-         * @param size 
+         * Address: 0x0043D210 (FUN_0043D210)
+         *
+         * What it does:
+         * Reads exactly `size` bytes or throws `PrematureEOF` when source underruns.
          */
         void Read(char* buf, size_t size) const;
 
         /**
-         * Address: 0x004CCDD0
-         * @param out 
+         * Address: 0x004CCDD0 (FUN_004CCDD0)
+         *
+         * What it does:
+         * Reads one NUL-terminated string from stream bytes.
          */
         void ReadString(msvc8::string* out) const;
+
+        /**
+         * Address: <synthetic host-build helper>
+         *
+         * What it does:
+         * Reads one 32-bit length-prefixed byte string into legacy string storage.
+         */
+        void ReadLengthPrefixedString(msvc8::string* out) const;
 
         /**
          * Read exactly sizeof(T) bytes into T's object storage.

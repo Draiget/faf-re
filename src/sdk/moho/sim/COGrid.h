@@ -36,6 +36,6 @@ namespace moho
     EntityOccupationGrid entityGrid;
     gpg::BitArray2D terrainOccupation;
     gpg::BitArray2D waterOccupation;
-    gpg::BitArray2D other;
+    gpg::BitArray2D mOccupation;
   };
 } // namespace moho

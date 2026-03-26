@@ -1,103 +1,47 @@
-﻿// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-#include "legacy/containers/String.h"
-
-namespace gpg
-{
-  class REnumType;
-  class RIndexed;
-  class RRef;
-  class RType;
-} // namespace gpg
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
   /**
-   * VFTABLE: 0x1073B180
-   * COL:  0x10782AA4
-   * Source hints:
-   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   * VFTABLE: 0x00E1BFD4
+   * COL:  0x00E71A88
    */
-  class EAiNavigatorStatusTypeInfo
+  class EAiNavigatorStatusTypeInfo : public gpg::REnumType
   {
   public:
     /**
-     * Address: 0x00401370
-     * Slot: 0
-     * Demangled: gpg::RType::GetClass
+     * Address: 0x005A2F40 (FUN_005A2F40, scalar deleting thunk)
      */
-    virtual gpg::RType* GetClass() const = 0;
+    ~EAiNavigatorStatusTypeInfo() override;
 
     /**
-     * Address: 0x00401390
-     * Slot: 1
-     * Demangled: gpg::RType::GetDerivedObjectRef
+     * Address: 0x005A2F30 (FUN_005A2F30)
+     *
+     * What it does:
+     * Returns the reflection type name literal for EAiNavigatorStatus.
      */
-    virtual gpg::RRef GetDerivedObjectRef() = 0;
+    [[nodiscard]]
+    const char* GetName() const override;
 
     /**
-     * Address: 0x10192D60
-     * Slot: 2
-     * Demangled: (likely scalar deleting destructor thunk)
+     * Address: 0x005A2F10 (FUN_005A2F10)
+     *
+     * What it does:
+     * Writes enum width, registers enum values, then finalizes metadata.
      */
-    virtual ~EAiNavigatorStatusTypeInfo() = default;
+    void Init() override;
 
+  private:
     /**
-     * Address: 0x10192D50
-     * Slot: 3
-     * Demangled: Moho::EAiNavigatorStatusTypeInfo::GetName
+     * Address: 0x005A2F70 (FUN_005A2F70)
+     *
+     * What it does:
+     * Registers EAiNavigatorStatus enum option names/values.
      */
-    virtual const char* GetName() const = 0;
-
-    /**
-     * Address: 0x104D7E08
-     * Slot: 4
-     * Demangled: gpg::REnumType::GetLexical
-     */
-    virtual msvc8::string GetLexical(gpg::RRef const&) const = 0;
-
-    /**
-     * Address: 0x104D7E02
-     * Slot: 5
-     * Demangled: gpg::REnumType::SetLexical
-     */
-    virtual bool SetLexical(gpg::RRef const&, char const*) const = 0;
-
-    /**
-     * Address: 0x004013B0
-     * Slot: 6
-     * Demangled: gpg::RType::IsIndexed
-     */
-    virtual gpg::RIndexed const* IsIndexed() const = 0;
-
-    /**
-     * Address: 0x004013C0
-     * Slot: 7
-     * Demangled: gpg::RType::IsPointer
-     */
-    virtual gpg::RIndexed const* IsPointer() const = 0;
-
-    /**
-     * Address: 0x104D7E14
-     * Slot: 8
-     * Demangled: gpg::REnumType::IsEnumType
-     */
-    virtual gpg::REnumType const* IsEnumType() const = 0;
-
-    /**
-     * Address: 0x10192D30
-     * Slot: 9
-     * Demangled: Moho::EAiNavigatorStatusTypeInfo::Init
-     */
-    virtual void Init() = 0;
-
-    /**
-     * Address: 0x104D7CE2
-     * Slot: 10
-     * Demangled: gpg::RType::Finish
-     */
-    virtual void Finish() = 0;
+    void AddEnums();
   };
+
+  static_assert(sizeof(EAiNavigatorStatusTypeInfo) == 0x78, "EAiNavigatorStatusTypeInfo size must be 0x78");
 } // namespace moho

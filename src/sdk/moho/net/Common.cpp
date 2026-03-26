@@ -15,7 +15,7 @@ using namespace moho;
 
 NetSpeeds::NetSpeeds()
   : vals{}
-  , v1(0)
+  , mReserved0(0)
   , head(0)
   , tail(0)
 {}
@@ -73,12 +73,12 @@ float NetSpeeds::Jitter(const float center) const noexcept
  * NOTE: Inlined
  *
  * What it does:
- * Initializes a send-stamp view for the requested [from, to] time window.
+ * Initializes a send-stamp view for the requested [start, end] time window.
  */
-SSendStampView::SSendStampView(const uint64_t start, const uint64_t end)
+SSendStampView::SSendStampView(const uint64_t durationUs, const uint64_t endTimeUs)
   : items{}
-  , from(start)
-  , to(end)
+  , windowDurationUs(durationUs)
+  , windowEndTimeUs(endTimeUs)
 {}
 
 void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, msvc8::string& out)
@@ -168,28 +168,28 @@ const char* moho::NetConnectionStateToStr(const ENetConnectionState state)
   }
 }
 
-SSendStampView SSendStampBuffer::GetBetween(const uint64_t startTime, const uint64_t endTime)
+SSendStampView SSendStampBuffer::GetBetween(const uint64_t endTimeUs, const uint64_t startTimeUs)
 {
-  // delta = startTime - endTime (matching engine math direction)
-  const uint64_t delta = startTime - endTime;
+  // Binary computes and stores duration as (end - start).
+  const uint64_t durationUs = endTimeUs - startTimeUs;
 
-  // Compute logical length in the ring [mEnd .. mStart) with capacity 4096
-  // Matches: (mEnd > mStart) ? (mStart - mEnd + 4096) : (mStart - mEnd)
-  const unsigned int len = (mEnd > mStart) ? (mStart - mEnd + cap) : (mStart - mEnd);
+  // Logical count in [mOldestIndex .. mNextWriteIndex) with 4096-cap ring.
+  const unsigned int len = (mOldestIndex > mNextWriteIndex)
+                             ? (mNextWriteIndex - mOldestIndex + cap)
+                             : (mNextWriteIndex - mOldestIndex);
 
-  // Lower_bound over [0, len): first index with time >= delta
+  // Lower_bound over [0, len): first stamp with timestampUs >= durationUs.
   unsigned int lo = 0, hi = len;
   while (lo < hi) {
     const unsigned int mid = (lo + hi) >> 1;
-    if (Get(mid).time >= delta) {
+    if (Get(mid).timestampUs >= durationUs) {
       hi = mid;
     } else {
       lo = mid + 1;
     }
   }
 
-  // View header matches engine: from=delta, to=startTime
-  SSendStampView out{delta, startTime};
+  SSendStampView out{durationUs, endTimeUs};
 
   // Reserve exactly the number of items we will push (len - lo)
   out.items.reserve(len - lo);
@@ -204,82 +204,70 @@ SSendStampView SSendStampBuffer::GetBetween(const uint64_t startTime, const uint
 
 void SSendStampBuffer::Reset()
 {
-  mEnd = 0;
-  mStart = 0;
+  mOldestIndex = 0;
+  mNextWriteIndex = 0;
 }
 
-uint32_t SSendStampBuffer::Push(const int dir, const LONGLONG timeUs, const int size) noexcept
+uint32_t SSendStampBuffer::Push(const int direction, const LONGLONG timeUs, const int payloadSizeBytes) noexcept
 {
   constexpr uint32_t kRingMask = cap - 1u;
 
-  // If advancing start would collide with end, drop the oldest.
-  const std::uint32_t next = (mStart + 1u) & kRingMask;
-  if (next == mEnd) {
-    mEnd = (mEnd + 1u) & kRingMask;
+  // If advancing write index collides with oldest, drop oldest first.
+  const std::uint32_t nextWriteIndex = (mNextWriteIndex + 1u) & kRingMask;
+  if (nextWriteIndex == mOldestIndex) {
+    mOldestIndex = (mOldestIndex + 1u) & kRingMask;
   }
 
-  // Prepare entry (a1a in the asm)
-  SSendStamp s;
-  s.time = timeUs;
-  s.direction = dir;
-  s.size = size;
+  SSendStamp stamp{};
+  stamp.timestampUs = static_cast<uint64_t>(timeUs);
+  stamp.direction = static_cast<uint32_t>(direction);
+  stamp.payloadSizeBytes = static_cast<uint32_t>(payloadSizeBytes);
 
-  return EmplaceAndAdvance(s);
+  return EmplaceAndAdvance(stamp);
 }
 
-void SSendStampBuffer::Add(const int direction, const LONGLONG time, const int size)
+void SSendStampBuffer::Add(const int direction, const LONGLONG timeUs, const int payloadSizeBytes)
 {
-  if ((mEnd + 1) % cap == mStart) {
-    mStart = (mStart + 1) % cap;
-  }
-
-  SSendStamp s;
-  s.time = time;
-  s.direction = direction;
-  s.size = size;
-  Append(&s);
+  (void)Push(direction, timeUs, payloadSizeBytes);
 }
 
-void SSendStampBuffer::Append(const SSendStamp* s)
+void SSendStampBuffer::Append(const SSendStamp* stamp)
 {
-  const auto pos = &mDat[mEnd];
-  if (pos != nullptr) {
-    *pos = *s;
-  }
-  mEnd = (mEnd + 1) % cap;
+  EmplaceAndAdvance(*stamp);
 }
 
 bool SSendStampBuffer::empty() const noexcept
 {
-  return mStart == mEnd;
+  return mNextWriteIndex == mOldestIndex;
 }
 
 uint32_t SSendStampBuffer::size() const noexcept
 {
-  return (mStart - mEnd) & (cap - 1u);
+  return (mNextWriteIndex - mOldestIndex) & (cap - 1u);
 }
 
-void SSendStampBuffer::push(const SSendStamp& s) noexcept
+void SSendStampBuffer::push(const SSendStamp& stamp) noexcept
 {
   constexpr uint32_t kRingMask = cap - 1u;
-  mDat[mStart] = s;
-  mStart = (mStart + 1u) & kRingMask;
-  if (mStart == mEnd) {
-    mEnd = (mEnd + 1u) & kRingMask;
+  mDat[mNextWriteIndex] = stamp;
+  mNextWriteIndex = (mNextWriteIndex + 1u) & kRingMask;
+  if (mNextWriteIndex == mOldestIndex) {
+    mOldestIndex = (mOldestIndex + 1u) & kRingMask;
   }
 }
 
-SSendStamp& SSendStampBuffer::Get(const size_t index) noexcept
-{
-  return mDat[(mStart + index) % cap];
-}
-
-uint32_t SSendStampBuffer::EmplaceAndAdvance(const SSendStamp& s) noexcept
+SSendStamp& SSendStampBuffer::Get(const size_t logicalIndex) noexcept
 {
   constexpr uint32_t kRingMask = cap - 1u;
-  mDat[mStart] = s;
-  mStart = (mStart + 1u) & kRingMask;
-  return mStart;
+  return mDat[(mOldestIndex + static_cast<uint32_t>(logicalIndex)) & kRingMask];
+}
+
+uint32_t SSendStampBuffer::EmplaceAndAdvance(const SSendStamp& stamp) noexcept
+{
+  constexpr uint32_t kRingMask = cap - 1u;
+  mDat[mNextWriteIndex] = stamp;
+  mNextWriteIndex = (mNextWriteIndex + 1u) & kRingMask;
+  return mNextWriteIndex;
 }
 
 bool moho::NET_Init()
@@ -580,13 +568,13 @@ ENetProtocolType moho::NET_ProtocolFromString(const char* str)
     throw std::domain_error("invalid protocol (null)");
   }
 
-  if (_stricmp(str, "None") == 0) {
+  if (gpg::STR_EqualsNoCase(str, "None")) {
     return ENetProtocolType::kNone;
   }
-  if (_stricmp(str, "TCP") == 0) {
+  if (gpg::STR_EqualsNoCase(str, "TCP")) {
     return ENetProtocolType::kTcp;
   }
-  if (_stricmp(str, "UDP") == 0) {
+  if (gpg::STR_EqualsNoCase(str, "UDP")) {
     return ENetProtocolType::kUdp;
   }
 

@@ -4,68 +4,383 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
-#include <winsock2.h>
 
 #include <array>
+#include <algorithm>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
+#include <memory>
+#include <sstream>
 #include <string>
-#include <system_error>
+#include <vector>
 
 #include <shellapi.h>
-#include <shlobj.h>
 
 #include "CScApp.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/Error.hpp"
 #include "WinApp.h"
-
-extern int __argc;
-extern char** __argv;
+#include "moho/misc/StartupHelpers.h"
 
 namespace
 {
+  class AllocationLogSymbolAddressCache
+  {
+  private:
+    struct SymbolAddressNode
+    {
+      SymbolAddressNode* next = nullptr;
+      SymbolAddressNode* prev = nullptr;
+      std::uint32_t address = 0;
+    };
+    static_assert(offsetof(SymbolAddressNode, next) == 0x00, "SymbolAddressNode::next offset must be 0x00");
+    static_assert(offsetof(SymbolAddressNode, prev) == 0x04, "SymbolAddressNode::prev offset must be 0x04");
+    static_assert(offsetof(SymbolAddressNode, address) == 0x08, "SymbolAddressNode::address offset must be 0x08");
+    static_assert(sizeof(SymbolAddressNode) == 0x0C, "SymbolAddressNode size must be 0x0C");
+
+    static constexpr std::uint32_t kInitialSymbolAddressMask = 0x3;
+    static constexpr std::uint32_t kHashXorMask = 0xDEADBEEFu;
+    static constexpr long kHashDivisor = 127773L;
+    static constexpr long kHashMul = 16807L;
+    static constexpr long kHashSub = 2836L;
+    static constexpr long kHashModulus = 0x7FFFFFFFL;
+
+    /**
+     * Address: 0x008D5580 (FUN_008D5580, sub_8D5580)
+     *
+     * What it does:
+     * Normalizes the bucket-head vector size used by the symbol-address cache.
+     */
+    static void NormalizeBucketVectorSize(
+      std::vector<SymbolAddressNode*>& bucketHeads, const std::size_t size, SymbolAddressNode* const fillValue
+    )
+    {
+      if (bucketHeads.size() < size) {
+        bucketHeads.insert(bucketHeads.end(), size - bucketHeads.size(), fillValue);
+      } else if (bucketHeads.size() > size) {
+        bucketHeads.erase(bucketHeads.begin() + static_cast<std::ptrdiff_t>(size), bucketHeads.end());
+      }
+    }
+
+    /**
+     * Address: 0x008D6410 (FUN_008D6410, func_NewSymbolAddrNode)
+     *
+     * What it does:
+     * Allocates and initializes one symbol-address cache node.
+     */
+    SymbolAddressNode* CreateSymbolAddressNode(
+      SymbolAddressNode* const next, SymbolAddressNode* const prev, const std::uint32_t address
+    )
+    {
+      auto node = std::make_unique<SymbolAddressNode>();
+      node->next = next;
+      node->prev = prev;
+      node->address = address;
+      SymbolAddressNode* const rawNode = node.get();
+      nodes_.push_back(std::move(node));
+      return rawNode;
+    }
+
+    [[nodiscard]]
+    static std::uint32_t ComputeAddressHash(const std::uint32_t address)
+    {
+      const long mixed = static_cast<long>(address ^ kHashXorMask);
+      const ldiv_t hashedParts = std::ldiv(mixed, kHashDivisor);
+      long hashedValue = kHashMul * hashedParts.rem - kHashSub * hashedParts.quot;
+      if (hashedValue < 0) {
+        hashedValue += kHashModulus;
+      }
+      return static_cast<std::uint32_t>(hashedValue);
+    }
+
+    [[nodiscard]]
+    std::uint32_t ResolveBucketIndex(const std::uint32_t address) const
+    {
+      return ComputeAddressHash(address) & symbolAddrMask_;
+    }
+
+    void EnsureInitialized()
+    {
+      if (!bucketHeads_.empty()) {
+        return;
+      }
+      symbolAddrMask_ = kInitialSymbolAddressMask;
+      NormalizeBucketVectorSize(bucketHeads_, static_cast<std::size_t>(symbolAddrMask_) + 1U, nullptr);
+    }
+
+    void Rehash(const std::uint32_t nextMask)
+    {
+      std::vector<SymbolAddressNode*> nextBucketHeads;
+      NormalizeBucketVectorSize(nextBucketHeads, static_cast<std::size_t>(nextMask) + 1U, nullptr);
+
+      for (const std::unique_ptr<SymbolAddressNode>& ownedNode : nodes_) {
+        SymbolAddressNode* const node = ownedNode.get();
+        node->next = nullptr;
+        node->prev = nullptr;
+
+        SymbolAddressNode*& bucketHead = nextBucketHeads[ComputeAddressHash(node->address) & nextMask];
+        SymbolAddressNode* previous = nullptr;
+        SymbolAddressNode* cursor = bucketHead;
+        while (cursor != nullptr && cursor->address < node->address) {
+          previous = cursor;
+          cursor = cursor->next;
+        }
+
+        node->next = cursor;
+        node->prev = previous;
+        if (previous != nullptr) {
+          previous->next = node;
+        } else {
+          bucketHead = node;
+        }
+        if (cursor != nullptr) {
+          cursor->prev = node;
+        }
+      }
+
+      bucketHeads_.swap(nextBucketHeads);
+      symbolAddrMask_ = nextMask;
+    }
+
+    void EnsureCapacityForInsert()
+    {
+      const std::uint32_t bucketCount = static_cast<std::uint32_t>(bucketHeads_.size());
+      if (bucketCount == 0) {
+        return;
+      }
+
+      // Keep the same high-level growth policy as the recovered helper path:
+      // grow when the cache exceeds 4 addresses per bucket on average.
+      if (symbolAddrNodeCount_ > (bucketCount * 4U)) {
+        const std::uint32_t nextMask = (symbolAddrMask_ * 2U) + 1U;
+        Rehash(nextMask);
+      }
+    }
+
+  public:
+    void Clear()
+    {
+      bucketHeads_.clear();
+      nodes_.clear();
+      symbolAddrMask_ = 0;
+      symbolAddrNodeCount_ = 0;
+    }
+
+    /**
+     * Address: 0x008D4C10 (FUN_008D4C10, sub_8D4C10)
+     *
+     * What it does:
+     * Looks up one frame address in the symbol cache and inserts it when absent.
+     */
+    [[nodiscard]]
+    bool InsertIfMissing(const std::uint32_t address)
+    {
+      EnsureInitialized();
+      EnsureCapacityForInsert();
+
+      SymbolAddressNode*& bucketHead = bucketHeads_[ResolveBucketIndex(address)];
+      SymbolAddressNode* previous = nullptr;
+      SymbolAddressNode* cursor = bucketHead;
+      while (cursor != nullptr && cursor->address < address) {
+        previous = cursor;
+        cursor = cursor->next;
+      }
+
+      if (cursor != nullptr && cursor->address == address) {
+        return false;
+      }
+
+      SymbolAddressNode* const insertedNode = CreateSymbolAddressNode(cursor, previous, address);
+      if (previous != nullptr) {
+        previous->next = insertedNode;
+      } else {
+        bucketHead = insertedNode;
+      }
+      if (cursor != nullptr) {
+        cursor->prev = insertedNode;
+      }
+
+      ++symbolAddrNodeCount_;
+      return true;
+    }
+
+  private:
+    std::uint32_t symbolAddrMask_ = 0;
+    std::uint32_t symbolAddrNodeCount_ = 0;
+    std::vector<SymbolAddressNode*> bucketHeads_{};
+    std::vector<std::unique_ptr<SymbolAddressNode>> nodes_{};
+  };
+
+  class AllocationLogRuntime
+  {
+  public:
+    [[nodiscard]]
+    bool Open(const char* const path)
+    {
+      if (path == nullptr || path[0] == '\0' || file_ != nullptr) {
+        return false;
+      }
+
+      std::FILE* file = nullptr;
+      if (::fopen_s(&file, path, "wb") != 0 || file == nullptr) {
+        return false;
+      }
+
+      LARGE_INTEGER frequency{};
+      ::QueryPerformanceFrequency(&frequency);
+      (void)::fwrite(&frequency, sizeof(frequency), 1, file);
+
+      ::InitializeCriticalSection(&criticalSection_);
+      criticalSectionInitialized_ = true;
+      file_ = file;
+      return true;
+    }
+
+    void Close()
+    {
+      if (file_ != nullptr) {
+        (void)::fclose(file_);
+        file_ = nullptr;
+      }
+
+      if (criticalSectionInitialized_) {
+        ::DeleteCriticalSection(&criticalSection_);
+        criticalSectionInitialized_ = false;
+      }
+
+      isFlushing_ = false;
+      symbolAddressCache_.Clear();
+    }
+
+    void WriteEntry(const int isFreeing, const int size, const void* const pointerValue)
+    {
+      if (file_ == nullptr || !criticalSectionInitialized_) {
+        return;
+      }
+
+      ::EnterCriticalSection(&criticalSection_);
+      if (isFlushing_) {
+        ::LeaveCriticalSection(&criticalSection_);
+        return;
+      }
+
+      isFlushing_ = true;
+      try {
+        const std::uint32_t threadId = static_cast<std::uint32_t>(::GetCurrentThreadId());
+        (void)::fwrite(&threadId, sizeof(threadId), 1, file_);
+
+        LARGE_INTEGER performanceCounter{};
+        ::QueryPerformanceCounter(&performanceCounter);
+        (void)::fwrite(&performanceCounter, sizeof(performanceCounter), 1, file_);
+
+        (void)::fwrite(&isFreeing, sizeof(isFreeing), 1, file_);
+        (void)::fwrite(&size, sizeof(size), 1, file_);
+
+        const std::uint32_t pointerWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointerValue));
+        (void)::fwrite(&pointerWord, sizeof(pointerWord), 1, file_);
+
+        std::uint32_t frames[64]{};
+        const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 64, frames);
+        for (std::uint32_t frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
+          const std::uint32_t frameAddress = frames[frameIndex];
+          (void)::fwrite(&frameAddress, sizeof(frameAddress), 1, file_);
+          WriteSymbolLineIfFirstSeen(frameAddress);
+        }
+
+        constexpr std::uint32_t kTerminator = 0;
+        (void)::fwrite(&kTerminator, sizeof(kTerminator), 1, file_);
+      } catch (...) {
+        // Preserve binary intent: swallow logging-side failures.
+      }
+
+      isFlushing_ = false;
+      ::LeaveCriticalSection(&criticalSection_);
+    }
+
+  private:
+    void WriteSymbolLineIfFirstSeen(const std::uint32_t frameAddress)
+    {
+      if (!symbolAddressCache_.InsertIfMissing(frameAddress)) {
+        return;
+      }
+
+      moho::SPlatSymbolInfo symbolInfo{};
+      if (!moho::PLAT_GetSymbolInfo(frameAddress, &symbolInfo)) {
+        return;
+      }
+
+      const msvc8::string symbolLine = symbolInfo.FormatResolvedLine();
+      (void)::fwrite(symbolLine.c_str(), 1, symbolLine.size() + 1U, file_);
+    }
+
+    std::FILE* file_ = nullptr;
+    CRITICAL_SECTION criticalSection_{};
+    bool criticalSectionInitialized_ = false;
+    bool isFlushing_ = false;
+    AllocationLogSymbolAddressCache symbolAddressCache_{};
+  };
+
+  AllocationLogRuntime sAllocationLogRuntime{};
+  STICKYKEYS sSavedStickyKeys{};
+  TOGGLEKEYS sSavedToggleKeys{};
+  FILTERKEYS sSavedFilterKeys{};
+
+  /**
+   * Address: 0x008D2140 (FUN_008D2140, func_CleanupAllocLoc)
+   *
+   * What it does:
+   * Removes the allocation hook callback and closes alloc-log runtime state.
+   */
+  void func_CleanupAllocLoc()
+  {
+    gpg::SetMemHook(nullptr);
+    sAllocationLogRuntime.Close();
+  }
+
+  /**
+   * Address: 0x008D1E50 (FUN_008D1E50, func_MemHook)
+   *
+   * int isFreeing, int size, ...
+   *
+   * What it does:
+   * Alloc-log sink callback: records thread/time/op/size/pointer, writes callstack
+   * frame addresses, and appends symbol text once per unique frame address.
+   */
+  void func_MemHook(const int isFreeing, const int size, ...)
+  {
+    va_list ptrs;
+    va_start(ptrs, size);
+    const void* const pointerValue = va_arg(ptrs, const void*);
+    va_end(ptrs);
+
+    sAllocationLogRuntime.WriteEntry(isFreeing, size, pointerValue);
+  }
+
   /**
    * Address: 0x008D2170 (FUN_008D2170)
    *
    * What it does:
    * Opens the `/alloclog` target file, writes the QPC frequency header,
-   * and keeps the stream open for the process lifetime.
+   * sets the memory hook callback, and keeps the sink active for process life.
    */
   void InitializeAllocationLog(const char* const path)
   {
-    if (path == nullptr || path[0] == '\0') {
+    if (!sAllocationLogRuntime.Open(path)) {
       return;
     }
 
-    static std::FILE* sAllocationLogFile = nullptr;
-    if (sAllocationLogFile != nullptr) {
-      return;
-    }
-
-    std::FILE* file = nullptr;
-    if (::fopen_s(&file, path, "wb") != 0 || file == nullptr) {
-      return;
-    }
-
-    LARGE_INTEGER frequency{};
-    ::QueryPerformanceFrequency(&frequency);
-    (void)::fwrite(&frequency, sizeof(frequency), 1, file);
-    sAllocationLogFile = file;
-
-    (void)::atexit([] {
-      if (sAllocationLogFile != nullptr) {
-        (void)::fclose(sAllocationLogFile);
-        sAllocationLogFile = nullptr;
-      }
-    });
+    (void)::atexit(&func_CleanupAllocLoc);
+    gpg::SetMemHook(&func_MemHook);
   }
 
   /**
@@ -76,170 +391,40 @@ namespace
    */
   void FatalErrorDieHandler(const char* const message)
   {
-    ::MessageBoxA(nullptr, message != nullptr ? message : "", "Fatal Error", MB_OK | MB_ICONERROR);
-  }
-
-  /**
-   * Address: 0x0041B560 (FUN_0041B560)
-   *
-   * What it does:
-   * Looks up command-line switches case-insensitively and optionally
-   * requires one following argument.
-   */
-  [[nodiscard]]
-  bool TryFindCommandSwitch(const char* const name, const int requiredFollowingArgs, const char** const firstArgOut)
-  {
-    if (name == nullptr || requiredFollowingArgs < 0) {
-      return false;
-    }
-
-    for (int index = 1; index < __argc; ++index) {
-      const char* const argument = __argv[index];
-      if (argument == nullptr || ::_stricmp(argument, name) != 0) {
-        continue;
-      }
-
-      if ((index + requiredFollowingArgs) >= __argc) {
-        continue;
-      }
-
-      if (firstArgOut != nullptr) {
-        *firstArgOut = requiredFollowingArgs > 0 ? __argv[index + 1] : nullptr;
-      }
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Address: 0x008C9D10 (FUN_008C9D10)
-   *
-   * What it does:
-   * Builds the local-appdata root folder for FA user files.
-   */
-  [[nodiscard]]
-  std::string GetFaLocalAppDataRoot()
-  {
-    std::array<wchar_t, MAX_PATH> localAppDataPath{};
-    if (::SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppDataPath.data()) < 0) {
-      return {};
-    }
-
-    std::filesystem::path root(localAppDataPath.data());
-    root /= "Gas Powered Games";
-    root /= "Supreme Commander Forged Alliance";
-    return root.generic_string();
-  }
-
-  /**
-   * Address: 0x008C9F90 (FUN_008C9F90)
-   *
-   * What it does:
-   * Resolves the FA cache directory and ensures it exists.
-   */
-  [[nodiscard]]
-  std::string GetFaCachePath()
-  {
-    std::filesystem::path cachePath(GetFaLocalAppDataRoot());
-    if (cachePath.empty()) {
-      return {};
-    }
-
-    cachePath /= "cache";
-    std::error_code createDirectoryError;
-    std::filesystem::create_directories(cachePath, createDirectoryError);
-    return cachePath.generic_string();
-  }
-
-  /**
-   * Address: 0x008CA070 (FUN_008CA070)
-   *
-   * What it does:
-   * Deletes contents of the cache directory using shell file operation flags.
-   */
-  void PurgeCacheDirectory()
-  {
-    std::string deletePattern = GetFaCachePath();
-    if (deletePattern.empty()) {
-      return;
-    }
-
-    deletePattern += "/*";
-    for (char& character : deletePattern) {
-      if (character == '/') {
-        character = '\\';
-      }
-    }
-
-    // SHFileOperation expects a double-null terminated multi-string.
-    deletePattern.push_back('\0');
-
-    SHFILEOPSTRUCTA operation{};
-    operation.wFunc = FO_DELETE;
-    operation.pFrom = deletePattern.c_str();
-    operation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI;
-
-    if (::SHFileOperationA(&operation) != 0) {
-      gpg::Warnf("Cache purge failed for \"%s\".", deletePattern.c_str());
-    }
+    moho::WIN_ShowCrashDialog(2, nullptr, "Fatal Error", message != nullptr ? message : "");
   }
 
   /**
    * Address: 0x008D4320 (FUN_008D4320)
    *
    * What it does:
-   * Applies startup accessibility tweaks and restores original values on exit.
+   * Applies startup accessibility tweaks or restores previously captured values.
    */
-  void ConfigureMouseSystemParameters(const bool restoreOriginalValues)
+  void ConfigureAccessibilitySystemParameters(const bool restoreOriginalValues)
   {
-    constexpr UINT kGetActionA = 0x3A;
-    constexpr UINT kSetActionA = 0x3B;
-    constexpr UINT kGetActionB = 0x34;
-    constexpr UINT kSetActionB = 0x35;
-    constexpr UINT kGetActionC = 0x32;
-    constexpr UINT kSetActionC = 0x33;
-
-    struct IntPair
-    {
-      std::uint32_t values[2]{};
-    };
-    struct IntSextet
-    {
-      std::uint32_t values[6]{};
-    };
-
-    static IntPair sSavedA{};
-    static IntPair sSavedB{};
-    static IntSextet sSavedC{};
-
     if (restoreOriginalValues) {
-      (void)::SystemParametersInfoW(kSetActionA, sizeof(sSavedA), &sSavedA, 0);
-      (void)::SystemParametersInfoW(kSetActionB, sizeof(sSavedB), &sSavedB, 0);
-      (void)::SystemParametersInfoW(kSetActionC, sizeof(sSavedC), &sSavedC, 0);
+      (void)::SystemParametersInfoW(SPI_SETSTICKYKEYS, sizeof(STICKYKEYS), &sSavedStickyKeys, 0);
+      (void)::SystemParametersInfoW(SPI_SETTOGGLEKEYS, sizeof(TOGGLEKEYS), &sSavedToggleKeys, 0);
+      (void)::SystemParametersInfoW(SPI_SETFILTERKEYS, sizeof(FILTERKEYS), &sSavedFilterKeys, 0);
       return;
     }
 
-    (void)::SystemParametersInfoW(kGetActionA, sizeof(sSavedA), &sSavedA, 0);
-    (void)::SystemParametersInfoW(kGetActionB, sizeof(sSavedB), &sSavedB, 0);
-    (void)::SystemParametersInfoW(kGetActionC, sizeof(sSavedC), &sSavedC, 0);
-
-    IntPair nextA = sSavedA;
-    if ((sSavedA.values[1] & 1U) == 0U) {
-      nextA.values[1] &= 0xFFFFFFF3U;
-      (void)::SystemParametersInfoW(kSetActionA, sizeof(nextA), &nextA, 0);
+    STICKYKEYS nextStickyKeys = sSavedStickyKeys;
+    if ((sSavedStickyKeys.dwFlags & SKF_STICKYKEYSON) == 0) {
+      nextStickyKeys.dwFlags = sSavedStickyKeys.dwFlags & ~(SKF_HOTKEYACTIVE | SKF_CONFIRMHOTKEY);
+      (void)::SystemParametersInfoW(SPI_SETSTICKYKEYS, sizeof(STICKYKEYS), &nextStickyKeys, 0);
     }
 
-    IntPair nextB = sSavedB;
-    if ((sSavedB.values[1] & 1U) == 0U) {
-      nextB.values[1] &= 0xFFFFFFF3U;
-      (void)::SystemParametersInfoW(kSetActionB, sizeof(nextB), &nextB, 0);
+    TOGGLEKEYS nextToggleKeys = sSavedToggleKeys;
+    if ((sSavedToggleKeys.dwFlags & TKF_TOGGLEKEYSON) == 0) {
+      nextToggleKeys.dwFlags = sSavedToggleKeys.dwFlags & ~(TKF_HOTKEYACTIVE | TKF_CONFIRMHOTKEY);
+      (void)::SystemParametersInfoW(SPI_SETTOGGLEKEYS, sizeof(TOGGLEKEYS), &nextToggleKeys, 0);
     }
 
-    IntSextet nextC = sSavedC;
-    if ((sSavedC.values[1] & 1U) == 0U) {
-      nextC.values[1] &= 0xFFFFFFF3U;
-      (void)::SystemParametersInfoW(kSetActionC, sizeof(nextC), &nextC, 0);
+    FILTERKEYS nextFilterKeys = sSavedFilterKeys;
+    if ((sSavedFilterKeys.dwFlags & FKF_FILTERKEYSON) == 0) {
+      nextFilterKeys.dwFlags = sSavedFilterKeys.dwFlags & ~(FKF_HOTKEYACTIVE | FKF_CONFIRMHOTKEY);
+      (void)::SystemParametersInfoW(SPI_SETFILTERKEYS, sizeof(FILTERKEYS), &nextFilterKeys, 0);
     }
   }
 
@@ -252,11 +437,11 @@ namespace
   [[nodiscard]]
   bool TryLaunchMediaCenterIfRequested()
   {
-    if (!TryFindCommandSwitch("/mediacenter", 0, nullptr)) {
+    if (!moho::CFG_GetArgOption("/mediacenter", 0, nullptr)) {
       return false;
     }
 
-    if (::GetSystemMetrics(0x57) == 0) {
+    if (::GetSystemMetrics(SM_MEDIACENTER) == 0) {
       return false;
     }
 
@@ -276,16 +461,6 @@ namespace
     return reinterpret_cast<std::uintptr_t>(result) > 32U;
   }
 
-  /**
-   * Address: 0x009071C0 (FUN_009071C0)
-   *
-   * What it does:
-   * AQtime instrumentation gate used by `/aqtime` startup switch.
-   */
-  void EnableAqtimeInstrumentation([[maybe_unused]] const int mode)
-  {
-    // This helper is currently a no-op until AQtime integration is reconstructed.
-  }
 } // namespace
 
 /**
@@ -307,22 +482,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
   gpg::time::Timer runTimer{};
 
-  if (TryFindCommandSwitch("/waitfordebugger", 0, nullptr)) {
+  if (moho::CFG_GetArgOption("/waitfordebugger", 0, nullptr)) {
     ::MessageBoxW(nullptr, L"Attach the debugger and click OK.", L"Waiting", 0);
   }
 
-  if (TryFindCommandSwitch("/aqtime", 0, nullptr)) {
-    EnableAqtimeInstrumentation(0);
+  if (moho::CFG_GetArgOption("/aqtime", 0, nullptr)) {
+    moho::APP_SetAqtimeInstrumentationMode(0);
   }
 
-  const char* allocLogPath = nullptr;
-  if (TryFindCommandSwitch("/alloclog", 1, &allocLogPath)) {
-    InitializeAllocationLog(allocLogPath);
+  msvc8::vector<msvc8::string> allocLogArgs;
+  if (moho::CFG_GetArgOption("/alloclog", 1, &allocLogArgs) && !allocLogArgs.empty()) {
+    InitializeAllocationLog(allocLogArgs[0].c_str());
   }
 
   gpg::SetDieHandler(&FatalErrorDieHandler);
 
-  if (TryFindCommandSwitch("/singleproc", 0, nullptr)) {
+  if (moho::CFG_GetArgOption("/singleproc", 0, nullptr)) {
     DWORD_PTR processAffinityMask = 0;
     DWORD_PTR systemAffinityMask = 0;
     (void)::GetProcessAffinityMask(::GetCurrentProcess(), &processAffinityMask, &systemAffinityMask);
@@ -339,24 +514,36 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     (void)::SetProcessAffinityMask(::GetCurrentProcess(), selectedMask);
   }
 
-  if (TryFindCommandSwitch("/purgecache", 0, nullptr)) {
-    PurgeCacheDirectory();
+  if (moho::CFG_GetArgOption("/purgecache", 0, nullptr)) {
+    moho::USER_PurgeAppCacheDir();
   }
 
-  ConfigureMouseSystemParameters(false);
+  (void)::SystemParametersInfoW(SPI_GETSTICKYKEYS, sizeof(STICKYKEYS), &sSavedStickyKeys, 0);
+  (void)::SystemParametersInfoW(SPI_GETTOGGLEKEYS, sizeof(TOGGLEKEYS), &sSavedToggleKeys, 0);
+  (void)::SystemParametersInfoW(SPI_GETFILTERKEYS, sizeof(FILTERKEYS), &sSavedFilterKeys, 0);
+  ConfigureAccessibilitySystemParameters(false);
 
   int exitCode = 0;
-  {
-    CScApp app;
-    moho::WIN_AppExecute(&app);
-    exitCode = app.exitValue;
-    app.framerates.Reset();
+  try {
+    {
+      CScApp app;
+      moho::WIN_AppExecute(&app);
+      exitCode = app.exitValue;
+      app.framerates.Reset();
+    }
+
+    const int totalSeconds = static_cast<int>(runTimer.ElapsedSeconds());
+    gpg::Logf("Run time: %dh%02dm%02ds", totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60);
+  } catch (const gpg::gal::Error& galError) {
+    std::ostringstream formatted;
+    formatted << "file : " << galError.GetRuntimeMessage() << "(" << galError.GetRuntimeLine() << ")\n";
+    formatted << "error: " << galError.what();
+    gpg::Die("GAL Exception: %s", formatted.str().c_str());
+  } catch (const std::exception& ex) {
+    gpg::Die("Unhandled exception:\n\n%s", ex.what());
   }
 
-  const int totalSeconds = static_cast<int>(gpg::time::CyclesToSeconds(runTimer.ElapsedCycles()));
-  gpg::Logf("Run time: %dh%02dm%02ds", totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60);
-
-  ConfigureMouseSystemParameters(true);
+  ConfigureAccessibilitySystemParameters(true);
   (void)TryLaunchMediaCenterIfRequested();
   return exitCode;
 }

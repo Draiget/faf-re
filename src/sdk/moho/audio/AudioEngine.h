@@ -4,6 +4,8 @@
 #include <cstdint>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/core/time/Timer.h"
 #include "wm3/Vector3.h"
 
 namespace moho
@@ -12,7 +14,7 @@ namespace moho
   class VTransform;
   class IXACTCue;
   class IXACTWaveBank;
-  struct SoundConfiguration;
+  struct AudioEngineImpl;
 
   class IXACTSoundBank
   {
@@ -240,6 +242,43 @@ namespace moho
     float mDopplerScaler;        // +0x60
   };
 
+  struct AudioEngineRef
+  {
+    AudioEngine* mEngine; // +0x00
+    void* mControl;       // +0x04 (`boost::detail::sp_counted_base*`)
+  };
+
+  struct AudioEngineRefVector
+  {
+    void* mAllocatorCookie;   // +0x00
+    AudioEngineRef* mStart;   // +0x04
+    AudioEngineRef* mFinish;  // +0x08
+    AudioEngineRef* mCapacity; // +0x0C
+  };
+
+  struct SoundConfiguration
+  {
+    gpg::time::Timer mTime;            // +0x00
+    AudioEngineRefVector mEngines;     // +0x08
+    gpg::MemBuffer<char> mGlobalSettingsBuffer; // +0x18
+    std::uint8_t mNoSound;             // +0x28
+    std::uint8_t mReserved29[0x03];    // +0x29
+    std::uint32_t mSpeakerConfiguration; // +0x2C
+    std::uint32_t mReserved30;         // +0x30
+    std::uint32_t mLookAheadTimeMs;    // +0x34
+    const void* mGlobalSettingsStart;  // +0x38
+    std::uint32_t mGlobalSettingsLength; // +0x3C
+    std::uint32_t mRuntimeFlags;       // +0x40
+    std::uint8_t mReserved44[0x0C];    // +0x44
+    std::uint32_t (__cdecl* mHandleSoundEvent)(int*); // +0x50
+    std::uint8_t mReserved54[0x04];    // +0x54
+    std::uint8_t mAudition;            // +0x58
+    std::uint8_t mReserved59[0x07];    // +0x59
+
+    [[nodiscard]] std::uint32_t EngineCount() const;
+    [[nodiscard]] AudioEngineImpl* EngineImplAt(std::uint32_t index) const;
+  };
+
   struct AudioEngineImpl
   {
     /**
@@ -268,7 +307,7 @@ namespace moho
     IXACTEngine* mInstance;             // +0x34
     Audio3DListener mListener;          // +0x38
     AudioMapStorage mMap2;              // +0x6C
-    std::uint32_t mReserved78;          // +0x78
+    float mGlobalCategoryVolume;        // +0x78
     Audio3DDspSettings mSettings;       // +0x7C
     Audio3DEmitter mEmitter;            // +0xAC
     std::uint8_t mAudioHandle[0x14];    // +0x110
@@ -283,10 +322,45 @@ namespace moho
   static_assert(sizeof(Audio3DListener) == 0x34, "Audio3DListener size must be 0x34");
   static_assert(sizeof(Audio3DDspSettings) == 0x30, "Audio3DDspSettings size must be 0x30");
   static_assert(sizeof(Audio3DEmitter) == 0x64, "Audio3DEmitter size must be 0x64");
+  static_assert(sizeof(AudioEngineRef) == 0x08, "AudioEngineRef size must be 0x08");
+  static_assert(sizeof(AudioEngineRefVector) == 0x10, "AudioEngineRefVector size must be 0x10");
+  static_assert(offsetof(SoundConfiguration, mTime) == 0x00, "SoundConfiguration::mTime offset must be 0x00");
+  static_assert(offsetof(SoundConfiguration, mEngines) == 0x08, "SoundConfiguration::mEngines offset must be 0x08");
+  static_assert(
+    offsetof(SoundConfiguration, mGlobalSettingsBuffer) == 0x18,
+    "SoundConfiguration::mGlobalSettingsBuffer offset must be 0x18"
+  );
+  static_assert(offsetof(SoundConfiguration, mNoSound) == 0x28, "SoundConfiguration::mNoSound offset must be 0x28");
+  static_assert(
+    offsetof(SoundConfiguration, mSpeakerConfiguration) == 0x2C,
+    "SoundConfiguration::mSpeakerConfiguration offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(SoundConfiguration, mLookAheadTimeMs) == 0x34,
+    "SoundConfiguration::mLookAheadTimeMs offset must be 0x34"
+  );
+  static_assert(
+    offsetof(SoundConfiguration, mGlobalSettingsStart) == 0x38,
+    "SoundConfiguration::mGlobalSettingsStart offset must be 0x38"
+  );
+  static_assert(
+    offsetof(SoundConfiguration, mGlobalSettingsLength) == 0x3C,
+    "SoundConfiguration::mGlobalSettingsLength offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(SoundConfiguration, mHandleSoundEvent) == 0x50,
+    "SoundConfiguration::mHandleSoundEvent offset must be 0x50"
+  );
+  static_assert(offsetof(SoundConfiguration, mAudition) == 0x58, "SoundConfiguration::mAudition offset must be 0x58");
+  static_assert(sizeof(SoundConfiguration) == 0x60, "SoundConfiguration size must be 0x60");
   static_assert(offsetof(AudioEngineImpl, mBanks) == 0x08, "AudioEngineImpl::mBanks offset must be 0x08");
   static_assert(offsetof(AudioEngineImpl, mInstance) == 0x34, "AudioEngineImpl::mInstance offset must be 0x34");
   static_assert(offsetof(AudioEngineImpl, mListener) == 0x38, "AudioEngineImpl::mListener offset must be 0x38");
   static_assert(offsetof(AudioEngineImpl, mMap2) == 0x6C, "AudioEngineImpl::mMap2 offset must be 0x6C");
+  static_assert(
+    offsetof(AudioEngineImpl, mGlobalCategoryVolume) == 0x78,
+    "AudioEngineImpl::mGlobalCategoryVolume offset must be 0x78"
+  );
   static_assert(offsetof(AudioEngineImpl, mSettings) == 0x7C, "AudioEngineImpl::mSettings offset must be 0x7C");
   static_assert(offsetof(AudioEngineImpl, mEmitter) == 0xAC, "AudioEngineImpl::mEmitter offset must be 0xAC");
   static_assert(offsetof(AudioEngineImpl, mAudioHandle) == 0x110, "AudioEngineImpl::mAudioHandle offset must be 0x110");
@@ -299,6 +373,17 @@ namespace moho
   {
   public:
     AudioEngineImpl* mImpl; // +0x00
+
+    /**
+     * Address: 0x004D9340 (FUN_004D9340, ?Create@AudioEngine@Moho@@SA?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@VStrArg@gpg@@@Z)
+     *
+     * gpg::StrArg voicePath
+     *
+     * What it does:
+     * Ensures global sound-configuration ownership is available, creates an
+     * `AudioEngine` instance, and registers it into the global engine lane.
+     */
+    [[nodiscard]] static boost::shared_ptr<AudioEngine> Create(gpg::StrArg voicePath);
 
     /**
      * Address: 0x004D9760 (FUN_004D9760)
@@ -375,6 +460,26 @@ namespace moho
      */
     static void Calculate3D(const Wm3::Vec3f* worldPos, AudioEngine* engine, IXACTCue* cue);
   };
+
+  extern SoundConfiguration* sSoundConfiguration;
+
+  /**
+   * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Advances XACT engine work queues for each configured audio engine and
+   * resets the global sound-configuration frame timer.
+   */
+  void SND_Frame();
+
+  /**
+   * Address: 0x004D8FC0 (FUN_004D8FC0, ?SND_Mute@Moho@@YAX_N@Z)
+   *
+   * What it does:
+   * Stores/restores per-engine "Global" category volume while applying
+   * process-wide mute transitions.
+   */
+  void SND_Mute(bool doMute);
 
   static_assert(sizeof(AudioEngine) == sizeof(void*), "AudioEngine size must be pointer-sized");
 } // namespace moho

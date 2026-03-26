@@ -43,82 +43,93 @@ namespace gpg
 	{
 	public:
 		/**
-		 * Non-virtual dtor frees all buffers.
+		 * Address: 0x009569A0 (FUN_009569A0)
+         * Deleting owner: 0x00956A90 (FUN_00956A90)
 		 *
-		 * Address: 0x00956A90
+		 * What it does:
+		 * Performs non-deleting teardown of pipe buffers/synchronization before Stream base teardown.
 		 */
 		~PipeStream() override;
 
 		/**
-		 * Read with blocking semantics.
+		 * Address: 0x00956A50 (FUN_00956A50)
 		 *
-		 * Address: 0x00956A50
+		 * What it does:
+		 * Blocking read wrapper that dispatches to `DoRead(..., true)`.
 		 */
 		size_t VirtRead(char* dst, size_t len) override;
 
 		/**
-		 * Read with non-blocking semantics.
+		 * Address: 0x00956A70 (FUN_00956A70)
 		 *
-		 * Address: 0x00956A70
+		 * What it does:
+		 * Non-blocking read wrapper that dispatches to `DoRead(..., false)`.
 		 */
 		size_t VirtReadNonBlocking(char* dst, size_t len) override;
 
 		/**
-		 * End-of-input once writer closed and nothing left to read.
+		 * Address: 0x009568E0 (FUN_009568E0)
 		 *
-		 * Address: 0x009568E0
+		 * What it does:
+		 * Returns true when output is closed and no committed unread bytes remain.
 		 */
 		bool VirtAtEnd() override;
 
 		/**
-		 * Write bytes; publishes them to readers immediately.
+		 * Address: 0x00956AB0 (FUN_00956AB0)
 		 *
-		 * Address: 0x00956AB0
+		 * What it does:
+		 * Appends bytes into 4KB chunk buffers and publishes written range to readers.
 		 */
 		void VirtWrite(const char* data, size_t size) override;
 
 		/**
-		 * Publish any staged bytes (no-op here; kept for parity).
+		 * Address: 0x00956CC0 (FUN_00956CC0)
 		 *
-		 * Address: 0x00956CC0
+		 * What it does:
+		 * Publishes pending write head to read boundary or throws when closed.
 		 */
 		void VirtFlush() override;
 
 		/**
-		 * Close pipe (respects write/read flags from Mode).
+		 * Address: 0x00956920 (FUN_00956920)
 		 *
-		 * Address: 0x00956920
+		 * What it does:
+		 * Closes the send lane when requested by mode and wakes waiting readers.
 		 */
 		void VirtClose(Mode mode) override;
 
 		/**
-		 * True if there is nothing to read at the moment.
+		 * Address: 0x00483470 (FUN_00483470)
 		 *
-		 * Address: 0x00483470
+		 * What it does:
+		 * Returns true only when local read window is exhausted and `VirtAtEnd()` is true.
 		 */
 		bool Empty();
 
 		/**
-		 * Total readable bytes currently available.
-         * Computes total readable bytes across [readHead..writeStart) spanning the buffer chain.
+		 * Address: 0x009566C0 (FUN_009566C0)
 		 *
-		 * Address: 0x009566C0
+		 * What it does:
+		 * Computes committed readable byte count across head/middle/tail chunk ranges.
 		 */
 		size_t GetLength();
 
-		/**
-		 * Internal: the read routine with optional waiting.
-		 *
-		 * Address: 0x00956740
-		 */
-		size_t DoRead(char* dst, size_t len, bool doWait);
+        /**
+         * Address: 0x00956740 (FUN_00956740)
+         *
+         * What it does:
+         * Internal read loop that drains current buffers and optionally waits for new committed bytes.
+         */
+        size_t DoRead(char* dst, size_t len, bool doWait);
 
-		/**
-		 * Ctor allocates the first buffer and resets pointers.
-		 *
-		 * Address: 0x00956740
-		 */
-		PipeStream();
+        /**
+         * Address: 0x009565D0 (FUN_009565D0)
+         *
+         * What it does:
+         * Initializes lock/condition/list state and allocates the first 4KB stream buffer.
+         */
+        PipeStream();
 
 	protected:
 		boost::mutex mLock{};
@@ -127,25 +138,13 @@ namespace gpg
 		DList<PipeStreamBuffer, void> mBuff;
 
 	private:
-		/**
-		 * Allocate a fresh 4KB buffer and link at tail; sets write window to this buffer.
-		 */
-		void allocateTailBuffer();
+        PipeStreamBuffer* headNode() noexcept {
+            return mBuff.front();
+        }
 
-		/**
-		 * Return pointer to the last (tail) buffer (undefined if list empty).
-		 */
-		PipeStreamBuffer* tailNode() noexcept;
-
-		/**
-		 * Return pointer to the first (head) buffer (undefined if list empty).
-		 */
-		PipeStreamBuffer* headNode() noexcept;
-
-		/**
-		 * Reset to a pristine single-buffer state (assumes lock held).
-		 */
-		void resetStateWithOneBuffer(PipeStreamBuffer* buf);
+        PipeStreamBuffer* tailNode() noexcept {
+            return mBuff.back();
+        }
 	};
 #pragma pack(pop)
 	static_assert(sizeof(PipeStream) == 0x48, "PipeStream size must be 0x48");

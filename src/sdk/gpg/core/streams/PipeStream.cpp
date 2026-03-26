@@ -1,125 +1,88 @@
 #include "PipeStream.h"
+#include <cstring>
+
 using namespace gpg;
 
 /**
- * Ensure intrusive list sentinel is initialized self-linked.
+ * Address: 0x009565D0 (FUN_009565D0)
+ *
+ * What it does:
+ * Initializes lock/condition/list state and allocates the first 4KB stream buffer.
  */
-static void init_sentinel(DList<PipeStreamBuffer>& list) noexcept {
-    list.mNext = &list;
-    list.mPrev = &list;
-}
-
-static bool is_sentinel(
-    const DListItem<PipeStreamBuffer>* n,
-    const DList<PipeStreamBuffer>* s) noexcept
-{
-    return reinterpret_cast<const void*>(n) == reinterpret_cast<const void*>(s);
-}
-
-static void link_before(DList<PipeStreamBuffer>& where, PipeStreamBuffer* node) noexcept {
-    // Insert node before 'where' (i.e., at tail if where==sentinel)
-    node->mPrev = where.mPrev;
-    node->mNext = &where;
-    where.mPrev->mNext = node;
-    where.mPrev = node;
-}
-
-static void unlink_and_isolate(PipeStreamBuffer* node) noexcept {
-    node->mPrev->mNext = node->mNext;
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev = node;
-    node->mNext = node;
-}
-
-void PipeStream::allocateTailBuffer() {
-	const auto b = new PipeStreamBuffer(); // DListItem ctor should self-link
-    link_before(mBuff, b);    // push_back
-    // Update write window to this fresh buffer
-    mWriteHead = b->begin();
-    mWriteStart = mWriteHead;     // write becomes visible immediately (engine behavior)
-    mWriteEnd = b->end();
-    // If this is the first buffer in the list, also wire read window.
-    if (mReadHead == nullptr) {
-        resetStateWithOneBuffer(b);
-    }
-}
-
-PipeStreamBuffer* PipeStream::tailNode() noexcept {
-    return is_sentinel(mBuff.mPrev, &mBuff) ? nullptr
-        : static_cast<PipeStreamBuffer*>(mBuff.mPrev);
-}
-
-PipeStreamBuffer* PipeStream::headNode() noexcept {
-    return is_sentinel(mBuff.mNext, &mBuff) ? nullptr
-        : static_cast<PipeStreamBuffer*>(mBuff.mNext);
-}
-
-void PipeStream::resetStateWithOneBuffer(PipeStreamBuffer* buf) {
-    // Set both read and write windows to this single buffer.
-    mReadHead = buf->begin();
-    mReadStart = buf->begin();
-    mReadEnd = buf->end();      // will be adjusted to mWriteStart if this is also the last buffer
-    if (tailNode() == buf) {
-        // Single buffer: end of readable range cannot exceed committed start.
-        mReadEnd = mWriteStart;
-    }
-}
-
 PipeStream::PipeStream()
-    : Stream()
+    : Stream(),
+      mLock(),
+      mClosed(false),
+      mCond(),
+      mBuff()
 {
-    // Initialize intrusive list sentinel
-    init_sentinel(mBuff);
+    auto* const first = new PipeStreamBuffer{};
+    mBuff.push_back(first);
 
-    // Allocate initial buffer and prime pointers
-    allocateTailBuffer();
+    mReadEnd = first->begin();
+    mReadHead = first->begin();
+    mReadStart = first->begin();
+    mWriteHead = first->begin();
+    mWriteStart = first->begin();
+    mWriteEnd = first->end();
 }
 
+/**
+ * Address: 0x009569A0 (FUN_009569A0)
+ * Deleting owner: 0x00956A90 (FUN_00956A90)
+ *
+ * What it does:
+ * Performs non-deleting teardown of pipe buffers/synchronization before Stream base teardown.
+ */
 PipeStream::~PipeStream()
 {
-    // No locking: object is tearing down.
-    // Walk once from head to sentinel, unlink+delete each node.
-    auto* n = mBuff.mNext;
-    while (!is_sentinel(n, &mBuff)) {
-        // save next before unlink
-        auto* next = n->mNext;                    
-        auto* buf = static_cast<PipeStreamBuffer*>(n);
-        // detach from list
-        unlink_and_isolate(buf);
-        // free 4KB block
-        delete buf;                               
-        n = next;
+    while (!mBuff.empty()) {
+        delete mBuff.pop_front();
     }
-
-    // Reset sentinel links (not strictly needed in dtor, but keeps invariants tidy)
-    mBuff.mNext = &mBuff;
-    mBuff.mPrev = &mBuff;
-
-    // Null sliding-window pointers so accidental post-dtor use AVs fast
-    mReadHead = mReadStart = mReadEnd = nullptr;
-    mWriteHead = mWriteStart = mWriteEnd = nullptr;
 }
 
+/**
+ * Address: 0x00956A50 (FUN_00956A50)
+ *
+ * What it does:
+ * Blocking read wrapper forwarding to DoRead(..., true).
+ */
 size_t PipeStream::VirtRead(char* dst, const size_t len)
 {
     return DoRead(dst, len, /*doWait=*/true);
 }
 
+/**
+ * Address: 0x00956A70 (FUN_00956A70)
+ *
+ * What it does:
+ * Non-blocking read wrapper forwarding to DoRead(..., false).
+ */
 size_t PipeStream::VirtReadNonBlocking(char* dst, const size_t len)
 {
     return DoRead(dst, len, /*doWait=*/false);
 }
 
+/**
+ * Address: 0x009568E0 (FUN_009568E0)
+ *
+ * What it does:
+ * Returns true when send side is closed and local read cursor reached current readable end.
+ */
 bool PipeStream::VirtAtEnd()
 {
     boost::mutex::scoped_lock lock(mLock);
-    return mClosed && (mReadHead == mWriteStart);
+    return mClosed && (mReadHead == mReadEnd);
 }
 
+/**
+ * Address: 0x00956AB0 (FUN_00956AB0)
+ *
+ * What it does:
+ * Appends bytes to chunk buffers, updates committed write boundary, and wakes readers.
+ */
 void PipeStream::VirtWrite(const char* data, size_t size)
 {
-    if (!data || size == 0) return;
-
     boost::mutex::scoped_lock lock(mLock);
 
     if (mClosed) {
@@ -127,41 +90,51 @@ void PipeStream::VirtWrite(const char* data, size_t size)
         throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
     }
 
-    while (size > 0) {
-        // Ensure there is a tail buffer to write into
-        const PipeStreamBuffer* tail = tailNode();
-        if (!tail) {
-            allocateTailBuffer();
-            tail = tailNode();
+    const size_t available = static_cast<size_t>(mWriteEnd - mWriteHead);
+    if (available < size) {
+        if (available != 0) {
+            std::memcpy(mWriteHead, data, available);
+            data += available;
+            size -= available;
         }
 
-        // Space left in current tail
-        size_t space = static_cast<size_t>(mWriteEnd - mWriteHead);
-        if (space == 0) {
-            // Need a new tail buffer
-            allocateTailBuffer();
-            continue;
+        while (size >= PipeStreamBuffer::kSize) {
+            auto* const chunk = new PipeStreamBuffer{};
+            mBuff.push_back(chunk);
+            std::memcpy(chunk->begin(), data, PipeStreamBuffer::kSize);
+            data += PipeStreamBuffer::kSize;
+            size -= PipeStreamBuffer::kSize;
         }
 
-        // Copy chunk into the current tail
-        const size_t chunk = (size < space) ? size : space;
-        std::memcpy(mWriteHead, data, chunk);
-        mWriteHead += chunk;
-        mWriteStart = mWriteHead;   // publish immediately (as in original)
-        data += chunk;
-        size -= chunk;
+        auto* const tail = new PipeStreamBuffer{};
+        mBuff.push_back(tail);
+        std::memcpy(tail->begin(), data, size);
+        mWriteHead = tail->begin() + size;
+        mWriteStart = mWriteHead;
+        mWriteEnd = tail->end();
+    } else {
+        std::memcpy(mWriteHead, data, size);
+        mWriteHead += size;
+        mWriteStart = mWriteHead;
     }
 
-    // Wake up any waiting readers
     mCond.notify_all();
 }
 
 /**
- * Address: 0x00956CC0 (original)
+ * Address: 0x00956CC0 (FUN_00956CC0)
+ *
+ * What it does:
+ * Publishes pending write bytes and wakes readers; throws on closed write side.
  */
 void PipeStream::VirtFlush()
 {
     boost::mutex::scoped_lock lock(mLock);
+
+    if (mClosed) {
+        throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
+    }
+
     // In our implementation writes are immediately published; still keep parity:
     if (mWriteHead != mWriteStart) {
         mWriteStart = mWriteHead;
@@ -169,6 +142,12 @@ void PipeStream::VirtFlush()
     }
 }
 
+/**
+ * Address: 0x00956920 (FUN_00956920)
+ *
+ * What it does:
+ * Closes send lane when requested by mode and wakes blocked readers.
+ */
 void PipeStream::VirtClose(const Mode mode)
 {
     // Keep compatibility: close write-end if requested
@@ -183,24 +162,36 @@ void PipeStream::VirtClose(const Mode mode)
     }
 }
 
+/**
+ * Address: 0x00483470 (FUN_00483470)
+ *
+ * What it does:
+ * Returns true when local read window is exhausted and VirtAtEnd confirms stream completion.
+ */
 bool PipeStream::Empty()
 {
-    boost::mutex::scoped_lock lock(mLock);
-    // "Empty" means nothing currently readable
-    return (mReadHead == mWriteStart);
+    return (mReadHead == mReadEnd) && VirtAtEnd();
 }
 
+/**
+ * Address: 0x009566C0 (FUN_009566C0)
+ *
+ * What it does:
+ * Computes total committed readable bytes across chunk chain.
+ */
 size_t PipeStream::GetLength()
 {
     boost::mutex::scoped_lock lock(mLock);
 
-    if (is_sentinel(mBuff.mNext, &mBuff)) {
+    PipeStreamBuffer* const head = mBuff.front();
+    PipeStreamBuffer* const tail = mBuff.back();
+    if (!head || !tail) {
         // no buffers - shouldn't happen
     	return 0; 
     }
 
     // Single-buffer fast path
-    if (mBuff.mNext == mBuff.mPrev) {
+    if (head == tail) {
         return static_cast<size_t>(mWriteStart - mReadHead);
     }
 
@@ -211,101 +202,72 @@ size_t PipeStream::GetLength()
     total += static_cast<size_t>(mReadEnd - mReadHead); // for head we keep mReadEnd = buffer->end()
 
     // Middle full buffers
-    for (const auto* n = mBuff.mNext->mNext; n != mBuff.mPrev; n = n->mNext) {
+    const auto* tailItem = static_cast<const DListItem<PipeStreamBuffer>*>(tail);
+    for (const auto* n = head->mNext; n != tailItem; n = n->mNext) {
         total += PipeStreamBuffer::kSize;
     }
 
     // Tail partial up to writeStart
-    if (auto* tail = tailNode()) {
-        total += static_cast<size_t>(mWriteStart - tail->begin());
-    }
+    total += static_cast<size_t>(mWriteStart - tail->begin());
     return total;
 }
 
 /**
- * Address: 0x00956740 (original)
+ * Address: 0x00956740 (FUN_00956740)
  *
- * Blocking read copies up to 'len' bytes; if 'doWait' is false, returns what is immediately available.
- * Wait wakes when bytes are published (notify_all) or when the stream is closed.
+ * What it does:
+ * Internal read loop that drains current buffers and optionally waits for new committed bytes.
  */
-size_t PipeStream::DoRead(char* dst, const size_t len, const bool doWait)
+size_t PipeStream::DoRead(char* dst, size_t len, const bool doWait)
 {
-    if (!dst || len == 0) {
-	    return 0;
-    }
-
     boost::mutex::scoped_lock lock(mLock);
+    size_t available = static_cast<size_t>(mReadEnd - mReadHead);
     size_t copied = 0;
 
-    auto recomputeReadWindow = [this] {
-        if (is_sentinel(mBuff.mNext, &mBuff)) {
-            mReadHead = mReadStart = mReadEnd = nullptr;
-            return;
+    while (available < len) {
+        if (available != 0) {
+            std::memcpy(dst, mReadHead, available);
+            dst += available;
+            copied += available;
+            len -= available;
+            mReadHead += available;
         }
 
-        if (mBuff.mNext == mBuff.mPrev) {
-            // Single buffer: readable end is the committed write start
-            mReadEnd = mWriteStart;
-        } else {
-            // Multi-buffer: head reads up to its end
-            auto* head = static_cast<PipeStreamBuffer*>(mBuff.mNext);
-            if (mReadHead < head->begin() || mReadHead > head->end()) {
-                mReadHead = head->begin();
-                mReadStart = head->begin();
-            }
-            mReadEnd = head->end();
-        }
-    };
+        PipeStreamBuffer* const head = headNode();
+        PipeStreamBuffer* const tail = tailNode();
 
-    recomputeReadWindow();
-
-    while (copied < len)
-    {
-        const size_t avail = (mReadHead && mReadEnd)
-            ? static_cast<size_t>(mReadEnd - mReadHead)
-            : 0;
-
-        if (avail == 0)
-        {
-            if (mBuff.mNext == mBuff.mPrev)
-            {
-                // Single buffer with no data: either wait or return what we have
+        if (head == tail) {
+            if (mReadEnd != mWriteStart) {
+                mReadEnd = mWriteStart;
+            } else {
                 if (!doWait || mClosed) {
-                    break;
+                    return copied;
                 }
                 mCond.wait(lock);
-                recomputeReadWindow();
-                continue;
             }
-
-            // Advance to next buffer
-            auto* head = static_cast<PipeStreamBuffer*>(mBuff.mNext);
-            auto* next = static_cast<PipeStreamBuffer*>(head->mNext);
-
-            // Unlink and destroy current head
-            unlink_and_isolate(head);
-            delete head;
-
-            // Setup new read window at 'next'
-            mReadHead = next->begin();
-            mReadStart = next->begin();
-            if (next == static_cast<PipeStreamBuffer*>(mBuff.mPrev)) {
-	            // Next is also tail: clamp by published boundary
-	            mReadEnd = mWriteStart;
+        } else {
+            if (mReadEnd != head->end()) {
+                mReadEnd = head->end();
             } else {
-	            mReadEnd = next->end();
+                delete mBuff.pop_front();
+                PipeStreamBuffer* const next = headNode();
+                mReadHead = next->begin();
+                mReadStart = next->begin();
+                if (next != tailNode()) {
+                    mReadEnd = next->end();
+                } else {
+                    mReadEnd = mWriteStart;
+                }
             }
-            continue;
         }
 
-        const size_t take = std::min(len - copied, avail);
-        std::memcpy(dst, mReadHead, take);
-        dst += take;
-        mReadHead += take;
-        copied += take;
-
-        // If we exactly consumed the head buffer, next loop iteration will advance/delete it.
+        available = static_cast<size_t>(mReadEnd - mReadHead);
     }
 
-    return copied;
+    if (len != 0) {
+        std::memcpy(dst, mReadHead, len);
+        mReadHead += len;
+    }
+
+    return copied + len;
 }

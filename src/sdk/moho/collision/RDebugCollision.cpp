@@ -160,7 +160,7 @@ namespace moho
     dtrFunc_ = &DestroyRDebugCollisionInPlace;
     AddRDebugOverlayBase(this);
     gpg::RType::Init();
-    RegisterOverlayClassToken("Collision");
+    RegisterOverlayClass("Display collision boxes for all units", "Collision");
     Finish();
   }
 } // namespace moho

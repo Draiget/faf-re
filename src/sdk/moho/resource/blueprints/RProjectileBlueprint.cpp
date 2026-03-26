@@ -1,7 +1,6 @@
 #include "RProjectileBlueprint.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <limits>
@@ -10,20 +9,12 @@
 #include <string_view>
 #include <typeinfo>
 
+#include "gpg/core/containers/String.h"
+
 namespace moho
 {
   namespace
   {
-    void NormalizeFilenameLowerSlash(std::string& value)
-    {
-      for (char& ch : value) {
-        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        if (ch == '\\') {
-          ch = '/';
-        }
-      }
-    }
-
     [[nodiscard]] std::string
     CompleteResourcePath(const std::string_view sourceName, const std::string_view resourceName)
     {
@@ -140,7 +131,7 @@ namespace moho
     REntityBlueprint::OnInitBlueprint();
 
     std::string completedMeshPath = CompleteResourcePath(mSource.view(), Display.MeshBlueprint.name.view());
-    NormalizeFilenameLowerSlash(completedMeshPath);
+    gpg::STR_NormalizeFilenameLowerSlash(completedMeshPath);
     Display.MeshBlueprint.name.assign_owned(completedMeshPath);
   }
 } // namespace moho

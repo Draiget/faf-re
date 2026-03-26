@@ -17,8 +17,40 @@ namespace moho
      */
     virtual ~CountedObject();
 
+    /**
+     * What it does:
+     * Increments intrusive reference count for this object.
+     */
+    void AddReference() noexcept;
+
+    /**
+     * What it does:
+     * Atomically increments intrusive reference count.
+     */
+    void AddReferenceAtomic() noexcept;
+
+    /**
+     * What it does:
+     * Decrements intrusive reference count and deletes this object when it
+     * reaches zero.
+     *
+     * @return true when this call deleted the object.
+     */
+    [[nodiscard]] bool ReleaseReference() noexcept;
+
+    /**
+     * What it does:
+     * Atomically decrements intrusive reference count and deletes this object
+     * when it reaches zero.
+     *
+     * @return true when this call deleted the object.
+     */
+    [[nodiscard]] bool ReleaseReferenceAtomic() noexcept;
+
   protected:
-    CountedObject() = default;
+    CountedObject()
+      : mRefCount(0)
+    {}
 
   public:
     // Intrusive reference counter used by `CountedPtr<T>`-style ownership paths.

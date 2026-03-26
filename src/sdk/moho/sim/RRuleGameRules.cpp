@@ -16,6 +16,7 @@
 #include "legacy/containers/Tree.h"
 #include "lua/LuaObject.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "moho/resource/blueprints/REmitterBlueprint.h"
@@ -377,6 +378,26 @@ namespace moho
       }
     }
   } // namespace
+
+  /**
+   * Address: 0x0052B960 (FUN_0052B960)
+   */
+  LuaPlus::LuaObject RULE_GetDefaultPlayerOptions(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr) {
+      return {};
+    }
+
+    LuaPlus::LuaObject lobbyModule = SCR_ImportLuaModule(state, "/lua/ui/lobby/lobbyComm.lua");
+    LuaPlus::LuaObject getDefaultPlayerOptions = SCR_GetLuaTableField(state, lobbyModule, "GetDefaultPlayerOptions");
+    if (getDefaultPlayerOptions.m_state == nullptr || getDefaultPlayerOptions.m_object.tt != LUA_TFUNCTION) {
+      gpg::Warnf("RULE_GetDefaultPlayerOptions: missing lobbyComm.GetDefaultPlayerOptions().");
+      return {};
+    }
+
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> getDefaultsFn{getDefaultPlayerOptions};
+    return getDefaultsFn();
+  }
 
   /**
    * Address: 0x0051CF90 callsite family (func_GetPropBlueprint)

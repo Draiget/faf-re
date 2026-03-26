@@ -18,11 +18,11 @@ CNullClient::CNullClient(
   const int32_t index,
   CClientManagerImpl* manager,
   const char* name,
-  LaunchInfoBase* launchInfo,
+  const int32_t ownerId,
   BVIntSet& commandSources,
   const uint32_t sourceId
 )
-  : CClientBase(index, manager, name, launchInfo, commandSources, sourceId)
+  : CClientBase(index, manager, name, ownerId, commandSources, sourceId)
 {}
 
 /**

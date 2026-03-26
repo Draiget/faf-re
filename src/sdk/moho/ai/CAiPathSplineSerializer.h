@@ -1,6 +1,8 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstddef>
+
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -12,10 +14,19 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005B48E0
-     * Slot: 0
-     * Demangled: RegisterSerializeFunctions (binds mSerLoadFunc/mSerSaveFunc)
+     * Address: 0x005B48E0 (FUN_005B48E0)
+     *
+     * What it does:
+     * Binds load/save serializer callbacks into CAiPathSpline RTTI.
      */
-    virtual void RegisterSerializeFunctions() = 0;
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    void* mNext;
+    void* mPrev;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
   };
+
+  static_assert(sizeof(CAiPathSplineSerializer) == 0x14, "CAiPathSplineSerializer size must be 0x14");
 } // namespace moho

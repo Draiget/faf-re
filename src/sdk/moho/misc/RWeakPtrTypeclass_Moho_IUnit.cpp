@@ -4,37 +4,9 @@
 #include <stdexcept>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-
-namespace gpg
-{
-  /**
-   * These signatures are recovered from import names used by MohoEngine:
-   * - ReadArchive::ReadRawPointer
-   * - WriteArchive::WriteRawPointer
-   * - REF_UpcastPtr
-   *
-   * They are declared here so helper reconstruction can mirror original control flow.
-   */
-  enum class TrackedPointerState : int
-  {
-    Unowned = 1,
-    Owned = 2,
-  };
-
-  struct TrackedPointerInfo
-  {
-    void* object;
-    gpg::RType* type;
-  };
-
-  TrackedPointerInfo ReadRawPointer(ReadArchive* archive, const gpg::RRef& ownerRef);
-  void WriteRawPointer(
-    WriteArchive* archive, const gpg::RRef& objectRef, TrackedPointerState state, const gpg::RRef& ownerRef
-  );
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-} // namespace gpg
 
 namespace
 {

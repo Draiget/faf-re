@@ -60,6 +60,9 @@ namespace moho
   class CArmyImpl : public SimArmy
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x006FE670 (FUN_006FE670)
      *

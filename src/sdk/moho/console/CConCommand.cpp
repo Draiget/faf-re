@@ -1,7 +1,5 @@
 #include "moho/console/CConCommand.h"
 
-#include <algorithm>
-#include <cctype>
 #include <cstdlib>
 #include <mutex>
 #include <string>
@@ -287,23 +285,29 @@ namespace
     return sRegistry;
   }
 
-  std::string CanonicalizeName(const char* name)
+  std::string CanonicalizeName(const char* const name)
   {
-    if (name == nullptr) {
+    if (name == nullptr || *name == '\0') {
       return {};
     }
 
-    std::string out{name};
-    std::transform(out.begin(), out.end(), out.begin(), [](const unsigned char c) {
-      return static_cast<char>(std::tolower(c));
-    });
-    return out;
+    return gpg::STR_ToLower(name).to_std();
+  }
+
+  std::string CanonicalizeName(const std::string_view name)
+  {
+    if (name.empty()) {
+      return {};
+    }
+
+    std::string storage{name};
+    return gpg::STR_ToLower(storage.c_str()).to_std();
   }
 
   [[nodiscard]]
   bool IsConsoleWhitespace(const char ch) noexcept
   {
-    return std::isspace(static_cast<unsigned char>(ch)) != 0;
+    return gpg::STR_IsAsciiWhitespace(ch);
   }
 
   [[nodiscard]]
@@ -388,14 +392,7 @@ namespace
   [[nodiscard]]
   CConCommand* FindRegisteredConCommand(const std::string_view commandName)
   {
-    if (commandName.empty()) {
-      return nullptr;
-    }
-
-    std::string key{commandName};
-    std::transform(key.begin(), key.end(), key.begin(), [](const unsigned char c) {
-      return static_cast<char>(std::tolower(c));
-    });
+    const std::string key = CanonicalizeName(commandName);
     if (key.empty()) {
       return nullptr;
     }

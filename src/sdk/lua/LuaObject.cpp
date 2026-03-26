@@ -1,5 +1,7 @@
 #include "LuaObject.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 
 #include "LuaTableIterator.h"
@@ -549,6 +551,16 @@ void LuaObject::SetInteger(const char* key, const int32_t value)
 	SetNumber(key, static_cast<float>(value));
 }
 
+void LuaObject::SetBoolean(const char* key, const bool value)
+{
+	Ensure(m_state != nullptr, "m_state");
+
+	TObject object;
+	object.tt = LUA_TBOOLEAN;
+	object.value.b = value ? 1 : 0;
+	SetTableHelper(key, &object);
+}
+
 void LuaObject::SetObject(const char* key, const LuaObject& value)
 {
 	Ensure(m_state == value.m_state, "m_state == value.m_state");
@@ -647,6 +659,43 @@ LuaObject LuaObject::GetByName(const char* name) const
 	LuaObject value{LuaStackObject(m_state, -1)};
 	lua_settop(lstate, oldTop);
 	return value;
+}
+
+LuaObject LuaObject::operator[](const char* const name) const
+{
+	return GetByName(name);
+}
+
+LuaObject LuaObject::operator[](const int32_t index) const
+{
+	return GetByIndex(index);
+}
+
+LuaObject LuaObject::Lookup(const char* const path) const
+{
+	if (!path || !*path) {
+		return *this;
+	}
+
+	LuaObject current = *this;
+	const char* segmentStart = path;
+	while (segmentStart && *segmentStart) {
+		const char* const dot = std::strchr(segmentStart, '.');
+		const std::size_t segmentLength = dot ? static_cast<std::size_t>(dot - segmentStart) : std::strlen(segmentStart);
+		if (segmentLength == 0) {
+			return {};
+		}
+
+		msvc8::string segment(segmentStart, segmentLength);
+		current = current.GetByName(segment.c_str());
+		if (current.IsNil()) {
+			return current;
+		}
+
+		segmentStart = dot ? (dot + 1) : nullptr;
+	}
+
+	return current;
 }
 
 int32_t LuaObject::GetN() const
@@ -783,6 +832,24 @@ const char* LuaObject::GetString() const noexcept
 
 	const auto* ts = static_cast<const TString*>(m_object.value.p);
 	return ts ? ts->str : nullptr;
+}
+
+int32_t LuaObject::GetInteger() const noexcept
+{
+	if (IsNumber()) {
+		return static_cast<int32_t>(GetNumber());
+	}
+
+	if (IsBoolean()) {
+		return GetBoolean() ? 1 : 0;
+	}
+
+	if (IsString()) {
+		const char* const str = GetString();
+		return str ? std::atoi(str) : 0;
+	}
+
+	return 0;
 }
 
 bool LuaObject::ToByteStream(gpg::Stream& stream)

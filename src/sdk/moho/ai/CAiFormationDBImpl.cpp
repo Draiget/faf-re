@@ -1,12 +1,11 @@
 #include "moho/ai/CAiFormationDBImpl.h"
 
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiFormationInstance.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
 
 using namespace moho;
@@ -29,87 +28,113 @@ namespace
     return bucket;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject
-  GetLuaTableField(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const char* fieldName)
-  {
-    if (!state || !tableObj || !fieldName || !*fieldName) {
-      return {};
-    }
-
-    lua_State* const luaState = state->GetCState();
-    if (!luaState) {
-      return {};
-    }
-
-    const int oldTop = lua_gettop(luaState);
-    const_cast<LuaPlus::LuaObject&>(tableObj).PushStack(luaState);
-    lua_pushstring(luaState, fieldName);
-    lua_gettable(luaState, -2);
-    LuaPlus::LuaObject fieldObj{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(luaState, oldTop);
-    return fieldObj;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* state, const char* modulePath)
-  {
-    if (!state || !modulePath || !*modulePath) {
-      return {};
-    }
-
-    lua_State* const luaState = state->GetCState();
-    if (!luaState) {
-      return {};
-    }
-
-    const int oldTop = lua_gettop(luaState);
-    lua_getglobal(luaState, "import");
-    if (!lua_isfunction(luaState, -1)) {
-      lua_settop(luaState, oldTop);
-      return {};
-    }
-
-    lua_pushstring(luaState, modulePath);
-    if (lua_pcall(luaState, 1, 1, 0) != 0) {
-      lua_settop(luaState, oldTop);
-      return {};
-    }
-
-    LuaPlus::LuaObject moduleObj{LuaPlus::LuaStackObject(state, -1)};
-    lua_settop(luaState, oldTop);
-    return moduleObj;
-  }
-
   [[nodiscard]] LuaPlus::LuaObject ResolveFormationBucket(LuaPlus::LuaState* state, const EFormationType formationType)
   {
-    LuaPlus::LuaObject module = ImportLuaModule(state, kFormationModulePath);
+    LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
     if (!module || !module.IsTable()) {
       return {};
     }
 
     const char* const bucketName = kFormationBuckets[ToFormationBucketIndex(formationType)];
-    LuaPlus::LuaObject bucket = GetLuaTableField(state, module, bucketName);
-    if (!bucket || !bucket.IsTable()) {
+    LuaPlus::LuaObject bucket = SCR_GetLuaTableField(state, module, bucketName);
+    if (!bucket.IsTable()) {
       return {};
     }
 
     return bucket;
   }
 
-  [[nodiscard]] bool EqualsIgnoreCaseAscii(const char* lhs, const char* rhs)
+  void UnlinkLinkedIUnitRef(SFormationLinkedUnitRef& linkRef) noexcept
   {
-    if (!lhs || !rhs) {
-      return false;
+    if (!linkRef.ownerChainHead) {
+      return;
     }
 
-    for (; *lhs && *rhs; ++lhs, ++rhs) {
-      const unsigned char l = static_cast<unsigned char>(*lhs);
-      const unsigned char r = static_cast<unsigned char>(*rhs);
-      if (std::tolower(l) != std::tolower(r)) {
-        return false;
+    std::uint32_t* cursor = linkRef.ownerChainHead;
+    const std::uint32_t selfWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&linkRef));
+    while (*cursor != selfWord) {
+      cursor = SFormationLinkedUnitRef::NextChainLinkSlot(*cursor);
+    }
+
+    *cursor = linkRef.nextChainLink;
+    linkRef.ownerChainHead = nullptr;
+    linkRef.nextChainLink = 0;
+  }
+
+  class ScopedLinkedIUnitRefs final
+  {
+  public:
+    explicit ScopedLinkedIUnitRefs(const SFormationUnitWeakRefSet* const unitWeakSet)
+    {
+      if (!unitWeakSet) {
+        return;
+      }
+
+      const SFormationUnitWeakRef* const begin = unitWeakSet->begin();
+      const SFormationUnitWeakRef* const end = unitWeakSet->end();
+      if (!begin || begin == end) {
+        return;
+      }
+
+      const std::size_t count = static_cast<std::size_t>(end - begin);
+      mLinkedRefs.Reserve(count);
+      for (const SFormationUnitWeakRef* src = begin; src != end; ++src) {
+        SFormationLinkedUnitRef linkedValue{};
+        mLinkedRefs.Append(linkedValue);
+        SFormationLinkedUnitRef& linked = mLinkedRefs.back();
+        linked.ownerChainHead = src->DecodeOwnerChainHead();
+        if (!linked.ownerChainHead) {
+          linked.nextChainLink = 0;
+          continue;
+        }
+
+        linked.nextChainLink = *linked.ownerChainHead;
+        *linked.ownerChainHead = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&linked));
       }
     }
 
-    return *lhs == '\0' && *rhs == '\0';
+    ~ScopedLinkedIUnitRefs()
+    {
+      for (SFormationLinkedUnitRef* it = mLinkedRefs.begin(); it != mLinkedRefs.end(); ++it) {
+        UnlinkLinkedIUnitRef(*it);
+      }
+    }
+
+    [[nodiscard]] const gpg::fastvector_n<SFormationLinkedUnitRef, 4>& refs() const noexcept
+    {
+      return mLinkedRefs;
+    }
+
+  private:
+    gpg::fastvector_n<SFormationLinkedUnitRef, 4> mLinkedRefs;
+  };
+
+  [[nodiscard]] CAiFormationInstance* TryConstructFormationInstance(
+    CAiFormationDBImpl& formationDb,
+    const char* scriptName,
+    const SCoordsVec2* formationCenter,
+    const float orientX,
+    const float orientY,
+    const float orientZ,
+    const float orientW,
+    const int commandType,
+    const gpg::fastvector_n<SFormationLinkedUnitRef, 4>& linkedUnits
+  )
+  {
+    (void)formationDb;
+    (void)scriptName;
+    (void)formationCenter;
+    (void)orientX;
+    (void)orientY;
+    (void)orientZ;
+    (void)orientW;
+    (void)commandType;
+    (void)linkedUnits;
+
+    // Full constructor lift remains blocked on unresolved CFormationInstance path:
+    // - FUN_005694B0 (constructor)
+    // - FUN_0056B200 and dependent container helpers it initializes.
+    return nullptr;
   }
 } // namespace
 
@@ -208,7 +233,7 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const EForm
     }
 
     const char* const candidate = scriptObj.GetString();
-    if (EqualsIgnoreCaseAscii(candidate, scriptName)) {
+    if (gpg::STR_EqualsNoCase(candidate, scriptName)) {
       return luaIndex - 1;
     }
   }
@@ -220,17 +245,25 @@ int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const EForm
  * Address: 0x0059C120 (FUN_0059C120)
  */
 CAiFormationInstance* CAiFormationDBImpl::NewFormation(
-  [[maybe_unused]] int scriptIndex,
-  [[maybe_unused]] const char* scriptName,
-  [[maybe_unused]] void* unitWeakSet,
-  [[maybe_unused]] int arg4,
-  [[maybe_unused]] int arg5,
-  [[maybe_unused]] int arg6,
-  [[maybe_unused]] int arg7,
-  [[maybe_unused]] int arg8
+  const SFormationUnitWeakRefSet* const unitWeakSet,
+  const char* const scriptName,
+  const SCoordsVec2* const formationCenter,
+  const float orientX,
+  const float orientY,
+  const float orientZ,
+  const float orientW,
+  const int commandType
 )
 {
-  // Full lift depends on unrecovered CAiFormationInstance ctor body (FUN_005694B0)
-  // and its 0x330-byte runtime layout.
-  return nullptr;
+  ScopedLinkedIUnitRefs linkedUnits(unitWeakSet);
+  CAiFormationInstance* const formation = TryConstructFormationInstance(
+    *this, scriptName, formationCenter, orientX, orientY, orientZ, orientW, commandType, linkedUnits.refs()
+  );
+  if (!formation) {
+    return nullptr;
+  }
+
+  CAiFormationInstance* formationForAppend = formation;
+  mFormInstances.Append(formationForAppend);
+  return formation;
 }

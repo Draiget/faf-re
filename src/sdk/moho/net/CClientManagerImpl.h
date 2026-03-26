@@ -6,6 +6,7 @@
 #include "gpg/core/time/Timer.h"
 #include "IClientManager.h"
 #include "legacy/containers/Vector.h"
+#include "lua/LuaObject.h"
 #include "moho/command/ICommandSink.h"
 
 namespace moho
@@ -316,7 +317,26 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0053E050
+     * Address: 0x0053DF20 (FUN_0053DF20)
+     *
+     * What it does:
+     * Initializes client-manager runtime state, client vector storage, and
+     * timing/connectivity lanes.
+     */
+    CClientManagerImpl(
+      std::size_t clientCount,
+      INetConnector* connector,
+      int gameSpeed,
+      bool adjustableGameSpeed
+    );
+
+    /**
+     * Address: 0x0053E050 (FUN_0053E050, scalar deleting dtor thunk)
+     * Address: 0x0053E090 (FUN_0053E090, non-deleting destructor core)
+     *
+     * What it does:
+     * Destroys owned clients, tears down connector ownership lanes, and then
+     * falls through normal member/base destruction order.
      * Slot: 0
      */
     virtual ~CClientManagerImpl();
@@ -325,28 +345,27 @@ namespace moho
      * Address: 0x0053E180
      * Slot: 1
      */
-    virtual IClient*
-    CreateLocalClient(const char* name, int32_t index, LaunchInfoBase* launchInfo, unsigned int sourceId);
+    virtual IClient* CreateLocalClient(const char* name, int32_t index, int32_t ownerId, unsigned int sourceId);
 
     /**
      * Address: 0x0053E260
      * Slot: 2
      */
     virtual IClient* CreateNetClient(
-      const char* name, int32_t index, LaunchInfoBase* info, uint32_t sourceId, INetConnection* connection
+      const char* name, int32_t index, int32_t ownerId, uint32_t sourceId, INetConnection* connection
     );
 
     /**
      * Address: 0x0053E400
      * Slot: 3
      */
-    virtual IClient* CreateReplayClient(int*, BVIntSet* set);
+    virtual IClient* CreateReplayClient(gpg::Stream**, BVIntSet* set);
 
     /**
      * Address: 0x0053E330
      * Slot: 4
      */
-    virtual IClient* CreateNullClient(const char* name, int32_t index, LaunchInfoBase* info, uint32_t sourceId);
+    virtual IClient* CreateNullClient(const char* name, int32_t index, int32_t ownerId, uint32_t sourceId);
 
     /**
      * Address: 0x0053BCB0
@@ -370,7 +389,7 @@ namespace moho
      * Address: 0x0053E470
      * Slot: 8
      */
-    virtual IClient* GetClientWithData(LaunchInfoBase* info);
+    virtual IClient* GetClientWithData(int32_t ownerId);
 
     /**
      * Address: 0x0053BD10
@@ -507,5 +526,34 @@ namespace moho
     gpg::time::Timer mDispatchedTimer;
     gpg::time::Timer mTimer2;
   };
+
+  static_assert(offsetof(CClientManagerImpl, mLock) == 0x40C, "CClientManagerImpl::mLock offset must be 0x40C");
+  static_assert(
+    offsetof(CClientManagerImpl, mClients) == 0x41C, "CClientManagerImpl::mClients offset must be 0x41C"
+  );
+  static_assert(
+    offsetof(CClientManagerImpl, mConnector) == 0x42C, "CClientManagerImpl::mConnector offset must be 0x42C"
+  );
+  static_assert(
+    offsetof(CClientManagerImpl, mStream) == 0x18470, "CClientManagerImpl::mStream offset must be 0x18470"
+  );
+  static_assert(
+    offsetof(CClientManagerImpl, mMarshaller) == 0x184B8, "CClientManagerImpl::mMarshaller offset must be 0x184B8"
+  );
+  static_assert(
+    offsetof(CClientManagerImpl, mDispatchedTimer) == 0x184C0,
+    "CClientManagerImpl::mDispatchedTimer offset must be 0x184C0"
+  );
+  static_assert(offsetof(CClientManagerImpl, mTimer2) == 0x184C8, "CClientManagerImpl::mTimer2 offset must be 0x184C8");
+  static_assert(sizeof(CClientManagerImpl) == 0x184D0, "CClientManagerImpl size must be 0x184D0");
+
+  /**
+   * Address: 0x0053FAF0 (FUN_0053FAF0)
+   *
+   * What it does:
+   * Allocates and constructs one `CClientManagerImpl`.
+   */
+  CClientManagerImpl*
+  CLIENT_CreateClientManager(std::size_t clientCount, INetConnector* connector, int gameSpeed, bool adjustableGameSpeed);
 
 } // namespace moho

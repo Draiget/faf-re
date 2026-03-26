@@ -11,6 +11,18 @@
 
 namespace moho
 {
+  class CDiskDirWatch
+  {
+  public:
+    /**
+     * Address context: called from CDiskWatch::WatchQuery map traversal.
+     *
+     * What it does:
+     * Polls one directory watch source and dispatches any resulting disk events.
+     */
+    void Update();
+  };
+
   struct SDiskWatchEvent
   {
     msvc8::string mPath;          // +0x00
@@ -82,6 +94,25 @@ namespace moho
   class CDiskWatch
   {
   public:
+    struct DiskWatchMapNode
+    {
+      DiskWatchMapNode* mLeft;      // +0x00
+      DiskWatchMapNode* mParent;    // +0x04
+      DiskWatchMapNode* mRight;     // +0x08
+      std::uint8_t mColor;          // +0x0C
+      std::uint8_t mIsSentinel;     // +0x0D
+      std::uint8_t pad_0E[2];       // +0x0E
+      std::uint8_t mKeyPayload[0x18]; // +0x10
+      CDiskDirWatch* mDirWatch;     // +0x28
+    };
+
+    struct DiskWatchMap
+    {
+      void* mAllocProxy;          // +0x00
+      DiskWatchMapNode* mHead;    // +0x04
+      std::uint32_t mNodeCount;   // +0x08
+    };
+
     /**
      * Address: 0x004627C0 (FUN_004627C0, ??0CDiskWatch@Moho@@QAE@XZ)
      *
@@ -111,11 +142,21 @@ namespace moho
     [[nodiscard]]
     bool EnablePrivileges() const;
 
+    /**
+     * Address: 0x004629B0 (FUN_004629B0, ?WatchQuery@CDiskWatch@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Locks the watch map and runs `CDiskDirWatch::Update()` for each registered
+     * directory watcher entry.
+     */
+    void WatchQuery();
+
   public:
     TDatListItem<CDiskWatchListener, void> mListeners; // +0x00
     void* mUnknown08;                                  // +0x08
     gpg::core::SharedLock mLock;                       // +0x0C
-    std::uint8_t mOpaque10[0x14];                      // +0x10
+    std::uint8_t mOpaque10[0x08];                      // +0x10
+    DiskWatchMap mDirWatchMap;                         // +0x18
   };
 
   /**
@@ -133,6 +174,15 @@ namespace moho
    */
   void DISK_ResetWatch();
 
+  /**
+   * Address: 0x004633A0 (FUN_004633A0, ?DISK_UpdateWatcher@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Ensures the global disk-watch singleton exists, then pumps one watch-query
+   * update pass.
+   */
+  void DISK_UpdateWatcher();
+
   static_assert(sizeof(SDiskWatchEvent) == 0x28, "SDiskWatchEvent size must be 0x28");
   static_assert(offsetof(SDiskWatchEvent, mActionCode) == 0x1C, "SDiskWatchEvent::mActionCode offset must be 0x1C");
   static_assert(sizeof(CDiskWatchListener) == 0x30, "CDiskWatchListener size must be 0x30");
@@ -140,6 +190,19 @@ namespace moho
   static_assert(offsetof(CDiskWatchListener, mWatch) == 0x0C, "CDiskWatchListener::mWatch offset must be 0x0C");
   static_assert(offsetof(CDiskWatchListener, mEvents) == 0x10, "CDiskWatchListener::mEvents offset must be 0x10");
   static_assert(offsetof(CDiskWatchListener, mPatterns) == 0x20, "CDiskWatchListener::mPatterns offset must be 0x20");
+  static_assert(
+    offsetof(CDiskWatch::DiskWatchMapNode, mDirWatch) == 0x28,
+    "CDiskWatch::DiskWatchMapNode::mDirWatch offset must be 0x28"
+  );
+  static_assert(sizeof(CDiskWatch::DiskWatchMap) == 0x0C, "CDiskWatch::DiskWatchMap size must be 0x0C");
+  static_assert(
+    offsetof(CDiskWatch::DiskWatchMap, mHead) == 0x04,
+    "CDiskWatch::DiskWatchMap::mHead offset must be 0x04"
+  );
   static_assert(sizeof(CDiskWatch) == 0x24, "CDiskWatch size must be 0x24");
   static_assert(offsetof(CDiskWatch, mLock) == 0x0C, "CDiskWatch::mLock offset must be 0x0C");
+  static_assert(
+    offsetof(CDiskWatch, mDirWatchMap) == 0x18,
+    "CDiskWatch::mDirWatchMap offset must be 0x18"
+  );
 } // namespace moho

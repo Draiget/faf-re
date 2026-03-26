@@ -8,6 +8,7 @@
 namespace moho
 {
   class Entity;
+  class Unit;
 
   struct CEntityDbListHead
   {
@@ -61,6 +62,24 @@ namespace moho
      * (`EEntityIdSentinel::FirstNonUnitFamily`, value `0x10000000`).
      */
     [[nodiscard]] CEntityDbAllUnitsNode* AllUnitsEnd() const;
+
+    /**
+     * Address: 0x005C87A0 (FUN_005C87A0, Moho::CUnitIterAllArmies::Next)
+     *
+     * What it does:
+     * Advances one all-units tree iterator node to its in-order successor.
+     */
+    [[nodiscard]]
+    static CEntityDbAllUnitsNode* NextAllUnitsNode(CEntityDbAllUnitsNode* node) noexcept;
+
+    /**
+     * Address: 0x005C87A0 callsite shape (Moho::CUnitIterAllArmies payload)
+     *
+     * What it does:
+     * Converts one all-units tree node payload into the owning `Unit*`.
+     */
+    [[nodiscard]]
+    static Unit* UnitFromAllUnitsNode(const CEntityDbAllUnitsNode* node) noexcept;
 
     [[nodiscard]] msvc8::list<Entity*>& Entities() noexcept;
     [[nodiscard]] const msvc8::list<Entity*>& Entities() const noexcept;

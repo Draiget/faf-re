@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include <exception>
-#include <mutex>
 #include <stdexcept>
 #include <typeinfo>
 
@@ -10,51 +9,12 @@
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
-#include "moho/misc/CVirtualFileSystem.h"
+#include "moho/misc/FileWaitHandleSet.h"
 
 using namespace moho;
 
 namespace
 {
-  struct CFileWaitHandleSet
-  {
-    std::uint8_t mOpaque00[0x4C];
-    CVirtualFileSystem* mVirtualFileSystem;
-  };
-
-  // +0x4C CVirtualFileSystem* slot exists in the original set object.
-  CFileWaitHandleSet gFileWaitHandleStorage{};
-  CFileWaitHandleSet* gFileWaitHandleSet = nullptr;
-  std::once_flag gFileWaitHandleSetInitOnce;
-
-  void ResetFileCWaitHandleSet()
-  {
-    gFileWaitHandleSet = nullptr;
-  }
-
-  /**
-   * Address: 0x00457F90 (FUN_00457F90, func_EnsureFileCWaitHandleSet)
-   *
-   * What it does:
-   * Lazily initializes the process-wide file wait-handle set pointer and
-   * publishes it to diskwatch code paths.
-   */
-  void EnsureFileCWaitHandleSet()
-  {
-    std::call_once(gFileWaitHandleSetInitOnce, [] {
-      // Recovery note:
-      // `func_InitFileCWaitHandleSet` and its full object wiring are still a
-      // tracked dependency. We preserve one-time publication semantics and keep
-      // a stable storage object for downstream users.
-      gFileWaitHandleSet = &gFileWaitHandleStorage;
-      std::atexit(&ResetFileCWaitHandleSet);
-    });
-
-    if (!gFileWaitHandleSet) {
-      gFileWaitHandleSet = &gFileWaitHandleStorage;
-    }
-  }
-
   gpg::RType* CachedScrDiskWatcherTaskType()
   {
     if (!ScrDiskWatcherTask::sType) {
@@ -86,12 +46,8 @@ namespace
 
   void ResolvePathForLua(const SDiskWatchEvent& event, msvc8::string& normalizedPath)
   {
-    EnsureFileCWaitHandleSet();
     normalizedPath = event.mPath;
-
-    if (gFileWaitHandleSet && gFileWaitHandleSet->mVirtualFileSystem) {
-      gFileWaitHandleSet->mVirtualFileSystem->ResolvePath(&normalizedPath, normalizedPath.c_str());
-    }
+    (void)FILE_ToMountedPath(&normalizedPath, normalizedPath.c_str());
   }
 
   /**

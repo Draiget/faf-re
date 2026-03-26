@@ -9,24 +9,22 @@
 #include <string>
 
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/String.h"
 #include "IUnit.h"
 #include "UnitAttributes.h"
 #include "legacy/containers/String.h"
+#include "lua/LuaObject.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
+#include "moho/misc/WeakPtr.h"
 #include "wm3/Vector3.h"
-
-namespace LuaPlus
-{
-  class LuaObject;
-  class LuaState;
-} // namespace LuaPlus
 
 namespace moho
 {
   enum EUnitState : std::int32_t;
+  class CIntel;
   class RUnitBlueprint;
   class ReconBlip;
   class StatItem;
@@ -39,13 +37,11 @@ namespace moho
   class CUnitCommandQueue;
   class CUnitMotion;
   class CAniActor;
+  class CFormationInstance;
   class IAiBuilder;
   class IAiNavigator;
   class IAiSteering;
-} // namespace moho
-namespace moho
-{
-  class CAiTransportCommandOps;
+  class IAiTransport;
 } // namespace moho
 
 namespace moho
@@ -64,7 +60,50 @@ namespace moho
   {
     void* valueWithTag;
     void* backlink;
+
+    template <class TObject>
+    [[nodiscard]] WeakPtr<TObject>& AsWeakPtr() noexcept
+    {
+      static_assert(sizeof(SWeakRefSlot) == sizeof(WeakPtr<void>), "SWeakRefSlot/WeakPtr layout mismatch");
+      static_assert(
+        offsetof(SWeakRefSlot, valueWithTag) == offsetof(WeakPtr<void>, ownerLinkSlot),
+        "SWeakRefSlot owner slot mismatch"
+      );
+      static_assert(
+        offsetof(SWeakRefSlot, backlink) == offsetof(WeakPtr<void>, nextInOwner), "SWeakRefSlot next slot mismatch"
+      );
+      return reinterpret_cast<WeakPtr<TObject>&>(*this);
+    }
+
+    template <class TObject>
+    [[nodiscard]] const WeakPtr<TObject>& AsWeakPtr() const noexcept
+    {
+      static_assert(sizeof(SWeakRefSlot) == sizeof(WeakPtr<void>), "SWeakRefSlot/WeakPtr layout mismatch");
+      static_assert(
+        offsetof(SWeakRefSlot, valueWithTag) == offsetof(WeakPtr<void>, ownerLinkSlot),
+        "SWeakRefSlot owner slot mismatch"
+      );
+      static_assert(
+        offsetof(SWeakRefSlot, backlink) == offsetof(WeakPtr<void>, nextInOwner), "SWeakRefSlot next slot mismatch"
+      );
+      return reinterpret_cast<const WeakPtr<TObject>&>(*this);
+    }
+
+    template <class TObject>
+    [[nodiscard]] TObject* ResolveObjectPtr() const noexcept
+    {
+      return AsWeakPtr<TObject>().GetObjectPtr();
+    }
+
+    template <class TObject>
+    void ResetObjectPtr(TObject* object) noexcept
+    {
+      AsWeakPtr<TObject>().ResetFromObject(object);
+    }
   };
+  static_assert(sizeof(SWeakRefSlot) == 0x08, "SWeakRefSlot size must be 0x08");
+  static_assert(offsetof(SWeakRefSlot, valueWithTag) == 0x00, "SWeakRefSlot::valueWithTag offset must be 0x00");
+  static_assert(offsetof(SWeakRefSlot, backlink) == 0x04, "SWeakRefSlot::backlink offset must be 0x04");
 
   /**
    * Packed pair emitted by Unit::GetExtraData during sync-filter serialization.
@@ -108,11 +147,32 @@ namespace moho
    * Size evidence:
    * - SInfoCacheTypeInfo::Init (0x006A4EC0) writes sizeof(type)=0x28.
    * - Unit::GetInfoCache returns this+0x0580 in FA.
+   *
+   * Recovered field evidence:
+   * - `Unit::IsHigherPriorityThan` (0x006A8D80) uses:
+   *   - +0x00 as formation-layer pointer (`CFormationInstance*`)
+   *   - +0x04 as intrusive weak owner-link slot (`Unit* + 0x04`)
+   *   - +0x08 as weak chain next pointer
+   *   - +0x0C as formation ordering word
+   *   - +0x18 as formation float tie-break metric
    */
   struct SInfoCache
   {
-    std::uint8_t storage[0x28];
+    CFormationInstance* mFormationLayer;   // +0x00
+    SWeakRefSlot mFormationLeadRef;        // +0x04
+    std::int32_t mFormationPriorityOrder;  // +0x0C
+    std::uint8_t mPad10[0x08];             // +0x10
+    float mFormationDistanceMetric;        // +0x18
+    std::uint8_t mPad1C[0x0C];             // +0x1C
   };
+  static_assert(offsetof(SInfoCache, mFormationLayer) == 0x00, "SInfoCache::mFormationLayer offset must be 0x00");
+  static_assert(offsetof(SInfoCache, mFormationLeadRef) == 0x04, "SInfoCache::mFormationLeadRef offset must be 0x04");
+  static_assert(
+    offsetof(SInfoCache, mFormationPriorityOrder) == 0x0C, "SInfoCache::mFormationPriorityOrder offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SInfoCache, mFormationDistanceMetric) == 0x18, "SInfoCache::mFormationDistanceMetric offset must be 0x18"
+  );
   static_assert(sizeof(SInfoCache) == 0x28, "SInfoCache size must be 0x28");
 
   /**
@@ -405,9 +465,67 @@ namespace moho
      */
     void SetFireState(std::int32_t fireState);
 
+    /**
+     * Address: 0x006AAF50 (?PickTargetPoint@Unit@Moho@@QBE_NAAH@Z)
+     *
+     * What it does:
+     * Picks a random index in `Blueprint->AI.TargetBones`; writes `-1` when
+     * the list is empty. Returns true on all paths.
+     */
+    bool PickTargetPoint(std::int32_t& outTargetPoint) const;
+
+    /**
+     * Address: 0x0059A430 (FUN_0059A430, ?GetGuardedUnit@Unit@Moho@@QBEPAV12@XZ)
+     *
+     * What it does:
+     * Resolves `GuardedUnitRef` intrusive weak-link slot to a `Unit*`.
+     */
+    [[nodiscard]]
+    Unit* GetGuardedUnit() const;
+
+    /**
+     * Address: 0x006A8D80 (FUN_006A8D80, ?IsHigherPriorityThan@Unit@Moho@@QBE_NPBV12@@Z)
+     *
+     * What it does:
+     * Compares steering/collision priority against `other` using unit state,
+     * formation metadata, footprint size, and forward-alignment tie-breakers.
+     */
+    [[nodiscard]]
+    bool IsHigherPriorityThan(const Unit* other) const;
+
+    /**
+     * Address: 0x006AB6F0 (FUN_006AB6F0, ?ReserveOgridRect@Unit@Moho@@QAEXABV?$Rect2@H@gpg@@@Z)
+     *
+     * What it does:
+     * Frees previous unit occupancy reservation, stores `ogridRect`, and marks
+     * the O-grid occupation bit-array region as occupied.
+     */
+    void ReserveOgridRect(const gpg::Rect2i& ogridRect);
+
+    /**
+     * Address: 0x006AB760 (FUN_006AB760, ?FreeOgridRect@Unit@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Clears this unit's current O-grid occupation reservation rectangle and
+     * unmarks the occupied bit-array region when a non-empty reservation exists.
+     */
+    void FreeOgridRect();
+
+    /**
+     * Address: 0x006AB810 (FUN_006AB810, ?CanReserveOgridRect@Unit@Moho@@QAE_NABV?$Rect2@H@gpg@@@Z)
+     *
+     * What it does:
+     * Temporarily clears this unit's own reservation marks, tests whether
+     * `ogridRect` intersects occupied cells, then restores prior reservation.
+     */
+    [[nodiscard]]
+    bool CanReserveOgridRect(const gpg::Rect2i& ogridRect);
+
   public:
     [[nodiscard]] bool NeedsKillCleanup() const noexcept;
     void ClearBeatResourceAccumulators() noexcept;
+    [[nodiscard]] CIntel* GetIntelManager() noexcept;
+    [[nodiscard]] CIntel const* GetIntelManager() const noexcept;
     [[nodiscard]] SSTIUnitVariableData& VarDat() noexcept;
     [[nodiscard]] SSTIUnitVariableData const& VarDat() const noexcept;
 
@@ -470,7 +588,7 @@ namespace moho
     IAiSteering* AiSteering;                         // 0x0550
     IAiBuilder* AiBuilder;                           // 0x0554
     CAiSiloBuildImpl* AiSiloBuild;                   // 0x0558
-    CAiTransportCommandOps* AiTransport;             // 0x055C
+    IAiTransport* AiTransport;                       // 0x055C
     bool FootprintDown;                              // 0x0560
     char pad_0561[0x13];                             // 0x0561
     TDatListItem<void, void> mEconomyEventListHead;  // 0x0574
@@ -478,9 +596,9 @@ namespace moho
     char pad_057D[3];                                // 0x057D
     SInfoCache mInfoCache;                           // 0x0580
     std::int32_t ReservedOgridRectMinX;              // 0x05A8
-    std::int32_t ReservedOgridRectMinY;              // 0x05AC
+    std::int32_t ReservedOgridRectMinZ;              // 0x05AC
     std::int32_t ReservedOgridRectMaxX;              // 0x05B0
-    std::int32_t ReservedOgridRectMaxY;              // 0x05B4
+    std::int32_t ReservedOgridRectMaxZ;              // 0x05B4
     // Built by FUN_006ADE50: fastvector_n with 8-byte elements and inline capacity 20.
     gpg::core::FastVectorN<SWeakRefSlot, 20> mBlipsInRange; // 0x05B8
     // External findings name; xrefs in current export set are still limited.
@@ -508,6 +626,18 @@ namespace moho
   );
   static_assert(
     offsetof(Unit, EconomyEventRequestedMassRate) == 0x02FC, "Unit::EconomyEventRequestedMassRate offset must be 0x02FC"
+  );
+  static_assert(
+    offsetof(Unit, ReservedOgridRectMinX) == 0x05A8, "Unit::ReservedOgridRectMinX offset must be 0x05A8"
+  );
+  static_assert(
+    offsetof(Unit, ReservedOgridRectMinZ) == 0x05AC, "Unit::ReservedOgridRectMinZ offset must be 0x05AC"
+  );
+  static_assert(
+    offsetof(Unit, ReservedOgridRectMaxX) == 0x05B0, "Unit::ReservedOgridRectMaxX offset must be 0x05B0"
+  );
+  static_assert(
+    offsetof(Unit, ReservedOgridRectMaxZ) == 0x05B4, "Unit::ReservedOgridRectMaxZ offset must be 0x05B4"
   );
   static_assert(offsetof(Unit, mEconomyEventListHead) == 0x0574, "Unit::mEconomyEventListHead offset must be 0x0574");
   static_assert(offsetof(Unit, mReconBlips) == 0x0670, "Unit::mReconBlips offset must be 0x0670");

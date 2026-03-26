@@ -2,13 +2,16 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace gpg {
-namespace gal {
+namespace gpg
+{
+  namespace gal
+  {
     /**
      * VFTABLE: 0x00D42F08
      * COL:  0x00E50AB8
      */
-    class VertexBuffer {
+    class VertexBuffer
+    {
     public:
       /**
        * Address: 0x00A82547
@@ -35,5 +38,5 @@ namespace gal {
        */
       virtual void purecall3() = 0;
     };
-} // namespace gal
+  } // namespace gal
 } // namespace gpg

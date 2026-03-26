@@ -7,6 +7,9 @@ namespace moho
   class SimArmy : public IArmy
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x006FDAD0 (FUN_006FDAD0, Moho::SimArmy::~SimArmy)
      *

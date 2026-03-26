@@ -11,11 +11,18 @@
 #include "ResourceDeposit.h"
 #include "util/Build.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
-  class CSimResources : public ISimResources, public IResources
+  class CSimResources : public ISimResources
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00545DC0 (??0CSimResources@Moho@@QAE@@Z)
      *
@@ -107,7 +114,7 @@ namespace moho
     msvc8::vector<ResourceDeposit> deposits_; // +0x0C
   };
 
-  static_assert(!std::is_polymorphic<ISimResources>::value, "ISimResources must be non-polymorphic");
+  static_assert(std::is_polymorphic<ISimResources>::value, "ISimResources must remain polymorphic");
   static_assert(offsetof(CSimResources, deposits_) == 0x0C, "CSimResources::deposits_ offset must be 0x0C");
   ABI_SIZE_MUST_BE(CSimResources, 0x1C);
 } // namespace moho

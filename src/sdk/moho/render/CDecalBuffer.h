@@ -4,56 +4,20 @@
 #include <cstdint>
 
 #include "legacy/containers/Vector.h"
+#include "moho/render/CDecalTypes.h"
 #include "moho/sim/IdPool.h"
 #include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+
+namespace gpg
+{
+  class RType;
+}
 
 namespace moho
 {
   class Sim;
   class CArmyImpl;
   class CDecalHandle;
-
-  struct SDecalInfo
-  {
-    // +0x00..+0x0B
-    Wm3::Vec3f worldOrigin;
-    // +0x0C..+0x17
-    Wm3::Vec3f worldSize;
-    // +0x18
-    float rotationRadians;
-    // +0x1C..+0x5B
-    std::uint8_t reserved1C[0x40];
-    // +0x5C
-    std::uint8_t requiresRecon;
-    // +0x5D..+0x63
-    std::uint8_t reserved5D[0x07];
-    // +0x64
-    std::uint32_t startTick;
-    // +0x68..+0x83
-    std::uint8_t reserved68[0x1C];
-    // +0x84
-    std::uint32_t scriptObjectId;
-    // +0x88
-    std::uint32_t sourceArmyIndex;
-    // +0x8C..+0x8F
-    std::uint8_t reserved8C[0x04];
-  };
-  static_assert(offsetof(SDecalInfo, worldOrigin) == 0x00, "SDecalInfo::worldOrigin offset must be 0x00");
-  static_assert(offsetof(SDecalInfo, worldSize) == 0x0C, "SDecalInfo::worldSize offset must be 0x0C");
-  static_assert(offsetof(SDecalInfo, rotationRadians) == 0x18, "SDecalInfo::rotationRadians offset must be 0x18");
-  static_assert(offsetof(SDecalInfo, requiresRecon) == 0x5C, "SDecalInfo::requiresRecon offset must be 0x5C");
-  static_assert(offsetof(SDecalInfo, startTick) == 0x64, "SDecalInfo::startTick offset must be 0x64");
-  static_assert(offsetof(SDecalInfo, scriptObjectId) == 0x84, "SDecalInfo::scriptObjectId offset must be 0x84");
-  static_assert(offsetof(SDecalInfo, sourceArmyIndex) == 0x88, "SDecalInfo::sourceArmyIndex offset must be 0x88");
-  static_assert(sizeof(SDecalInfo) == 0x90, "SDecalInfo size must be 0x90");
-
-  struct CDecalHandleListNode
-  {
-    CDecalHandleListNode* next;
-    CDecalHandleListNode* prev;
-  };
-  static_assert(sizeof(CDecalHandleListNode) == 0x08, "CDecalHandleListNode size must be 0x08");
 
   struct CDecalStartTickMapStorage
   {
@@ -65,6 +29,16 @@ namespace moho
 
   class CDecalBuffer
   {
+  public:
+    static gpg::RType* sType;
+
+    /**
+     * What it does:
+     * Returns cached reflection descriptor for `CDecalBuffer`.
+     */
+    [[nodiscard]]
+    static gpg::RType* StaticGetClass();
+
   public:
     /**
      * Address: 0x00779170 (FUN_00779170)
@@ -137,7 +111,7 @@ namespace moho
     Sim* mSim;                                          // +0x0000
     std::uint32_t mReserved04;                          // +0x0004
     IdPool mPool;                                       // +0x0008
-    CDecalHandleListNode mHandleListHead;               // +0x0CB8
+    CDecalHandleList mHandleListHead;                   // +0x0CB8
     CDecalStartTickMapStorage mStartTickBuckets;        // +0x0CC0
     msvc8::vector<SDecalInfo> mVisibleDecals;           // +0x0CCC
     msvc8::vector<std::uint32_t> mPendingHideObjectIds; // +0x0CDC

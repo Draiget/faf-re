@@ -1,6 +1,11 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
+
+#include <cstddef>
+
+namespace gpg
+{
+  class RType;
+} // namespace gpg
 
 namespace moho
 {
@@ -12,10 +17,15 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00598A00
-     * Slot: 0
-     * Demangled: (likely scalar deleting destructor thunk)
+     * Address: 0x00598A00 (FUN_00598A00, scalar deleting thunk)
+     *
+     * VFTable SLOT: 0
      */
-    virtual ~IAiCommandDispatch() = default;
+    virtual ~IAiCommandDispatch();
+
+  public:
+    static gpg::RType* sType;
   };
+
+  static_assert(sizeof(IAiCommandDispatch) == 0x04, "IAiCommandDispatch size must be 0x04");
 } // namespace moho

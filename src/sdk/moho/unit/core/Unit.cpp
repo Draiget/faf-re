@@ -2,14 +2,19 @@
 #include "moho/unit/core/Unit.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <new>
 
 #include "moho/ai/CAiAttackerImpl.h"
-#include "moho/ai/CAiTransportCommandOps.h"
+#include "moho/ai/IAiTransport.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/misc/StatItem.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/COGrid.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommandQueue.h"
 
 using namespace moho;
@@ -20,6 +25,115 @@ namespace
   constexpr EUnitState kTransportScriptBitGuardState = UNITSTATE_Attached;
   constexpr std::uint32_t kCommandCapPause = 0x00020000u;  // RULEUCC_Pause
   constexpr std::uint32_t kToggleCapGeneric = 0x00000040u; // RULEUTC_GenericToggle
+
+  [[nodiscard]] std::int32_t PickUniformIndexFromU32(const std::uint32_t randomValue, const std::uint32_t count) noexcept
+  {
+    const std::uint64_t product = static_cast<std::uint64_t>(randomValue) * static_cast<std::uint64_t>(count);
+    return static_cast<std::int32_t>(product >> 32u);
+  }
+
+  [[nodiscard]] bool HasFootprintFlag(const EFootprintFlags value, const EFootprintFlags flag) noexcept
+  {
+    return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
+  }
+
+  [[nodiscard]] Wm3::Vector3f ForwardXZ(const Unit& unit) noexcept
+  {
+    Wm3::Vector3f forward = unit.GetTransform().orient_.Rotate({0.0f, 0.0f, 1.0f});
+    forward.y = 0.0f;
+    return Wm3::Vector3f::NormalizeOrZero(forward);
+  }
+
+  struct CollisionDBRect
+  {
+    std::uint16_t xPos;
+    std::uint16_t zPos;
+    std::uint16_t xSize;
+    std::uint16_t zSize;
+  };
+
+  [[nodiscard]] CollisionDBRect COORDS_OgridRectToCollisionRect(const gpg::Rect2i& ogridRect) noexcept
+  {
+    // Address: 0x004FCAA0 (FUN_004FCAA0)
+    const std::int32_t xPos = std::clamp(ogridRect.x0 >> 2, 0, 0xFFFF);
+    const std::int32_t zPos = std::clamp(ogridRect.z0 >> 2, 0, 0xFFFF);
+    const std::int32_t xEnd = (ogridRect.x1 + 3) >> 2;
+    const std::int32_t zEnd = (ogridRect.z1 + 3) >> 2;
+
+    CollisionDBRect collisionRect{};
+    collisionRect.xPos = static_cast<std::uint16_t>(xPos);
+    collisionRect.zPos = static_cast<std::uint16_t>(zPos);
+
+    const std::int32_t maxXSpan = 0xFFFF - static_cast<std::int32_t>(collisionRect.xPos);
+    const std::int32_t maxZSpan = 0xFFFF - static_cast<std::int32_t>(collisionRect.zPos);
+    const std::int32_t xSpan =
+      std::clamp(xEnd - static_cast<std::int32_t>(collisionRect.xPos), std::int32_t{1}, maxXSpan);
+    const std::int32_t zSpan =
+      std::clamp(zEnd - static_cast<std::int32_t>(collisionRect.zPos), std::int32_t{1}, maxZSpan);
+
+    collisionRect.xSize = static_cast<std::uint16_t>(xSpan);
+    collisionRect.zSize = static_cast<std::uint16_t>(zSpan);
+    return collisionRect;
+  }
+
+  [[nodiscard]] bool IsCollisionRectEquivalentToZero(const gpg::Rect2i& ogridRect) noexcept
+  {
+    const gpg::Rect2i zeroRect{};
+    const CollisionDBRect currentCollisionRect = COORDS_OgridRectToCollisionRect(ogridRect);
+    const CollisionDBRect zeroCollisionRect = COORDS_OgridRectToCollisionRect(zeroRect);
+    return currentCollisionRect.xPos == zeroCollisionRect.xPos &&
+      currentCollisionRect.zPos == zeroCollisionRect.zPos &&
+      currentCollisionRect.xSize == zeroCollisionRect.xSize &&
+      currentCollisionRect.zSize == zeroCollisionRect.zSize;
+  }
+
+  [[nodiscard]] gpg::Rect2i GetReservedOgridRect(const Unit& unit) noexcept
+  {
+    return {
+      unit.ReservedOgridRectMinX,
+      unit.ReservedOgridRectMinZ,
+      unit.ReservedOgridRectMaxX,
+      unit.ReservedOgridRectMaxZ,
+    };
+  }
+
+  void FillReservedOgridRect(Unit& unit, const bool occupied) noexcept
+  {
+    if (!unit.SimulationRef || !unit.SimulationRef->mOGrid) {
+      return;
+    }
+
+    const gpg::Rect2i ogridRect = GetReservedOgridRect(unit);
+    unit.SimulationRef->mOGrid->mOccupation.FillRect(
+      ogridRect.x0,
+      ogridRect.z0,
+      ogridRect.x1 - ogridRect.x0,
+      ogridRect.z1 - ogridRect.z0,
+      occupied
+    );
+  }
+
+  /**
+   * Address: 0x0062EAC0 (FUN_0062EAC0, func_UnitMoreInLineToOther)
+   */
+  [[nodiscard]] const Unit* UnitMoreInLineToOther(const Unit* const a1, const Unit* const a2) noexcept
+  {
+    if (!a1 || !a2) {
+      return nullptr;
+    }
+
+    const Wm3::Vector3f a2Forward = ForwardXZ(*a2);
+    const Wm3::Vector3f a1Forward = ForwardXZ(*a1);
+    const Wm3::Vector3f a2ToA1 = Wm3::Vector3f::NormalizeOrZero(a1->GetPosition() - a2->GetPosition());
+    const Wm3::Vector3f a1ToA2 = Wm3::Vector3f::NormalizeOrZero(a2->GetPosition() - a1->GetPosition());
+
+    const float a2Alignment = Wm3::Vector3f::Dot(a2ToA1, a2Forward);
+    const float a1Alignment = Wm3::Vector3f::Dot(a1ToA2, a1Forward);
+    if (a2Alignment <= 0.0f && a1Alignment <= 0.0f) {
+      return nullptr;
+    }
+    return (a2Alignment <= a1Alignment) ? a2 : a1;
+  }
 
   class ExtraDataPairBuffer
   {
@@ -129,6 +243,16 @@ void Unit::ClearBeatResourceAccumulators() noexcept
   mBeatResourceAccumulators.Clear();
 }
 
+CIntel* Unit::GetIntelManager() noexcept
+{
+  return mIntelManager;
+}
+
+CIntel const* Unit::GetIntelManager() const noexcept
+{
+  return mIntelManager;
+}
+
 SSTIUnitVariableData& Unit::VarDat() noexcept
 {
   return *reinterpret_cast<SSTIUnitVariableData*>(mVarDatHead);
@@ -188,6 +312,29 @@ RUnitBlueprint const* Unit::GetBlueprint() const
   return blueprint ? blueprint->IsUnitBlueprint() : nullptr;
 }
 
+/**
+ * Address: 0x006AAF50 (?PickTargetPoint@Unit@Moho@@QBE_NAAH@Z)
+ *
+ * What it does:
+ * Picks a random index in `Blueprint->AI.TargetBones`; writes `-1` when
+ * the list is empty. Returns true on all paths.
+ */
+bool Unit::PickTargetPoint(std::int32_t& outTargetPoint) const
+{
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  const std::uint32_t targetBoneCount =
+    (blueprint != nullptr) ? static_cast<std::uint32_t>(blueprint->AI.TargetBones.size()) : 0u;
+
+  if (targetBoneCount == 0u || !SimulationRef || !SimulationRef->mRngState) {
+    outTargetPoint = -1;
+    return true;
+  }
+
+  const std::uint32_t randomValue = SimulationRef->mRngState->twister.NextUInt32();
+  outTargetPoint = PickUniformIndexFromU32(randomValue, targetBoneCount);
+  return true;
+}
+
 // 0x006A49D0
 LuaPlus::LuaObject Unit::GetLuaObject()
 {
@@ -238,6 +385,176 @@ bool Unit::IsUnitState(const EUnitState state) const
     return false;
   }
   return (UnitStateMask & (1ull << bit)) != 0ull;
+}
+
+/**
+ * Address: 0x0059A430 (FUN_0059A430, ?GetGuardedUnit@Unit@Moho@@QBEPAV12@XZ)
+ */
+Unit* Unit::GetGuardedUnit() const
+{
+  return GuardedUnitRef.ResolveObjectPtr<Unit>();
+}
+
+/**
+ * Address: 0x006A8D80 (FUN_006A8D80, ?IsHigherPriorityThan@Unit@Moho@@QBE_NPBV12@@Z)
+ */
+bool Unit::IsHigherPriorityThan(const Unit* const other) const
+{
+  if (!other) {
+    return true;
+  }
+
+  if (IsUnitState(UNITSTATE_Immobile) || IsUnitState(UNITSTATE_Upgrading)) {
+    return true;
+  }
+  if (other->IsUnitState(UNITSTATE_Immobile) || other->IsUnitState(UNITSTATE_Upgrading)) {
+    return false;
+  }
+
+  if (mIsNaval) {
+    if (!other->mIsNaval) {
+      return true;
+    }
+  } else if (other->mIsNaval) {
+    return false;
+  }
+
+  const bool thisIgnoreStructures = HasFootprintFlag(GetFootprint().mFlags, EFootprintFlags::FPFLAG_IgnoreStructures);
+  const bool otherIgnoreStructures =
+    HasFootprintFlag(other->GetFootprint().mFlags, EFootprintFlags::FPFLAG_IgnoreStructures);
+  if (thisIgnoreStructures) {
+    if (!otherIgnoreStructures) {
+      return true;
+    }
+  } else if (otherIgnoreStructures) {
+    return false;
+  }
+
+  if (const RUnitBlueprint* const blueprint = GetBlueprint()) {
+    if (blueprint->Air.CanFly && mCurrentLayer != LAYER_Air) {
+      return true;
+    }
+  }
+  if (const RUnitBlueprint* const blueprint = other->GetBlueprint()) {
+    if (blueprint->Air.CanFly && other->mCurrentLayer != LAYER_Air) {
+      return false;
+    }
+  }
+
+  if (IsUnitState(UNITSTATE_WaitingForTransport) && !other->IsUnitState(UNITSTATE_WaitingForTransport)) {
+    return true;
+  }
+
+  if (GetGuardedUnit() == other) {
+    return false;
+  }
+  if (other->GetGuardedUnit() == this) {
+    return true;
+  }
+
+  bool inSharedFormation = false;
+  if (mInfoCache.mFormationLayer && mInfoCache.mFormationLayer == other->mInfoCache.mFormationLayer) {
+    inSharedFormation = true;
+
+    const Unit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    if (formationLead == this) {
+      return true;
+    }
+    if (formationLead == other) {
+      return false;
+    }
+  }
+
+  if (IsUnitState(UNITSTATE_Moving) && !other->IsUnitState(UNITSTATE_Moving)) {
+    return false;
+  }
+  if (!IsUnitState(UNITSTATE_Moving) && other->IsUnitState(UNITSTATE_Moving)) {
+    return true;
+  }
+
+  if (inSharedFormation) {
+    if (mInfoCache.mFormationPriorityOrder != other->mInfoCache.mFormationPriorityOrder) {
+      return mInfoCache.mFormationPriorityOrder < other->mInfoCache.mFormationPriorityOrder;
+    }
+    return other->mInfoCache.mFormationDistanceMetric > mInfoCache.mFormationDistanceMetric;
+  }
+
+  const SFootprint& thisFootprint = GetFootprint();
+  const SFootprint& otherFootprint = other->GetFootprint();
+  const std::uint8_t thisFootprintSize = std::max(thisFootprint.mSizeX, thisFootprint.mSizeZ);
+  const std::uint8_t otherFootprintSize = std::max(otherFootprint.mSizeX, otherFootprint.mSizeZ);
+  if (thisFootprintSize > otherFootprintSize) {
+    return true;
+  }
+  if (thisFootprintSize != otherFootprintSize) {
+    return false;
+  }
+
+  if (const Unit* const moreInLine = UnitMoreInLineToOther(other, this)) {
+    return moreInLine == this;
+  }
+
+  return static_cast<std::uint32_t>(GetEntityId()) < static_cast<std::uint32_t>(other->GetEntityId());
+}
+
+/**
+ * Address: 0x006AB6F0 (FUN_006AB6F0, ?ReserveOgridRect@Unit@Moho@@QAEXABV?$Rect2@H@gpg@@@Z)
+ */
+void Unit::ReserveOgridRect(const gpg::Rect2i& ogridRect)
+{
+  FreeOgridRect();
+
+  ReservedOgridRectMinX = ogridRect.x0;
+  ReservedOgridRectMinZ = ogridRect.z0;
+  ReservedOgridRectMaxX = ogridRect.x1;
+  ReservedOgridRectMaxZ = ogridRect.z1;
+
+  FillReservedOgridRect(*this, true);
+}
+
+/**
+ * Address: 0x006AB760 (FUN_006AB760, ?FreeOgridRect@Unit@Moho@@QAEXXZ)
+ */
+void Unit::FreeOgridRect()
+{
+  const gpg::Rect2i reservedRect = GetReservedOgridRect(*this);
+  if (!IsCollisionRectEquivalentToZero(reservedRect)) {
+    FillReservedOgridRect(*this, false);
+  }
+
+  ReservedOgridRectMinX = 0;
+  ReservedOgridRectMinZ = 0;
+  ReservedOgridRectMaxX = 0;
+  ReservedOgridRectMaxZ = 0;
+}
+
+/**
+ * Address: 0x006AB810 (FUN_006AB810, ?CanReserveOgridRect@Unit@Moho@@QAE_NABV?$Rect2@H@gpg@@@Z)
+ */
+bool Unit::CanReserveOgridRect(const gpg::Rect2i& ogridRect)
+{
+  const gpg::Rect2i reservedRect = GetReservedOgridRect(*this);
+  const bool hadReservation = !IsCollisionRectEquivalentToZero(reservedRect);
+  if (hadReservation) {
+    FillReservedOgridRect(*this, false);
+  }
+
+  bool canReserve = true;
+  if (SimulationRef && SimulationRef->mOGrid) {
+    canReserve = !SimulationRef->mOGrid->mOccupation.GetRectOr(
+      ogridRect.x0,
+      ogridRect.z0,
+      ogridRect.x1 - ogridRect.x0,
+      ogridRect.z1 - ogridRect.z0,
+      true
+    );
+  }
+
+  if (hadReservation) {
+    FillReservedOgridRect(*this, true);
+  }
+
+  return canReserve;
 }
 
 // 0x006A4990
@@ -386,7 +703,7 @@ void Unit::GetExtraData(SExtraUnitData* out) const
       SExtraUnitDataPair pair{};
       pair.key = weaponExtra.key;
       pair.value = CAiAttackerImpl::ReadExtraDataValue(weaponExtra.ref);
-      pairBuffer.push_back(pair);
+      (void)pairBuffer.push_back(pair);
     }
   } else if (AiTransport) {
     const Unit* teleportBeacon = AiTransport->TransportGetTeleportBeaconForSync();
@@ -394,7 +711,7 @@ void Unit::GetExtraData(SExtraUnitData* out) const
       SExtraUnitDataPair pair{};
       pair.key = -1;
       pair.value = teleportBeacon->id_;
-      pairBuffer.push_back(pair);
+      (void)pairBuffer.push_back(pair);
     }
   }
 

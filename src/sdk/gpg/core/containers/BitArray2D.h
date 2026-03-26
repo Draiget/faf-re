@@ -50,6 +50,22 @@ namespace gpg
 		 * Finds the next set bit near `progress`, returning x/z coordinates.
 		 */
 		[[nodiscard]] bool AnyBitSet(unsigned int* storeWidth, unsigned int* storeHeight, unsigned int* progress) const;
+
+		/**
+		 * Address: 0x008D8460 (FUN_008D8460, ?GetRectOr@BitArray2D@gpg@@QBE_NHHHH_N@Z)
+		 *
+		 * What it does:
+		 * Returns true when any set bit intersects the queried rectangle.
+		 * When `disallowNegative` is true, negative/out-of-range rectangle input
+		 * is treated as occupied if it overlaps a non-empty area.
+		 */
+		[[nodiscard]] bool GetRectOr(int x0, int z0, int w, int h, bool disallowNegative) const;
+
+		/**
+		 * What it does:
+		 * Returns true when `(x,z)` is out of bounds or the corresponding bit is set.
+		 */
+		[[nodiscard]] bool IsBitSetOrOutOfBounds(int x, int z) const;
 	};
 
 	static_assert(sizeof(BitArray2D) == 0x10, "BitArray2D size must be 0x10");

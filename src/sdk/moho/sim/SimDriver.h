@@ -14,6 +14,9 @@
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/command/CmdDefs.h"
+#include "moho/command/SSTICommandConstantData.h"
+#include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/net/Common.h"
 #include "platform/Platform.h"
 #include "SSyncFilter.h"
@@ -24,49 +27,57 @@ namespace moho
   class CMarshaller;
   class CDecoder;
 
+  struct SSyncPublishedCommandPacket
+  {
+    CmdId commandId;                       // +0x00
+    std::uint8_t pad_0004_0008[0x04]{};    // +0x04
+    std::uint8_t serializedBlob0x70[0x70]{}; // +0x08
+  };
+  static_assert(sizeof(SSyncPublishedCommandPacket) == 0x78, "SSyncPublishedCommandPacket size must be 0x78");
+  static_assert(
+    offsetof(SSyncPublishedCommandPacket, serializedBlob0x70) == 0x08,
+    "SSyncPublishedCommandPacket::serializedBlob0x70 offset must be 0x08"
+  );
+
   /**
-   * Minimal sync payload view used by CSimDriver queue handling.
+   * Sync publication payload exchanged from sim thread to driver consumers.
    *
-   * The full runtime object is larger (0x2B8 in the target binary), but
-   * beat number is at offset 0 and is all CSimDriver needs directly.
+   * Recovered size/layout from FA `SSyncData` usage in publish/remove paths.
    */
   struct SSyncData
   {
-    int32_t mCurBeat = 0;
+    int32_t mCurBeat = 0;                                  // +0x000
+    std::uint8_t pad_0004_0188[0x184]{};                    // +0x004
+    msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
+    msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
+    msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
+    msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
+    std::uint8_t pad_01C8_02B8[0xF0]{};                     // +0x1C8
+
+    void QueuePendingCommandEventRemoval(CmdId commandId);
   };
-
-  /**
-   * Save request payload passed from CSimDriver::Dispatch to request objects.
-   *
-   * Address shape comes from 0x0073C250.
-   */
-  struct SSaveGameDispatchData
-  {
-    bool useSuggestedName = false;
-    msvc8::string saveName;
-  };
-
-  /**
-   * Opaque save request interface used by the driver.
-   *
-   * Method names are reconstructed from call patterns in
-   * 0x0073C250 / 0x0073DD70.
-   */
-  class CSaveGameRequestImpl
-  {
-  public:
-    virtual ~CSaveGameRequestImpl() = default;
-
-    /**
-     * Returns the request-provided save file name.
-     */
-    virtual const char* GetSaveName() = 0;
-
-    /**
-     * Executes the save operation.
-     */
-    virtual void Save(const SSaveGameDispatchData& data) = 0;
-  };
+  static_assert(sizeof(SSTICommandConstantData) == 0x3C, "SSTICommandConstantData size must be 0x3C");
+  static_assert(
+    offsetof(SSTICommandConstantData, unk2) == 0x20,
+    "SSTICommandConstantData::unk2 offset must be 0x20"
+  );
+  static_assert(
+    offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
+    "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
+  );
+  static_assert(
+    offsetof(SSyncData, mPublishedCommandPackets) == 0x198,
+    "SSyncData::mPublishedCommandPackets offset must be 0x198"
+  );
+  static_assert(
+    offsetof(SSyncData, mPendingCommandEventRemovals) == 0x1A8,
+    "SSyncData::mPendingCommandEventRemovals offset must be 0x1A8"
+  );
+  static_assert(
+    offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
+    "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
+  );
+  static_assert(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
 
   /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
@@ -322,19 +333,6 @@ namespace moho
 
   private:
     /**
-     * Address: 0x00401C50 (FUN_00401C50)
-     * Compares SSyncFilterMaskBlock raw word + vector payload.
-     */
-    static bool IsSameMaskBlock(const SSyncFilterMaskBlock& lhs, const SSyncFilterMaskBlock& rhs);
-    /**
-     * Address: 0x004028E0 (FUN_004028E0) helper usage in FUN_0073DD10
-     */
-    static void CopyMaskBlock(SSyncFilterMaskBlock& dst, const SSyncFilterMaskBlock& src);
-    /**
-     * Address: 0x0073DD10 (FUN_0073DD10)
-     */
-    static void CopySyncFilter(SSyncFilter& dst, const SSyncFilter& src);
-    /**
      * Address: 0x0073D8C0 (FUN_0073D8C0, thunk to FUN_0128FAC0)
      *
      * What it does:
@@ -353,7 +351,7 @@ namespace moho
     /**
      * Address: 0x0073DD70 (FUN_0073DD70) + exception-recovery tail 0x0073DDF9..0x0073DE2B
      */
-    void PreparePendingSaveRequestLocked();
+    void PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock);
     // Local source-side adapter for removed out-param command-cookie returns.
     void ForwardCommandResultLocked();
     static void JoinAndDeleteThread(boost::thread*& thread);
@@ -444,4 +442,23 @@ namespace moho
     const boost::shared_ptr<LaunchInfoBase>& launchInfo,
     uint32_t commandSourceId
   );
+
+  /**
+   * Address context: process-global `sSimDriver` ownership lane used by world/app frame code.
+   *
+   * What it does:
+   * Returns the currently active simulation driver instance, or nullptr.
+   */
+  [[nodiscard]] ISTIDriver* SIM_GetActiveDriver();
+
+  /**
+   * Address context:
+   * - world teardown path (`WLD_Teardown`) clears process-global driver ownership
+   *   before destroying the detached instance.
+   *
+   * What it does:
+   * Detaches and returns the active simulation driver pointer, then clears the
+   * global active-driver lane.
+   */
+  [[nodiscard]] ISTIDriver* SIM_DetachActiveDriver();
 } // namespace moho

@@ -9,92 +9,16 @@
 #include "INetDatagramHandler.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Map.h"
-#include "legacy/containers/Set.h"
+#include "lua/LuaObject.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/task/CTask.h"
+#include "SPeer.h"
 namespace moho
 {
   class SSTICommandSource;
-  constexpr auto kPlayerUidBufSize = 16;
 
   class INetConnector;
   class INetConnection;
-
-  class SPeer : public TDatListItem<SPeer, void>
-  {
-  public:
-    msvc8::string playerName;
-    int32_t uid{0};
-    u_long address{0};
-    u_short port{0};
-    ENetworkPlayerState state{ENetworkPlayerState::kUnknown};
-    int32_t mReserved0x34{0};
-    INetConnection* peerConnection{nullptr};
-    msvc8::set<int32_t> establishedUids;
-    uint32_t mCmdSource{0xFFu};
-    int32_t mClientIndex{-1};
-
-    /**
-     * Address: 0x007C05C0 (FUN_007C05C0)
-     *
-     * What it does:
-     * Initializes a peer record and sets default command-source/client index sentinels.
-     */
-    SPeer(
-      const msvc8::string& playerName,
-      const int32_t uid,
-      const u_long address,
-      const u_short port,
-      INetConnection* connection,
-      const ENetworkPlayerState state
-    );
-
-    /**
-     * Address: 0x007C1340 (FUN_007C1340)
-     *
-     * What it does:
-     * Destroys peer-owned containers/strings and restores detached list-link state.
-     */
-    ~SPeer();
-
-    /**
-     * Address: 0x007C0690 (FUN_007C0690)
-     *
-     * What it does:
-     * Formats a human-readable peer endpoint string.
-     */
-    [[nodiscard]]
-    msvc8::string ToString() const;
-
-    /**
-     * Address: 0x007C2950 (FUN_007C2950)
-     *
-     * Note:
-     * For `thiscall` MSVC require this to be in ECX register, so this is not SPeer member function.
-     *
-     * What it does:
-     * Builds a Lua table for peer replication/debug views.
-     */
-    static LuaPlus::LuaObject ToLua(LuaPlus::LuaState* state, const SPeer* peer);
-
-    /**
-     * Address: 0x007C8070 (FUN_007C8070)
-     *
-     * What it does:
-     * Sends `LOBMSG_NewPeer` payload for this peer over the provided connection.
-     */
-    void SendInfoTo(INetConnection* connection) const;
-  };
-  static_assert(sizeof(SPeer) == 0x50, "SPeer must be 0x50");
-  static_assert(offsetof(SPeer, uid) == 0x24, "SPeer::uid offset must be 0x24");
-  static_assert(offsetof(SPeer, address) == 0x28, "SPeer::address offset must be 0x28");
-  static_assert(offsetof(SPeer, port) == 0x2C, "SPeer::port offset must be 0x2C");
-  static_assert(offsetof(SPeer, state) == 0x30, "SPeer::state offset must be 0x30");
-  static_assert(offsetof(SPeer, mReserved0x34) == 0x34, "SPeer::mReserved0x34 offset must be 0x34");
-  static_assert(offsetof(SPeer, peerConnection) == 0x38, "SPeer::peerConnection offset must be 0x38");
-  static_assert(offsetof(SPeer, establishedUids) == 0x3C, "SPeer::establishedUids offset must be 0x3C");
-  static_assert(offsetof(SPeer, mCmdSource) == 0x48, "SPeer::mCmdSource offset must be 0x48");
-  static_assert(offsetof(SPeer, mClientIndex) == 0x4C, "SPeer::mClientIndex offset must be 0x4C");
 
   class MOHO_EMPTY_BASES CLobby : public CScriptObject,
                                   public IMessageReceiver,
@@ -118,6 +42,25 @@ namespace moho
      * Packs `{this, GetClass()}` into an `RRef`.
      */
     gpg::RRef GetDerivedObjectRef() override;
+
+    /**
+     * Address: 0x007C0970 (FUN_007C0970)
+     * Mangled: ??0CLobby@Moho@@QAE@ABVLuaObject@LuaPlus@@PAVINetConnector@1@H_NVStrArg@gpg@@H@Z
+     *
+     * LuaPlus::LuaObject const &,Moho::INetConnector *,int,bool,gpg::StrArg,int
+     *
+     * What it does:
+     * Binds Lua lobby object state, initializes connector/session fields, and
+     * registers lobby event handles with connector + wait-handle set.
+     */
+    CLobby(
+      const LuaPlus::LuaObject& clazz,
+      INetConnector* connector,
+      int32_t maxConnections,
+      bool hasNAT,
+      gpg::StrArg playerName,
+      int32_t localUid
+    );
 
     /**
      * Address: 0x007C0C60 (FUN_007C0C60 deleting wrapper, body via ?1CLobby@Moho@@UAE@XZ)
@@ -349,6 +292,10 @@ namespace moho
     uint32_t AssignCommandSource(
       int timeouts, int32_t ownerId, msvc8::vector<SSTICommandSource>& commandSources, uint32_t& sourceId
     );
+
+  private:
+    SPeer* FindPeerByConnection(const INetConnection* connection);
+    SPeer* FindPeerByUid(int32_t uid);
 
   public:
     INetConnector* connector{nullptr};           // 0x78

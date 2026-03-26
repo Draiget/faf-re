@@ -11,6 +11,7 @@ namespace moho
     [[nodiscard]] CSimConVarBase* SimPathBackgroundUpdateConVar();
     [[nodiscard]] CSimConVarBase* SimPathBackgroundBudgetConVar();
     [[nodiscard]] CSimConVarBase* SimChecksumPeriodConVar();
+    [[nodiscard]] CSimConVarBase* SimSteeringAirToleranceConVar();
 
     [[nodiscard]] bool SimDebugCheatsEnabled();
     [[nodiscard]] bool SimReportCheatsEnabled();

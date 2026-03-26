@@ -12,4 +12,12 @@ namespace moho
     : mSkeleton(skeleton)
     , mScale(scale)
   {}
+
+  /**
+   * Address: 0x005E3B10 (FUN_005E3B10, ?GetSkeleton@CAniPose@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+   */
+  boost::shared_ptr<const CAniSkel> CAniPose::GetSkeleton() const
+  {
+    return mSkeleton;
+  }
 } // namespace moho

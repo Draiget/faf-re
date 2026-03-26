@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "moho/app/WinApp.h"
 #include "moho/sim/CSimConVarBase.h"
 
 namespace moho
@@ -13,12 +14,10 @@ namespace moho
       constexpr std::uintptr_t kPathBackgroundUpdateConVarEa = 0x010BA530u;
       constexpr std::uintptr_t kPathBackgroundBudgetConVarEa = 0x010BA404u;
       constexpr std::uintptr_t kChecksumPeriodConVarEa = 0x010BA5E0u;
+      constexpr std::uintptr_t kSteeringAirToleranceConVarEa = 0x010AFE14u;
 
       constexpr std::uintptr_t kSimDebugCheatsEa = 0x010A63ECu;
       constexpr std::uintptr_t kSimReportCheatsEa = 0x010A63EDu;
-
-      constexpr std::uintptr_t kGetCallStackEa = 0x004A22B0u;
-      constexpr std::uintptr_t kFormatCallStackEa = 0x004A26E0u;
 
       constexpr std::uintptr_t kRenderFogOfWarEa = 0x00F57DC3u;
     } // namespace
@@ -36,6 +35,11 @@ namespace moho
     CSimConVarBase* SimChecksumPeriodConVar()
     {
       return reinterpret_cast<CSimConVarBase*>(kChecksumPeriodConVarEa);
+    }
+
+    CSimConVarBase* SimSteeringAirToleranceConVar()
+    {
+      return reinterpret_cast<CSimConVarBase*>(kSteeringAirToleranceConVarEa);
     }
 
     bool SimDebugCheatsEnabled()
@@ -56,13 +60,7 @@ namespace moho
         return 0;
       }
 
-      using GetCallStackFn = unsigned int(__cdecl*)(void*, unsigned int, unsigned int*);
-      const auto getCallStack = reinterpret_cast<GetCallStackFn>(kGetCallStackEa);
-      if (!getCallStack) {
-        return 0;
-      }
-
-      return static_cast<int>(getCallStack(nullptr, maxFrames, outFrames));
+      return static_cast<int>(moho::PLAT_GetCallStack(nullptr, maxFrames, outFrames));
     }
 
     void PlatformFormatCallstack(msvc8::string* outText, const int frameCount, const unsigned int* frames)
@@ -71,13 +69,13 @@ namespace moho
         return;
       }
 
-      using FormatCallStackFn = msvc8::string*(__cdecl*)(msvc8::string*, int, int, const unsigned int*);
-      const auto formatCallStack = reinterpret_cast<FormatCallStackFn>(kFormatCallStackEa);
-      if (!formatCallStack) {
+      if (frameCount <= 0) {
+        outText->assign_owned("");
         return;
       }
 
-      formatCallStack(outText, 0, frameCount, frames);
+      const msvc8::string formatted = moho::PLAT_FormatCallstack(0, frameCount, frames);
+      outText->assign_owned(formatted.c_str());
     }
 
     bool RenderFogOfWarEnabled()

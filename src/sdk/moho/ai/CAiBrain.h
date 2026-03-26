@@ -1,10 +1,15 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-#include "moho/lua/CScrLuaBinderFwd.h"
+#include <cstddef>
+#include <cstdint>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
+#include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/script/CScriptObject.h"
+#include "wm3/Vector2.h"
 
 namespace LuaPlus
 {
@@ -13,39 +18,140 @@ namespace LuaPlus
 
 namespace moho
 {
+  class CArmyImpl;
+  class CAiPersonality;
+  class CTaskStage;
+  class Sim;
+
+  struct SBuildResourceInfoLink
+  {
+    SBuildResourceInfoLink** mOwnerSlot; // +0x00
+    SBuildResourceInfoLink* mNext;       // +0x04
+  };
+  static_assert(sizeof(SBuildResourceInfoLink) == 0x08, "SBuildResourceInfoLink size must be 0x08");
+
+  struct SBuildResourceInfo
+  {
+    SBuildResourceInfoLink mPlacementLink;  // +0x00
+    SBuildResourceInfoLink mResourceLink;   // +0x08
+  };
+  static_assert(sizeof(SBuildResourceInfo) == 0x10, "SBuildResourceInfo size must be 0x10");
+
+  struct SBuildStructurePositionNode
+  {
+    SBuildStructurePositionNode* left;      // +0x00
+    SBuildStructurePositionNode* parent;    // +0x04
+    SBuildStructurePositionNode* right;     // +0x08
+    Wm3::Vector2i mGridPosition;            // +0x0C
+    SBuildResourceInfo mBuildInfo;          // +0x14
+    std::uint8_t mColor;                    // +0x24
+    std::uint8_t mIsNil;                    // +0x25
+    std::uint8_t mPad26[2];                 // +0x26
+  };
+  static_assert(sizeof(SBuildStructurePositionNode) == 0x28, "SBuildStructurePositionNode size must be 0x28");
+  static_assert(
+    offsetof(SBuildStructurePositionNode, mGridPosition) == 0x0C,
+    "SBuildStructurePositionNode::mGridPosition offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SBuildStructurePositionNode, mBuildInfo) == 0x14,
+    "SBuildStructurePositionNode::mBuildInfo offset must be 0x14"
+  );
+  static_assert(offsetof(SBuildStructurePositionNode, mColor) == 0x24, "SBuildStructurePositionNode::mColor");
+  static_assert(offsetof(SBuildStructurePositionNode, mIsNil) == 0x25, "SBuildStructurePositionNode::mIsNil");
+
+  struct SBuildStructurePositionMap
+  {
+    std::uint32_t mMeta00;                   // +0x00
+    SBuildStructurePositionNode* mHead;      // +0x04
+    std::uint32_t mSize;                     // +0x08
+  };
+  static_assert(sizeof(SBuildStructurePositionMap) == 0x0C, "SBuildStructurePositionMap size must be 0x0C");
+  static_assert(
+    offsetof(SBuildStructurePositionMap, mHead) == 0x04, "SBuildStructurePositionMap::mHead offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SBuildStructurePositionMap, mSize) == 0x08, "SBuildStructurePositionMap::mSize offset must be 0x08"
+  );
+
   /**
    * VFTABLE: 0x00E19900
    * COL:  0x00E6EA10
    */
-  class CAiBrain
+  class CAiBrain : public CScriptObject
   {
   public:
     /**
-     * Address: 0x00579590
-     * Slot: 0
-     * Demangled: Moho::CAiBrain::GetClass
+     * Address: 0x00579E40 (FUN_00579E40, default ctor)
      */
-    virtual void GetClass() = 0;
+    CAiBrain();
+
     /**
-     * Address: 0x005795B0
-     * Slot: 1
-     * Demangled: Moho::CAiBrain::GetDerivedObjectRef
+     * Address: 0x00579F80 (FUN_00579F80, army ctor)
      */
-    virtual void GetDerivedObjectRef() = 0;
+    explicit CAiBrain(CArmyImpl* army);
+
     /**
-     * Address: 0x00579F30
-     * Slot: 2
-     * Demangled: (likely scalar deleting destructor thunk)
+     * Address: 0x00579590 (FUN_00579590, ?GetClass@CAiBrain@Moho@@UBEPAVRType@gpg@@XZ)
+     *
+     * VFTable SLOT: 0
      */
-    virtual ~CAiBrain() = default;
+    [[nodiscard]]
+    gpg::RType* GetClass() const override;
+
     /**
-     * Address: 0x004C70A0
-     * Slot: 3
-     * Demangled: public: virtual class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char>>
-     * __thiscall Moho::CScriptObject::GetErrorDescription(void)const
+     * Address: 0x005795B0 (FUN_005795B0, ?GetDerivedObjectRef@CAiBrain@Moho@@UAE?AVRRef@gpg@@XZ)
+     *
+     * VFTable SLOT: 1
      */
-    virtual msvc8::string GetErrorDescription() const = 0;
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /**
+     * Address: 0x00579F30 (FUN_00579F30, scalar deleting thunk)
+     * Address: 0x0057A1E0 (FUN_0057A1E0, core destructor)
+     *
+     * VFTable SLOT: 2
+     */
+    ~CAiBrain() override;
+
+  public:
+    static gpg::RType* sType;
+
+    CArmyImpl* mArmy;                              // +0x34
+    CArmyImpl* mCurrentEnemy;                      // +0x38
+    CAiPersonality* mPersonality;                  // +0x3C
+    msvc8::string mCurrentPlan;                    // +0x40
+    msvc8::vector<std::uint8_t> mAttackVectors;    // +0x5C
+    std::uint32_t mAttackVectorMeta6C;             // +0x6C (unknown; written/used outside recovered scope)
+    CategoryWordRangeView mBuildCategoryRange;     // +0x70
+    SBuildStructurePositionMap mBuildStructureMap; // +0x98
+    Sim* mSim;                                     // +0xA4
+    CTaskStage* mAiThreadStage;                    // +0xA8
+    CTaskStage* mAttackerThreadStage;              // +0xAC
+    CTaskStage* mReservedThreadStage;              // +0xB0
+    std::uint32_t mTailWord;                       // +0xB4
   };
+
+  static_assert(sizeof(CAiBrain) == 0xB8, "CAiBrain size must be 0xB8");
+  static_assert(offsetof(CAiBrain, mArmy) == 0x34, "CAiBrain::mArmy offset must be 0x34");
+  static_assert(offsetof(CAiBrain, mCurrentEnemy) == 0x38, "CAiBrain::mCurrentEnemy offset must be 0x38");
+  static_assert(offsetof(CAiBrain, mPersonality) == 0x3C, "CAiBrain::mPersonality offset must be 0x3C");
+  static_assert(offsetof(CAiBrain, mCurrentPlan) == 0x40, "CAiBrain::mCurrentPlan offset must be 0x40");
+  static_assert(offsetof(CAiBrain, mAttackVectors) == 0x5C, "CAiBrain::mAttackVectors offset must be 0x5C");
+  static_assert(offsetof(CAiBrain, mAttackVectorMeta6C) == 0x6C, "CAiBrain::mAttackVectorMeta6C offset must be 0x6C");
+  static_assert(
+    offsetof(CAiBrain, mBuildCategoryRange) == 0x70, "CAiBrain::mBuildCategoryRange offset must be 0x70"
+  );
+  static_assert(offsetof(CAiBrain, mBuildStructureMap) == 0x98, "CAiBrain::mBuildStructureMap offset must be 0x98");
+  static_assert(offsetof(CAiBrain, mSim) == 0xA4, "CAiBrain::mSim offset must be 0xA4");
+  static_assert(offsetof(CAiBrain, mAiThreadStage) == 0xA8, "CAiBrain::mAiThreadStage offset must be 0xA8");
+  static_assert(
+    offsetof(CAiBrain, mAttackerThreadStage) == 0xAC, "CAiBrain::mAttackerThreadStage offset must be 0xAC"
+  );
+  static_assert(
+    offsetof(CAiBrain, mReservedThreadStage) == 0xB0, "CAiBrain::mReservedThreadStage offset must be 0xB0"
+  );
+  static_assert(offsetof(CAiBrain, mTailWord) == 0xB4, "CAiBrain::mTailWord offset must be 0xB4");
 } // namespace moho
 
 /**

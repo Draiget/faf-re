@@ -2,6 +2,7 @@
 #include "boost/enable_shared_from_this.h"
 #include "boost/mutex.h"
 #include "boost/recursive_mutex.h"
+#include "boost/shared_ptr.h"
 #include "boost/thread.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/utils/Sync.h"
@@ -347,4 +348,38 @@ namespace moho
     boost::weak_ptr<INetNATTraversalHandler> mNATHandler;
   };
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
+
+  /**
+   * Address context:
+   * - process-global GPGNet shared-pointer lane (`sGPGNet`).
+   *
+   * What it does:
+   * Replaces the active process-global GPGNet interface pointer.
+   */
+  void GPGNET_SetPtr(const boost::shared_ptr<CGpgNetInterface>& ptr);
+
+  /**
+   * Address context:
+   * - process-global GPGNet shared-pointer lane (`sGPGNet`).
+   *
+   * What it does:
+   * Returns the active process-global GPGNet interface pointer.
+   */
+  [[nodiscard]] boost::shared_ptr<CGpgNetInterface> GPGNET_GetPtr();
+
+  /**
+   * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
+   *
+   * What it does:
+   * Creates and connects the process-global GPGNet interface.
+   */
+  void GPGNET_Attach(u_long addr, u_short port);
+
+  /**
+   * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Shuts down and clears the process-global GPGNet interface pointer.
+   */
+  void GPGNET_Shutdown();
 } // namespace moho

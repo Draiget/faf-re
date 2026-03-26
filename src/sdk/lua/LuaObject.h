@@ -129,6 +129,7 @@ namespace LuaPlus
 		void SetNumber(int32_t index, float value);
 		void SetNumber(const char* key, float value);
 		void SetInteger(const char* key, int32_t value);
+		void SetBoolean(const char* key, bool value);
 
 		/**
 		 * Address: 0x00908760
@@ -161,6 +162,15 @@ namespace LuaPlus
 
 		[[nodiscard]]
 		LuaObject GetByName(const char* name) const;
+
+		[[nodiscard]]
+		LuaObject operator[](const char* name) const;
+
+		[[nodiscard]]
+		LuaObject operator[](int32_t index) const;
+
+		[[nodiscard]]
+		LuaObject Lookup(const char* path) const;
 
 		[[nodiscard]]
 		int32_t GetN() const;
@@ -198,6 +208,7 @@ namespace LuaPlus
 		 */
 		[[nodiscard]] bool GetBoolean() const noexcept { return m_object.value.b != 0; }
 		[[nodiscard]] double GetNumber() const noexcept { return static_cast<double>(m_object.value.n); }
+		[[nodiscard]] int32_t GetInteger() const noexcept;
 		[[nodiscard]] const char* GetString() const noexcept;
 
 	public:

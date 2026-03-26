@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -14,6 +13,7 @@
 #include "moho/path/SNamedFootprint.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "gpg/core/containers/String.h"
 
 namespace moho
 {
@@ -74,16 +74,6 @@ namespace moho
       return static_cast<EFootprintFlags>(kFootprintFlagsByMotion[ToMotionIndex(motionType)]);
     }
 
-    void NormalizeFilenameLowerSlash(std::string& value)
-    {
-      for (char& ch : value) {
-        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        if (ch == '\\') {
-          ch = '/';
-        }
-      }
-    }
-
     [[nodiscard]] std::string
     CompleteResourcePath(const std::string_view sourceName, const std::string_view resourceName)
     {
@@ -103,7 +93,7 @@ namespace moho
     void AssignNormalizedFilename(msvc8::string& destination, const std::string_view filename)
     {
       std::string normalized{filename};
-      NormalizeFilenameLowerSlash(normalized);
+      gpg::STR_NormalizeFilenameLowerSlash(normalized);
       destination.assign_owned(normalized);
     }
   } // namespace
@@ -222,7 +212,7 @@ namespace moho
 
     if (!Display.MeshBlueprint.name.empty()) {
       std::string meshPath = CompleteResourcePath(mSource.view(), Display.MeshBlueprint.name.view());
-      NormalizeFilenameLowerSlash(meshPath);
+      gpg::STR_NormalizeFilenameLowerSlash(meshPath);
       Display.MeshBlueprint.name.assign_owned(meshPath);
     }
 

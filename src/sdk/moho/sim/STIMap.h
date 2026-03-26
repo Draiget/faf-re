@@ -7,11 +7,15 @@
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/SMinMax.h"
 #include "wm3/AABB.h"
 
 namespace moho
 {
+  class COGrid;
+
   struct CHeightFieldMinMaxGrid
   {
     SMinMax<std::uint16_t>* data; // +0x00
@@ -477,6 +481,34 @@ namespace moho
     void LoadTerrainTypes(LuaPlus::LuaState* state);
 
     /**
+     * Address: 0x00577F20 (FUN_00577F20)
+     *
+     * unsigned int z, unsigned int x
+     *
+     * IDA signature:
+     * bool __usercall Moho::STIMap::IsBlockingTerrain@<al>(Moho::STIMap *this@<ecx>, unsigned int x@<edi>, unsigned int y@<esi>);
+     *
+     * What it does:
+     * Returns whether terrain cell `(x,z)` is blocked by map terrain-type flags.
+     */
+    [[nodiscard]]
+    bool IsBlockingTerrain(std::uint32_t z, std::uint32_t x) const;
+
+    /**
+     * Address: 0x00564DF0 (FUN_00564DF0)
+     *
+     * Moho::SOCellPos const &, Moho::SFootprint const &
+     *
+     * IDA signature:
+     * Moho::EOccupancyCaps callcnv_F3 Moho::STIMap::OccupancyCapsOfFootprintAt@<al>(Moho::SOCellPos *pos@<eax>, Moho::STIMap *map@<ecx>, const Moho::SFootprint *fp);
+     *
+     * What it does:
+     * Computes terrain/water/slope occupancy caps for one footprint origin.
+     */
+    [[nodiscard]]
+    EOccupancyCaps OccupancyCapsOfFootprintAt(const SOCellPos& pos, const SFootprint& footprint) const;
+
+    /**
      * Address: 0x00758E10 (FUN_00758E10)
      *
      * unsigned int x, unsigned int z
@@ -580,4 +612,49 @@ namespace moho
   static_assert(offsetof(STIMap, mBlocking) == 0x1434, "STIMap::mBlocking offset must be 0x1434");
   static_assert(offsetof(STIMap, mWaterEnabled) == 0x1534, "STIMap::mWaterEnabled offset must be 0x1534");
   static_assert(sizeof(STIMap) == 0x1544, "STIMap size must be 0x1544");
+
+  /**
+   * Address: 0x00564AB0 (FUN_00564AB0, ?OCCUPY_MobileCheck@Moho@@YA?AW4ELayer@1@ABUSFootprint@1@ABUSOCellPos@1@PBVSTIMap@1@@Z)
+   *
+   * Moho::SFootprint const &, Moho::STIMap const &, Moho::SOCellPos const &
+   *
+   * What it does:
+   * Computes dynamic occupancy caps for multi-cell footprints using terrain,
+   * blocking-map, depth, and slope checks.
+   */
+  [[nodiscard]]
+  EOccupancyCaps OCCUPY_MobileCheck(const SFootprint& footprint, const STIMap& map, const SOCellPos& pos);
+
+  /**
+   * Address: 0x00720920 (FUN_00720920)
+   *
+   * Moho::SFootprint const &, Moho::COGrid const &, Moho::SOCellPos const &, Moho::EOccupancyCaps
+   *
+   * What it does:
+   * Applies single-cell occupancy filtering against terrain/water occupation bitmaps.
+   */
+  [[nodiscard]]
+  EOccupancyCaps OCCUPY_Filter(
+    const SFootprint& footprint,
+    const COGrid& grid,
+    const SOCellPos& pos,
+    EOccupancyCaps occupancyCaps
+  );
+
+  /**
+   * Address: 0x007209E0 (FUN_007209E0)
+   *
+   * Moho::COGrid const &, Moho::SOCellPos const &, Moho::SFootprint const &, Moho::EOccupancyCaps
+   *
+   * What it does:
+   * Returns occupancy-fit caps for a footprint at one origin using mobile
+   * terrain checks plus terrain/water occupation bit arrays.
+   */
+  [[nodiscard]]
+  EOccupancyCaps OCCUPY_FootprintFits(
+    const COGrid& grid,
+    const SOCellPos& pos,
+    const SFootprint& footprint,
+    EOccupancyCaps occupancyCaps
+  );
 } // namespace moho

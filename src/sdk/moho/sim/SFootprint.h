@@ -4,6 +4,9 @@
 
 namespace moho
 {
+  class COGrid;
+  struct SCoordsVec2;
+
   enum class EFootprintFlags : int8_t
   {
     FPFLAG_None = 0x0,
@@ -30,6 +33,17 @@ namespace moho
     float mMaxSlope;               // +0x04
     float mMinWaterDepth;          // +0x08
     float mMaxWaterDepth;          // +0x0C
+
+    /**
+     * Address: 0x00720AA0 (FUN_00720AA0, Moho::SFootprint::FitsAt)
+     *
+     * Moho::SCoordsVec2 const &, Moho::COGrid const &
+     *
+     * What it does:
+     * Converts world-space center coordinates to a footprint-origin cell and
+     * returns occupancy-fit caps via `OCCUPY_FootprintFits(..., OC_ANY)`.
+     */
+    [[nodiscard]] EOccupancyCaps FitsAt(const SCoordsVec2& worldPos, const COGrid& grid) const;
   };
 
   static_assert(offsetof(SFootprint, mSizeX) == 0x00, "SFootprint::mSizeX offset must be 0x00");

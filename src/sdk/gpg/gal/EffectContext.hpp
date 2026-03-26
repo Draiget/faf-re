@@ -1,21 +1,22 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace gpg {
-namespace gal {
+namespace gpg::gal
+{
     /**
      * VFTABLE: 0x00D434D8
-     * COL:  0x00E50FC8
+     * COL:     0x00E50FC8
      */
-    class EffectContext {
+    class EffectContext
+    {
     public:
-      /**
-       * Address: 0x008FE8B0
-       * Slot: 0
-       * Demangled: sub_8FE8B0
-       */
-      virtual void sub_8FE8B0() = 0;
+        /**
+         * Address: 0x008FE8B0 (FUN_008FE8B0)
+         *
+         * What it does:
+         * Owns the scalar-deleting destructor thunk for effect-context interface instances.
+         */
+        virtual ~EffectContext();
     };
-} // namespace gal
-} // namespace gpg
+
+    static_assert(sizeof(EffectContext) == 0x4, "EffectContext size must be 0x4");
+}

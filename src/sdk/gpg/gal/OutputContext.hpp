@@ -1,21 +1,38 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace gpg {
-namespace gal {
+#include <cstdint>
+
+#include "boost/shared_ptr.h"
+#include "gpg/gal/CubeRenderTargetContext.hpp"
+#include "gpg/gal/RenderTargetContext.hpp"
+#include "gpg/gal/TextureContext.hpp"
+
+namespace gpg::gal
+{
     /**
      * VFTABLE: 0x00D42180
-     * COL:  0x00E5EB7C
+     * COL:     0x00E5EB7C
      */
-    class OutputContext {
+    class OutputContext
+    {
     public:
-      /**
-       * Address: 0x008E8250
-       * Slot: 0
-       * Demangled: sub_8E8250
-       */
-      virtual void sub_8E8250() = 0;
+        using CubeTargetHandle = boost::shared_ptr<CubeRenderTargetContext>;
+        using SurfaceHandle = boost::shared_ptr<RenderTargetContext>;
+        using TextureHandle = boost::shared_ptr<TextureContext>;
+
+        /**
+         * Address: 0x008E8250 (FUN_008E8250)
+         *
+         * What it does:
+         * Owns the vector/scalar deleting-destructor thunk path for OutputContext.
+         */
+        virtual ~OutputContext();
+
+        CubeTargetHandle cubeTarget;  // +0x04
+        std::int32_t face;            // +0x0C
+        SurfaceHandle surface;        // +0x10
+        TextureHandle texture;        // +0x18
     };
-} // namespace gal
-} // namespace gpg
+
+    static_assert(sizeof(OutputContext) == 0x20, "OutputContext size must be 0x20");
+}

@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <typeinfo>
 
 namespace
@@ -32,104 +31,6 @@ namespace
 
     auto* const resource = static_cast<const AnimationResourceView*>(ref.px);
     return resource->mClipHeader;
-  }
-
-  void ReleaseAnimationRef(moho::CAnimationManipulator::AnimationResourceRef& ref) noexcept
-  {
-    if (ref.pi != nullptr) {
-      ref.pi->release();
-    }
-    ref.px = nullptr;
-    ref.pi = nullptr;
-  }
-
-  void AssignAnimationRef(
-    moho::CAnimationManipulator::AnimationResourceRef& destination,
-    const moho::CAnimationManipulator::AnimationResourceRef& source
-  )
-  {
-    if (source.pi != nullptr) {
-      source.pi->add_ref_copy();
-    }
-    ReleaseAnimationRef(destination);
-    destination = source;
-  }
-
-  void FreeBoneMaskStorage(moho::SAniManipBitStorage& mask)
-  {
-    if (mask.mWords != nullptr) {
-      delete[] mask.mWords;
-    }
-    mask.mBitCount = 0;
-    mask.mReservedWordBase = 0;
-    mask.mWords = nullptr;
-    mask.mWordsEnd = nullptr;
-    mask.mWordsCapacityEnd = nullptr;
-  }
-
-  [[nodiscard]] std::uint32_t WordCountForBits(const std::uint32_t bitCount)
-  {
-    return (bitCount + 31u) >> 5u;
-  }
-
-  void InitializeBoneMaskStorage(moho::SAniManipBitStorage& mask, const std::uint32_t bitCount)
-  {
-    const std::uint32_t requiredWords = WordCountForBits(bitCount);
-    if (requiredWords == 0) {
-      FreeBoneMaskStorage(mask);
-      return;
-    }
-
-    const std::uint32_t existingCapacity =
-      mask.mWords && mask.mWordsCapacityEnd ? static_cast<std::uint32_t>(mask.mWordsCapacityEnd - mask.mWords) : 0u;
-    if (existingCapacity < requiredWords) {
-      if (mask.mWords != nullptr) {
-        delete[] mask.mWords;
-      }
-      mask.mWords = new std::uint32_t[requiredWords];
-      mask.mWordsCapacityEnd = mask.mWords + requiredWords;
-    }
-
-    mask.mBitCount = bitCount;
-    mask.mReservedWordBase = 0;
-    mask.mWordsEnd = mask.mWords + requiredWords;
-    for (std::uint32_t* word = mask.mWords; word != mask.mWordsEnd; ++word) {
-      *word = 0xFFFFFFFFu;
-    }
-
-    const std::uint32_t trailingBits = bitCount & 31u;
-    if (trailingBits != 0u) {
-      mask.mWordsEnd[-1] &= ((1u << trailingBits) - 1u);
-    }
-  }
-
-  [[nodiscard]] bool IsBoneMaskBitSet(const moho::SAniManipBitStorage& mask, const std::uint32_t bitIndex)
-  {
-    if (!mask.mWords || bitIndex >= mask.mBitCount) {
-      return false;
-    }
-
-    const std::uint32_t wordIndex = bitIndex >> 5u;
-    const std::uint32_t bitInWord = bitIndex & 31u;
-    const std::uint32_t* const word = mask.mWords + wordIndex;
-    return ((*word & (1u << bitInWord)) != 0u);
-  }
-
-  void SetBoneMaskBit(moho::SAniManipBitStorage& mask, const std::uint32_t bitIndex, const bool enabled)
-  {
-    if (!mask.mWords || bitIndex >= mask.mBitCount) {
-      return;
-    }
-
-    const std::uint32_t wordIndex = bitIndex >> 5u;
-    const std::uint32_t bitInWord = bitIndex & 31u;
-    std::uint32_t* const word = mask.mWords + wordIndex;
-    const std::uint32_t bit = (1u << bitInWord);
-    if (enabled) {
-      *word |= bit;
-    } else {
-      *word &= ~bit;
-    }
   }
 
   [[nodiscard]] float WrapToRange(const float value, const float range)
@@ -242,8 +143,8 @@ namespace moho
    */
   CAnimationManipulator::~CAnimationManipulator()
   {
-    ReleaseAnimationRef(mAnimationRef);
-    FreeBoneMaskStorage(mBoneMask);
+    mAnimationRef.release();
+    mBoneMask.Reset();
     UnlinkOwnerNode(mOwnerLink);
   }
 
@@ -364,7 +265,7 @@ namespace moho
       ResetWatchBoneStorage();
     }
 
-    AssignAnimationRef(mAnimationRef, resource);
+    mAnimationRef.assign_retain(resource);
     mAnimationTime = 0.0f;
     mLastFramePosition = -1.0f;
     mLooping = looping;
@@ -382,7 +283,7 @@ namespace moho
       return;
     }
 
-    SetBoneMaskBit(mBoneMask, static_cast<std::uint32_t>(boneIndex), enabled);
+    mBoneMask.SetBit(static_cast<std::uint32_t>(boneIndex), enabled);
   }
 
   float CAnimationManipulator::GetRate() const noexcept
@@ -436,7 +337,7 @@ namespace moho
 
   void CAnimationManipulator::InitializeBoneMask(const std::uint32_t boneCount)
   {
-    InitializeBoneMaskStorage(mBoneMask, boneCount);
+    mBoneMask.Resize(boneCount, true);
   }
 
   /**

@@ -4,31 +4,11 @@
 #include <typeinfo>
 
 #include "CTaskThread.h"
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 
 using namespace moho;
-
-namespace gpg
-{
-  enum class TrackedPointerState : int
-  {
-    Unowned = 1,
-    Owned = 2,
-  };
-
-  struct TrackedPointerInfo
-  {
-    void* object;
-    gpg::RType* type;
-  };
-
-  TrackedPointerInfo ReadRawPointer(ReadArchive* archive, const gpg::RRef& ownerRef);
-  void WriteRawPointer(
-    WriteArchive* archive, const gpg::RRef& objectRef, TrackedPointerState state, const gpg::RRef& ownerRef
-  );
-  gpg::RRef REF_UpcastPtr(const gpg::RRef& source, const gpg::RType* targetType);
-} // namespace gpg
 
 namespace
 {

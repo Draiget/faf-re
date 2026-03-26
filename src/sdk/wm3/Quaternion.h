@@ -270,6 +270,9 @@ namespace Wm3
   using Quatf = Quaternion<float>;
   using Quatd = Quaternion<double>;
   using Quati = Quaternion<int>; // storage-only; rotation math expects floating-point
+  using Quaternionf = Quatf;
+  using Quaterniond = Quatd;
+  using Quaternioni = Quati;
 
   static_assert(sizeof(Quatf) == 0x10, "Quatf size must be 0x10");
 } // namespace Wm3

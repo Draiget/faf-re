@@ -49,6 +49,11 @@ namespace
   }
 } // namespace
 
+namespace moho
+{
+  gpg::RType* ISimResources::sType = nullptr;
+} // namespace moho
+
 namespace moho::detail
 {
   /**

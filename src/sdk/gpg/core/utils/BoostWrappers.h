@@ -99,7 +99,117 @@ namespace boost
         static SharedPtrRaw with_deleter(T* p, Deleter d) {
             return SharedPtrRaw(p, std::move(d));
         }
+
+        [[nodiscard]] bool has_control_block() const noexcept {
+            return pi != nullptr;
+        }
+
+        void add_ref_copy() const noexcept {
+            if (pi != nullptr) {
+                pi->add_ref_copy();
+            }
+        }
+
+        [[nodiscard]] bool add_ref_lock() const noexcept {
+            return pi != nullptr && pi->add_ref_lock();
+        }
+
+        void weak_add_ref() const noexcept {
+            if (pi != nullptr) {
+                pi->weak_add_ref();
+            }
+        }
+
+        void weak_release() noexcept {
+            if (pi != nullptr) {
+                pi->weak_release();
+            }
+            px = nullptr;
+            pi = nullptr;
+        }
+
+        void release() noexcept {
+            if (pi != nullptr) {
+                pi->release();
+            }
+            px = nullptr;
+            pi = nullptr;
+        }
+
+        void assign_retain(const SharedPtrRaw& source) noexcept {
+            // Keep VC8-era assignment ordering: copy px first, then swap control block.
+            px = source.px;
+            if (source.pi != pi) {
+                if (source.pi != nullptr) {
+                    source.pi->add_ref_copy();
+                }
+                if (pi != nullptr) {
+                    pi->release();
+                }
+                pi = source.pi;
+            }
+        }
+
+        [[nodiscard]] SharedPtrRaw clone_retained() const noexcept {
+            SharedPtrRaw out{};
+            out.px = px;
+            out.pi = pi;
+            if (out.pi != nullptr) {
+                out.pi->add_ref_copy();
+            }
+            return out;
+        }
     };
+
+    template <class T>
+    struct SharedPtrLayoutView
+    {
+        T* px;
+        detail::sp_counted_base* pi;
+    };
+
+    template <class T>
+    [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedBorrow(const boost::shared_ptr<T>& source) noexcept
+    {
+        static_assert(
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
+        );
+
+        const auto* const layout = reinterpret_cast<const SharedPtrLayoutView<T>*>(&source);
+        SharedPtrRaw<T> out{};
+        out.px = layout->px;
+        out.pi = layout->pi;
+        return out;
+    }
+
+    template <class T>
+    [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedRetained(const boost::shared_ptr<T>& source) noexcept
+    {
+        SharedPtrRaw<T> out = SharedPtrRawFromSharedBorrow(source);
+        if (out.pi != nullptr) {
+            out.pi->add_ref_copy();
+        }
+        return out;
+    }
+
+    template <class T>
+    [[nodiscard]] boost::shared_ptr<T> SharedPtrFromRawRetained(const SharedPtrRaw<T>& source) noexcept
+    {
+        static_assert(
+            sizeof(boost::shared_ptr<T>) == sizeof(SharedPtrLayoutView<T>),
+            "boost::shared_ptr<T> layout must match (px,pi) pair on this target"
+        );
+
+        boost::shared_ptr<T> out{};
+        auto* const layout = reinterpret_cast<SharedPtrLayoutView<T>*>(&out);
+        layout->px = source.px;
+        layout->pi = source.pi;
+        if (layout->pi != nullptr) {
+            layout->pi->add_ref_copy();
+        }
+        return out;
+    }
 
     // Detection: is T iterable (has member begin()/end())?
     template <class U, class = void>

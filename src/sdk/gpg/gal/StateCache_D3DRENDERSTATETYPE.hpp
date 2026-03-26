@@ -1,6 +1,7 @@
 // ReSharper disable CppTooWideScope
 #pragma once
 
+#include "StateCache.h"
 #include "D3D9Utils.h"
 #include "legacy/containers/Tree.h"
 
@@ -11,25 +12,30 @@ namespace gpg::gal
 	 * COL:     0x00E5358C
 	 */
     template<>
-	class StateCache<d3d9::RenderState, unsigned int>
-	{
+    class StateCache<d3d9::RenderState, unsigned int>
+    {
     public:
         using state_type = d3d9::RenderState;
         using value_type = unsigned int;
 
         /**
-	     * Scalar deleting destructor.
-		 *
-         * Address: 0x00948190
+         * Address: 0x00948190 (FUN_00948190)
+         *
          * Slot: 0
          * Demangled: sub_948190
+         *
+         * What it does:
+         * Clears the render-state cache tree and releases owned nodes.
          */
-        virtual ~StateCache() = default;
+        virtual ~StateCache();
 
     protected:
-        /**0x00948190
+        /**
+         * Address: 0x00948190 (FUN_00948190)
+         *
          * Embedded VC8-like tree sentinel + clear-on-destruction.
          */
         msvc8::EmbeddedTree<> tree_;
     };
+
 }

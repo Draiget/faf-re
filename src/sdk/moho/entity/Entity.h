@@ -1,11 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
 #include "../script/CScriptObject.h"
 #include "../task/CTask.h"
 #include "EntityId.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/String.h"
@@ -32,9 +34,9 @@ namespace moho
   class Sim;
   class Unit;
   class VTransform;
+  class CIntel;
   class EntityMotor;
   class EntityCollisionUpdater;
-  class EntityPositionWatchEntry;
   class CArmyImpl;
   struct PositionHistory;
   struct SSyncData;
@@ -475,6 +477,14 @@ namespace moho
     [[nodiscard]] VTransform const& GetTransformWm3() const noexcept;
 
     /**
+     * Address: 0x00678800 (FUN_00678800, ?InitPositionHistory@Entity@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Rebuilds the rolling position-history ring with identity/default samples.
+     */
+    void InitPositionHistory();
+
+    /**
      * Address: 0x00678F10 (FUN_00678F10)
      *
      * What it does:
@@ -515,7 +525,7 @@ namespace moho
     EntityCollisionCellSpan mCollisionCellSpan; // 0x004C
 
     // 0x60: intrusive node used by Sim::mCoordEntities (+0xA5C in Sim).
-    TDatListItem<void*, void> mCoordNode;
+    TDatListItem<Entity, void> mCoordNode;
     EntId id_;                     // 0x0068
     REntityBlueprint* BluePrint;   // 0x006C
     std::uint32_t mTickCreated;    // 0x0070
@@ -549,11 +559,9 @@ namespace moho
     char pad_011E[2];                          // 0x011E
     char pad_0120[0x28];                       // 0x0120
     Sim* SimulationRef;                        // 0x0148
-    union
-    {
-      Entity* mAttachParent; // 0x014C
-      CArmyImpl* ArmyRef;    // legacy name used by older reconstruction paths
-    };
+    // +0x014C is the owning army pointer in constructor/init and callsite evidence.
+    // Attachment parent linkage is represented by mAttachInfo (+0x018C).
+    CArmyImpl* ArmyRef;                           // 0x014C
     // Pending transform payload (equivalent logical role to VTransform: orientation + position).
     Vector4f PendingOrientation;                   // 0x0150
     Wm3::Vector3f PendingPosition;                 // 0x0160
@@ -567,21 +575,21 @@ namespace moho
     std::uint8_t DestroyQueuedFlag;                // 0x01B9
     std::uint8_t mOnDestroyDispatched;             // 0x01BA
     char pad_01BB[0x1D];                           // 0x01BB
-    EntityPositionWatchEntry** mProximityWatchers; // 0x01D8
-    std::int32_t mVisibilityLayerFriendly;         // 0x01DC
-    std::int32_t mVisibilityLayerEnemy;            // 0x01E0
-    std::int32_t mVisibilityLayerNeutral;          // 0x01E4
-    std::int32_t mVisibilityLayerDefault;          // 0x01E8
-    std::uint8_t mInterfaceCreated;                // 0x01EC
-    char pad_01ED[0x07];                           // 0x01ED
-    std::int32_t readinessFlags;                   // 0x01F4
-    char pad_01F8_01FC[0x04];                      // 0x01F8
-    msvc8::string mUniqueName;                     // 0x01FC (FUN_00689F20)
-    char pad_0218_0240[0x28];                      // 0x0218
-    Wm3::Vector3f mCollisionBoundsMin;             // 0x0240
-    Wm3::Vector3f mCollisionBoundsMax;             // 0x024C
-    char pad_0258[0x14];                           // 0x0258
-    EntityMotor* mMotor;                           // 0x026C
+    CIntel* mIntelManager;                // 0x01D8
+    std::int32_t mVisibilityLayerFriendly; // 0x01DC
+    std::int32_t mVisibilityLayerEnemy;    // 0x01E0
+    std::int32_t mVisibilityLayerNeutral;  // 0x01E4
+    std::int32_t mVisibilityLayerDefault;  // 0x01E8
+    std::uint8_t mInterfaceCreated;        // 0x01EC
+    char pad_01ED[0x07];                   // 0x01ED
+    std::int32_t readinessFlags;           // 0x01F4
+    char pad_01F8_01FC[0x04];              // 0x01F8
+    msvc8::string mUniqueName;             // 0x01FC (FUN_00689F20)
+    char pad_0218_0240[0x28];              // 0x0218
+    Wm3::Vector3f mCollisionBoundsMin;     // 0x0240
+    Wm3::Vector3f mCollisionBoundsMax;     // 0x024C
+    char pad_0258[0x14];                   // 0x0258
+    EntityMotor* mMotor;                   // 0x026C
   };
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
@@ -607,6 +615,7 @@ namespace moho
     offsetof(Entity, mUseAltFootprintSecondary) == 0x11D, "Entity::mUseAltFootprintSecondary offset must be 0x11D"
   );
   static_assert(offsetof(Entity, SimulationRef) == 0x148, "Entity::SimulationRef offset must be 0x148");
+  static_assert(offsetof(Entity, ArmyRef) == 0x14C, "Entity::ArmyRef offset must be 0x14C");
   static_assert(offsetof(Entity, PendingOrientation) == 0x150, "Entity::PendingOrientation offset must be 0x150");
   static_assert(offsetof(Entity, PendingPosition) == 0x160, "Entity::PendingPosition offset must be 0x160");
   static_assert(offsetof(Entity, mPositionHistory) == 0x16C, "Entity::mPositionHistory offset must be 0x16C");
@@ -615,7 +624,7 @@ namespace moho
   static_assert(offsetof(Entity, mAttachedEntities) == 0x17C, "Entity::mAttachedEntities offset must be 0x17C");
   static_assert(offsetof(Entity, mAttachInfo) == 0x18C, "Entity::mAttachInfo offset must be 0x18C");
   static_assert(offsetof(Entity, DestroyQueuedFlag) == 0x1B9, "Entity::DestroyQueuedFlag offset must be 0x1B9");
-  static_assert(offsetof(Entity, mProximityWatchers) == 0x1D8, "Entity::mProximityWatchers offset must be 0x1D8");
+  static_assert(offsetof(Entity, mIntelManager) == 0x1D8, "Entity::mIntelManager offset must be 0x1D8");
   static_assert(offsetof(Entity, mInterfaceCreated) == 0x1EC, "Entity::mInterfaceCreated offset must be 0x1EC");
   static_assert(offsetof(Entity, mUniqueName) == 0x1FC, "Entity::mUniqueName offset must be 0x1FC");
   static_assert(offsetof(Entity, mCollisionBoundsMin) == 0x240, "Entity::mCollisionBoundsMin offset must be 0x240");
@@ -624,5 +633,129 @@ namespace moho
 
   template <class T>
   class EntitySetTemplate
-  {};
+    : public TDatList<EntitySetTemplate<T>, void>
+  {
+  public:
+    using storage_type = gpg::fastvector_n<Entity*, 4>;
+    using iterator = Entity**;
+    using const_iterator = Entity* const*;
+
+    EntitySetTemplate() noexcept = default;
+
+    EntitySetTemplate(const EntitySetTemplate&) = delete;
+    EntitySetTemplate& operator=(const EntitySetTemplate&) = delete;
+
+    EntitySetTemplate(EntitySetTemplate&& other) noexcept
+      : TDatList<EntitySetTemplate<T>, void>{}
+      , mVec()
+    {
+      mVec.ResetFrom(other.mVec);
+      other.Clear();
+    }
+
+    EntitySetTemplate& operator=(EntitySetTemplate&& other) noexcept
+    {
+      if (this == &other) {
+        return *this;
+      }
+
+      Clear();
+      this->ListUnlink();
+      mVec.ResetFrom(other.mVec);
+      other.Clear();
+      return *this;
+    }
+
+    ~EntitySetTemplate()
+    {
+      Clear();
+      this->ListUnlink();
+    }
+
+    [[nodiscard]] bool Empty() const noexcept
+    {
+      return mVec.begin() == mVec.end();
+    }
+
+    [[nodiscard]] std::size_t Size() const noexcept
+    {
+      return static_cast<std::size_t>(mVec.end() - mVec.begin());
+    }
+
+    [[nodiscard]] iterator begin() noexcept
+    {
+      return mVec.begin();
+    }
+
+    [[nodiscard]] iterator end() noexcept
+    {
+      return mVec.end();
+    }
+
+    [[nodiscard]] const_iterator begin() const noexcept
+    {
+      return mVec.begin();
+    }
+
+    [[nodiscard]] const_iterator end() const noexcept
+    {
+      return mVec.end();
+    }
+
+    [[nodiscard]] bool Contains(const Entity* const entity) const noexcept
+    {
+      if (!entity) {
+        return false;
+      }
+
+      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
+      const const_iterator it = std::lower_bound(
+        begin(),
+        end(),
+        key,
+        [](const Entity* const candidate, const std::uint32_t targetId) noexcept -> bool {
+          const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
+          return candidateId < targetId;
+        }
+      );
+      return it != end() && *it == entity;
+    }
+
+    [[nodiscard]] bool Add(Entity* const entity)
+    {
+      if (!entity) {
+        return false;
+      }
+
+      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
+      const iterator it = std::lower_bound(
+        begin(),
+        end(),
+        key,
+        [](const Entity* const candidate, const std::uint32_t targetId) noexcept -> bool {
+          const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
+          return candidateId < targetId;
+        }
+      );
+      if (it != end() && *it == entity) {
+        return false;
+      }
+
+      mVec.InsertAt(it, &entity, &entity + 1);
+      return true;
+    }
+
+    void Clear() noexcept
+    {
+      mVec.ResetStorageToInline();
+    }
+
+  public:
+    storage_type mVec;
+  };
+
+  static_assert(
+    offsetof(EntitySetTemplate<Entity>, mVec) == 0x08, "EntitySetTemplate<Entity>::mVec offset must be 0x08"
+  );
+  static_assert(sizeof(EntitySetTemplate<Entity>) == 0x28, "EntitySetTemplate<Entity> size must be 0x28");
 } // namespace moho

@@ -4,22 +4,13 @@
 #include <cstring>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/STIMap.h"
 
 namespace gpg
 {
-  enum class TrackedPointerState : int
-  {
-    Unowned = 1,
-    Owned = 2,
-  };
-
-  void WriteRawPointer(
-    WriteArchive* archive, const gpg::RRef& objectRef, TrackedPointerState state, const gpg::RRef& ownerRef
-  );
-
   class SerSaveConstructArgsResult
   {
   public:
