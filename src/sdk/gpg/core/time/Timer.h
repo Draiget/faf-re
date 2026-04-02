@@ -26,8 +26,20 @@ namespace gpg::time
 		 */
 		LONGLONG ElapsedCycles() const;
 		LONGLONG ElapsedMicroseconds() const; // 0x00485A40
-		LONGLONG ElapsedSeconds() const; // 0x004A3560
-		LONGLONG ElapsedMilliseconds() const; // 0x00461A90
+		/**
+		 * Address: 0x004A3560 (FUN_004A3560, ?ElapsedSeconds@Timer@time@gpg@@QBEMXZ)
+		 *
+		 * What it does:
+		 * Returns elapsed wall-clock time in seconds since the timer baseline.
+		 */
+		float ElapsedSeconds() const;
+		/**
+		 * Address: 0x00461A90 (FUN_00461A90, ?ElapsedMilliseconds@Timer@time@gpg@@QBEMXZ)
+		 *
+		 * What it does:
+		 * Returns elapsed wall-clock time in milliseconds since the timer baseline.
+		 */
+		float ElapsedMilliseconds() const;
 	};
 
     LONGLONG GetTime(); // 0x00955400

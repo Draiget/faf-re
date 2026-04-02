@@ -6,6 +6,8 @@
 
 namespace gpg
 {
+  class ReadArchive;
+  class SerConstructResult;
   struct SerHelperBase;
 } // namespace gpg
 
@@ -19,12 +21,29 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005BFBC0 (FUN_005BFBC0, Moho::ReconBlipConstruct::Construct)
+     *
+     * What it does:
+     * Forwards construct callback flow into `ReconBlip::MemberConstruct`.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+
+    /**
      * Address: 0x005C4330 (FUN_005C4330, gpg::SerConstructHelper_ReconBlip::Init)
      *
      * What it does:
      * Binds construct/delete callbacks into ReconBlip RTTI.
      */
     virtual void RegisterConstructFunction();
+
+    /**
+     * Address: 0x005C9070 (FUN_005C9070, Moho::ReconBlipConstruct::Deconstruct)
+     *
+     * What it does:
+     * Releases one constructed object through its deleting-destructor vtable
+     * entry when the pointer is non-null.
+     */
+    static void DeleteConstructedObject(void* objectPtr);
 
   public:
     gpg::SerHelperBase* mHelperNext;
@@ -47,4 +66,13 @@ namespace moho
     offsetof(ReconBlipConstruct, mDeleteCallback) == 0x10, "ReconBlipConstruct::mDeleteCallback offset must be 0x10"
   );
   static_assert(sizeof(ReconBlipConstruct) == 0x14, "ReconBlipConstruct size must be 0x14");
+
+  /**
+   * Address: 0x00BCDCA0 (FUN_00BCDCA0, register_ReconBlipConstruct)
+   *
+   * What it does:
+   * Initializes ReconBlip construct helper callback lanes, binds them into
+   * reflected RTTI, and installs process-exit cleanup.
+   */
+  void register_ReconBlipConstruct();
 } // namespace moho

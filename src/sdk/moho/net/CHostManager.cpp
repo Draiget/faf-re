@@ -8,6 +8,92 @@
 
 using namespace moho;
 
+namespace
+{
+  /**
+   * Address: 0x0047F560 (FUN_0047F560)
+   *
+   * What it does:
+   * Formats one Win32 system message into a reusable wide-buffer lane.
+   */
+  [[nodiscard]] WCHAR* FormatSystemMessageWide(const DWORD messageId) noexcept
+  {
+    static WCHAR messageFormatBuffer[0x400]{};
+    FormatMessageW(
+      FORMAT_MESSAGE_MAX_WIDTH_MASK | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+      nullptr,
+      messageId,
+      0x400,
+      messageFormatBuffer,
+      0x400,
+      nullptr
+    );
+    return messageFormatBuffer;
+  }
+} // namespace
+
+/**
+ * Address: 0x0047F8A0 (FUN_0047F8A0, struct_Host::struct_Host)
+ */
+Host::Host(const msvc8::string& name)
+  : TDatListItem<Host, void>{}
+  , mName{}
+  , mMapNodeBackLink(nullptr)
+{
+  mName = name;
+}
+
+/**
+ * Address: 0x0047FBA0 (FUN_0047FBA0)
+ */
+void Host::ResetNameAndUnlink() noexcept
+{
+  // 0x0047FBA0 explicitly resets dynamic string storage back to inline lane.
+  mName.tidy(true, 0);
+  auto& node = static_cast<TDatListItem<Host, void>&>(*this);
+  node.ListUnlink();
+}
+
+/**
+ * Address: 0x0047FB50 (FUN_0047FB50, struct_Host::operator delete)
+ */
+void Host::DestroyHeapNode(Host* const host) noexcept
+{
+  if (host == nullptr) {
+    return;
+  }
+
+  host->ResetNameAndUnlink();
+  delete host;
+}
+
+/**
+ * Address: 0x0047F900 (FUN_0047F900, sHostManager::sHostManager)
+ */
+CHostManager::CHostManager() = default;
+
+/**
+ * Address: 0x0047FA40 (FUN_0047FA40, sHostManager::~sHostManager)
+ */
+CHostManager::~CHostManager()
+{
+  while (!mHostList.empty()) {
+    auto* const front = static_cast<Host*>(mHostList.mNext);
+    auto it = FindByValue(front);
+    if (it != mHosts.end()) {
+      Host* const owned = it->second;
+      mHosts.erase(it);
+      Host::DestroyHeapNode(owned);
+      continue;
+    }
+
+    Host::DestroyHeapNode(front);
+  }
+
+  mHostList.ListResetLinks();
+  mHosts.clear();
+}
+
 /**
  * Address: 0x0047FF10 (FUN_0047FF10)
  * Mangled: ?NET_GetAddrInfo@Moho@@YA_NVStrArg@gpg@@G_NAAIAAG@Z
@@ -45,18 +131,8 @@ bool moho::NET_GetAddrInfo(const char* str, const u_short defaultPort, const boo
   ADDRINFOA* result = nullptr;
   const int rc = getaddrinfo(nodeName.c_str(), serviceName.c_str(), &hints, &result);
   if (rc != 0 || result == nullptr) {
-    wchar_t wideError[0x400]{};
     char narrowError[0x400]{};
-
-    FormatMessageW(
-      FORMAT_MESSAGE_MAX_WIDTH_MASK | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-      nullptr,
-      static_cast<DWORD>(rc),
-      0x400,
-      wideError,
-      0x400,
-      nullptr
-    );
+    const wchar_t* const wideError = FormatSystemMessageWide(static_cast<DWORD>(rc));
 
     if (wideError[0] != L'\0') {
       WideCharToMultiByte(CP_ACP, 0, wideError, -1, narrowError, sizeof(narrowError), nullptr, nullptr);
@@ -102,29 +178,31 @@ msvc8::string CHostManager::GetHostName(const std::uint32_t host)
   {
     boost::mutex::scoped_lock lock(mLock);
     const auto it = mHosts.find(host);
-    if (it != mHosts.end()) {
-      Touch(it->second);
-      return it->second.mName;
+    if (it != mHosts.end() && it->second != nullptr) {
+      Touch(*it->second);
+      return it->second->mName;
     }
   }
 
   NET_Init();
   const msvc8::string resolvedName = ResolveHostName(host);
+  Host* const pendingHost = new Host(resolvedName);
 
   boost::mutex::scoped_lock lock(mLock);
-  const auto [it, inserted] = mHosts.emplace(host, Host{});
-  Host& entry = it->second;
+  const auto [it, inserted] = mHosts.emplace(host, pendingHost);
 
   if (inserted) {
-    entry.mName = resolvedName;
-    entry.mMapNodeBackLink = static_cast<void*>(&(*it));
-    mHostList.push_front(&entry);
+    Host* const insertedHost = it->second;
+    insertedHost->mMapNodeBackLink = static_cast<void*>(&(*it));
+    Touch(*insertedHost);
     EvictIfNeeded();
-  } else {
-    Touch(entry);
+    return resolvedName;
   }
 
-  return entry.mName;
+  // Match FA behavior: racing duplicate insert deletes pending host and returns
+  // the freshly resolved name rather than reloading from the cache entry.
+  Host::DestroyHeapNode(pendingHost);
+  return resolvedName;
 }
 
 msvc8::string& CHostManager::GetHostName(const std::uint32_t host, msvc8::string& out)
@@ -154,20 +232,23 @@ void CHostManager::EvictIfNeeded() noexcept
       break;
     }
 
-    auto* lru = static_cast<Host*>(node);
-    node->ListUnlink();
-
+    auto* const lru = static_cast<Host*>(node);
     auto mapIt = FindByValue(lru);
     if (mapIt != mHosts.end()) {
+      Host* const owned = mapIt->second;
       mHosts.erase(mapIt);
+      Host::DestroyHeapNode(owned);
+      continue;
     }
+
+    Host::DestroyHeapNode(lru);
   }
 }
 
-auto CHostManager::FindByValue(const Host* h) -> std::map<std::uint32_t, Host>::iterator
+auto CHostManager::FindByValue(const Host* h) -> CHostManager::HostMap::iterator
 {
   for (auto it = mHosts.begin(); it != mHosts.end(); ++it) {
-    if (&it->second == h) {
+    if (it->second == h) {
       return it;
     }
   }

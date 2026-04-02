@@ -239,7 +239,8 @@ namespace
 
   [[nodiscard]] moho::Unit* ResolveUnitFromLuaObject(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
   {
-    return ResolveTypedGameObject<moho::Unit>(object, state, CachedUnitType());
+    (void)state;
+    return moho::SCR_FromLua_Unit(object);
   }
 
   void RaiseLuaArgCountError(

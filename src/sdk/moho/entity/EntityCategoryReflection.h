@@ -65,6 +65,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0052B720 (FUN_0052B720, Moho::EntityCategoryHelperTypeInfo::EntityCategoryHelperTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for
+     * `EntityCategoryHelper`.
+     */
+    EntityCategoryHelperTypeInfo();
+
+    /**
      * Address: 0x0052B7B0 (FUN_0052B7B0, deleting dtor thunk)
      * Slot: 2
      */
@@ -92,6 +101,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00BF3AD0 (FUN_00BF3AD0, Moho::EntityCategoryHelperSerializer::dtr)
+     *
+     * What it does:
+     * Unlinks the serializer helper node from the intrusive helper list.
+     */
+    ~EntityCategoryHelperSerializer();
+
+    /**
      * Address: 0x0052C8E0 (FUN_0052C8E0, gpg::SerSaveLoadHelper_EntityCategoryHelper::Init)
      *
      * What it does:
@@ -106,4 +123,20 @@ namespace moho
     gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(sizeof(EntityCategoryHelperSerializer) == 0x14, "EntityCategoryHelperSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BC8F10 (FUN_00BC8F10, register_EntityCategoryHelperTypeInfoStartup)
+   *
+   * What it does:
+   * Materializes and startup-registers `EntityCategoryHelperTypeInfo`.
+   */
+  int register_EntityCategoryHelperTypeInfoStartup();
+
+  /**
+   * Address: 0x00BC8F30 (FUN_00BC8F30, register_EntityCategoryHelperSerializer)
+   *
+   * What it does:
+   * Initializes serializer helper links/callbacks and registers teardown.
+   */
+  void register_EntityCategoryHelperSerializer();
 } // namespace moho

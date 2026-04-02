@@ -1,9 +1,12 @@
 #include "LuaObject.h"
 
+#include <cstdarg>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <stdexcept>
 
+#include "LuaAssertion.h"
 #include "LuaTableIterator.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
@@ -14,6 +17,15 @@ using namespace LuaPlus;
 
 namespace
 {
+	extern "C"
+	{
+		const TObject* luaH_get(Table* t, const TObject* key);
+		const TObject* luaH_getnum(Table* t, int key);
+		Table* luaH_new(lua_State* L, int narray, int nhash);
+		int luaO_log2(unsigned int x);
+		void luaG_typeerror(lua_State* L, const TObject* o, const char* op);
+	}
+
 	[[noreturn]] void LuaAssertFail(const char* message)
 	{
 		throw std::runtime_error(message ? message : "Lua assertion failed");
@@ -24,6 +36,84 @@ namespace
 		if (!cond) {
 			LuaAssertFail(message);
 		}
+	}
+
+	/**
+	 * Address: 0x0090A8C0 (FUN_0090A8C0, LS_LOG)
+	 *
+	 * What it does:
+	 * Implements Lua `LOG`/`_ALERT` by applying `tostring` to each argument,
+	 * joining with tab separators, and forwarding the final text to gpg logging.
+	 */
+	[[maybe_unused]] int LS_LOG(lua_State* const state)
+	{
+		Ensure(state != nullptr, "state");
+
+		const int argumentCount = lua_gettop(state);
+		lua_pushstring(state, "tostring");
+		lua_gettable(state, LUA_GLOBALSINDEX);
+
+		std::ostringstream messageBuilder{};
+		for (int argumentIndex = 1; argumentIndex <= argumentCount; ++argumentIndex) {
+			lua_pushvalue(state, -1);
+			lua_pushvalue(state, argumentIndex);
+			lua_call(state, 1, 1);
+
+			const char* const convertedText = lua_tostring(state, -1);
+			if (convertedText == nullptr) {
+				luaL_error(state, "`tostring' must return a string to `print'");
+				return 0;
+			}
+
+			if (argumentIndex > 1) {
+				messageBuilder << '\t';
+			}
+			messageBuilder << convertedText;
+
+			lua_settop(state, -2);
+		}
+
+		msvc8::string message{};
+		message.assign_owned(messageBuilder.str());
+		gpg::LogMessage(gpg::LogSeverity::Info, message);
+		return 0;
+	}
+
+	unsigned int HashLuaString(const char* key, const unsigned int length)
+	{
+		unsigned int hash = length;
+		const unsigned int step = (hash >> 5U) + 1U;
+		for (unsigned int i = length; i >= step; i -= step) {
+			hash ^= (hash >> 2U) + (hash << 5U) + static_cast<unsigned char>(key[i - 1U]);
+		}
+		return hash;
+	}
+
+	const TString* FindInternedString(lua_State* state, const char* key)
+	{
+		Ensure(state != nullptr && state->l_G != nullptr, "state != nullptr && state->l_G != nullptr");
+		Ensure(key != nullptr, "key");
+
+		const stringtable& strings = state->l_G->strt;
+		if (strings.hash == nullptr || strings.size <= 0) {
+			return nullptr;
+		}
+
+		const unsigned int keyLength = static_cast<unsigned int>(std::strlen(key));
+		const unsigned int hash = HashLuaString(key, keyLength);
+		GCObject* current = strings.hash[hash & static_cast<unsigned int>(strings.size - 1)];
+		while (current != nullptr) {
+			if (current->gch.tt == LUA_TSTRING) {
+				const auto* candidate = reinterpret_cast<const TString*>(current);
+				if (candidate->len == static_cast<size_t>(keyLength)
+					&& std::memcmp(candidate->str, key, static_cast<size_t>(keyLength)) == 0) {
+					return candidate;
+				}
+			}
+			current = current->gch.next;
+		}
+
+		return nullptr;
 	}
 
 	TObject CaptureStackValue(lua_State* state, const int index)
@@ -80,6 +170,12 @@ namespace
 	}
 }
 
+/**
+ * Address: 0x009072A0 (FUN_009072A0, LuaPlus::LuaObject::LuaObject)
+ *
+ * What it does:
+ * Initializes an empty LuaObject with null list links/state and NIL payload.
+ */
 LuaObject::LuaObject()
 	: m_next(nullptr),
 	  m_prev(nullptr),
@@ -116,6 +212,13 @@ LuaObject::LuaObject(const LuaStackObject& stackObject)
 	AddToUsedObjectList(stackObject.m_state, const_cast<TObject*>(&stackValue));
 }
 
+/**
+ * Address: 0x00908A40 (FUN_00908A40, LuaPlus::LuaObject::LuaObject)
+ *
+ * What it does:
+ * Initializes an empty object, then mirrors the source LuaObject by
+ * linking into the same root-state used-object list when bound.
+ */
 LuaObject::LuaObject(const LuaObject& other)
 	: LuaObject()
 {
@@ -124,6 +227,13 @@ LuaObject::LuaObject(const LuaObject& other)
 	}
 }
 
+/**
+ * Address: 0x00908AB0 (FUN_00908AB0, LuaPlus::LuaObject::operator=)
+ *
+ * What it does:
+ * Unlinks current state-list ownership (when bound), then binds to `other`
+ * by re-inserting this object into the source state's used-object list.
+ */
 LuaObject& LuaObject::operator=(const LuaObject& other)
 {
 	if (this == &other) {
@@ -149,6 +259,63 @@ LuaObject& LuaObject::operator=(const LuaObject& other)
 LuaObject::~LuaObject()
 {
 	Reset();
+}
+
+/**
+ * Address: 0x0090A520 (FUN_0090A520, LuaPlus::LuaState::LuaState)
+ *
+ * What it does:
+ * Creates one coroutine thread state under the provided root wrapper, captures
+ * the pushed thread object into `m_threadObj`, then binds `stateUserData`.
+ */
+LuaState::LuaState(LuaState* const parentState)
+	: m_state(nullptr),
+	  m_luaTask(nullptr),
+	  m_ownState(0),
+	  m_pad9{0, 0, 0},
+	  m_threadObj(),
+	  m_rootState(parentState ? parentState->m_rootState : nullptr),
+	  m_headObject{nullptr, nullptr},
+	  m_tailObject{nullptr, nullptr}
+{
+	Ensure(parentState != nullptr, "parentState");
+	Ensure(m_rootState != nullptr, "parentState->m_rootState");
+	Ensure(m_rootState->m_state != nullptr, "parentState->m_rootState->m_state");
+
+	m_state = lua_newthread(m_rootState->m_state);
+	Ensure(m_state != nullptr, "lua_newthread");
+
+	const LuaStackObject threadStackObject(m_rootState, lua_gettop(m_rootState->m_state));
+	m_threadObj = LuaObject(threadStackObject);
+	lua_settop(m_rootState->m_state, -2);
+
+	m_state->stateUserData = this;
+}
+
+/**
+ * Address: 0x0090A600 (FUN_0090A600, LuaPlus::LuaState::~LuaState)
+ *
+ * What it does:
+ * Clears root-owned live objects, detaches Lua state userdata, closes owned
+ * C-state when required, then lets member destructors run.
+ */
+LuaState::~LuaState()
+{
+	if (m_rootState == this) {
+		const auto* const tail = reinterpret_cast<const LuaObject*>(&m_tailObject);
+		while (m_headObject.m_next != tail) {
+			LuaObject* const live = m_headObject.m_next;
+			Ensure(live != nullptr, "live");
+			live->Reset();
+		}
+	}
+
+	if (m_state != nullptr) {
+		m_state->stateUserData = nullptr;
+		if (m_ownState != 0) {
+			lua_close(m_state);
+		}
+	}
 }
 
 LuaState* LuaState::GetActiveState()
@@ -189,19 +356,8 @@ LuaObject LuaState::GetGlobals()
  */
 LuaObject LuaState::GetGlobal(const char* name)
 {
-	if (!m_state) {
-		return {};
-	}
-
-	lua_State* lstate = GetCState();
-	Ensure(lstate != nullptr, "state->GetCState()");
-
-	const int oldTop = lua_gettop(lstate);
-	lua_pushstring(lstate, name ? name : "");
-	lua_gettable(lstate, LUA_GLOBALSINDEX);
-	LuaObject result{ LuaStackObject(this, -1) };
-	lua_settop(lstate, oldTop);
-	return result;
+	LuaObject globals = GetGlobals();
+	return globals[name ? name : ""];
 }
 
 LuaState* LuaState::GetRootState()
@@ -240,10 +396,41 @@ bool LuaState::IsSuspended() const
 	return false;
 }
 
+void LuaState::Error(LuaState* const state, const char* const format, ...)
+{
+	if (state == nullptr || state->m_state == nullptr) {
+		throw std::runtime_error("LuaState::Error called with null state");
+	}
+
+	va_list args;
+	va_start(args, format);
+	lua_pushvfstring(state->m_state, format ? format : "", args);
+	va_end(args);
+	lua_error(state->m_state);
+}
+
+/**
+ * Address: 0x00415490 (FUN_00415490, LuaPlus::LuaStackObject::LuaStackObject)
+ */
 LuaStackObject::LuaStackObject(LuaState* state, const int32_t stackIndex)
 	: m_state(state),
 	  m_stackIndex(stackIndex)
 {
+}
+
+/**
+ * Address: 0x00456AE0 (FUN_00456AE0, sub_456AE0)
+ *
+ * LuaState *,char const *
+ *
+ * What it does:
+ * Pushes one C-string onto the Lua state stack and returns a stack-object
+ * view for the pushed slot.
+ */
+LuaStackObject LuaPlus::PushStringAndCaptureStackObject(LuaState* const state, const char* const value)
+{
+	lua_pushstring(state->m_state, value);
+	return LuaStackObject(state, lua_gettop(state->m_state));
 }
 
 bool LuaStackObject::IsNil() const
@@ -251,14 +438,84 @@ bool LuaStackObject::IsNil() const
 	return !m_state || !m_state->GetCState() || lua_type(m_state->GetCState(), m_stackIndex) == LUA_TNIL;
 }
 
+/**
+ * Address: 0x004154B0 (FUN_004154B0, LuaPlus::LuaStackObject::TypeError)
+ *
+ * What it does:
+ * Raises the standard Lua bad-argument error for the current stack slot.
+ */
+void LuaStackObject::TypeError(const char* const expectedType) const
+{
+	luaL_argerror(m_state->GetCState(), m_stackIndex, expectedType ? expectedType : "value");
+}
+
+void LuaStackObject::TypeError(const char* const expectedType, const int32_t) const
+{
+	TypeError(expectedType);
+}
+
+void LuaStackObject::TypeError(LuaStackObject* const self, const char* const expectedType)
+{
+	if (self != nullptr) {
+		self->TypeError(expectedType);
+	}
+}
+
+/**
+ * Address: 0x00415530 (FUN_00415530, LuaPlus::LuaStackObject::GetString)
+ *
+ * What it does:
+ * Returns the string view for the current stack slot, coercing via Lua and
+ * raising a type error when conversion fails.
+ */
 const char* LuaStackObject::GetString() const
 {
-	if (!m_state || !m_state->GetCState()) {
-		return "";
+	const char* const str = lua_tostring(m_state->GetCState(), m_stackIndex);
+	if (!str) {
+		TypeError("string");
 	}
+	return str;
+}
 
-	const char* str = lua_tostring(m_state->GetCState(), m_stackIndex);
-	return str ? str : "";
+/**
+ * Address: 0x0041B520 (FUN_0041B520, LuaPlus::LuaStackObject::GetInteger)
+ *
+ * What it does:
+ * Reads one integer lane from the current Lua stack slot and raises a type
+ * error when the slot is not numeric.
+ */
+int32_t LuaStackObject::GetInteger() const
+{
+	lua_State* const cState = m_state->GetCState();
+	if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
+		TypeError("integer");
+	}
+	return static_cast<int32_t>(lua_tonumber(cState, m_stackIndex));
+}
+
+double LuaStackObject::ToNumber() const
+{
+	lua_State* const cState = m_state->GetCState();
+	if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
+		TypeError("number");
+	}
+	return lua_tonumber(cState, m_stackIndex);
+}
+
+/**
+ * Address: 0x00415560 (FUN_00415560, LuaPlus::LuaStackObject::GetBoolean)
+ *
+ * What it does:
+ * Reads the current stack slot as a Lua boolean, allowing nil as false and
+ * raising a type error for other non-boolean values.
+ */
+bool LuaStackObject::GetBoolean() const
+{
+	const int type = lua_type(m_state->GetCState(), m_stackIndex);
+	if (type != LUA_TBOOLEAN && type != LUA_TNIL) {
+		TypeError("boolean");
+	}
+	return lua_toboolean(m_state->GetCState(), m_stackIndex) != 0;
 }
 
 LuaState* LuaObject::GetActiveState() const
@@ -270,11 +527,15 @@ LuaState* LuaObject::GetActiveState() const
 	return m_state->m_state->l_G->lstate->stateUserData;
 }
 
+/**
+ * Address: 0x009072C0 (FUN_009072C0, LuaPlus::LuaObject::GetActiveCState)
+ *
+ * What it does:
+ * Returns the active C-state pointer through this object's bound root
+ * wrapper lane.
+ */
 lua_State* LuaObject::GetActiveCState() const
 {
-	if (!m_state || !m_state->m_state || !m_state->m_state->l_G) {
-		return nullptr;
-	}
 	return m_state->m_state->l_G->lstate;
 }
 
@@ -347,6 +608,39 @@ LuaObject::operator bool() const noexcept
 	return true;
 }
 
+/**
+ * Address: 0x0128BF90 (FUN_0128BF90, LuaPlus::LuaObject::IsFunction)
+ *
+ * What it does:
+ * Validates state ownership, then checks the wrapped tagged value against
+ * `LUA_TFUNCTION`.
+ */
+bool LuaObject::IsFunction() const
+{
+	Ensure(m_state != nullptr, "m_state");
+	return m_object.tt == LUA_TFUNCTION;
+}
+
+/**
+ * Address: 0x009072D0 (FUN_009072D0, LuaPlus::LuaObject::TypeError)
+ *
+ * What it does:
+ * Raises one Lua-object operation type error for the current tagged value.
+ */
+void LuaObject::TypeError(const char* const operation) const
+{
+	lua_State* const cState = GetActiveCState();
+	const char* const valueType = cState != nullptr ? lua_typename(cState, m_object.tt) : "unknown";
+	const char* const opText = operation != nullptr ? operation : "operate on";
+
+	std::string message("attempt to ");
+	message += opText;
+	message += " a ";
+	message += valueType != nullptr ? valueType : "unknown";
+	message += " value";
+	throw std::runtime_error(message);
+}
+
 void LuaObject::SetTableHelper(const char* key, TObject* object)
 {
 	Ensure(m_state != nullptr, "m_state");
@@ -380,20 +674,31 @@ void LuaObject::SetTableHelper(const int32_t index, TObject* object)
 	lua_settop(lstate, oldTop);
 }
 
+/**
+ * Address: 0x00907D10 (FUN_00907D10)
+ * Mangled: ?PushStack@LuaObject@LuaPlus@@QBEXPAUlua_State@@@Z
+ *
+ * What it does:
+ * Validates that both objects share the same Lua global-state root, pushes this
+ * object's raw `TObject` payload onto `state->top`, extends stack space when
+ * needed, then advances the stack top by one slot.
+ */
 StkId LuaObject::PushStack(lua_State* state) const
 {
-	Ensure(state && m_state && m_state->m_state, "state->l_G == m_state->m_state->l_G");
+	if (state == nullptr || m_state == nullptr || m_state->m_state == nullptr) {
+		throw LuaAssertion("state->l_G == m_state->m_state->l_G");
+	}
 	if (state->l_G != m_state->m_state->l_G) {
-		LuaAssertFail("state->l_G == m_state->m_state->l_G");
+		throw LuaAssertion("state->l_G == m_state->m_state->l_G");
 	}
 
-	StkId slot = state->top;
+	StkId const slot = state->top;
 	*slot = m_object;
 
-	if (state->top >= state->ci->top) {
+	if (slot >= state->ci->top) {
 		lua_checkstack(state, 1);
 	}
-	state->top += 1;
+	state->top = slot + 1;
 	return slot;
 }
 
@@ -411,12 +716,13 @@ void LuaObject::AssignNewTable(LuaState* state, const int32_t nArray, const uint
 	lua_State* lstate = GetActiveCState();
 	Ensure(lstate != nullptr, "active lua state");
 
-	(void)nArray;
-	(void)lnHash;
-	const int oldTop = lua_gettop(lstate);
-	lua_newtable(lstate);
-	m_object = *(lstate->top - 1);
-	lua_settop(lstate, oldTop);
+	// Address: 0x00909940 (FUN_00909940)
+	// Binary path creates a table directly via luaH_new using requested array/hash sizing.
+	const int hashBits = luaO_log2(lnHash);
+	Table* const table = luaH_new(lstate, nArray, hashBits + 1);
+	Ensure(table != nullptr, "luaH_new returned null");
+	m_object.tt = table->tt;
+	m_object.value.p = table;
 }
 
 void LuaObject::AssignNumber(LuaState* state, const double number)
@@ -626,6 +932,37 @@ void LuaObject::SetMetaTable(const LuaObject& valueObj)
 }
 
 /**
+ * Address: 0x00909CE0 (FUN_00909CE0, LuaPlus::LuaObject::Insert)
+ *
+ * What it does:
+ * Calls `table.insert(this, key, obj)` in the active Lua state and restores
+ * the original stack top after the call.
+ */
+void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
+{
+	if (m_state != obj.m_state) {
+		throw LuaAssertion("m_state == obj.m_state");
+	}
+
+	LuaState* const activeState = m_state->GetActiveState();
+	lua_State* const lstate = activeState->m_state;
+	const int oldTop = lua_gettop(lstate);
+
+	{
+		LuaObject tableObject = activeState->GetGlobal("table");
+		LuaObject insertFunction = tableObject["insert"];
+		insertFunction.PushStack(activeState);
+
+		const_cast<LuaObject*>(this)->PushStack(activeState);
+		lua_pushnumber(lstate, static_cast<lua_Number>(key));
+		const_cast<LuaObject&>(obj).PushStack(activeState);
+		lua_call(lstate, 3, LUA_MULTRET);
+	}
+
+	lua_settop(lstate, oldTop);
+}
+
+/**
  * Address: 0x10007360 (?GetByIndex@LuaObject@LuaPlus@@QBE?AV12@H@Z)
  */
 LuaObject LuaObject::GetByIndex(const int32_t index) const
@@ -661,14 +998,70 @@ LuaObject LuaObject::GetByName(const char* name) const
 	return value;
 }
 
+/**
+ * Address: 0x00908F60 (FUN_00908F60, LuaPlus::LuaObject::operator[])
+ *
+ * What it does:
+ * Validates table indexing, resolves an already-interned string key from the
+ * VM string table, and returns the raw table slot value.
+ */
 LuaObject LuaObject::operator[](const char* const name) const
 {
-	return GetByName(name);
+	Ensure(m_state != nullptr, "m_state");
+	Ensure(name != nullptr, "name");
+
+	lua_State* const lstate = GetActiveCState();
+	Ensure(lstate != nullptr, "active lua state");
+
+	if (m_object.tt != LUA_TTABLE) {
+		luaG_typeerror(lstate, &m_object, "index");
+	}
+
+	const TString* const internedKey = FindInternedString(lstate, name);
+	if (internedKey == nullptr) {
+		LuaObject nilValue;
+		nilValue.AddToUsedList(m_state);
+		nilValue.m_object.tt = LUA_TNIL;
+		return nilValue;
+	}
+
+	TObject keyObject;
+	keyObject.tt = internedKey->tt;
+	keyObject.value.p = const_cast<TString*>(internedKey);
+
+	const TObject* const rawValue = luaH_get(reinterpret_cast<Table*>(m_object.value.p), &keyObject);
+	Ensure(rawValue != nullptr, "obj");
+
+	LuaObject result;
+	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+	return result;
 }
 
+/**
+ * Address: 0x009091E0 (FUN_009091E0, LuaPlus::LuaObject::operator[])
+ *
+ * What it does:
+ * Validates state + table type for integer indexing, then fetches the raw
+ * numeric-key slot directly from Lua's table storage.
+ */
 LuaObject LuaObject::operator[](const int32_t index) const
 {
-	return GetByIndex(index);
+	if (!m_state) {
+		throw LuaAssertion("m_state");
+	}
+
+	lua_State* const lstate = GetActiveCState();
+	if (m_object.tt != LUA_TTABLE) {
+		luaG_typeerror(lstate, &m_object, "index");
+		if (m_object.tt != LUA_TTABLE) {
+			throw LuaAssertion("(((o)->tt) == LUA_TTABLE)");
+		}
+	}
+
+	const TObject* const rawValue = luaH_getnum(reinterpret_cast<Table*>(m_object.value.p), index);
+	LuaObject result;
+	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+	return result;
 }
 
 LuaObject LuaObject::Lookup(const char* const path) const
@@ -737,6 +1130,13 @@ void LuaObject::Register(const char* key, CFunction value, const int32_t tagMeth
 	(void)tagMethod;
 }
 
+/**
+ * Address: 0x004D2A40 (FUN_004D2A40, Moho::SCR_FromByteStream)
+ *
+ * What it does:
+ * Deserializes one tagged Lua payload from a binary stream and recursively
+ * rebuilds nested table key/value pairs.
+ */
 void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader)
 {
 	Ensure(state != nullptr, "state");
@@ -794,17 +1194,13 @@ void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::B
 				LuaObject key;
 				SCR_FromByteStream(key, state, reader);
 				if (key.IsNil()) {
-					gpg::Warnf("Deserialized nil table key.");
-					result.AssignNil(state);
-					break;
+					gpg::Die("Deserialized nil table key.");
 				}
 
 				LuaObject value;
 				SCR_FromByteStream(value, state, reader);
 				if (value.IsNil()) {
-					gpg::Warnf("Deserialized nil table value.");
-					result.AssignNil(state);
-					break;
+					gpg::Die("Deserialized nil table value.");
 				}
 
 				result.SetObject(key, value);
@@ -824,14 +1220,50 @@ void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::B
 	out = result;
 }
 
-const char* LuaObject::GetString() const noexcept
+/**
+ * Address: 0x00907A90 (FUN_00907A90, LuaPlus::LuaObject::GetString)
+ *
+ * What it does:
+ * Validates this object has a bound state, raises Lua's type-error lane for
+ * non-string values, and returns the underlying interned string buffer.
+ */
+const char* LuaObject::GetString() const
 {
-	if (!m_state || m_object.tt != LUA_TSTRING) {
-		return nullptr;
+	if (!m_state) {
+		throw LuaAssertion("m_state");
+	}
+
+	lua_State* const lstate = GetActiveCState();
+	if (m_object.tt != LUA_TSTRING) {
+		luaG_typeerror(lstate, &m_object, "get as string");
 	}
 
 	const auto* ts = static_cast<const TString*>(m_object.value.p);
-	return ts ? ts->str : nullptr;
+	return ts->str;
+}
+
+const char* LuaObject::ToString() const
+{
+	if (IsString()) {
+		return GetString();
+	}
+
+	if (IsNil()) {
+		return "nil";
+	}
+
+	if (IsBoolean()) {
+		return GetBoolean() ? "true" : "false";
+	}
+
+	thread_local std::string scratch;
+	if (IsNumber()) {
+		scratch = std::to_string(GetNumber());
+		return scratch.c_str();
+	}
+
+	lua_State* const state = GetActiveCState();
+	return state ? lua_typename(state, m_object.tt) : "unknown";
 }
 
 int32_t LuaObject::GetInteger() const noexcept
@@ -852,6 +1284,13 @@ int32_t LuaObject::GetInteger() const noexcept
 	return 0;
 }
 
+/**
+ * Address: 0x004D2C80 (FUN_004D2C80, ?SCR_ToByteStream@Moho@@YA_NABVLuaObject@LuaPlus@@AAVStream@gpg@@@Z)
+ *
+ * What it does:
+ * Encodes one LuaObject value into the SCR tagged stream format and recursively
+ * serializes table keys/values while warning on userdata/unsupported lanes.
+ */
 bool LuaObject::ToByteStream(gpg::Stream& stream)
 {
 	char typeTag;

@@ -15,6 +15,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00538580 (FUN_00538580, Moho::CAniResourceSkelTypeInfo::CAniResourceSkelTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for
+     * `CAniResourceSkel`.
+     */
+    CAniResourceSkelTypeInfo();
+
+    /**
      * Address: 0x00538610 (FUN_00538610, Moho::CAniResourceSkelTypeInfo::dtr)
      * Slot: 2
      */
@@ -36,6 +45,14 @@ namespace moho
      */
     void Init() override;
   };
+
+  /**
+   * Address: 0x00BC9060 (FUN_00BC9060, register_CAniResourceSkelTypeInfo)
+   *
+   * What it does:
+   * Materializes and startup-registers `CAniResourceSkelTypeInfo`.
+   */
+  void register_CAniResourceSkelTypeInfo();
 
   static_assert(sizeof(CAniResourceSkelTypeInfo) == 0x64, "CAniResourceSkelTypeInfo size must be 0x64");
 } // namespace moho

@@ -39,4 +39,13 @@ namespace moho
   };
 
   static_assert(sizeof(CAiPathSplineTypeInfo) == 0x64, "CAiPathSplineTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCD330 (FUN_00BCD330, register_CAiPathSplineTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI descriptor for `CAiPathSpline` and
+   * installs process-exit cleanup.
+   */
+  int register_CAiPathSplineTypeInfo();
 } // namespace moho

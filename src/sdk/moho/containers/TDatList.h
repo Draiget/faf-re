@@ -29,7 +29,14 @@ namespace moho
     {}
 
     /**
-     * Reset links to singleton without patching neighboring nodes.
+     * Address: 0x00442DA0 (FUN_00442DA0)
+     * Address: 0x00443020 (FUN_00443020)
+     * Address: 0x00443230 (FUN_00443230)
+     * Address: 0x004856F0 (FUN_004856F0, typed-instantiation lane)
+     * Address: 0x00485780 (FUN_00485780, typed-instantiation lane)
+     *
+     * What it does:
+     * Resets one intrusive node to a self-linked singleton state.
      */
     void ListResetLinks() noexcept
     {
@@ -38,7 +45,21 @@ namespace moho
     }
 
     /**
-     * Unlink this node and return next.
+     * Address: 0x00443A50 (FUN_00443A50)
+     * Address: 0x00443AA0 (FUN_00443AA0)
+     * Address: 0x00443AC0 (FUN_00443AC0)
+     * Address: 0x00443AE0 (FUN_00443AE0)
+     * Address: 0x00443B00 (FUN_00443B00)
+     * Address: 0x00443B60 (FUN_00443B60)
+     * Address: 0x0047C260 (FUN_0047C260, typed-instantiation lane)
+     * Address: 0x0047C540 (FUN_0047C540, typed-instantiation lane)
+     * Address: 0x0047CA00 (FUN_0047CA00, typed-instantiation lane)
+     * Address: 0x0047CA60 (FUN_0047CA60, typed-instantiation lane)
+     * Address: 0x0047FA20 (FUN_0047FA20, typed-instantiation lane)
+     * Address: 0x00480910 (FUN_00480910, typed-instantiation lane)
+     *
+     * What it does:
+     * Unlinks this node from its current ring and resets it to singleton state.
      */
     item_t* ListUnlink() noexcept
     {
@@ -50,7 +71,17 @@ namespace moho
     }
 
     /**
-     * Link this node after the given node (that).
+     * Address: 0x00442D60 (FUN_00442D60)
+     * Address: 0x00442DD0 (FUN_00442DD0)
+     * Address: 0x00442E40 (FUN_00442E40)
+     * Address: 0x00442ED0 (FUN_00442ED0)
+     * Address: 0x00443050 (FUN_00443050)
+     * Address: 0x00480930 (FUN_00480930, typed-instantiation lane)
+     * Address: 0x00485730 (FUN_00485730, offset+0x410 member-node lane)
+     * Address: 0x004857B0 (FUN_004857B0, typed-instantiation lane)
+     *
+     * What it does:
+     * Unlinks this node from its current ring and inserts it directly after `that`.
      */
     item_t* ListLinkAfter(item_t* that) noexcept
     {
@@ -66,7 +97,11 @@ namespace moho
     }
 
     /**
-     * Link this node before the given node (that).
+     * Address: 0x00443260 (FUN_00443260, offset+0x04 member-node lane)
+     * Address: 0x00443A70 (FUN_00443A70)
+     *
+     * What it does:
+     * Unlinks this node from its current ring and inserts it directly before `that`.
      */
     item_t* ListLinkBefore(item_t* that) noexcept
     {
@@ -82,6 +117,66 @@ namespace moho
     }
 
     /**
+     * Address: 0x004439F0 (FUN_004439F0)
+     * Address: 0x00443A10 (FUN_00443A10)
+     * Address: 0x00443A30 (FUN_00443A30)
+     * Address: 0x00443B20 (FUN_00443B20)
+     * Address: 0x00443B40 (FUN_00443B40)
+     *
+     * What it does:
+     * Swaps one node's intrusive link lanes (`mPrev`, `mNext`) with another node.
+     */
+    item_t* SwapLinks(item_t* that) noexcept
+    {
+      item_t* const prev = mPrev;
+      mPrev = that->mPrev;
+      that->mPrev = prev;
+
+      item_t* const next = mNext;
+      mNext = that->mNext;
+      that->mNext = next;
+      return that;
+    }
+
+    /**
+     * Address: 0x00443240 (FUN_00443240)
+     *
+     * What it does:
+     * Returns the `mNext` node lane from one intrusive list node.
+     */
+    static item_t* NextNode(item_t* node) noexcept
+    {
+      return node->mNext;
+    }
+
+    /**
+     * Address: 0x00443250 (FUN_00443250)
+     * Address: 0x00444140 (FUN_00444140)
+     * Address: 0x00444150 (FUN_00444150)
+     *
+     * What it does:
+     * Returns the same node pointer unchanged.
+     */
+    static item_t* IdentityNode(item_t* node) noexcept
+    {
+      return node;
+    }
+
+    /**
+     * Address: 0x00443880 (FUN_00443880)
+     *
+     * What it does:
+     * Advances one node-pointer cursor to `cursor->mNext`.
+     */
+    static item_t** AdvanceCursor(item_t** cursor) noexcept
+    {
+      *cursor = (*cursor)->mNext;
+      return cursor;
+    }
+
+    /**
+     * Address: 0x0047C560 (FUN_0047C560, typed-instantiation lane)
+     *
      * Return owner object for next node.
      */
     type* ListGetNext() noexcept
@@ -98,6 +193,8 @@ namespace moho
     }
 
     /**
+     * Address: 0x00485720 (FUN_00485720, typed-instantiation lane)
+     *
      * Is this node unlinked (self-linked)?
      */
     [[nodiscard]]
@@ -147,6 +244,12 @@ namespace moho
 
       pointer pos{nullptr};
 
+      /**
+       * Address: 0x00443880 (FUN_00443880)
+       *
+       * What it does:
+       * Advances node cursor to `mNext`.
+       */
       Iterator& operator++() noexcept
       {
         pos = pos->mNext;
@@ -179,6 +282,13 @@ namespace moho
       }
 
       Iterator() = default;
+
+      /**
+       * Address: 0x00443250 (FUN_00443250)
+       *
+       * What it does:
+       * Initializes one iterator cursor from a raw node pointer.
+       */
       explicit Iterator(pointer p)
         : pos{p}
       {}
@@ -197,6 +307,14 @@ namespace moho
     /**
      * Begin/end as node iterators.
      */
+    /**
+     * Address: 0x00443240 (FUN_00443240)
+     * Address: 0x00485700 (FUN_00485700, typed-instantiation lane)
+     * Address: 0x00485790 (FUN_00485790, typed-instantiation lane)
+     *
+     * What it does:
+     * Builds node-iterator begin cursor from head `mNext`.
+     */
     iterator begin() noexcept
     {
       return iterator{this->mNext};
@@ -209,6 +327,14 @@ namespace moho
     {
       return const_iterator{this->mNext};
     }
+
+    /**
+     * Address: 0x00485710 (FUN_00485710, typed-instantiation lane)
+     * Address: 0x004857A0 (FUN_004857A0, typed-instantiation lane)
+     *
+     * What it does:
+     * Builds node-iterator end cursor from the head sentinel.
+     */
     const_iterator end() const noexcept
     {
       return const_iterator{const_cast<item_t*>(static_cast<const item_t*>(this))};
@@ -344,7 +470,6 @@ namespace moho
     }
     owner_range owners() const noexcept
     {
-      // const-версию можно сделать отдельно, если нужен const T*
       return {
         owner_iterator{const_cast<item_t*>(this->mNext)},
         owner_iterator{const_cast<item_t*>(static_cast<const item_t*>(this))}
@@ -441,6 +566,20 @@ namespace moho
     }
 
     template <class Owner, class MemberNode, MemberNode Owner::* Member>
+    /**
+     * Address: 0x00442D90 (FUN_00442D90)
+     * Address: 0x00442E00 (FUN_00442E00)
+     * Address: 0x00442E70 (FUN_00442E70)
+     * Address: 0x00442F00 (FUN_00442F00)
+     * Address: 0x00443080 (FUN_00443080)
+     * Address: 0x00443890 (FUN_00443890)
+     * Address: 0x004438A0 (FUN_004438A0)
+     * Address: 0x00485770 (FUN_00485770, offset+0x410 member-node lane)
+     *
+     * What it does:
+     * Converts one intrusive-member pointer back to the owning object pointer.
+     * The listed codegen lanes match offset-`0x04` member ownership recovery.
+     */
     static Owner* owner_from_member(MemberNode* node) noexcept
     {
       static_assert(std::is_base_of_v<item_t, MemberNode>, "MemberNode must derive from TDatList item_t");

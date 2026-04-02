@@ -2,14 +2,26 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
+#include "boost/shared_ptr.h"
+
 namespace gpg {
 namespace gal {
+    class EffectContext;
+
     /**
      * VFTABLE: 0x00D47D24
      * COL:  0x00E53238
      */
     class Effect {
     public:
+      /**
+       * EffectContext const &
+       *
+       * What it does:
+       * Creates one backend effect instance from one prepared effect context.
+       */
+      static boost::shared_ptr<Effect> Create(const EffectContext& context);
+
       /**
        * Address: 0x00A82547
        * Slot: 0

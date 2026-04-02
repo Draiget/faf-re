@@ -14,11 +14,20 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class SerConstructResult;
+  class RType;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class Unit;
   class CAiFormationInstance;
   class Sim;
+  struct SSTICommandIssueData;
   struct SSyncData;
 
   struct SCommandUnitSet
@@ -45,6 +54,51 @@ namespace moho
   class CUnitCommand : public Broadcaster
   {
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
+     *
+     * What it does:
+     * Initializes one command from issue payload lanes, updates sim command
+     * digest/counter state, and links coordinating-order relationships.
+     */
+    CUnitCommand(Sim* sim, const SSTICommandIssueData& issueData);
+
+    /**
+     * Address: 0x006E7D40 (FUN_006E7D40, ?GetCoordinateWith@CUnitCommand@Moho@@QBE?AV?$vector@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@V?$allocator@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@@std@@@std@@XZ)
+     *
+     * What it does:
+     * Returns a by-value snapshot of this command's coordinating-order weak links.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> GetCoordinatingOrdersSnapshot() const;
+
+    /**
+     * Address: 0x006E91C0 (FUN_006E91C0, Moho::CUnitCommand::MemberConstruct)
+     *
+     * What it does:
+     * Allocates one `CUnitCommand`, default-constructs it, and returns it as an
+     * unowned construct result.
+     */
+    static void MemberConstruct(gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x006ECB80 (FUN_006ECB80, Moho::CUnitCommand::MemberDeserialize)
+     *
+     * What it does:
+     * Loads the serialized command payload lanes into this command instance.
+     */
+    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitCommand* command, int version);
+
+    /**
+     * Address: 0x006ECE20 (FUN_006ECE20, Moho::CUnitCommand::MemberSerialize)
+     *
+     * What it does:
+     * Saves the serialized command payload lanes from this command instance.
+     */
+    static void MemberSerialize(CUnitCommand* command, gpg::WriteArchive* archive, int version);
+
     /**
      * Address: 0x006E8B40 (FUN_006E8B40)
      *
@@ -97,6 +151,8 @@ namespace moho
     void RefreshBlipState();
 
   private:
+    friend class CUnitCommandConstruct;
+
     /**
      * Address: 0x006E8500 (FUN_006E8500)
      *
@@ -141,4 +197,17 @@ namespace moho
     LuaPlus::LuaObject mArgs;
     int32_t mUnknownTailInt;
   };
+
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+  static_assert(sizeof(CUnitCommand) == 0x178, "CUnitCommand size must be 0x178");
+#endif
+
+  /**
+   * Address: 0x0128E638 (FUN_0128E638, SimGetCommandQueueInsert)
+   *
+   * What it does:
+   * Serializes one command record into a Lua table row and appends it to the
+   * destination command-queue Lua array.
+   */
+  void SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, const CUnitCommand& command);
 } // namespace moho

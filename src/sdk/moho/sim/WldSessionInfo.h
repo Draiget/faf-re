@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/utils/Sync.h"
@@ -87,6 +88,32 @@ namespace moho
     kRunning = 2,
     kReadyForDestroy = 3,
     kCompleted = 4,
+  };
+
+  /**
+   * VFTABLE: 0x00E00A94
+   * COL: 0x00E5D738
+   */
+  class XBackgroundTaskAborted : public std::exception
+  {
+  public:
+    XBackgroundTaskAborted() noexcept = default;
+
+    /**
+     * Address: 0x00412DC0 (FUN_00412DC0)
+     *
+     * What it does:
+     * Copy-constructs background-task-aborted exception state.
+     */
+    XBackgroundTaskAborted(const XBackgroundTaskAborted& other) noexcept;
+
+    /**
+     * Address: 0x00412DE0 (FUN_00412DE0)
+     *
+     * What it does:
+     * Destroys background-task-aborted exception instance.
+     */
+    ~XBackgroundTaskAborted() noexcept override;
   };
 
   using WldScenarioLoadEntryFn = void (*)(SWldScenarioInfo*, CWaitHandleSet**);
@@ -212,6 +239,15 @@ namespace moho
      * Address: 0x004132B0 (FUN_004132b0)
      */
     void RunWorkerThread();
+
+    /**
+     * Address: 0x00412C70 (FUN_00412C70, func_UpdateLoadingProgress)
+     *
+     * What it does:
+     * Updates loader progress state, waits while pause is requested, and throws
+     * `XBackgroundTaskAborted` when stop is requested.
+     */
+    void UpdateLoadingProgress();
   };
 
   static_assert(sizeof(SWldScenarioLoadControl) == 0x70, "SWldScenarioLoadControl size must be 0x70");
@@ -260,6 +296,14 @@ namespace moho
      * Address: 0x00412E00 (FUN_00412e00)
      */
     void ReleaseOwnedResources();
+
+    /**
+     * Address: 0x00413270 (FUN_00413270)
+     *
+     * What it does:
+     * Starts/resumes the worker and joins one active thread instance.
+     */
+    void StartOrResumeAndJoin();
   };
 
   static_assert(sizeof(SWldScenarioLoadTask) == 0x08, "SWldScenarioLoadTask size must be 0x08");

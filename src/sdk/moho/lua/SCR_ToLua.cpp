@@ -3,6 +3,47 @@
 #include "moho/lua/CLuaVectorMetatableFactory.h"
 
 /**
+ * Address: 0x004D0350 (FUN_004D0350, Moho::SCR_ToLua<Moho::SPointVector>)
+ *
+ * What it does:
+ * Builds a 6-key Lua hash table (`px`,`py`,`pz`,`vx`,`vy`,`vz`) from one
+ * `SPointVector` payload.
+ */
+template <>
+LuaPlus::LuaObject
+moho::SCR_ToLua<moho::SPointVector>(LuaPlus::LuaState* const state, const moho::SPointVector& value)
+{
+  LuaPlus::LuaObject result;
+  result.AssignNewTable(state, 0, 6);
+  result.SetNumber("px", value.point.x);
+  result.SetNumber("py", value.point.y);
+  result.SetNumber("pz", value.point.z);
+  result.SetNumber("vx", value.vector.x);
+  result.SetNumber("vy", value.vector.y);
+  result.SetNumber("vz", value.vector.z);
+  return result;
+}
+
+/**
+ * Address: 0x004D08E0 (FUN_004D08E0, Moho::SCR_ToLua<gpg::Rect2<float>>)
+ *
+ * What it does:
+ * Builds a 4-key Lua hash table (`x0`,`y0`,`x1`,`y1`) from one `Rect2f`.
+ */
+template <>
+LuaPlus::LuaObject
+moho::SCR_ToLua<gpg::Rect2<float>>(LuaPlus::LuaState* const state, const gpg::Rect2<float>& value)
+{
+  LuaPlus::LuaObject result;
+  result.AssignNewTable(state, 0, 4);
+  result.SetNumber("x0", value.x0);
+  result.SetNumber("y0", value.z0);
+  result.SetNumber("x1", value.x1);
+  result.SetNumber("y1", value.z1);
+  return result;
+}
+
+/**
  * Address: 0x100C1240 (FUN_100C1240)
  *
  * LuaPlus::LuaState*, Wm3::Quaternion<float> const&

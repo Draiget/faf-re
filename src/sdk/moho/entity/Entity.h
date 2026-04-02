@@ -17,7 +17,16 @@
 #include "REntityBlueprint.h"
 #include "SEntAttachInfo.h"
 #include "wm3/Box3.h"
+#include "wm3/Quaternion.h"
 #include "wm3/Vector3.h"
+
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+} // namespace gpg
 
 namespace moho
 {
@@ -164,6 +173,15 @@ namespace moho
     offsetof(EntityCollisionCellSpan, mBucketFlags) == 0x10, "EntityCollisionCellSpan::mBucketFlags offset must be 0x10"
   );
 
+  /**
+   * Address: 0x0050B480 (FUN_0050B480, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@ABV?$Vector3@M@3@@Z)
+   *
+   * What it does:
+   * Builds an orientation quaternion whose forward axis follows `direction`,
+   * with fixed fallback quaternions for zero-length and vertical vectors.
+   */
+  [[nodiscard]] Wm3::Quaternionf COORDS_Orient(const Wm3::Vector3f& direction) noexcept;
+
   class Entity : public CScriptObject, public CTask
   {
     // Primary vftable (38 entries)
@@ -188,6 +206,17 @@ namespace moho
     virtual ~Entity() = 0;
 
     /**
+     * Address: 0x006779E0 (FUN_006779E0)
+     *
+     * Moho::Sim *,int
+     *
+     * What it does:
+     * Serialization constructor lane that seeds base entity storage directly
+     * from `Sim` and collision-bucket flags without blueprint script binding.
+     */
+    Entity(Sim* sim, std::uint32_t collisionBucketFlags);
+
+    /**
      * Address: 0x00677C90 (FUN_00677C90)
      *
      * What it does:
@@ -196,6 +225,47 @@ namespace moho
      * then executes `StandardInit`.
      */
     Entity(REntityBlueprint* blueprint, Sim* sim, EntId entityId, std::uint32_t collisionBucketFlags);
+
+    /**
+     * Address: 0x00677F40 (FUN_00677F40)
+     *
+     * LuaPlus::LuaObject const &,Moho::Sim *,Moho::EntId
+     *
+     * What it does:
+     * Initializes base entity state from a pre-created Lua object, seeds
+     * default collision grid bucket flags (`0x800`), runs `StandardInit`,
+     * then binds the script object via `SetLuaObject`.
+     */
+    Entity(const LuaPlus::LuaObject& luaObject, Sim* sim, EntId entityId);
+
+    /**
+     * Address: 0x0067B470 (FUN_0067B470,
+     * ?MemberSaveConstructArgs@Entity@Moho@@AAEXAAVWriteArchive@gpg@@HABVRRef@4@AAVSerSaveConstructArgsResult@4@@Z)
+     *
+     * What it does:
+     * Saves construct payload (`Sim*`) as an unowned tracked-pointer lane.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
+    );
+
+    /**
+     * Address: 0x0067B570 (FUN_0067B570,
+     * ?MemberConstruct@Entity@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
+     *
+     * What it does:
+     * Reads construct payload (`Sim*`) and allocates one `Entity` with
+     * default entity collision-bucket flags (`0x800`).
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x00679F70
@@ -252,6 +322,15 @@ namespace moho
     virtual int GetBoneCount() const;
 
     /**
+     * Address: 0x00678CC0 (FUN_00678CC0, Moho::Entity::ResolveBoneIndex)
+     *
+     * What it does:
+     * Resolves one bone name through the entity's current mesh/skeleton lane,
+     * returning `-1` when no skeleton is available.
+     */
+    [[nodiscard]] int ResolveBoneIndex(const char* boneName) const;
+
+    /**
      * Address: 0x005BDB60
      * VFTable SLOT: 11
      */
@@ -295,6 +374,15 @@ namespace moho
      * VFTable SLOT: 17
      */
     virtual void Warp(const VTransform&);
+
+    /**
+     * Address: 0x00678E90 (FUN_00678E90, ?SetPendingTransform@Entity@Moho@@QAEXABVVTransform@2@M@Z)
+     *
+     * What it does:
+     * Writes pending transform payload + pending velocity scale and ensures
+     * this entity is linked into the Sim coord update list.
+     */
+    void SetPendingTransform(const VTransform& transform, float pendingVelocityScale);
 
     /** Address: 0x00679CE0, VFTable SLOT: 18 */
     virtual VTransform GetBoneWorldTransform(int) const;
@@ -519,6 +607,13 @@ namespace moho
     [[nodiscard]] msvc8::string GetUniqueName() const;
 
   public:
+    /**
+     * Address: 0x0050AD80 (FUN_0050AD80, ?COORDS_LayerToString@Moho@@YAPBDW4ELayer@1@@Z)
+     *
+     * What it does:
+     * Returns debug/script text for a single-layer enum value and falls back to
+     * an empty string for bitmask combinations.
+     */
     [[nodiscard]] static const char* LayerToString(const ELayer layer) noexcept;
 
     // Entity data begins after CScriptObject(+0x34) and CTask(+0x18) subobjects.
@@ -592,6 +687,15 @@ namespace moho
     EntityMotor* mMotor;                   // 0x026C
   };
 
+  /**
+   * Address: 0x00692580 (FUN_00692580, Moho::ENTSCR_ResolveBoneIndex)
+   *
+   * What it does:
+   * Resolves one Lua bone identifier (integer index, string name, or optional
+   * nil lane) into one validated entity bone index.
+   */
+  int ENTSCR_ResolveBoneIndex(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
+
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
   static_assert(offsetof(Entity, mCollisionCellSpan) == 0x4C, "Entity::mCollisionCellSpan offset must be 0x4C");
   static_assert(offsetof(Entity, mCoordNode) == 0x60, "Entity::mCoordNode offset must be 0x60");
@@ -636,9 +740,17 @@ namespace moho
     : public TDatList<EntitySetTemplate<T>, void>
   {
   public:
+    inline static gpg::RType* sType = nullptr;
+
     using storage_type = gpg::fastvector_n<Entity*, 4>;
     using iterator = Entity**;
     using const_iterator = Entity* const*;
+
+    struct InsertResult
+    {
+      iterator position;
+      bool inserted;
+    };
 
     EntitySetTemplate() noexcept = default;
 
@@ -666,6 +778,13 @@ namespace moho
       return *this;
     }
 
+    /**
+     * Address: 0x005C23A0 (FUN_005C23A0)
+     *
+     * What it does:
+     * Resets fastvector_n storage back to inline capacity and unlinks this
+     * intrusive list node from its owner chain.
+     */
     ~EntitySetTemplate()
     {
       Clear();
@@ -709,15 +828,7 @@ namespace moho
       }
 
       const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
-      const const_iterator it = std::lower_bound(
-        begin(),
-        end(),
-        key,
-        [](const Entity* const candidate, const std::uint32_t targetId) noexcept -> bool {
-          const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
-          return candidateId < targetId;
-        }
-      );
+      const const_iterator it = LowerBoundByEntityId(begin(), end(), key);
       return it != end() && *it == entity;
     }
 
@@ -727,22 +838,7 @@ namespace moho
         return false;
       }
 
-      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
-      const iterator it = std::lower_bound(
-        begin(),
-        end(),
-        key,
-        [](const Entity* const candidate, const std::uint32_t targetId) noexcept -> bool {
-          const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
-          return candidateId < targetId;
-        }
-      );
-      if (it != end() && *it == entity) {
-        return false;
-      }
-
-      mVec.InsertAt(it, &entity, &entity + 1);
-      return true;
+      return InsertUniqueByEntityId(mVec, entity).inserted;
     }
 
     void Clear() noexcept
@@ -752,10 +848,104 @@ namespace moho
 
   public:
     storage_type mVec;
+
+  private:
+    template <typename Iter>
+    [[nodiscard]] static Iter LowerBoundByEntityIdImpl(Iter first, Iter last, const std::uint32_t targetId) noexcept
+    {
+      std::ptrdiff_t count = last - first;
+      while (count > 0) {
+        const std::ptrdiff_t step = count / 2;
+        Iter mid = first + step;
+        const Entity* const candidate = *mid;
+        const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
+        if (candidateId < targetId) {
+          first = mid + 1;
+          count -= step + 1;
+        } else {
+          count = step;
+        }
+      }
+      return first;
+    }
+
+    /**
+     * Address: 0x005CB710 (FUN_005CB710)
+     *
+     * What it does:
+     * Binary-search lower-bound over a sorted `Entity*` span by `Entity::id_`.
+     */
+    [[nodiscard]] static iterator LowerBoundByEntityId(
+      iterator first, iterator last, const std::uint32_t targetId
+    ) noexcept
+    {
+      return LowerBoundByEntityIdImpl(first, last, targetId);
+    }
+
+    /**
+     * Address: 0x005CB710 (FUN_005CB710)
+     *
+     * What it does:
+     * Const overload of lower-bound search over sorted `Entity*` span.
+     */
+    [[nodiscard]] static const_iterator LowerBoundByEntityId(
+      const_iterator first, const_iterator last, const std::uint32_t targetId
+    ) noexcept
+    {
+      return LowerBoundByEntityIdImpl(first, last, targetId);
+    }
+
+    /**
+     * Address: 0x005C3A90 (FUN_005C3A90)
+     *
+     * What it does:
+     * Inserts one entity pointer into sorted storage when missing and returns
+     * `{position, inserted}` semantics.
+     */
+    [[nodiscard]] static InsertResult InsertUniqueByEntityId(storage_type& vec, Entity* const entity) noexcept
+    {
+      iterator first = vec.begin();
+      iterator last = vec.end();
+      const std::uint32_t key = static_cast<std::uint32_t>(entity->id_);
+      iterator it = LowerBoundByEntityId(first, last, key);
+      if (it != last && *it == entity) {
+        return InsertResult{it, false};
+      }
+
+      const std::ptrdiff_t insertionIndex = it - first;
+      vec.InsertAt(it, &entity, &entity + 1);
+      return InsertResult{vec.begin() + insertionIndex, true};
+    }
   };
 
   static_assert(
     offsetof(EntitySetTemplate<Entity>, mVec) == 0x08, "EntitySetTemplate<Entity>::mVec offset must be 0x08"
   );
   static_assert(sizeof(EntitySetTemplate<Entity>) == 0x28, "EntitySetTemplate<Entity> size must be 0x28");
+
+  /**
+   * Binary-facing alias wrapper for `EntitySetTemplate<Entity>` with independent RTTI slot.
+   */
+  class EntitySetBase : public EntitySetTemplate<Entity>
+  {
+  public:
+    inline static gpg::RType* sType = nullptr;
+  };
+
+  /**
+   * Binary-facing weak set wrapper that preserves legacy RTTI identity while reusing
+   * `EntitySetTemplate<T>` storage/layout lanes.
+   */
+  template <class T>
+  class WeakEntitySetTemplate : public EntitySetTemplate<T>
+  {
+  public:
+    inline static gpg::RType* sType = nullptr;
+  };
+
+  using UnitSet = EntitySetTemplate<Unit>;
+  using WeakUnitSet = WeakEntitySetTemplate<Unit>;
+
+  static_assert(sizeof(EntitySetBase) == 0x28, "EntitySetBase size must be 0x28");
+  static_assert(sizeof(WeakEntitySetTemplate<Unit>) == 0x28, "WeakEntitySetTemplate<Unit> size must be 0x28");
 } // namespace moho

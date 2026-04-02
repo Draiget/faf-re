@@ -2,19 +2,35 @@
 
 #include <cstdint>
 
+#include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
+
+namespace gpg
+{
+  class RRef;
+}
 
 namespace moho
 {
   class CScriptObject;
 
   /**
-   * Address: 0x100C3290 (?SCR_CreateSimpleMetatable@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@@Z)
+   * Address: 0x004D22D0 (FUN_004D22D0, ?SCR_CreateSimpleMetatable@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@@Z)
+   * Alias:   0x100C3290 (alt lane)
    *
    * Creates a table metatable and sets __index = self.
    */
   LuaPlus::LuaObject SCR_CreateSimpleMetatable(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004D3250 (FUN_004D3250, ?SCR_Import@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@VStrArg@gpg@@@Z)
+   *
+   * What it does:
+   * Calls global `import(modulePath)` and returns the resulting Lua object
+   * while restoring the caller's original Lua stack top.
+   */
+  [[nodiscard]] LuaPlus::LuaObject SCR_Import(LuaPlus::LuaState* state, gpg::StrArg modulePath);
 
   /**
    * Imports a Lua module by calling global `import(modulePath)`.
@@ -36,6 +52,52 @@ namespace moho
    * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `msvc8::string`.
    */
   [[nodiscard]] msvc8::string SCR_ToString(const LuaPlus::LuaObject& object);
+
+  /**
+   * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
+   *
+   * What it does:
+   * Returns a Lua-quoted/escaped string literal choosing `'` or `"` based on
+   * source contents and escaping control/non-printable bytes.
+   */
+  [[nodiscard]] msvc8::string SCR_QuoteLuaString(gpg::StrArg text);
+
+  /**
+   * Address: 0x004CF0B0 (FUN_004CF0B0, ?SCR_RObjectToLuaMerge@Moho@@YAXABVRRef@gpg@@AAVLuaObject@LuaPlus@@@Z)
+   *
+   * What it does:
+   * Recursively merges one reflected source object/reference into an existing
+   * Lua object, handling primitive upcasts, pointers, indexed ranges, and named
+   * reflected fields.
+   */
+  void SCR_RObjectToLuaMerge(const gpg::RRef& source, LuaPlus::LuaObject& destination);
+
+  /**
+   * Address: 0x004CF510 (FUN_004CF510, ?SCR_LuaBuildObject@Moho@@YA_NVLuaObject@LuaPlus@@ABVRRef@gpg@@_N@Z)
+   *
+   * What it does:
+   * Recursively applies one Lua value/table into a reflected destination reference,
+   * handling lexical, indexed, enum-flag, and named-field paths with warning logs.
+   */
+  [[nodiscard]] bool SCR_LuaBuildObject(LuaPlus::LuaObject valueObject, const gpg::RRef& destination, bool ignoreMissingFields);
+
+  /**
+   * Address: 0x004D2550 (FUN_004D2550, ?SCR_GetEnum@Moho@@YAXPAVLuaState@LuaPlus@@VStrArg@gpg@@AAVRRef@5@@Z)
+   *
+   * What it does:
+   * Writes one enum lexical value into a reflected destination and, on failure,
+   * raises a Lua error listing all valid enum option names.
+   */
+  void SCR_GetEnum(LuaPlus::LuaState* state, gpg::StrArg enumString, gpg::RRef& ref);
+
+  /**
+   * Address: 0x004CDBA0 (FUN_004CDBA0, ?SCR_LuaDoString@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
+   *
+   * What it does:
+   * Loads and executes one Lua chunk from `scriptText`, warns on compile/runtime
+   * failures, and restores the caller's original Lua stack top.
+   */
+  [[nodiscard]] bool SCR_LuaDoString(const char* scriptText, LuaPlus::LuaState* state);
 
   class CScrLuaObjectFactory
   {
@@ -79,7 +141,21 @@ namespace moho
     static int32_t AllocateFactoryObjectIndex();
 
     /**
+     * Recovery helper:
+     * Overrides the cached factory index lane on an already-materialized factory object.
+     */
+    void SetFactoryObjectIndexForRecovery(const int32_t factoryObjectIndex) noexcept
+    {
+      mFactoryObjectIndex = factoryObjectIndex;
+    }
+
+    /**
+     * Address: 0x004CCE70 (FUN_004CCE70, FA exe)
      * Address: 0x100BE9E0 (?Get@CScrLuaObjectFactory@Moho@@QAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     *
+     * What it does:
+     * Returns one cached factory object from global `__factory_objects`,
+     * creating/storing a new entry when the indexed slot is nil.
      */
     LuaPlus::LuaObject Get(LuaPlus::LuaState* state);
 

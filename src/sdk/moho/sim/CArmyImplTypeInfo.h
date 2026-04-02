@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006FE3D0 (FUN_006FE3D0, Moho::CArmyImplTypeInfo::CArmyImplTypeInfo)
+     *
+     * What it does:
+     * Initializes RTTI base lanes and preregisters `CArmyImpl` type metadata.
+     */
+    CArmyImplTypeInfo();
+
+    /**
      * Address: 0x006FE480 (FUN_006FE480, Moho::CArmyImplTypeInfo::dtr)
      * Slot: 2
      */

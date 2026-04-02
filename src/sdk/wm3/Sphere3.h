@@ -2,6 +2,12 @@
 
 #include "Vector3.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace Wm3
 {
   template <class T> struct Sphere3
@@ -14,6 +20,22 @@ namespace Wm3
         Center(center),
         Radius(radius)
     {}
+
+    /**
+     * Address: 0x00474260 (FUN_00474260, Wm3::Sphere3f::MemberDeserialize)
+     *
+     * What it does:
+     * Reads reflected center/radius fields from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x004742B0 (FUN_004742B0, Wm3::Sphere3f::MemberSerialize)
+     *
+     * What it does:
+     * Writes reflected center/radius fields to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   using Sphere3f = Sphere3<float>;

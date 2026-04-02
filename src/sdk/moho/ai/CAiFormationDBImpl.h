@@ -5,6 +5,12 @@
 #include "gpg/core/containers/FastVector.h"
 #include "moho/ai/IAiFormationDB.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Sim;
@@ -57,6 +63,22 @@ namespace moho
       float orientW,
       int commandType
     ) override;
+
+    /**
+     * Address: 0x0059EA20 (FUN_0059EA20, Moho::CAiFormationDBImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Reads serialized formation-DB members from archive lanes.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0059EA90 (FUN_0059EA90, Moho::CAiFormationDBImpl::MemberSerialize)
+     *
+     * What it does:
+     * Writes serialized formation-DB members to archive lanes.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     Sim* mSim;                                                   // +0x04

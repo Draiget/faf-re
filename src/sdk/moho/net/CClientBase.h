@@ -24,6 +24,7 @@ namespace moho
 {
   class CClientBase;
   class CClientManagerImpl;
+  class CMarshaller;
 
   struct SEjectRequest
   {
@@ -213,6 +214,15 @@ namespace moho
      * Caller is expected to hold `mManager->mLock`.
      */
     bool IsReadyForBeat(int beat) const;
+
+    /**
+     * Address: 0x0053C550 (FUN_0053C550, Moho::CClientBase::UpdateState)
+     *
+     * What it does:
+     * Pumps queued per-client command-stream data up to `beat`, enforces
+     * command-source ownership, and forwards authorized packets to output pipe.
+     */
+    void UpdateState(int beat, CMarshaller* update, gpg::PipeStream* outPipe);
 
     /**
      * Address: 0x0053F2C0 (FUN_0053F2C0)

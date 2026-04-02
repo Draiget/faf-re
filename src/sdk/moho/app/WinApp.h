@@ -167,6 +167,54 @@ namespace moho
   msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uint32_t* frames);
 
   /**
+   * Address: 0x004A25D0 (FUN_004A25D0)
+   * Mangled:
+   * ?PLAT_UnDecorateSymbolName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PBD_N@Z
+   *
+   * What it does:
+   * Converts one decorated symbol into undecorated text under the shared
+   * symbol-handler mutex, with optional underscore-stripping mode.
+   */
+  msvc8::string PLAT_UnDecorateSymbolName(const char* name, bool stripLeadingUnderscore);
+
+  /**
+   * Address: 0x004A1F10 (FUN_004A1F10)
+   *
+   * What it does:
+   * Writes one registry value at `keyPath` using raw byte payload and explicit
+   * registry value type.
+   */
+  bool PLAT_SetRegistryValue(
+    const char* keyPath, const std::uint8_t* data, std::uint32_t dataSize, std::uint32_t valueType
+  );
+
+  /**
+   * Address: 0x004A2F60 (FUN_004A2F60)
+   *
+   * What it does:
+   * Writes one 32-bit DWORD registry value.
+   */
+  bool PLAT_SetRegistryValueDword(const char* keyPath, std::uint32_t value);
+
+  /**
+   * Address: 0x004A2F80 (FUN_004A2F80)
+   *
+   * What it does:
+   * Writes one zero-terminated string registry value; null input writes an
+   * empty string payload.
+   */
+  bool PLAT_SetRegistryValueString(const char* value, const char* keyPath);
+
+  /**
+   * Address: 0x004A2D40 (FUN_004A2D40)
+   *
+   * What it does:
+   * Reads one registry value payload into `outData` and returns byte count read.
+   * Binary behavior clamps read size to 0x100 bytes.
+   */
+  std::uint32_t PLAT_GetRegistryValue(const char* keyPath, void* outData, std::uint32_t maxDataBytes);
+
+  /**
    * Address: 0x004F2800 (FUN_004F2800, ?WIN_OkBox@Moho@@YAXVStrArg@gpg@@0@Z)
    *
    * What it does:

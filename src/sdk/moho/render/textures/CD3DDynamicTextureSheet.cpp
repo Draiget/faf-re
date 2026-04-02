@@ -18,20 +18,36 @@ namespace moho
     constexpr std::uint32_t kDefaultMipmapLevels = 1u;
   } // namespace
 
-  CD3DDynamicTextureSheet::CD3DDynamicTextureSheet()
+  /**
+   * Address: 0x0043CE40 (FUN_0043CE40, Moho::CD3DDynamicTextureSheet::CD3DDynamicTextureSheet)
+   *
+   * CD3DDevice *,bool,std::uint32_t,std::uint32_t,std::uint32_t,bool
+   *
+   * What it does:
+   * Initializes list links, binds optional owner-device lane, and seeds texture
+   * context fields used by the archive/device texture creation path.
+   */
+  CD3DDynamicTextureSheet::CD3DDynamicTextureSheet(
+    CD3DDevice* const device,
+    const bool archiveTextureMode,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t format,
+    const bool dynamicUsage
+  )
     : mLink()
-    , mDevice(nullptr)
+    , mDevice(device)
     , mTexture()
     , mContext()
-    , mArchiveTextureMode(false)
+    , mArchiveTextureMode(archiveTextureMode)
     , mPad6D{}
   {
     mContext.source_ = kTextureSourceDevice;
-    mContext.width_ = 0;
-    mContext.height_ = 0;
-    mContext.format_ = 0;
-    mContext.mipmapLevels_ = kDefaultMipmapLevels;
-    mContext.usage_ = kTextureUsageStatic;
+    mContext.width_ = width;
+    mContext.height_ = height;
+    mContext.format_ = format;
+    mContext.mipmapLevels_ = archiveTextureMode ? 0u : kDefaultMipmapLevels;
+    mContext.usage_ = dynamicUsage ? kTextureUsageDynamic : kTextureUsageStatic;
   }
 
   /**

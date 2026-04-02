@@ -117,7 +117,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x100BEB50 (FUN_100BEB50)
+   * Address: 0x004CCFE0 (FUN_004CCFE0, Moho::CScrLuaInitFormSet::DumpDocs)
    *
    * What it does:
    * Emits Lua binding docs grouped by group/doc/name with nested gpg log contexts.

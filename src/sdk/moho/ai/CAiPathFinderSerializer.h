@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005AAC30 (FUN_005AAC30, Moho::CAiPathFinderSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `CAiPathFinder::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005AAC40 (FUN_005AAC40, Moho::CAiPathFinderSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `CAiPathFinder::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005AB210 (FUN_005AB210)
      *
      * What it does:
@@ -50,4 +66,13 @@ namespace moho
     "CAiPathFinderSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiPathFinderSerializer) == 0x14, "CAiPathFinderSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCCD70 (FUN_00BCCD70, register_CAiPathFinderSerializer)
+   *
+   * What it does:
+   * Initializes the global path-finder serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  int register_CAiPathFinderSerializer();
 } // namespace moho

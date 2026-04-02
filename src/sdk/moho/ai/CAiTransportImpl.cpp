@@ -4,7 +4,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiFormationInstance.h"
@@ -13,6 +17,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/containers/SCoordsVec2.h"
+#include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/SEntAttachInfo.h"
 #include "moho/lua/SCR_ToLua.h"
@@ -23,6 +28,15 @@
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
 
 using namespace moho;
 
@@ -41,12 +55,157 @@ void STransportPickUpInfo::RemoveUnit(Unit* const unit) noexcept
 
 namespace
 {
+  gpg::RType* gIAiTransportType = nullptr;
+  gpg::RType* gCAiTransportImplType = nullptr;
+  gpg::RType* gUnitType = nullptr;
+  gpg::RType* gWeakPtrUnitType = nullptr;
+  gpg::RType* gEntitySetTemplateUnitType = nullptr;
+  gpg::RType* gReservedBoneVectorType = nullptr;
+  gpg::RType* gPickupInfoType = nullptr;
+  gpg::RType* gFormationInstanceType = nullptr;
+  gpg::RType* gVector3fType = nullptr;
+  gpg::RType* gAttachPointVectorType = nullptr;
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
+  {
+    if (!slot) {
+      slot = gpg::LookupRType(typeid(TObject));
+    }
+    return slot;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveIAiTransportType()
+  {
+    if (!IAiTransport::sType) {
+      IAiTransport::sType = CachedType<IAiTransport>(gIAiTransportType);
+    }
+    return IAiTransport::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCAiTransportImplType()
+  {
+    if (!CAiTransportImpl::sType) {
+      CAiTransportImpl::sType = CachedType<CAiTransportImpl>(gCAiTransportImplType);
+    }
+    return CAiTransportImpl::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveUnitType()
+  {
+    return CachedType<Unit>(gUnitType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
+  {
+    return CachedType<WeakPtr<Unit>>(gWeakPtrUnitType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
+  {
+    return CachedType<SEntitySetTemplateUnit>(gEntitySetTemplateUnitType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveReservedBoneVectorType()
+  {
+    return CachedType<msvc8::vector<SAiReservedTransportBone>>(gReservedBoneVectorType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolvePickupInfoType()
+  {
+    return CachedType<STransportPickUpInfo>(gPickupInfoType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveFormationInstanceType()
+  {
+    return CachedType<IFormationInstance>(gFormationInstanceType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveVector3fType()
+  {
+    return CachedType<Wm3::Vector3<float>>(gVector3fType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveAttachPointVectorType()
+  {
+    return CachedType<msvc8::vector<SAttachPoint>>(gAttachPointVectorType);
+  }
+
+  [[nodiscard]] bool BlueprintBelongsToCategory(
+    const RUnitBlueprint* const blueprint,
+    const CategoryWordRangeView* const category
+  ) noexcept
+  {
+    if (!blueprint || !category) {
+      return false;
+    }
+
+    return category->ContainsBit(static_cast<std::uint32_t>(blueprint->mCategoryBitIndex));
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject* DecodeTrackedPointer(const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType)
+  {
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    if (tracked.type && expectedType) {
+      gpg::RRef source{};
+      source.mObj = tracked.object;
+      source.mType = tracked.type;
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+      return static_cast<TObject*>(upcast.mObj);
+    }
+
+    return static_cast<TObject*>(tracked.object);
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject* ReadPointerUnowned(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef,
+    gpg::RType* const expectedType
+  )
+  {
+    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    return DecodeTrackedPointer<TObject>(tracked, expectedType);
+  }
+
+  template <class TObject>
+  void WritePointerUnowned(
+    gpg::WriteArchive* const archive,
+    const TObject* const object,
+    gpg::RType* const objectType,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RRef objectRef{};
+    objectRef.mObj = const_cast<TObject*>(object);
+    objectRef.mType = object ? objectType : nullptr;
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
   [[nodiscard]] float DistSq(const Wm3::Vec3f& lhs, const Wm3::Vec3f& rhs) noexcept
   {
     const float dx = lhs.x - rhs.x;
     const float dy = lhs.y - rhs.y;
     const float dz = lhs.z - rhs.z;
     return (dx * dx) + (dy * dy) + (dz * dz);
+  }
+
+  /**
+   * Address: 0x00405050 (FUN_00405050, func_max)
+   *
+   * What it does:
+   * Returns the greater integer value.
+   */
+  [[nodiscard]] int MaxInt(const int lhs, const int rhs) noexcept
+  {
+    if (lhs < rhs) {
+      return rhs;
+    }
+    return lhs;
   }
 
   [[nodiscard]] Wm3::Vec3f ForwardFromOrientation(const Wm3::Quatf& orient) noexcept
@@ -182,6 +341,222 @@ namespace
 } // namespace
 
 gpg::RType* CAiTransportImpl::sType = nullptr;
+
+/**
+ * Address: 0x005E5300 (FUN_005E5300, Moho::CAiTransportImpl::CAiTransportImpl)
+ * Address: 0x005E5670 (FUN_005E5670, Moho::CAiTransportImpl::CAiTransportImpl)
+ * Mangled: ??0CAiTransportImpl@Moho@@AAE@XZ
+ * Mangled: ??0CAiTransportImpl@Moho@@QAE@PAVUnit@1@@Z
+ *
+ * What it does:
+ * Builds baseline transport state and, for unit-bound construction, resolves
+ * staging/teleport category flags and links transport entity sets into the sim DB.
+ */
+CAiTransportImpl::CAiTransportImpl(Unit* const unit)
+  : IAiTransport()
+  , mUnit(unit)
+  , mTeleportBeacon()
+  , mStagingPlatform(0)
+  , mTeleportation(0)
+  , mUnknown1A{0, 0}
+  , mAttachpoints(0)
+  , mNextGeneric(0)
+  , mLaunchAttachIndex(0)
+  , mGenericOverflow(0)
+  , mUnknown2C{0, 0, 0, 0}
+  , mUnitSet30()
+  , mStoredUnits()
+  , mUnitSet80()
+  , mReservedBones()
+  , mPickupInfo()
+  , mWaitingFormation(nullptr)
+  , mPickupFacing(0.0f, 0.0f, 0.0f)
+  , mGenericAttachPoints()
+  , mClass1AttachPoints()
+  , mClass2AttachPoints()
+  , mClass3AttachPoints()
+  , mClass4AttachPoints()
+  , mClassSAttachPoints()
+  , mLaunchAttachPoints()
+{
+  SetUpAttachPoints();
+
+  if (!mUnit) {
+    return;
+  }
+
+  Sim* const sim = mUnit->SimulationRef;
+  if (!sim) {
+    return;
+  }
+
+  if (sim->mRules) {
+    const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+    const CategoryWordRangeView* const airStagingCategory = sim->mRules->GetEntityCategory("AIRSTAGINGPLATFORM");
+    const CategoryWordRangeView* const podStagingCategory = sim->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
+    const bool isStagingTransport =
+      BlueprintBelongsToCategory(blueprint, airStagingCategory) ||
+      BlueprintBelongsToCategory(blueprint, podStagingCategory);
+    mStagingPlatform = static_cast<std::uint8_t>(isStagingTransport ? 1u : 0u);
+
+    const CategoryWordRangeView* const teleportCategory = sim->mRules->GetEntityCategory("TELEPORTATION");
+    mTeleportation = static_cast<std::uint8_t>(BlueprintBelongsToCategory(blueprint, teleportCategory) ? 1u : 0u);
+  }
+
+  if (sim->mEntityDB) {
+    sim->mEntityDB->RegisterEntitySet(mPickupInfo.mUnits);
+    sim->mEntityDB->RegisterEntitySet(mUnitSet30);
+    sim->mEntityDB->RegisterEntitySet(mStoredUnits);
+    sim->mEntityDB->RegisterEntitySet(mUnitSet80);
+  }
+}
+
+/**
+ * Address: 0x005E8500 (FUN_005E8500, Moho::CAiTransportImpl::MemberConstruct)
+ *
+ * What it does:
+ * Allocates one `CAiTransportImpl` object and publishes it via
+ * `SerConstructResult::SetUnowned`.
+ */
+void CAiTransportImpl::MemberConstruct(gpg::SerConstructResult* const result)
+{
+  CAiTransportImpl* const object = new (std::nothrow) CAiTransportImpl{};
+  if (!result) {
+    return;
+  }
+
+  gpg::RRef objectRef{};
+  objectRef.mObj = object;
+  objectRef.mType = ResolveCAiTransportImplType();
+  result->SetUnowned(objectRef, 0u);
+}
+
+/**
+ * Address: 0x005EEE30 (FUN_005EEE30, Moho::CAiTransportImpl::MemberDeserialize)
+ *
+ * What it does:
+ * Loads runtime transport state lanes from the read archive.
+ */
+void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  gpg::RType* const aiTransportType = ResolveIAiTransportType();
+  GPG_ASSERT(aiTransportType != nullptr);
+  archive->Read(aiTransportType, static_cast<IAiTransport*>(this), ownerRef);
+
+  mUnit = ReadPointerUnowned<Unit>(archive, ownerRef, ResolveUnitType());
+
+  gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+  GPG_ASSERT(weakUnitType != nullptr);
+  archive->Read(weakUnitType, &mTeleportBeacon, ownerRef);
+
+  bool boolValue = false;
+  archive->ReadBool(&boolValue);
+  mStagingPlatform = static_cast<std::uint8_t>(boolValue ? 1 : 0);
+  archive->ReadBool(&boolValue);
+  mTeleportation = static_cast<std::uint8_t>(boolValue ? 1 : 0);
+
+  archive->ReadInt(&mAttachpoints);
+  archive->ReadInt(&mNextGeneric);
+  archive->ReadInt(&mLaunchAttachIndex);
+  archive->ReadInt(&mGenericOverflow);
+
+  gpg::RType* const entitySetType = ResolveEntitySetTemplateUnitType();
+  GPG_ASSERT(entitySetType != nullptr);
+  archive->Read(entitySetType, &mUnitSet30, ownerRef);
+  archive->Read(entitySetType, &mStoredUnits, ownerRef);
+  archive->Read(entitySetType, &mUnitSet80, ownerRef);
+
+  gpg::RType* const reservedBoneVectorType = ResolveReservedBoneVectorType();
+  GPG_ASSERT(reservedBoneVectorType != nullptr);
+  archive->Read(reservedBoneVectorType, &mReservedBones, ownerRef);
+
+  gpg::RType* const pickupInfoType = ResolvePickupInfoType();
+  GPG_ASSERT(pickupInfoType != nullptr);
+  archive->Read(pickupInfoType, &mPickupInfo, ownerRef);
+
+  mWaitingFormation =
+    ReadPointerUnowned<IFormationInstance>(archive, ownerRef, ResolveFormationInstanceType());
+
+  gpg::RType* const vector3fType = ResolveVector3fType();
+  GPG_ASSERT(vector3fType != nullptr);
+  archive->Read(vector3fType, &mPickupFacing, ownerRef);
+
+  gpg::RType* const attachPointVectorType = ResolveAttachPointVectorType();
+  GPG_ASSERT(attachPointVectorType != nullptr);
+  archive->Read(attachPointVectorType, &mGenericAttachPoints, ownerRef);
+  archive->Read(attachPointVectorType, &mClass1AttachPoints, ownerRef);
+  archive->Read(attachPointVectorType, &mClass2AttachPoints, ownerRef);
+  archive->Read(attachPointVectorType, &mClass3AttachPoints, ownerRef);
+  archive->Read(attachPointVectorType, &mClass4AttachPoints, ownerRef);
+  archive->Read(attachPointVectorType, &mClassSAttachPoints, ownerRef);
+  archive->Read(attachPointVectorType, &mLaunchAttachPoints, ownerRef);
+}
+
+/**
+ * Address: 0x005EF1F0 (FUN_005EF1F0, Moho::CAiTransportImpl::MemberSerialize)
+ *
+ * What it does:
+ * Saves runtime transport state lanes into the write archive.
+ */
+void CAiTransportImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  gpg::RType* const aiTransportType = ResolveIAiTransportType();
+  GPG_ASSERT(aiTransportType != nullptr);
+  archive->Write(aiTransportType, static_cast<const IAiTransport*>(this), ownerRef);
+
+  WritePointerUnowned(archive, mUnit, ResolveUnitType(), ownerRef);
+
+  gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+  GPG_ASSERT(weakUnitType != nullptr);
+  archive->Write(weakUnitType, &mTeleportBeacon, ownerRef);
+
+  archive->WriteBool(mStagingPlatform != 0u);
+  archive->WriteBool(mTeleportation != 0u);
+  archive->WriteInt(mAttachpoints);
+  archive->WriteInt(mNextGeneric);
+  archive->WriteInt(mLaunchAttachIndex);
+  archive->WriteInt(mGenericOverflow);
+
+  gpg::RType* const entitySetType = ResolveEntitySetTemplateUnitType();
+  GPG_ASSERT(entitySetType != nullptr);
+  archive->Write(entitySetType, &mUnitSet30, ownerRef);
+  archive->Write(entitySetType, &mStoredUnits, ownerRef);
+  archive->Write(entitySetType, &mUnitSet80, ownerRef);
+
+  gpg::RType* const reservedBoneVectorType = ResolveReservedBoneVectorType();
+  GPG_ASSERT(reservedBoneVectorType != nullptr);
+  archive->Write(reservedBoneVectorType, &mReservedBones, ownerRef);
+
+  gpg::RType* const pickupInfoType = ResolvePickupInfoType();
+  GPG_ASSERT(pickupInfoType != nullptr);
+  archive->Write(pickupInfoType, &mPickupInfo, ownerRef);
+
+  WritePointerUnowned(archive, mWaitingFormation, ResolveFormationInstanceType(), ownerRef);
+
+  gpg::RType* const vector3fType = ResolveVector3fType();
+  GPG_ASSERT(vector3fType != nullptr);
+  archive->Write(vector3fType, &mPickupFacing, ownerRef);
+
+  gpg::RType* const attachPointVectorType = ResolveAttachPointVectorType();
+  GPG_ASSERT(attachPointVectorType != nullptr);
+  archive->Write(attachPointVectorType, &mGenericAttachPoints, ownerRef);
+  archive->Write(attachPointVectorType, &mClass1AttachPoints, ownerRef);
+  archive->Write(attachPointVectorType, &mClass2AttachPoints, ownerRef);
+  archive->Write(attachPointVectorType, &mClass3AttachPoints, ownerRef);
+  archive->Write(attachPointVectorType, &mClass4AttachPoints, ownerRef);
+  archive->Write(attachPointVectorType, &mClassSAttachPoints, ownerRef);
+  archive->Write(attachPointVectorType, &mLaunchAttachPoints, ownerRef);
+}
 
 /**
  * Address: 0x005E60F0 (FUN_005E60F0)
@@ -512,6 +887,82 @@ void CAiTransportImpl::TransportClearWaitingFormation()
 }
 
 /**
+ * Address: 0x005E4930 (FUN_005E4930, Moho::CAiTransportImpl::SetUpAttachPoints)
+ *
+ * What it does:
+ * Walks the transport skeleton and classifies attach bones by name token into
+ * class-specific attach vectors used by transport slot assignment.
+ */
+void CAiTransportImpl::SetUpAttachPoints()
+{
+  if (!mUnit || !mUnit->AniActor) {
+    return;
+  }
+
+  const boost::shared_ptr<const CAniSkel> skeletonHandle = mUnit->AniActor->GetSkeleton();
+  const CAniSkel* const skeleton = skeletonHandle.get();
+  if (!skeleton) {
+    return;
+  }
+
+  const SAniSkelBone* const bonesBegin = skeleton->mBones.begin();
+  const SAniSkelBone* const bonesEnd = skeleton->mBones.end();
+  const unsigned int boneCount = static_cast<unsigned int>(bonesEnd - bonesBegin);
+
+  for (unsigned int boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
+    const SAniSkelBone* const bone = skeleton->GetBone(boneIndex);
+    if (!bone || !bone->mBoneName) {
+      continue;
+    }
+
+    const VTransform localTransform = mUnit->GetBoneLocalTransform(static_cast<int>(boneIndex));
+    SAttachPoint attachPoint{};
+    attachPoint.index = boneIndex;
+    attachPoint.localPos = localTransform.pos_;
+    attachPoint.distSq = 0.0f;
+
+    msvc8::vector<SAttachPoint>* targetList = nullptr;
+    if (std::strstr(bone->mBoneName, "Launchpoint")) {
+      targetList = &mLaunchAttachPoints;
+    } else if (std::strstr(bone->mBoneName, "Attachpoint_Spr")) {
+      ++mAttachpoints;
+      if (mUnit->GetBlueprint()->Transport.ClassGenericUpTo < 4) {
+        targetList = &mClass4AttachPoints;
+      } else {
+        targetList = &mGenericAttachPoints;
+      }
+    } else if (std::strstr(bone->mBoneName, "Attachpoint_Lrg")) {
+      ++mAttachpoints;
+      if (mUnit->GetBlueprint()->Transport.ClassGenericUpTo < 3) {
+        targetList = &mClass3AttachPoints;
+      } else {
+        targetList = &mGenericAttachPoints;
+      }
+    } else if (std::strstr(bone->mBoneName, "Attachpoint_Med")) {
+      ++mAttachpoints;
+      if (mUnit->GetBlueprint()->Transport.ClassGenericUpTo < 2) {
+        targetList = &mClass2AttachPoints;
+      } else {
+        targetList = &mGenericAttachPoints;
+      }
+    } else if (std::strstr(bone->mBoneName, "Attachpoint")) {
+      ++mAttachpoints;
+      if (mUnit->GetBlueprint()->Transport.ClassGenericUpTo < 1) {
+        targetList = &mClass1AttachPoints;
+      } else {
+        targetList = &mGenericAttachPoints;
+      }
+    } else if (std::strstr(bone->mBoneName, "AttachSpecial")) {
+      targetList = &mClassSAttachPoints;
+    }
+
+    if (targetList) {
+      targetList->push_back(attachPoint);
+    }
+  }
+}
+
+/**
  * Address: 0x005E5120 (FUN_005E5120)
  */
 const SAiReservedTransportBone* CAiTransportImpl::GetReservedBone(Unit* const unit) const
@@ -735,7 +1186,7 @@ bool CAiTransportImpl::TransportHasSpaceFor(const RUnitBlueprint* const unitBlue
     return false;
   }
 
-  attachSize = std::max(1, attachSize);
+  attachSize = MaxInt(1, attachSize);
   for (const SAttachPoint* it = attachVec.begin(); it != attachVec.end(); ++it) {
     msvc8::vector<int> candidate = GetClosestAttachPointsTo(hookVec, static_cast<int>(it->index), attachSize);
     if (!candidate.empty() && !IsBoneReserved(candidate)) {
@@ -762,7 +1213,7 @@ bool CAiTransportImpl::TransportAssignSlot(Unit* const unit, const int hookIndex
   TransportFindAttachList(unit->GetBlueprint()->Transport.TransportClass, attachVec, hookVec, attachSize);
 
   if (hookIndex >= 0) {
-    const int normalizedAttachSize = std::max(1, attachSize);
+    const int normalizedAttachSize = MaxInt(1, attachSize);
     msvc8::vector<int> candidate = GetClosestAttachPointsTo(hookVec, hookIndex, normalizedAttachSize);
     if (candidate.empty() || IsBoneReserved(candidate)) {
       return false;
@@ -775,7 +1226,7 @@ bool CAiTransportImpl::TransportAssignSlot(Unit* const unit, const int hookIndex
     return false;
   }
 
-  attachSize = std::max(1, attachSize);
+  attachSize = MaxInt(1, attachSize);
   for (const SAttachPoint* it = attachVec.begin(); it != attachVec.end(); ++it) {
     msvc8::vector<int> candidate = GetClosestAttachPointsTo(hookVec, static_cast<int>(it->index), attachSize);
     if (candidate.empty() || IsBoneReserved(candidate)) {

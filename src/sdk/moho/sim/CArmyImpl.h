@@ -182,6 +182,40 @@ namespace moho
     /** Address: 0x006FE310 (FUN_006FE310, Moho::CArmyImpl::GetPathcapBoth) */
     std::int32_t GetPathcapBoth() override;
 
+    /**
+     * Address: 0x00705BE0 (FUN_00705BE0, Moho::CArmyImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes CArmyImpl-owned runtime fields and dependent owned pointers.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00705E40 (FUN_00705E40, Moho::CArmyImpl::MemberSerialize)
+     *
+     * What it does:
+     * Serializes CArmyImpl-owned runtime fields and dependent owned pointers.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x007010B0 (FUN_007010B0, Moho::CArmyImpl::DeserializePlatoons)
+     *
+     * What it does:
+     * Reads owned platoon pointers until null terminator and appends them into
+     * the platoon pool.
+     */
+    void DeserializePlatoons(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00701130 (FUN_00701130, Moho::CArmyImpl::SerializePlatoons)
+     *
+     * What it does:
+     * Writes owned platoon pointers from the platoon pool and emits a null
+     * pointer terminator.
+     */
+    void SerializePlatoons(gpg::WriteArchive* archive) const;
+
   public:
     void* N000006B2;                                     // 0x0004
     std::int32_t ArmyId;                                 // 0x0008

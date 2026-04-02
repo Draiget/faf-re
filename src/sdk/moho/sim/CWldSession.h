@@ -11,6 +11,7 @@
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/misc/VisionDb.h"
+#include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/VisibilityRect.h"
@@ -22,6 +23,7 @@
 namespace moho
 {
   class UserArmy;
+  class UserUnit;
   class EntityCategoryLookupResolver;
   class LaunchInfoBase;
   class RRuleGameRules;
@@ -84,13 +86,6 @@ namespace moho
     COMMOD_Move = 4,
     COMMOD_Reclaim = 5,
     COMMOD_Ping = 6,
-  };
-
-  enum ERuleBPUnitCommandCaps : std::int32_t
-  {
-    RULEUCC_None = 0,
-    RULEUCC_Transport = 1,
-    RULEUCC_CallTransport = 2,
   };
 
   struct CommandModeData
@@ -159,6 +154,61 @@ namespace moho
   static_assert(sizeof(SSessionSaveNodeMap) == 0x0C, "SSessionSaveNodeMap size must be 0x0C");
   static_assert(offsetof(SSessionSaveNodeMap, mHead) == 0x04, "SSessionSaveNodeMap::mHead offset must be 0x04");
   static_assert(offsetof(SSessionSaveNodeMap, mSize) == 0x08, "SSessionSaveNodeMap::mSize offset must be 0x08");
+
+  struct SSelectionWeakRefUserEntity
+  {
+    void* mOwnerLinkSlot;                    // +0x00
+    SSelectionWeakRefUserEntity* mNextOwner; // +0x04
+  };
+
+  static_assert(sizeof(SSelectionWeakRefUserEntity) == 0x08, "SSelectionWeakRefUserEntity size must be 0x08");
+  static_assert(
+    offsetof(SSelectionWeakRefUserEntity, mOwnerLinkSlot) == 0x00,
+    "SSelectionWeakRefUserEntity::mOwnerLinkSlot offset must be 0x00"
+  );
+  static_assert(
+    offsetof(SSelectionWeakRefUserEntity, mNextOwner) == 0x04,
+    "SSelectionWeakRefUserEntity::mNextOwner offset must be 0x04"
+  );
+
+  struct SSelectionNodeUserEntity
+  {
+    SSelectionNodeUserEntity* mLeft;   // +0x00
+    SSelectionNodeUserEntity* mParent; // +0x04
+    SSelectionNodeUserEntity* mRight;  // +0x08
+    std::uint32_t mKey;                // +0x0C
+    SSelectionWeakRefUserEntity mEnt;  // +0x10
+    std::uint8_t mColor;               // +0x18
+    std::uint8_t mIsSentinel;          // +0x19
+    std::uint8_t pad_1A[2];
+  };
+
+  static_assert(sizeof(SSelectionNodeUserEntity) == 0x1C, "SSelectionNodeUserEntity size must be 0x1C");
+  static_assert(
+    offsetof(SSelectionNodeUserEntity, mEnt) == 0x10, "SSelectionNodeUserEntity::mEnt offset must be 0x10"
+  );
+  static_assert(
+    offsetof(SSelectionNodeUserEntity, mIsSentinel) == 0x19,
+    "SSelectionNodeUserEntity::mIsSentinel offset must be 0x19"
+  );
+
+  struct SSelectionSetUserEntity
+  {
+    void* mAllocProxy;                 // +0x00
+    SSelectionNodeUserEntity* mHead;   // +0x04
+    std::uint32_t mSize;               // +0x08
+    std::uint32_t mSizeMirrorOrUnused; // +0x0C
+  };
+
+  static_assert(sizeof(SSelectionSetUserEntity) == 0x10, "SSelectionSetUserEntity size must be 0x10");
+  static_assert(
+    offsetof(SSelectionSetUserEntity, mHead) == 0x04, "SSelectionSetUserEntity::mHead offset must be 0x04"
+  );
+  static_assert(offsetof(SSelectionSetUserEntity, mSize) == 0x08, "SSelectionSetUserEntity::mSize offset must be 0x08");
+  static_assert(
+    offsetof(SSelectionSetUserEntity, mSizeMirrorOrUnused) == 0x0C,
+    "SSelectionSetUserEntity::mSizeMirrorOrUnused offset must be 0x0C"
+  );
 
   struct SSessionSaveData
   {
@@ -281,6 +331,15 @@ namespace moho
      * pause is holding on a tick boundary.
      */
     [[nodiscard]] float GetDelayToNextBeat() const;
+
+    /**
+     * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
+     *
+     * What it does:
+     * Walks world-session selected-entity weak-set and appends typed `UserUnit*`
+     * entries for currently live selected units.
+     */
+    void GetSelectionUnits(msvc8::vector<UserUnit*>& outUnits) const;
 
     /**
      * Address: 0x00896F00 (FUN_00896F00,
@@ -416,23 +475,24 @@ namespace moho
     int32_t FocusArmy;                                      // 0x0488
     uint8_t IsGameOver;                                     // 0x048C
     char pad_048D[19];                                      // 0x048D
-    void* selectedUnitUnknownPtr1;                          // 0x04A0
-    void* selectedUnitListPtr;                              // 0x04A4
-    int32_t selectedUnitCount1;                             // 0x04A8
-    int32_t selectedUnitCount2;                             // 0x04AC
+    SSelectionSetUserEntity mSelection;                     // 0x04A0
     char pad_04B0[4];                                       // 0x04B0
     Wm3::Vector3f CursorWorldPos;                           // 0x04B4
     char pad_04C0[8];                                       // 0x04C0
     int32_t HighlightCommandId;                             // 0x04C8
     Wm3::Vector2f CursorScreenPos;                          // 0x04CC
     bool IsCheatsEnabled;                                   // 0x04D4
-    char pad_04D5[19];                                      // 0x04D5
+    char pad_04D5[3];                                       // 0x04D5
+    msvc8::vector<msvc8::string> mOverlayFilters;           // 0x04D8
+    char pad_04E4[4];                                       // 0x04E4
     bool DisplayEconomyOverlay;                             // 0x04E8
     bool mTeamColorMode;                                    // 0x04E9
     char pad_04EA[30];                                      // 0x04EA
   };
 
-  static_assert(sizeof(CWldSession) == 0x508, "CWldSession size must be 0x508");
+  static_assert(
+    sizeof(CWldSession) >= 0x500 && sizeof(CWldSession) <= 0x540, "CWldSession size must remain in expected x86 range"
+  );
   static_assert(offsetof(CWldSession, mWldMap) == 0x1C, "CWldSession::mWldMap offset must be 0x1C");
   static_assert(offsetof(CWldSession, mLaunchInfo) == 0x20, "CWldSession::mLaunchInfo offset must be 0x20");
   static_assert(
@@ -458,6 +518,10 @@ namespace moho
     offsetof(CWldSession, mReplayIsPaused) == 0x46C, "CWldSession::mReplayIsPaused offset must be 0x46C"
   );
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
+  static_assert(offsetof(CWldSession, mSelection) == 0x4A0, "CWldSession::mSelection offset must be 0x4A0");
+  static_assert(
+    offsetof(CWldSession, mOverlayFilters) == 0x4D8, "CWldSession::mOverlayFilters offset must be 0x4D8"
+  );
 
   enum class EWldFrameAction : std::int32_t
   {

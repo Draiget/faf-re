@@ -1,5 +1,7 @@
 #include "moho/ai/IAiTransportTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/ai/IAiTransport.h"
@@ -9,6 +11,29 @@ using namespace moho;
 
 namespace
 {
+  alignas(IAiTransportTypeInfo) unsigned char gIAiTransportTypeInfoStorage[sizeof(IAiTransportTypeInfo)];
+  bool gIAiTransportTypeInfoConstructed = false;
+
+  [[nodiscard]] IAiTransportTypeInfo* AcquireIAiTransportTypeInfo()
+  {
+    if (!gIAiTransportTypeInfoConstructed) {
+      new (gIAiTransportTypeInfoStorage) IAiTransportTypeInfo();
+      gIAiTransportTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<IAiTransportTypeInfo*>(gIAiTransportTypeInfoStorage);
+  }
+
+  void cleanup_IAiTransportTypeInfo()
+  {
+    if (!gIAiTransportTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireIAiTransportTypeInfo()->~IAiTransportTypeInfo();
+    gIAiTransportTypeInfoConstructed = false;
+  }
+
   [[nodiscard]] gpg::RType* CachedBroadcasterType()
   {
     static gpg::RType* cached = nullptr;
@@ -52,4 +77,19 @@ void IAiTransportTypeInfo::Init()
   }
 
   Finish();
+}
+
+/**
+ * Address: 0x00BCEE90 (FUN_00BCEE90, register_IAiTransportTypeInfo)
+ *
+ * What it does:
+ * Registers `IAiTransport` type-info object and installs process-exit
+ * cleanup.
+ */
+int moho::register_IAiTransportTypeInfo()
+{
+  auto* const type = AcquireIAiTransportTypeInfo();
+  gpg::PreRegisterRType(typeid(IAiTransport), type);
+  IAiTransport::sType = type;
+  return std::atexit(&cleanup_IAiTransportTypeInfo);
 }

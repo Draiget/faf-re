@@ -20,6 +20,18 @@ namespace gpg::gal
         using SurfaceHandle = boost::shared_ptr<RenderTargetContext>;
         using TextureHandle = boost::shared_ptr<TextureContext>;
 
+        OutputContext();
+
+        /**
+         * Address: 0x00430160 (FUN_00430160)
+         *
+         * OutputContext const &
+         *
+         * What it does:
+         * Copies one output-context payload and retains shared-handle ownership.
+         */
+        OutputContext(const OutputContext& other);
+
         /**
          * Address: 0x008E8250 (FUN_008E8250)
          *

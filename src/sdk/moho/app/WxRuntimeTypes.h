@@ -33,10 +33,19 @@ struct wxSize
 
 static_assert(sizeof(wxSize) == 0x8, "wxSize size must be 0x8");
 
+struct wxStringRuntime;
+
 class wxWindowBase
 {
 public:
-  virtual void* GetClassInfo() const { return nullptr; }
+  /**
+   * Address: 0x0042B770 (FUN_0042B770)
+   * Mangled: ?GetClassInfo@wxWindowBase@@UBEPAVwxClassInfo@@XZ
+   *
+   * What it does:
+   * Returns the static class-info lane for wxWindowBase runtime RTTI checks.
+   */
+  virtual void* GetClassInfo() const;
   virtual void DeleteObject() {}
   virtual void* CreateRefData() const { return nullptr; }
   virtual void* CloneRefData(const void* sourceRefData) const
@@ -66,12 +75,58 @@ public:
    * Mangled: ?Destroy@wxWindowBase@@UAE_NXZ
    */
   virtual bool Destroy() { return false; }
-  virtual void SetTitle(const void* title) { (void)title; }
-  virtual void* GetTitle() const { return nullptr; }
-  virtual void SetLabel(const void* label) { (void)label; }
-  virtual void* GetLabel() const { return nullptr; }
-  virtual void SetName(const void* name) { (void)name; }
-  virtual void* GetName() const { return nullptr; }
+  /**
+   * Address: 0x0042B3E0 (FUN_0042B3E0)
+   * Mangled: ?SetTitle@wxWindowBase@@UAEXPBG@Z
+   *
+   * What it does:
+   * Base implementation accepts but ignores title updates.
+   */
+  virtual void SetTitle(const wxStringRuntime& title);
+
+  /**
+   * Address: 0x0042B3F0 (FUN_0042B3F0)
+   * Mangled: ?GetTitle@wxWindowBase@@UBE?AVwxString@@XZ
+   *
+   * What it does:
+   * Returns an empty runtime wx string for base windows.
+   */
+  [[nodiscard]] virtual wxStringRuntime GetTitle() const;
+  /**
+   * Address: 0x0042B420 (FUN_0042B420)
+   * Mangled: ?SetLabel@wxWindowBase@@UAEXABVwxString@@@Z
+   *
+   * What it does:
+   * Forwards label updates to `SetTitle`.
+   */
+  virtual void SetLabel(const wxStringRuntime& label);
+
+  /**
+   * Address: 0x0042B430 (FUN_0042B430)
+   * Mangled: ?GetLabel@wxWindowBase@@UBE?AVwxString@@XZ
+   *
+   * What it does:
+   * Forwards label reads to `GetTitle`.
+   */
+  [[nodiscard]] virtual wxStringRuntime GetLabel() const;
+
+  /**
+   * Address: 0x0042B450 (FUN_0042B450)
+   * Mangled: ?SetName@wxWindowBase@@UAEXABVwxString@@@Z
+   *
+   * What it does:
+   * Stores one runtime window-name value.
+   */
+  virtual void SetName(const wxStringRuntime& name);
+
+  /**
+   * Address: 0x0042B460 (FUN_0042B460)
+   * Mangled: ?GetName@wxWindowBase@@UBE?AVwxString@@XZ
+   *
+   * What it does:
+   * Returns the current runtime window-name value.
+   */
+  [[nodiscard]] virtual wxStringRuntime GetName() const;
   virtual void Raise() {}
   virtual void Lower() {}
   virtual wxPoint GetClientAreaOrigin() const { return wxPoint{}; }
@@ -106,16 +161,51 @@ public:
     (void)maxWidth;
     (void)maxHeight;
   }
-  virtual std::int32_t GetMinWidth() const { return 0; }
-  virtual std::int32_t GetMinHeight() const { return 0; }
-  virtual wxSize GetMaxSize() const { return wxSize{}; }
+  /**
+   * Address: 0x0042B4F0 (FUN_0042B4F0)
+   * Mangled: ?GetMinWidth@wxWindowBase@@UBEHXZ
+   */
+  [[nodiscard]] virtual std::int32_t GetMinWidth() const;
+
+  /**
+   * Address: 0x0042B500 (FUN_0042B500)
+   * Mangled: ?GetMinHeight@wxWindowBase@@UBEHXZ
+   */
+  [[nodiscard]] virtual std::int32_t GetMinHeight() const;
+
+  /**
+   * Address: 0x0042B510 (FUN_0042B510)
+   * Mangled: ?GetMaxSize@wxWindowBase@@UBE?AVwxSize@@XZ
+   */
+  [[nodiscard]] virtual wxSize GetMaxSize() const;
   virtual void DoSetVirtualSize(std::int32_t width, std::int32_t height)
   {
     (void)width;
     (void)height;
   }
   virtual wxSize DoGetVirtualSize() const { return wxSize{}; }
-  virtual wxSize GetBestVirtualSize() const { return wxSize{}; }
+
+  /**
+   * Address: 0x0042B4A0 (FUN_0042B4A0)
+   *
+   * What it does:
+   * Returns client size by forwarding to `DoGetClientSize`.
+   */
+  [[nodiscard]] wxSize GetClientSize() const;
+
+  /**
+   * Address: 0x0042B4D0 (FUN_0042B4D0)
+   *
+   * What it does:
+   * Returns best size by forwarding to `DoGetBestSize`.
+   */
+  [[nodiscard]] wxSize GetBestSize() const;
+
+  /**
+   * Address: 0x0042B530 (FUN_0042B530)
+   * Mangled: ?GetBestVirtualSize@wxWindowBase@@UBE?AVwxSize@@XZ
+   */
+  [[nodiscard]] virtual wxSize GetBestVirtualSize() const;
 
   /**
    * Address: 0x00967820
@@ -131,28 +221,81 @@ public:
     (void)enable;
     return false;
   }
-  virtual void SetWindowStyleFlag(long style) { (void)style; }
-  virtual long GetWindowStyleFlag() const { return 0; }
-  virtual bool IsRetained() const { return false; }
-  virtual void SetExtraStyle(long style) { (void)style; }
+  /**
+   * Address: 0x0042B5B0 (FUN_0042B5B0)
+   * Mangled: ?SetWindowStyleFlag@wxWindowBase@@UAEXJ@Z
+   */
+  virtual void SetWindowStyleFlag(long style);
+
+  /**
+   * Address: 0x0042B5C0 (FUN_0042B5C0)
+   * Mangled: ?GetWindowStyleFlag@wxWindowBase@@UBEJXZ
+   */
+  [[nodiscard]] virtual long GetWindowStyleFlag() const;
+
+  /**
+   * Address: 0x0042B5F0 (FUN_0042B5F0)
+   * Mangled: ?IsRetained@wxWindowBase@@UBE_NXZ
+   */
+  [[nodiscard]] virtual bool IsRetained() const;
+
+  /**
+   * Address: 0x0042B600 (FUN_0042B600)
+   * Mangled: ?SetExtraStyle@wxWindowBase@@UAEXJ@Z
+   */
+  virtual void SetExtraStyle(long style);
   virtual void MakeModal(bool modal) { (void)modal; }
-  virtual void SetThemeEnabled(bool enabled) { (void)enabled; }
-  virtual bool GetThemeEnabled() const { return false; }
+  /**
+   * Address: 0x0042B610 (FUN_0042B610)
+   * Mangled: ?SetThemeEnabled@wxWindowBase@@UAEX_N@Z
+   */
+  virtual void SetThemeEnabled(bool enabled);
+
+  /**
+   * Address: 0x0042B620 (FUN_0042B620)
+   * Mangled: ?GetThemeEnabled@wxWindowBase@@UBE_NXZ
+   */
+  [[nodiscard]] virtual bool GetThemeEnabled() const;
 
   /**
    * Address: 0x00967650
    * Mangled: ?SetFocus@wxWindow@@UAEXXZ
    */
   virtual void SetFocus() {}
-  virtual void SetFocusFromKbd() {}
-  virtual bool AcceptsFocus() const { return false; }
-  virtual bool AcceptsFocusFromKeyboard() const { return false; }
-  virtual void* GetDefaultItem() const { return nullptr; }
-  virtual void* SetDefaultItem(void* defaultItem)
-  {
-    return defaultItem;
-  }
-  virtual void SetTmpDefaultItem(void* defaultItem) { (void)defaultItem; }
+  /**
+   * Address: 0x0042B630 (FUN_0042B630)
+   * Mangled: ?SetFocusFromKbd@wxWindowBase@@UAEXXZ
+   */
+  virtual void SetFocusFromKbd();
+
+  /**
+   * Address: 0x0042B640 (FUN_0042B640)
+   * Mangled: ?AcceptsFocus@wxWindowBase@@UBE_NXZ
+   */
+  [[nodiscard]] virtual bool AcceptsFocus() const;
+
+  /**
+   * Address: 0x0042B660 (FUN_0042B660)
+   * Mangled: ?AcceptsFocusFromKeyboard@wxWindowBase@@UBE_NXZ
+   */
+  [[nodiscard]] virtual bool AcceptsFocusFromKeyboard() const;
+
+  /**
+   * Address: 0x0042B670 (FUN_0042B670)
+   * Mangled: ?GetDefaultItem@wxWindowBase@@UBEPAVwxWindow@@XZ
+   */
+  [[nodiscard]] virtual void* GetDefaultItem() const;
+  /**
+   * Address: 0x0042B680 (FUN_0042B680)
+   * Mangled: ?SetDefaultItem@wxWindowBase@@UAEPAVwxWindow@@PAV2@@Z
+   */
+  virtual void* SetDefaultItem(void* defaultItem);
+
+  /**
+   * Address: 0x0042B690 (FUN_0042B690)
+   * Mangled: ?SetTmpDefaultItem@wxWindowBase@@UAEXPAVwxWindow@@@Z
+   */
+  virtual void SetTmpDefaultItem(void* defaultItem);
   virtual bool IsTopLevel() const { return false; }
   virtual bool Reparent(wxWindowBase* parent)
   {
@@ -173,17 +316,41 @@ public:
     (void)x;
     (void)y;
   }
-  virtual bool HasCapture() const { return false; }
+  /**
+   * Address: 0x0042B6E0 (FUN_0042B6E0)
+   * Mangled: ?HasCapture@wxWindowBase@@UBE_NXZ
+   */
+  virtual bool HasCapture() const;
+
+  /**
+   * What it does:
+   * Returns the current runtime capture owner window, when tracked.
+   */
+  [[nodiscard]] static wxWindowBase* GetCapture();
+
   virtual void Refresh(bool eraseBackground, const void* updateRect)
   {
     (void)eraseBackground;
     (void)updateRect;
   }
-  virtual void Update() {}
+  /**
+   * Address: 0x0042B700 (FUN_0042B700)
+   */
+  virtual void Update();
   virtual void Clear() {}
-  virtual void Freeze() {}
-  virtual void Thaw() {}
-  virtual void PrepareDC(void* deviceContext) { (void)deviceContext; }
+  /**
+   * Address: 0x0042B710 (FUN_0042B710)
+   */
+  virtual void Freeze();
+  /**
+   * Address: 0x0042B720 (FUN_0042B720)
+   */
+  virtual void Thaw();
+  /**
+   * Address: 0x0042B730 (FUN_0042B730)
+   * Mangled: ?PrepareDC@wxWindowBase@@UAEXAAVwxDC@@@Z
+   */
+  virtual void PrepareDC(void* deviceContext);
   virtual bool SetBackgroundColour(const void* colour)
   {
     (void)colour;
@@ -271,18 +438,20 @@ public:
     (void)dy;
     (void)rect;
   }
-  virtual bool ScrollLines(std::int32_t lines)
-  {
-    (void)lines;
-    return false;
-  }
-  virtual bool ScrollPages(std::int32_t pages)
-  {
-    (void)pages;
-    return false;
-  }
-  virtual void SetDropTarget(void* dropTarget) { (void)dropTarget; }
-  virtual void* GetDropTarget() const { return nullptr; }
+  /**
+   * Address: 0x0042B740 (FUN_0042B740)
+   */
+  virtual bool ScrollLines(std::int32_t lines);
+  /**
+   * Address: 0x0042B750 (FUN_0042B750)
+   */
+  virtual bool ScrollPages(std::int32_t pages);
+  virtual void SetDropTarget(void* dropTarget);
+  /**
+   * Address: 0x0042B760 (FUN_0042B760)
+   * Mangled: ?GetDropTarget@wxWindowBase@@UBEPAVwxDropTarget@@XZ
+   */
+  virtual void* GetDropTarget() const;
   virtual void SetConstraintSizes(bool recurse) { (void)recurse; }
   virtual bool LayoutPhase1(std::int32_t* flags)
   {
@@ -388,7 +557,7 @@ public:
    * - ?DoGetClientSize@wxWindow@@MBEXPAH0@Z
    * - ?DoGetClientSize@wxFrame@@MBEXPAH0@Z
    */
-  virtual void DoGetClientSize(std::int32_t* outWidth, std::int32_t* outHeight)
+  virtual void DoGetClientSize(std::int32_t* outWidth, std::int32_t* outHeight) const
   {
     if (outWidth != nullptr) {
       *outWidth = 0;
@@ -463,11 +632,23 @@ public:
     (void)dialogId;
     return false;
   }
-  virtual bool ContainsHWND(unsigned long nativeHandle) const
-  {
-    (void)nativeHandle;
-    return false;
-  }
+  /**
+   * Address: 0x0042B830 (FUN_0042B830)
+   * Mangled: ?ContainsHWND@wxWindow@@UBE_NK@Z
+   *
+   * What it does:
+   * Base implementation reports the queried native handle as not contained.
+   */
+  virtual bool ContainsHWND(unsigned long nativeHandle) const;
+
+  /**
+   * Address: 0x0042B840 (FUN_0042B840)
+   * Mangled: ?GetClassInfo@wxWindow@@UBEPAVwxClassInfo@@XZ
+   *
+   * What it does:
+   * Returns the static class-info lane for wxWindow runtime RTTI checks.
+   */
+  [[nodiscard]] void* GetClassInfo() const override;
   virtual unsigned long MSWGetStyle(long style, unsigned long* extendedStyle) const
   {
     (void)style;
@@ -481,12 +662,15 @@ public:
     (void)notificationCode;
     return false;
   }
-  virtual void* CreateWindowFromHWND(void* parent, unsigned long nativeHandle)
-  {
-    (void)parent;
-    (void)nativeHandle;
-    return nullptr;
-  }
+  /**
+   * Address: 0x0097D080 (FUN_0097D080)
+   * Mangled: ?CreateWindowFromHWND@wxWindow@@UAEPAV1@PAV1@K@Z
+   *
+   * What it does:
+   * Adapts one native Win32 HWND into the closest recovered wx runtime
+   * control wrapper and adopts HWND-derived attributes.
+   */
+  virtual void* CreateWindowFromHWND(void* parent, unsigned long nativeHandle);
   virtual void AdoptAttributesFromHWND() {}
   virtual void SetupColours() {}
   virtual bool MSWOnScroll(
@@ -572,16 +756,39 @@ static_assert(sizeof(wxWindowMswRuntime) == 0x4, "wxWindowMswRuntime size must b
 class wxControlRuntime : public wxWindowMswRuntime
 {
 public:
+  /**
+   * Address: 0x004A3830 (FUN_004A3830)
+   * Mangled: ?Command@wxControl@@UAEXAAVwxCommandEvent@@@Z
+   *
+   * What it does:
+   * Forwards one command-event dispatch into `ProcessCommand`.
+   */
+  virtual void Command(void* commandEvent);
+
   virtual void ControlSlot131() {}
-  virtual bool MSWOnDraw(void** drawStruct)
+
+  /**
+   * Address: 0x004A3840 (FUN_004A3840)
+   * Mangled: ?MSWOnDraw@wxControl@@UAE_NPAPAX@Z
+   *
+   * What it does:
+   * Base implementation reports that no owner-draw handling was performed.
+   */
+  virtual bool MSWOnDraw(void** drawStruct);
+
+  /**
+   * Address: 0x004A3850 (FUN_004A3850)
+   * Mangled: ?MSWOnMeasure@wxControl@@UAE_NPAPAX@Z
+   *
+   * What it does:
+   * Base implementation reports that no owner-measure handling was performed.
+   */
+  virtual bool MSWOnMeasure(void** measureStruct);
+
+protected:
+  virtual void ProcessCommand(void* commandEvent)
   {
-    (void)drawStruct;
-    return false;
-  }
-  virtual bool MSWOnMeasure(void** measureStruct)
-  {
-    (void)measureStruct;
-    return false;
+    (void)commandEvent;
   }
 };
 
@@ -599,6 +806,133 @@ struct wxStringRuntime
 };
 
 static_assert(sizeof(wxStringRuntime) == 0x4, "wxStringRuntime size must be 0x4");
+
+/**
+ * Minimal recovered `wxClientData` runtime object.
+ */
+class wxClientDataRuntime
+{
+public:
+  /**
+   * Address: 0x004A3690 (FUN_004A3690)
+   * Mangled: ??0wxClientData@@QAE@@Z
+   *
+   * What it does:
+   * Constructs one `wxClientData` runtime lane.
+   */
+  wxClientDataRuntime();
+
+  virtual ~wxClientDataRuntime() = default;
+
+  /**
+   * Address: 0x004A36A0 (FUN_004A36A0)
+   *
+   * What it does:
+   * Rebinds this object to the `wxClientData` runtime vtable lane.
+   */
+  void ResetRuntimeVTable() noexcept;
+
+  /**
+   * Address: 0x004A36B0 (FUN_004A36B0)
+   *
+   * What it does:
+   * Implements the deleting-dtor thunk lane for `wxClientData`.
+   */
+  static wxClientDataRuntime* DeleteWithFlag(wxClientDataRuntime* object, std::uint8_t deleteFlags) noexcept;
+};
+
+static_assert(sizeof(wxClientDataRuntime) == 0x4, "wxClientDataRuntime size must be 0x4");
+
+/**
+ * Minimal recovered `wxImageHandler` runtime layout used by image codec startup
+ * lanes and handler registration.
+ */
+class wxImageHandlerRuntime
+{
+public:
+  /**
+   * Address: 0x0042B870 (FUN_0042B870)
+   * Mangled: ??0wxImageHandler@@QAE@@Z
+   *
+   * What it does:
+   * Initializes name/extension/mime string lanes and sets type to invalid.
+   */
+  wxImageHandlerRuntime();
+
+  /**
+   * Address: 0x0042B8F0 (FUN_0042B8F0)
+   * Mangled: ?GetClassInfo@wxImageHandler@@UBEPAVwxClassInfo@@XZ
+   *
+   * What it does:
+   * Returns the static class-info lane for wxImageHandler runtime RTTI checks.
+   */
+  [[nodiscard]] virtual void* GetClassInfo() const;
+
+  /**
+   * Address: 0x0042B920 (FUN_0042B920)
+   *
+   * What it does:
+   * Releases runtime string lanes and clears shared ref-data ownership.
+   */
+  virtual ~wxImageHandlerRuntime();
+
+protected:
+  void SetDescriptor(
+    const wchar_t* name, const wchar_t* extension, const wchar_t* mimeType, std::int32_t bitmapType
+  ) noexcept;
+
+private:
+  static void ReleaseSharedWxString(wxStringRuntime& value) noexcept;
+
+public:
+  void* mRefData = nullptr;
+  wxStringRuntime mName{};
+  wxStringRuntime mExtension{};
+  wxStringRuntime mMime{};
+  std::int32_t mType = 0;
+};
+
+static_assert(offsetof(wxImageHandlerRuntime, mRefData) == 0x4, "wxImageHandlerRuntime::mRefData offset must be 0x4");
+static_assert(offsetof(wxImageHandlerRuntime, mName) == 0x8, "wxImageHandlerRuntime::mName offset must be 0x8");
+static_assert(
+  offsetof(wxImageHandlerRuntime, mExtension) == 0xC,
+  "wxImageHandlerRuntime::mExtension offset must be 0xC"
+);
+static_assert(offsetof(wxImageHandlerRuntime, mMime) == 0x10, "wxImageHandlerRuntime::mMime offset must be 0x10");
+static_assert(offsetof(wxImageHandlerRuntime, mType) == 0x14, "wxImageHandlerRuntime::mType offset must be 0x14");
+static_assert(sizeof(wxImageHandlerRuntime) == 0x18, "wxImageHandlerRuntime size must be 0x18");
+
+class wxPngHandlerRuntime final : public wxImageHandlerRuntime
+{
+public:
+  /**
+   * Address: 0x0042B9E0 (FUN_0042B9E0)
+   * Mangled: ??0wxPNGHandler@@QAE@XZ
+   *
+   * What it does:
+   * Initializes the PNG handler descriptor (name, extension, mime, bitmap type).
+   */
+  wxPngHandlerRuntime();
+
+  /**
+   * Address: 0x0042BA50 (FUN_0042BA50)
+   * Mangled: ?GetClassInfo@wxPNGHandler@@UBEPAVwxClassInfo@@XZ
+   *
+   * What it does:
+   * Returns the static class-info lane for wxPNGHandler runtime RTTI checks.
+   */
+  [[nodiscard]] void* GetClassInfo() const override;
+
+  /**
+   * Address: 0x0042BA60 (FUN_0042BA60)
+   *
+   * What it does:
+   * Deleting-dtor thunk lane for `wxPNGHandler`; no extra teardown beyond base.
+   */
+  ~wxPngHandlerRuntime() override;
+};
+
+static_assert(sizeof(wxPngHandlerRuntime) == sizeof(wxImageHandlerRuntime), "wxPngHandlerRuntime size must stay 0x18");
 
 struct wxColourRuntime
 {
@@ -787,6 +1121,15 @@ static_assert(sizeof(wxTextCtrlRuntime) == 0x4, "wxTextCtrlRuntime size must be 
 class wxTopLevelWindowRuntime : public wxWindowMswRuntime
 {
 public:
+  /**
+   * Address: 0x004A3710 (FUN_004A3710)
+   * Mangled: ??0wxTopLevelWindowMSW@@QAE@@Z
+   *
+   * What it does:
+   * Constructs one top-level-window runtime base lane and resets fullscreen
+   * state bookkeeping.
+   */
+  wxTopLevelWindowRuntime();
 
   /**
    * Address: 0x0098C1E0 family
@@ -805,16 +1148,449 @@ public:
     (void)style;
     return false;
   }
-  virtual bool IsFullScreen() const { return false; }
-  virtual bool IsOneOfBars(const void* window) const
-  {
-    (void)window;
-    return false;
-  }
+
+  /**
+   * Address: 0x004A3770 (FUN_004A3770)
+   * Mangled: ?IsFullScreen@wxTopLevelWindowMSW@@UBE_NXZ
+   *
+   * What it does:
+   * Returns one cached fullscreen-visible flag.
+   */
+  [[nodiscard]] bool IsFullScreen() const;
+
+  /**
+   * Address: 0x004A3700 (FUN_004A3700)
+   * Mangled: ?IsOneOfBars@wxTopLevelWindowBase@@MBE_NPBVwxWindow@@@Z
+   *
+   * What it does:
+   * Base implementation reports the queried window as not one of frame bars.
+   */
+  [[nodiscard]] virtual bool IsOneOfBars(const void* window) const;
+
+  /**
+   * Address: 0x004A36F0 (FUN_004A36F0)
+   * Mangled: ?IsTopLevel@wxTopLevelWindowBase@@UBE_NXZ
+   *
+   * What it does:
+   * Reports this runtime lane as a top-level wx window.
+   */
+  [[nodiscard]] bool IsTopLevel() const override;
+
+  /**
+   * Address: 0x004A3780 (FUN_004A3780)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for top-level-window runtime
+   * lanes.
+   */
+  static wxTopLevelWindowRuntime* DeleteWithFlag(wxTopLevelWindowRuntime* object, std::uint8_t deleteFlags) noexcept;
+
+protected:
+  /**
+   * Address: 0x004A36E0 (FUN_004A36E0)
+   *
+   * What it does:
+   * Resets one top-level-window runtime flag lane.
+   */
+  void ResetTopLevelFlag34() noexcept;
 };
 
 static_assert(sizeof(wxWindowBase) == 0x4, "wxWindowBase size must be 0x4");
 static_assert(sizeof(wxTopLevelWindowRuntime) == 0x4, "wxTopLevelWindowRuntime size must be 0x4");
+
+/**
+ * Minimal recovered `wxTopLevelWindow` runtime lane used for shared class-info
+ * ownership.
+ */
+class wxTopLevelWindowRootRuntime : public wxTopLevelWindowRuntime
+{
+public:
+  /**
+   * Address: 0x004A37A0 (FUN_004A37A0)
+   * Mangled: ??0wxTopLevelWindow@@QAE@@Z
+   *
+   * What it does:
+   * Constructs one `wxTopLevelWindow` runtime layer and reapplies base
+   * top-level init.
+   */
+  wxTopLevelWindowRootRuntime();
+
+  /**
+   * Address: 0x004A3800 (FUN_004A3800)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for `wxTopLevelWindow`.
+   */
+  static wxTopLevelWindowRootRuntime* DeleteWithFlag(
+    wxTopLevelWindowRootRuntime* object,
+    std::uint8_t deleteFlags
+  ) noexcept;
+
+  /**
+   * Address: 0x004A3820 (FUN_004A3820)
+   *
+   * What it does:
+   * Runs the non-deleting top-level-window teardown thunk.
+   */
+  static wxTopLevelWindowRootRuntime* DestroyWithoutDelete(wxTopLevelWindowRootRuntime* object) noexcept;
+
+  static void* sm_classInfo[1];
+};
+
+static_assert(sizeof(wxTopLevelWindowRootRuntime) == 0x4, "wxTopLevelWindowRootRuntime size must be 0x4");
+
+/**
+ * Address: 0x004A37F0 (FUN_004A37F0)
+ * Mangled: ?GetClassInfo@wxFrameBase@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the shared class-info lane used by frame/dialog/top-level
+ * `GetClassInfo` slot-0 entries.
+ */
+[[nodiscard]] void** WX_FrameBaseGetClassInfo() noexcept;
+
+/**
+ * Address: 0x0099E8A0 (FUN_0099E8A0)
+ *
+ * What it does:
+ * Runs non-deleting frame-runtime teardown for frame-derived windows.
+ */
+[[nodiscard]] wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(wxTopLevelWindowRuntime* frame) noexcept;
+
+/**
+ * Minimal recovered runtime projection for `wxControlContainer`.
+ */
+struct wxControlContainerRuntime
+{
+  std::uint8_t mAcceptsFocusRecursion = 0;
+  std::uint8_t mPadding01To03[0x3]{};
+
+  void Initialize(bool acceptsFocusRecursion) noexcept;
+};
+
+static_assert(
+  sizeof(wxControlContainerRuntime) == 0x4,
+  "wxControlContainerRuntime size must be 0x4"
+);
+
+/**
+ * Minimal recovered `wxDialogBase` runtime view.
+ */
+class wxDialogBaseRuntime : public wxTopLevelWindowRootRuntime
+{
+public:
+  /**
+   * Address: 0x004A3860 (FUN_004A3860)
+   * Mangled: ??0wxDialogBase@@QAE@@Z
+   *
+   * What it does:
+   * Builds one dialog-base runtime lane, initializes control-container
+   * storage, then runs dialog-base init.
+   */
+  wxDialogBaseRuntime();
+
+  /**
+   * Address: 0x004A38C0 (FUN_004A38C0)
+   *
+   * What it does:
+   * Runs non-deleting teardown for dialog-base runtime lanes.
+   */
+  static wxDialogBaseRuntime* DestroyWithoutDelete(wxDialogBaseRuntime* object) noexcept;
+
+  /**
+   * Address: 0x004A38D0 (FUN_004A38D0)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for dialog-base runtime lanes.
+   */
+  static wxDialogBaseRuntime* DeleteWithFlag(wxDialogBaseRuntime* object, std::uint8_t deleteFlags) noexcept;
+
+protected:
+  void InitRuntime() noexcept;
+
+public:
+  std::uint8_t mUnknown004To157[0x154]{};
+  wxControlContainerRuntime mControlContainer{};
+};
+
+static_assert(
+  offsetof(wxDialogBaseRuntime, mControlContainer) == 0x158,
+  "wxDialogBaseRuntime::mControlContainer offset must be 0x158"
+);
+
+/**
+ * Minimal recovered `wxDialog` runtime view.
+ */
+class wxDialogRuntime : public wxDialogBaseRuntime
+{
+public:
+  /**
+   * Address: 0x004A3900 (FUN_004A3900)
+   * Mangled: ??0wxDialog@@QAE@PAVwxWindow@@HABVwxString@@ABVwxPoint@@ABVwxSize@@J1@Z
+   *
+   * What it does:
+   * Builds one dialog runtime lane, then applies create/init arguments.
+   */
+  wxDialogRuntime(
+    void* parentWindow,
+    std::int32_t windowId,
+    const wxStringRuntime& title,
+    const wxPoint& position,
+    const wxSize& size,
+    long style,
+    const wxStringRuntime& name
+  );
+
+  /**
+   * Address: 0x004A3970 (FUN_004A3970)
+   * Mangled: ?GetClassInfo@wxDialog@@UBEPAVwxClassInfo@@XZ
+   *
+   * What it does:
+   * Returns the static class-info lane for dialog runtime RTTI checks.
+   */
+  [[nodiscard]] void* GetClassInfo() const override;
+
+  /**
+   * Address: 0x004A3980 (FUN_004A3980)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for dialog runtime lanes.
+   */
+  static wxDialogRuntime* DeleteWithFlag(wxDialogRuntime* object, std::uint8_t deleteFlags) noexcept;
+
+  static void* sm_classInfo[1];
+
+  std::uint8_t mUnknown15CTo16F[0x14]{};
+};
+
+static_assert(sizeof(wxDialogRuntime) == 0x170, "wxDialogRuntime size must be 0x170");
+
+/**
+ * Minimal recovered `wxTreeItemId` runtime value wrapper.
+ */
+struct wxTreeItemIdRuntime
+{
+  /**
+   * Address: 0x004A39A0 (FUN_004A39A0)
+   *
+   * What it does:
+   * Clears this item-id to the null value.
+   */
+  void Reset() noexcept;
+
+  /**
+   * Address: 0x004A39B0 (FUN_004A39B0)
+   *
+   * What it does:
+   * Reports whether this item-id currently references a valid node.
+   */
+  [[nodiscard]] bool IsValid() const noexcept;
+
+  void* mNode = nullptr;
+};
+
+static_assert(sizeof(wxTreeItemIdRuntime) == 0x4, "wxTreeItemIdRuntime size must be 0x4");
+
+/**
+ * Minimal recovered `wxTreeItemData` runtime payload lane.
+ */
+class wxTreeItemDataRuntime : public wxClientDataRuntime
+{
+public:
+  /**
+   * Address: 0x004A39C0 (FUN_004A39C0)
+   *
+   * What it does:
+   * Constructs one tree-item payload lane with null item data.
+   */
+  wxTreeItemDataRuntime();
+
+  /**
+   * Address: 0x004A39D0 (FUN_004A39D0)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for tree-item payload lanes.
+   */
+  static wxTreeItemDataRuntime* DeleteWithFlag(wxTreeItemDataRuntime* object, std::uint8_t deleteFlags) noexcept;
+
+protected:
+  /**
+   * Address: 0x004A39F0 (FUN_004A39F0)
+   *
+   * What it does:
+   * Rebinds this object to the `wxClientData` base vtable lane.
+   */
+  void ResetClientDataBaseVTable() noexcept;
+
+public:
+  void* mPayload = nullptr;
+};
+
+static_assert(offsetof(wxTreeItemDataRuntime, mPayload) == 0x4, "wxTreeItemDataRuntime::mPayload offset must be 0x4");
+static_assert(sizeof(wxTreeItemDataRuntime) == 0x8, "wxTreeItemDataRuntime size must be 0x8");
+
+/**
+ * Minimal recovered `wxTreeListColumnInfo` runtime projection.
+ */
+class wxTreeListColumnInfoRuntime
+{
+public:
+  /**
+   * Address: 0x004A3A30 (FUN_004A3A30)
+   *
+   * What it does:
+   * Initializes one tree-list column descriptor from title/width/align and
+   * owner lane arguments.
+   */
+  wxTreeListColumnInfoRuntime(
+    const wxStringRuntime& title,
+    std::int32_t width,
+    void* ownerTreeControl,
+    std::uint8_t shown,
+    std::uint8_t alignment,
+    std::int32_t userData
+  );
+
+  /**
+   * Address: 0x004A3AC0 (FUN_004A3AC0)
+   *
+   * What it does:
+   * Runs non-deleting teardown for one tree-list column descriptor lane.
+   */
+  void DestroyWithoutDelete() noexcept;
+
+  /**
+   * Address: 0x004A3B30 (FUN_004A3B30)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for tree-list column descriptors.
+   */
+  static wxTreeListColumnInfoRuntime* DeleteWithFlag(
+    wxTreeListColumnInfoRuntime* object,
+    std::uint8_t deleteFlags
+  ) noexcept;
+
+  virtual ~wxTreeListColumnInfoRuntime() = default;
+
+  void* mRefData = nullptr;
+  std::uint8_t mShown = 0;
+  std::uint8_t mAlignment = 0;
+  std::uint8_t mPadding0A = 0;
+  std::uint8_t mPadding0B = 0;
+  std::int32_t mUserData = 0;
+  wxStringRuntime mText{};
+  std::int32_t mWidth = -1;
+  std::int32_t mImageIndex = -1;
+  void* mOwnerTreeControl = nullptr;
+};
+
+static_assert(
+  offsetof(wxTreeListColumnInfoRuntime, mRefData) == 0x4,
+  "wxTreeListColumnInfoRuntime::mRefData offset must be 0x4"
+);
+static_assert(
+  offsetof(wxTreeListColumnInfoRuntime, mText) == 0x10,
+  "wxTreeListColumnInfoRuntime::mText offset must be 0x10"
+);
+static_assert(
+  offsetof(wxTreeListColumnInfoRuntime, mWidth) == 0x14,
+  "wxTreeListColumnInfoRuntime::mWidth offset must be 0x14"
+);
+static_assert(
+  offsetof(wxTreeListColumnInfoRuntime, mImageIndex) == 0x18,
+  "wxTreeListColumnInfoRuntime::mImageIndex offset must be 0x18"
+);
+static_assert(
+  offsetof(wxTreeListColumnInfoRuntime, mOwnerTreeControl) == 0x1C,
+  "wxTreeListColumnInfoRuntime::mOwnerTreeControl offset must be 0x1C"
+);
+static_assert(sizeof(wxTreeListColumnInfoRuntime) == 0x20, "wxTreeListColumnInfoRuntime size must be 0x20");
+
+/**
+ * Minimal recovered `wxTreeListCtrl` runtime projection.
+ */
+class wxTreeListCtrlRuntime : public wxControlRuntime
+{
+public:
+  /**
+   * Address: 0x004A3B50 (FUN_004A3B50)
+   * Mangled: ??0wxTreeListCtrl@@QAE@PAVwxWindow@@HABVwxPoint@@ABVwxSize@@JABVwxValidator@@ABVwxString@@@Z
+   *
+   * What it does:
+   * Initializes one tree-list control runtime lane with parent/style/name
+   * creation arguments.
+   */
+  wxTreeListCtrlRuntime(
+    wxWindowBase* parentWindow,
+    std::int32_t windowId,
+    const wxPoint& position,
+    const wxSize& size,
+    long style,
+    const wxStringRuntime& name
+  );
+
+  /**
+   * Address: 0x004A3BD0 (FUN_004A3BD0)
+   *
+   * What it does:
+   * Runs non-deleting teardown for one tree-list control runtime lane.
+   */
+  static wxTreeListCtrlRuntime* DestroyWithoutDelete(wxTreeListCtrlRuntime* object) noexcept;
+
+  /**
+   * Address: 0x004A3BE0 (FUN_004A3BE0)
+   * Mangled: ?AddColumn@wxTreeListCtrl@@QAEXABVwxString@@I_NW4wxTreeListColumnAlign@@@Z
+   *
+   * What it does:
+   * Appends one tree-list column descriptor to this control.
+   */
+  void AddColumn(const wxStringRuntime& title, std::uint32_t width, bool shown, std::uint8_t alignment = 0);
+
+  /**
+   * Address: 0x004A3C50 (FUN_004A3C50)
+   * Mangled: ?GetWindowStyleFlag@wxTreeListCtrl@@UBEJXZ
+   *
+   * What it does:
+   * Returns the cached window-style flags for this tree-list control.
+   */
+  [[nodiscard]] long GetWindowStyleFlag() const override;
+
+  /**
+   * Address: 0x004A3C70 (FUN_004A3C70)
+   * Mangled: ?GetClassInfo@wxTreeListCtrl@@UBEPAVwxClassInfo@@XZ
+   *
+   * What it does:
+   * Returns the static class-info lane for tree-list runtime RTTI checks.
+   */
+  [[nodiscard]] void* GetClassInfo() const override;
+
+  /**
+   * Address: 0x004A3C80 (FUN_004A3C80)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for tree-list control runtime
+   * lanes.
+   */
+  static wxTreeListCtrlRuntime* DeleteWithFlag(wxTreeListCtrlRuntime* object, std::uint8_t deleteFlags) noexcept;
+
+  [[nodiscard]] wxTreeItemIdRuntime AddRoot(const wxStringRuntime& text);
+  [[nodiscard]] wxTreeItemIdRuntime AppendItem(const wxTreeItemIdRuntime& parentItem, const wxStringRuntime& text);
+  void Expand(const wxTreeItemIdRuntime& item) noexcept;
+  void Collapse(const wxTreeItemIdRuntime& item) noexcept;
+  [[nodiscard]] bool IsExpanded(const wxTreeItemIdRuntime& item) const noexcept;
+  [[nodiscard]] bool HasChildren(const wxTreeItemIdRuntime& item) const noexcept;
+  void SortChildren(const wxTreeItemIdRuntime& item);
+  void SetItemData(const wxTreeItemIdRuntime& item, wxTreeItemDataRuntime* itemData);
+  [[nodiscard]] wxTreeItemDataRuntime* GetItemData(const wxTreeItemIdRuntime& item) const noexcept;
+  void SetItemHasChildren(const wxTreeItemIdRuntime& item, bool hasChildren) noexcept;
+  void SetItemText(const wxTreeItemIdRuntime& item, std::uint32_t column, const wxStringRuntime& text);
+
+  static void* sm_classInfo[1];
+
+  std::uint8_t mUnknown04To13F[0x13C]{};
+};
+
+static_assert(sizeof(wxTreeListCtrlRuntime) == 0x140, "wxTreeListCtrlRuntime size must be 0x140");
 
 class wxApp
 {
@@ -1002,6 +1778,17 @@ extern wxApp* wxTheApp;
 class WSupComFrame : public wxTopLevelWindowRuntime
 {
 public:
+  /**
+   * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
+   * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
+   *
+   * What it does:
+   * Handles SupCom frame resize/maximize/app-activation/system-command
+   * routing, updates persisted window prefs, and forwards unhandled messages
+   * to base frame dispatch.
+   */
+  long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam) override;
+
   std::uint8_t mUnknown004To178[0x175];
   std::uint8_t mPendingMaximizeSync;
   std::uint8_t mPersistedMaximizeSync;
@@ -1037,6 +1824,15 @@ static_assert(sizeof(WSupComFrame) == 0x17C, "WSupComFrame size must be 0x17C");
 class wxEventRuntime
 {
 public:
+  /**
+   * Address: 0x00978FF0 (FUN_00978FF0, ??0wxEvent@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes core wxEvent runtime lanes (`type`, `id`, object/ref pointers,
+   * timestamp, skip flag, callback user-data, and command-event flag).
+   */
+  explicit wxEventRuntime(std::int32_t eventId = 0, std::int32_t eventType = 0);
+
   virtual void* GetClassInfo() const { return nullptr; }
   virtual void DeleteObject() {}
   virtual void* CreateRefData() const { return nullptr; }
@@ -1074,6 +1870,110 @@ static_assert(
   "wxEventRuntime::mIsCommandEvent offset must be 0x1D"
 );
 static_assert(sizeof(wxEventRuntime) == 0x20, "wxEventRuntime size must be 0x20");
+
+/**
+ * Minimal recovered `wxCommandEvent` runtime projection.
+ *
+ * Evidence:
+ * - `FUN_00979090` constructor writes one `wxString` lane at `+0x20` and
+ *   clears command/client payload lanes (`+0x24..+0x30`).
+ * - `FUN_006609B0` releases shared `mCommandString` storage then runs the
+ *   `wxEvent::UnRef` tail.
+ */
+class wxCommandEventRuntime : public wxEventRuntime
+{
+public:
+  /**
+   * Address: 0x00979090 (FUN_00979090, ??0wxCommandEvent@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes command-event payload lanes and marks this event as a command
+   * event.
+   */
+  explicit wxCommandEventRuntime(std::int32_t commandType = 0, std::int32_t eventId = 0);
+
+  /**
+   * Address: 0x006609B0 (FUN_006609B0, ??1wxCommandEvent@@QAE@@Z)
+   *
+   * What it does:
+   * Releases one shared command-string payload and clears wxEvent ref-data
+   * ownership via the base unref tail.
+   */
+  ~wxCommandEventRuntime();
+
+  wxStringRuntime mCommandString{};
+  std::int32_t mCommandInt = 0;
+  std::int32_t mExtraLong = 0;
+  void* mClientData = nullptr;
+  wxClientDataRuntime* mClientObject = nullptr;
+};
+
+static_assert(
+  offsetof(wxCommandEventRuntime, mCommandString) == 0x20,
+  "wxCommandEventRuntime::mCommandString offset must be 0x20"
+);
+static_assert(
+  offsetof(wxCommandEventRuntime, mCommandInt) == 0x24,
+  "wxCommandEventRuntime::mCommandInt offset must be 0x24"
+);
+static_assert(
+  offsetof(wxCommandEventRuntime, mExtraLong) == 0x28,
+  "wxCommandEventRuntime::mExtraLong offset must be 0x28"
+);
+static_assert(
+  offsetof(wxCommandEventRuntime, mClientData) == 0x2C,
+  "wxCommandEventRuntime::mClientData offset must be 0x2C"
+);
+static_assert(
+  offsetof(wxCommandEventRuntime, mClientObject) == 0x30,
+  "wxCommandEventRuntime::mClientObject offset must be 0x30"
+);
+static_assert(sizeof(wxCommandEventRuntime) == 0x34, "wxCommandEventRuntime size must be 0x34");
+
+/**
+ * Minimal recovered `wxTreeEvent` runtime projection.
+ */
+class wxTreeEventRuntime : public wxEventRuntime
+{
+public:
+  /**
+   * Address: 0x004A3A00 (FUN_004A3A00)
+   *
+   * What it does:
+   * Copies the primary tree-item-id lane into `outItem`.
+   */
+  void GetItem(wxTreeItemIdRuntime* outItem) const noexcept;
+
+  /**
+   * Address: 0x004A3A10 (FUN_004A3A10)
+   *
+   * What it does:
+   * Returns the label storage lane for this tree event.
+   */
+  [[nodiscard]] wxStringRuntime* GetLabelStorage() noexcept;
+
+  /**
+   * Address: 0x004A3A20 (FUN_004A3A20)
+   *
+   * What it does:
+   * Returns the edit-cancelled flag lane for this tree event.
+   */
+  [[nodiscard]] bool IsEditCancelled() const noexcept;
+
+  std::uint8_t mUnknown20To73[0x54]{};
+  wxTreeItemIdRuntime mItem{};
+  wxTreeItemIdRuntime mPreviousItem{};
+  wxPoint mDragPoint{};
+  wxStringRuntime mLabel{};
+  std::uint8_t mEditCancelled = 0;
+};
+
+static_assert(offsetof(wxTreeEventRuntime, mItem) == 0x74, "wxTreeEventRuntime::mItem offset must be 0x74");
+static_assert(offsetof(wxTreeEventRuntime, mLabel) == 0x84, "wxTreeEventRuntime::mLabel offset must be 0x84");
+static_assert(
+  offsetof(wxTreeEventRuntime, mEditCancelled) == 0x88,
+  "wxTreeEventRuntime::mEditCancelled offset must be 0x88"
+);
 
 namespace moho
 {
@@ -1420,12 +2320,15 @@ namespace moho
    * - `CScApp::CreateAppFrame` (0x008CF8C0) reads `viewport->m_parent`
    *   before calling `GetHandle()` on both parent and viewport.
    */
-  struct WRenViewport : wxWindowBase
+  struct WRenViewport : wxWindowMswRuntime
   {
-    std::uint8_t mUnknown04To2B[0x28];
+    std::uint8_t mUnknown04To1C[0x19];
+    std::uint8_t mEnabled = 0;
+    std::uint8_t mUnknown1ETo2B[0x0E];
     wxWindowBase* m_parent;
   };
 
+  static_assert(offsetof(WRenViewport, mEnabled) == 0x1D, "moho::WRenViewport::mEnabled offset must be 0x1D");
   static_assert(offsetof(WRenViewport, m_parent) == 0x2C, "moho::WRenViewport::m_parent offset must be 0x2C");
 
   struct wxPaintEventRuntime
@@ -1435,13 +2338,125 @@ namespace moho
 
   static_assert(sizeof(wxPaintEventRuntime) == 0x24, "moho::wxPaintEventRuntime size must be 0x24");
 
+  struct wxDCRuntime
+  {
+    explicit wxDCRuntime(wxWindowBase* ownerWindow) noexcept;
+
+    void SetBrush(const void* brushToken) noexcept;
+    void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept;
+    void DoDrawRectangle(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height) noexcept;
+
+  private:
+    wxWindowBase* mOwnerWindow = nullptr;
+    const void* mActiveBrush = nullptr;
+  };
+
+  struct wxPaintDCRuntime : wxDCRuntime
+  {
+    explicit wxPaintDCRuntime(wxWindowBase* ownerWindow) noexcept;
+    ~wxPaintDCRuntime();
+  };
+
+  struct WPreviewImageRuntime
+  {
+    void* lane0 = nullptr;
+    void* lane1 = nullptr;
+  };
+
+  static_assert(sizeof(WPreviewImageRuntime) == 0x8, "moho::WPreviewImageRuntime size must be 0x8");
+
   struct WD3DViewport : WRenViewport
   {
     /**
+     * Address: 0x00430980 (FUN_00430980)
+     * Mangled:
+     * ??0WD3DViewport@Moho@@QAE@PAVwxWindow@@VStrArg@gpg@@ABVwxPoint@@ABVwxSize@@@Z
+     *
+     * What it does:
+     * Initializes viewport runtime ownership from parent/title/size startup
+     * lanes and clears retained D3D-device reference storage.
+     */
+    WD3DViewport(wxWindowBase* parentWindow, const char* title, const wxPoint& position, const wxSize& size);
+
+    /**
+     * Address: 0x00430970 (FUN_00430970)
+     * Mangled: ?GetEventTable@WD3DViewport@Moho@@MBEPBUwxEventTable@@XZ
+     *
+     * What it does:
+     * Returns the static event-table lane for this viewport runtime type.
+     */
+    [[nodiscard]] const void* GetEventTable() const override;
+
+    /**
+     * Address: 0x0042BA90 (FUN_0042BA90)
+     * Mangled: ??1WD3DViewport@Moho@@UAE@XZ
+     *
+     * What it does:
+     * Releases one held D3D-device reference before base window teardown.
+     */
+    virtual ~WD3DViewport();
+
+    /**
+     * Address: 0x0042BAF0 (FUN_0042BAF0)
+     */
+    virtual void D3DWindowOnDeviceInit();
+
+    /**
+     * Address: 0x0042BB00 (FUN_0042BB00)
+     */
+    virtual void D3DWindowOnDeviceRender();
+
+    /**
+     * Address: 0x0042BB10 (FUN_0042BB10)
+     */
+    virtual void D3DWindowOnDeviceExit();
+
+    /**
+     * Address: 0x0042BB20 (FUN_0042BB20)
+     */
+    virtual void RenderPreviewImage();
+
+    /**
+     * Address: 0x0042BB30 (FUN_0042BB30)
+     */
+    [[nodiscard]] virtual WPreviewImageRuntime GetPreviewImage() const;
+
+    /**
+     * Address: 0x0042BB50 (FUN_0042BB50)
+     */
+    [[nodiscard]] virtual void* GetPrimBatcher() const;
+
+    /**
      * Address: 0x00430AC0
      * Mangled: ?OnPaint@WD3DViewport@Moho@@QAEXAAVwxPaintEvent@@@Z
+     *
+     * What it does:
+     * Builds one paint-DC for this viewport, then either paints via active
+     * D3D device path or draws fallback background.
      */
     void OnPaint(wxPaintEventRuntime& paintEvent);
+
+    /**
+     * Address: 0x00430A60 (FUN_00430A60)
+     * Mangled: ?DrawBackgroundImage@WD3DViewport@Moho@@AAEXAAVwxDC@@@Z
+     *
+     * What it does:
+     * Draws a solid black background over the viewport DC extents.
+     */
+    void DrawBackgroundImage(wxDCRuntime& deviceContext);
+
+    /**
+     * Address: 0x00430B90 (FUN_00430B90)
+     * Mangled: ?MSWWindowProc@WD3DViewport@Moho@@UAEJIIJ@Z
+     *
+     * What it does:
+     * Handles cursor message routing for D3D cursor ownership and forwards
+     * unhandled messages to base wx window dispatch.
+     */
+    long MSWWindowProc(unsigned int message, unsigned int wParam, long lParam) override;
+
+    static void* sm_eventTable[1];
+    void* mD3DDevice = nullptr;
   };
 
   /**

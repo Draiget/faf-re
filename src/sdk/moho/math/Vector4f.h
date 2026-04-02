@@ -2,6 +2,7 @@
 
 #include "Angle.h"
 #include "platform/Platform.h"
+#include <cstdint>
 #include <cmath>
 
 // --- Feature switches ---
@@ -32,6 +33,66 @@ namespace moho
   struct Vector4f
   {
     float x{}, y{}, z{}, w{};
+
+    Vector4f() noexcept = default;
+
+    /**
+     * Address: 0x0046FAB0 (FUN_0046FAB0, Moho::Vector4f::Vector4f)
+     *
+     * float,float,float,float
+     *
+     * What it does:
+     * Initializes all four scalar lanes in-order.
+     */
+    Vector4f(float xValue, float yValue, float zValue, float wValue) noexcept;
+
+    /**
+     * Address: 0x0046FAE0 (FUN_0046FAE0, Moho::Vector4f::operator[])
+     *
+     * What it does:
+     * Returns one scalar lane by unchecked index.
+     */
+    [[nodiscard]] float operator[](std::uint32_t index) const noexcept;
+
+    /**
+     * Address: 0x0046FAF0 (FUN_0046FAF0, Moho::Vector4f::X)
+     *
+     * What it does:
+     * Returns x lane.
+     */
+    [[nodiscard]] float X() const noexcept;
+
+    /**
+     * Address: 0x0046FB00 (FUN_0046FB00, Moho::Vector4f::Y)
+     *
+     * What it does:
+     * Returns y lane.
+     */
+    [[nodiscard]] float Y() const noexcept;
+
+    /**
+     * Address: 0x0046FB10 (FUN_0046FB10, Moho::Vector4f::Z)
+     *
+     * What it does:
+     * Returns z lane.
+     */
+    [[nodiscard]] float Z() const noexcept;
+
+    /**
+     * Address: 0x0046FB20 (FUN_0046FB20, Moho::Vector4f::operator=)
+     *
+     * What it does:
+     * Copies all four scalar lanes from rhs.
+     */
+    Vector4f& operator=(const Vector4f& rhs) noexcept;
+
+    /**
+     * Address: 0x0046FB40 (FUN_0046FB40, Moho::Vector4f::operator*=)
+     *
+     * What it does:
+     * Multiplies all scalar lanes by one uniform scalar.
+     */
+    Vector4f& operator*=(float scalar) noexcept;
 
 #if MOHO_USE_SSE2
     // Unaligned load/store keeps ABI alignment at 4 bytes.

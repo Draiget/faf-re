@@ -80,6 +80,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x0043F850 (FUN_0043F850)
+   *
+   * What it does:
+   * Returns true when retained index-buffer context type equals static token `1`.
+   */
+  bool CD3DIndexSheet::IsStaticBufferType() const
+  {
+    return mBuffer.get()->GetContextBuffer()->type_ == kIndexContextTypeStatic;
+  }
+
+  /**
    * Address: 0x0043F890 (FUN_0043F890)
    *
    * What it does:
@@ -87,7 +98,7 @@ namespace moho
    */
   bool CD3DIndexSheet::Func3()
   {
-    return mBuffer.get()->GetContextBuffer()->type_ != kIndexContextTypeStatic;
+    return !IsStaticBufferType();
   }
 
   /**

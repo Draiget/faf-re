@@ -25,6 +25,38 @@ namespace moho
     return sType;
   }
 
+  /**
+   * Address: 0x00703EA0 (FUN_00703EA0, Moho::SimArmy::MemberDeserialize)
+   */
+  void SimArmy::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    IArmy* const base = this ? static_cast<IArmy*>(this) : nullptr;
+    gpg::RType* type = IArmy::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(IArmy));
+      IArmy::sType = type;
+    }
+
+    gpg::RRef owner{};
+    archive->Read(type, base, owner);
+  }
+
+  /**
+   * Address: 0x00703EF0 (FUN_00703EF0, Moho::SimArmy::MemberSerialize)
+   */
+  void SimArmy::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const IArmy* const base = this ? static_cast<const IArmy*>(this) : nullptr;
+    gpg::RType* type = IArmy::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(IArmy));
+      IArmy::sType = type;
+    }
+
+    gpg::RRef owner{};
+    archive->Write(type, base, owner);
+  }
+
   IArmy::~IArmy() = default;
 
   /**

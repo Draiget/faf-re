@@ -10,6 +10,9 @@
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/script/CScriptObject.h"
 #include "wm3/Vector2.h"
+#include "wm3/Vector3.h"
+
+struct lua_State;
 
 namespace LuaPlus
 {
@@ -20,8 +23,10 @@ namespace moho
 {
   class CArmyImpl;
   class CAiPersonality;
+  class CScrLuaInitForm;
   class CTaskStage;
   class Sim;
+  class Unit;
 
   struct SBuildResourceInfoLink
   {
@@ -74,6 +79,17 @@ namespace moho
     offsetof(SBuildStructurePositionMap, mSize) == 0x08, "SBuildStructurePositionMap::mSize offset must be 0x08"
   );
 
+  struct SAiAttackVectorDebug
+  {
+    Wm3::Vector3f mOrigin;     // +0x00
+    Wm3::Vector3f mDirection;  // +0x0C
+  };
+  static_assert(sizeof(SAiAttackVectorDebug) == 0x18, "SAiAttackVectorDebug size must be 0x18");
+  static_assert(offsetof(SAiAttackVectorDebug, mOrigin) == 0x00, "SAiAttackVectorDebug::mOrigin offset must be 0x00");
+  static_assert(
+    offsetof(SAiAttackVectorDebug, mDirection) == 0x0C, "SAiAttackVectorDebug::mDirection offset must be 0x0C"
+  );
+
   /**
    * VFTABLE: 0x00E19900
    * COL:  0x00E6EA10
@@ -114,6 +130,23 @@ namespace moho
      */
     ~CAiBrain() override;
 
+    /**
+     * Address: 0x0057A6D0 (FUN_0057A6D0, Moho::CAiBrain::CanBuildUnit)
+     *
+     * What it does:
+     * Resolves a unit blueprint id through active sim rules and tests whether
+     * `builder` can construct that blueprint under current build restrictions.
+     */
+    static bool CanBuildUnit(const char* blueprintId, CAiBrain* brain, Unit* builder);
+
+    /**
+     * Address: 0x0057BAA0 (FUN_0057BAA0, Moho::CAiBrain::DrawDebug)
+     *
+     * What it does:
+     * Draws AI debug grid lines and per-attack-vector direction markers.
+     */
+    static CAiBrain* DrawDebug(CAiBrain* brain);
+
   public:
     static gpg::RType* sType;
 
@@ -121,7 +154,7 @@ namespace moho
     CArmyImpl* mCurrentEnemy;                      // +0x38
     CAiPersonality* mPersonality;                  // +0x3C
     msvc8::string mCurrentPlan;                    // +0x40
-    msvc8::vector<std::uint8_t> mAttackVectors;    // +0x5C
+    msvc8::vector<SAiAttackVectorDebug> mAttackVectors; // +0x5C
     std::uint32_t mAttackVectorMeta6C;             // +0x6C (unknown; written/used outside recovered scope)
     CategoryWordRangeView mBuildCategoryRange;     // +0x70
     SBuildStructurePositionMap mBuildStructureMap; // +0x98
@@ -152,6 +185,14 @@ namespace moho
     offsetof(CAiBrain, mReservedThreadStage) == 0xB0, "CAiBrain::mReservedThreadStage offset must be 0xB0"
   );
   static_assert(offsetof(CAiBrain, mTailWord) == 0xB4, "CAiBrain::mTailWord offset must be 0xB4");
+
+  /**
+   * Address: 0x00BCB4B0 (FUN_00BCB4B0, sub_BCB4B0)
+   *
+   * What it does:
+   * Allocates the next Lua metatable-factory object index for the CAiBrain startup lane.
+   */
+  int register_CScrLuaMetatableFactory_CAiBrain_Index();
 } // namespace moho
 
 /**
@@ -375,6 +416,174 @@ using CAiBrainBuildUnit_LuaFuncDef = ::moho::CScrLuaBinder;
  * COL:  0x00E6F498
  */
 using CAiBrainIsAnyEngineerBuilding_LuaFuncDef = ::moho::CScrLuaBinder;
+
+namespace moho
+{
+  /**
+   * Address: 0x005883E0 (FUN_005883E0, cfunc_CAiBrainGiveStorage)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGiveStorageL`.
+   */
+  int cfunc_CAiBrainGiveStorage(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588400 (FUN_00588400, func_CAiBrainGiveStorage_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GiveStorage(type,amount)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGiveStorage_LuaFuncDef();
+
+  /**
+   * Address: 0x00588460 (FUN_00588460, cfunc_CAiBrainGiveStorageL)
+   *
+   * What it does:
+   * Replaces one economy extra-storage lane (`ENERGY` or `MASS`) with `amount`
+   * after decoding `(brain, resourceType, amount)` from Lua.
+   */
+  int cfunc_CAiBrainGiveStorageL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00588660 (FUN_00588660, cfunc_CAiBrainTakeResourceL)
+   *
+   * What it does:
+   * Removes up to `amount` from the selected stored economy resource and
+   * returns the actually removed value.
+   */
+  int cfunc_CAiBrainTakeResourceL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005889A0 (FUN_005889A0, cfunc_CAiBrainFindUnit)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainFindUnitL`.
+   */
+  int cfunc_CAiBrainFindUnit(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588A20 (FUN_00588A20, cfunc_CAiBrainFindUnitL)
+   *
+   * What it does:
+   * Returns the first live army unit matching category arg #2, optionally
+   * requiring idle-state when arg #3 is true.
+   */
+  int cfunc_CAiBrainFindUnitL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005889C0 (FUN_005889C0, func_CAiBrainFindUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:FindUnit(unitCategory, needToBeIdle)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainFindUnit_LuaFuncDef();
+
+  /**
+   * Address: 0x00588EB0 (FUN_00588EB0, cfunc_CAiBrainFindUnitToUpgrade)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainFindUnitToUpgradeL`.
+   */
+  int cfunc_CAiBrainFindUnitToUpgrade(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588F30 (FUN_00588F30, cfunc_CAiBrainFindUnitToUpgradeL)
+   *
+   * What it does:
+   * Scans one `(fromBlueprintId, toBlueprintId)` candidate list and returns the
+   * first eligible unit Lua object plus the upgrade blueprint id.
+   */
+  int cfunc_CAiBrainFindUnitToUpgradeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00588ED0 (FUN_00588ED0, func_CAiBrainFindUnitToUpgrade_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:FindUnitToUpgrade(upgradeList)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainFindUnitToUpgrade_LuaFuncDef();
+
+  /**
+   * Address: 0x00589380 (FUN_00589380, cfunc_CAiBrainDecideWhatToBuild)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainDecideWhatToBuildL`.
+   */
+  int cfunc_CAiBrainDecideWhatToBuild(lua_State* luaContext);
+
+  /**
+   * Address: 0x00589400 (FUN_00589400, cfunc_CAiBrainDecideWhatToBuildL)
+   *
+   * What it does:
+   * Selects and returns the first buildable blueprint id from a typed
+   * candidate table (`buildingTypes`) for the requested builder/type pair.
+   */
+  int cfunc_CAiBrainDecideWhatToBuildL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005893A0 (FUN_005893A0, func_CAiBrainDecideWhatToBuild_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:DecideWhatToBuild(builder, type, buildingTypes)`
+   * Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainDecideWhatToBuild_LuaFuncDef();
+
+  /**
+   * Address: 0x0058B610 (FUN_0058B610, cfunc_CAiBrainBuildStructure)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainBuildStructureL`.
+   */
+  int cfunc_CAiBrainBuildStructure(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058B690 (FUN_0058B690, cfunc_CAiBrainBuildStructureL)
+   *
+   * What it does:
+   * Orders one structure build from `(brain, builder, blueprintId, locationInfo,
+   * [relativeToArmyStart])` and schedules build-structure bookkeeping.
+   */
+  int cfunc_CAiBrainBuildStructureL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058B630 (FUN_0058B630, func_CAiBrainBuildStructure_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:BuildStructure(builder, structureName, locationInfo)`
+   * Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainBuildStructure_LuaFuncDef();
+
+  /**
+   * Address: 0x0058CA40 (FUN_0058CA40, cfunc_CAiBrainIsAnyEngineerBuilding)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainIsAnyEngineerBuildingL`.
+   */
+  int cfunc_CAiBrainIsAnyEngineerBuilding(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058CAC0 (FUN_0058CAC0, cfunc_CAiBrainIsAnyEngineerBuildingL)
+   *
+   * What it does:
+   * Returns whether any engineer currently in a build state has a blueprint
+   * that matches the requested category set.
+   */
+  int cfunc_CAiBrainIsAnyEngineerBuildingL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058CA60 (FUN_0058CA60, func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:IsAnyEngineerBuilding(category)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef();
+} // namespace moho
 
 /**
  * VFTABLE: 0x00E1B084

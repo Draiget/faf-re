@@ -368,6 +368,14 @@ namespace gpg
         }
     }
 
+    /**
+     * Address: 0x00937C00 (FUN_00937C00, gpg::LogMessage)
+     *
+     * What it does:
+     * Dispatches one preformatted log line at a requested severity.
+     */
+    void LogMessage(LogSeverity level, const msvc8::string& message);
+
     // ReSharper disable once IdentifierTypo
     /**
      * Printf-style logging helper (info severity).
@@ -418,5 +426,11 @@ namespace gpg
 
     FILETIME FileTimeLocal();
 
+    /**
+     * Address: 0x00485CB0 (FUN_00485CB0, func_FileTimeToString)
+     *
+     * What it does:
+     * Converts microsecond timestamp to local `HH:MM:SS.mmm` text.
+     */
     msvc8::string FileTimeToString(LONGLONG time);
 } // namespace gpg

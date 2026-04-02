@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A32D0 (FUN_005A32D0, Moho::IAiNavigatorSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `IAiNavigator::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005A32E0 (FUN_005A32E0, Moho::IAiNavigatorSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `IAiNavigator::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005A71A0 (FUN_005A71A0)
      *
      * What it does:
@@ -50,5 +66,14 @@ namespace moho
     "IAiNavigatorSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(IAiNavigatorSerializer) == 0x14, "IAiNavigatorSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCC6C0 (FUN_00BCC6C0, register_IAiNavigatorSerializer)
+   *
+   * What it does:
+   * Initializes the global IAiNavigator serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_IAiNavigatorSerializer();
 } // namespace moho
 

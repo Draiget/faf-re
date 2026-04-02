@@ -1,12 +1,13 @@
 #include "CLuaTask.h"
 
-#include <stdexcept>
+#include <string>
 #include <typeinfo>
 
+#include "CTaskThread.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/StatItem.h"
 
 extern "C" {
 void lua_traceback(lua_State* L, const char* message);
@@ -16,6 +17,41 @@ using namespace moho;
 
 namespace
 {
+  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+  constexpr const char* kResumeThreadHelpText =
+    "ResumeThread(thread) -- resume a thread that had been suspended with SuspendCurrentThread(). Does nothing if "
+    "the thread wasn't suspended.";
+  constexpr const char* kResumeThreadKilledTraceback = "Attempted to resume a thread that was already killed";
+  constexpr const char* kResumeThreadTypeError = "thread";
+  constexpr const char* kResumeThreadForkOnlyError = "Can't resume a thread that wasn't created with ForkThread.";
+
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
+  {
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
+    }
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
+  }
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
+
   gpg::RType* CachedCLuaTaskType()
   {
     static gpg::RType* cached = nullptr;
@@ -32,72 +68,6 @@ namespace
       cached = gpg::LookupRType(typeid(CTask));
     }
     return cached;
-  }
-
-  gpg::RType* CachedLuaStateType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(LuaPlus::LuaState));
-    }
-    return cached;
-  }
-
-  gpg::RRef MakeLuaStateRef(LuaPlus::LuaState* state)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = CachedLuaStateType();
-    if (!state) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = CachedLuaStateType();
-    try {
-      dynamicType = gpg::LookupRType(typeid(*state));
-    } catch (...) {
-      dynamicType = CachedLuaStateType();
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(CachedLuaStateType(), &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = state;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(state) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  LuaPlus::LuaState* ReadLuaStatePointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedLuaStateType());
-    if (upcast.mObj) {
-      return static_cast<LuaPlus::LuaState*>(upcast.mObj);
-    }
-
-    const char* const expected = CachedLuaStateType()->GetName();
-    const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-      "instead",
-      expected ? expected : "LuaState",
-      actual ? actual : "null"
-    );
-    throw std::runtime_error(msg.c_str());
   }
 
   void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
@@ -126,44 +96,22 @@ namespace
    * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
    * Chain:   0x004CC2B0 (FUN_004CC2B0)
    */
-  void DeserializeCLuaTask(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void DeserializeCLuaTask(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
   {
     auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
     GPG_ASSERT(task != nullptr);
-
-    gpg::RType* const baseTaskType = CachedCTaskType();
-    GPG_ASSERT(baseTaskType && baseTaskType->serLoadFunc_);
-    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    baseTaskType->serLoadFunc_(archive, objectPtr, baseTaskType->version_, &owner);
-
-    task->mLuaState = ReadLuaStatePointer(archive, owner);
-    archive->ReadInt(&task->mResumeArgCount);
-
-    if (task->mLuaState) {
-      task->mLuaState->m_luaTask = task;
-    }
+    task->MemberDeserialize(archive);
   }
 
   /**
    * Address: 0x004C9C50 (FUN_004C9C50, CLuaTaskSerializer::Serialize callback)
    * Chain:   0x004CC320 (FUN_004CC320)
    */
-  void SerializeCLuaTask(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void SerializeCLuaTask(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
   {
     auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
     GPG_ASSERT(task != nullptr);
-
-    gpg::RType* const baseTaskType = CachedCTaskType();
-    GPG_ASSERT(baseTaskType && baseTaskType->serSaveFunc_);
-    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    baseTaskType->serSaveFunc_(archive, objectPtr, baseTaskType->version_, &owner);
-    const gpg::RRef stateRef = MakeLuaStateRef(task->mLuaState);
-    gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Owned, owner);
-    archive->WriteInt(task->mResumeArgCount);
-
-    if (task->mLuaState) {
-      task->mLuaState->m_luaTask = task;
-    }
+    task->MemberSerialize(archive);
   }
 } // namespace
 
@@ -190,6 +138,56 @@ msvc8::string moho::SCR_Traceback(LuaPlus::LuaState* const state, const gpg::Str
 }
 
 /**
+ * Address: 0x004CB370 (FUN_004CB370, Moho::InstanceCounter<Moho::CLuaTask>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the stat slot used for CLuaTask instance-count
+ * tracking (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CLuaTask>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  if (!engineStats) {
+    return nullptr;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CLuaTask).name());
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
+
+/**
+ * Address: 0x004C9570 (FUN_004C9570, ??0CLuaTask@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Pushes this task on the provided thread stack, adopts one pending LuaState
+ * pointer from `newState`, resets resume-argument state, and binds
+ * `state->m_luaTask` back to this task.
+ */
+CLuaTask::CLuaTask(CTaskThread* const thread, LuaPlus::LuaState** const newState)
+  : CTask(thread, thread != nullptr)
+  , mLuaState(newState ? *newState : nullptr)
+  , mResumeArgCount(0)
+  , mExecuteDestroyedFlag(nullptr)
+{
+  AddStatCounter(InstanceCounter<CLuaTask>::GetStatItem(), 1);
+
+  if (newState) {
+    *newState = nullptr;
+  }
+
+  if (mLuaState) {
+    mLuaState->m_luaTask = this;
+  }
+}
+
+/**
  * Address: 0x004C9610 (FUN_004C9610, non-deleting body)
  *
  * What it does:
@@ -206,6 +204,8 @@ CLuaTask::~CLuaTask()
   } else {
     delete mLuaState;
   }
+
+  AddStatCounter(InstanceCounter<CLuaTask>::GetStatItem(), -1);
 }
 
 /**
@@ -267,6 +267,182 @@ int CLuaTask::Execute()
       mExecuteDestroyedFlag = nullptr;
     }
     throw;
+  }
+}
+
+/**
+ * Address: 0x004C9D80 (FUN_004C9D80, cfunc_ForkThreadL)
+ *
+ * What it does:
+ * Validates a function argument, creates one coroutine LuaState + CLuaTask
+ * pair bound to the caller's task stage, copies call arguments onto the new
+ * coroutine stack, pushes the new thread object to the caller, and mirrors
+ * active hook settings.
+ */
+int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
+{
+  if (lua_gettop(curState->m_state) == 0) {
+    LuaPlus::LuaState::Error(curState, "ForkThread: missing FUNCTION argument");
+  }
+
+  const LuaPlus::LuaObject functionObject(LuaPlus::LuaStackObject(curState, 1));
+  if (!functionObject.IsFunction()) {
+    LuaPlus::LuaState::Error(curState, "ForkThread: first argument isn't a function");
+  }
+
+  CTaskStage* ownerStage = nullptr;
+  LuaPlus::LuaState* const rootState = curState->m_rootState;
+  if (rootState == curState) {
+    ownerStage = reinterpret_cast<CTaskStage*>(curState->m_luaTask);
+  } else {
+    CLuaTask* const currentTask = curState->m_luaTask;
+    if (currentTask && currentTask->mOwnerThread) {
+      ownerStage = currentTask->mOwnerThread->mStage;
+    } else {
+      ownerStage = rootState ? reinterpret_cast<CTaskStage*>(rootState->m_luaTask) : nullptr;
+    }
+  }
+
+  if (!ownerStage) {
+    LuaPlus::LuaState::Error(curState, "ForkThread: Lua state has not been set up for multiple threads");
+  }
+
+  LuaPlus::LuaState* const threadState = new LuaPlus::LuaState(curState);
+  LuaPlus::LuaState* pendingTransferState = threadState;
+  CLuaTask* const task = new CLuaTask(new CTaskThread(ownerStage), &pendingTransferState);
+
+  functionObject.PushStack(threadState->m_state);
+
+  const int argumentCount = lua_gettop(curState->m_state);
+  for (int stackIndex = 2; stackIndex <= argumentCount; ++stackIndex) {
+    const LuaPlus::LuaObject argumentObject(LuaPlus::LuaStackObject(curState, stackIndex));
+    argumentObject.PushStack(task->mLuaState->m_state);
+    ++task->mResumeArgCount;
+  }
+
+  const LuaPlus::LuaObject threadObject(threadState->m_threadObj);
+  threadObject.PushStack(curState);
+
+  const int hookMask = lua_gethookmask(curState->m_state);
+  if (hookMask != 0) {
+    lua_Hook hookFunction = lua_gethook(curState->m_state);
+    lua_sethook(threadState->m_state, hookFunction, hookMask, 0);
+  }
+
+  if (pendingTransferState != nullptr) {
+    delete pendingTransferState;
+  }
+
+  return 1;
+}
+
+/**
+ * Address: 0x004C9D00 (FUN_004C9D00, cfunc_ForkThread)
+ *
+ * What it does:
+ * Unwraps binding context and forwards to `cfunc_ForkThreadL`.
+ */
+int moho::cfunc_ForkThread(lua_State* const luaContext)
+{
+  return cfunc_ForkThreadL(luaContext->stateUserData);
+}
+
+/**
+ * Address: 0x004CAC10 (FUN_004CAC10, cfunc_ResumeThreadL)
+ *
+ * What it does:
+ * Validates one coroutine thread argument, warns on stale-killed thread
+ * handles, and resumes a ForkThread-created task thread by clearing pending
+ * frames and unstaging the owner thread.
+ */
+int moho::cfunc_ResumeThreadL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kResumeThreadHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject threadArgument(state, 1);
+  lua_State* const rawThreadState = lua_tothread(state->m_state, 1);
+  if (!rawThreadState) {
+    threadArgument.TypeError(kResumeThreadTypeError);
+  }
+
+  LuaPlus::LuaState* const threadState = rawThreadState ? rawThreadState->stateUserData : nullptr;
+  if (!threadState) {
+    const msvc8::string traceback = SCR_Traceback(state, kResumeThreadKilledTraceback);
+    gpg::Warnf(traceback.c_str());
+    return 0;
+  }
+
+  CLuaTask* const threadTask = threadState->m_luaTask;
+  if (threadState->m_rootState == threadState || !threadTask) {
+    LuaPlus::LuaState::Error(state, kResumeThreadForkOnlyError);
+  }
+
+  CTaskThread* const taskThread = threadTask->mOwnerThread;
+  if (taskThread) {
+    taskThread->mPendingFrames = 0;
+    if (taskThread->mStaged) {
+      taskThread->Unstage();
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x004CAB90 (FUN_004CAB90, cfunc_ResumeThread)
+ *
+ * What it does:
+ * Unwraps binding context and forwards to `cfunc_ResumeThreadL`.
+ */
+int moho::cfunc_ResumeThread(lua_State* const luaContext)
+{
+  return cfunc_ResumeThreadL(luaContext->stateUserData);
+}
+
+/**
+ * Address: 0x004CC2B0 (FUN_004CC2B0, Moho::CLuaTask::MemberDeserialize)
+ */
+void CLuaTask::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  gpg::RType* taskType = CTask::sType;
+  if (!taskType) {
+    taskType = gpg::LookupRType(typeid(CTask));
+    CTask::sType = taskType;
+  }
+
+  gpg::RRef ownerRef{};
+  archive->Read(taskType, this, ownerRef);
+  (void)archive->ReadPointer_LuaState(&mLuaState, &ownerRef);
+  archive->ReadInt(&mResumeArgCount);
+
+  if (mLuaState) {
+    mLuaState->m_luaTask = this;
+  }
+}
+
+/**
+ * Address: 0x004CC320 (FUN_004CC320, Moho::CLuaTask::MemberSerialize)
+ */
+void CLuaTask::MemberSerialize(gpg::WriteArchive* const archive)
+{
+  gpg::RType* taskType = CTask::sType;
+  if (!taskType) {
+    taskType = gpg::LookupRType(typeid(CTask));
+    CTask::sType = taskType;
+  }
+
+  gpg::RRef ownerRef{};
+  archive->Write(taskType, this, ownerRef);
+  gpg::RRef stateRef{};
+  (void)gpg::RRef_LuaState(&stateRef, mLuaState);
+  gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Owned, ownerRef);
+  archive->WriteInt(mResumeArgCount);
+
+  if (mLuaState) {
+    mLuaState->m_luaTask = this;
   }
 }
 

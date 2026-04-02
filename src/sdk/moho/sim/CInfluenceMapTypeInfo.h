@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00717490 (FUN_00717490, sub_717490)
+     *
+     * What it does:
+     * Preregisters CInfluenceMap RTTI with the reflection system.
+     */
+    CInfluenceMapTypeInfo();
+
+    /**
      * Address: 0x00717520 (FUN_00717520, Moho::CInfluenceMapTypeInfo::dtr)
      *
      * What it does:
@@ -36,4 +44,52 @@ namespace moho
   };
 
   static_assert(sizeof(CInfluenceMapTypeInfo) == 0x64, "CInfluenceMapTypeInfo size must be 0x64");
+
+  /**
+   * Owns reflected metadata for the `EThreatType` enum.
+   */
+  class EThreatTypeTypeInfo final : public gpg::REnumType
+  {
+  public:
+    /**
+     * Address: 0x00715580 (FUN_00715580, j_??1REnumType@gpg@@QAE@@Z_48)
+     *
+     * What it does:
+     * Scalar deleting-destructor thunk lane for `EThreatTypeTypeInfo`.
+     */
+    ~EThreatTypeTypeInfo() override;
+
+    /**
+     * Address: 0x00715550 (FUN_00715550, Moho::EThreatTypeTypeInfo::GetName)
+     *
+     * What it does:
+     * Returns the reflected type label for `EThreatType`.
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00715530 (FUN_00715530, Moho::EThreatTypeTypeInfo::Init)
+     *
+     * What it does:
+     * Writes enum size metadata, registers enum entries, and finalizes.
+     */
+    void Init() override;
+
+  private:
+    /**
+     * Address: 0x00715590 (FUN_00715590, Moho::EThreatTypeTypeInfo::AddEnums)
+     *
+     * What it does:
+     * Registers the `THREATTYPE_` enum names and numeric values.
+     */
+    void AddEnums();
+  };
+
+  static_assert(sizeof(EThreatTypeTypeInfo) == 0x78, "EThreatTypeTypeInfo size must be 0x78");
+
+  /**
+   * What it does:
+   * Forces EThreatType type-info startup materialization.
+   */
+  void register_EThreatTypeTypeInfo();
 } // namespace moho

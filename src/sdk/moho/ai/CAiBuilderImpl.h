@@ -5,6 +5,12 @@
 
 #include "moho/ai/IAiBuilder.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Unit;
@@ -52,6 +58,22 @@ namespace moho
      * VFTable SLOT: 0
      */
     ~CAiBuilderImpl() override;
+
+    /**
+     * Address: 0x005A2460 (FUN_005A2460, Moho::CAiBuilderImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Reads serialized builder state lanes and marks the factory queue dirty.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005A2550 (FUN_005A2550, Moho::CAiBuilderImpl::MemberSerialize)
+     *
+     * What it does:
+     * Writes serialized builder state lanes.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x0059FAA0 (FUN_0059FAA0)

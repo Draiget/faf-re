@@ -1,5 +1,6 @@
 #include "CTask.h"
 
+#include <string>
 #include <stdexcept>
 #include <typeinfo>
 
@@ -7,20 +8,54 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/misc/StatItem.h"
 
 using namespace moho;
 
 namespace
 {
-  gpg::RType* CachedCTaskType()
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTask));
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
     }
-    return cached;
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
   }
 
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
+
+  gpg::RType* CachedCTaskType()
+  {
+    if (!CTask::sType) {
+      CTask::sType = gpg::LookupRType(typeid(CTask));
+    }
+    return CTask::sType;
+  }
+
+  /**
+   * Address: 0x0040BDE0 (FUN_0040BDE0, gpg::RRef_CTask)
+   *
+   * What it does:
+   * Packs one `CTask` pointer into `RRef` lanes using reflected dynamic type
+   * ownership when available.
+   */
   gpg::RRef MakeCTaskRef(CTask* task)
   {
     gpg::RRef out{};
@@ -52,6 +87,19 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x0040BF90 (FUN_0040BF90, gpg::RRef::Upcast_CTask)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `CTask` and returns the resulting
+   * object pointer (or null on mismatch).
+   */
+  [[nodiscard]] CTask* UpcastCTaskRef(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskType());
+    return static_cast<CTask*>(upcast.mObj);
+  }
+
   CTask* ReadCTaskPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
@@ -62,9 +110,9 @@ namespace
     gpg::RRef source{};
     source.mObj = tracked.object;
     source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskType());
-    if (upcast.mObj) {
-      return static_cast<CTask*>(upcast.mObj);
+    CTask* const task = UpcastCTaskRef(source);
+    if (task) {
+      return task;
     }
 
     const char* const expected = CachedCTaskType()->GetName();
@@ -109,7 +157,58 @@ namespace
     const gpg::RRef subtaskRef = MakeCTaskRef(task->mSubtask);
     gpg::WriteRawPointer(archive, subtaskRef, gpg::TrackedPointerState::Unowned, owner);
   }
+
+  CTaskSerializer gCTaskSerializer{};
+
+  /**
+   * Address: 0x00BC2FE0 (FUN_00BC2FE0, register_CTaskSerializer)
+   *
+   * What it does:
+   * Initializes the global CTask serializer helper and binds task load/save
+   * callbacks into reflected type metadata.
+   */
+  void RegisterCTaskSerializerBootstrap()
+  {
+    gCTaskSerializer.mNext = nullptr;
+    gCTaskSerializer.mPrev = nullptr;
+    gCTaskSerializer.mSerLoadFunc = &DeserializeCTask;
+    gCTaskSerializer.mSerSaveFunc = &SerializeCTask;
+    gCTaskSerializer.RegisterSerializeFunctions();
+  }
+
 } // namespace
+
+gpg::RType* CTask::sType = nullptr;
+
+gpg::RType* CTask::StaticGetClass()
+{
+  return CachedCTaskType();
+}
+
+/**
+ * Address: 0x0040AB50 (FUN_0040AB50, Moho::InstanceCounter<Moho::CTask>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for task-instance
+ * counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CTask>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  if (!engineStats) {
+    return nullptr;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CTask).name());
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
 
 /**
  * Address: 0x00408CB0 (FUN_00408CB0, ??1CTask@Moho@@UAE@XZ)
@@ -139,6 +238,8 @@ CTask::~CTask()
   if (mDestroyFlag != nullptr) {
     *mDestroyFlag = true;
   }
+
+  AddStatCounter(InstanceCounter<CTask>::GetStatItem(), -1);
 }
 
 /**
@@ -150,6 +251,8 @@ CTask::~CTask()
  */
 CTask::CTask(CTaskThread* const thread, const bool owning)
 {
+  AddStatCounter(InstanceCounter<CTask>::GetStatItem(), 1);
+
   if (thread != nullptr) {
     mAutoDelete = owning;
     mOwnerThread = thread;

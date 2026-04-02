@@ -25,6 +25,17 @@ CMessage::CMessage()
 }
 
 /**
+ * Address: 0x0047F000 (FUN_0047F000)
+ *
+ * What it does:
+ * Releases heap-backed payload storage and restores inline-lane ownership.
+ */
+CMessage::~CMessage()
+{
+  mBuff.ResetStorageToInline();
+}
+
+/**
  * Address: 0x00483490 (FUN_00483490)
  * Address: 0x10076360 (sub_10076360)
  * Address: 0x100763B0 (sub_100763B0)
@@ -34,12 +45,34 @@ CMessage::CMessage()
  */
 CMessage::CMessage(const MessageType type, size_t size)
 {
-  size += kHeaderSize;
-  constexpr char fill = 0;
-  mBuff.Resize(size, fill);
-  SetSize(size);
-  SetType(type);
+  InitializeHeaderForPayloadSizeAndType(size, type);
   mPos = 0;
+}
+
+/**
+ * Address: 0x0047BD10 (FUN_0047BD10)
+ *
+ * What it does:
+ * Resizes wire storage to `payloadSize + 3` and writes the two-byte wire-size header.
+ */
+void CMessage::InitializeHeaderForPayloadSize(const size_t payloadSize)
+{
+  const auto wireSize = payloadSize + kHeaderSize;
+  constexpr char fill = 0;
+  mBuff.Resize(wireSize, fill);
+  SetSize(wireSize);
+}
+
+/**
+ * Address: 0x0047BCC0 (FUN_0047BCC0)
+ *
+ * What it does:
+ * Rebuilds wire header for payload size and writes message type byte 0.
+ */
+void CMessage::InitializeHeaderForPayloadSizeAndType(const size_t payloadSize, const MessageType type)
+{
+  InitializeHeaderForPayloadSize(payloadSize);
+  SetType(type);
 }
 
 /**

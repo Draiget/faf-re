@@ -14,6 +14,14 @@ namespace LuaPlus
 		using std::logic_error::logic_error;
 
 		/**
+		 * Address: 0x00457880 (FUN_00457880, ??0LuaAssertion@LuaPlus@@QAE@PBD@Z)
+		 *
+		 * What it does:
+		 * Builds one Lua assertion exception object from the provided message.
+		 */
+		explicit LuaAssertion(const char* message);
+
+		/**
 		 * Address: 0x00457920
 		 * Slot: 0
 		 * Demangled: LuaPlus::LuaAssertion scalar deleting destructor

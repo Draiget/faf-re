@@ -12,6 +12,16 @@ namespace moho
   public:
     using FormatHandle = ID3DVertexFormat::FormatHandle;
 
+  private:
+    /**
+     * Address: 0x0043F410 (FUN_0043F410, sub_43F410)
+     *
+     * What it does:
+     * Initializes vftable state and clears retained vertex-format ownership lanes.
+     */
+    CD3DVertexFormat();
+
+  public:
     /**
      * Address: 0x0043CFC0 (FUN_0043CFC0)
      *
@@ -22,6 +32,15 @@ namespace moho
      * stores retained ownership.
      */
     explicit CD3DVertexFormat(std::uint32_t formatCode);
+
+    /**
+     * Address: 0x00440CB0 (FUN_00440CB0, non-deleting body)
+     * Address: 0x00440C70 (FUN_00440C70, deleting thunk)
+     *
+     * What it does:
+     * Releases retained vertex-format ownership lanes before object teardown.
+     */
+    ~CD3DVertexFormat();
 
     /**
      * Address: 0x0043F430 (FUN_0043F430)

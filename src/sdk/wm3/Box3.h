@@ -8,6 +8,12 @@
 
 #include "Mat34.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace Wm3
 {
 
@@ -70,6 +76,24 @@ namespace Wm3
       Extent[1] = ex.y;
       Extent[2] = ex.z;
     }
+
+    /**
+     * Address: 0x00474170 (FUN_00474170, Wm3::Box3f::Box3f)
+     *
+     * What it does:
+     * Builds a box from center, three orthonormal axes, and scalar extents.
+     */
+    constexpr Box3(
+      const Vector3<T>& c,
+      const Vector3<T>& axis0,
+      const Vector3<T>& axis1,
+      const Vector3<T>& axis2,
+      const T extentX,
+      const T extentY,
+      const T extentZ
+    ) noexcept
+      : Box3(c, axis0, axis1, axis2, Vector3<T>{extentX, extentY, extentZ})
+    {}
 
     /** Factory from Mat34: axes in columns (m[0..2], m[4..6], m[8..10]), translation in m[3],m[7],m[11] */
     static constexpr Box3 FromMat34(const Mat34<T>& t, const Vector3<T>& ex) noexcept
@@ -315,6 +339,22 @@ namespace Wm3
       b.Extent[2] = (mx.z - mn.z) * T(0.5);
       return b;
     }
+
+    /**
+     * Address: 0x00475800 (FUN_00475800, Wm3::Box3f::MemberDeserialize)
+     *
+     * What it does:
+     * Reads reflected center/axes/extents from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00475910 (FUN_00475910, Wm3::Box3f::MemberSerialize)
+     *
+     * What it does:
+     * Writes reflected center/axes/extents to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   using Box3f = Box3<float>;

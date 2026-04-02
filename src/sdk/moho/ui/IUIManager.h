@@ -1,5 +1,7 @@
 #pragma once
 
+#include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "moho/ui/UiRuntimeTypes.h"
 
 namespace moho
@@ -193,4 +195,13 @@ namespace moho
    * `/lua/ui/uimain.lua:StartJoinLobbyUI(...)`.
    */
   [[nodiscard]] bool UI_StartJoinLobbyUI(const char* protocol, const char* endpoint, const char* playerName);
+
+  /**
+   * Address: 0x0083D500 (FUN_0083D500, ?UI_ShowDesyncDialog@Moho@@YAXHABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z)
+   *
+   * What it does:
+   * Builds one Lua table from desync payload strings and invokes
+   * `/lua/ui/uimain.lua:ShowDesyncDialog(sessionTick, payloadTable)`.
+   */
+  void UI_ShowDesyncDialog(int sessionTick, const msvc8::vector<msvc8::string>& payloadLines);
 } // namespace moho

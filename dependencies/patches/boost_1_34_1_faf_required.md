@@ -6,6 +6,17 @@ This repo uses an external Boost tree and only needs:
 
 The patch file `boost_1_34_1_faf_required.patch` captures local fixes needed for modern MSVC/UCRT compatibility.
 
+## Current patch scope
+
+Patched files in `boost_1_34_1_faf_required.patch`:
+
+- `boost/function/function_base.hpp`
+- `boost/function/function_template.hpp`
+- `boost/get_pointer.hpp`
+- `boost/thread/mutex.hpp`
+- `boost/thread/recursive_mutex.hpp`
+- `boost/thread/xtime.hpp`
+
 ## One-shot bootstrap
 
 Run from a Visual Studio developer shell:

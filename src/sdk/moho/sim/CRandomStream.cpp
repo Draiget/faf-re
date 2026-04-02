@@ -1,6 +1,16 @@
 #include "CRandomStream.h"
 
 #include <cmath>
+#include <typeinfo>
+
+#include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Global.h"
+
+gpg::RType* moho::CMersenneTwister::sType = nullptr;
+gpg::RType* moho::CRandomStream::sType = nullptr;
 
 namespace moho
 {
@@ -21,7 +31,34 @@ namespace moho
       const std::uint32_t value = stream.twister.NextUInt32();
       return static_cast<float>(static_cast<double>(value) * kInvTwoTo31 - 1.0);
     }
+
+    [[nodiscard]] const gpg::RRef& NullOwnerRef()
+    {
+      static const gpg::RRef kNullOwner{nullptr, nullptr};
+      return kNullOwner;
+    }
+
+    [[nodiscard]] gpg::RType* CachedCMersenneTwisterType()
+    {
+      gpg::RType* type = CMersenneTwister::sType;
+      if (!type) {
+        type = gpg::LookupRType(typeid(CMersenneTwister));
+        CMersenneTwister::sType = type;
+      }
+      return type;
+    }
   } // namespace
+
+  /**
+   * Address: 0x0040EB50 (FUN_0040EB50, Moho::CMersenneTwister::CMersenneTwister)
+   *
+   * What it does:
+   * Seeds MT state from caller seed.
+   */
+  CMersenneTwister::CMersenneTwister(const std::uint32_t seed) noexcept
+  {
+    Seed(seed);
+  }
 
   /**
    * Address: 0x0040EB60 (FUN_0040EB60)
@@ -92,6 +129,97 @@ namespace moho
   }
 
   /**
+   * Address: 0x0040EC60 (FUN_0040EC60, Moho::CMersenneTwister::Checksum)
+   *
+   * What it does:
+   * Appends MT state words to MD5 (excludes extraction position lane).
+   */
+  void CMersenneTwister::Checksum(gpg::MD5Context& md5) const
+  {
+    md5.Update(state, sizeof(state));
+  }
+
+  /**
+   * Address: 0x0040F7A0 (FUN_0040F7A0, Moho::CMersenneTwister::MemberDeserialize)
+   *
+   * What it does:
+   * Reads the full MT state vector and extraction position from archive.
+   */
+  void CMersenneTwister::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    for (std::uint32_t i = 0; i < kStateWordCount; ++i) {
+      archive->ReadUInt(&state[i]);
+    }
+
+    int pos = 0;
+    archive->ReadInt(&pos);
+    k = static_cast<std::uint32_t>(pos);
+  }
+
+  /**
+   * Address: 0x0040F7E0 (FUN_0040F7E0, Moho::CMersenneTwister::MemberSerialize)
+   *
+   * What it does:
+   * Writes the full MT state vector and extraction position to archive.
+   */
+  void CMersenneTwister::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    for (std::uint32_t i = 0; i < kStateWordCount; ++i) {
+      archive->WriteUInt(state[i]);
+    }
+
+    archive->WriteInt(static_cast<int>(k));
+  }
+
+  /**
+   * Address: 0x0040EA60 (FUN_0040EA60, Moho::CRandomStream::CRandomStream)
+   *
+   * What it does:
+   * Seeds twister state from caller seed and clears cached Marsaglia-pair flag.
+   */
+  CRandomStream::CRandomStream(const std::uint32_t seed) noexcept
+  {
+    twister.Seed(seed);
+    hasMarsagliaPair = 0;
+  }
+
+  /**
+   * Address: 0x0040EA70 (FUN_0040EA70, Moho::CRandomStream::FRand)
+   *
+   * What it does:
+   * Returns one uniform random sample in [0,1) from the embedded twister.
+   */
+  float CRandomStream::FRand() noexcept
+  {
+    return static_cast<float>(static_cast<double>(twister.NextUInt32()) * kInvTwoTo32);
+  }
+
+  /**
+   * Address: 0x0040F030 (FUN_0040F030, Moho::CRandomStream::Checksum)
+   *
+   * What it does:
+   * Appends deterministic RNG state and gaussian-cache lanes into MD5.
+   */
+  void CRandomStream::Checksum(gpg::MD5Context& md5) const
+  {
+    md5.Update(twister.state, sizeof(twister.state));
+    md5.Update(&hasMarsagliaPair, sizeof(hasMarsagliaPair));
+    if (hasMarsagliaPair) {
+      md5.Update(&marsagliaPair, sizeof(marsagliaPair));
+    }
+  }
+
+  /**
    * Address: 0x0040EA40 (FUN_0040EA40)
    *
    * What it does:
@@ -132,5 +260,41 @@ namespace moho
     hasMarsagliaPair = 1;
     marsagliaPair = y * scale;
     return x * scale;
+  }
+
+  /**
+   * Address: 0x0040F810 (FUN_0040F810, Moho::CRandomStream::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes the embedded MT state, cached gaussian sample, and cache flag.
+   */
+  void CRandomStream::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    archive->Read(CachedCMersenneTwisterType(), &twister, NullOwnerRef());
+    archive->ReadFloat(&marsagliaPair);
+    archive->ReadBool(&hasMarsagliaPair);
+  }
+
+  /**
+   * Address: 0x0040F870 (FUN_0040F870, Moho::CRandomStream::MemberSerialize)
+   *
+   * What it does:
+   * Serializes the embedded MT state, cached gaussian sample, and cache flag.
+   */
+  void CRandomStream::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    archive->Write(CachedCMersenneTwisterType(), &twister, NullOwnerRef());
+    archive->WriteFloat(marsagliaPair);
+    archive->WriteBool(hasMarsagliaPair);
   }
 } // namespace moho

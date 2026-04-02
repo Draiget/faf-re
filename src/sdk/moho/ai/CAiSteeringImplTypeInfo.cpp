@@ -1,5 +1,6 @@
 #include "moho/ai/CAiSteeringImplTypeInfo.h"
 
+#include <cstdlib>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -10,6 +11,19 @@ using namespace moho;
 
 namespace
 {
+  alignas(CAiSteeringImplTypeInfo) unsigned char gCAiSteeringImplTypeInfoStorage[sizeof(CAiSteeringImplTypeInfo)];
+  bool gCAiSteeringImplTypeInfoConstructed = false;
+
+  [[nodiscard]] CAiSteeringImplTypeInfo* AcquireCAiSteeringImplTypeInfo()
+  {
+    if (!gCAiSteeringImplTypeInfoConstructed) {
+      new (gCAiSteeringImplTypeInfoStorage) CAiSteeringImplTypeInfo();
+      gCAiSteeringImplTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<CAiSteeringImplTypeInfo*>(gCAiSteeringImplTypeInfoStorage);
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiSteeringImplType()
   {
     if (!CAiSteeringImpl::sType) {
@@ -117,6 +131,32 @@ namespace
     field.mDesc = nullptr;
     typeInfo->AddBase(field);
   }
+
+  /**
+   * Address: 0x00BF8130 (FUN_00BF8130, cleanup_CAiSteeringImplTypeInfo)
+   *
+   * What it does:
+   * Tears down recovered static `CAiSteeringImplTypeInfo` storage.
+   */
+  void cleanup_CAiSteeringImplTypeInfo()
+  {
+    if (!gCAiSteeringImplTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCAiSteeringImplTypeInfo()->~CAiSteeringImplTypeInfo();
+    gCAiSteeringImplTypeInfoConstructed = false;
+  }
+
+  struct CAiSteeringImplTypeInfoBootstrap
+  {
+    CAiSteeringImplTypeInfoBootstrap()
+    {
+      (void)moho::register_CAiSteeringImplTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CAiSteeringImplTypeInfoBootstrap gCAiSteeringImplTypeInfoBootstrap;
 } // namespace
 
 /**
@@ -146,4 +186,19 @@ void CAiSteeringImplTypeInfo::Init()
   AddIAiSteeringBase(this);
   AddCTaskBase(this);
   Finish();
+}
+
+/**
+ * Address: 0x00BCE480 (FUN_00BCE480, register_CAiSteeringImplTypeInfo)
+ *
+ * What it does:
+ * Registers the `CAiSteeringImpl` RTTI type-info object and installs
+ * process-exit cleanup.
+ */
+int moho::register_CAiSteeringImplTypeInfo()
+{
+  CAiSteeringImplTypeInfo* const typeInfo = AcquireCAiSteeringImplTypeInfo();
+  gpg::PreRegisterRType(typeid(CAiSteeringImpl), typeInfo);
+  CAiSteeringImpl::sType = typeInfo;
+  return std::atexit(&cleanup_CAiSteeringImplTypeInfo);
 }

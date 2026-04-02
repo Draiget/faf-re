@@ -7,6 +7,35 @@
 using namespace moho;
 
 /**
+ * Address: 0x00414750 (FUN_00414750)
+ *
+ * What it does:
+ * Resets begin/end/capacity pointers to an empty-vector state.
+ */
+void CWaitHandle::reset() noexcept
+{
+  begin = nullptr;
+  end = nullptr;
+  cap = nullptr;
+}
+
+/**
+ * Address: 0x004147B0 (FUN_004147B0)
+ *
+ * What it does:
+ * Returns the current number of HANDLE entries.
+ */
+size_t CWaitHandle::size() const noexcept
+{
+  return begin ? static_cast<size_t>(end - begin) : 0u;
+}
+
+size_t CWaitHandle::capacity() const noexcept
+{
+  return begin ? static_cast<size_t>(cap - begin) : 0u;
+}
+
+/**
  * Address: 0x00414A00 (FUN_00414A00)
  *
  * Insert `count` copies of `*value` at iterator `pos`.
@@ -136,6 +165,27 @@ CWaitHandleSet::CWaitHandleSet()
   } else {
     handleSet.AppendHandle(handleSet.end, 1u, &h);
   }
+}
+
+/**
+ * Address: 0x00414300 (FUN_00414300)
+ *
+ * What it does:
+ * Closes the wake event handle and releases dynamic handle storage before
+ * member teardown.
+ */
+CWaitHandleSet::~CWaitHandleSet()
+{
+  lock.lock();
+  if (handleSet.begin != nullptr && *handleSet.begin != nullptr) {
+    (void)::CloseHandle(*handleSet.begin);
+  }
+  lock.unlock();
+
+  if (handleSet.begin != nullptr) {
+    ::operator delete(handleSet.begin);
+  }
+  handleSet.reset();
 }
 
 /**

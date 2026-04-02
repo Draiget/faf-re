@@ -22,7 +22,14 @@ namespace moho
     virtual void Handle(const char* text) = 0;
 
   protected:
-    IConOutputHandler() = default;
+    /**
+     * Address: 0x0041E8F0 (FUN_0041E8F0)
+     *
+     * What it does:
+     * Initializes the intrusive-list base node for one output handler object.
+     */
+    IConOutputHandler() noexcept;
+
     ~IConOutputHandler() = default;
   };
 

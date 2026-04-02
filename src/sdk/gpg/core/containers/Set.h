@@ -31,6 +31,22 @@ namespace moho
     // +28 (a2+260): owner/pad (unknown)
     void *owner_or_pad;
 
+    /**
+     * Address: 0x00401080 (FUN_00401080)
+     *
+     * What it does:
+     * Initializes the inline two-word storage window and zeroes base word index.
+     */
+    Set();
+
+    /**
+     * Address: 0x00401E10 (FUN_00401E10, legacy Set copy-ctor lane)
+     *
+     * What it does:
+     * Copies the absolute base-word index and clones the fastvector_n2 word window.
+     */
+    Set(const Set& other);
+
     [[nodiscard]] bool IsSso() const noexcept
     {
       return items_begin == const_cast<uint32_t *>(&sso_word) && items_capacity_end == items_begin + 1;

@@ -191,8 +191,8 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };

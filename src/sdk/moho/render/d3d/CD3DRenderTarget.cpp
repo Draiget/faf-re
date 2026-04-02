@@ -1,5 +1,8 @@
 #include "CD3DRenderTarget.h"
 
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+
 namespace moho
 {
   /**
@@ -44,7 +47,7 @@ namespace moho
    */
   CD3DRenderTarget::~CD3DRenderTarget()
   {
-    mSurface.reset();
+    ReleaseSurfaceHandle();
     mLink.ListUnlink();
   }
 
@@ -71,5 +74,46 @@ namespace moho
   {
     outSurface = mSurface;
     return outSurface;
+  }
+
+  /**
+   * Address: 0x0043EF10 (FUN_0043EF10, sub_43EF10)
+   *
+   * What it does:
+   * Releases retained render-target surface ownership and clears handle lanes.
+   */
+  void CD3DRenderTarget::ReleaseSurfaceHandle()
+  {
+    mSurface.reset();
+  }
+
+  /**
+   * Address: 0x0043EDF0 (FUN_0043EDF0, sub_43EDF0)
+   */
+  bool CD3DRenderTarget::RecreateFromContext()
+  {
+    SurfaceHandle recreatedSurface{};
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    device->CreateVolumeTexture(&recreatedSurface, &mRenderTargetContext);
+    mSurface = recreatedSurface;
+    return true;
+  }
+
+  /**
+   * Address: 0x0043EF50 (FUN_0043EF50, sub_43EF50)
+   */
+  bool CD3DRenderTarget::ConfigureAndRecreate(
+    CD3DDevice* const ownerDevice,
+    const int width,
+    const int height,
+    const int format
+  )
+  {
+    ReleaseSurfaceHandle();
+    mOwnerDevice = ownerDevice;
+    mRenderTargetContext.width_ = static_cast<std::uint32_t>(width);
+    mRenderTargetContext.height_ = static_cast<std::uint32_t>(height);
+    mRenderTargetContext.format_ = static_cast<std::uint32_t>(format);
+    return RecreateFromContext();
   }
 } // namespace moho

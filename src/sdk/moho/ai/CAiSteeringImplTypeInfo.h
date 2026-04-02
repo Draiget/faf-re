@@ -36,5 +36,14 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCE480 (FUN_00BCE480, register_CAiSteeringImplTypeInfo)
+   *
+   * What it does:
+   * Registers the `CAiSteeringImpl` RTTI type-info object and installs
+   * process-exit cleanup.
+   */
+  int register_CAiSteeringImplTypeInfo();
+
   static_assert(sizeof(CAiSteeringImplTypeInfo) == 0x64, "CAiSteeringImplTypeInfo size must be 0x64");
 } // namespace moho

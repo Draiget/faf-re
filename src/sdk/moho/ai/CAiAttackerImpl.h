@@ -15,6 +15,7 @@ namespace LuaPlus
 namespace moho
 {
   struct WeaponExtraRefSubobject;
+  class CScrLuaInitForm;
 
   /**
    * VFTABLE: 0x00E1E9CC
@@ -243,6 +244,179 @@ namespace moho
      */
     [[nodiscard]] static std::int32_t ReadExtraDataValue(const WeaponExtraRefSubobject* ref);
   };
+
+  // Underlying Lua function-definition publishers referenced by this thunk pack.
+  CScrLuaInitForm* func_CAiAttackerImplGetUnit_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplGetWeaponCount_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplSetDesiredTarget_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplGetDesiredTarget_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplStop_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplCanAttackTarget_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplFindBestEnemy_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplGetTargetWeapon_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplIsTooClose_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplIsTargetExempt_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplHasSlavedTarget_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplResetReportingState_LuaFuncDef();
+  CScrLuaInitForm* func_CAiAttackerImplForceEngage_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE970 (FUN_00BCE970, register_CAiAttackerImplLuaInitFormAnchor)
+   *
+   * What it does:
+   * Saves current `sim` Lua-init form head and re-links it to recovered
+   * attacker-Lua anchor lane `off_F599F0`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplLuaInitFormAnchor();
+
+  /**
+   * Address: 0x00BCE990 (FUN_00BCE990, register_CAiAttackerImplGetUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplGetUnit_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplGetUnit_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE9A0 (FUN_00BCE9A0, register_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE9B0 (FUN_00BCE9B0, register_CAiAttackerImplGetWeaponCount_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplGetWeaponCount_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplGetWeaponCount_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE9C0 (FUN_00BCE9C0, register_CAiAttackerImplSetDesiredTarget_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplSetDesiredTarget_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplSetDesiredTarget_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE9D0 (FUN_00BCE9D0, register_CAiAttackerImplGetDesiredTarget_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplGetDesiredTarget_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplGetDesiredTarget_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE9E0 (FUN_00BCE9E0, register_CAiAttackerImplStop_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplStop_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplStop_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCE9F0 (FUN_00BCE9F0, register_CAiAttackerImplCanAttackTarget_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplCanAttackTarget_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplCanAttackTarget_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA00 (FUN_00BCEA00, register_CAiAttackerImplFindBestEnemy_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplFindBestEnemy_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplFindBestEnemy_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA10 (FUN_00BCEA10, register_CAiAttackerImplGetTargetWeapon_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplGetTargetWeapon_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplGetTargetWeapon_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA20 (FUN_00BCEA20, register_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA30 (FUN_00BCEA30, register_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA40 (FUN_00BCEA40, register_CAiAttackerImplIsWithinAttackRange_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplIsWithinAttackRange_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA50 (FUN_00BCEA50, register_CAiAttackerImplIsTooClose_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplIsTooClose_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplIsTooClose_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA60 (FUN_00BCEA60, register_CAiAttackerImplIsTargetExempt_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplIsTargetExempt_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplIsTargetExempt_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA70 (FUN_00BCEA70, register_CAiAttackerImplHasSlavedTarget_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplHasSlavedTarget_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplHasSlavedTarget_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA80 (FUN_00BCEA80, register_CAiAttackerImplResetReportingState_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplResetReportingState_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplResetReportingState_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEA90 (FUN_00BCEA90, register_CAiAttackerImplForceEngage_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards the startup thunk to `func_CAiAttackerImplForceEngage_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiAttackerImplForceEngage_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCEB20 (FUN_00BCEB20, register_CScrLuaMetatableFactory_CAiAttackerImpl_Index)
+   *
+   * What it does:
+   * Allocates and stores the recovered startup Lua factory index lane for
+   * `CScrLuaMetatableFactory<CAiAttackerImpl>`.
+   */
+  int register_CScrLuaMetatableFactory_CAiAttackerImpl_Index();
 
   /**
    * VFTABLE: 0x00E1EB3C

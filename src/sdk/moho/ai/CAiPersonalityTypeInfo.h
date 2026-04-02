@@ -37,4 +37,13 @@ namespace moho
   };
 
   static_assert(sizeof(CAiPersonalityTypeInfo) == 0x64, "CAiPersonalityTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCD600 (FUN_00BCD600, register_CAiPersonalityTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters CAiPersonality RTTI storage and installs
+   * process-exit cleanup.
+   */
+  int register_CAiPersonalityTypeInfo();
 } // namespace moho

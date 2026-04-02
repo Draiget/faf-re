@@ -1,5 +1,6 @@
 #include "RTrailBlueprintTypeInfo.h"
 
+#include <cstdlib>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -10,6 +11,31 @@
 
 namespace
 {
+  using TypeInfo = moho::RTrailBlueprintTypeInfo;
+
+  alignas(TypeInfo) unsigned char gRTrailBlueprintTypeInfoStorage[sizeof(TypeInfo)];
+  bool gRTrailBlueprintTypeInfoConstructed = false;
+
+  [[nodiscard]] TypeInfo& AcquireRTrailBlueprintTypeInfo()
+  {
+    if (!gRTrailBlueprintTypeInfoConstructed) {
+      new (gRTrailBlueprintTypeInfoStorage) TypeInfo();
+      gRTrailBlueprintTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<TypeInfo*>(gRTrailBlueprintTypeInfoStorage);
+  }
+
+  void cleanup_RTrailBlueprintTypeInfo()
+  {
+    if (!gRTrailBlueprintTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireRTrailBlueprintTypeInfo().~TypeInfo();
+    gRTrailBlueprintTypeInfoConstructed = false;
+  }
+
   gpg::RType* CachedTrailBlueprintType()
   {
     static gpg::RType* cached = nullptr;
@@ -92,26 +118,6 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  void RegisterTrailFields(gpg::RType* typeInfo)
-  {
-    AddFieldWithDescription(typeInfo, "BlueprintId", CachedRResIdType(), 0x08, "Blueprint ID");
-    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), 0x28, "Lifetime of emitter");
-    AddFieldWithDescription(typeInfo, "TrailLength", CachedFloatType(), 0x2C, "Trail Length");
-    AddFieldWithDescription(typeInfo, "StartSize", CachedFloatType(), 0x30, "Startsize");
-    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), 0x34, "Sort Order");
-    AddFieldWithDescription(typeInfo, "BlendMode", CachedInt32Type(), 0x38, "BlendMode");
-    AddFieldWithDescription(typeInfo, "TextureRepeatRate", CachedFloatType(), 0x44, "Texture repeat rate in units");
-    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), 0x3C, "cutoff distance");
-    AddFieldWithDescription(
-      typeInfo, "EmitIfVisible", CachedBoolType(), 0x40, "Emit particles ONLY if this is emitter is visible"
-    );
-    AddFieldWithDescription(
-      typeInfo, "CatchupEmit", CachedBoolType(), 0x41, "catchup particles for the ticks that we weren't visible"
-    );
-    AddFieldWithDescription(typeInfo, "RepeatTexture", CachedStringType(), 0x48, "name of texture that repeats");
-    AddFieldWithDescription(typeInfo, "RampTexture", CachedStringType(), 0x64, "RampTextureName");
-  }
-
   gpg::RRef MakeTrailBlueprintRef(moho::RTrailBlueprint* object)
   {
     gpg::RRef out{};
@@ -148,10 +154,29 @@ namespace
 
     static_cast<moho::RTrailBlueprint*>(objectMemory)->~RTrailBlueprint();
   }
+
+  struct RTrailBlueprintTypeInfoBootstrap
+  {
+    RTrailBlueprintTypeInfoBootstrap()
+    {
+      moho::register_RTrailBlueprintTypeInfo();
+    }
+  };
+
+  RTrailBlueprintTypeInfoBootstrap gRTrailBlueprintTypeInfoBootstrap;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x0050F1D0 (FUN_0050F1D0, Moho::RTrailBlueprintTypeInfo::RTrailBlueprintTypeInfo)
+   */
+  RTrailBlueprintTypeInfo::RTrailBlueprintTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(RTrailBlueprint), this);
+  }
+
   /**
    * Address: 0x0050F290 (FUN_0050F290, scalar deleting destructor thunk)
    */
@@ -181,7 +206,39 @@ namespace moho
     dtrFunc_ = &DestroyTrailBlueprintObject;
     AddEffectBase(this);
     gpg::RType::Init();
-    RegisterTrailFields(this);
+    AddFields(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x0050F330 (FUN_0050F330, Moho::RTrailBlueprintTypeInfo::AddFields)
+   */
+  void RTrailBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  {
+    AddFieldWithDescription(typeInfo, "BlueprintId", CachedRResIdType(), 0x08, "Blueprint ID");
+    AddFieldWithDescription(typeInfo, "Lifetime", CachedFloatType(), 0x28, "Lifetime of emitter");
+    AddFieldWithDescription(typeInfo, "TrailLength", CachedFloatType(), 0x2C, "Trail Length");
+    AddFieldWithDescription(typeInfo, "Size", CachedFloatType(), 0x30, "Startsize");
+    AddFieldWithDescription(typeInfo, "SortOrder", CachedFloatType(), 0x34, "Sort Order");
+    AddFieldWithDescription(typeInfo, "BlendMode", CachedInt32Type(), 0x38, "BlendMode");
+    AddFieldWithDescription(typeInfo, "TextureRepeatRate", CachedFloatType(), 0x44, "Texture repeat rate in units");
+    AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), 0x3C, "cutoff distance");
+    AddFieldWithDescription(
+      typeInfo, "EmitIfVisible", CachedBoolType(), 0x40, "Emit particles ONLY if this is emitter is visible"
+    );
+    AddFieldWithDescription(
+      typeInfo, "CatchupEmit", CachedBoolType(), 0x41, "catchup particles for the ticks that we weren't visible"
+    );
+    AddFieldWithDescription(typeInfo, "RepeatTexture", CachedStringType(), 0x48, "name of texture that repeats");
+    AddFieldWithDescription(typeInfo, "RampTexture", CachedStringType(), 0x64, "RampTextureName");
+  }
+
+  /**
+   * Address: 0x00BC8070 (FUN_00BC8070, register_RTrailBlueprintTypeInfo)
+   */
+  void register_RTrailBlueprintTypeInfo()
+  {
+    (void)AcquireRTrailBlueprintTypeInfo();
+    (void)std::atexit(&cleanup_RTrailBlueprintTypeInfo);
   }
 } // namespace moho

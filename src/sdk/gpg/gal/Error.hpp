@@ -5,6 +5,20 @@
 
 #include "legacy/containers/String.h"
 
+namespace gpg
+{
+    /**
+     * Address: 0x00B50FD8 (FUN_00B50FD8)
+     *
+     * HRESULT
+     *
+     * What it does:
+     * Maps a large set of DirectX/COM HRESULT values to stable engine-facing
+     * diagnostic text, returning `"n/a"` for unknown values.
+     */
+    const char* __stdcall D3DErrorToString(long code);
+}
+
 namespace gpg::gal
 {
     /**

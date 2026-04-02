@@ -22,6 +22,7 @@ namespace moho
   public:
     /**
      * Address: 0x004827C0 (FUN_004827C0)
+     * Address: 0x00482820 (FUN_00482820, deleting destructor thunk)
      * Address: 0x1007C610 (sub_1007C610)
      * Slot: 0
      *

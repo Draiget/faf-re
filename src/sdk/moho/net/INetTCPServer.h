@@ -43,6 +43,7 @@ namespace moho
 
     /**
      * Address: 0x00482740 (FUN_00482740)
+     * Address: 0x00483260 (FUN_00483260, ctor alias lane)
      *
      * What it does:
      * Initializes interface vtable for TCP server instances.

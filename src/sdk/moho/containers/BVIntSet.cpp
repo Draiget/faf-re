@@ -5,6 +5,11 @@
 #include <cstring>
 #include <limits>
 
+#include "gpg/core/containers/FastVectorUIntReflection.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/utils/Global.h"
+
 using namespace moho;
 
 namespace
@@ -12,15 +17,147 @@ namespace
   constexpr unsigned int kBitsPerWord = 32u;
   constexpr unsigned int kWordShift = 5u;
   constexpr unsigned int kWordBitMask = kBitsPerWord - 1u;
+
+  struct BVIntSetWordRange
+  {
+    unsigned int mStartWord;
+    unsigned int mEndWord;
+  };
+
+  [[nodiscard]] const gpg::RRef& NullOwnerRef()
+  {
+    static const gpg::RRef kNullOwner{nullptr, nullptr};
+    return kNullOwner;
+  }
+
+  [[nodiscard]] BVIntSetWordRange GetWordRange(const BVIntSet& set) noexcept
+  {
+    return {set.mFirstWordIndex, set.mFirstWordIndex + static_cast<unsigned int>(set.Buckets())};
+  }
+
+  template <typename WordOp>
+  BVIntSet* CopyAndApplyOverlap(
+    const BVIntSet& lhs,
+    const BVIntSet& rhs,
+    BVIntSet* const out,
+    const unsigned int outStartWord,
+    const unsigned int outWordCount,
+    WordOp&& op
+  )
+  {
+    const BVIntSetWordRange lhsRange = GetWordRange(lhs);
+    const BVIntSetWordRange rhsRange = GetWordRange(rhs);
+
+    out->mFirstWordIndex = outStartWord;
+    out->mWords.ResetStorageToInline();
+    out->mWords.Resize(outWordCount, 0u);
+
+    if (lhsRange.mStartWord < lhsRange.mEndWord) {
+      std::copy(
+        lhs.mWords.start_, lhs.mWords.end_, out->mWords.start_ + (lhsRange.mStartWord - outStartWord)
+      );
+    }
+
+    const unsigned int overlapStart = std::max(lhsRange.mStartWord, rhsRange.mStartWord);
+    const unsigned int overlapEnd = std::min(lhsRange.mEndWord, rhsRange.mEndWord);
+    for (unsigned int wordIndex = overlapStart; wordIndex < overlapEnd; ++wordIndex) {
+      op(out->mWords[wordIndex - outStartWord], rhs.mWords[wordIndex - rhsRange.mStartWord]);
+    }
+
+    return out;
+  }
+
+  template <typename CombineFn>
+  BVIntSet* BuildTrimmedOverlap(
+    const BVIntSet& lhs, const BVIntSet& rhs, BVIntSet* const out, CombineFn&& combine
+  )
+  {
+    const BVIntSetWordRange lhsRange = GetWordRange(lhs);
+    const BVIntSetWordRange rhsRange = GetWordRange(rhs);
+    const unsigned int overlapStart = std::max(lhsRange.mStartWord, rhsRange.mStartWord);
+    unsigned int overlapEnd = std::min(lhsRange.mEndWord, rhsRange.mEndWord);
+
+    out->mWords.ResetStorageToInline();
+    if (overlapStart >= overlapEnd) {
+      out->mFirstWordIndex = 0u;
+      return out;
+    }
+
+    unsigned int firstNonZero = overlapStart;
+    while (firstNonZero < overlapEnd) {
+      if (combine(lhs.mWords[firstNonZero - lhsRange.mStartWord], rhs.mWords[firstNonZero - rhsRange.mStartWord]) != 0u) {
+        break;
+      }
+      ++firstNonZero;
+    }
+
+    if (firstNonZero >= overlapEnd) {
+      out->mFirstWordIndex = 0u;
+      return out;
+    }
+
+    while (overlapEnd > firstNonZero) {
+      const unsigned int wordIndex = overlapEnd - 1u;
+      if (combine(lhs.mWords[wordIndex - lhsRange.mStartWord], rhs.mWords[wordIndex - rhsRange.mStartWord]) != 0u) {
+        break;
+      }
+      --overlapEnd;
+    }
+
+    const unsigned int wordCount = overlapEnd - firstNonZero;
+    out->mFirstWordIndex = firstNonZero;
+    out->mWords.Resize(wordCount, 0u);
+    for (unsigned int wordIndex = firstNonZero; wordIndex < overlapEnd; ++wordIndex) {
+      out->mWords[wordIndex - firstNonZero] =
+        combine(lhs.mWords[wordIndex - lhsRange.mStartWord], rhs.mWords[wordIndex - rhsRange.mStartWord]);
+    }
+
+    return out;
+  }
 } // namespace
 
 gpg::RType* BVIntSet::sType = nullptr;
+
+/**
+ * Address: 0x00401050 (FUN_00401050)
+ * Address: 0x00401070 (FUN_00401070)
+ *
+ * What it does:
+ * Packs `{owner, value}` into a BVIntSet index pair.
+ */
+BVIntSetIndex moho::MakeBVIntSetIndex(BVIntSet* const owner, const unsigned int value) noexcept
+{
+  return BVIntSetIndex{owner, value};
+}
+
+/**
+ * Address: 0x00401060 (FUN_00401060)
+ *
+ * What it does:
+ * Compares BVIntSet index pairs by value lane only.
+ */
+bool moho::BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept
+{
+  return lhs.mValue != rhs.mValue;
+}
 
 BVIntSet::BVIntSet(const BVIntSet& set)
 {
   mFirstWordIndex = set.mFirstWordIndex;
   mReservedMetaWord = set.mReservedMetaWord;
   mWords.ResetFrom(set.mWords);
+}
+
+BVIntSet& BVIntSet::operator=(const BVIntSet& set)
+{
+  if (this == &set) {
+    return *this;
+  }
+
+  mFirstWordIndex = set.mFirstWordIndex;
+  mReservedMetaWord = set.mReservedMetaWord;
+  mWords.ResetFrom(set.mWords);
+  return *this;
 }
 
 size_t BVIntSet::Buckets() const
@@ -46,6 +183,29 @@ unsigned int BVIntSet::Min() const
 unsigned int BVIntSet::Max() const
 {
   return static_cast<unsigned int>(FromBucket(Buckets()));
+}
+
+/**
+ * Address: 0x004010A0 (FUN_004010A0)
+ *
+ * What it does:
+ * Builds the begin iterator/index pair `{this, GetNext(UINT_MAX)}`.
+ */
+BVIntSetIndex BVIntSet::BeginIndex()
+{
+  return MakeBVIntSetIndex(this, GetNext(std::numeric_limits<unsigned int>::max()));
+}
+
+/**
+ * Address: 0x004010C0 (FUN_004010C0)
+ *
+ * What it does:
+ * Builds the end iterator/index pair `{this, 32 * (mFirstWordIndex + wordCount)}`.
+ */
+BVIntSetIndex BVIntSet::EndIndex()
+{
+  const unsigned int wordCount = static_cast<unsigned int>(mWords.end_ - mWords.start_);
+  return MakeBVIntSetIndex(this, 32u * (mFirstWordIndex + wordCount));
 }
 
 /**
@@ -146,28 +306,20 @@ unsigned int BVIntSet::Count() const
 }
 
 /**
- * Address: <lifted helper from FUN_0053D360 command-source gate>
+ * Address: 0x004035F0 (FUN_004035F0, Moho::BVIntSet::Contains)
  *
  * What it does:
  * Returns whether `val` bit is set in this set.
  */
 bool BVIntSet::Contains(const unsigned int val) const
 {
-  if (mWords.start_ == mWords.end_) {
+  const unsigned int relativeWord = (val >> kWordShift) - mFirstWordIndex;
+  const std::size_t wordCount = static_cast<std::size_t>(mWords.end_ - mWords.start_);
+  if (relativeWord >= wordCount) {
     return false;
   }
 
-  const unsigned int wordIndex = (val >> kWordShift);
-  if (wordIndex < mFirstWordIndex) {
-    return false;
-  }
-
-  const std::size_t relativeWord = static_cast<std::size_t>(wordIndex - mFirstWordIndex);
-  if (relativeWord >= Buckets()) {
-    return false;
-  }
-
-  const unsigned int word = mWords[relativeWord];
+  const unsigned int word = mWords.start_[relativeWord];
   return ((word >> (val & kWordBitMask)) & 1u) != 0u;
 }
 
@@ -207,6 +359,37 @@ unsigned int BVIntSet::GetNext(const unsigned int val) const
 
   current += static_cast<unsigned int>(std::countr_zero(bits));
   return current;
+}
+
+/**
+ * Address: 0x00401830 (FUN_00401830)
+ *
+ * What it does:
+ * Finds the previous set bit before `val` by walking backward across bucket storage.
+ */
+unsigned int BVIntSet::GetPrev(const unsigned int val) const
+{
+  unsigned int result = val - 1u;
+  const unsigned int startWord = mFirstWordIndex;
+  const unsigned int* const words = mWords.start_;
+
+  unsigned int bitIndex = result & kWordBitMask;
+  unsigned int wordIndex = (result >> kWordShift) - startWord;
+  unsigned int bits = (0xFFFFFFFEu << bitIndex) & words[wordIndex];
+  if (bits == 0u) {
+    do {
+      bits = words[--wordIndex];
+    } while (bits == 0u);
+
+    result = 32u * (startWord + wordIndex) + 31u;
+    bitIndex = 31u;
+  }
+
+  for (; ((1u << bitIndex) & bits) == 0u; --result) {
+    --bitIndex;
+  }
+
+  return result;
 }
 
 /**
@@ -433,6 +616,109 @@ bool BVIntSet::Equals(const BVIntSet* other) const
 }
 
 /**
+ * Address: 0x00401CA0 (FUN_00401CA0)
+ *
+ * What it does:
+ * Returns whether two sets differ.
+ */
+bool moho::operator!=(const BVIntSet& lhs, const BVIntSet& rhs) noexcept
+{
+  return !lhs.Equals(&rhs);
+}
+
+/**
+ * Address: 0x00401CB0 (FUN_00401CB0)
+ *
+ * What it does:
+ * Builds the union of `*this` and `rhs` into `out`.
+ */
+BVIntSet* BVIntSet::Union(BVIntSet* const out, const BVIntSet* const rhs) const
+{
+  const BVIntSetWordRange lhsRange = GetWordRange(*this);
+  const BVIntSetWordRange rhsRange = GetWordRange(*rhs);
+  const unsigned int outStartWord = std::min(lhsRange.mStartWord, rhsRange.mStartWord);
+  const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
+
+  return CopyAndApplyOverlap(
+    *this,
+    *rhs,
+    out,
+    outStartWord,
+    outWordCount,
+    [](unsigned int& dstWord, const unsigned int rhsWord) {
+      dstWord |= rhsWord;
+    }
+  );
+}
+
+/**
+ * Address: 0x00401E30 (FUN_00401E30)
+ *
+ * What it does:
+ * Builds the symmetric difference of `*this` and `rhs` into `out`.
+ */
+BVIntSet* BVIntSet::ExclusiveOr(BVIntSet* const out, const BVIntSet* const rhs) const
+{
+  const BVIntSetWordRange lhsRange = GetWordRange(*this);
+  const BVIntSetWordRange rhsRange = GetWordRange(*rhs);
+  const unsigned int outStartWord = std::min(lhsRange.mStartWord, rhsRange.mStartWord);
+  const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
+
+  CopyAndApplyOverlap(
+    *this,
+    *rhs,
+    out,
+    outStartWord,
+    outWordCount,
+    [](unsigned int& dstWord, const unsigned int rhsWord) {
+      dstWord ^= rhsWord;
+    }
+  );
+  out->Finalize();
+  return out;
+}
+
+/**
+ * Address: 0x00401F60 (FUN_00401F60)
+ *
+ * What it does:
+ * Builds the trimmed intersection of `*this` and `rhs` into `out`.
+ */
+BVIntSet* BVIntSet::Intersect(BVIntSet* const out, const BVIntSet* const rhs) const
+{
+  return BuildTrimmedOverlap(
+    *this,
+    *rhs,
+    out,
+    [](const unsigned int lhsWord, const unsigned int rhsWord) {
+      return lhsWord & rhsWord;
+    }
+  );
+}
+
+/**
+ * Address: 0x00402110 (FUN_00402110)
+ *
+ * What it does:
+ * Builds `*this & ~rhs` into `out` and compacts the result.
+ */
+BVIntSet* BVIntSet::Subtract(BVIntSet* const out, const BVIntSet* const rhs) const
+{
+  const BVIntSetWordRange lhsRange = GetWordRange(*this);
+  CopyAndApplyOverlap(
+    *this,
+    *rhs,
+    out,
+    lhsRange.mStartWord,
+    lhsRange.mEndWord - lhsRange.mStartWord,
+    [](unsigned int& dstWord, const unsigned int rhsWord) {
+      dstWord &= ~rhsWord;
+    }
+  )->Finalize();
+  return out;
+}
+
+/**
  * Address: 0x004036A0 (FUN_004036A0)
  *
  * What it does:
@@ -470,6 +756,60 @@ bool BVIntSet::Remove(const unsigned int val)
 
   Finalize();
   return ((previousWord >> shift) & 1u) != 0u;
+}
+
+/**
+ * Address: 0x004032A0 (FUN_004032A0, Moho::BVIntSet::MemberDeserialize)
+ *
+ * IDA signature:
+ * void __usercall Moho::BVIntSet::MemberDeserialize(Moho::BVIntSet *a1@<eax>, gpg::ReadArchive *a3@<esi>);
+ *
+ * What it does:
+ * Reads the base word index and packed word-vector payload from archive.
+ */
+void BVIntSet::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  GPG_ASSERT(archive != nullptr);
+  if (!archive) {
+    return;
+  }
+
+  archive->ReadUInt(&mFirstWordIndex);
+
+  gpg::RType* const vectorType = gpg::ResolveFastVectorUIntType();
+  GPG_ASSERT(vectorType != nullptr);
+  if (!vectorType) {
+    return;
+  }
+
+  archive->Read(vectorType, &mWords, NullOwnerRef());
+}
+
+/**
+ * Address: 0x004032F0 (FUN_004032F0, Moho::BVIntSet::MemberSerialize)
+ *
+ * IDA signature:
+ * void __usercall Moho::BVIntSet::MemberSerialize(Moho::BVIntSet *a1@<eax>, BinaryWriteArchive *a2@<esi>);
+ *
+ * What it does:
+ * Writes the base word index and packed word-vector payload to archive.
+ */
+void BVIntSet::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  GPG_ASSERT(archive != nullptr);
+  if (!archive) {
+    return;
+  }
+
+  archive->WriteUInt(mFirstWordIndex);
+
+  gpg::RType* const vectorType = gpg::ResolveFastVectorUIntType();
+  GPG_ASSERT(vectorType != nullptr);
+  if (!vectorType) {
+    return;
+  }
+
+  archive->Write(vectorType, &mWords, NullOwnerRef());
 }
 
 unsigned int BVIntSet::MaskRange(const unsigned loBit, const unsigned hiBit) noexcept

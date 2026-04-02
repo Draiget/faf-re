@@ -24,11 +24,11 @@ namespace moho
   {
     THREATTYPE_Overall = 0,
     THREATTYPE_OverallNotAssigned = 1,
-    THREATTYPE_StructuresNotMex = 2,
-    THREATTYPE_Structures = 3,
+    THREATTYPE_Structures = 2,
+    THREATTYPE_StructuresNotMex = 3,
     THREATTYPE_Naval = 4,
-    THREATTYPE_Air = 5,
-    THREATTYPE_Land = 6,
+    THREATTYPE_Land = 5,
+    THREATTYPE_Air = 6,
     THREATTYPE_Experimental = 7,
     THREATTYPE_Commander = 8,
     THREATTYPE_Artillery = 9,
@@ -38,6 +38,7 @@ namespace moho
     THREATTYPE_Economy = 13,
     THREATTYPE_Unknown = 14,
   };
+  static_assert(sizeof(EThreatType) == 0x04, "EThreatType size must be 0x04");
 
   struct SThreat
   {
@@ -160,6 +161,14 @@ namespace moho
   public:
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x00715BC0 (FUN_00715BC0, ??0CInfluenceMap@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes empty influence-map storage for serializer construct paths.
+     */
+    CInfluenceMap();
 
     /**
      * Address: 0x00716140 (FUN_00716140, ??0CInfluenceMap@Moho@@QAE@Z)

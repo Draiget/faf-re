@@ -132,6 +132,14 @@ namespace moho
     int GetStreamCount() const override;
 
     /**
+     * Address: 0x00440280 (FUN_00440280, Moho::CD3DVertexSheet::HasVertexStreamAvailable)
+     *
+     * What it does:
+     * Returns true when every retained stream buffer is in static-usage mode.
+     */
+    bool HasVertexStreamAvailable();
+
+    /**
      * Address: 0x004403F0 (FUN_004403F0)
      *
      * std::uint32_t

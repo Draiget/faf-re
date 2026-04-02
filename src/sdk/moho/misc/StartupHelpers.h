@@ -3,12 +3,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <string>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/audio/SofdecRuntime.h"
 
+struct lua_State;
 struct IDirectSoundBuffer;
 
 namespace gpg::gal
@@ -16,9 +19,15 @@ namespace gpg::gal
   class DeviceContext;
 } // namespace gpg::gal
 
+namespace LuaPlus
+{
+  class LuaState;
+} // namespace LuaPlus
+
 namespace moho
 {
   class CMovieManager;
+  class CScrLuaInitForm;
 
   struct CfgAliasSet
   {
@@ -147,6 +156,28 @@ namespace moho
    * ?OPTIONS_GetString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z
    */
   [[nodiscard]] msvc8::string OPTIONS_GetString(gpg::StrArg key);
+
+  /**
+   * Address: 0x008C6EC0 (FUN_008C6EC0)
+   * Mangled: ?OPTIONS_CreateInitialProfileIfNeeded@Moho@@YAXVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Executes `/lua/user/prefs.lua` profile bootstrap:
+   * - `ProfilesExist()`
+   * - `CreateProfile(profileName)` when profiles are missing.
+   */
+  void OPTIONS_CreateInitialProfileIfNeeded(gpg::StrArg profileName);
+
+  /**
+   * Address: 0x008C7040 (FUN_008C7040)
+   * Mangled:
+   * ?OPTIONS_GetCurrentProfileName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+   *
+   * What it does:
+   * Invokes `/lua/user/prefs.lua:GetCurrentProfile()` and returns the
+   * profile `Name` field.
+   */
+  [[nodiscard]] msvc8::string OPTIONS_GetCurrentProfileName();
 
   /**
    * Address: 0x008D21E0 (FUN_008D21E0)
@@ -282,6 +313,14 @@ namespace moho
   extern std::int32_t wnd_DefaultCreateHeight;
 
   // Address-backed startup flags from FA globals.
+  extern std::int32_t graphics_Fidelity;
+  extern std::int32_t graphics_FidelitySupported;
+  extern std::int32_t shadow_Fidelity;
+  extern std::int32_t shadow_FidelitySupported;
+  extern bool d3d_UseRefRast;
+  extern bool d3d_ForceSoftwareVP;
+  extern bool d3d_NoPureDevice;
+  extern bool d3d_ForceDirect3DDebugEnabled;
   extern bool d3d_WindowsCursor;
   extern std::uint32_t sAdapterNotCLOverridden;
   extern bool sDeviceLock;
@@ -353,6 +392,111 @@ namespace moho
   msvc8::string CFG_GetArgs();
 
   /**
+   * Address: 0x0041B790 (FUN_0041B790, cfunc_GetCommandLineArg)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` to `LuaPlus::LuaState*` and
+   * forwards to `cfunc_GetCommandLineArgL`.
+   */
+  int cfunc_GetCommandLineArg(lua_State* luaContext);
+
+  /**
+   * Address: 0x0041B810 (FUN_0041B810, cfunc_GetCommandLineArgL)
+   *
+   * What it does:
+   * Resolves one command-line option with requested argument count; returns a
+   * Lua array table on success or `false` when the option is missing.
+   */
+  int cfunc_GetCommandLineArgL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0041B7B0 (FUN_0041B7B0, func_GetCommandLineArg_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder for `GetCommandLineArg`.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetCommandLineArg_LuaFuncDef();
+
+  /**
+   * Address: 0x0041BA20 (FUN_0041BA20, cfunc_HasCommandLineArg)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` to `LuaPlus::LuaState*` and
+   * forwards to `cfunc_HasCommandLineArgL`.
+   */
+  int cfunc_HasCommandLineArg(lua_State* luaContext);
+
+  /**
+   * Address: 0x0041BAA0 (FUN_0041BAA0, cfunc_HasCommandLineArgL)
+   *
+   * What it does:
+   * Returns Lua boolean indicating whether a command-line option is present.
+   */
+  int cfunc_HasCommandLineArgL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0041BA40 (FUN_0041BA40, func_HasCommandLineArg_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder for `HasCommandLineArg`.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_HasCommandLineArg_LuaFuncDef();
+
+  /**
+   * Address: 0x004D68C0 (FUN_004D68C0, cfunc_SHGetFolderPath)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_SHGetFolderPathL`.
+   */
+  int cfunc_SHGetFolderPath(lua_State* luaContext);
+
+  /**
+   * Address: 0x004D6940 (FUN_004D6940, cfunc_SHGetFolderPathL)
+   *
+   * What it does:
+   * Resolves one unsafe-path id string into a CSIDL value and pushes the
+   * resolved folder path with trailing `\\`.
+   */
+  int cfunc_SHGetFolderPathL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004D68E0 (FUN_004D68E0, func_SHGetFolderPath_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `SHGetFolderPath`
+   * in the unsafe init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_SHGetFolderPath_LuaFuncDef();
+
+  /**
+   * Address: 0x00780A70 (FUN_00780A70, cfunc_GetTextureDimensions)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetTextureDimensionsL`.
+   */
+  int cfunc_GetTextureDimensions(lua_State* luaContext);
+
+  /**
+   * Address: 0x00780AF0 (FUN_00780AF0, cfunc_GetTextureDimensionsL)
+   *
+   * What it does:
+   * Loads one texture by filename and optional border and returns
+   * `(width, height)` on success, otherwise `nil`.
+   */
+  int cfunc_GetTextureDimensionsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00780A90 (FUN_00780A90, func_GetTextureDimensions_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for
+   * `GetTextureDimensions` in the user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetTextureDimensions_LuaFuncDef();
+
+  /**
    * Address: 0x00410760 (FUN_00410760)
    * Mangled:
    * ?FILE_SuggestedExt@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@0@Z
@@ -362,6 +506,15 @@ namespace moho
    * appends `suggestedExt` (with leading `.` normalization).
    */
   msvc8::string FILE_SuggestedExt(gpg::StrArg inputPath, gpg::StrArg suggestedExt);
+
+  /**
+   * Address: 0x0040FA50 (FUN_0040FA50)
+   *
+   * What it does:
+   * Returns true when path starts with a single local-root slash (`/`) and is
+   * not UNC-style.
+   */
+  [[nodiscard]] bool FILE_IsLocal(gpg::StrArg filename);
 
   /**
    * Address: 0x0040FDC0 (FUN_0040FDC0)
@@ -386,6 +539,117 @@ namespace moho
    * Returns true when `filename` is an absolute path.
    */
   [[nodiscard]] bool FILE_IsAbsolute(gpg::StrArg filename);
+
+  /**
+   * Address: 0x0040FFC0 (FUN_0040FFC0, Moho::FILE_MakeAbsolute)
+   *
+   * What it does:
+   * Combines one resource path (`dir`) with one base directory path
+   * (`filename`) while preserving drive/UNC semantics and emitting the same
+   * validation failures as the original startup helper.
+   */
+  [[nodiscard]] msvc8::string FILE_MakeAbsolute(gpg::StrArg dir, gpg::StrArg filename);
+
+  /**
+   * Address: 0x00457D40 (FUN_00457D40, sub_457D40)
+   *
+   * std::string const &,std::string const &,std::string *
+   *
+   * What it does:
+   * Resolves one path token against one base path and stores the resolved text
+   * in `outPath`.
+   */
+  msvc8::string* PATH_ResolveAgainstBase(
+    const msvc8::string& path, const msvc8::string& basePath, msvc8::string* outPath
+  );
+
+  /**
+   * Address: 0x0040FAF0 (FUN_0040FAF0)
+   *
+   * What it does:
+   * Parses alphabetical drive prefix and returns 1..26 (`A/a` -> 1), throwing
+   * `XFileError` on malformed input.
+   */
+  [[nodiscard]] int GetDrive(gpg::StrArg filename);
+
+  /**
+   * Address: 0x00410650 (FUN_00410650)
+   *
+   * What it does:
+   * Returns pointer to extension text in the final path segment, or null when
+   * no extension exists.
+   */
+  [[nodiscard]] const char* FILE_Ext(gpg::StrArg filename);
+
+  /**
+   * Address: 0x004108B0 (FUN_004108B0)
+   *
+   * What it does:
+   * Forces a filename extension by removing existing extension and appending
+   * `.` + `ext` when provided.
+   */
+  [[nodiscard]] msvc8::string FILE_ForcedExt(gpg::StrArg filename, gpg::StrArg ext);
+
+  /**
+   * Address: 0x00410A10 (FUN_00410A10)
+   * Mangled:
+   * ?FILE_DirPrefix@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@_N@Z
+   *
+   * What it does:
+   * Normalizes slashes and returns directory prefix text for `filename`.
+   */
+  [[nodiscard]] msvc8::string FILE_DirPrefix(gpg::StrArg filename, bool unusedFlag = false);
+
+  /**
+   * Address: 0x00410C60 (FUN_00410C60)
+   * Mangled:
+   * ?FILE_Dir@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Builds a normalized system-directory path for `filename`.
+   */
+  [[nodiscard]] msvc8::string FILE_Dir(gpg::StrArg filename);
+
+  /**
+   * Address: 0x004111C0 (FUN_004111C0)
+   * Mangled:
+   * ?FILE_Base@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@_N@Z
+   *
+   * What it does:
+   * Returns final path segment text, optionally stripping extension.
+   */
+  [[nodiscard]] msvc8::string FILE_Base(gpg::StrArg filename, bool stripExtension);
+
+  /**
+   * Address: 0x004115A0 (FUN_004115A0)
+   * Mangled:
+   * ?FILE_CollapsePath@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@PA_N@Z
+   *
+   * What it does:
+   * Collapses `.`/`..` path segments and normalizes separators.
+   */
+  [[nodiscard]] msvc8::string FILE_CollapsePath(gpg::StrArg filename, bool* success);
+
+  /**
+   * Address: 0x0046AE90 (FUN_0046AE90, sub_46AE90)
+   * Address: 0x0046B4B0 (FUN_0046B4B0, sub_46B4B0)
+   * Address: 0x0046BA60 (FUN_0046BA60, sub_46BA60)
+   *
+   * What it does:
+   * Compares two canonical path strings by reverse component order (leaf
+   * token first, then parent tokens toward root).
+   */
+  [[nodiscard]] bool PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::string& rhs);
+
+  /**
+   * Address: 0x00411A20 (FUN_00411A20)
+   * Mangled:
+   * ?FILE_GetErrorFromErrno@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z
+   *
+   * What it does:
+   * Maps CRT errno values used by FILE_* path helpers to user-facing text.
+   */
+  [[nodiscard]] msvc8::string FILE_GetErrorFromErrno(int err);
 
   /**
    * Address: 0x008C9D10 (FUN_008C9D10)
@@ -421,6 +685,15 @@ namespace moho
    * `<Documents>\\My Games\\<Company>\\<Product>\\`.
    */
   [[nodiscard]] msvc8::string USER_GetAppDocDir();
+
+  /**
+   * Address: 0x008CAF70 (FUN_008CAF70, func_OpenDocuments)
+   *
+   * What it does:
+   * Ensures the user document tree exists by creating:
+   * `<Documents>\\My Games\\<Company>\\<Product>`.
+   */
+  void USER_EnsureDocumentDirectories();
 
   /**
    * Address: 0x008CA2D0 (FUN_008CA2D0)
@@ -465,6 +738,34 @@ namespace moho
   [[nodiscard]] bool StartCommandLineSession(gpg::StrArg mapName, bool isPerfTest);
 
   /**
+   * Address: 0x0045A670 (FUN_0045A670)
+   * Mangled:
+   * ?DISK_GetLaunchDir@Moho@@YA?AV?$basic_path@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@Upath_traits@filesystem@boost@@@filesystem@boost@@XZ
+   *
+   * What it does:
+   * Resolves executable launch directory from `argv[0]`.
+   */
+  [[nodiscard]] std::filesystem::path DISK_GetLaunchDir();
+
+  /**
+   * Address: 0x0045A770 (FUN_0045A770)
+   * Mangled: ?DISK_CreateFolder@Moho@@YA_NVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Attempts to create one folder and stores wait-handle error text on failure.
+   */
+  [[nodiscard]] bool DISK_CreateFolder(gpg::StrArg sourcePath);
+
+  /**
+   * Address: 0x0045A7A0 (FUN_0045A7A0)
+   * Mangled: ?DISK_Recycle@Moho@@YAXVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Moves one file/folder path into shell recycle bin without UI prompts.
+   */
+  void DISK_Recycle(gpg::StrArg sourcePath);
+
+  /**
    * Address: 0x00459DE0 (FUN_00459DE0)
    * Mangled:
    * ?DISK_SetupDataAndSearchPaths@Moho@@YA_NV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV?$basic_path@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@Upath_traits@filesystem@boost@@@filesystem@boost@@@Z
@@ -474,6 +775,14 @@ namespace moho
    * early startup services.
    */
   bool DISK_SetupDataAndSearchPaths(const msvc8::string& dataPathScriptName, const std::filesystem::path& launchDir);
+
+  /**
+   * Address: 0x00459DA0 (FUN_00459DA0, ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)
+   *
+   * What it does:
+   * Returns a copy of startup-configured URL protocols allowed by the disk layer.
+   */
+  [[nodiscard]] std::vector<std::wstring> DISK_GetAllowedProtocols();
 
   [[nodiscard]] std::filesystem::path DISK_GetLaunchDirectory();
   [[nodiscard]] std::filesystem::path DISK_GetDataPathScriptFile();

@@ -1,3 +1,131 @@
+--- a/boost/function/function_base.hpp
++++ b/boost/function/function_base.hpp
+@@ -301,13 +301,13 @@
+         manager(const function_buffer& in_buffer, function_buffer& out_buffer, 
+                 functor_manager_operation_type op, mpl::false_)
+         {
+-#ifndef BOOST_NO_STD_ALLOCATOR
+-          typedef typename Allocator::template rebind<functor_type>::other
+-            allocator_type;
+-          typedef typename allocator_type::pointer pointer_type;
+-#else
+-          typedef functor_type* pointer_type;
+-#endif // BOOST_NO_STD_ALLOCATOR
++#ifndef BOOST_NO_STD_ALLOCATOR
++          typedef std::allocator<functor_type> allocator_type;
++          typedef std::allocator_traits<allocator_type> allocator_traits;
++          typedef functor_type* pointer_type;
++#else
++          typedef functor_type* pointer_type;
++#endif // BOOST_NO_STD_ALLOCATOR
+ 
+ #  ifndef BOOST_NO_STD_ALLOCATOR
+           allocator_type allocator;
+@@ -320,9 +320,9 @@
+               (const functor_type*)(in_buffer.obj_ptr);
+ 
+             // Clone the functor
+-#  ifndef BOOST_NO_STD_ALLOCATOR
+-            pointer_type copy = allocator.allocate(1);
+-            allocator.construct(copy, *f);
++#  ifndef BOOST_NO_STD_ALLOCATOR
++            pointer_type copy = allocator_traits::allocate(allocator, 1);
++            allocator_traits::construct(allocator, copy, *f);
+ 
+             // Get back to the original pointer type
+             functor_type* new_f = static_cast<functor_type*>(copy);
+@@ -335,15 +335,15 @@
+             functor_type* f =
+               static_cast<functor_type*>(out_buffer.obj_ptr);
+ 
+-#  ifndef BOOST_NO_STD_ALLOCATOR
+-            /* Cast from the functor pointer type to the allocator's pointer
+-               type */
+-            pointer_type victim = static_cast<pointer_type>(f);
+-
+-            // Destroy and deallocate the functor
+-            allocator.destroy(victim);
+-            allocator.deallocate(victim, 1);
+-#  else
++#  ifndef BOOST_NO_STD_ALLOCATOR
++            /* Cast from the functor pointer type to the allocator's pointer
++               type */
++            pointer_type victim = static_cast<pointer_type>(f);
++
++            // Destroy and deallocate the functor
++            allocator_traits::destroy(allocator, victim);
++            allocator_traits::deallocate(allocator, victim, 1);
++#  else
+             delete f;
+ #  endif // BOOST_NO_STD_ALLOCATOR
+             out_buffer.obj_ptr = 0;
+
+--- a/boost/function/function_template.hpp
++++ b/boost/function/function_template.hpp
+@@ -9,7 +9,8 @@
+ 
+ // Note: this header is a header template and must NOT have multiple-inclusion
+ // protection.
+-#include <boost/function/detail/prologue.hpp>
++#include <boost/function/detail/prologue.hpp>
++#include <memory>
+ 
+ #define BOOST_FUNCTION_TEMPLATE_PARMS BOOST_PP_ENUM_PARAMS(BOOST_FUNCTION_NUM_ARGS, typename T)
+ 
+@@ -382,20 +383,18 @@
+         void 
+         assign_functor(FunctionObj f, function_buffer& functor, mpl::false_)
+         {
+-#ifndef BOOST_NO_STD_ALLOCATOR
+-          typedef typename Allocator::template rebind<FunctionObj>::other
+-            allocator_type;
+-          typedef typename allocator_type::pointer pointer_type;
+-
+-          allocator_type allocator;
+-          pointer_type copy = allocator.allocate(1);
+-          allocator.construct(copy, f);
+-
+-          // Get back to the original pointer type
+-          functor.obj_ptr = static_cast<FunctionObj*>(copy);
+-#  else
+-          functor.obj_ptr = new FunctionObj(f);
+-#  endif // BOOST_NO_STD_ALLOCATOR
++#ifndef BOOST_NO_STD_ALLOCATOR
++          typedef std::allocator<FunctionObj> allocator_type;
++
++          allocator_type allocator;
++          FunctionObj* copy = std::allocator_traits<allocator_type>::allocate(allocator, 1);
++          std::allocator_traits<allocator_type>::construct(allocator, copy, f);
++
++          // Get back to the original pointer type
++          functor.obj_ptr = copy;
++#  else
++          functor.obj_ptr = new FunctionObj(f);
++#  endif // BOOST_NO_STD_ALLOCATOR
+         }
+ 
+         template<typename FunctionObj>
+
+--- a/boost/get_pointer.hpp
++++ b/boost/get_pointer.hpp
+@@ -18,10 +18,12 @@
+ 
+ // get_pointer(shared_ptr<T> const & p) has been moved to shared_ptr.hpp
+ 
+-template<class T> T * get_pointer(std::auto_ptr<T> const& p)
+-{
+-    return p.get();
+-}
++#if !defined(BOOST_NO_AUTO_PTR)
++template<class T> T * get_pointer(std::auto_ptr<T> const& p)
++{
++    return p.get();
++}
++#endif
+ 
+ 
+ } // namespace boost
+
 --- a/boost/thread/mutex.hpp
 +++ b/boost/thread/mutex.hpp
 @@ -33,13 +33,16 @@
@@ -71,6 +199,7 @@
  
  private:
  #if defined(BOOST_HAS_WINTHREADS)
+
 --- a/boost/thread/recursive_mutex.hpp
 +++ b/boost/thread/recursive_mutex.hpp
 @@ -32,13 +32,16 @@
@@ -79,16 +208,13 @@
  {
 -public:
 -    friend class detail::thread::lock_ops<recursive_mutex>;
--
--    typedef detail::thread::scoped_lock<recursive_mutex> scoped_lock;
--
--    recursive_mutex();
--    ~recursive_mutex();
 +public:
 +    friend class detail::thread::lock_ops<recursive_mutex>;
-+
-+    typedef detail::thread::scoped_lock<recursive_mutex> scoped_lock;
-+
+ 
+     typedef detail::thread::scoped_lock<recursive_mutex> scoped_lock;
+ 
+-    recursive_mutex();
+-    ~recursive_mutex();
 +    recursive_mutex();
 +    ~recursive_mutex();
 +
@@ -147,235 +273,55 @@
  
  private:
  #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
+
 --- a/boost/thread/xtime.hpp
 +++ b/boost/thread/xtime.hpp
-@@ -7,11 +7,17 @@
- #ifndef BOOST_XTIME_WEK070601_HPP
- #define BOOST_XTIME_WEK070601_HPP
+@@ -11,11 +11,17 @@
  
--#include <boost/thread/detail/config.hpp>
--
--#include <boost/cstdint.hpp>
--
+ #include <boost/cstdint.hpp>
+ 
 -namespace boost {
-+#include <boost/thread/detail/config.hpp>
-+
-+#include <boost/cstdint.hpp>
-+
-+// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
-+// Boost.Thread's TIME_UTC enum constant.
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
-+namespace boost {
- 
- enum xtime_clock_types
- {
---- a/libs/thread/src/condition.cpp
-+++ b/libs/thread/src/condition.cpp
-@@ -21,16 +21,22 @@
- #   include <windows.h>
- #elif defined(BOOST_HAS_PTHREADS)
- #   include <errno.h>
--#elif defined(BOOST_HAS_MPTASKS)
--#   include <MacErrors.h>
--#   include "mac/init.hpp"
--#   include "mac/safe.hpp"
--#endif
 -
--// The following include can be removed after the bug on QNX
--// has been tracked down. I need this only for debugging
--//#if !defined(NDEBUG) && defined(BOOST_HAS_PTHREADS)
--#include <iostream>
-+#elif defined(BOOST_HAS_MPTASKS)
-+#   include <MacErrors.h>
-+#   include "mac/init.hpp"
-+#   include "mac/safe.hpp"
-+#endif
-+
-+// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
-+// Boost.Thread's TIME_UTC enum constant.
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
-+// The following include can be removed after the bug on QNX
-+// has been tracked down. I need this only for debugging
-+//#if !defined(NDEBUG) && defined(BOOST_HAS_PTHREADS)
-+#include <iostream>
- //#endif
- 
- namespace boost {
---- a/libs/thread/src/mutex.cpp
-+++ b/libs/thread/src/mutex.cpp
-@@ -24,13 +24,19 @@
- #   include "mutex.inl"
- #elif defined(BOOST_HAS_PTHREADS)
- #   include <errno.h>
--#elif defined(BOOST_HAS_MPTASKS)
--#    include <MacErrors.h>
--#    include "mac/init.hpp"
--#    include "mac/safe.hpp"
--#endif
--
--namespace boost {
-+#elif defined(BOOST_HAS_MPTASKS)
-+#    include <MacErrors.h>
-+#    include "mac/init.hpp"
-+#    include "mac/safe.hpp"
-+#endif
-+
-+// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
-+// Boost.Thread's TIME_UTC enum constant.
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
-+namespace boost {
- 
- #if defined(BOOST_HAS_WINTHREADS)
- 
---- a/libs/thread/src/once.cpp
-+++ b/libs/thread/src/once.cpp
-@@ -111,19 +111,23 @@
- 
- // The friendly form of InterlockedCompareExchange that defers
- // according to the above function type wrappers.
--inline LONG compare_exchange(volatile LPLONG dest, LONG exch, LONG cmp)
+-enum xtime_clock_types
 -{
--#ifdef _WIN64
--    // Original patch from Anthony Williams.
--    // I (Roland Schwarz) am trying this for RC_1_34_0, since x64 regressions are
--    // currently not run on x64 platforms for HEAD
--    return InterlockedCompareExchange(dest, exch,cmp);
--#else    
--    return ice_wrapper(&InterlockedCompareExchange, dest, exch, cmp);
--#endif
--}
--}
--#endif
-+inline LONG compare_exchange(volatile LONG* dest, LONG exch, LONG cmp)
-+{
-+#ifdef _WIN64
-+    // Original patch from Anthony Williams.
-+    // I (Roland Schwarz) am trying this for RC_1_34_0, since x64 regressions are
-+    // currently not run on x64 platforms for HEAD
-+    return InterlockedCompareExchange(dest, exch,cmp);
-+#else    
-+#   if defined(BOOST_MSVC)
-+    return _InterlockedCompareExchange(dest, exch, cmp);
-+#   else
-+    return ice_wrapper(&InterlockedCompareExchange, dest, exch, cmp);
-+#   endif
-+#endif
-+}
-+}
-+#endif
- 
- namespace boost {
- 
---- a/libs/thread/src/recursive_mutex.cpp
-+++ b/libs/thread/src/recursive_mutex.cpp
-@@ -23,12 +23,18 @@
- #   include "mutex.inl"
- #elif defined(BOOST_HAS_PTHREADS)
- #   include <errno.h>
--#elif defined(BOOST_HAS_MPTASKS)
--#   include <MacErrors.h>
--#   include "safe.hpp"
--#endif
--
--namespace boost {
-+#elif defined(BOOST_HAS_MPTASKS)
-+#   include <MacErrors.h>
-+#   include "safe.hpp"
-+#endif
-+
-+// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
-+// Boost.Thread's TIME_UTC enum constant.
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
+-    TIME_UTC=1
 +namespace boost {
++
++#if defined(TIME_UTC) && defined(_MSC_VER)
++# pragma push_macro("TIME_UTC")
++# undef TIME_UTC
++# define BOOST_THREAD_RESTORE_TIME_UTC
++#endif
++
++enum xtime_clock_types
++{
++    TIME_UTC=1
+ //    TIME_TAI,
+ //    TIME_MONOTONIC,
+ //    TIME_PROCESS,
+@@ -41,14 +47,19 @@
  
- #if defined(BOOST_HAS_WINTHREADS)
+ int BOOST_THREAD_DECL xtime_get(struct xtime* xtp, int clock_type);
  
---- a/libs/thread/src/thread.cpp
-+++ b/libs/thread/src/thread.cpp
-@@ -26,11 +26,17 @@
- 
- #include "timeconv.inl"
- 
--#if defined(BOOST_HAS_WINTHREADS)
--#   include "boost/thread/detail/tss_hooks.hpp"
--#endif
+-inline int xtime_cmp(const xtime& xt1, const xtime& xt2)
+-{
++inline int xtime_cmp(const xtime& xt1, const xtime& xt2)
++{
+     if (xt1.sec == xt2.sec)
+         return (int)(xt1.nsec - xt2.nsec);
+     else 
+         return (xt1.sec > xt2.sec) ? 1 : -1;
+-}
 -
--namespace {
-+#if defined(BOOST_HAS_WINTHREADS)
-+#   include "boost/thread/detail/tss_hooks.hpp"
+-} // namespace boost
++}
++
++#if defined(BOOST_THREAD_RESTORE_TIME_UTC) && defined(_MSC_VER)
++# pragma pop_macro("TIME_UTC")
++# undef BOOST_THREAD_RESTORE_TIME_UTC
 +#endif
 +
-+// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
-+// Boost.Thread's TIME_UTC enum constant.
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
-+namespace {
++} // namespace boost
  
- #if defined(BOOST_HAS_WINTHREADS) && defined(BOOST_NO_THREADEX)
- // Windows CE doesn't define _beginthreadex
---- a/libs/thread/src/timeconv.inl
-+++ b/libs/thread/src/timeconv.inl
-@@ -4,12 +4,16 @@
- //  Distributed under the Boost Software License, Version 1.0. (See accompanying 
- //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
- 
--// boostinspect:nounnamed
--
--namespace {
--const int MILLISECONDS_PER_SECOND = 1000;
--const int NANOSECONDS_PER_SECOND = 1000000000;
--const int NANOSECONDS_PER_MILLISECOND = 1000000;
-+// boostinspect:nounnamed
-+
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
-+namespace {
-+const int MILLISECONDS_PER_SECOND = 1000;
-+const int NANOSECONDS_PER_SECOND = 1000000000;
-+const int NANOSECONDS_PER_MILLISECOND = 1000000;
- 
- const int MICROSECONDS_PER_SECOND = 1000000;
- const int NANOSECONDS_PER_MICROSECOND = 1000;
---- a/libs/thread/src/xtime.cpp
-+++ b/libs/thread/src/xtime.cpp
-@@ -17,12 +17,18 @@
- #   include <boost/cstdint.hpp>
- #elif defined(BOOST_HAS_GETTIMEOFDAY)
- #   include <sys/time.h>
--#elif defined(BOOST_HAS_MPTASKS)
--#   include <DriverServices.h>
--#   include <boost/thread/detail/force_cast.hpp>
--#endif
--
--#include <cassert>
-+#elif defined(BOOST_HAS_MPTASKS)
-+#   include <DriverServices.h>
-+#   include <boost/thread/detail/force_cast.hpp>
-+#endif
-+
-+// Modern Windows UCRT defines TIME_UTC as a macro, which collides with
-+// Boost.Thread's TIME_UTC enum constant.
-+#ifdef TIME_UTC
-+#   undef TIME_UTC
-+#endif
-+
-+#include <cassert>
- 
- namespace boost {
- 
+ #endif //BOOST_XTIME_WEK070601_HPP
+

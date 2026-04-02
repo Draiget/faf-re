@@ -15,6 +15,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0048EDB0 (FUN_0048EDB0, Moho::CParticleTextureTypeInfo::CParticleTextureTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for
+     * `CParticleTexture`.
+     */
+    CParticleTextureTypeInfo();
+
+    /**
      * Address: 0x0048EE40 (FUN_0048EE40, Moho::CParticleTextureTypeInfo::dtr)
      * Slot: 2
      */
@@ -39,6 +48,14 @@ namespace moho
      */
     void Init() override;
   };
+
+  /**
+   * Address: 0x00BC5250 (FUN_00BC5250, register_CParticleTextureTypeInfo)
+   *
+   * What it does:
+   * Materializes and startup-registers `CParticleTextureTypeInfo`.
+   */
+  int register_CParticleTextureTypeInfo();
 
   static_assert(sizeof(CParticleTextureTypeInfo) == 0x64, "CParticleTextureTypeInfo size must be 0x64");
 } // namespace moho

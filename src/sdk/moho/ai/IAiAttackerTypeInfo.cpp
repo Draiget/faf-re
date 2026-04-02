@@ -1,10 +1,44 @@
 #include "moho/ai/IAiAttackerTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/ai/IAiAttacker.h"
 
 using namespace moho;
+
+namespace
+{
+  alignas(IAiAttackerTypeInfo) unsigned char gIAiAttackerTypeInfoStorage[sizeof(IAiAttackerTypeInfo)];
+  bool gIAiAttackerTypeInfoConstructed = false;
+
+  [[nodiscard]] IAiAttackerTypeInfo* AcquireIAiAttackerTypeInfo()
+  {
+    if (!gIAiAttackerTypeInfoConstructed) {
+      new (gIAiAttackerTypeInfoStorage) IAiAttackerTypeInfo();
+      gIAiAttackerTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<IAiAttackerTypeInfo*>(gIAiAttackerTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00BF8280 (FUN_00BF8280, sub_BF8280)
+   *
+   * What it does:
+   * Tears down recovered static `IAiAttackerTypeInfo` storage.
+   */
+  void cleanup_IAiAttackerTypeInfo()
+  {
+    if (!gIAiAttackerTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireIAiAttackerTypeInfo()->~IAiAttackerTypeInfo();
+    gIAiAttackerTypeInfoConstructed = false;
+  }
+} // namespace
 
 /**
  * Address: 0x005D5BA0 (FUN_005D5BA0, scalar deleting thunk)
@@ -44,4 +78,18 @@ void IAiAttackerTypeInfo::Init()
   }
 
   Finish();
+}
+
+/**
+ * Address: 0x00BCE7B0 (FUN_00BCE7B0, sub_BCE7B0)
+ *
+ * What it does:
+ * Registers `IAiAttacker` type-info object and installs process-exit cleanup.
+ */
+int moho::register_IAiAttackerTypeInfo()
+{
+  auto* const type = AcquireIAiAttackerTypeInfo();
+  gpg::PreRegisterRType(typeid(IAiAttacker), type);
+  IAiAttacker::sType = type;
+  return std::atexit(&cleanup_IAiAttackerTypeInfo);
 }

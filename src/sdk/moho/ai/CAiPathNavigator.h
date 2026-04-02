@@ -127,6 +127,22 @@ namespace moho
     [[nodiscard]]
     bool CanPathTo(const SAiNavigatorGoal& goal, Wm3::Vector3f* outTargetPos) const;
 
+    /**
+     * Address: 0x005B0F10 (FUN_005B0F10, Moho::CAiPathNavigator::MemberDeserialize)
+     *
+     * What it does:
+     * Loads one serialized navigator state payload from archive storage.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
+
+    /**
+     * Address: 0x005B12A0 (FUN_005B12A0, Moho::CAiPathNavigator::MemberSerialize)
+     *
+     * What it does:
+     * Saves one serialized navigator state payload to archive storage.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
+
     [[nodiscard]]
     SNavPath* GetPath() noexcept
     {

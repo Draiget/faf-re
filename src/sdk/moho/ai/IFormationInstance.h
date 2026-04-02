@@ -2,6 +2,11 @@
 
 #include <cstdint>
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   /**
@@ -17,6 +22,8 @@ namespace moho
   class IFormationInstance
   {
   public:
+    inline static gpg::RType* sType = nullptr;
+
     virtual void operator_delete(std::int32_t deleteFlags) = 0;
   };
 

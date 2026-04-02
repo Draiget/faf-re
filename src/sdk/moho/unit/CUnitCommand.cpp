@@ -1,14 +1,20 @@
 #include "CUnitCommand.h"
 
+#include <cstdio>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 
 #include "moho/ai/CAiFormationInstance.h"
+#include "moho/command/CCommandDb.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/CountedObject.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 
@@ -28,6 +34,46 @@ namespace
   static_assert(sizeof(CommandOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "CommandOwnerSlotNode size");
   static_assert(sizeof(BroadcasterOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "BroadcasterOwnerSlotNode size");
   static_assert(sizeof(EntityOwnerSlotNode) == sizeof(std::uintptr_t) * 2u, "EntityOwnerSlotNode size");
+
+  constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
+  constexpr const char* kCommandTypeKey = "CommandType";
+  constexpr const char* kXKey = "X";
+  constexpr const char* kYKey = "Y";
+  constexpr const char* kZKey = "Z";
+  constexpr const char* kTargetIdKey = "TargetId";
+  constexpr const char* kBlueprintIdKey = "BlueprintId";
+
+  template <typename TValue>
+  void SetCommandQueueField(LuaPlus::LuaObject& row, const char* key, const TValue& value);
+
+  template <>
+  void SetCommandQueueField<std::int32_t>(LuaPlus::LuaObject& row, const char* const key, const std::int32_t& value)
+  {
+    row.SetInteger(key, value);
+  }
+
+  template <>
+  void SetCommandQueueField<float>(LuaPlus::LuaObject& row, const char* const key, const float& value)
+  {
+    row.SetNumber(key, value);
+  }
+
+  template <>
+  void SetCommandQueueField<const char*>(LuaPlus::LuaObject& row, const char* const key, const char* const& value)
+  {
+    row.SetString(key, value ? value : "");
+  }
+
+  [[nodiscard]] const char* ResolveBlueprintId(const CUnitCommand& command) noexcept
+  {
+    const REntityBlueprint* const blueprint = command.mConstDat.blueprint;
+    if (!blueprint) {
+      return nullptr;
+    }
+
+    const char* const blueprintId = blueprint->mBlueprintId.c_str();
+    return (blueprintId && blueprintId[0] != '\0') ? blueprintId : nullptr;
+  }
 
   struct CUnitCommandDestroyRuntimeView
   {
@@ -71,6 +117,29 @@ namespace
 
     (void)object->ReleaseReference();
     object = nullptr;
+  }
+
+  void CopyIssueDataToVariablePayload(const SSTICommandIssueData& issueData, SSTICommandVariableData& variableData)
+  {
+    variableData = SSTICommandVariableData{};
+    variableData.v1 = issueData.unk04;
+    variableData.v2 = issueData.mIndex;
+    variableData.mCmdType = issueData.mCommandType;
+    variableData.mTarget1 = issueData.mTarget;
+    variableData.mTarget2 = issueData.mTarget2;
+    variableData.v14 = issueData.unk38;
+
+    variableData.mCells.clear();
+    variableData.mCells.reserve(issueData.mCells.Size());
+    for (std::size_t i = 0; i < issueData.mCells.Size(); ++i) {
+      variableData.mCells.push_back(issueData.mCells[i]);
+    }
+
+    variableData.v19 = issueData.unk64;
+    variableData.v20 = issueData.unk68;
+    variableData.mMaxCount = issueData.unk6C;
+    variableData.mCount = issueData.unk70;
+    variableData.v23 = issueData.unk74;
   }
 
 } // namespace
@@ -181,6 +250,100 @@ bool SCommandUnitSet::RemoveUnitSorted(Unit* const unit)
 
   mVec.end_ = begin + size - 1;
   return true;
+}
+
+/**
+ * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
+ *
+ * What it does:
+ * Initializes one command from issue payload lanes, updates sim command
+ * digest/counter state, and links coordinating-order relationships.
+ */
+CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData)
+  : unk0(nullptr)
+  , mSim(sim)
+  , mConstDat{}
+  , mVarDat{}
+  , unk1(nullptr)
+  , mUnitSet{}
+  , mFormationInstance(nullptr)
+  , mTarget{}
+  , mInstanceSerial(0)
+  , mHasPublishedCommandEvent(false)
+  , mNeedsUpdate(true)
+  , mUnknownFlag142(false)
+  , mUnknownFlag143(false)
+  , mCoordinatingOrders{}
+  , mUnknownFlag154(false)
+  , mUnit()
+  , mArgs(issueData.mObject)
+  , mUnknownTailInt(0)
+{
+  mPrev = this;
+  mNext = this;
+
+  mConstDat.cmd = issueData.nextCommandId;
+  mConstDat.unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(issueData.unk38));
+  mConstDat.origin = issueData.mOri;
+  mConstDat.unk1 = issueData.unk4C;
+  mConstDat.blueprint = static_cast<REntityBlueprint*>(issueData.mBlueprint);
+  mConstDat.unk2 = SCR_ToString(issueData.mObject);
+
+  CopyIssueDataToVariablePayload(issueData, mVarDat);
+  mUnitSet.mVec = gpg::core::FastVector<CScriptObject*>{};
+  mTarget.DecodeFromSSTITarget(issueData.mTarget, sim);
+
+  if (!sim) {
+    return;
+  }
+
+  const std::uint32_t commandSerial = sim->mReserved98C;
+  sim->mReserved98C = commandSerial + 1u;
+  mInstanceSerial = static_cast<CmdId>(commandSerial);
+
+  sim->Logf("Creating command 0x%08x, type=%d\n", mConstDat.cmd, static_cast<int>(mVarDat.mCmdType));
+  sim->mContext.Update(&mConstDat.cmd, sizeof(mConstDat.cmd));
+  const std::int32_t commandTypeValue = static_cast<std::int32_t>(mVarDat.mCmdType);
+  sim->mContext.Update(&commandTypeValue, sizeof(commandTypeValue));
+
+  if (!sim->mCommandDB || issueData.unk04 == -1) {
+    return;
+  }
+
+  const auto it = sim->mCommandDB->commands.find(static_cast<CmdId>(issueData.unk04));
+  if (it == sim->mCommandDB->commands.end()) {
+    return;
+  }
+
+  CUnitCommand* const coordinatingCommand = &it->second;
+  if (!coordinatingCommand) {
+    return;
+  }
+
+  const msvc8::vector<WeakPtr<CUnitCommand>> coordinatingPeers = coordinatingCommand->GetCoordinatingOrdersSnapshot();
+  for (const WeakPtr<CUnitCommand>& peerWeak : coordinatingPeers) {
+    CUnitCommand* const peer = peerWeak.GetObjectPtr();
+    if (!peer || peer == this) {
+      continue;
+    }
+
+    peer->LinkCoordinatingOrder(this);
+    LinkCoordinatingOrder(peer);
+  }
+
+  coordinatingCommand->LinkCoordinatingOrder(this);
+  LinkCoordinatingOrder(coordinatingCommand);
+}
+
+/**
+ * Address: 0x006E7D40 (FUN_006E7D40, ?GetCoordinateWith@CUnitCommand@Moho@@QBE?AV?$vector@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@V?$allocator@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@@std@@@std@@XZ)
+ *
+ * What it does:
+ * Returns a by-value snapshot of this command's coordinating-order weak links.
+ */
+msvc8::vector<WeakPtr<CUnitCommand>> CUnitCommand::GetCoordinatingOrdersSnapshot() const
+{
+  return mCoordinatingOrders;
 }
 
 /**
@@ -442,4 +605,40 @@ void CUnitCommand::LinkCoordinatingOrder(CUnitCommand* const other)
   auto& coordinatingOrders = other->mCoordinatingOrders;
   coordinatingOrders.push_back(temp);
   temp.UnlinkFromOwnerChain();
+}
+
+/**
+ * Address: 0x0128E638 (FUN_0128E638, SimGetCommandQueueInsert)
+ *
+ * What it does:
+ * Builds one command-queue Lua row from `command` and appends it to
+ * `queueArray`.
+ */
+void moho::SimGetCommandQueueInsert(LuaPlus::LuaObject& queueArray, const CUnitCommand& command)
+{
+  LuaPlus::LuaState* const state = queueArray.GetActiveState();
+  if (!state) {
+    return;
+  }
+
+  LuaPlus::LuaObject row(state);
+  row.AssignNewTable(state, 0, 0);
+
+  SetCommandQueueField<std::int32_t>(row, kCommandTypeKey, static_cast<std::int32_t>(command.mVarDat.mCmdType));
+  SetCommandQueueField<float>(row, kXKey, command.mVarDat.mTarget1.mPos.x);
+  SetCommandQueueField<float>(row, kYKey, command.mVarDat.mTarget1.mPos.y);
+  SetCommandQueueField<float>(row, kZKey, command.mVarDat.mTarget1.mPos.z);
+
+  const std::uint32_t targetEntityId = command.mVarDat.mTarget1.mEntityId;
+  if (targetEntityId != kNoTargetEntityId) {
+    char targetIdText[0x10] = {};
+    std::snprintf(targetIdText, sizeof(targetIdText), "%d", static_cast<std::int32_t>(targetEntityId));
+    SetCommandQueueField<const char*>(row, kTargetIdKey, targetIdText);
+  }
+
+  if (const char* const blueprintId = ResolveBlueprintId(command)) {
+    SetCommandQueueField<const char*>(row, kBlueprintIdKey, blueprintId);
+  }
+
+  queueArray.SetObject(queueArray.GetN() + 1, row);
 }

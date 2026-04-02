@@ -14,6 +14,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A4560 (FUN_005A4560, ctor)
+     *
+     * What it does:
+     * Preregisters `CAiNavigatorLand` RTTI so lookup resolves to this type
+     * helper.
+     */
+    CAiNavigatorLandTypeInfo();
+
+    /**
      * Address: 0x005A45F0 (FUN_005A45F0, scalar deleting thunk)
      *
      * VFTable SLOT: 2
@@ -37,5 +46,13 @@ namespace moho
   };
 
   static_assert(sizeof(CAiNavigatorLandTypeInfo) == 0x64, "CAiNavigatorLandTypeInfo size must be 0x64");
-} // namespace moho
 
+  /**
+   * Address: 0x00BCC780 (FUN_00BCC780)
+   *
+   * What it does:
+   * Constructs startup-owned `CAiNavigatorLandTypeInfo` storage and installs
+   * process-exit cleanup.
+   */
+  int register_CAiNavigatorLandTypeInfo();
+} // namespace moho

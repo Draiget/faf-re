@@ -15,6 +15,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006FDB60 (FUN_006FDB60, Moho::SimArmySerializer::Deserialize)
+     *
+     * What it does:
+     * Thin ser-load thunk that forwards to `SimArmy::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x006FDB70 (FUN_006FDB70, Moho::SimArmySerializer::Serialize)
+     *
+     * What it does:
+     * Thin ser-save thunk that forwards to `SimArmy::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00701610 (FUN_00701610, gpg::SerSaveLoadHelper_SimArmy::Init)
      *
      * What it does:

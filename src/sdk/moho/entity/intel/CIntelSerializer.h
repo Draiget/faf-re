@@ -27,14 +27,12 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
+    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
     gpg::RType::load_func_t mLoadCallback;
     gpg::RType::save_func_t mSaveCallback;
   };
 
-  static_assert(offsetof(CIntelSerializer, mHelperNext) == 0x04, "CIntelSerializer::mHelperNext offset must be 0x04");
-  static_assert(offsetof(CIntelSerializer, mHelperPrev) == 0x08, "CIntelSerializer::mHelperPrev offset must be 0x08");
+  static_assert(offsetof(CIntelSerializer, mHelperLinks) == 0x04, "CIntelSerializer::mHelperLinks offset must be 0x04");
   static_assert(
     offsetof(CIntelSerializer, mLoadCallback) == 0x0C, "CIntelSerializer::mLoadCallback offset must be 0x0C"
   );
@@ -43,3 +41,4 @@ namespace moho
   );
   static_assert(sizeof(CIntelSerializer) == 0x14, "CIntelSerializer size must be 0x14");
 } // namespace moho
+

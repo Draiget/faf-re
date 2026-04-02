@@ -22,6 +22,7 @@ namespace moho
   class CD3DDepthStencil;
   class CD3DEffect;
   class CD3DIndexSheet;
+  class ID3DRenderTarget;
   class CD3DRenderTarget;
   class CD3DVertexFormat;
   class CD3DVertexSheet;
@@ -38,6 +39,14 @@ namespace moho
     using TextureResourceHandle = boost::shared_ptr<RD3DTextureResource>;
     using PrefetchDataHandle = boost::shared_ptr<PrefetchData>;
     using DynamicTextureSheetWeakHandle = boost::weak_ptr<CD3DDynamicTextureSheet>;
+
+    /**
+     * Address: 0x00440630 (FUN_00440630, sub_440630)
+     *
+     * What it does:
+     * Initializes the base interface vftable lane for D3D device-resource wrappers.
+     */
+    ID3DDeviceResources();
 
     /**
      * Address: 0x00A82547 (_purecall slot)
@@ -202,11 +211,12 @@ namespace moho
      * Address: 0x00A82547 (_purecall slot)
      *
      * What it does:
-     * Copies one dynamic texture sheet, recreating intermediate surface on mismatch.
+     * Copies one render-target surface into a dynamic texture sheet, recreating
+     * the destination texture when current dimensions mismatch.
      */
     virtual DynamicTextureSheetHandle& Func10(
       DynamicTextureSheetHandle& outSheet,
-      int arg2,
+      ID3DRenderTarget* sourceRenderTarget,
       DynamicTextureSheetHandle currentSheet
     ) = 0;
 
@@ -224,9 +234,8 @@ namespace moho
      * What it does:
      * Dumps preloaded texture usage lines to a stream.
      */
-    virtual void Func11(gpg::Stream* stream) = 0;
+    virtual void DumpPreloadedTextures(gpg::Stream* stream) = 0;
   };
 
   static_assert(sizeof(ID3DDeviceResources) == 0x04, "ID3DDeviceResources size must be 0x04");
 } // namespace moho
-

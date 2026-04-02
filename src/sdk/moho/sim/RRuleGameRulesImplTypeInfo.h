@@ -14,6 +14,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0052B5E0 (FUN_0052B5E0, Moho::RRuleGameRulesImplTypeInfo::RRuleGameRulesImplTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for
+     * `RRuleGameRulesImpl`.
+     */
+    RRuleGameRulesImplTypeInfo();
+
+    /**
      * Address: 0x0052B670 (FUN_0052B670)
      *
      * What it does:
@@ -48,6 +57,14 @@ namespace moho
      */
     static void AddBase_RRuleGameRules(gpg::RType* typeInfo);
   };
+
+  /**
+   * Address: 0x00BC8EF0 (FUN_00BC8EF0, register_RRuleGameRulesImplTypeInfoStartup)
+   *
+   * What it does:
+   * Materializes and startup-registers `RRuleGameRulesImplTypeInfo`.
+   */
+  int register_RRuleGameRulesImplTypeInfoStartup();
 
   static_assert(sizeof(RRuleGameRulesImplTypeInfo) == 0x64, "RRuleGameRulesImplTypeInfo size must be 0x64");
 } // namespace moho

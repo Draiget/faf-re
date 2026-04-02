@@ -383,5 +383,49 @@ namespace moho
     static gpg::RType* sType;
   };
 
+  /**
+   * Address: 0x00BCEFA0 (FUN_00BCEFA0, register_RBroadcasterRType_EAiTransportEvent)
+   *
+   * What it does:
+   * Registers the broadcaster reflection lane for `EAiTransportEvent` and
+   * installs process-exit cleanup.
+   */
+  int register_RBroadcasterRType_EAiTransportEvent();
+
+  /**
+   * Address: 0x00BCEFC0 (FUN_00BCEFC0, register_RListenerRType_EAiTransportEvent)
+   *
+   * What it does:
+   * Registers the listener reflection lane for `EAiTransportEvent` and
+   * installs process-exit cleanup.
+   */
+  int register_RListenerRType_EAiTransportEvent();
+
+  /**
+   * Address: 0x00BCEFE0 (FUN_00BCEFE0, register_RVectorType_int)
+   *
+   * What it does:
+   * Registers `msvc8::vector<int>` reflection metadata and installs cleanup.
+   */
+  int register_RVectorType_int();
+
+  /**
+   * Address: 0x00BCF000 (FUN_00BCF000, register_RVectorType_SAiReservedTransportBone)
+   *
+   * What it does:
+   * Registers `msvc8::vector<SAiReservedTransportBone>` reflection metadata and
+   * installs cleanup.
+   */
+  int register_RVectorType_SAiReservedTransportBone();
+
+  /**
+   * Address: 0x00BCF020 (FUN_00BCF020, register_RVectorType_SAttachPoint)
+   *
+   * What it does:
+   * Registers `msvc8::vector<SAttachPoint>` reflection metadata and installs
+   * cleanup.
+   */
+  int register_RVectorType_SAttachPoint();
+
   static_assert(sizeof(IAiTransport) == 0x0C, "IAiTransport size must be 0x0C");
 } // namespace moho

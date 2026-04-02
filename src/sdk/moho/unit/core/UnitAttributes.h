@@ -19,7 +19,10 @@ namespace moho
     std::uint8_t unknown_0000[0x30];
     float spawnElevationOffset; // +0x30 (mElevation in decompiler output)
     float moveSpeedMult;        // +0x34 (GetAttributes vslot users scale movement tolerances/speeds)
-    std::uint8_t unknown_0038[0x28];
+    std::uint8_t unknown_0038[0x10];
+    float consumptionPerSecondEnergy; // +0x48
+    float consumptionPerSecondMass;   // +0x4C
+    std::uint8_t unknown_0050[0x10];
     std::uint32_t commandCapsMask; // +0x60 (RULEUCC_* bits, e.g. Pause=0x20000)
     std::uint32_t toggleCapsMask;  // +0x64 (RULEUTC_* bits, e.g. GenericToggle=0x40)
     std::uint32_t unknown_0068;    // +0x68
@@ -40,6 +43,14 @@ namespace moho
     offsetof(UnitAttributes, spawnElevationOffset) == 0x30, "UnitAttributes::spawnElevationOffset offset must be 0x30"
   );
   static_assert(offsetof(UnitAttributes, moveSpeedMult) == 0x34, "UnitAttributes::moveSpeedMult offset must be 0x34");
+  static_assert(
+    offsetof(UnitAttributes, consumptionPerSecondEnergy) == 0x48,
+    "UnitAttributes::consumptionPerSecondEnergy offset must be 0x48"
+  );
+  static_assert(
+    offsetof(UnitAttributes, consumptionPerSecondMass) == 0x4C,
+    "UnitAttributes::consumptionPerSecondMass offset must be 0x4C"
+  );
   static_assert(
     offsetof(UnitAttributes, commandCapsMask) == 0x60, "UnitAttributes::commandCapsMask offset must be 0x60"
   );

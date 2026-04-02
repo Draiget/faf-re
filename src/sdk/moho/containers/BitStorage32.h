@@ -23,6 +23,8 @@ namespace moho
 
     /**
      * Address: 0x00440030/FUN_00440030 and 0x0063F8D0/FUN_0063F8D0 equivalent
+     * Address: 0x00443110 (FUN_00443110, storage-reset lane preserving base-word metadata)
+     * Address: 0x00443144 (FUN_00443144, capacity-tail clear lane)
      *
      * What it does:
      * Releases word storage and clears all metadata lanes.
@@ -31,6 +33,7 @@ namespace moho
 
     /**
      * Address: 0x00443150/FUN_00443150 behavior-equivalent shape
+     * Address: 0x00443950 (FUN_00443950, word-window allocation helper lane)
      *
      * std::uint32_t,bool
      *
@@ -41,6 +44,7 @@ namespace moho
 
     /**
      * Address: 0x00642140/FUN_00642140 behavior-equivalent
+     * Address: 0x00443860 (FUN_00443860, bit-cursor test lane)
      *
      * std::uint32_t
      *
@@ -52,6 +56,7 @@ namespace moho
 
     /**
      * Address: 0x0063EF20/FUN_0063EF20 behavior-equivalent
+     * Address: 0x00443830 (FUN_00443830, bit-cursor set/clear lane)
      *
      * std::uint32_t,bool
      *

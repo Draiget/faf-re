@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0076E550 (FUN_0076E550, Moho::CIntelTypeInfo::CIntelTypeInfo)
+     *
+     * What it does:
+     * Constructs `CIntel` type-info storage and preregisters its RTTI mapping.
+     */
+    CIntelTypeInfo();
+
+    /**
      * Address: 0x0076E600 (FUN_0076E600, Moho::CIntelTypeInfo::dtr)
      * Slot: 2
      *
@@ -79,4 +87,20 @@ namespace moho
   };
 
   static_assert(sizeof(CIntelTypeInfo) == 0x64, "CIntelTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00C01D90 (FUN_00C01D90, cleanup_CIntelTypeInfo)
+   *
+   * What it does:
+   * Runs process-exit teardown for startup `CIntelTypeInfo` storage.
+   */
+  void cleanup_CIntelTypeInfo();
+
+  /**
+   * Address: 0x00BDCBC0 (FUN_00BDCBC0, register_CIntelTypeInfo)
+   *
+   * What it does:
+   * Builds startup `CIntelTypeInfo` storage and installs process-exit cleanup.
+   */
+  void register_CIntelTypeInfo();
 } // namespace moho

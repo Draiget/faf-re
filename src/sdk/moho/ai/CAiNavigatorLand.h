@@ -35,6 +35,24 @@ namespace moho
     ~CAiNavigatorLand() override;
 
     /**
+     * Address: 0x005A8F40 (FUN_005A8F40, Moho::CAiNavigatorLand::MemberDeserialize)
+     *
+     * What it does:
+     * Loads base navigator state, owned path-navigator pointer, destination-unit
+     * weak link, and goal rectangle payload.
+     */
+    static void MemberDeserialize(CAiNavigatorLand* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005A9030 (FUN_005A9030, Moho::CAiNavigatorLand::MemberSerialize)
+     *
+     * What it does:
+     * Saves base navigator state, owned path-navigator pointer,
+     * destination-unit weak link, and goal rectangle payload.
+     */
+    static void MemberSerialize(const CAiNavigatorLand* object, gpg::WriteArchive* archive);
+
+    /**
      * Address: 0x005A3ED0 (FUN_005A3ED0)
      *
      * VFTable SLOT: 2
@@ -166,4 +184,3 @@ namespace moho
   );
   static_assert(offsetof(CAiNavigatorLand, mGoal) == 0x74, "CAiNavigatorLand::mGoal offset must be 0x74");
 } // namespace moho
-

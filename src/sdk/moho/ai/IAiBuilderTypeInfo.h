@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0059ED90 (FUN_0059ED90, ctor)
+     *
+     * What it does:
+     * Preregisters `IAiBuilder` RTTI so lookup resolves to this type helper.
+     */
+    IAiBuilderTypeInfo();
+
+    /**
      * Address: 0x0059EE20 (FUN_0059EE20, scalar deleting thunk)
      *
      * VFTable SLOT: 2
@@ -37,4 +45,13 @@ namespace moho
   };
 
   static_assert(sizeof(IAiBuilderTypeInfo) == 0x64, "IAiBuilderTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCC2A0 (FUN_00BCC2A0)
+   *
+   * What it does:
+   * Constructs startup-owned `IAiBuilderTypeInfo` storage and installs
+   * process-exit cleanup.
+   */
+  int register_IAiBuilderTypeInfo();
 } // namespace moho

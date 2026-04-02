@@ -4,7 +4,22 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
+#include <vector>
+
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "moho/misc/WeakPtr.h"
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
 
 namespace
 {
@@ -111,6 +126,258 @@ namespace
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
+  }
+
+  using TypeInfo = moho::CAnimationManipulatorTypeInfo;
+
+  alignas(TypeInfo) unsigned char gCAnimationManipulatorTypeInfoStorage[sizeof(TypeInfo)] = {};
+  bool gCAnimationManipulatorTypeInfoConstructed = false;
+  moho::CAnimationManipulatorConstruct gCAnimationManipulatorConstruct;
+  moho::CAnimationManipulatorSerializer gCAnimationManipulatorSerializer;
+  gpg::RType* gWeakPtrUnitType = nullptr;
+  gpg::RType* gVectorBoolType = nullptr;
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mNext = self;
+    helper.mPrev = self;
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
+  {
+    if (helper.mNext != nullptr && helper.mPrev != nullptr) {
+      static_cast<gpg::SerHelperBase*>(helper.mNext)->mPrev = static_cast<gpg::SerHelperBase*>(helper.mPrev);
+      static_cast<gpg::SerHelperBase*>(helper.mPrev)->mNext = static_cast<gpg::SerHelperBase*>(helper.mNext);
+    }
+
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mPrev = self;
+    helper.mNext = self;
+    return self;
+  }
+
+  [[nodiscard]] TypeInfo& GetCAnimationManipulatorTypeInfo() noexcept
+  {
+    if (!gCAnimationManipulatorTypeInfoConstructed) {
+      auto* const typeInfo = new (gCAnimationManipulatorTypeInfoStorage) TypeInfo();
+      gpg::PreRegisterRType(typeid(moho::CAnimationManipulator), typeInfo);
+      gCAnimationManipulatorTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<TypeInfo*>(gCAnimationManipulatorTypeInfoStorage);
+  }
+
+  [[nodiscard]] gpg::RType* CachedIAniManipulatorTypeForSerializer()
+  {
+    if (!moho::IAniManipulator::sType) {
+      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
+    }
+    return moho::IAniManipulator::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
+  {
+    if (!gWeakPtrUnitType) {
+      gWeakPtrUnitType = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+    }
+    return gWeakPtrUnitType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVectorBoolType()
+  {
+    if (!gVectorBoolType) {
+      gVectorBoolType = gpg::LookupRType(typeid(std::vector<bool>));
+    }
+    return gVectorBoolType;
+  }
+
+  [[nodiscard]] moho::WeakPtr<moho::Unit>* AnimationGoalWeakPtr(moho::CAnimationManipulator* const object)
+  {
+    return reinterpret_cast<moho::WeakPtr<moho::Unit>*>(&object->mOwnerLink);
+  }
+
+  [[nodiscard]] const moho::WeakPtr<moho::Unit>* AnimationGoalWeakPtr(const moho::CAnimationManipulator* const object)
+  {
+    return reinterpret_cast<const moho::WeakPtr<moho::Unit>*>(&object->mOwnerLink);
+  }
+
+  struct ReflectedObjectDeleter
+  {
+    gpg::RType::delete_func_t deleteFunc = nullptr;
+
+    void operator()(void* const object) const noexcept
+    {
+      if (deleteFunc) {
+        deleteFunc(object);
+      }
+    }
+  };
+
+  void PromoteTrackedPointerToShared(gpg::TrackedPointerInfo& tracked)
+  {
+    GPG_ASSERT(tracked.type != nullptr && tracked.type->deleteFunc_ != nullptr);
+    if (!tracked.type || !tracked.type->deleteFunc_) {
+      return;
+    }
+
+    auto* const control = new boost::detail::sp_counted_impl_pd<void*, ReflectedObjectDeleter>(
+      tracked.object, ReflectedObjectDeleter{tracked.type->deleteFunc_}
+    );
+    tracked.sharedObject = tracked.object;
+    tracked.sharedControl = control;
+    tracked.state = gpg::TrackedPointerState::Shared;
+  }
+
+  void ReadSharedAnimationResourcePointer(
+    moho::CAnimationManipulator::AnimationResourceRef& outPointer,
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      outPointer.release();
+      return;
+    }
+
+    if (tracked.state == gpg::TrackedPointerState::Unowned) {
+      PromoteTrackedPointerToShared(tracked);
+    }
+
+    GPG_ASSERT(tracked.state == gpg::TrackedPointerState::Shared);
+    GPG_ASSERT(tracked.sharedObject != nullptr && tracked.sharedControl != nullptr);
+
+    if (tracked.state != gpg::TrackedPointerState::Shared || !tracked.sharedObject || !tracked.sharedControl) {
+      outPointer.release();
+      return;
+    }
+
+    moho::CAnimationManipulator::AnimationResourceRef source{};
+    source.px = tracked.sharedObject;
+    source.pi = tracked.sharedControl;
+    outPointer.assign_retain(source);
+  }
+
+  void WriteSharedAnimationResourcePointer(
+    const moho::CAnimationManipulator::AnimationResourceRef& pointer,
+    gpg::WriteArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RRef objectRef{};
+    objectRef.mObj = pointer.px;
+    if (pointer.px != nullptr) {
+      objectRef.mType = static_cast<gpg::RObject*>(pointer.px)->GetClass();
+      GPG_ASSERT(objectRef.mType != nullptr);
+    } else {
+      objectRef.mType = nullptr;
+    }
+
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, ownerRef);
+  }
+
+  /**
+   * Address: 0x00642A50 (FUN_00642A50, DeserializeCAnimationManipulatorState)
+   *
+   * What it does:
+   * Loads CAnimationManipulator-specific serialization fields after
+   * IAniManipulator base payload.
+   */
+  void DeserializeCAnimationManipulatorState(moho::CAnimationManipulator* const object, gpg::ReadArchive* const archive)
+  {
+    if (!archive || !object) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->Read(CachedIAniManipulatorTypeForSerializer(), static_cast<moho::IAniManipulator*>(object), nullOwner);
+    archive->Read(CachedWeakPtrUnitType(), AnimationGoalWeakPtr(object), nullOwner);
+    archive->Read(CachedVectorBoolType(), &object->mBoneMask, nullOwner);
+    ReadSharedAnimationResourcePointer(object->mAnimationRef, archive, nullOwner);
+    archive->ReadFloat(&object->mRate);
+    archive->ReadFloat(&object->mAnimationTime);
+    archive->ReadFloat(&object->mLastFramePosition);
+    archive->ReadBool(&object->mLooping);
+    archive->ReadBool(&object->mFrameChanged);
+    archive->ReadBool(&object->mIgnoreMotionScaling);
+    archive->ReadBool(&object->mOverwriteMode);
+    archive->ReadBool(&object->mDisableOnSignal);
+    archive->ReadBool(&object->mDirectionalAnim);
+  }
+
+  /**
+   * Address: 0x00642BB0 (FUN_00642BB0, SerializeCAnimationManipulatorState)
+   *
+   * What it does:
+   * Saves CAnimationManipulator-specific serialization fields after
+   * IAniManipulator base payload.
+   */
+  void SerializeCAnimationManipulatorState(
+    const moho::CAnimationManipulator* const object, gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !object) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    archive->Write(CachedIAniManipulatorTypeForSerializer(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(object)), nullOwner);
+    archive->Write(CachedWeakPtrUnitType(), const_cast<moho::WeakPtr<moho::Unit>*>(AnimationGoalWeakPtr(object)), nullOwner);
+    archive->Write(CachedVectorBoolType(), const_cast<moho::SAniManipBitStorage*>(&object->mBoneMask), nullOwner);
+    WriteSharedAnimationResourcePointer(object->mAnimationRef, archive, nullOwner);
+    archive->WriteFloat(object->mRate);
+    archive->WriteFloat(object->mAnimationTime);
+    archive->WriteFloat(object->mLastFramePosition);
+    archive->WriteBool(object->mLooping);
+    archive->WriteBool(object->mFrameChanged);
+    archive->WriteBool(object->mIgnoreMotionScaling);
+    archive->WriteBool(object->mOverwriteMode);
+    archive->WriteBool(object->mDisableOnSignal);
+    archive->WriteBool(object->mDirectionalAnim);
+  }
+
+  gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructImpl()
+  {
+    return UnlinkHelperNode(gCAnimationManipulatorConstruct);
+  }
+
+  gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializerImpl()
+  {
+    return UnlinkHelperNode(gCAnimationManipulatorSerializer);
+  }
+
+  void cleanup_CAnimationManipulatorTypeInfoImpl()
+  {
+    if (!gCAnimationManipulatorTypeInfoConstructed) {
+      return;
+    }
+
+    static_cast<gpg::RType*>(&GetCAnimationManipulatorTypeInfo())->~RType();
+    gCAnimationManipulatorTypeInfoConstructed = false;
+  }
+
+  void CleanupCAnimationManipulatorConstructAtexit()
+  {
+    (void)cleanup_CAnimationManipulatorConstructImpl();
+  }
+
+  void CleanupCAnimationManipulatorSerializerAtexit()
+  {
+    (void)cleanup_CAnimationManipulatorSerializerImpl();
+  }
+
+  void CleanupCAnimationManipulatorTypeInfoAtexit()
+  {
+    cleanup_CAnimationManipulatorTypeInfoImpl();
   }
 } // namespace
 
@@ -341,7 +608,38 @@ namespace moho
   }
 
   /**
-   * Address: 0x00641E70 (FUN_00641E70, sub_641E70)
+   * Address: 0x0063F220 (FUN_0063F220, Moho::CAnimationManipulatorConstruct::Construct)
+   */
+  void CAnimationManipulatorConstruct::Construct(
+    gpg::ReadArchive* const,
+    const int,
+    const int,
+    gpg::SerConstructResult* const result
+  )
+  {
+    CAnimationManipulator* const object = new (std::nothrow) CAnimationManipulator();
+    if (result == nullptr) {
+      delete object;
+      return;
+    }
+
+    const gpg::RRef objectRef = MakeTypedRef(object, CachedCAnimationManipulatorType());
+    result->SetUnowned(objectRef, 0u);
+  }
+
+  /**
+   * Address: 0x00642340 (FUN_00642340, Moho::CAnimationManipulatorConstruct::Deconstruct)
+   */
+  void CAnimationManipulatorConstruct::Deconstruct(void* const objectPtr)
+  {
+    auto* const object = static_cast<CAnimationManipulator*>(objectPtr);
+    if (object != nullptr) {
+      delete object;
+    }
+  }
+
+  /**
+   * Address: 0x00641E70 (FUN_00641E70, Moho::CAnimationManipulatorConstruct::RegisterConstructFunctions)
    */
   void CAnimationManipulatorConstruct::RegisterConstructFunctions()
   {
@@ -352,14 +650,34 @@ namespace moho
   }
 
   /**
-   * Address: 0x00641EF0 (FUN_00641EF0, sub_641EF0)
+   * Address: 0x0063F2C0 (FUN_0063F2C0, Moho::CAnimationManipulatorSerializer::Deserialize)
+   */
+  void CAnimationManipulatorSerializer::Deserialize(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
+  {
+    DeserializeCAnimationManipulatorState(reinterpret_cast<CAnimationManipulator*>(objectPtr), archive);
+  }
+
+  /**
+   * Address: 0x0063F2D0 (FUN_0063F2D0, Moho::CAnimationManipulatorSerializer::Serialize)
+   */
+  void CAnimationManipulatorSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
+  {
+    SerializeCAnimationManipulatorState(reinterpret_cast<const CAnimationManipulator*>(objectPtr), archive);
+  }
+
+  /**
+   * Address: 0x00641EF0 (FUN_00641EF0, Moho::CAnimationManipulatorSerializer::RegisterSerializeFunctions)
    */
   void CAnimationManipulatorSerializer::RegisterSerializeFunctions()
   {
     gpg::RType* const type = CachedCAnimationManipulatorType();
-    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mSerLoadFunc);
     type->serLoadFunc_ = mSerLoadFunc;
-    GPG_ASSERT(type->serSaveFunc_ == nullptr);
+    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerSaveFunc);
     type->serSaveFunc_ = mSerSaveFunc;
   }
 
@@ -386,4 +704,95 @@ namespace moho
     AddIAniManipulatorBase(this);
     Finish();
   }
+
+  /**
+   * Address: 0x00BFAFF0 (FUN_00BFAFF0, Moho::CAnimationManipulatorConstruct::~CAnimationManipulatorConstruct)
+   *
+   * What it does:
+   * Unlinks the global construct helper node from the intrusive helper list.
+   */
+  gpg::SerHelperBase* cleanup_CAnimationManipulatorConstruct()
+  {
+    return cleanup_CAnimationManipulatorConstructImpl();
+  }
+
+  /**
+   * Address: 0x00BFAF90 (FUN_00BFAF90, Moho::CAnimationManipulatorTypeInfo::~CAnimationManipulatorTypeInfo)
+   *
+   * What it does:
+   * Releases startup-owned `CAnimationManipulatorTypeInfo` reflection storage.
+   */
+  void cleanup_CAnimationManipulatorTypeInfo()
+  {
+    cleanup_CAnimationManipulatorTypeInfoImpl();
+  }
+
+  /**
+   * Address: 0x00BFB020 (FUN_00BFB020, Moho::CAnimationManipulatorSerializer::~CAnimationManipulatorSerializer)
+   *
+   * What it does:
+   * Unlinks the global serializer helper node from the intrusive helper list.
+   */
+  gpg::SerHelperBase* cleanup_CAnimationManipulatorSerializer()
+  {
+    return cleanup_CAnimationManipulatorSerializerImpl();
+  }
+
+  /**
+   * Address: 0x00BD2DF0 (FUN_00BD2DF0, register_CAnimationManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes the global serializer helper callbacks and installs process-exit cleanup.
+   */
+  int register_CAnimationManipulatorSerializer()
+  {
+    InitializeHelperNode(gCAnimationManipulatorSerializer);
+    gCAnimationManipulatorSerializer.mSerLoadFunc = &CAnimationManipulatorSerializer::Deserialize;
+    gCAnimationManipulatorSerializer.mSerSaveFunc = &CAnimationManipulatorSerializer::Serialize;
+    gCAnimationManipulatorSerializer.RegisterSerializeFunctions();
+    return std::atexit(&CleanupCAnimationManipulatorSerializerAtexit);
+  }
+
+  /**
+   * Address: 0x00BD2DB0 (FUN_00BD2DB0, register_CAnimationManipulatorConstruct)
+   *
+   * What it does:
+   * Initializes the global construct helper callbacks and registers process-exit cleanup.
+   */
+  void register_CAnimationManipulatorConstruct()
+  {
+    InitializeHelperNode(gCAnimationManipulatorConstruct);
+    gCAnimationManipulatorConstruct.mSerConstructFunc =
+      reinterpret_cast<gpg::RType::construct_func_t>(&CAnimationManipulatorConstruct::Construct);
+    gCAnimationManipulatorConstruct.mDeleteFunc = &CAnimationManipulatorConstruct::Deconstruct;
+    gCAnimationManipulatorConstruct.RegisterConstructFunctions();
+    (void)std::atexit(&CleanupCAnimationManipulatorConstructAtexit);
+  }
+
+  /**
+   * Address: 0x00BD2D90 (FUN_00BD2D90, register_CAnimationManipulatorTypeInfo)
+   *
+   * What it does:
+   * Forces startup construction/preregistration for `CAnimationManipulator` RTTI and installs exit cleanup.
+   */
+  void register_CAnimationManipulatorTypeInfo()
+  {
+    (void)GetCAnimationManipulatorTypeInfo();
+    (void)std::atexit(&CleanupCAnimationManipulatorTypeInfoAtexit);
+  }
 } // namespace moho
+
+namespace
+{
+  struct CAnimationManipulatorStartupBootstrap
+  {
+    CAnimationManipulatorStartupBootstrap()
+    {
+      moho::register_CAnimationManipulatorTypeInfo();
+      moho::register_CAnimationManipulatorConstruct();
+      (void)moho::register_CAnimationManipulatorSerializer();
+    }
+  };
+
+  [[maybe_unused]] CAnimationManipulatorStartupBootstrap gCAnimationManipulatorStartupBootstrap;
+} // namespace

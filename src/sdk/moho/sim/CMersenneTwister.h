@@ -3,6 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
+namespace gpg
+{
+  class MD5Context;
+  class RType;
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   /**
@@ -18,11 +26,27 @@ namespace moho
   class CMersenneTwister
   {
   public:
+    static gpg::RType* sType;
+
     static constexpr std::uint32_t kStateWordCount = 0x270; // 624
     using StateWords = std::uint32_t[kStateWordCount];
 
-    StateWords state; // +0x0000
-    std::uint32_t k;  // +0x09C0
+    StateWords state; // +0x0000 (mState)
+    std::uint32_t k;  // +0x09C0 (mPos)
+
+    /**
+     * What it does:
+     * Default-initializes storage; reflected/new-ref paths seed explicitly.
+     */
+    CMersenneTwister() = default;
+
+    /**
+     * Address: 0x0040EB50 (FUN_0040EB50, Moho::CMersenneTwister::CMersenneTwister)
+     *
+     * What it does:
+     * Seeds the MT state from caller seed.
+     */
+    explicit CMersenneTwister(std::uint32_t seed) noexcept;
 
     /**
      * Address: 0x0040EB60 (FUN_0040EB60)
@@ -56,6 +80,30 @@ namespace moho
      * into `[0, 1)` float range.
      */
     [[nodiscard]] static float ToUnitFloat(std::uint32_t value) noexcept;
+
+    /**
+     * Address: 0x0040EC60 (FUN_0040EC60, Moho::CMersenneTwister::Checksum)
+     *
+     * What it does:
+     * Appends the 624-word MT state block to MD5 (excludes extraction index).
+     */
+    void Checksum(gpg::MD5Context& md5) const;
+
+    /**
+     * Address: 0x0040F7A0 (FUN_0040F7A0, Moho::CMersenneTwister::MemberDeserialize)
+     *
+     * What it does:
+     * Reads the full MT state vector and the extraction position from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0040F7E0 (FUN_0040F7E0, Moho::CMersenneTwister::MemberSerialize)
+     *
+     * What it does:
+     * Writes the full MT state vector and the extraction position to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   static_assert(offsetof(CMersenneTwister, state) == 0x0000, "CMersenneTwister::state offset must be 0x0000");

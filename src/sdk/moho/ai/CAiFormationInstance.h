@@ -11,6 +11,12 @@
 #include "wm3/Quaternion.h"
 #include "wm3/Vector3.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace LuaPlus
 {
   class LuaState;
@@ -175,6 +181,22 @@ namespace moho
      * Slot: 0
      */
     void operator_delete(std::int32_t deleteFlags) override;
+
+    /**
+     * Address: 0x0059E950 (FUN_0059E950, Moho::CAiFormationInstance::MemberDeserialize)
+     *
+     * What it does:
+     * Reads serialized formation-instance members from archive lanes.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0059E9B0 (FUN_0059E9B0, Moho::CAiFormationInstance::MemberSerialize)
+     *
+     * What it does:
+     * Writes serialized formation-instance members to archive lanes.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00569A10

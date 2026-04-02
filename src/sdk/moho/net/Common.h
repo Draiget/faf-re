@@ -45,6 +45,14 @@ namespace moho
   {
     unsigned short mSource{0};
     gpg::time::Timer mTime;
+
+    /**
+     * Address: 0x00485B60 (FUN_00485B60)
+     *
+     * What it does:
+     * Initializes packet timing lane with zeroed source id and reset timer.
+     */
+    NetPacketTime();
   };
 
   struct NetSpeeds
@@ -55,20 +63,43 @@ namespace moho
     int tail{0};
 
     /**
-     * Address: <synthetic host-build helper>
+     * Address: <inlined constructor lane in owning ctors>
      *
      * What it does:
-     * Initializes fixed-size sample ring state.
+     * Initializes fixed-size rolling sample ring state.
      */
     NetSpeeds();
 
     /**
-     * Address: <synthetic host-build helper>
+     * Address: 0x0048C320 (FUN_0048C320, struct_RollingFloat_25 dtor lane)
+     *
+     * What it does:
+     * Resets rolling sample ring cursors to empty state.
      */
     ~NetSpeeds();
 
+    /**
+     * Address: 0x0048BEC0 (FUN_0048BEC0, struct_RollingFloat_25::roll)
+     *
+     * What it does:
+     * Appends one sample to rolling ring and advances write head.
+     */
     int Append(float sample) noexcept;
+
+    /**
+     * Address: 0x0048BF00 (FUN_0048BF00, struct_RollingFloat_25::median)
+     *
+     * What it does:
+     * Computes median of current rolling samples.
+     */
     float Median() const noexcept;
+
+    /**
+     * Address: 0x0048BF60 (FUN_0048BF60, struct_RollingFloat_25::jitter)
+     *
+     * What it does:
+     * Computes median absolute deviation from `center`.
+     */
     float Jitter(float center) const noexcept;
   };
 
@@ -96,6 +127,30 @@ namespace moho
      * @param endTimeUs
      */
     SSendStampView(uint64_t durationUs, uint64_t endTimeUs);
+
+    /**
+     * Address: 0x0047D4D0 (FUN_0047D4D0, GetStampCount)
+     *
+     * What it does:
+     * Returns current number of copied send-stamp records.
+     */
+    [[nodiscard]] uint32_t StampCount() const noexcept;
+
+    /**
+     * Address: 0x0047D3C0 (FUN_0047D3C0, ReserveStampCapacity)
+     *
+     * What it does:
+     * Ensures contiguous capacity for at least `count` copied stamps.
+     */
+    void ReserveStamps(uint32_t count);
+
+    /**
+     * Address: 0x0047D500 (FUN_0047D500, AppendStamp)
+     *
+     * What it does:
+     * Appends one copied send-stamp record to this view.
+     */
+    void AppendStamp(const SSendStamp& stamp);
   };
 
   struct SSendStampBuffer
@@ -143,6 +198,14 @@ namespace moho
 
     SSendStamp& Get(size_t logicalIndex) noexcept;
 
+    /**
+     * Address: 0x0047D690 (FUN_0047D690, AdvanceOldestIndex)
+     *
+     * What it does:
+     * Advances the oldest readable ring slot by one modulo capacity.
+     */
+    void AdvanceOldestIndex() noexcept;
+
   private:
     /**
      * Place entry at `mNextWriteIndex` and advance by one (mod 4096).
@@ -152,10 +215,70 @@ namespace moho
   };
   static_assert(sizeof(SSendStampBuffer) == 0x18008, "SSendStampBuffer size must be 0x18008");
 
+  struct SBandwidthUsageSample
+  {
+    float outboundBytesPerSec{0.0f};
+    float inboundBytesPerSec{0.0f};
+  };
+  static_assert(sizeof(SBandwidthUsageSample) == 0x8, "SBandwidthUsageSample size must be 0x8");
+
+  struct SBandwidthUsageSeries
+  {
+    msvc8::vector<SBandwidthUsageSample> samples;
+
+    /**
+     * Address: 0x0047D6E0 (FUN_0047D6E0, GetBandwidthSampleCount)
+     *
+     * What it does:
+     * Returns the number of generated bandwidth samples.
+     */
+    [[nodiscard]] uint32_t SampleCount() const noexcept;
+
+    /**
+     * Address: 0x0047DA00 (FUN_0047DA00, ResizeBandwidthSamples)
+     *
+     * What it does:
+     * Resizes sample storage to `count`, zero-initializing new lanes.
+     */
+    void ResizeSamples(uint32_t count);
+
+    /**
+     * Address: 0x0047D6B0 (FUN_0047D6B0, EnsureBandwidthSampleCount)
+     *
+     * What it does:
+     * Alias lane for `ResizeSamples`.
+     */
+    void EnsureSampleCount(uint32_t count);
+  };
+
+  /**
+   * Address: 0x0047CC00 (FUN_0047CC00, BuildBandwidthUsageSeries)
+   *
+   * What it does:
+   * Builds rolling in/out byte-rate samples from send-stamp events over the
+   * requested time range and applies a 3-point smoothing pass.
+   */
+  void NET_BuildBandwidthUsageSeries(
+    SBandwidthUsageSeries& outSeries,
+    const SSendStampView& stamps,
+    int sampleCount,
+    uint64_t rangeStartUs,
+    uint64_t rangeEndUs,
+    uint64_t averagingWindowUs
+  );
+
   /**
    * Address: 0x0047F5A0
    */
   bool NET_Init();
+
+  /**
+   * Address: 0x0047F540 (FUN_0047F540, NETMAIL_SendError)
+   *
+   * What it does:
+   * Legacy no-op mail/error reporting hook.
+   */
+  void NETMAIL_SendError(const char* title, const char* message);
 
   /**
    * Address: 0x0047F990 (FUN_0047F990)
@@ -206,15 +329,43 @@ namespace moho
   bool NET_GetAddrInfo(const char* str, u_short defaultPort, bool isTcp, u_long& address, u_short& port);
 
   /**
-   * Address: 0x0047ED50
+   * Address: 0x0047ED50 (FUN_0047ED50, NET_ProtocolFromString)
    *
-   * @param str
-   * @return
+   * What it does:
+   * Parses "None"/"TCP"/"UDP" (case-insensitive) into `ENetProtocolType`,
+   * otherwise throws `std::domain_error`.
    */
   ENetProtocolType NET_ProtocolFromString(const char* str);
 
   /**
-   * Address: 0x0048BBE0
+   * Address: 0x0047EC90 (FUN_0047EC90, NET_GetProtocolName)
+   *
+   * What it does:
+   * Converts `ENetProtocolType` to `"None"`, `"TCP"`, or `"UDP"`, otherwise
+   * throws `std::domain_error`.
+   */
+  msvc8::string NET_GetProtocolName(ENetProtocolType protocol);
+
+  /**
+   * Address: 0x0047EBF0 (FUN_0047EBF0, NET_MakeConnector)
+   *
+   * What it does:
+   * Creates protocol-specific connector implementation for `port`, using NAT
+   * traversal provider only on UDP.
+   * Unknown/`kNone` protocol values produce a `CNetNullConnector`.
+   */
+  INetConnector* NET_MakeConnector(
+    u_short port,
+    ENetProtocolType protocol,
+    const boost::weak_ptr<INetNATTraversalProvider>& natTraversalProvider
+  );
+
+  /**
+   * Address: 0x0048BBE0 (FUN_0048BBE0)
+   *
+   * What it does:
+   * Creates a non-blocking UDP connector bound to `port`, or returns null on
+   * socket/ioctl/bind/allocation failure.
    */
   INetConnector* NET_MakeUDPConnector(u_short port, boost::weak_ptr<INetNATTraversalProvider> prov);
 

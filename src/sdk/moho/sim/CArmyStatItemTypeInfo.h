@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0070B610 (FUN_0070B610, sub_70B610)
+     *
+     * What it does:
+     * Initializes RTTI base lanes and preregisters `CArmyStatItem` type metadata.
+     */
+    CArmyStatItemTypeInfo();
+
+    /**
      * Address: 0x0070B6C0 (FUN_0070B6C0, Moho::CArmyStatItemTypeInfo::dtr)
      *
      * What it does:

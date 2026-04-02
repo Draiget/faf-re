@@ -12,6 +12,7 @@
 
 namespace moho
 {
+  class CScrLuaInitForm;
   /**
    * Legacy 4-byte ownership slot between IAiNavigator and CTask subobjects.
    *
@@ -54,6 +55,24 @@ namespace moho
      * VFTable SLOT: 0
      */
     ~CAiNavigatorImpl() override;
+
+    /**
+     * Address: 0x005A8C70 (FUN_005A8C70, Moho::CAiNavigatorImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Loads reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
+     * followed by unit pointer, ignore-formation flag, and navigator status.
+     */
+    static void MemberDeserialize(CAiNavigatorImpl* object, gpg::ReadArchive* archive, int version);
+
+    /**
+     * Address: 0x005A8DD0 (FUN_005A8DD0, Moho::CAiNavigatorImpl::MemberSerialize)
+     *
+     * What it does:
+     * Saves reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
+     * followed by unit pointer, ignore-formation flag, and navigator status.
+     */
+    static void MemberSerialize(const CAiNavigatorImpl* object, gpg::WriteArchive* archive, int version);
 
     /**
      * Address: 0x005A33A0 (FUN_005A33A0, ?GetClass@CAiNavigatorImpl@Moho@@UBEPAVRType@gpg@@XZ)
@@ -280,5 +299,142 @@ namespace moho
    * COL:  0x00E70F64
    */
   using CAiNavigatorImplCanPathToGoal_LuaFuncDef = ::moho::CScrLuaBinder;
-} // namespace moho
 
+  /**
+   * Address: 0x00BCC760 (FUN_00BCC760)
+   *
+   * What it does:
+   * Saves current `sim` Lua-init form head and re-links it to recovered
+   * navigator-Lua anchor lane `off_F59960`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplLuaInitFormAnchor();
+
+  /**
+   * Address: 0x00BCC8C0 (FUN_00BCC8C0, register_CAiNavigatorImplSetGoal_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplSetGoal_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplSetGoal_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC8D0 (FUN_00BCC8D0, register_CAiNavigatorImplSetDestUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplSetDestUnit_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplSetDestUnit_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC8E0 (FUN_00BCC8E0, register_CAiNavigatorImplAbortMove_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplAbortMove_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplAbortMove_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC8F0 (FUN_00BCC8F0, register_CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC900 (FUN_00BCC900, register_CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC910 (FUN_00BCC910, register_CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC920 (FUN_00BCC920, register_CAiNavigatorImplGetGoalPos_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplGetGoalPos_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplGetGoalPos_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC930 (FUN_00BCC930, register_CAiNavigatorImplGetStatus_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplGetStatus_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplGetStatus_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC940 (FUN_00BCC940, register_CAiNavigatorImplHasGoodPath_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplHasGoodPath_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplHasGoodPath_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC950 (FUN_00BCC950, register_CAiNavigatorImplFollowingLeader_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplFollowingLeader_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplFollowingLeader_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC960 (FUN_00BCC960, register_CAiNavigatorImplIgnoreFormation_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplIgnoreFormation_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplIgnoreFormation_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC970 (FUN_00BCC970, register_CAiNavigatorImplIsIgnorningFormation_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplIsIgnorningFormation_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplIsIgnorningFormation_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC980 (FUN_00BCC980, register_CAiNavigatorImplAtGoal_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplAtgoal_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplAtGoal_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC990 (FUN_00BCC990, j_func_CAiNavigatorImplCanPathToGoal_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk to `func_CAiNavigatorImplCanPathToGoal_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CAiNavigatorImplCanPathToGoal_LuaFuncDef();
+
+  /**
+   * Address: 0x00BCC9E0 (FUN_00BCC9E0)
+   *
+   * What it does:
+   * Allocates and stores the startup Lua metatable-factory index for
+   * `CScrLuaMetatableFactory<CAiNavigatorImpl>`.
+   */
+  int register_CScrLuaMetatableFactory_CAiNavigatorImpl_Index();
+
+  /**
+   * Address: 0x00BCCA60 (FUN_00BCCA60)
+   *
+   * What it does:
+   * Installs process-exit cleanup for one startup-owned navigator stats slot.
+   */
+  int register_CAiNavigatorImplStartupCleanup();
+} // namespace moho

@@ -17,6 +17,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0047EC40 (FUN_0047EC40)
+     *
+     * What it does:
+     * Constructor lane that installs the CNetNullConnector vtable.
+     */
+    CNetNullConnector();
+
+    /**
      * Address: 0x0047EC50 (FUN_0047EC50, ??1CNetNullConnector@Moho@@QAE@XZ)
      *
      * What it does:

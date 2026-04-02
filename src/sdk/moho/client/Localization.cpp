@@ -38,20 +38,14 @@ msvc8::string moho::Loc(LuaPlus::LuaState* const state, const gpg::StrArg key)
       throw std::runtime_error("attempt to call a non-function value");
     }
 
-    lua_State* const activeState = locObject.GetActiveCState();
-    if (activeState == nullptr) {
+    if (locObject.GetActiveCState() == nullptr) {
       throw std::runtime_error("LOC has no active lua_State");
     }
 
-    const int32_t savedTop = lua_gettop(activeState);
-    locObject.PushStack(activeState);
-    lua_pushstring(activeState, input);
-    lua_call(activeState, 1, 1);
-
-    const char* const localized = lua_tostring(activeState, -1);
+    LuaPlus::LuaFunction<const char*> locFunction(locObject);
+    const char* const localized = locFunction(input);
     const char* const out = localized ? localized : "";
     const msvc8::string result(out, std::strlen(out));
-    lua_settop(activeState, savedTop);
     return result;
   } catch (const std::exception& ex) {
     gpg::Warnf("Error localizing \"%s\": %s", input, ex.what() ? ex.what() : "<unknown>");

@@ -220,7 +220,12 @@ namespace Wm3
       return out.Normalized();
     }
 
-    /** Convert to 3x3 rotation matrix (row-major). Assumes unit quaternion. */
+    /**
+     * Address: 0x00452FD0 (FUN_00452FD0, func_QuatToMatrix)
+     *
+     * What it does:
+     * Converts this quaternion into a row-major 3x3 rotation matrix.
+     */
     void ToMat3(T m[3][3]) const noexcept
     {
       const T xx = x + x, yy = y + y, zz = z + z;

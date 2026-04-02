@@ -19,6 +19,17 @@ namespace gpg::gal
 
     struct HeadSampleOption
     {
+        HeadSampleOption() = default;
+
+        /**
+         * Address: 0x004369B0 (FUN_004369B0)
+         *
+         * What it does:
+         * Copies one sample-option lane, including scalar sample settings and
+         * owned label text.
+         */
+        HeadSampleOption(const HeadSampleOption& other);
+
         std::uint32_t sampleType = 0;  // +0x00
         std::uint32_t sampleQuality = 0; // +0x04
         msvc8::string label{};         // +0x08
@@ -33,6 +44,17 @@ namespace gpg::gal
     class Head
     {
     public:
+        Head() = default;
+
+        /**
+         * Address: 0x004368B0 (FUN_004368B0)
+         *
+         * What it does:
+         * Copies one head descriptor lane, including nested sample/mode/format
+         * vector payloads and owned display text.
+         */
+        Head(const Head& other);
+
         /**
          * Address: 0x00436990 (FUN_00436990)
          *

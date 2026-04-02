@@ -40,6 +40,15 @@ namespace moho
     CMessage();
 
     /**
+     * Address: 0x0047F000 (FUN_0047F000)
+     *
+     * What it does:
+     * Releases heap-backed payload storage (if active) and rebinds vector lanes
+     * to inline storage metadata.
+     */
+    ~CMessage();
+
+    /**
      * Address: 0x00483490 (FUN_00483490)
      * Address: 0x10076360 (sub_10076360)
      * Address: 0x100763B0 (sub_100763B0)
@@ -118,7 +127,7 @@ namespace moho
     }
 
     /**
-     * Address: <inlined helper>
+     * Address: 0x0047BC80 (FUN_0047BC80)
      *
      * What it does:
      * Returns message type stored in header byte 0.
@@ -129,7 +138,7 @@ namespace moho
     }
 
     /**
-     * Address: <inlined helper>
+     * Address: 0x0047BD00 (FUN_0047BD00)
      *
      * What it does:
      * Writes message type to header byte 0.
@@ -138,6 +147,22 @@ namespace moho
     {
       mBuff[0] = type.raw();
     }
+
+    /**
+     * Address: 0x0047BD10 (FUN_0047BD10)
+     *
+     * What it does:
+     * Resizes wire storage to `payloadSize + 3` and writes the two-byte wire-size header.
+     */
+    void InitializeHeaderForPayloadSize(size_t payloadSize);
+
+    /**
+     * Address: 0x0047BCC0 (FUN_0047BCC0)
+     *
+     * What it does:
+     * Rebuilds wire header for payload size and writes message type byte 0.
+     */
+    void InitializeHeaderForPayloadSizeAndType(size_t payloadSize, MessageType type);
 
     template <U8Enum E>
     void SetType(E e)

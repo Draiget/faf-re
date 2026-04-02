@@ -2,6 +2,18 @@
 
 namespace moho
 {
+  CSimConFunc::CSimConFunc() noexcept
+    : CSimConCommand()
+    , mHandler(nullptr)
+  {
+  }
+
+  CSimConFunc::CSimConFunc(const bool requiresCheat, const char* const name, Callback const handler) noexcept
+    : CSimConCommand(requiresCheat, name)
+    , mHandler(handler)
+  {
+  }
+
   /**
    * Address: 0x007347F0 (FUN_007347F0, sub_7347F0)
    */

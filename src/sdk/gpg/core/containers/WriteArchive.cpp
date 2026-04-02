@@ -10,6 +10,11 @@ using namespace gpg;
 
 namespace
 {
+struct LegacyValueFloatLane
+{
+    float number;
+};
+
 [[noreturn]] void ThrowSerializationError(const char* const message)
 {
     throw SerializationError(message ? message : "");
@@ -157,6 +162,20 @@ private:
 WriteArchive::~WriteArchive() = default;
 
 /**
+ * Address: 0x0040F970 (FUN_0040F970, gpg::WriteArchive::WriteValue)
+ *
+ * What it does:
+ * Reads one numeric lane from a legacy value payload and forwards it to
+ * `WriteFloat`.
+ */
+WriteArchive* WriteArchive::WriteValue(const void* const valueLane, const int /*unusedTag*/)
+{
+    const auto* const value = static_cast<const LegacyValueFloatLane*>(valueLane);
+    WriteFloat(value->number);
+    return this;
+}
+
+/**
  * Address: 0x00953200 (FUN_00953200)
  * Demangled: gpg::WriteArchive::WriteRefCounts
  *
@@ -213,6 +232,34 @@ void WriteArchive::Write(const RType* const type, const void* const object, cons
     WriteRefCounts(type);
     type->serSaveFunc_(this, reinterpret_cast<int>(const_cast<void*>(object)), type->version_, const_cast<RRef*>(&ownerRef));
     WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
+}
+
+/**
+ * Address: 0x009523F0 (FUN_009523F0)
+ * Demangled: public: class gpg::WriteArchive & __thiscall gpg::WriteArchive::PreCreatedPtr(class gpg::RRef const &)
+ *
+ * What it does:
+ * Pre-registers one non-null object pointer into the tracked-pointer map so
+ * nested writes can emit `ExistingPointer` references to that object.
+ */
+WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
+{
+    if (!objectRef.mObj) {
+        ThrowSerializationError("Error while creating archive: NULL pre-created pointers are not allowed.");
+    }
+
+    if (mObjRefs.find(objectRef.mObj) != mObjRefs.end()) {
+        ThrowSerializationError(
+            "Error while creating archive: can't register pre-created pointer because it has already been serialized."
+        );
+    }
+
+    TrackedPointerRecord record{};
+    record.type = objectRef.mType;
+    record.index = static_cast<int>(mObjRefs.size());
+    record.ownership = TrackedPointerState::Owned;
+    mObjRefs.insert(std::make_pair(objectRef.mObj, record));
+    return *this;
 }
 
 /**

@@ -76,7 +76,7 @@ namespace moho
     void RunInits(LuaPlus::LuaState* state);
 
     /**
-     * Address: 0x100BEB50 (FUN_100BEB50)
+     * Address: 0x004CCFE0 (FUN_004CCFE0, Moho::CScrLuaInitFormSet::DumpDocs)
      *
      * What it does:
      * Dumps grouped Lua binder documentation entries for this set.

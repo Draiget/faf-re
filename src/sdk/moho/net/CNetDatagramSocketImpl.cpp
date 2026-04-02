@@ -125,16 +125,17 @@ HANDLE CNetDatagramSocketImpl::CreateEvent()
 }
 
 /**
- * Address: <synthetic host-build wrapper>
+ * Address: 0x0047F030 (FUN_0047F030)
  *
  * Binary evidence:
+ * - 0x0047F030 (FUN_0047F030, object-init lane)
  * - 0x0047F360 (FUN_0047F360, NET_OpenDatagramSocket)
  * - 0x0047F44E (inlined object-init block inside FUN_0047F360)
  * - 0x10079940 (Moho::NET_OpenDatagramSocket)
  *
  * What it does:
- * Initializes datagram socket object fields; real FA/Moho init is inlined in
- * `NET_OpenDatagramSocket`.
+ * Initializes datagram socket object fields; this same field-init lane is also
+ * emitted inline inside `NET_OpenDatagramSocket`.
  */
 CNetDatagramSocketImpl::CNetDatagramSocketImpl(INetDatagramHandler* handler, const SOCKET sock)
   : mDatagramHandler(handler)

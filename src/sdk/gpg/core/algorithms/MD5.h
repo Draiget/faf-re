@@ -72,6 +72,12 @@ namespace gpg
 
         /**
          * Address: 0x008E4F40
+         * Address: 0x00485A30 (FUN_00485A30, alias wrapper lane)
+         *
+         * Alias note:
+         * `FUN_00485A30` is a thin adapter that forwards to this reset body and
+         * returns `this` for caller chaining.
+         *
          * Reset context to MD5 initial vector.
          */
         void Reset();

@@ -17,6 +17,14 @@ namespace moho
     using FormatHandle = boost::shared_ptr<gpg::gal::VertexFormatD3D9>;
 
     /**
+     * Address: 0x0043F420 (FUN_0043F420, sub_43F420)
+     *
+     * What it does:
+     * Initializes the base interface vftable lane for derived vertex formats.
+     */
+    ID3DVertexFormat();
+
+    /**
      * Address: 0x00A82547 (_purecall slot)
      *
      * What it does:

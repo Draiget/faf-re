@@ -1,9 +1,27 @@
 #include "moho/sim/SimArmyTypeInfo.h"
 
+#include <typeinfo>
+
 #include "moho/sim/SimArmy.h"
+
+namespace
+{
+  moho::SimArmyTypeInfo gSimArmyTypeInfo;
+}
 
 namespace moho
 {
+  /**
+   * Address: 0x006FD970 (FUN_006FD970, Moho::SimArmyTypeInfo::SimArmyTypeInfo)
+   *
+   * IDA signature:
+   * gpg::RType *__thiscall sub_6FD970(void);
+   */
+  SimArmyTypeInfo::SimArmyTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(SimArmy), this);
+  }
+
   /**
    * Address: 0x006FDA00 (FUN_006FDA00, Moho::SimArmyTypeInfo::dtr)
    */
@@ -46,4 +64,29 @@ namespace moho
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
+
+  /**
+   * Address: 0x00BD9BA0 (FUN_00BD9BA0, sub_BD9BA0)
+   *
+   * What it does:
+   * Forces SimArmy RTTI preregistration and keeps the startup-side cleanup lane
+   * aligned with the binary's static-init sequence.
+   */
+  void register_SimArmyTypeInfo()
+  {
+    (void)gSimArmyTypeInfo;
+  }
 } // namespace moho
+
+namespace
+{
+  struct SimArmyTypeInfoBootstrap
+  {
+    SimArmyTypeInfoBootstrap()
+    {
+      moho::register_SimArmyTypeInfo();
+    }
+  };
+
+  SimArmyTypeInfoBootstrap gSimArmyTypeInfoBootstrap;
+} // namespace

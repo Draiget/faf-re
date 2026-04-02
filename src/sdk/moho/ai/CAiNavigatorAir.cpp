@@ -3,7 +3,9 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <typeinfo>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiSteering.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SFootprint.h"
@@ -103,6 +105,32 @@ namespace
       position.z + (velocity.z * 10.0f),
     };
   }
+
+  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
+  {
+    if (!CAiNavigatorImpl::sType) {
+      CAiNavigatorImpl::sType = gpg::LookupRType(typeid(CAiNavigatorImpl));
+    }
+    return CAiNavigatorImpl::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakUnitType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(WeakPtr<Unit>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return cached;
+  }
 } // namespace
 
 gpg::RType* CAiNavigatorAir::sType = nullptr;
@@ -137,6 +165,90 @@ CAiNavigatorAir::CAiNavigatorAir(Unit* const unit)
 CAiNavigatorAir::~CAiNavigatorAir()
 {
   mDestinationUnitLink.ResetFromObject(nullptr);
+}
+
+/**
+ * Address: 0x005A9100 (FUN_005A9100, Moho::CAiNavigatorAir::MemberDeserialize)
+ *
+ * What it does:
+ * Loads base navigator state, destination weak link, current target, goal
+ * position, and formation-tracking flag.
+ */
+void CAiNavigatorAir::MemberDeserialize(CAiNavigatorAir* const object, gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Read(CachedCAiNavigatorImplType(), object, ownerRef);
+
+  WeakPtr<Unit> destination{};
+  archive->Read(
+    CachedWeakUnitType(),
+    object ? static_cast<void*>(&object->mDestinationUnitLink) : static_cast<void*>(&destination),
+    ownerRef
+  );
+
+  Wm3::Vector3f currentTarget = Wm3::Vector3f::Zero();
+  archive->Read(
+    CachedVector3fType(),
+    object ? static_cast<void*>(&object->mCurrentTargetPos) : static_cast<void*>(&currentTarget),
+    ownerRef
+  );
+
+  Wm3::Vector3f goalPos = Wm3::Vector3f::Zero();
+  archive->Read(
+    CachedVector3fType(),
+    object ? static_cast<void*>(&object->mGoalPos) : static_cast<void*>(&goalPos),
+    ownerRef
+  );
+
+  bool trackFormation = false;
+  archive->ReadBool(&trackFormation);
+  if (object) {
+    object->mTrackFormationTarget = trackFormation ? 1u : 0u;
+  }
+}
+
+/**
+ * Address: 0x005A91F0 (FUN_005A91F0, Moho::CAiNavigatorAir::MemberSerialize)
+ *
+ * What it does:
+ * Saves base navigator state, destination weak link, current target, goal
+ * position, and formation-tracking flag.
+ */
+void CAiNavigatorAir::MemberSerialize(const CAiNavigatorAir* const object, gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Write(CachedCAiNavigatorImplType(), object, ownerRef);
+
+  const WeakPtr<Unit> destination{};
+  archive->Write(
+    CachedWeakUnitType(),
+    object ? static_cast<const void*>(&object->mDestinationUnitLink) : static_cast<const void*>(&destination),
+    ownerRef
+  );
+
+  const Wm3::Vector3f currentTarget = Wm3::Vector3f::Zero();
+  archive->Write(
+    CachedVector3fType(),
+    object ? static_cast<const void*>(&object->mCurrentTargetPos) : static_cast<const void*>(&currentTarget),
+    ownerRef
+  );
+
+  const Wm3::Vector3f goalPos = Wm3::Vector3f::Zero();
+  archive->Write(
+    CachedVector3fType(),
+    object ? static_cast<const void*>(&object->mGoalPos) : static_cast<const void*>(&goalPos),
+    ownerRef
+  );
+
+  archive->WriteBool(object && object->mTrackFormationTarget != 0u);
 }
 
 /**

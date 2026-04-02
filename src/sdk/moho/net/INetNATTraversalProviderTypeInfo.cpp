@@ -1,9 +1,49 @@
 #include "moho/net/INetNATTraversalProviderTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
+#include <typeinfo>
+
 #include "moho/net/INetNATTraversalProvider.h"
+
+namespace
+{
+  alignas(moho::INetNATTraversalProviderTypeInfo)
+  unsigned char gINetNATTraversalProviderTypeInfoStorage[sizeof(moho::INetNATTraversalProviderTypeInfo)];
+  bool gINetNATTraversalProviderTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::INetNATTraversalProviderTypeInfo& GetINetNATTraversalProviderTypeInfo() noexcept
+  {
+    if (!gINetNATTraversalProviderTypeInfoConstructed) {
+      new (gINetNATTraversalProviderTypeInfoStorage) moho::INetNATTraversalProviderTypeInfo();
+      gINetNATTraversalProviderTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<moho::INetNATTraversalProviderTypeInfo*>(gINetNATTraversalProviderTypeInfoStorage);
+  }
+
+  void cleanup_INetNATTraversalProviderTypeInfo()
+  {
+    if (!gINetNATTraversalProviderTypeInfoConstructed) {
+      return;
+    }
+
+    GetINetNATTraversalProviderTypeInfo().~INetNATTraversalProviderTypeInfo();
+    gINetNATTraversalProviderTypeInfoConstructed = false;
+  }
+} // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x004818C0 (FUN_004818C0, Moho::INetNATTraversalProviderTypeInfo::INetNATTraversalProviderTypeInfo)
+   */
+  INetNATTraversalProviderTypeInfo::INetNATTraversalProviderTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(INetNATTraversalProvider), this);
+  }
+
   /**
    * Address: 0x00481950 (FUN_00481950, Moho::INetNATTraversalProviderTypeInfo::dtr)
    */
@@ -32,4 +72,26 @@ namespace moho
     gpg::RType::Init();
     Finish();
   }
+
+  /**
+   * Address: 0x00BC4D70 (FUN_00BC4D70, register_INetNATTraversalProviderTypeInfo)
+   */
+  void register_INetNATTraversalProviderTypeInfo()
+  {
+    (void)GetINetNATTraversalProviderTypeInfo();
+    (void)std::atexit(&cleanup_INetNATTraversalProviderTypeInfo);
+  }
 } // namespace moho
+
+namespace
+{
+  struct INetNATTraversalProviderTypeInfoBootstrap
+  {
+    INetNATTraversalProviderTypeInfoBootstrap()
+    {
+      moho::register_INetNATTraversalProviderTypeInfo();
+    }
+  };
+
+  INetNATTraversalProviderTypeInfoBootstrap gINetNATTraversalProviderTypeInfoBootstrap;
+} // namespace

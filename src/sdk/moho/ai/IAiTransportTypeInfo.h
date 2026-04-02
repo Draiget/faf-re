@@ -36,5 +36,14 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCEE90 (FUN_00BCEE90, register_IAiTransportTypeInfo)
+   *
+   * What it does:
+   * Registers `IAiTransport` type-info object and installs process-exit
+   * cleanup.
+   */
+  int register_IAiTransportTypeInfo();
+
   static_assert(sizeof(IAiTransportTypeInfo) == 0x64, "IAiTransportTypeInfo size must be 0x64");
 } // namespace moho

@@ -10,6 +10,8 @@
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 }
 
 namespace LuaPlus
@@ -142,6 +144,24 @@ namespace moho
      * VFTable SLOT: 0
      */
     virtual ~IAiNavigator();
+
+    /**
+     * Address: 0x005A7B60 (FUN_005A7B60, Moho::IAiNavigator::MemberDeserialize)
+     *
+     * What it does:
+     * Loads IAiNavigator broadcaster listener payload through reflected
+     * `Broadcaster<EAiNavigatorEvent>` metadata.
+     */
+    static void MemberDeserialize(IAiNavigator* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005A7BB0 (FUN_005A7BB0, Moho::IAiNavigator::MemberSerialize)
+     *
+     * What it does:
+     * Saves IAiNavigator broadcaster listener payload through reflected
+     * `Broadcaster<EAiNavigatorEvent>` metadata.
+     */
+    static void MemberSerialize(const IAiNavigator* object, gpg::WriteArchive* archive);
 
     /**
      * Address: 0x005A3600 (FUN_005A3600)
@@ -303,6 +323,24 @@ namespace moho
 
     TDatListItem<void, void> mListenerNode; // +0x04
   };
+
+  /**
+   * Address: 0x00BCC9A0 (FUN_00BCC9A0)
+   *
+   * What it does:
+   * Registers the broadcaster reflection lane for `EAiNavigatorEvent` and
+   * installs process-exit cleanup.
+   */
+  int register_RBroadcasterRType_EAiNavigatorEvent();
+
+  /**
+   * Address: 0x00BCC9C0 (FUN_00BCC9C0)
+   *
+   * What it does:
+   * Registers the listener reflection lane for `EAiNavigatorEvent` and installs
+   * process-exit cleanup.
+   */
+  int register_RListenerRType_EAiNavigatorEvent();
 
   static_assert(sizeof(IAiNavigator) == 0x0C, "IAiNavigator size must be 0x0C");
   static_assert(offsetof(IAiNavigator, mListenerNode) == 0x04, "IAiNavigator::mListenerNode offset must be 0x04");

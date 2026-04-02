@@ -1,5 +1,7 @@
 #include "moho/ai/CAiPersonalityTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiPersonality.h"
@@ -9,6 +11,31 @@ using namespace moho;
 
 namespace
 {
+  alignas(CAiPersonalityTypeInfo) unsigned char gCAiPersonalityTypeInfoStorage[sizeof(CAiPersonalityTypeInfo)] = {};
+  bool gCAiPersonalityTypeInfoConstructed = false;
+
+  [[nodiscard]] CAiPersonalityTypeInfo* AcquireCAiPersonalityTypeInfo()
+  {
+    if (!gCAiPersonalityTypeInfoConstructed) {
+      auto* const typeInfo = new (gCAiPersonalityTypeInfoStorage) CAiPersonalityTypeInfo();
+      gpg::PreRegisterRType(typeid(CAiPersonality), typeInfo);
+      gCAiPersonalityTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<CAiPersonalityTypeInfo*>(gCAiPersonalityTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x005B6810 (FUN_005B6810, preregister_CAiPersonalityTypeInfo)
+   *
+   * What it does:
+   * Constructs static CAiPersonality RTTI storage and preregisters it.
+   */
+  [[nodiscard]] gpg::RType* preregister_CAiPersonalityTypeInfo()
+  {
+    return AcquireCAiPersonalityTypeInfo();
+  }
+
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     static gpg::RType* cached = nullptr;
@@ -16,6 +43,22 @@ namespace
       cached = gpg::LookupRType(typeid(CScriptObject));
     }
     return cached;
+  }
+
+  /**
+   * Address: 0x00BF76B0 (FUN_00BF76B0, cleanup_CAiPersonalityTypeInfo)
+   *
+   * What it does:
+   * Releases static CAiPersonality RTTI storage.
+   */
+  void cleanup_CAiPersonalityTypeInfo()
+  {
+    if (!gCAiPersonalityTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCAiPersonalityTypeInfo()->~CAiPersonalityTypeInfo();
+    gCAiPersonalityTypeInfoConstructed = false;
   }
 } // namespace
 
@@ -50,3 +93,29 @@ void CAiPersonalityTypeInfo::Init()
 
   Finish();
 }
+
+/**
+ * Address: 0x00BCD600 (FUN_00BCD600, register_CAiPersonalityTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters static CAiPersonality RTTI storage and installs
+ * process-exit cleanup.
+ */
+int moho::register_CAiPersonalityTypeInfo()
+{
+  (void)preregister_CAiPersonalityTypeInfo();
+  return std::atexit(&cleanup_CAiPersonalityTypeInfo);
+}
+
+namespace
+{
+  struct CAiPersonalityTypeInfoBootstrap
+  {
+    CAiPersonalityTypeInfoBootstrap()
+    {
+      (void)moho::register_CAiPersonalityTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CAiPersonalityTypeInfoBootstrap gCAiPersonalityTypeInfoBootstrap;
+} // namespace

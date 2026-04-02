@@ -48,17 +48,33 @@ LONGLONG time::Timer::ElapsedCycles() const {
     return GetTime() - this->mTime;
 }
 
-// 0x00485A40
+/**
+ * Address: 0x00485A40 (FUN_00485A40)
+ *
+ * What it does:
+ * Converts elapsed cycle delta to microseconds.
+ */
 LONGLONG time::Timer::ElapsedMicroseconds() const {
     return CyclesToMicroseconds(this->ElapsedCycles());
 }
 
-// 0x004A3560
-LONGLONG time::Timer::ElapsedSeconds() const {
+/**
+ * Address: 0x004A3560 (FUN_004A3560, ?ElapsedSeconds@Timer@time@gpg@@QBEMXZ)
+ *
+ * What it does:
+ * Converts elapsed cycle delta to seconds.
+ */
+float time::Timer::ElapsedSeconds() const {
     return CyclesToSeconds(this->ElapsedCycles());
 }
 
-LONGLONG time::Timer::ElapsedMilliseconds() const {
+/**
+ * Address: 0x00461A90 (FUN_00461A90, ?ElapsedMilliseconds@Timer@time@gpg@@QBEMXZ)
+ *
+ * What it does:
+ * Returns elapsed wall-clock time in milliseconds since the timer baseline.
+ */
+float time::Timer::ElapsedMilliseconds() const {
     return CyclesToMilliseconds(this->ElapsedCycles());
 }
 

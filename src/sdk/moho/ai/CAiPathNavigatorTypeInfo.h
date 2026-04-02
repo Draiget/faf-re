@@ -37,4 +37,13 @@ namespace moho
   };
 
   static_assert(sizeof(CAiPathNavigatorTypeInfo) == 0x64, "CAiPathNavigatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCD020 (FUN_00BCD020, register_CAiPathNavigatorTypeInfo)
+   *
+   * What it does:
+   * Constructs the recovered `CAiPathNavigatorTypeInfo` startup owner and
+   * installs process-exit cleanup.
+   */
+  void register_CAiPathNavigatorTypeInfo();
 } // namespace moho

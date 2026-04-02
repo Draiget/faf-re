@@ -2,8 +2,11 @@
 
 #include <cstdint>
 #include <new>
+#include <typeinfo>
 
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/path/PathTables.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
@@ -18,6 +21,18 @@ namespace
   constexpr std::uint32_t kPropEntityIdFallback =
     moho::MakeEntityId(moho::EEntityIdFamily::Prop, kPropEntityIdSourceIndex, 1u);
   constexpr std::uint32_t kPropCollisionBucketFlags = 0x200u;
+
+  gpg::RType* gEntitySerializationType = nullptr;
+
+  template <typename T>
+  [[nodiscard]] gpg::RType* ResolveSerializedType(gpg::RType*& cache)
+  {
+    if (cache == nullptr) {
+      cache = gpg::LookupRType(typeid(T));
+    }
+    GPG_ASSERT(cache != nullptr);
+    return cache;
+  }
 
   struct DestroyQueueNodeView
   {
@@ -102,6 +117,54 @@ namespace
 
 namespace moho
 {
+  gpg::RType* SPropPriorityInfo::sType = nullptr;
+  gpg::RType* Prop::sType = nullptr;
+  CScrLuaMetatableFactory<Prop> CScrLuaMetatableFactory<Prop>::sInstance{};
+
+  CScrLuaMetatableFactory<Prop>& CScrLuaMetatableFactory<Prop>::Instance()
+  {
+    return sInstance;
+  }
+
+  /**
+   * Address: 0x00680010 (FUN_00680010, Moho::CScrLuaMetatableFactory<Moho::Prop>::Create)
+   */
+  LuaPlus::LuaObject CScrLuaMetatableFactory<Prop>::Create(LuaPlus::LuaState* const state)
+  {
+    return SCR_CreateSimpleMetatable(state);
+  }
+
+  /**
+   * Address: 0x00BD50F0 (FUN_00BD50F0, register_CScrLuaMetatableFactory_Prop_Index)
+   *
+   * What it does:
+   * Allocates one factory-object index and assigns it to prop metatable factory singleton.
+   */
+  int register_CScrLuaMetatableFactory_Prop_Index()
+  {
+    const int index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
+    CScrLuaMetatableFactory<Prop>::Instance().SetFactoryObjectIndexForRecovery(index);
+    return index;
+  }
+
+  /**
+   * Address: 0x006F9CD0 (FUN_006F9CD0)
+   *
+   * What it does:
+   * Initializes Prop for serializer construction lanes by using Entity's
+   * non-blueprint constructor and applying Prop reclaim defaults.
+   */
+  Prop::Prop(Sim* sim)
+    : Entity(sim, kPropCollisionBucketFlags)
+    , mReclaimMass(0.0f)
+    , mReclaimEnergy(0.0f)
+    , mTracksReclaimArea(false)
+    , mReclaimTerminated(false)
+    , pad_027A{0u, 0u}
+    , mPriorityInfo{0, 0}
+    , mHandleIndex(-1)
+  {}
+
   /**
    * Address: 0x006F9D90 (FUN_006F9D90)
    *
@@ -120,12 +183,11 @@ namespace moho
       )
     , mReclaimMass(0.0f)
     , mReclaimEnergy(0.0f)
-    , mTracksReclaimArea(0u)
-    , mReclaimTerminated(0u)
+    , mTracksReclaimArea(false)
+    , mReclaimTerminated(false)
     , pad_027A{0u, 0u}
-    , mPriority(0)
-    , mHandleIndex(0)
-    , mHandleLink(-1)
+    , mPriorityInfo{0, 0}
+    , mHandleIndex(-1)
   {
     if (!blueprint) {
       return;
@@ -162,7 +224,7 @@ namespace moho
     RunScript("OnCreate");
 
     if (mReclaimMass > 0.0f || mReclaimEnergy > 0.0f) {
-      mTracksReclaimArea = 1u;
+      mTracksReclaimArea = true;
 
       if (sim && sim->mOGrid) {
         gpg::Rect2i rect{};
@@ -192,6 +254,30 @@ namespace moho
     }
 
     return new (std::nothrow) Prop(sim, blueprint, transform);
+  }
+
+  /**
+   * Address: 0x006F9A30 (FUN_006F9A30, Moho::Prop::GetClass)
+   */
+  gpg::RType* Prop::GetClass() const
+  {
+    gpg::RType* type = sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Prop));
+      sType = type;
+    }
+    return type;
+  }
+
+  /**
+   * Address: 0x006F9A50 (FUN_006F9A50, Moho::Prop::GetDerivedObjectRef)
+   */
+  gpg::RRef Prop::GetDerivedObjectRef()
+  {
+    gpg::RRef ref{};
+    ref.mObj = this;
+    ref.mType = GetClass();
+    return ref;
   }
 
   /**
@@ -294,7 +380,7 @@ namespace moho
 
     if (FractionCompleted == 0.0f && reclaimDelta < 0.0f) {
       CallbackStr("OnReclaimed");
-      mReclaimTerminated = 1u;
+      mReclaimTerminated = true;
       QueuePropReclaimDelete(*this);
     }
 
@@ -307,6 +393,77 @@ namespace moho
   void Prop::Kill(Entity* killer, gpg::StrArg reason, const float overkillRatio)
   {
     Entity::Kill(killer, reason, overkillRatio);
-    mReclaimTerminated = 1u;
+    mReclaimTerminated = true;
+  }
+
+  /**
+   * Address: 0x006FB0F0 (FUN_006FB0F0, Moho::Prop::MemberDeserialize)
+   *
+   * What it does:
+   * Loads Prop reclaim and priority state after deserializing Entity base lanes.
+   */
+  void Prop::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    gpg::RRef ownerRef{};
+    const gpg::RType* const entityType = ResolveSerializedType<Entity>(gEntitySerializationType);
+    archive->Read(entityType, this, ownerRef);
+
+    archive->ReadFloat(&mReclaimMass);
+    archive->ReadFloat(&mReclaimEnergy);
+    archive->ReadBool(&mTracksReclaimArea);
+    archive->ReadBool(&mReclaimTerminated);
+
+    if (version >= 1) {
+      ownerRef = {};
+      const gpg::RType* const priorityType = ResolveSerializedType<SPropPriorityInfo>(SPropPriorityInfo::sType);
+      archive->Read(priorityType, &mPriorityInfo, ownerRef);
+      archive->ReadInt(&mHandleIndex);
+    }
+  }
+
+  /**
+   * Address: 0x006FB1D0 (FUN_006FB1D0, Moho::Prop::MemberSerialize)
+   *
+   * What it does:
+   * Saves Prop reclaim and priority state after serializing Entity base lanes.
+   */
+  void Prop::MemberSerialize(gpg::WriteArchive* const archive, const int version) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    gpg::RRef ownerRef{};
+    const gpg::RType* const entityType = ResolveSerializedType<Entity>(gEntitySerializationType);
+    archive->Write(entityType, this, ownerRef);
+
+    archive->WriteFloat(mReclaimMass);
+    archive->WriteFloat(mReclaimEnergy);
+    archive->WriteBool(mTracksReclaimArea);
+    archive->WriteBool(mReclaimTerminated);
+
+    if (version >= 1) {
+      ownerRef = {};
+      const gpg::RType* const priorityType = ResolveSerializedType<SPropPriorityInfo>(SPropPriorityInfo::sType);
+      archive->Write(priorityType, &mPriorityInfo, ownerRef);
+      archive->WriteInt(mHandleIndex);
+    }
   }
 } // namespace moho
+
+namespace
+{
+  struct PropLuaFactoryBootstrap
+  {
+    PropLuaFactoryBootstrap()
+    {
+      (void)moho::register_CScrLuaMetatableFactory_Prop_Index();
+    }
+  };
+
+  [[maybe_unused]] PropLuaFactoryBootstrap gPropLuaFactoryBootstrap;
+} // namespace

@@ -15,6 +15,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0047EF30 (FUN_0047EF30)
+     * Address: 0x0047F090 (FUN_0047F090, ctor alias lane)
+     *
+     * What it does:
+     * Base constructor lane that installs INetDatagramSocket vtable.
+     */
+    INetDatagramSocket();
+
+    /**
      * Address: 0x0047EF40 (FUN_0047EF40)
      * Address: 0x10079520 (sub_10079520)
      * Slot: 0

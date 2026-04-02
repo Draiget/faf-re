@@ -2,7 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiFormationInstance.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -12,11 +19,91 @@ using namespace moho;
 
 namespace
 {
+  [[nodiscard]] gpg::RType* CachedSimType()
+  {
+    if (!Sim::sType) {
+      Sim::sType = gpg::LookupRType(typeid(Sim));
+    }
+    return Sim::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFormationInstanceVectorType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(gpg::fastvector<IFormationInstance*>));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RRef MakeSimRef(Sim* sim)
+  {
+    gpg::RRef out{};
+    gpg::RType* const staticType = CachedSimType();
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!sim || !staticType) {
+      out.mObj = sim;
+      return out;
+    }
+
+    gpg::RType* const dynamicType = gpg::LookupRType(typeid(*sim));
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = sim;
+      out.mType = dynamicType ? dynamicType : staticType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(sim) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  [[nodiscard]] Sim* ReadPointerSim(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  {
+    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RType* const expectedType = CachedSimType();
+    if (!expectedType || !tracked.type) {
+      return static_cast<Sim*>(tracked.object);
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    if (upcast.mObj) {
+      return static_cast<Sim*>(upcast.mObj);
+    }
+
+    const char* const expected = expectedType->GetName();
+    const char* const actual = source.GetTypeName();
+    const msvc8::string message = gpg::STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expected ? expected : "Sim",
+      actual ? actual : "null"
+    );
+    throw gpg::SerializationError(message.c_str());
+  }
+
+  void WritePointerSim(gpg::WriteArchive* const archive, Sim* const sim, const gpg::RRef& ownerRef)
+  {
+    const gpg::RRef objectRef = MakeSimRef(sim);
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
   constexpr const char* kFormationModulePath = "/lua/formations.lua";
   constexpr const char* kFormationBuckets[] = {
     "SurfaceFormations",
     "AirFormations",
   };
+  constexpr const char* kPickBestFinalFormationIndexName = "PickBestFinalFormationIndex";
   constexpr int kFormationBucketCount = static_cast<int>(sizeof(kFormationBuckets) / sizeof(kFormationBuckets[0]));
 
   [[nodiscard]] int ToFormationBucketIndex(const EFormationType type)
@@ -139,12 +226,199 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x00575A30 (FUN_00575A30, ?FORMATION_GetNumScripts@Moho@@YAIPAVLuaState@LuaPlus@@W4EFormationType@1@@Z)
+ *
+ * What it does:
+ * Loads `/lua/formations.lua`, resolves the selected formation bucket table,
+ * and returns the number of scripts in that bucket.
+ */
+unsigned int moho::FORMATION_GetNumScripts(LuaPlus::LuaState* const state, const EFormationType formationType)
+{
+  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+
+  LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
+  if (module.IsNil()) {
+    gpg::Warnf("can't load the formations module -- no formations for you.");
+    return 0;
+  }
+
+  LuaPlus::LuaObject scripts = module.GetByName(bucketName.c_str());
+  if (!scripts.IsTable()) {
+    gpg::Warnf("The formations module didn't define formations.  Hmm Odd?");
+    return 0;
+  }
+
+  return static_cast<unsigned int>(scripts.GetN());
+}
+
+/**
+ * Address: 0x00575BD0 (FUN_00575BD0, ?FORMATION_GetScriptName@Moho@@YAPBDPAVLuaState@LuaPlus@@HW4EFormationType@1@@Z)
+ *
+ * What it does:
+ * Loads `/lua/formations.lua`, resolves the selected formation bucket table,
+ * and returns the script-name string for the requested index.
+ */
+const char* moho::FORMATION_GetScriptName(
+  LuaPlus::LuaState* const state,
+  const int scriptIndex,
+  const EFormationType formationType
+)
+{
+  if (!state) {
+    return nullptr;
+  }
+
+  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+
+  LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
+  if (module.IsNil()) {
+    gpg::Warnf("can't load the formations module -- no formations for you.");
+    return nullptr;
+  }
+
+  LuaPlus::LuaObject scripts = module.GetByName(bucketName.c_str());
+  if (!scripts.IsTable()) {
+    gpg::Warnf("The formations module didn't define formations.  Hmm Odd?");
+    return nullptr;
+  }
+
+  const int scriptCount = scripts.GetN();
+  const int luaIndex = (scriptIndex >= scriptCount) ? 1 : (scriptIndex + 1);
+  LuaPlus::LuaObject scriptObject = scripts.GetByIndex(luaIndex);
+  return scriptObject.GetString();
+}
+
+/**
+ * Address: 0x00575DB0 (FUN_00575DB0, ?FORMATION_GetScriptIndex@Moho@@YAHPAVLuaState@LuaPlus@@VStrArg@gpg@@W4EFormationType@1@@Z)
+ *
+ * What it does:
+ * Loads `/lua/formations.lua`, resolves the selected formation bucket table,
+ * and returns the zero-based index of the requested script name (or `-1` if
+ * not present).
+ */
+int moho::FORMATION_GetScriptIndex(
+  LuaPlus::LuaState* const state,
+  const gpg::StrArg scriptName,
+  const EFormationType formationType
+)
+{
+  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+
+  LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
+  if (module.IsNil()) {
+    gpg::Warnf("Couldn't load the formations module -- no formations for you.");
+    return 0;
+  }
+
+  LuaPlus::LuaObject scripts = module.GetByName(bucketName.c_str());
+  if (!scripts.IsTable()) {
+    gpg::Warnf("The formations module didn't define formations.  Hmm Odd?");
+    return 0;
+  }
+
+  const int scriptCount = scripts.GetN();
+  for (int luaIndex = 1; luaIndex <= scriptCount; ++luaIndex) {
+    LuaPlus::LuaObject scriptObj = scripts.GetByIndex(luaIndex);
+    if (!scriptObj.IsString()) {
+      continue;
+    }
+
+    const char* const candidate = scriptObj.GetString();
+    if (gpg::STR_EqualsNoCase(candidate, scriptName)) {
+      return luaIndex - 1;
+    }
+  }
+
+  return -1;
+}
+
+/**
+ * Address: 0x00576350 (FUN_00576350, ?FORMATION_PickBestFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
+ *
+ * What it does:
+ * Calls `/lua/formations.lua`::`PickBestFinalFormationIndex(formationType, radius)`
+ * and returns the chosen formation index (or `0` on import/call failure).
+ */
+int moho::FORMATION_PickBestFormation(
+  LuaPlus::LuaState* const state,
+  const EFormationType formationType,
+  const float radius
+)
+{
+  LuaPlus::LuaObject formationTypeArg;
+  formationTypeArg.AssignString(state, kFormationBuckets[ToFormationBucketIndex(formationType)]);
+
+  LuaPlus::LuaObject radiusArg;
+  radiusArg.AssignNumber(state, radius);
+
+  LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
+  if (!module.IsTable()) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject pickBestFn = module.GetByName(kPickBestFinalFormationIndexName);
+  if (!pickBestFn.IsFunction()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int savedTop = lua_gettop(rawState);
+
+  pickBestFn.PushStack(rawState);
+  formationTypeArg.PushStack(rawState);
+  radiusArg.PushStack(rawState);
+  if (lua_pcall(rawState, 2, 1, 0) != 0) {
+    lua_settop(rawState, savedTop);
+    return 0;
+  }
+
+  const LuaPlus::LuaStackObject resultSlot(state, -1);
+  const LuaPlus::LuaObject result(resultSlot);
+  const int bestIndex = result.GetInteger();
+
+  lua_settop(rawState, savedTop);
+  return bestIndex;
+}
+
+/**
  * Address: 0x0059C340 (FUN_0059C340)
  */
 CAiFormationDBImpl::~CAiFormationDBImpl()
 {
   // Mirrors FUN_0059BFE0 storage teardown semantics before base destruction.
   mFormInstances.ResetStorageToInline();
+}
+
+/**
+ * Address: 0x0059EA20 (FUN_0059EA20, Moho::CAiFormationDBImpl::MemberDeserialize)
+ *
+ * What it does:
+ * Reads serialized formation DB members from archive lanes.
+ */
+void CAiFormationDBImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  gpg::RRef owner{};
+  mSim = ReadPointerSim(archive, owner);
+
+  gpg::RType* const vectorType = CachedFormationInstanceVectorType();
+  gpg::RRef vectorOwner{};
+  archive->Read(vectorType, &mFormInstances, vectorOwner);
+}
+
+/**
+ * Address: 0x0059EA90 (FUN_0059EA90, Moho::CAiFormationDBImpl::MemberSerialize)
+ *
+ * What it does:
+ * Writes serialized formation DB members to archive lanes.
+ */
+void CAiFormationDBImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  gpg::RRef owner{};
+  WritePointerSim(archive, mSim, owner);
+
+  gpg::RType* const vectorType = CachedFormationInstanceVectorType();
+  gpg::RRef vectorOwner{};
+  archive->Write(vectorType, &mFormInstances, vectorOwner);
 }
 
 /**
@@ -184,27 +458,10 @@ void CAiFormationDBImpl::RemoveFormation(CAiFormationInstance* const formation)
  */
 const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const EFormationType formationType)
 {
-  if (!mSim || !mSim->GetLuaState()) {
+  if (!mSim) {
     return nullptr;
   }
-
-  LuaPlus::LuaObject scripts = ResolveFormationBucket(mSim->GetLuaState(), formationType);
-  if (!scripts || !scripts.IsTable()) {
-    return nullptr;
-  }
-
-  const int scriptCount = scripts.GetN();
-  if (scriptCount <= 0) {
-    return nullptr;
-  }
-
-  const int clampedIndex = (scriptIndex >= 0 && scriptIndex < scriptCount) ? (scriptIndex + 1) : 1;
-  LuaPlus::LuaObject scriptObj = scripts.GetByIndex(clampedIndex);
-  if (!scriptObj.IsString()) {
-    return nullptr;
-  }
-
-  return scriptObj.GetString();
+  return FORMATION_GetScriptName(mSim->GetLuaState(), scriptIndex, formationType);
 }
 
 /**
@@ -212,33 +469,11 @@ const char* CAiFormationDBImpl::GetScriptName(const int scriptIndex, const EForm
  */
 int CAiFormationDBImpl::GetScriptIndex(const gpg::StrArg scriptName, const EFormationType formationType)
 {
-  if (!mSim || !mSim->GetLuaState()) {
+  if (!mSim) {
     return 0;
   }
 
-  LuaPlus::LuaObject scripts = ResolveFormationBucket(mSim->GetLuaState(), formationType);
-  if (!scripts || !scripts.IsTable()) {
-    return 0;
-  }
-
-  if (!scriptName || !*scriptName) {
-    return -1;
-  }
-
-  const int scriptCount = scripts.GetN();
-  for (int luaIndex = 1; luaIndex <= scriptCount; ++luaIndex) {
-    LuaPlus::LuaObject scriptObj = scripts.GetByIndex(luaIndex);
-    if (!scriptObj.IsString()) {
-      continue;
-    }
-
-    const char* const candidate = scriptObj.GetString();
-    if (gpg::STR_EqualsNoCase(candidate, scriptName)) {
-      return luaIndex - 1;
-    }
-  }
-
-  return -1;
+  return FORMATION_GetScriptIndex(mSim->GetLuaState(), scriptName, formationType);
 }
 
 /**

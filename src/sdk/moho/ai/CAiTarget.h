@@ -7,6 +7,12 @@
 #include "moho/misc/WeakPtr.h"
 #include "wm3/Vector3.h"
 
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
 namespace moho
 {
   class Entity;
@@ -131,4 +137,20 @@ namespace moho
   static_assert(offsetof(CAiTarget, targetPoint) == 0x18, "CAiTarget::targetPoint offset must be 0x18");
   static_assert(offsetof(CAiTarget, targetIsMobile) == 0x1C, "CAiTarget::targetIsMobile offset must be 0x1C");
   static_assert(sizeof(CAiTarget) == 0x20, "CAiTarget size must be 0x20");
+
+  /**
+   * Address: 0x005E2EC0 (FUN_005E2EC0, Moho::SCR_ToLua<Moho::CAiTarget>)
+   *
+   * What it does:
+   * Serializes one AI target payload into Lua table form.
+   */
+  void SCR_ToLua_CAiTarget(LuaPlus::LuaObject& outObject, LuaPlus::LuaState* state, const CAiTarget& target);
+
+  /**
+   * Address: 0x005E3000 (FUN_005E3000, Moho::SCR_FromLuaCopy<Moho::CAiTarget>)
+   *
+   * What it does:
+   * Parses one Lua target table (`Type` + payload fields) into `outTarget`.
+   */
+  void SCR_FromLuaCopy_CAiTarget(CAiTarget& outTarget, const LuaPlus::LuaObject& object);
 } // namespace moho

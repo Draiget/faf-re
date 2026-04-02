@@ -36,5 +36,14 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCED70 (FUN_00BCED70, register_SAiReservedTransportBoneTypeInfo)
+   *
+   * What it does:
+   * Registers `SAiReservedTransportBone` type-info and installs process-exit
+   * cleanup.
+   */
+  int register_SAiReservedTransportBoneTypeInfo();
+
   static_assert(sizeof(SAiReservedTransportBoneTypeInfo) == 0x64, "SAiReservedTransportBoneTypeInfo size must be 0x64");
 } // namespace moho

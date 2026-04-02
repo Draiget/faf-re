@@ -4,7 +4,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/reflection/RVectorTypestruct_Moho_SSavedGameArmyInfo.h"
+#include "moho/serialization/SSavedGameArmyInfoVectorReflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/LaunchInfoBase.h"
 
@@ -192,3 +192,4 @@ namespace moho
     type->serSaveFunc_ = mSerSaveFunc;
   }
 } // namespace moho
+

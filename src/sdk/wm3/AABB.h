@@ -23,4 +23,17 @@ namespace moho
     // Compatibility alias; owning layout is Wm3::AxisAlignedBox3<float>.
     using AABBf = Wm3::AxisAlignedBox3f;
     static_assert(sizeof(AABBf) == 0x18, "AABBf size must be 0x18");
+
+    template <class T>
+    [[nodiscard]] const T& Empty();
+
+    /**
+     * Address: 0x00472BB0 (FUN_00472BB0, Moho::Empty<Wm3::AxisAlignedBox3<float>>)
+     *
+     * What it does:
+     * Returns process-lifetime canonical empty AABB bounds (`Min = +inf`,
+     * `Max = -inf`).
+     */
+    template <>
+    [[nodiscard]] const Wm3::AxisAlignedBox3f& Empty<Wm3::AxisAlignedBox3f>();
 }

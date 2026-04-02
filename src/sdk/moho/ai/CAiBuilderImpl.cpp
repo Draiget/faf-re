@@ -3,9 +3,18 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <map>
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/containers/BVSet.h"
 #include "moho/entity/Entity.h"
@@ -23,6 +32,148 @@ using namespace moho;
 
 namespace
 {
+  using RebuildMapStorage = std::map<unsigned int, const RUnitBlueprint*>;
+  using FactoryCommandQueueStorage = msvc8::vector<WeakPtr<CUnitCommand>>;
+
+  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
+  {
+    for (const char* const name : names) {
+      if (!name) {
+        continue;
+      }
+
+      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
+        return type;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Unit));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedRebuildMapType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(RebuildMapStorage));
+      if (!type) {
+        type = ResolveTypeByAnyName(
+          {"std::map<unsigned int,Moho::RUnitBlueprint const *>", "map<unsigned int,Moho::RUnitBlueprint const *>"}
+        );
+      }
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedFactoryCommandQueueType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(FactoryCommandQueueStorage));
+      if (!type) {
+        type = ResolveTypeByAnyName(
+          {"std::vector<Moho::WeakPtr<Moho::CUnitCommand>>", "vector<WeakPtr<CUnitCommand>>"}
+        );
+      }
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RRef MakeUnitRef(Unit* unit)
+  {
+    gpg::RRef out{};
+    gpg::RType* const staticType = CachedUnitType();
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!unit || !staticType) {
+      out.mObj = unit;
+      return out;
+    }
+
+    gpg::RType* dynamicType = staticType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*unit));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = unit;
+      out.mType = dynamicType ? dynamicType : staticType;
+      return out;
+    }
+
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(unit) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  [[nodiscard]] Unit* ReadPointerUnit(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  {
+    if (!archive) {
+      return nullptr;
+    }
+
+    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RType* const expectedType = CachedUnitType();
+    if (!expectedType || !tracked.type) {
+      return static_cast<Unit*>(tracked.object);
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    if (upcast.mObj) {
+      return static_cast<Unit*>(upcast.mObj);
+    }
+
+    const char* const expected = expectedType->GetName();
+    const char* const actual = source.GetTypeName();
+    const msvc8::string message = gpg::STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expected ? expected : "Unit",
+      actual ? actual : "null"
+    );
+    throw gpg::SerializationError(message.c_str());
+  }
+
+  void WritePointerUnit(gpg::WriteArchive* const archive, Unit* const unit, const gpg::RRef& ownerRef)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef objectRef = MakeUnitRef(unit);
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
   [[nodiscard]] std::uint32_t EncodeRebuildKey(const SOCellPos& cellPos) noexcept
   {
     const int x = static_cast<int>(cellPos.x);
@@ -359,6 +510,73 @@ CAiBuilderImpl::~CAiBuilderImpl()
 {
   BuilderClearFactoryCommandQueue();
   DestroyRebuildMap(mRebuildStructures);
+}
+
+/**
+ * Address: 0x005A2460 (FUN_005A2460, Moho::CAiBuilderImpl::MemberDeserialize)
+ *
+ * What it does:
+ * Reads builder runtime state from archive lanes and marks the command queue
+ * dirty for post-load revalidation.
+ */
+void CAiBuilderImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  mOwnerUnit = ReadPointerUnit(archive, owner);
+
+  bool value = false;
+  archive->ReadBool(&value);
+  mIsFactory = value ? 1u : 0u;
+  archive->ReadBool(&value);
+  mIsOnTarget = value ? 1u : 0u;
+
+  if (gpg::RType* const vector3Type = CachedVector3fType()) {
+    archive->Read(vector3Type, &mAimTarget, owner);
+  }
+
+  if (gpg::RType* const rebuildMapType = CachedRebuildMapType()) {
+    archive->Read(rebuildMapType, &mRebuildStructures, owner);
+  }
+
+  if (gpg::RType* const commandQueueType = CachedFactoryCommandQueueType()) {
+    archive->Read(commandQueueType, &mFactoryCommands, owner);
+  }
+
+  mFactoryQueueDirty = 1u;
+}
+
+/**
+ * Address: 0x005A2550 (FUN_005A2550, Moho::CAiBuilderImpl::MemberSerialize)
+ *
+ * What it does:
+ * Writes builder runtime state to archive lanes.
+ */
+void CAiBuilderImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  WritePointerUnit(archive, mOwnerUnit, owner);
+  archive->WriteBool(mIsFactory != 0u);
+  archive->WriteBool(mIsOnTarget != 0u);
+
+  if (gpg::RType* const vector3Type = CachedVector3fType()) {
+    archive->Write(vector3Type, &mAimTarget, owner);
+  }
+
+  if (gpg::RType* const rebuildMapType = CachedRebuildMapType()) {
+    archive->Write(rebuildMapType, &mRebuildStructures, owner);
+  }
+
+  if (gpg::RType* const commandQueueType = CachedFactoryCommandQueueType()) {
+    archive->Write(commandQueueType, &mFactoryCommands, owner);
+  }
 }
 
 /**

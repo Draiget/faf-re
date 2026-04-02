@@ -5,11 +5,18 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/lua/CScrLuaBinder.h"
 
 namespace
 {
-  constexpr const char* kAddConOutputReceiverHelp = "AddConsoleOutputReciever";
-  constexpr const char* kRemoveConOutputReceiverHelp = "RemoveConsoleOutputReciever";
+  constexpr const char* kAddConOutputReceiverHelp = "handler AddConsoleOutputReciever(func(text))";
+  constexpr const char* kRemoveConOutputReceiverHelp = "RemoveConsoleOutputReciever(handler)";
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
+  {
+    static moho::CScrLuaInitFormSet sSet("user");
+    return sSet;
+  }
 
   /**
    * Address: 0x0041EB00 (FUN_0041EB00, context unwrap)
@@ -55,6 +62,13 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x00420FF0 (FUN_00420FF0, sub_420FF0)
+   * Address: 0x00421BA0 (FUN_00421BA0, sub_421BA0)
+   *
+   * What it does:
+   * Builds `gpg::RRef` for `CLuaConOutputHandler*` userdata payload.
+   */
   gpg::RRef MakeConOutputHandlerPointerRef(moho::CLuaConOutputHandler* handler)
   {
     gpg::RRef ref{};
@@ -146,13 +160,76 @@ namespace
     lua_call(activeState, 1, 1);
     lua_settop(activeState, savedTop);
   }
+
+  /**
+   * Address: 0x0041C8B0 (FUN_0041C8B0, sub_41C8B0)
+   * Address: 0x0041FC90 (FUN_0041FC90, sub_41FC90)
+   *
+   * What it does:
+   * Unlinks handler from its current list position and relinks it at the tail
+   * of the global console output handler list.
+   */
+  void RelinkConOutputHandlerTail(moho::CLuaConOutputHandler* const handler)
+  {
+    if (handler == nullptr) {
+      return;
+    }
+
+    handler->ListUnlink();
+    handler->ListLinkBefore(&moho::CON_GetOutputHandlers());
+  }
+
+  template <typename TObject>
+  void MaterializeReflectionSingleton(TObject& singleton)
+  {
+    (void)singleton;
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* CLuaConOutputHandler::sType = nullptr;
+  CLuaConOutputHandlerTypeInfo gCLuaConOutputHandlerTypeInfo{};
   CScrLuaMetatableFactory<CLuaConOutputHandler*> CScrLuaMetatableFactory<CLuaConOutputHandler*>::sInstance{};
+
+  /**
+   * Address: 0x00BC3B10 (FUN_00BC3B10, register_CScrLuaMetatableFactory_CLuaConOutputHandler)
+   *
+   * What it does:
+   * Reallocates startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<CLuaConOutputHandler*>`.
+   */
+  void RegisterCLuaConOutputHandlerFactoryIndexBootstrap()
+  {
+    const std::int32_t index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
+    CScrLuaMetatableFactory<CLuaConOutputHandler*>::Instance().SetFactoryObjectIndexForRecovery(index);
+  }
+
+  /**
+   * Address: 0x00BC38D0 (FUN_00BC38D0, register_CLuaConOutputHandlerTypeInfo)
+   *
+   * What it does:
+   * Materializes the global reflection descriptor for CLuaConOutputHandler.
+   */
+  void RegisterCLuaConOutputHandlerTypeInfoBootstrap()
+  {
+    MaterializeReflectionSingleton(gCLuaConOutputHandlerTypeInfo);
+  }
 } // namespace moho
+
+namespace
+{
+  struct CLuaConOutputHandlerTypeInfoBootstrap
+  {
+    CLuaConOutputHandlerTypeInfoBootstrap()
+    {
+      moho::RegisterCLuaConOutputHandlerFactoryIndexBootstrap();
+      moho::RegisterCLuaConOutputHandlerTypeInfoBootstrap();
+    }
+  };
+
+  CLuaConOutputHandlerTypeInfoBootstrap gCLuaConOutputHandlerTypeInfoBootstrap;
+} // namespace
 
 /**
  * Address: 0x0041E840 (FUN_0041E840, ??0CLuaConOutputHandler@Moho@@QAE@ABVLuaObject@LuaPlus@@@Z)
@@ -161,6 +238,18 @@ moho::CLuaConOutputHandler::CLuaConOutputHandler(const LuaPlus::LuaObject& callb
   : IConOutputHandler()
   , mCallback(callback)
 {}
+
+/**
+ * Address: 0x0041E9B0 (FUN_0041E9B0, ??0CLuaConOutputHandlerTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters the CLuaConOutputHandler RTTI descriptor for global lookup.
+ */
+moho::CLuaConOutputHandlerTypeInfo::CLuaConOutputHandlerTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(moho::CLuaConOutputHandler), this);
+}
 
 /**
  * Address: 0x0041E8D0 (FUN_0041E8D0, deleting-thunk chain via 0x004228B0)
@@ -178,12 +267,13 @@ gpg::RType* moho::CLuaConOutputHandler::GetClass() const
 
 /**
  * Address: 0x0041E820 (FUN_0041E820, ?GetDerivedObjectRef@CLuaConOutputHandler@Moho@@UAE?AVRRef@gpg@@XZ)
+ * Address: 0x00421B60 (FUN_00421B60, sub_421B60 helper lane)
+ * Address: 0x004220D0 (FUN_004220D0, gpg::RRef_CLuaConOutputHandler helper lane)
  */
 gpg::RRef moho::CLuaConOutputHandler::GetDerivedObjectRef()
 {
   gpg::RRef out{};
-  out.mObj = this;
-  out.mType = GetClass();
+  gpg::RRef_CLuaConOutputHandler(&out, this);
   return out;
 }
 
@@ -256,6 +346,44 @@ void moho::CLuaConOutputHandlerTypeInfo::Init()
 }
 
 /**
+ * Address: 0x0041EB20 (FUN_0041EB20, func_AddConsoleOutputReciever_LuaFuncDef)
+ *
+ * What it does:
+ * Returns the binder definition used to expose AddConsoleOutputReciever to Lua.
+ */
+moho::CScrLuaInitForm* moho::func_AddConsoleOutputReciever_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "AddConsoleOutputReciever",
+    &moho::cfunc_AddConsoleOutputReciever,
+    nullptr,
+    "<global>",
+    kAddConOutputReceiverHelp
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0041ED20 (FUN_0041ED20, func_RemoveConsoleOutputReciever_LuaFuncDef)
+ *
+ * What it does:
+ * Returns the binder definition used to expose RemoveConsoleOutputReciever to Lua.
+ */
+moho::CScrLuaInitForm* moho::func_RemoveConsoleOutputReciever_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RemoveConsoleOutputReciever",
+    &moho::cfunc_RemoveConsoleOutputReciever,
+    nullptr,
+    "<global>",
+    kRemoveConOutputReceiverHelp
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x00420910 (FUN_00420910, sub_420910)
  */
 LuaPlus::LuaObject
@@ -270,6 +398,7 @@ moho::SCR_CreateLuaConOutputHandlerObject(LuaPlus::LuaState* const state, CLuaCo
 
 /**
  * Address: 0x004209D0 (FUN_004209D0, func_GetCObj_ConOutputHandler)
+ * Address: 0x00421020 (FUN_00421020, sub_421020 helper lane)
  */
 moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus::LuaObject& object)
 {
@@ -311,9 +440,7 @@ int moho::cfunc_AddConsoleOutputRecieverL(LuaPlus::LuaState* const state)
   auto* const handler = new CLuaConOutputHandler(callback);
   LuaPlus::LuaObject wrapped = SCR_CreateLuaConOutputHandlerObject(state, handler);
 
-  // Binary unlinks first, then links at tail (`consoleoutputhandlers.prev` path).
-  handler->ListUnlink();
-  handler->ListLinkBefore(&CON_GetOutputHandlers());
+  RelinkConOutputHandlerTail(handler);
 
   wrapped.PushStack(state);
   return 1;

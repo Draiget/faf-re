@@ -64,6 +64,16 @@ namespace moho
      */
     void Unlock() override;
 
+  private:
+    /**
+     * Address: 0x0043FD20 (FUN_0043FD20, sub_43FD20)
+     *
+     * What it does:
+     * Releases retained vertex-buffer ownership and clears handle lanes.
+     */
+    void ReleaseBufferHandle();
+
+  public:
     /**
      * Address: 0x0043FC20 (FUN_0043FC20)
      *

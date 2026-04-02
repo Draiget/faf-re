@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00760F40 (FUN_00760F40, Moho::CSimSoundManagerTypeInfo::CSimSoundManagerTypeInfo)
+     * Slot: constructor
+     *
+     * What it does:
+     * Constructs and preregisters `CSimSoundManager` reflection type metadata.
+     */
+    CSimSoundManagerTypeInfo();
+
+    /**
      * Address: 0x00760FD0 (FUN_00760FD0, Moho::CSimSoundManagerTypeInfo::dtr)
      * Slot: 2
      */
@@ -46,6 +55,22 @@ namespace moho
     static void AddBase_ISoundManager(gpg::RType* typeInfo);
   };
 
+  /**
+   * Address: 0x00C01500 (FUN_00C01500, cleanup_CSimSoundManagerTypeInfo)
+   *
+   * What it does:
+   * Releases process-exit `CSimSoundManagerTypeInfo` field/base vector storage.
+   */
+  void cleanup_CSimSoundManagerTypeInfo();
+
+  /**
+   * Address: 0x00BDC500 (FUN_00BDC500, register_CSimSoundManagerTypeInfo)
+   *
+   * What it does:
+   * Forces `CSimSoundManagerTypeInfo` startup construction and installs
+   * `atexit` cleanup.
+   */
+  int register_CSimSoundManagerTypeInfo();
+
   static_assert(sizeof(CSimSoundManagerTypeInfo) == 0x64, "CSimSoundManagerTypeInfo size must be 0x64");
 } // namespace moho
-

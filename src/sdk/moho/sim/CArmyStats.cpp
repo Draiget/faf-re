@@ -9,6 +9,32 @@
 
 namespace
 {
+  [[nodiscard]] int CompareNameIndexKey(const msvc8::string& lhs, const msvc8::string& rhs)
+  {
+    return std::strcmp(lhs.c_str(), rhs.c_str());
+  }
+
+  [[nodiscard]] moho::ArmyNameIndexNode* FindNameIndexNode(
+    moho::ArmyNameIndexTree* const tree, const msvc8::string& statPath
+  )
+  {
+    if (tree == nullptr || tree->head == nullptr) {
+      return nullptr;
+    }
+
+    moho::ArmyNameIndexNode* const head = tree->head;
+    moho::ArmyNameIndexNode* node = head->parent;
+    while (node != nullptr && node != head && node->isNil == 0u) {
+      const int keyCmp = CompareNameIndexKey(statPath, node->key);
+      if (keyCmp == 0) {
+        return node;
+      }
+      node = (keyCmp < 0) ? node->left : node->right;
+    }
+
+    return nullptr;
+  }
+
   [[nodiscard]] moho::CArmyStatItem* FindArmyChildByName(moho::CArmyStatItem* parent, const msvc8::string& token)
   {
     if (parent == nullptr) {
@@ -205,6 +231,105 @@ namespace
     node->parent = pivot;
   }
 
+  void FixupAfterNameIndexInsert(moho::ArmyNameIndexTree* const tree, moho::ArmyNameIndexNode* node)
+  {
+    moho::ArmyNameIndexNode* const head = tree->head;
+    while (node != head->parent && node->parent->color == 0u) {
+      moho::ArmyNameIndexNode* const parent = node->parent;
+      moho::ArmyNameIndexNode* const grand = parent->parent;
+      if (grand == nullptr || grand == head) {
+        break;
+      }
+
+      if (parent == grand->left) {
+        moho::ArmyNameIndexNode* const uncle = grand->right;
+        if (!IsNameIndexNil(uncle) && uncle->color == 0u) {
+          parent->color = 1;
+          uncle->color = 1;
+          grand->color = 0;
+          node = grand;
+          continue;
+        }
+
+        if (node == parent->right) {
+          node = parent;
+          RotateNameIndexLeft(tree, node);
+        }
+
+        node->parent->color = 1;
+        grand->color = 0;
+        RotateNameIndexRight(tree, grand);
+        continue;
+      }
+
+      moho::ArmyNameIndexNode* const uncle = grand->left;
+      if (!IsNameIndexNil(uncle) && uncle->color == 0u) {
+        parent->color = 1;
+        uncle->color = 1;
+        grand->color = 0;
+        node = grand;
+        continue;
+      }
+
+      if (node == parent->left) {
+        node = parent;
+        RotateNameIndexRight(tree, node);
+      }
+
+      node->parent->color = 1;
+      grand->color = 0;
+      RotateNameIndexLeft(tree, grand);
+    }
+
+    if (head->parent != nullptr && head->parent != head) {
+      head->parent->color = 1;
+    }
+  }
+
+  void InsertOrAssignNameIndexNode(
+    moho::ArmyNameIndexTree* const tree, const msvc8::string& statPath, moho::CArmyStatItem* const value
+  )
+  {
+    if (tree == nullptr || tree->head == nullptr) {
+      return;
+    }
+
+    moho::ArmyNameIndexNode* const head = tree->head;
+    moho::ArmyNameIndexNode* parent = head;
+    moho::ArmyNameIndexNode* node = head->parent;
+    int cmp = 0;
+    while (node != nullptr && node != head && node->isNil == 0u) {
+      parent = node;
+      cmp = CompareNameIndexKey(statPath, node->key);
+      if (cmp == 0) {
+        node->value = value;
+        return;
+      }
+      node = (cmp < 0) ? node->left : node->right;
+    }
+
+    auto* const inserted = new moho::ArmyNameIndexNode{};
+    inserted->left = head;
+    inserted->right = head;
+    inserted->parent = parent;
+    inserted->key.assign(statPath, 0, msvc8::string::npos);
+    inserted->value = value;
+    inserted->color = 0;
+    inserted->isNil = 0;
+
+    if (parent == head) {
+      head->parent = inserted;
+    } else if (cmp < 0) {
+      parent->left = inserted;
+    } else {
+      parent->right = inserted;
+    }
+
+    ++tree->size;
+    FixupAfterNameIndexInsert(tree, inserted);
+    RecomputeNameIndexExtrema(tree);
+  }
+
   void FixupAfterNameIndexErase(
     moho::ArmyNameIndexTree* tree, moho::ArmyNameIndexNode* node, moho::ArmyNameIndexNode* nodeParent
   )
@@ -307,8 +432,7 @@ namespace
   [[nodiscard]] moho::ArmyAuxListNode* CreateAuxListSentinel()
   {
     auto* const head = new moho::ArmyAuxListNode{};
-    head->next = head;
-    head->prev = head;
+    head->ListResetLinks();
     return head;
   }
 } // namespace
@@ -401,7 +525,7 @@ namespace moho
    */
   Stats<CArmyStatItem>::Stats()
     : mItem(new CArmyStatItem("Root"))
-    , mLock()
+    , mLock(new boost::mutex())
     , pad_000D{0, 0, 0}
   {}
 
@@ -412,6 +536,8 @@ namespace moho
   {
     delete mItem;
     mItem = nullptr;
+    delete mLock;
+    mLock = nullptr;
   }
 
   /**
@@ -470,7 +596,7 @@ namespace moho
    */
   CArmyStatItem* Stats<CArmyStatItem>::TraverseTables(const gpg::StrArg statPath, const bool allowCreate)
   {
-    boost::mutex::scoped_lock lock(mLock);
+    boost::mutex::scoped_lock lock(*mLock);
 
     msvc8::vector<msvc8::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
@@ -484,11 +610,31 @@ namespace moho
   }
 
   /**
+   * Address: 0x00706360 (FUN_00706360, sub_706360)
+   * Alias:   0x00705BD0 (FUN_00705BD0, thunk)
+   */
+  CArmyStatItem* Stats<CArmyStatItem>::GetStringItem(const gpg::StrArg statPath)
+  {
+    boost::mutex::scoped_lock lock(*mLock);
+
+    msvc8::vector<msvc8::string> tokens;
+    gpg::STR_GetTokens(statPath, "_", tokens);
+
+    bool didCreate = false;
+    CArmyStatItem* const item = WalkTokenPath(mItem, tokens, true, &didCreate);
+    if (didCreate && item != nullptr) {
+      boost::mutex::scoped_lock itemLock(item->mLock);
+      item->mType = EStatType::kString;
+    }
+    return item;
+  }
+
+  /**
    * Address: 0x00703D70 (FUN_00703D70, delete-by-path helper)
    */
   void Stats<CArmyStatItem>::Delete(const char* statPath)
   {
-    boost::mutex::scoped_lock lock(mLock);
+    boost::mutex::scoped_lock lock(*mLock);
     CArmyStatItem* const item = TraverseTables(statPath, false);
     if (item == mItem) {
       throw std::runtime_error("Don't be doing that, chief.");
@@ -596,6 +742,41 @@ namespace moho
     }
 
     Stats<CArmyStatItem>::Delete(statPath);
+  }
+
+  /**
+   * Address: 0x00704FD0 (FUN_00704FD0, sub_704FD0)
+   */
+  CArmyStatItem* CArmyStats::GetStringItemCached(const gpg::StrArg statPath)
+  {
+    const msvc8::string key(statPath ? statPath : "");
+    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&mNameIndex, key)) {
+      return foundNode->value;
+    }
+
+    CArmyStatItem* const item = GetStringItem(key.c_str());
+    if (item != nullptr) {
+      item->Release(0);
+    }
+    InsertOrAssignNameIndexNode(&mNameIndex, key, item);
+    return item;
+  }
+
+  /**
+   * Address: 0x00704000 (FUN_00704000, sub_704000)
+   */
+  void CArmyStats::SetStringValueByPath(const gpg::StrArg statPath, const msvc8::string& value)
+  {
+    CArmyStatItem* const item = GetStringItemCached(statPath);
+    if (item == nullptr) {
+      return;
+    }
+
+    {
+      boost::mutex::scoped_lock itemLock(item->mLock);
+      item->mType = EStatType::kString;
+    }
+    item->SetValue(value);
   }
 
   void CArmyStats::DestroyNameIndexTree()

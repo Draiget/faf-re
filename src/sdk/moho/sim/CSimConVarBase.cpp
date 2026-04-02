@@ -1,8 +1,21 @@
 #include "moho/sim/CSimConVarBase.h"
 
+#include <cstdint>
+
 #include "moho/sim/Sim.h"
 
 using namespace moho;
+
+namespace
+{
+  std::uint32_t gSimConVarIndexCounter = 0u;
+}
+
+CSimConVarBase::CSimConVarBase(const bool requiresCheat, const char* const name)
+  : CSimConCommand(requiresCheat, name)
+  , mIndex(0u)
+{
+}
 
 /**
  * Address: 0x00734820 (FUN_00734820, sub_734820)
@@ -35,4 +48,9 @@ int CSimConVarBase::Run(
 CSimConVarBase* CSimConVarBase::Identity()
 {
   return this;
+}
+
+std::uint32_t CSimConVarBase::AllocateSimConVarIndex() noexcept
+{
+  return gSimConVarIndexCounter++;
 }

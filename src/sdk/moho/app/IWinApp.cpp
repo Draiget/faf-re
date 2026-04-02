@@ -83,18 +83,7 @@ namespace
   [[nodiscard]]
   std::filesystem::path ResolveLaunchDirectory()
   {
-    std::array<char, MAX_PATH> fullPathBuffer{};
-    const char* const argv0 = (__argv != nullptr && __argv[0] != nullptr) ? __argv[0] : ".";
-    if (_fullpath(fullPathBuffer.data(), argv0, fullPathBuffer.size()) == nullptr) {
-      return std::filesystem::current_path();
-    }
-
-    std::filesystem::path launchPath(fullPathBuffer.data());
-    if (launchPath.has_parent_path()) {
-      return launchPath.parent_path();
-    }
-
-    return std::filesystem::current_path();
+    return moho::DISK_GetLaunchDir();
   }
 }
 

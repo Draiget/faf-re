@@ -5,6 +5,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/IConOutputHandler.h"
 
@@ -107,6 +108,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0041E9B0 (FUN_0041E9B0, ??0CLuaConOutputHandlerTypeInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Preregistered RTTI constructor for the CLuaConOutputHandler reflection type.
+     */
+    CLuaConOutputHandlerTypeInfo();
+
+    /**
      * Address: 0x0041EA50 (FUN_0041EA50, scalar deleting destructor thunk)
      * Slot: 2
      */
@@ -146,6 +155,24 @@ namespace moho
    * COL:     0x00E5DF6C
    */
   using RemoveConsoleOutputReciever_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * Address: 0x0041EB20 (FUN_0041EB20, func_AddConsoleOutputReciever_LuaFuncDef)
+   *
+   * What it does:
+   * Returns the global Lua binder definition for AddConsoleOutputReciever.
+   */
+  [[nodiscard]]
+  CScrLuaInitForm* func_AddConsoleOutputReciever_LuaFuncDef();
+
+  /**
+   * Address: 0x0041ED20 (FUN_0041ED20, func_RemoveConsoleOutputReciever_LuaFuncDef)
+   *
+   * What it does:
+   * Returns the global Lua binder definition for RemoveConsoleOutputReciever.
+   */
+  [[nodiscard]]
+  CScrLuaInitForm* func_RemoveConsoleOutputReciever_LuaFuncDef();
 
   /**
    * Address: 0x00420910 (FUN_00420910, sub_420910)

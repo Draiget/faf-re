@@ -47,7 +47,7 @@ namespace moho
    */
   CD3DVertexStream::~CD3DVertexStream()
   {
-    mBuffer.reset();
+    ReleaseBufferHandle();
   }
 
   /**
@@ -110,6 +110,17 @@ namespace moho
     if (gpg::gal::VertexBufferD3D9* const vertexBuffer = mBuffer.get(); vertexBuffer != nullptr) {
       vertexBuffer->Unlock();
     }
+  }
+
+  /**
+   * Address: 0x0043FD20 (FUN_0043FD20, sub_43FD20)
+   *
+   * What it does:
+   * Releases retained vertex-buffer ownership and clears handle lanes.
+   */
+  void CD3DVertexStream::ReleaseBufferHandle()
+  {
+    mBuffer.reset();
   }
 
   /**

@@ -35,7 +35,7 @@ namespace msvc8
          * From C-string: SSO copy if fits.
          * If not, adopt pointer without ownership (no growth).
          */
-        explicit string(const char* s) noexcept;
+        string(const char* s) noexcept;
 
         /**
          * From string_view: same policy as above (SSO copy if fits, else adopt pointer).
@@ -59,6 +59,9 @@ namespace msvc8
         /**
          * Read-only pointer to character data (unsafe if the struct is invalid).
          * Use data_view() / try_view() helpers instead where possible.
+         *
+         * Address: 0x00402790 (FUN_00402790, std::string::c_str lane)
+         * Address: 0x00442A60 (FUN_00442A60)
          */
         [[nodiscard]]
     	const char* raw_data_unsafe() const noexcept {
@@ -119,7 +122,7 @@ namespace msvc8
 
         [[nodiscard]]
     	const char* c_str() const noexcept {
-	        return data();
+	        return raw_data_unsafe();
         }
 
         /**
@@ -164,6 +167,8 @@ namespace msvc8
         /**
          * VC8 xstring-style storage reset helper (`_Tidy` equivalent).
          * If `built` is true and the string is in heap mode, releases the heap buffer.
+         *
+         * Address: 0x00402740 (FUN_00402740)
          */
         void tidy(bool built = true, uint32_t newSize = 0U) noexcept;
 
@@ -294,8 +299,47 @@ namespace msvc8
          * @return *this
          */
         string& assign(const string& other, std::size_t pos, std::size_t count = npos) noexcept;
+        string& assign(std::size_t count, char ch) noexcept {
+            clear();
+            (void)append(count, ch);
+            return *this;
+        }
+        string& assign(const char* s) noexcept {
+            return (*this = s);
+        }
+
+        /**
+         * Address: 0x004422C0 (FUN_004422C0)
+         * Address: 0x00445FD0 (FUN_00445FD0)
+         *
+         * What it does:
+         * Resets this string to empty SSO state and assigns full contents from
+         * another string.
+         */
+        string& reset_and_assign(const string& other) noexcept;
 
         string& assign(const char* data, std::size_t size) noexcept;
+
+        string& erase(const std::size_t pos = 0, const std::size_t count = npos) noexcept {
+            if (!basic_sanity() || pos >= mySize) {
+                return *this;
+            }
+
+            const std::size_t available = static_cast<std::size_t>(mySize) - pos;
+            const std::size_t removeCount = (count == npos || count > available) ? available : count;
+            if (removeCount == 0) {
+                return *this;
+            }
+
+            char* const dst = raw_data_mut_unsafe();
+            const std::size_t tailCount = available - removeCount;
+            if (tailCount != 0) {
+                std::memmove(dst + pos, dst + pos + removeCount, tailCount);
+            }
+            mySize = static_cast<uint32_t>(static_cast<std::size_t>(mySize) - removeCount);
+            dst[mySize] = '\0';
+            return *this;
+        }
 
         /**
 		 * Return substring [from .. from+maxLen) as a new msvc8::string.
@@ -388,6 +432,67 @@ namespace msvc8
         /** Compare with C-string (LHS). */
         friend bool operator==(const char* a, const string& b) noexcept {
             return b == a;
+        }
+
+        [[nodiscard]] int compare(std::string_view rhs) const noexcept {
+            const std::string_view lhs = view();
+            const std::size_t shared = lhs.size() < rhs.size() ? lhs.size() : rhs.size();
+            const int cmp = shared == 0 ? 0 : std::memcmp(lhs.data(), rhs.data(), shared);
+            if (cmp != 0) {
+                return cmp;
+            }
+            if (lhs.size() < rhs.size()) {
+                return -1;
+            }
+            if (lhs.size() > rhs.size()) {
+                return 1;
+            }
+            return 0;
+        }
+
+        [[nodiscard]] int compare(const char* rhs) const noexcept {
+            return compare(std::string_view(rhs ? rhs : ""));
+        }
+
+        [[nodiscard]] int compare(
+            const std::size_t pos,
+            const std::size_t count,
+            const std::string_view rhs
+        ) const noexcept {
+            const std::string_view lhs = view();
+            const std::size_t clampedPos = pos > lhs.size() ? lhs.size() : pos;
+            const std::size_t lhsTail = lhs.size() - clampedPos;
+            const std::size_t lhsCount = (count == npos || count > lhsTail) ? lhsTail : count;
+            const std::string_view lhsSlice(lhs.data() + clampedPos, lhsCount);
+
+            const std::size_t shared = lhsSlice.size() < rhs.size() ? lhsSlice.size() : rhs.size();
+            const int cmp = shared == 0 ? 0 : std::memcmp(lhsSlice.data(), rhs.data(), shared);
+            if (cmp != 0) {
+                return cmp;
+            }
+            if (lhsSlice.size() < rhs.size()) {
+                return -1;
+            }
+            if (lhsSlice.size() > rhs.size()) {
+                return 1;
+            }
+            return 0;
+        }
+
+        [[nodiscard]] int compare(
+            const std::size_t pos,
+            const std::size_t count,
+            const char* rhs,
+            const std::size_t rhsCount
+        ) const noexcept {
+            if (rhs == nullptr) {
+                return compare(pos, count, std::string_view());
+            }
+            return compare(pos, count, std::string_view(rhs, rhsCount));
+        }
+
+        [[nodiscard]] bool operator<(const string& rhs) const noexcept {
+            return compare(rhs.view()) < 0;
         }
 
         /** string + string */

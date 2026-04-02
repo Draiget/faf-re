@@ -3,8 +3,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <initializer_list>
+#include <list>
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "moho/ai/CAiPathNavigator.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
@@ -38,6 +45,221 @@ namespace
     node->prev = node;
     node->rect = {};
     return node;
+  }
+
+  gpg::RType* gBroadcasterNavPathType = nullptr;
+  gpg::RType* gUnitType = nullptr;
+  gpg::RType* gSimType = nullptr;
+  gpg::RType* gPathQueueType = nullptr;
+  gpg::RType* gOGridType = nullptr;
+  gpg::RType* gPathCellType = nullptr;
+  gpg::RType* gGoalType = nullptr;
+  gpg::RType* gSearchType = nullptr;
+  gpg::RType* gRect2iListType = nullptr;
+  gpg::RType* gMotionType = nullptr;
+
+  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
+  {
+    for (const char* const name : names) {
+      if (!name) {
+        continue;
+      }
+
+      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
+        return type;
+      }
+    }
+
+    return nullptr;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
+  {
+    if (!slot) {
+      slot = gpg::LookupRType(typeid(TObject));
+    }
+    return slot;
+  }
+
+  [[nodiscard]] gpg::RType* CachedBroadcasterNavPathType()
+  {
+    if (!gBroadcasterNavPathType) {
+      gBroadcasterNavPathType = ResolveTypeByAnyName(
+        {"Broadcaster<Moho::NavPath const &>", "Moho::Broadcaster<Moho::NavPath const &>", "Broadcaster"}
+      );
+      if (!gBroadcasterNavPathType) {
+        gBroadcasterNavPathType = gpg::LookupRType(typeid(Broadcaster));
+      }
+    }
+    return gBroadcasterNavPathType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitType()
+  {
+    return CachedType<Unit>(gUnitType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedSimType()
+  {
+    if (!Sim::sType) {
+      Sim::sType = CachedType<Sim>(gSimType);
+    }
+    return Sim::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedPathQueueType()
+  {
+    if (!gPathQueueType) {
+      gPathQueueType = ResolveTypeByAnyName({"PathQueue", "Moho::PathQueue", "class Moho::PathQueue"});
+    }
+    return gPathQueueType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedOGridType()
+  {
+    return CachedType<COGrid>(gOGridType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedPathCellType()
+  {
+    return CachedType<HPathCell>(gPathCellType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedGoalType()
+  {
+    return CachedType<SAiNavigatorGoal>(gGoalType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedSearchType()
+  {
+    return CachedType<ESearchType>(gSearchType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedRect2iListType()
+  {
+    if (!gRect2iListType) {
+      gRect2iListType = gpg::LookupRType(typeid(std::list<gpg::Rect2i>));
+      if (!gRect2iListType) {
+        gRect2iListType = ResolveTypeByAnyName({"std::list<gpg::Rect2<int>>", "list<gpg::Rect2<int>>"});
+      }
+    }
+    return gRect2iListType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedMotionType()
+  {
+    return CachedType<ERuleBPUnitMovementType>(gMotionType);
+  }
+
+  template <typename TObject>
+  [[nodiscard]] TObject* ReadPointerWithType(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
+  {
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    if (!expectedType || !tracked.type) {
+      return static_cast<TObject*>(tracked.object);
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    return static_cast<TObject*>(upcast.mObj);
+  }
+
+  [[nodiscard]] void* ReadPointerUnchecked(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
+  {
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    if (!expectedType || !tracked.type) {
+      return tracked.object;
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    return gpg::REF_UpcastPtr(source, expectedType).mObj;
+  }
+
+  template <typename TObject>
+  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!object || !staticType) {
+      out.mObj = object;
+      return out;
+    }
+
+    gpg::RType* dynamicType = staticType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType ? dynamicType : staticType;
+      return out;
+    }
+
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  template <typename TObject>
+  void WritePointerWithType(
+    gpg::WriteArchive* const archive,
+    TObject* const object,
+    gpg::RType* const staticType,
+    const gpg::TrackedPointerState state,
+    const gpg::RRef& owner
+  )
+  {
+    if (!archive) {
+      return;
+    }
+
+    if (object != nullptr && staticType == nullptr) {
+      gpg::WriteRawPointer(archive, gpg::RRef{}, state, owner);
+      return;
+    }
+
+    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    gpg::WriteRawPointer(archive, objectRef, state, owner);
+  }
+
+  void WritePointerUnchecked(
+    gpg::WriteArchive* const archive,
+    void* const object,
+    gpg::RType* const staticType,
+    const gpg::TrackedPointerState state,
+    const gpg::RRef& owner
+  )
+  {
+    if (!archive) {
+      return;
+    }
+
+    gpg::RRef objectRef{};
+    if (object != nullptr && staticType != nullptr) {
+      objectRef.mObj = object;
+      objectRef.mType = staticType;
+    }
+    gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
 } // namespace
@@ -412,6 +634,136 @@ void CAiPathFinder::GetResultCell(HPathCell* const outCell) const
     return;
   }
   *outCell = mResultCell;
+}
+
+/**
+ * Address: 0x005ABED0 (FUN_005ABED0, Moho::CAiPathFinder::MemberDeserialize)
+ */
+void CAiPathFinder::MemberDeserialize(gpg::ReadArchive* const archive, const int)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+
+  if (gpg::RType* const broadcasterType = CachedBroadcasterNavPathType()) {
+    archive->Read(broadcasterType, static_cast<Broadcaster*>(this), owner);
+  }
+
+  bool boolValue = false;
+  archive->ReadBool(&boolValue);
+  mIsGoalBoundaryBlocked = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mIsQueuedOnPathQueue = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mUseWholeMap = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mUseGoalBoundaryProbe = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mInsidePlayableRect = boolValue ? 1u : 0u;
+
+  int footprintSpan = 0;
+  archive->ReadInt(&footprintSpan);
+  mMaxFootprintSpan = footprintSpan < 0 ? 0u : static_cast<std::uint32_t>(footprintSpan);
+
+  mUnit = ReadPointerWithType<Unit>(archive, owner, CachedUnitType());
+  mSim = ReadPointerWithType<Sim>(archive, owner, CachedSimType());
+  mPathQueueProxy = ReadPointerUnchecked(archive, owner, CachedPathQueueType());
+  mOGrid = ReadPointerWithType<COGrid>(archive, owner, CachedOGridType());
+
+  if (gpg::RType* const pathCellType = CachedPathCellType()) {
+    archive->Read(pathCellType, &mAnchorCell, owner);
+    archive->Read(pathCellType, &mResultCell, owner);
+  }
+
+  if (gpg::RType* const goalType = CachedGoalType()) {
+    archive->Read(goalType, &mGoal, owner);
+  }
+
+  if (gpg::RType* const searchType = CachedSearchType()) {
+    ESearchType search = AIPATHSEARCH_None;
+    archive->Read(searchType, &search, owner);
+    mSearchType = search;
+  }
+
+  archive->ReadBool(&boolValue);
+  mHasOccupancyMask = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mHasPathResult = boolValue ? 1u : 0u;
+
+  if (gpg::RType* const rectListType = CachedRect2iListType()) {
+    archive->Read(rectListType, &mRecentSearchRects, owner);
+  }
+
+  if (gpg::RType* const motionType = CachedMotionType()) {
+    ERuleBPUnitMovementType movementType = RULEUMT_None;
+    archive->Read(motionType, &movementType, owner);
+    mPathLayerSelector = static_cast<std::int32_t>(movementType);
+  }
+
+  if (mUnit) {
+    const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+    mFootprint = blueprint ? blueprint->Physics.ResolvedFootprint : nullptr;
+    mAltFootprint = blueprint ? blueprint->Physics.ResolvedAltFootprint : nullptr;
+  } else {
+    mFootprint = nullptr;
+    mAltFootprint = nullptr;
+  }
+}
+
+/**
+ * Address: 0x005AC150 (FUN_005AC150, Moho::CAiPathFinder::MemberSerialize)
+ */
+void CAiPathFinder::MemberSerialize(gpg::WriteArchive* const archive, const int)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+
+  if (gpg::RType* const broadcasterType = CachedBroadcasterNavPathType()) {
+    archive->Write(broadcasterType, static_cast<const Broadcaster*>(this), owner);
+  }
+
+  archive->WriteBool(mIsGoalBoundaryBlocked != 0u);
+  archive->WriteBool(mIsQueuedOnPathQueue != 0u);
+  archive->WriteBool(mUseWholeMap != 0u);
+  archive->WriteBool(mUseGoalBoundaryProbe != 0u);
+  archive->WriteBool(mInsidePlayableRect != 0u);
+  archive->WriteInt(static_cast<int>(mMaxFootprintSpan));
+
+  WritePointerWithType(archive, mUnit, CachedUnitType(), gpg::TrackedPointerState::Unowned, owner);
+  WritePointerWithType(archive, mSim, CachedSimType(), gpg::TrackedPointerState::Unowned, owner);
+  WritePointerUnchecked(archive, mPathQueueProxy, CachedPathQueueType(), gpg::TrackedPointerState::Unowned, owner);
+  WritePointerWithType(archive, mOGrid, CachedOGridType(), gpg::TrackedPointerState::Unowned, owner);
+
+  if (gpg::RType* const pathCellType = CachedPathCellType()) {
+    archive->Write(pathCellType, &mAnchorCell, owner);
+    archive->Write(pathCellType, &mResultCell, owner);
+  }
+
+  if (gpg::RType* const goalType = CachedGoalType()) {
+    archive->Write(goalType, &mGoal, owner);
+  }
+
+  if (gpg::RType* const searchType = CachedSearchType()) {
+    ESearchType search = mSearchType;
+    archive->Write(searchType, &search, owner);
+  }
+
+  archive->WriteBool(mHasOccupancyMask != 0u);
+  archive->WriteBool(mHasPathResult != 0u);
+
+  if (gpg::RType* const rectListType = CachedRect2iListType()) {
+    archive->Write(rectListType, &mRecentSearchRects, owner);
+  }
+
+  if (gpg::RType* const motionType = CachedMotionType()) {
+    const ERuleBPUnitMovementType movementType = static_cast<ERuleBPUnitMovementType>(mPathLayerSelector);
+    archive->Write(motionType, &movementType, owner);
+  }
 }
 
 void CAiPathFinder::ClearRectHistory()

@@ -9,6 +9,8 @@
 #include "legacy/containers/Vector.h"
 #include "moho/mesh/MeshBatchKey.h"
 #include "moho/mesh/MeshEnvironment.h"
+#include "moho/containers/TDatList.h"
+#include "moho/resource/CResourceWatcher.h"
 #include "moho/render/camera/VTransform.h"
 #include "wm3/Box3.h"
 #include "wm3/Sphere3.h"
@@ -95,7 +97,7 @@ namespace moho
      * What it does:
      * Builds one material from one mesh LOD blueprint descriptor.
      */
-    static boost::shared_ptr<MeshMaterial> Create(const RMeshBlueprintLOD& blueprintLod, void* resourceWatcher);
+    static boost::shared_ptr<MeshMaterial> Create(const RMeshBlueprintLOD& blueprintLod, CResourceWatcher* resourceWatcher);
 
     /**
      * Address: 0x007DC1B0 (FUN_007DC1B0,
@@ -111,7 +113,7 @@ namespace moho
       const msvc8::string& specularName,
       const msvc8::string& lookupName,
       const msvc8::string& secondaryName,
-      void* resourceWatcher
+      CResourceWatcher* resourceWatcher
     );
 
   public:
@@ -144,7 +146,7 @@ namespace moho
       const RMeshBlueprintLOD& blueprintLod,
       boost::shared_ptr<RScmResource> previousResource,
       boost::shared_ptr<MeshMaterial> material,
-      Mesh* ownerWatcher
+      CResourceWatcher* ownerWatcher
     );
 
     /**
@@ -162,7 +164,7 @@ namespace moho
       const RMeshBlueprintLOD& blueprintLod,
       boost::shared_ptr<RScmResource> previousResource,
       boost::shared_ptr<MeshMaterial> material,
-      Mesh* ownerWatcher
+      CResourceWatcher* ownerWatcher
     );
 
     /**
@@ -197,7 +199,7 @@ namespace moho
     boost::shared_ptr<MeshBatch> dynamicBatch;             // +0xC0
   };
 
-  class Mesh
+  class Mesh : public CResourceWatcher
   {
   public:
     /**
@@ -247,12 +249,6 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<RScmResource> GetResource(std::int32_t lodIndex) const;
 
   public:
-    std::uint32_t watcherFlags;                // +0x04
-    void* watchedBegin;                        // +0x08
-    void* watchedEnd;                          // +0x0C
-    void* watchedStorageEnd;                   // +0x10
-    void* watchedStorageOrigin;                // +0x14
-    std::uint8_t watchedInlineStorage[0x08]{}; // +0x18
     const RMeshBlueprint* bp;                  // +0x20
     boost::shared_ptr<MeshMaterial> material;  // +0x24
     std::uint32_t unk2C;                       // +0x2C
@@ -348,11 +344,7 @@ namespace moho
     void UpdateInterpolatedFields();
 
   public:
-    struct ListLink
-    {
-      ListLink* prev; // +0x00
-      ListLink* next; // +0x04
-    };
+    using ListLink = TDatListItem<void, void>;
 
     ListLink* linkPrev;           // +0x04
     ListLink* linkNext;           // +0x08

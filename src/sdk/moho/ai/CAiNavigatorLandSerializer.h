@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A47D0 (FUN_005A47D0, Moho::CAiNavigatorLandSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `CAiNavigatorLand::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005A47E0 (FUN_005A47E0, Moho::CAiNavigatorLandSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `CAiNavigatorLand::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005A7430 (FUN_005A7430)
      *
      * What it does:
@@ -50,5 +66,13 @@ namespace moho
     "CAiNavigatorLandSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiNavigatorLandSerializer) == 0x14, "CAiNavigatorLandSerializer size must be 0x14");
-} // namespace moho
 
+  /**
+   * Address: 0x00BCC7E0 (FUN_00BCC7E0, register_CAiNavigatorLandSerializer)
+   *
+   * What it does:
+   * Initializes the global CAiNavigatorLand serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CAiNavigatorLandSerializer();
+} // namespace moho

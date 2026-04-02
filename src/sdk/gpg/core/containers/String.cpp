@@ -567,13 +567,44 @@ void gpg::STR_NormalizeFilenameLowerSlash(std::string& inOut) {
     }
 }
 
+/**
+ * Address: 0x0051E2E0 (FUN_0051E2E0, func_StringInitFilename)
+ *
+ * What it does:
+ * Initializes destination string into empty SSO state, then canonicalizes one
+ * filename/path token to lowercase backslash form.
+ */
+msvc8::string* gpg::STR_InitFilename(msvc8::string* const out, const StrArg in) {
+    if (out == nullptr) {
+        return nullptr;
+    }
+
+    out->tidy(false, 0U);
+    STR_CanonizeFilename(out, in);
+    return out;
+}
+
+msvc8::string* gpg::STR_SetFilename(msvc8::string* const out, const StrArg in) {
+    return STR_InitFilename(out, in);
+}
+
+/**
+ * Address: 0x00458450 (FUN_00458450, gpg::STR_CanonizeFilename)
+ *
+ * What it does:
+ * Lowercases one path and normalizes `/` separators to `\\`.
+ */
 void gpg::STR_CanonizeFilename(msvc8::string* const out, const StrArg in) {
     if (out == nullptr) {
         return;
     }
 
-    out->assign_owned(in ? in : "");
-    STR_NormalizeFilenameLowerSlash(*out);
+    out->assign_owned(STR_ToLower(in ? in : "").view());
+    for (std::size_t i = 0; i < out->size(); ++i) {
+        if ((*out)[i] == '/') {
+            (*out)[i] = '\\';
+        }
+    }
 }
 
 // 0x009388C0

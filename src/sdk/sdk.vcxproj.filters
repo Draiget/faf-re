@@ -21,6 +21,15 @@
     <ClCompile Include="moho\command\ICommandSink.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\command\CCommandDbTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\command\CCommandDbSerHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\command\EUnitCommandTypeTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\console\CConAlias.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -45,7 +54,19 @@
     <ClCompile Include="moho\entity\Entity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\entity\CollisionBeamStartupRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\CollisionBeamEntityLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\EntityLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\entity\REntityBlueprint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\REntityBlueprintTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\entity\EntityDb.cpp">
@@ -54,7 +75,22 @@
     <ClCompile Include="moho\entity\EntityMotor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\entity\EntityMotorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\MotorFallDown.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\EntityFastVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\EntitySetReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\entity\EntityTransformPayload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\EntityAttachPositionReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\entity\intel\CIntel.cpp">
@@ -93,6 +129,18 @@
     <ClCompile Include="moho\entity\Prop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\entity\PropConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\PropSaveConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\PropSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\PropTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\entity\Shield.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -126,10 +174,25 @@
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintEnumTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RMeshBlueprint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RMeshBlueprintConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RMeshBlueprintTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RMeshBlueprintSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprint.cpp">
@@ -147,6 +210,9 @@
     <ClCompile Include="moho\resource\blueprints\RBeamBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\REffectBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -156,10 +222,52 @@
     <ClCompile Include="moho\resource\blueprints\REmitterBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\REmitterBlueprintTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\REmitterCurveTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintNestedTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintSaveConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\resource\blueprints\RPropBlueprint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RPropBlueprintDisplayTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RMeshBlueprintLODTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintDefenseShieldTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintNestedTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintSaveConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\sim\SimDriver.cpp">
@@ -169,6 +277,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\sim\ISTIDriver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\EAllianceTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\ESquadClassTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\EGenericIconTypeTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\EImpactTypeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\random\Random.cpp">
@@ -195,7 +315,16 @@
     <ClCompile Include="moho\resource\CAniResourceSkelTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\resource\RScmResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\RScmResourceTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\resource\CParticleTexture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\CParticleTextureReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\CParticleTextureConstruct.cpp">
@@ -207,7 +336,7 @@
     <ClCompile Include="moho\resource\CParticleTextureTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\CD3DTextureResourceFactory.cpp">
+    <ClCompile Include="moho\render\d3d\CD3DTextureResourceFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\IResources.cpp">
@@ -219,19 +348,28 @@
     <ClCompile Include="moho\resource\ISimResourcesTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\RD3DTextureResource.cpp">
+    <ClCompile Include="moho\render\d3d\RD3DTextureResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\resource\RD3DTextureResourceTypeInfo.cpp">
+    <ClCompile Include="moho\render\d3d\RD3DTextureResourceTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\ResourceReflectionHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\RResId.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\RResIdSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\SScmFile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\ResourceDeposit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\resource\CResourceWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\resource\ResourceManager.cpp">
@@ -246,10 +384,58 @@
     <ClCompile Include="moho\sim\SimArmyTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\IArmySerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\IArmyTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\ArmyUnitSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\ArmyUnitSetVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SDelayedSubVizInfoReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CArmyImpl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CArmyLuaFunctionRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CPlatoon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CCommandLuaFunctionRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\ManipulatorLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SimGravityCommandRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SimDebugCommandRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SimFloatInitializers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\ManipulatorStartupRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SimStartupRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SPhysConstantsTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SPhysConstantsSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SPhysBodyReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\sim\CArmyImplSerializer.cpp">
@@ -271,6 +457,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\containers\ReadArchive.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\core\containers\SerSaveLoadHelper_Box3f.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\containers\WriteArchive.cpp">
@@ -306,6 +495,9 @@
     <ClCompile Include="moho\sim\STIMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\STIMapReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CArmyStatItemSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -330,6 +522,9 @@
     <ClCompile Include="moho\misc\CDecoder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\movie\MPVDecoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\misc\CombinedMilitaryExtractor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -343,6 +538,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\CountedObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ThreadSafeCountedObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ThreadSafeCountedObjectTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\MiscellaneousExtractor.cpp">
@@ -360,13 +561,40 @@
     <ClCompile Include="moho\misc\SonarExtractor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\misc\BVSetRTypeclass_Moho_RBlueprint_const_near_struct_Moho_EntityCategoryHelper.cpp">
+    <ClCompile Include="moho\entity\EntityCategorySetTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\entity\EntityCategorySetVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\EngineStatsCleanup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\projectile\ProjectileLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\projectile\ProjectileSerHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\projectile\ProjectileStartupRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\projectile\ProjectileTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\StatItem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\Stats.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\XException.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\XDataError.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\XFileError.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\TimeBar.cpp">
@@ -378,10 +606,40 @@
     <ClCompile Include="moho\math\Vector4f.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\camera\CameraImpl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\camera\GeomCamera3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\camera\VTransform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\particles\CParticleTextureCountedPtr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\SWorldBeam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\CWorldParticles.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\BeamRenderHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\ParticleRenderBuckets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\ParticleRenderWorkItemRuntime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\SWorldParticle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="wm3\Distance3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wm3\AABB.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="wm3\Vector2.cpp">
@@ -411,7 +669,67 @@
     <ClCompile Include="gpg\core\reflection\Reflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gpg\core\reflection\RVectorTypestruct_Moho_SSavedGameArmyInfo.cpp">
+    <ClCompile Include="gpg\core\reflection\BadRefCast.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\core\reflection\RMapStringFloatTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpg\core\containers\FastVectorUIntReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\PrefetchHandleBaseVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CPrefetchSet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CPrefetchSetSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CFireWeaponTaskSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CUnitCallAirStagingPlatformSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CUnitCallLandTransportSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CUnitCallTeleportSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CUnitCallTransportSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CFireWeaponTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CWeaponAttributesSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\CWeaponAttributesTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\WeakUnitSetSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\WeakUnitSetTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\SBlackListInfoSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\SBlackListInfoTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\SBlackListInfoVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\INetNATTraversalProviderWeakPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\SSavedGameArmyInfoVectorReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\reflection\SerializationError.cpp">
@@ -471,6 +789,9 @@
     <ClCompile Include="moho\ai\CAiBrainTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\CAiBrainLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\CAiBuilderImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -499,6 +820,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\CAiFormationInstanceTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\IFormationInstanceCountedPtrReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\CAimManipulator.cpp">
@@ -562,6 +886,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\CAiPersonality.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\CAiPersonalityLuaFunctionThunks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\CAiPersonalityConstruct.cpp">
@@ -702,6 +1029,60 @@
     <ClCompile Include="moho\unit\core\IUnit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\core\IUnitWeakPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitFastVectorReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\SInfoCacheReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CAcquireTargetTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CAcquireTargetTaskSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CAcquireTargetTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallAirStagingPlatform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallAirStagingPlatformTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallLandTransport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallLandTransportTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallTeleport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallTransport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCallTransportTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CFireWeaponTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\CWeaponAttributes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\EIntelTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\EUnitStateTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\core\WeaponExtractor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -717,10 +1098,52 @@
     <ClCompile Include="moho\unit\core\Unit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitSerHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitSaveConstruct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitSetSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitSetTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitWeakPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitWeaponWeakPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitWeapon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitWeaponSerHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitWeaponTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitWeaponLuaFunctionThunks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\UnitLuaFactoryIndexRegistrations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\Broadcaster.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\CUnitMotion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\CUnitMotionSerHelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\CUnitMotionConstruct.cpp">
@@ -730,6 +1153,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\CUnitMotionTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\UnitMotionEnumTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gpg\core\time\Timer.cpp">
@@ -745,6 +1171,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\net\INetNATTraversalProviderTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\ENetProtocolTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\net\INetNATTraversalHandler.cpp">
@@ -789,6 +1218,12 @@
     <ClCompile Include="moho\task\CTaskThread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\task\CTaskThreadReflectionBootstrap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\task\CTaskThreadWeakPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\task\CCommandTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -804,10 +1239,22 @@
     <ClCompile Include="moho\task\CTaskEvent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\SConditionTriggerReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SConditionTriggerTypes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\task\CWaitForTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ui\CUIManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ui\EMauiEventTypeTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ui\EMauiKeyCodeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ui\IUIManager.cpp">
@@ -849,6 +1296,36 @@
     <ClCompile Include="moho\script\CScriptObjectTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\misc\ScrActivation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrBreakpoint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrDebugHooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrFileLine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrFileCtrl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrWatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\TreeData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrWatchCtrl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\ScrPauseEvent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\misc\PausedThread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\script\ScriptedDecal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -879,10 +1356,19 @@
     <ClCompile Include="lua\LuaStateTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lua\LuaTypeInfoRegistration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\client\Localization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\containers\BVIntSet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\BVIntSetSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\containers\BVIntSetTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\containers\BVSet.cpp">
@@ -903,6 +1389,9 @@
     <ClCompile Include="moho\misc\StringUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\misc\ID3DDeviceResources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\misc\FileWaitHandleSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -919,6 +1408,33 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\serialization\SSavedGameArmyInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\PrefetchHandleBaseSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\PrefetchHandleBaseTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\serializers\SWorldBeamSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\serializers\SWorldParticleSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\typeinfo\SWorldBeamTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\typeinfo\SWorldParticleTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\typeinfo\SBatchTextureDataTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\serialization\typeinfo\Sphere3fTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\serialization\SSavedGameHeader.cpp">
@@ -990,10 +1506,10 @@
     <ClCompile Include="moho\collision\CColPrimitiveBaseTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\collision\CColPrimitiveclass_Wm3_Box3float.cpp">
+    <ClCompile Include="moho\collision\CColPrimitiveBox3f.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\collision\CColPrimitiveclass_Wm3_Sphere3float.cpp">
+    <ClCompile Include="moho\collision\CColPrimitiveSphere3f.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\collision\CounterIntelExtractor.cpp">
@@ -1071,37 +1587,52 @@
     <ClCompile Include="moho\mesh\Mesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectImpl.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectImplSerializer.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectImplSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectImplTypeInfo.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectImplTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectManagerImpl.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectManagerImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectManagerImplConstruct.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectManagerImplConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectManagerImplSaveConstruct.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectManagerImplSaveConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectManagerImplSerializer.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectManagerImplSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\CEffectManagerImplTypeInfo.cpp">
+    <ClCompile Include="moho\effects\rendering\CEffectManagerImplTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\effects\rendering\CEfxBeam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\effects\rendering\CEfxBeamSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\CDecalBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\SParticleBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\CDecalBufferSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\CDecalBufferTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\CWldTerrainDecalTYPETypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\CDecalHandle.cpp">
@@ -1128,19 +1659,22 @@
     <ClCompile Include="moho\render\RangeRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\SelectionBracketParams.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\RenderGeometryBuffers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\VisionRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\SEfxCurve.cpp">
+    <ClCompile Include="moho\effects\rendering\SEfxCurve.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\SEfxCurveSerializer.cpp">
+    <ClCompile Include="moho\effects\rendering\SEfxCurveSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\SEfxCurveTypeInfo.cpp">
+    <ClCompile Include="moho\effects\rendering\SEfxCurveTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\EEmitterCurveTypeInfo.cpp">
@@ -1158,19 +1692,25 @@
     <ClCompile Include="moho\render\EmitterTypeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\IEffect.cpp">
+    <ClCompile Include="moho\effects\rendering\IEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\IEffectManager.cpp">
+    <ClCompile Include="moho\effects\rendering\EffectLuaStartupRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\IEffectManagerTypeInfo.cpp">
+    <ClCompile Include="moho\effects\rendering\IEffectManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\IEffectSerializer.cpp">
+    <ClCompile Include="moho\effects\rendering\IEffectManagerTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\render\IEffectTypeInfo.cpp">
+    <ClCompile Include="moho\effects\rendering\IEffectSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\effects\rendering\IEffectTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\effects\rendering\IEffectWeakPtrReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\IEdRenderHook.cpp">
@@ -1179,13 +1719,58 @@
     <ClCompile Include="moho\render\ID3DTextureSheet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\ID3DTextureSheetTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\IRenderWorldView.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\CD3DBatchTexture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\CD3DFileBatchTexture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\CD3DRawBatchTexture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\CD3DSolidBatchTexture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\textures\CD3DDynamicTextureSheet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\render\textures\DeviceExitListener.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\DXTCodec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\SBatchTextureData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\textures\SBatchTextureDataFactory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\d3d\CD3DFont.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\d3d\CD3DEffectTechnique.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\d3d\CD3DDeviceResources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\d3d\CD3DPrimBatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\d3d\D3DSingletonCleanup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\d3d\CD3DTextureBatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\render\d3d\ShaderVar.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\render\RDebugOverlay.cpp">
@@ -1269,6 +1854,30 @@
     <ClCompile Include="moho\sim\CRandomStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\IdPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\IdPoolTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\IdPoolSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SMinMaxTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CMersenneTwisterTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CMersenneTwisterSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CRandomStreamTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\CRandomStreamSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CWldMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1293,6 +1902,27 @@
     <ClCompile Include="moho\unit\CUnitCommand.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\CUnitCommandQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\CUnitCommandQueueReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\CUnitCommandSerHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\CUnitCommandTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\CUnitCommandWeakPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\ECommandEventTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\EUnitCommandQueueStatusTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\AITarget_LuaFuncDef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1305,7 +1935,22 @@
     <ClCompile Include="moho\lua\CLuaVectorMetatableFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\lua\SCR_FromLua.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\lua\SCR_ToLua.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\lua\SCR_Color.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\lua\SCR_Math.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\lua\SCR_String.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\lua\SCR_Trace.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\lua\CScrLuaBinder.cpp">
@@ -1327,6 +1972,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\CAiPathSplineTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\EPathTypeTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\ESearchTypeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\CAiTarget.cpp">
@@ -1356,6 +2007,9 @@
     <ClCompile Include="moho\ai\EAiTargetTypeTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\ai\ESiloBuildStageTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ai\EAiTransportEventTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1366,6 +2020,24 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ai\SAiReservedTransportBoneTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\SAttachPointSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\SAttachPointTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\STransportPickUpInfoSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\STransportPickUpInfoTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\SContinueInfoSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ai\SContinueInfoTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\animation\CAniDefaultSkel.cpp">
@@ -1389,6 +2061,9 @@
     <ClCompile Include="moho\animation\CAniPose.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\animation\CAniPoseSharedPtrReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\animation\CAniSkel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1396,6 +2071,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\animation\IAniManipulator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\animation\SAniManipBindingReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\animation\CAnimationManipulator.cpp">
@@ -1445,6 +2123,18 @@
     <ClInclude Include="moho\sim\ISTIDriver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\EAllianceTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\ESquadClassTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\EGenericIconTypeTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\EImpactTypeTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="gpg\core\random\Random.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1478,6 +2168,9 @@
     <ClInclude Include="moho\resource\CParticleTexture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\resource\CParticleTextureReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\resource\CParticleTextureConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1487,7 +2180,13 @@
     <ClInclude Include="moho\resource\CParticleTextureTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\CD3DTextureResourceFactory.h">
+    <ClInclude Include="moho\render\d3d\CD3DTextureResourceFactory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\ResourceFactory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\CResourceWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\IResources.h">
@@ -1499,10 +2198,10 @@
     <ClInclude Include="moho\resource\ISimResourcesTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\RD3DTextureResource.h">
+    <ClInclude Include="moho\render\d3d\RD3DTextureResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\resource\RD3DTextureResourceTypeInfo.h">
+    <ClInclude Include="moho\render\d3d\RD3DTextureResourceTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\utils\BoostUtils.h">
@@ -1535,7 +2234,58 @@
     <ClInclude Include="moho\sim\IArmy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\IArmySerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\IArmyTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\ArmyUnitSetVectorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SDelayedSubVizInfoReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\CArmyImpl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CArmyLuaFunctionRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CPlatoon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CCommandLuaFunctionRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\ManipulatorLuaFunctionThunks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SimGravityCommandRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SimDebugCommandRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SimFloatInitializers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\ManipulatorStartupRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SimStartupRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SPhysConstantsTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SPhysConstantsSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SPhysBody.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SPhysBodyReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\CArmyImplSerializer.h">
@@ -1604,6 +2354,9 @@
     <ClInclude Include="moho\sim\STIMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\STIMapReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\CArmyStats.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1620,6 +2373,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\misc\CDecoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\movie\MPVDecoder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\misc\CSaveGameRequestImpl.h">
@@ -1646,6 +2402,12 @@
     <ClInclude Include="moho\misc\CountedObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\misc\ThreadSafeCountedObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ThreadSafeCountedObjectTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\misc\CVirtualFileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1667,7 +2429,31 @@
     <ClInclude Include="moho\misc\LaunchInfoBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\misc\BVSetRTypeclass_Moho_RBlueprint_const_near_struct_Moho_EntityCategoryHelper.h">
+    <ClInclude Include="moho\entity\EntityCategorySetTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\EntityCategorySetVectorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\EngineStatsCleanup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\projectile\CProjectileAttributes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\projectile\EProjectileImpactEvent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\projectile\Projectile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\projectile\ProjectileSerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\projectile\ProjectileStartupRegistrations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\projectile\ProjectileTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\misc\StatItem.h">
@@ -1682,6 +2468,15 @@
     <ClInclude Include="moho\misc\Stats.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\misc\XException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\XDataError.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\XFileError.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\misc\TimeBar.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1694,10 +2489,52 @@
     <ClInclude Include="moho\serialization\SSavedGameArmyInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\serialization\PrefetchHandleBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\PrefetchHandleBaseSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\PrefetchHandleBaseTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CWeaponAttributesSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CWeaponAttributesTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\WeakUnitSetSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\WeakUnitSetTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\serializers\SWorldBeamSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\serializers\SWorldParticleSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\typeinfo\SWorldBeamTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\typeinfo\SWorldParticleTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\typeinfo\SBatchTextureDataTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\typeinfo\Sphere3fTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\serialization\SSavedGameHeader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\Entity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\CollisionBeamStartupRegistrations.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\EntityCategoryLookupResolver.h">
@@ -1710,6 +2547,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\EntityMotor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\EntityMotorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\EntityFastVectorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\EntitySetReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\EntityPositionWatchEntry.h">
@@ -1784,6 +2630,36 @@
     <ClInclude Include="moho\script\CScriptObjectTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\misc\ScrActivation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrBreakpoint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrDebugHooks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrFileLine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrFileCtrl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrWatch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\TreeData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrWatchCtrl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\ScrPauseEvent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\misc\PausedThread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\script\ScriptedDecal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1841,10 +2717,10 @@
     <ClInclude Include="moho\collision\CColPrimitiveBaseTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\collision\CColPrimitiveclass_Wm3_Box3float.h">
+    <ClInclude Include="moho\collision\CColPrimitiveBox3f.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\collision\CColPrimitiveclass_Wm3_Sphere3float.h">
+    <ClInclude Include="moho\collision\CColPrimitiveSphere3f.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\collision\AABB.h">
@@ -1896,6 +2772,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\RScmResource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\RScmResourceTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\IAiSiloBuild.h">
@@ -1988,9 +2867,6 @@
     <ClInclude Include="moho\net\CNetUDPConnector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gpg\core\containers\DListItem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\containers\TDatList.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2004,6 +2880,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\FastVector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\containers\SerSaveLoadHelper_Box3f.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\Rect2.h">
@@ -2045,7 +2924,58 @@
     <ClInclude Include="gpg\core\reflection\Reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gpg\core\reflection\RVectorTypestruct_Moho_SSavedGameArmyInfo.h">
+    <ClInclude Include="gpg\core\reflection\BadRefCast.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\reflection\RMapStringFloatTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gpg\core\containers\FastVectorUIntReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\PrefetchHandleBaseVectorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CPrefetchSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CPrefetchSetSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CFireWeaponTaskSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CUnitCallAirStagingPlatformSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CUnitCallLandTransportSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CUnitCallTeleportSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CUnitCallTransportSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\CFireWeaponTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\SBlackListInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\SBlackListInfoSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\SBlackListInfoTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\SBlackListInfoVectorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\INetNATTraversalProviderWeakPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\serialization\SSavedGameArmyInfoVectorReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\reflection\SerializationError.h">
@@ -2291,6 +3221,27 @@
     <ClInclude Include="moho\render\camera\VTransform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\particles\CParticleTextureCountedPtr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\CWorldParticles.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\BeamRenderHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\ParticleRenderBuckets.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\ParticleRenderWorkItemRuntime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\SWorldBeam.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\SWorldParticle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="wm3\Quaternion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2378,6 +3329,9 @@
     <ClInclude Include="moho\ai\CAiFormationInstance.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\ai\IFormationInstanceCountedPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\ai\CAiFormationInstanceSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2445,6 +3399,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiPersonality.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\CAiPersonalityLuaFunctionThunks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiPersonalityConstruct.h">
@@ -2579,6 +3536,60 @@
     <ClInclude Include="moho\unit\core\IUnit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\core\IUnitWeakPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitFastVectorReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\SInfoCacheReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CAcquireTargetTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CAcquireTargetTaskSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CAcquireTargetTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallAirStagingPlatform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallAirStagingPlatformTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallLandTransport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallLandTransportTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallTeleport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallTransport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCallTransportTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CFireWeaponTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\CWeaponAttributes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\EIntelTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\EUnitStateTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\core\WeaponExtractor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2586,6 +3597,39 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\core\Unit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitSerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitSaveConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitSetSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitSetTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitWeakPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitWeaponWeakPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitWeapon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitWeaponSerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitWeaponTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitLuaFunctionThunks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="boost\weak_ptr.h">
@@ -2607,6 +3651,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\net\INetNATTraversalProviderTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\net\ENetProtocolTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\net\INetNATTraversal.h">
@@ -2660,6 +3707,9 @@
     <ClInclude Include="moho\task\CTaskThread.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\task\CTaskThreadWeakPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\task\CWaitForTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2685,6 +3735,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\containers\BVIntSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\containers\BVIntSetSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\containers\BVIntSetTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\containers\BVSet.h">
@@ -2780,6 +3836,9 @@
     <ClInclude Include="moho\sim\SSTIArmyVariableData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\SConditionTriggerTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\SDesyncInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2789,6 +3848,21 @@
     <ClInclude Include="moho\sim\CRandomStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\CMersenneTwister.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CMersenneTwisterTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CMersenneTwisterSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CRandomStreamTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\CRandomStreamSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="gpg\core\containers\BitArray2D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2796,6 +3870,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ui\CUIManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ui\EMauiEventTypeTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ui\EMauiKeyCodeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ui\IUIManager.h">
@@ -2825,34 +3905,61 @@
     <ClInclude Include="moho\sim\IdPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\IdPoolTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\IdPoolSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SMinMaxTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\command\CCommandDb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\command\CCommandDbTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\command\CCommandDbSerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\command\EUnitCommandTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\SParticleBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectImpl.h">
+    <ClInclude Include="moho\effects\rendering\CEffectImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectImplSerializer.h">
+    <ClInclude Include="moho\effects\rendering\CEffectImplSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectImplTypeInfo.h">
+    <ClInclude Include="moho\effects\rendering\CEffectImplTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectManagerImpl.h">
+    <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectManagerImplConstruct.h">
+    <ClInclude Include="moho\effects\rendering\CEffectManagerImplConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectManagerImplSaveConstruct.h">
+    <ClInclude Include="moho\effects\rendering\CEffectManagerImplSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectManagerImplSerializer.h">
+    <ClInclude Include="moho\effects\rendering\CEffectManagerImplSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\CEffectManagerImplTypeInfo.h">
+    <ClInclude Include="moho\effects\rendering\CEffectManagerImplTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\effects\rendering\CEfxBeam.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\effects\rendering\CEfxBeamSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\CDecalBuffer.h">
@@ -2862,6 +3969,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\CDecalBufferTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\CWldTerrainDecalTYPETypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\CDecalHandle.h">
@@ -2891,16 +4001,19 @@
     <ClInclude Include="moho\render\RangeRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\render\SelectionBracketParams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\render\RenderGeometryBuffers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\SEfxCurve.h">
+    <ClInclude Include="moho\effects\rendering\SEfxCurve.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\SEfxCurveSerializer.h">
+    <ClInclude Include="moho\effects\rendering\SEfxCurveSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\SEfxCurveTypeInfo.h">
+    <ClInclude Include="moho\effects\rendering\SEfxCurveTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\EEmitterCurve.h">
@@ -2933,25 +4046,31 @@
     <ClInclude Include="moho\render\EmitterTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\IEffect.h">
+    <ClInclude Include="moho\effects\rendering\IEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\IEffectManager.h">
+    <ClInclude Include="moho\effects\rendering\IEffectManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\IEffectManagerTypeInfo.h">
+    <ClInclude Include="moho\effects\rendering\IEffectManagerTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\IEffectSerializer.h">
+    <ClInclude Include="moho\effects\rendering\IEffectSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\render\IEffectTypeInfo.h">
+    <ClInclude Include="moho\effects\rendering\IEffectTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\effects\rendering\IEffectWeakPtrReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\IEdRenderHook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\ID3DTextureSheet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\ID3DTextureSheetTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\IRenderWorldView.h">
@@ -2966,13 +4085,52 @@
     <ClInclude Include="moho\render\VisionRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\render\d3d\CD3DFont.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\d3d\CD3DEffectTechnique.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\d3d\CD3DDeviceResources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\render\d3d\CD3DPrimBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\d3d\D3DSingletonCleanup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\d3d\CD3DTextureBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\d3d\ShaderVar.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\textures\CD3DDynamicTextureSheet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\textures\CD3DBatchTexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\CD3DFileBatchTexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\CD3DRawBatchTexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\CD3DSolidBatchTexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\DeviceExitListener.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\DXTCodec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\SBatchTextureData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\textures\SBatchTextureDataFactory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\debug\CPathDebugger.h">
@@ -3089,7 +4247,7 @@
     <ClInclude Include="moho\sim\TSimConVarbool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\TSimConVarclass_std_basic_stringchar_struct_std_char_traitschar_class_std_allocatorchar.h">
+    <ClInclude Include="moho\sim\TSimConVarString.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\TSimConVarfloat.h">
@@ -3098,13 +4256,13 @@
     <ClInclude Include="moho\sim\TSimConVarint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\TSimConVarunsigned_char.h">
+    <ClInclude Include="moho\sim\TSimConVarUInt8.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\TSimConVarInstancebool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\TSimConVarInstanceclass_std_basic_stringchar_struct_std_char_traitschar_class_std_allocatorchar.h">
+    <ClInclude Include="moho\sim\TSimConVarInstanceString.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\TSimConVarInstancefloat.h">
@@ -3113,7 +4271,7 @@
     <ClInclude Include="moho\sim\TSimConVarInstanceint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\sim\TSimConVarInstanceunsigned_char.h">
+    <ClInclude Include="moho\sim\TSimConVarInstanceUInt8.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\SPhysConstants.h">
@@ -3122,7 +4280,22 @@
     <ClInclude Include="moho\entity\EntityShield.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\entity\MotorFallDown.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\entity\Prop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\PropConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\PropSaveConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\PropSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\PropTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\Shield.h">
@@ -3137,6 +4310,12 @@
     <ClInclude Include="moho\resource\RResId.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\resource\RResIdSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\BlueprintConstructSerializationHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RPropBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3144,6 +4323,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RMeshBlueprint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RMeshBlueprintConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RMeshBlueprintTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RMeshBlueprintSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprint.h">
@@ -3161,6 +4349,9 @@
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\REffectBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3170,10 +4361,61 @@
     <ClInclude Include="moho\resource\blueprints\REmitterBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\REmitterBlueprintTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\REmitterCurveTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RProjectileBlueprint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintNestedTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintSaveConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RPropBlueprintDisplayTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintCapabilityEnums.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintEnumTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RMeshBlueprintLODTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintDefenseShieldTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintNestedTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintSaveConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponConstruct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponSaveConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\command\SSTICommandIssueData.h">
@@ -3204,6 +4446,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\CAniPose.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\animation\CAniPoseSharedPtrReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\animation\CAniSkel.h">
@@ -3254,6 +4499,9 @@
     <ClInclude Include="moho\unit\CUnitMotion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\CUnitMotionSerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\CUnitMotionConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3263,10 +4511,34 @@
     <ClInclude Include="moho\unit\CUnitMotionTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\EUnitMotionEnums.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\UnitMotionEnumTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\CUnitCommandQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\CUnitCommandQueueReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\CUnitCommandTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\CUnitCommandSerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\CUnitCommandWeakPtrReflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\ECommandEvent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\ECommandEventTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\EUnitCommandQueueStatusTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\command\CmdDefs.h">
@@ -3279,6 +4551,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\REntityBlueprint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\entity\REntityBlueprintTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\collision\ECollisionShape.h">
@@ -3302,7 +4577,22 @@
     <ClInclude Include="moho\lua\CLuaVectorMetatableFactory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\lua\SCR_FromLua.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\lua\SCR_ToLua.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\lua\SCR_Color.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\lua\SCR_Math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\lua\SCR_String.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\lua\SCR_Trace.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\lua\CScrLuaBaseClassSpec.h">
@@ -3327,6 +4617,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiPathSplineTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\EPathTypeTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\ESearchTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\ai\CAiTargetSerializer.h">
@@ -3356,6 +4652,9 @@
     <ClInclude Include="moho\ai\EAiTargetTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\ai\ESiloBuildStageTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\ai\EAiTransportEventTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3368,5 +4667,24 @@
     <ClInclude Include="moho\ai\SAiReservedTransportBoneTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\ai\SAttachPointSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\SAttachPointTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\STransportPickUpInfoSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\STransportPickUpInfoTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\SContinueInfoSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\ai\SContinueInfoTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
+

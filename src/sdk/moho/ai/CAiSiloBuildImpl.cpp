@@ -3,7 +3,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <list>
+#include <new>
+#include <stdexcept>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/entity/Entity.h"
@@ -11,14 +16,155 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/core/UnitWeaponRuntimeView.h"
 
 using namespace moho;
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 namespace
 {
+  gpg::RType* gUnitType = nullptr;
+  gpg::RType* gUnitWeaponType = nullptr;
+  gpg::RType* gCEconRequestType = nullptr;
+  gpg::RType* gSEconValueType = nullptr;
+  gpg::RType* gESiloBuildStageType = nullptr;
+  gpg::RType* gESiloTypeListType = nullptr;
+
   constexpr float kSiloMinimumBuildRate = 0.1f;
   constexpr std::uint64_t kSiloBuildingStateMask = (1ull << static_cast<std::uint32_t>(UNITSTATE_SiloBuildingAmmo));
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
+  {
+    if (!slot) {
+      slot = gpg::LookupRType(typeid(TObject));
+    }
+    return slot;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCAiSiloBuildImplType()
+  {
+    if (!CAiSiloBuildImpl::sType) {
+      CAiSiloBuildImpl::sType = gpg::LookupRType(typeid(CAiSiloBuildImpl));
+    }
+    return CAiSiloBuildImpl::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveSSiloBuildInfoType()
+  {
+    if (!SSiloBuildInfo::sType) {
+      SSiloBuildInfo::sType = gpg::LookupRType(typeid(SSiloBuildInfo));
+    }
+    return SSiloBuildInfo::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveESiloTypeListType()
+  {
+    return CachedType<std::list<ESiloType>>(gESiloTypeListType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveUnitType()
+  {
+    return CachedType<Unit>(gUnitType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveUnitWeaponType()
+  {
+    return CachedType<UnitWeapon>(gUnitWeaponType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCEconRequestType()
+  {
+    if (!CEconRequest::sType) {
+      CEconRequest::sType = CachedType<CEconRequest>(gCEconRequestType);
+    }
+    return CEconRequest::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveSEconValueType()
+  {
+    if (!SEconValue::sType) {
+      SEconValue::sType = CachedType<SEconValue>(gSEconValueType);
+    }
+    return SEconValue::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveESiloBuildStageType()
+  {
+    return CachedType<ESiloBuildStage>(gESiloBuildStageType);
+  }
+
+  template <typename TObject>
+  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = staticType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType ? dynamicType : staticType;
+      return out;
+    }
+
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  template <typename TObject>
+  [[nodiscard]] TObject* ReadPointerWithType(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
+  {
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    if (upcast.mObj) {
+      return static_cast<TObject*>(upcast.mObj);
+    }
+
+    throw std::runtime_error("CAiSiloBuildImpl pointer type mismatch during archive load");
+  }
+
+  template <typename TObject>
+  void WritePointerWithType(
+    gpg::WriteArchive* const archive,
+    TObject* const object,
+    gpg::RType* const staticType,
+    const gpg::TrackedPointerState state,
+    const gpg::RRef& owner
+  )
+  {
+    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    gpg::WriteRawPointer(archive, objectRef, state, owner);
+  }
 
   [[nodiscard]] std::size_t ToSiloIndex(const ESiloType type) noexcept
   {
@@ -187,13 +333,44 @@ namespace
   }
 } // namespace
 
+gpg::RType* SSiloBuildInfo::sType = nullptr;
 gpg::RType* CAiSiloBuildImpl::sType = nullptr;
 
 /**
- * Address: 0x005CED30 (FUN_005CED30, ??0CAiSiloBuildImpl@Moho@@QAE@PAVUnit@1@@Z)
+ * Address: 0x005D04A0 (FUN_005D04A0, Moho::SSiloBuildInfo::MemberDeserialize)
  */
-CAiSiloBuildImpl::CAiSiloBuildImpl(Unit* const unit)
-  : mUnit(unit)
+void SSiloBuildInfo::MemberDeserialize(gpg::ReadArchive* const archive, SSiloBuildInfo* const info)
+{
+  if (!archive || !info) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  info->mWeapon = ReadPointerWithType<UnitWeapon>(archive, owner, ResolveUnitWeaponType());
+  archive->ReadInt(&info->mAmmo);
+  archive->ReadInt(&info->mMaxStorageCount);
+}
+
+/**
+ * Address: 0x005D04F0 (FUN_005D04F0, Moho::SSiloBuildInfo::MemberSerialize)
+ */
+void SSiloBuildInfo::MemberSerialize(const SSiloBuildInfo* const info, gpg::WriteArchive* const archive)
+{
+  if (!archive || !info) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  WritePointerWithType(archive, info->mWeapon, ResolveUnitWeaponType(), gpg::TrackedPointerState::Unowned, owner);
+  archive->WriteInt(info->mAmmo);
+  archive->WriteInt(info->mMaxStorageCount);
+}
+
+/**
+ * Address: 0x005CF5B0 (FUN_005CF5B0, ??0CAiSiloBuildImpl@Moho@@AAE@XZ)
+ */
+CAiSiloBuildImpl::CAiSiloBuildImpl()
+  : mUnit(nullptr)
   , mSiloInfo{}
   , mSiloTypes{}
   , mRequest(nullptr)
@@ -204,7 +381,15 @@ CAiSiloBuildImpl::CAiSiloBuildImpl(Unit* const unit)
   , mCurSegments(0)
 {
   InitializeSiloTypeList(mSiloTypes);
-  ClearSiloTypeList(mSiloTypes);
+}
+
+/**
+ * Address: 0x005CED30 (FUN_005CED30, ??0CAiSiloBuildImpl@Moho@@QAE@PAVUnit@1@@Z)
+ */
+CAiSiloBuildImpl::CAiSiloBuildImpl(Unit* const unit)
+  : CAiSiloBuildImpl()
+{
+  mUnit = unit;
 
   if (mUnit) {
     mUnit->WorkProgress = 0.0f;
@@ -221,6 +406,98 @@ CAiSiloBuildImpl::~CAiSiloBuildImpl()
 {
   DestroyEconomyRequestPointer(mRequest);
   DestroySiloTypeListStorage(mSiloTypes);
+}
+
+/**
+ * Address: 0x005CF850 (FUN_005CF850, Moho::CAiSiloBuildImpl::MemberConstruct)
+ */
+void CAiSiloBuildImpl::MemberConstruct(gpg::SerConstructResult* const result)
+{
+  CAiSiloBuildImpl* const object = new (std::nothrow) CAiSiloBuildImpl();
+  if (!result) {
+    delete object;
+    return;
+  }
+
+  gpg::RRef objectRef{};
+  objectRef.mObj = object;
+  objectRef.mType = ResolveCAiSiloBuildImplType();
+  result->SetUnowned(objectRef, 0u);
+}
+
+/**
+ * Address: 0x005D1080 (FUN_005D1080, Moho::CAiSiloBuildImpl::MemberDeserialize)
+ */
+void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  mUnit = ReadPointerWithType<Unit>(archive, owner, ResolveUnitType());
+
+  for (std::size_t index = 0; index < 2; ++index) {
+    gpg::RType* const siloInfoType = ResolveSSiloBuildInfoType();
+    GPG_ASSERT(siloInfoType != nullptr);
+    archive->Read(siloInfoType, &mSiloInfo[index], owner);
+  }
+
+  gpg::RType* const siloListType = ResolveESiloTypeListType();
+  GPG_ASSERT(siloListType != nullptr);
+  archive->Read(siloListType, &mSiloTypes, owner);
+
+  CEconRequest* const loadedRequest = ReadPointerWithType<CEconRequest>(archive, owner, ResolveCEconRequestType());
+  ReplaceEconomyRequestPointer(mRequest, loadedRequest);
+
+  gpg::RType* const stateType = ResolveESiloBuildStageType();
+  GPG_ASSERT(stateType != nullptr);
+  archive->Read(stateType, &mState, owner);
+
+  archive->ReadFloat(&mSegments);
+  archive->ReadInt(&mCurSegments);
+
+  gpg::RType* const econValueType = ResolveSEconValueType();
+  GPG_ASSERT(econValueType != nullptr);
+  archive->Read(econValueType, &mSegmentCost, owner);
+  archive->Read(econValueType, &mSegmentSpent, owner);
+}
+
+/**
+ * Address: 0x005D1230 (FUN_005D1230, Moho::CAiSiloBuildImpl::MemberSerialize)
+ */
+void CAiSiloBuildImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+  WritePointerWithType(archive, mUnit, ResolveUnitType(), gpg::TrackedPointerState::Unowned, owner);
+
+  for (std::size_t index = 0; index < 2; ++index) {
+    gpg::RType* const siloInfoType = ResolveSSiloBuildInfoType();
+    GPG_ASSERT(siloInfoType != nullptr);
+    archive->Write(siloInfoType, &mSiloInfo[index], owner);
+  }
+
+  gpg::RType* const siloListType = ResolveESiloTypeListType();
+  GPG_ASSERT(siloListType != nullptr);
+  archive->Write(siloListType, &mSiloTypes, owner);
+
+  WritePointerWithType(archive, mRequest, ResolveCEconRequestType(), gpg::TrackedPointerState::Owned, owner);
+
+  gpg::RType* const stateType = ResolveESiloBuildStageType();
+  GPG_ASSERT(stateType != nullptr);
+  archive->Write(stateType, &mState, owner);
+
+  archive->WriteFloat(mSegments);
+  archive->WriteInt(mCurSegments);
+
+  gpg::RType* const econValueType = ResolveSEconValueType();
+  GPG_ASSERT(econValueType != nullptr);
+  archive->Write(econValueType, &mSegmentCost, owner);
+  archive->Write(econValueType, &mSegmentSpent, owner);
 }
 
 /**

@@ -24,6 +24,7 @@
 namespace moho
 {
   enum EUnitState : std::int32_t;
+  struct CEconRequest;
   class CIntel;
   class RUnitBlueprint;
   class ReconBlip;
@@ -43,6 +44,14 @@ namespace moho
   class IAiSteering;
   class IAiTransport;
 } // namespace moho
+
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+  class RRef;
+  class SerConstructResult;
+} // namespace gpg
 
 namespace moho
 {
@@ -154,16 +163,20 @@ namespace moho
    *   - +0x04 as intrusive weak owner-link slot (`Unit* + 0x04`)
    *   - +0x08 as weak chain next pointer
    *   - +0x0C as formation ordering word
-   *   - +0x18 as formation float tie-break metric
+   *   - +0x10 bool lane serialized by SInfoCacheSerializer::Serialize
+   *   - +0x14/+0x18 float lanes serialized by SInfoCacheSerializer::Serialize
+   *   - +0x1C as cached vector lane serialized by SInfoCacheSerializer::Serialize
    */
   struct SInfoCache
   {
     CFormationInstance* mFormationLayer;   // +0x00
     SWeakRefSlot mFormationLeadRef;        // +0x04
     std::int32_t mFormationPriorityOrder;  // +0x0C
-    std::uint8_t mPad10[0x08];             // +0x10
+    bool mHasFormationSpeedData;           // +0x10
+    std::uint8_t mPad11[0x03];             // +0x11
+    float mFormationTopSpeed;              // +0x14
     float mFormationDistanceMetric;        // +0x18
-    std::uint8_t mPad1C[0x0C];             // +0x1C
+    Wm3::Vector3f mFormationHeadingHint;   // +0x1C
   };
   static_assert(offsetof(SInfoCache, mFormationLayer) == 0x00, "SInfoCache::mFormationLayer offset must be 0x00");
   static_assert(offsetof(SInfoCache, mFormationLeadRef) == 0x04, "SInfoCache::mFormationLeadRef offset must be 0x04");
@@ -171,7 +184,16 @@ namespace moho
     offsetof(SInfoCache, mFormationPriorityOrder) == 0x0C, "SInfoCache::mFormationPriorityOrder offset must be 0x0C"
   );
   static_assert(
+    offsetof(SInfoCache, mHasFormationSpeedData) == 0x10, "SInfoCache::mHasFormationSpeedData offset must be 0x10"
+  );
+  static_assert(
+    offsetof(SInfoCache, mFormationTopSpeed) == 0x14, "SInfoCache::mFormationTopSpeed offset must be 0x14"
+  );
+  static_assert(
     offsetof(SInfoCache, mFormationDistanceMetric) == 0x18, "SInfoCache::mFormationDistanceMetric offset must be 0x18"
+  );
+  static_assert(
+    offsetof(SInfoCache, mFormationHeadingHint) == 0x1C, "SInfoCache::mFormationHeadingHint offset must be 0x1C"
   );
   static_assert(sizeof(SInfoCache) == 0x28, "SInfoCache size must be 0x28");
 
@@ -213,6 +235,36 @@ namespace moho
   class Unit : public IUnit, public Entity
   {
   public:
+    /**
+     * Address: 0x006AD3C0 (FUN_006AD3C0, Moho::Unit::MemberConstruct)
+     *
+     * What it does:
+     * Deserializes construct-time owner lanes and returns a newly constructed
+     * `Unit` via `SerConstructResult`.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x006B2B50 (FUN_006B2B50, Moho::Unit::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes runtime `Unit` state lanes for the given archive version.
+     */
+    static void MemberDeserialize(gpg::ReadArchive* archive, Unit* unit, int version);
+
+    /**
+     * Address: 0x006B33A0 (FUN_006B33A0, Moho::Unit::MemberSerialize)
+     *
+     * What it does:
+     * Serializes runtime `Unit` state lanes for the given archive version.
+     */
+    static void MemberSerialize(gpg::WriteArchive* archive, Unit* unit, int version);
+
     /**
      * Address: 0x006A4BC0
      * Slot: 0
@@ -450,6 +502,33 @@ namespace moho
     void SetRepeatQueue(bool enabled);
 
     /**
+     * Address: 0x006AA900 (FUN_006AA900, ?SetConsumptionActive@Unit@Moho@@QAEX_N@Z)
+     *
+     * What it does:
+     * Rebuilds unit upkeep request lanes for active/inactive economy
+     * consumption and dispatches matching Lua script callbacks.
+     */
+    void SetConsumptionActive(bool isActive);
+
+    /**
+     * Address: 0x006AC530 (FUN_006AC530, ?ShowAIDebugInfo@Unit@Moho@@QAEX_N@Z)
+     *
+     * What it does:
+     * Resolves this unit's `AIDebug_<UniqueName>` stat path and clears it from
+     * owning army stats.
+     */
+    void ShowAIDebugInfo(bool isEnabled);
+
+    /**
+     * Address: 0x006AC600 (FUN_006AC600, ?DebugShowRaisedPlatforms@Unit@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * When `ShowRaisedPlatforms` sim-convar is enabled, draws one debug quad
+     * for each raised-platform blueprint polygon relative to unit position.
+     */
+    void DebugShowRaisedPlatforms();
+
+    /**
      * Address: 0x006A7490 (FUN_006A7490)
      *
      * What it does:
@@ -475,6 +554,16 @@ namespace moho
     bool PickTargetPoint(std::int32_t& outTargetPoint) const;
 
     /**
+     * Address: 0x006A9E50 (FUN_006A9E50, ?CanBuild@Unit@Moho@@QBE_NPBVRUnitBlueprint@2@@Z)
+     *
+     * What it does:
+     * Tests whether `blueprint` is present in this unit's effective build
+     * category set after army and per-unit build restrictions are applied.
+     */
+    [[nodiscard]]
+    bool CanBuild(const RUnitBlueprint* blueprint) const;
+
+    /**
      * Address: 0x0059A430 (FUN_0059A430, ?GetGuardedUnit@Unit@Moho@@QBEPAV12@XZ)
      *
      * What it does:
@@ -482,6 +571,16 @@ namespace moho
      */
     [[nodiscard]]
     Unit* GetGuardedUnit() const;
+
+    /**
+     * Address: 0x0062EE00 (FUN_0062EE00, Moho::Unit::GetStagingPlatform)
+     *
+     * What it does:
+     * Resolves `TransportedByRef` and returns the parent transport unit when
+     * it is alive and flagged as an air-staging platform.
+     */
+    [[nodiscard]]
+    Unit* GetStagingPlatform() const;
 
     /**
      * Address: 0x006A8D80 (FUN_006A8D80, ?IsHigherPriorityThan@Unit@Moho@@QBE_NPBV12@@Z)
@@ -550,8 +649,19 @@ namespace moho
     msvc8::string CustomName;    // 0x02CC
     // 0x02E8..0x02F4 reset in Sim::AdvanceBeat for living units.
     SBeatResourceAccumulators mBeatResourceAccumulators; // 0x02E8
-    float EconomyEventRequestedEnergyRate;               // 0x02F8
-    float EconomyEventRequestedMassRate;                 // 0x02FC
+    union
+    {
+      struct
+      {
+        float EconomyEventRequestedEnergyRate; // 0x02F8
+        float EconomyEventRequestedMassRate;   // 0x02FC
+      };
+      struct
+      {
+        float MaintainenceCostEnergy; // 0x02F8
+        float MaintainenceCostMass;   // 0x02FC
+      };
+    };
     char pad_0300[16];                                   // 0x0300
     class CAniPose* AnimationPose;                       // 0x0310
     char pad_0314[0x114];                                // 0x0314
@@ -576,7 +686,7 @@ namespace moho
     bool mNeedsKillCleanup;            // 0x0524: tested in Sim::AdvanceBeat, cleared by Unit::KillCleanup (0x006A8790)
     char pad_0525[0x0B];               // 0x0525
     std::int32_t PriorityBoost;        // 0x0530
-    char pad_0534[4];                  // 0x0534
+    CEconRequest* mConsumptionData;    // 0x0534
     bool ConsumptionActive;            // 0x0538
     bool ProductionActive;             // 0x0539
     char pad_053A[2];                  // 0x053A
@@ -593,7 +703,8 @@ namespace moho
     char pad_0561[0x13];                             // 0x0561
     TDatListItem<void, void> mEconomyEventListHead;  // 0x0574
     std::uint8_t CurrentTerrainType;                 // 0x057C
-    char pad_057D[3];                                // 0x057D
+    bool mDebugAIStates;                             // 0x057D
+    char pad_057E[2];                                // 0x057E
     SInfoCache mInfoCache;                           // 0x0580
     std::int32_t ReservedOgridRectMinX;              // 0x05A8
     std::int32_t ReservedOgridRectMinZ;              // 0x05AC
@@ -620,13 +731,22 @@ namespace moho
 
   static_assert(offsetof(Unit, GuardedByListStorage) == 0x04F8, "Unit::GuardedByListStorage offset must be 0x04F8");
   static_assert(offsetof(Unit, PriorityBoost) == 0x0530, "Unit::PriorityBoost offset must be 0x0530");
+  static_assert(offsetof(Unit, mConsumptionData) == 0x0534, "Unit::mConsumptionData offset must be 0x0534");
+  static_assert(
+    offsetof(Unit, MaintainenceCostEnergy) == 0x02F8, "Unit::MaintainenceCostEnergy offset must be 0x02F8"
+  );
+  static_assert(
+    offsetof(Unit, MaintainenceCostMass) == 0x02FC, "Unit::MaintainenceCostMass offset must be 0x02FC"
+  );
   static_assert(
     offsetof(Unit, EconomyEventRequestedEnergyRate) == 0x02F8,
     "Unit::EconomyEventRequestedEnergyRate offset must be 0x02F8"
   );
   static_assert(
-    offsetof(Unit, EconomyEventRequestedMassRate) == 0x02FC, "Unit::EconomyEventRequestedMassRate offset must be 0x02FC"
+    offsetof(Unit, EconomyEventRequestedMassRate) == 0x02FC,
+    "Unit::EconomyEventRequestedMassRate offset must be 0x02FC"
   );
+  static_assert(offsetof(Unit, mDebugAIStates) == 0x057D, "Unit::mDebugAIStates offset must be 0x057D");
   static_assert(
     offsetof(Unit, ReservedOgridRectMinX) == 0x05A8, "Unit::ReservedOgridRectMinX offset must be 0x05A8"
   );
@@ -745,6 +865,33 @@ namespace moho
    * COL:  0x00E86A18
    */
   using UnitKillManipulators_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * Address: 0x006C52E0 (FUN_006C52E0, cfunc_UnitKillManipulators)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_UnitKillManipulatorsL`.
+   */
+  int cfunc_UnitKillManipulators(lua_State* luaContext);
+
+  /**
+   * Address: 0x006C5300 (FUN_006C5300, func_UnitKillManipulators_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:KillManipulators([boneName|boneIndex])` Lua binder
+   * definition.
+   */
+  CScrLuaInitForm* func_UnitKillManipulators_LuaFuncDef();
+
+  /**
+   * Address: 0x006C5360 (FUN_006C5360, cfunc_UnitKillManipulatorsL)
+   *
+   * What it does:
+   * Kills each unit manipulator that matches arg #2 by bone index (`number`) or
+   * bone name wildcard (`string`).
+   */
+  int cfunc_UnitKillManipulatorsL(LuaPlus::LuaState* state);
 
   /**
    * VFTABLE: 0x00E2D428

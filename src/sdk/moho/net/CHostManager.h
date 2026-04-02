@@ -18,6 +18,35 @@ namespace moho
     // FA/Moho keep a back-link to a map node/iterator for O(1) erase from the tree.
     // In lifted C++ we keep this as an opaque slot for parity/documentation.
     void* mMapNodeBackLink{nullptr};
+
+    /**
+     * Address: 0x0047F8A0 (FUN_0047F8A0, struct_Host::struct_Host)
+     *
+     * What it does:
+     * Initializes intrusive list lanes, copies host name, and clears map-node
+     * back-link metadata.
+     */
+    explicit Host(const msvc8::string& name);
+
+    Host() = default;
+
+    /**
+     * Address: 0x0047FBA0 (FUN_0047FBA0)
+     *
+     * What it does:
+     * Clears hostname payload and unlinks this host entry from intrusive MRU
+     * list lanes.
+     */
+    void ResetNameAndUnlink() noexcept;
+
+    /**
+     * Address: 0x0047FB50 (FUN_0047FB50, struct_Host::operator delete)
+     *
+     * What it does:
+     * Clears payload, unlinks list lanes, and deletes a heap-allocated host
+     * node.
+     */
+    static void DestroyHeapNode(Host* host) noexcept;
   };
 
 #if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
@@ -26,9 +55,27 @@ namespace moho
 
   struct CHostManager
   {
+    using HostMap = std::map<std::uint32_t, Host*>;
+
     boost::mutex mLock;
-    std::map<std::uint32_t, Host> mHosts;
+    HostMap mHosts;
     TDatList<Host, void> mHostList;
+
+    /**
+     * Address: 0x0047F900 (FUN_0047F900, sHostManager::sHostManager)
+     *
+     * What it does:
+     * Initializes host cache lock/map/list sentinel state.
+     */
+    CHostManager();
+
+    /**
+     * Address: 0x0047FA40 (FUN_0047FA40, sHostManager::~sHostManager)
+     *
+     * What it does:
+     * Clears host cache entries and resets intrusive list/map lanes on teardown.
+     */
+    ~CHostManager();
 
     /**
      * Address: 0x0047FBE0 (FUN_0047FBE0)
@@ -69,7 +116,7 @@ namespace moho
     /**
      * Linear search: map key for a given Host*. O(N), tolerable for N<=0x4C.
      */
-    auto FindByValue(const Host* h) -> std::map<std::uint32_t, Host>::iterator;
+    auto FindByValue(const Host* h) -> HostMap::iterator;
 
     /**
      * Address: <inlined inside 0x0047FBE0 in FA and 0x1007A1A0 in Moho>

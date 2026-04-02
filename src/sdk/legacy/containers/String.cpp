@@ -89,15 +89,30 @@ void msvc8::string::eos(const uint32_t newSize) noexcept {
     }
 }
 
+/**
+ * Address: 0x00402740 (FUN_00402740)
+ *
+ * What it does:
+ * Resets string storage to SSO lane and optionally preserves `newSize` bytes
+ * from the old heap buffer before freeing it.
+ */
 void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
-    // Mirrors VC8 xstring _Tidy: optionally free heap storage, then reset to SSO.
-    if (built && myRes >= 0x10U && bx.ptr != nullptr) {
-        ::operator delete(bx.ptr);
+    // Preserve legacy lane shape:
+    // if (built && large) { optional memcpy to SSO; delete(oldHeap); }
+    if (built && myRes >= 0x10U) {
+        char* const oldHeap = bx.ptr;
+        if (oldHeap != nullptr) {
+            if (newSize != 0U) {
+                (void)memcpy_s(&bx, 0x10U, oldHeap, newSize);
+            }
+            ::operator delete(oldHeap);
+        }
     }
 
-    alVal = nullptr;
+    mySize = newSize;
     myRes = 15U;
-    eos(newSize);
+    // Binary lane writes trailing NUL directly in inline storage.
+    bx.buf[newSize] = '\0';
 }
 
 void msvc8::string::assign_owned(const std::string_view value) {
@@ -380,6 +395,20 @@ msvc8::string msvc8::string::adopt(char* buf, const uint32_t len, const uint32_t
     s.myRes = cap;
     // leave _Alval as nullptr; we never free adopted memory
     return s;
+}
+
+/**
+ * Address: 0x004422C0 (FUN_004422C0)
+ * Address: 0x00445FD0 (FUN_00445FD0)
+ *
+ * What it does:
+ * Reinitializes this string to empty SSO storage, then copies full source text.
+ */
+msvc8::string& msvc8::string::reset_and_assign(const string& other) noexcept {
+    mySize = 0U;
+    myRes = 15U;
+    bx.buf[0] = '\0';
+    return assign(other, 0U, npos);
 }
 
 msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const std::size_t count) noexcept {

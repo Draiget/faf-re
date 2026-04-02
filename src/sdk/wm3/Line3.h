@@ -8,6 +8,19 @@ namespace Wm3
   {
     Vector3<T> Origin{};
     Vector3<T> Direction{};
+
+    /**
+     * Address: 0x004741F0 (FUN_004741F0, Wm3::Line3f::Line3f)
+     *
+     * What it does:
+     * Copies origin and direction vectors into a line object and returns `this`.
+     */
+    constexpr Line3(const Vector3<T>& origin, const Vector3<T>& direction) noexcept
+      : Origin(origin)
+      , Direction(direction)
+    {}
+
+    constexpr Line3() noexcept = default;
   };
 
   using Line3f = Line3<float>;

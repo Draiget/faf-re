@@ -1,5 +1,6 @@
 #include "RDebugCollision.h"
 
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -11,6 +12,11 @@
 
 namespace
 {
+  using TypeInfo = moho::RDebugCollisionTypeInfo;
+
+  alignas(TypeInfo) unsigned char gRDebugCollisionTypeInfoStorage[sizeof(TypeInfo)] = {};
+  bool gRDebugCollisionTypeInfoConstructed = false;
+
   [[nodiscard]] gpg::RType* CachedRDebugCollisionType()
   {
     if (!moho::RDebugCollision::sType) {
@@ -86,6 +92,32 @@ namespace
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
+  }
+
+  [[nodiscard]] TypeInfo& GetRDebugCollisionTypeInfo() noexcept
+  {
+    if (!gRDebugCollisionTypeInfoConstructed) {
+      auto* const typeInfo = new (gRDebugCollisionTypeInfoStorage) TypeInfo();
+      gpg::PreRegisterRType(typeid(moho::RDebugCollision), typeInfo);
+      gRDebugCollisionTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<TypeInfo*>(gRDebugCollisionTypeInfoStorage);
+  }
+
+  void cleanup_RDebugCollisionTypeInfo_00BFB670_Impl()
+  {
+    if (!gRDebugCollisionTypeInfoConstructed) {
+      return;
+    }
+
+    GetRDebugCollisionTypeInfo().~RDebugCollisionTypeInfo();
+    gRDebugCollisionTypeInfoConstructed = false;
+  }
+
+  void CleanupRDebugCollisionTypeInfoAtexit()
+  {
+    cleanup_RDebugCollisionTypeInfo_00BFB670_Impl();
   }
 } // namespace
 
@@ -163,4 +195,40 @@ namespace moho
     RegisterOverlayClass("Display collision boxes for all units", "Collision");
     Finish();
   }
+
+  /**
+   * Address: 0x00BFB670 (FUN_00BFB670, sub_BFB670)
+   *
+   * What it does:
+   * Releases startup-owned `RDebugCollisionTypeInfo` reflection storage.
+   */
+  void cleanup_RDebugCollisionTypeInfo()
+  {
+    cleanup_RDebugCollisionTypeInfo_00BFB670_Impl();
+  }
+
+  /**
+   * Address: 0x00BD3B30 (FUN_00BD3B30, register_RDebugCollisionTypeInfo)
+   *
+   * What it does:
+   * Forces startup construction/preregistration for `RDebugCollision` RTTI and installs exit cleanup.
+   */
+  void register_RDebugCollisionTypeInfo()
+  {
+    (void)GetRDebugCollisionTypeInfo();
+    (void)std::atexit(&CleanupRDebugCollisionTypeInfoAtexit);
+  }
 } // namespace moho
+
+namespace
+{
+  struct RDebugCollisionStartupBootstrap
+  {
+    RDebugCollisionStartupBootstrap()
+    {
+      moho::register_RDebugCollisionTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] RDebugCollisionStartupBootstrap gRDebugCollisionStartupBootstrap;
+} // namespace

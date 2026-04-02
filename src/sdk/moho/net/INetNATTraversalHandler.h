@@ -39,6 +39,15 @@ namespace moho
      * Queues raw NAT traversal payload for UDP send toward (`addr`,`port`).
      */
     virtual void ReceivePacket(u_long addr, u_short port, const char* dat, size_t size) = 0;
+
+  protected:
+    /**
+     * Address: 0x00485A10 (FUN_00485A10)
+     *
+     * What it does:
+     * Initializes NAT traversal handler interface vtable lane.
+     */
+    INetNATTraversalHandler();
   };
 
   static_assert(sizeof(INetNATTraversalHandler) == 0x4, "INetNATTraversalHandler size must be 0x4");

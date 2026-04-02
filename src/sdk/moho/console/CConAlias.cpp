@@ -94,7 +94,21 @@ void moho::CConAlias::InitializeRecovered(const char* description, const char* n
   }
 
   const char* const text = aliasCommandText != nullptr ? aliasCommandText : "";
-  new (AliasCommandStorageAddress()) msvc8::string(text);
+  AliasCommandStorage() = text;
+}
+
+/**
+ * Address: 0x00BFE370/FUN_00BFE370-family cleanup lanes
+ *
+ * What it does:
+ * Resets owned alias text storage and unregisters this alias command entry.
+ */
+void moho::CConAlias::ShutdownRecovered()
+{
+  msvc8::string& aliasCommand = AliasCommandStorage();
+  aliasCommand.tidy(true, 0U);
+
+  TeardownConCommandRegistration(*this);
 }
 
 /**

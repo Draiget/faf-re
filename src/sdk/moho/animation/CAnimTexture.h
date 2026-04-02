@@ -49,7 +49,7 @@ namespace moho
      * Address: 0x00423190 (FUN_00423190)
      *
      * What it does:
-     * Samples a frame pointer by floored frame index and returns an intrusive
+     * Samples a frame pointer by positive-wrapped frame index and returns an intrusive
      * `SharedPtrRaw` copy (`pi` refcount retained on success).
      */
     void GetFrameAt(FrameRef& outFrame, float frameIndex) const;

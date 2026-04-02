@@ -2,13 +2,14 @@
 
 #include <typeinfo>
 
+#include "gpg/core/streams/MemBufferStream.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/resource/CAniResourceSkel.h"
 #include "moho/resource/CParticleTexture.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/IResources.h"
 #include "moho/resource/ISimResources.h"
-#include "moho/resource/RD3DTextureResource.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/ID3DTextureSheet.h"
 
 namespace moho::resource_reflection
@@ -54,14 +55,32 @@ namespace moho::resource_reflection
     return ResolveCachedType(moho::IResources::sType, typeid(moho::IResources));
   }
 
+  /**
+   * Address: 0x004441C0 (FUN_004441C0)
+   *
+   * What it does:
+   * Returns cached `RD3DTextureResource` reflected type, resolving it lazily.
+   */
   gpg::RType* ResolveRD3DTextureResourceType()
   {
     return ResolveCachedType(moho::RD3DTextureResource::sType, typeid(moho::RD3DTextureResource));
   }
 
+  /**
+   * Address: 0x00444200 (FUN_00444200)
+   *
+   * What it does:
+   * Returns cached `ID3DTextureSheet` reflected type, resolving it lazily.
+   */
   gpg::RType* ResolveID3DTextureSheetType()
   {
     return ResolveCachedType(moho::ID3DTextureSheet::sType, typeid(moho::ID3DTextureSheet));
+  }
+
+  gpg::RType* ResolveMemBufferConstType()
+  {
+    static gpg::RType* sType = nullptr;
+    return ResolveCachedType(sType, typeid(gpg::MemBuffer<const char>));
   }
 
   void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType)

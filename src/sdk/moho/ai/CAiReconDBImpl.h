@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
@@ -53,6 +54,24 @@ namespace moho
   {
     WeakPtr<Unit> sourceUnit; // +0x00
     std::uint32_t sourceEntityId; // +0x08
+
+    /**
+     * Address: 0x005C90F0 (FUN_005C90F0, Moho::SReconKey::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes source-unit weak pointer plus source entity-id payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005C9170 (FUN_005C9170, Moho::SReconKey::MemberSerialize)
+     *
+     * What it does:
+     * Serializes source-unit weak pointer plus source entity-id payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    static gpg::RType* sType;
   };
   static_assert(sizeof(SReconKey) == 0x0C, "SReconKey size must be 0x0C");
   static_assert(offsetof(SReconKey, sourceUnit) == 0x00, "SReconKey::sourceUnit offset must be 0x00");
@@ -89,24 +108,60 @@ namespace moho
     void ReconTick(int dTicks) override;
 
     /**
-     * Address: 0x005C14E0
+     * Address: 0x005C14E0 (FUN_005C14E0)
+     *
+     * Moho::CAiReconDBImpl::ReconRefresh()
+     *
+     * IDA signature:
+     * _DWORD *__thiscall Moho::CAiReconDBImpl::ReconRefresh(Moho::CAiReconDBImpl *this)
+     *
+     * What it does:
+     * Traverses `mBlipMap` and refreshes each blip's per-army cached
+     * payload from its source unit when that source still exists and is not
+     * queued for destruction.
+     *
      * VFTable SLOT: 2
      */
     void ReconRefresh() override;
 
     /**
-     * Address: 0x005C18A0
+     * Address: 0x005C18A0 (FUN_005C18A0, Moho::CAiReconDBImpl::ReconCanDetect)
+     *
+     * gpg::Rect2<int> const &, float, int
+     *
+     * What it does:
+     * Computes recon flags for an area and merges allied-army recon state
+     * before applying counter-intel suppression.
+     *
      * VFTable SLOT: 3
      */
     [[nodiscard]]
     EReconFlags ReconCanDetect(const moho::Rect2<int>& rect, float y, int oldFlags) const override;
 
     /**
-     * Address: 0x005C1850
+     * Address: 0x005C1850 (FUN_005C1850, Moho::CAiReconDBImpl::ReconCanDetect)
+     *
+     * Wm3::Vector3<float> const &, int
+     *
+     * What it does:
+     * Classifies point medium (surface/underwater) and resolves detection
+     * through the shared recon-flag aggregation path.
+     *
      * VFTable SLOT: 4
      */
     [[nodiscard]]
     EReconFlags ReconCanDetect(const Wm3::Vec3f& pos, int oldFlags) const override;
+
+    /**
+     * Address: 0x005C18F0 (FUN_005C18F0, Moho::CAiReconDBImpl::ReconCanDetect)
+     *
+     * Entity *, Wm3::Vector3<float> const &, EReconFlags
+     *
+     * What it does:
+     * Runs map/alliance/layer gating for an entity probe and resolves final
+     * recon flags through the point recon helper chain.
+     */
+    [[nodiscard]] EReconFlags ReconCanDetect(Entity* ent, const Wm3::Vec3f& pos, EReconFlags oldFlags) const;
 
     /**
      * Address: 0x005C1720
@@ -198,6 +253,9 @@ namespace moho
 
     /**
      * Address: 0x005C29C0 (nullsub_1553)
+     *
+     * What it does:
+     * No-op checksum hook in this implementation.
      * VFTable SLOT: 18
      */
     void UpdateSimChecksum() override;
@@ -223,6 +281,15 @@ namespace moho
     void ReconFlushBlipsInRect(const moho::Rect2<int>& rect) override;
 
     /**
+     * Address: 0x005C0370 (FUN_005C0370, Moho::CAiReconDBImpl::Flush)
+     *
+     * What it does:
+     * Clears per-army recon flags for orphan + mapped blips, emits intel-loss
+     * events, destroys unused blips, and resets map/list state.
+     */
+    void Flush();
+
+    /**
      * Address: 0x005C36A0 (FUN_005C36A0, ??2CAiReconDBImpl@Moho@@QAE@@Z)
      *
      * What it does:
@@ -243,6 +310,49 @@ namespace moho
     static_assert(sizeof(SNewBlip) == 0x0C, "CAiReconDBImpl::SNewBlip size must be 0x0C");
 
   public:
+    /**
+     * Address: 0x005C07E0 (FUN_005C07E0, Moho::CAiReconDBImpl::CheckEvent)
+     *
+     * ReconBlip *, int, EReconFlags
+     *
+     * What it does:
+     * Dispatches one `OnIntelChange` callback to army script for a single
+     * recon-sense lane transition.
+     */
+    void CheckEvent(ReconBlip* blip, int newFlags, EReconFlags changedFlag);
+
+    /**
+     * Address: 0x005C0890 (FUN_005C0890, Moho::CAiReconDBImpl::CheckIntelEvents)
+     *
+     * ReconBlip *, int, int
+     *
+     * What it does:
+     * Diffs old/new recon masks and emits lane-specific intel-change events.
+     */
+    void CheckIntelEvents(ReconBlip* blip, int oldFlags, int newFlags);
+
+    /**
+     * Address: 0x005C0A70 (FUN_005C0A70, Moho::CAiReconDBImpl::GenerateNewBlips)
+     *
+     * std::vector<SNewBlip> const &
+     *
+     * What it does:
+     * Materializes pending blip requests, updates per-army state, and inserts
+     * resulting blips into the typed blip map.
+     */
+    void GenerateNewBlips(const std::vector<SNewBlip>& pending);
+
+    /**
+     * Address: 0x005C1810 (FUN_005C1810, Moho::CAiReconDBImpl::IntelConfirmDead)
+     *
+     * ReconBlip *
+     *
+     * What it does:
+     * Returns true when a blip should be treated as confirmed-dead for this
+     * army (ally visibility or direct LOS probe).
+     */
+    [[nodiscard]] bool IntelConfirmDead(ReconBlip* blip);
+
     /**
      * Address: 0x005C0930 (FUN_005C0930)
      *
@@ -279,6 +389,17 @@ namespace moho
     void UpdateBlip(ReconBlip* blip, Unit* sourceUnit, std::uint32_t newFlags);
 
     /**
+     * Address: 0x005C1F80 (FUN_005C1F80)
+     *
+     * Unit *, EReconFlags, std::vector<SNewBlip> &
+     *
+     * What it does:
+     * Updates all map-owned blips for one source unit, prunes excess fake
+     * jammer blips, and appends pending fake-blip creation requests when needed.
+     */
+    void UpdateBlips(Unit* sourceUnit, EReconFlags detectedFlags, std::vector<SNewBlip>& pending);
+
+    /**
      * Address: 0x005C21F0 (FUN_005C21F0)
      *
      * ReconBlip *
@@ -287,6 +408,86 @@ namespace moho
      * Clears this army's recon state on `blip` and destroys it if no longer used.
      */
     void DeleteBlip(ReconBlip* blip);
+
+    /**
+     * Address: 0x005C2230 (FUN_005C2230)
+     *
+     * Unit *
+     *
+     * What it does:
+     * Clears this army's recon state for all map-owned blips from `sourceUnit`
+     * and erases those blips from the typed recon map range.
+     */
+    void DeleteBlips(Unit* sourceUnit);
+
+    /**
+     * Address: 0x005C9720 (FUN_005C9720, sub_5C9720)
+     *
+     * gpg::Rect2<int> const &, EReconFlags, bool
+     *
+     * What it does:
+     * Merges rectangle recon senses from this army + allies and applies
+     * rectangle counter-intel filtering.
+     */
+    [[nodiscard]]
+    EReconFlags GetReconFlagsForRect(const moho::Rect2<int>& rect, EReconFlags oldFlags, bool isUnderwater) const;
+
+    /**
+     * Address: 0x005C9600 (FUN_005C9600, Moho::CAiReconDBImpl::GetReconFlags)
+     *
+     * Entity *, Wm3::Vector3<float> const &, EReconFlags, bool
+     *
+     * What it does:
+     * Merges point recon senses from this army and allied recon DBs, then
+     * applies point counter-intel filtering.
+     */
+    [[nodiscard]]
+    EReconFlags GetReconFlags(Entity* entity, const Wm3::Vec3f& pos, EReconFlags oldFlags, bool belowWater) const;
+
+    /**
+     * Address: 0x005CB360 (FUN_005CB360, Moho::CAiReconDBImpl::GetNewReconFor)
+     *
+     * Entity *, Wm3::Vector3<float> const &, EReconFlags, bool
+     *
+     * What it does:
+     * Computes one-army point recon senses (LOS/radar/sonar/omni) before
+     * counter-intel suppression.
+     */
+    [[nodiscard]]
+    EReconFlags GetNewReconFor(Entity* entity, const Wm3::Vec3f& pos, EReconFlags oldFlags, bool belowWater) const;
+
+    /**
+     * Address: 0x005CB460 (FUN_005CB460, Moho::CAiReconDBImpl::ApplyReconCounters)
+     *
+     * Entity *, Wm3::Vector3<float> const &, EReconFlags
+     *
+     * What it does:
+     * Applies point counter-intel and stealth/counter-stealth suppression to
+     * raw recon flags.
+     */
+    [[nodiscard]]
+    EReconFlags ApplyReconCounters(Entity* entity, const Wm3::Vec3f& pos, EReconFlags flags) const;
+
+    /**
+     * Address: 0x005CB520 (FUN_005CB520, Moho::CAiReconDBImpl::GetDetection)
+     *
+     * gpg::Rect2<int> const &, EReconFlags, bool
+     *
+     * What it does:
+     * Evaluates direct detection senses (LOS/radar/sonar/omni) over one
+     * rectangle for this army's recon grids.
+     */
+    [[nodiscard]] EReconFlags GetDetection(const moho::Rect2<int>& rect, EReconFlags oldFlags, bool isUnderwater) const;
+
+    /**
+     * Address: 0x005CB600 (FUN_005CB600, Moho::CAiReconDBImpl::DoCounterDetection)
+     *
+     * gpg::Rect2<int> const &, EReconFlags
+     *
+     * What it does:
+     * Applies radar/sonar/LOS suppression against counter-intel coverage.
+     */
+    [[nodiscard]] EReconFlags DoCounterDetection(const moho::Rect2<int>& rect, EReconFlags flags) const;
 
     [[nodiscard]] static boost::SharedPtrRaw<CIntelGrid> MakeGrid(STIMap* map, std::uint32_t gridSize);
 

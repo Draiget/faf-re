@@ -3,6 +3,7 @@
 #include "boost/mutex.h"
 #include <cstddef>
 #include <cstdint>
+#include "platform/Platform.h"
 
 namespace moho
 {
@@ -12,18 +13,23 @@ namespace moho
     HANDLE* end;   // end()
     HANDLE* cap;   // capacity end
 
-    void reset() noexcept
-    {
-      begin = end = cap = nullptr;
-    }
-    [[nodiscard]] size_t size() const noexcept
-    {
-      return begin ? static_cast<size_t>(end - begin) : 0u;
-    }
-    [[nodiscard]] size_t capacity() const noexcept
-    {
-      return begin ? static_cast<size_t>(cap - begin) : 0u;
-    }
+    /**
+     * Address: 0x00414750 (FUN_00414750)
+     *
+     * What it does:
+     * Resets begin/end/capacity pointers to an empty-vector state.
+     */
+    void reset() noexcept;
+
+    /**
+     * Address: 0x004147B0 (FUN_004147B0)
+     *
+     * What it does:
+     * Returns the current number of stored HANDLE entries.
+     */
+    [[nodiscard]] size_t size() const noexcept;
+
+    [[nodiscard]] size_t capacity() const noexcept;
 
     /**
      * Address: 0x00414A00
@@ -42,6 +48,14 @@ namespace moho
      * Address: 0x00414220
      */
     CWaitHandleSet();
+
+    /**
+     * Address: 0x00414300 (FUN_00414300)
+     *
+     * What it does:
+     * Tears down runtime wait-handle storage and closes the wake event.
+     */
+    ~CWaitHandleSet();
 
     /**
      * Address: 0x004143C0
@@ -81,4 +95,13 @@ namespace moho
     std::int32_t mutatorCount;
     boost::condition objectReceiver;
   };
+
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+  static_assert(offsetof(CWaitHandleSet, handleSet) == 0x0C, "CWaitHandleSet::handleSet offset must be 0x0C");
+  static_assert(offsetof(CWaitHandleSet, activeWaiters) == 0x18, "CWaitHandleSet::activeWaiters offset must be 0x18");
+  static_assert(offsetof(CWaitHandleSet, objectSender) == 0x1C, "CWaitHandleSet::objectSender offset must be 0x1C");
+  static_assert(offsetof(CWaitHandleSet, mutatorCount) == 0x34, "CWaitHandleSet::mutatorCount offset must be 0x34");
+  static_assert(offsetof(CWaitHandleSet, objectReceiver) == 0x38, "CWaitHandleSet::objectReceiver offset must be 0x38");
+  static_assert(sizeof(CWaitHandleSet) == 0x50, "CWaitHandleSet size must be 0x50");
+#endif
 } // namespace moho

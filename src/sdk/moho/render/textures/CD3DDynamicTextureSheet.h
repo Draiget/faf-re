@@ -18,7 +18,23 @@ namespace moho
   public:
     using TextureHandle = ID3DTextureSheet::TextureHandle;
 
-    CD3DDynamicTextureSheet();
+    /**
+     * Address: 0x0043CE40 (FUN_0043CE40, Moho::CD3DDynamicTextureSheet::CD3DDynamicTextureSheet)
+     *
+     * CD3DDevice *,bool,std::uint32_t,std::uint32_t,std::uint32_t,bool
+     *
+     * What it does:
+     * Initializes intrusive-list linkage and texture context metadata for one
+     * dynamic texture sheet instance.
+     */
+    explicit CD3DDynamicTextureSheet(
+      CD3DDevice* device = nullptr,
+      bool archiveTextureMode = false,
+      std::uint32_t width = 0,
+      std::uint32_t height = 0,
+      std::uint32_t format = 0,
+      bool dynamicUsage = false
+    );
 
     /**
      * Address: 0x0043CF90 (FUN_0043CF90, deleting thunk)

@@ -51,6 +51,19 @@ void BinaryReader::Read(char* buf, const size_t size) const
 }
 
 /**
+ * Address: 0x00445590 (FUN_00445590)
+ *
+ * What it does:
+ * Reads one 32-bit integer and returns it by value.
+ */
+int BinaryReader::ReadInt32() const
+{
+    int value = 0;
+    Read(reinterpret_cast<char*>(&value), sizeof(value));
+    return value;
+}
+
+/**
  * Address: 0x004CCDD0 (FUN_004CCDD0)
  *
  * What it does:

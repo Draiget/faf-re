@@ -64,6 +64,35 @@ namespace moho
      */
     SurfaceHandle& GetSurface(SurfaceHandle& outSurface) override;
 
+  private:
+    /**
+     * Address: 0x0043F320 (FUN_0043F320, sub_43F320)
+     *
+     * What it does:
+     * Releases retained depth-stencil surface ownership and clears handle lanes.
+     */
+    void ReleaseSurfaceHandle();
+
+  public:
+    /**
+     * Address: 0x0043F230 (FUN_0043F230, sub_43F230)
+     *
+     * What it does:
+     * Rebuilds depth-stencil surface ownership from retained context lanes.
+     */
+    bool RecreateFromContext();
+
+    /**
+     * Address: 0x0043F360 (FUN_0043F360, sub_43F360)
+     *
+     * CD3DDevice *,int,int,int
+     *
+     * What it does:
+     * Clears current surface ownership, updates owner/context dimensions, and
+     * rebuilds one depth-stencil surface.
+     */
+    bool ConfigureAndRecreate(CD3DDevice* ownerDevice, int width, int height, int format);
+
   public:
     TDatListItem<CD3DDepthStencil, void> mLink;        // +0x04
     CD3DDevice* mOwnerDevice;                          // +0x0C

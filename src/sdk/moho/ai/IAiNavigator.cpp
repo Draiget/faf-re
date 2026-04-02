@@ -1,10 +1,109 @@
 #include "moho/ai/IAiNavigator.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <new>
+#include <typeinfo>
+
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/misc/Listener.h"
 
 using namespace moho;
+
+namespace moho
+{
+  class RBroadcasterRType_EAiNavigatorEvent final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "Broadcaster<EAiNavigatorEvent>";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(Broadcaster);
+      Finish();
+    }
+  };
+
+  class RListenerRType_EAiNavigatorEvent final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "Listener<EAiNavigatorEvent>";
+    }
+
+    void Init() override
+    {
+      size_ = sizeof(Listener<EAiNavigatorEvent>);
+      Finish();
+    }
+  };
+} // namespace moho
+
+namespace
+{
+  using BroadcasterNavigatorType = moho::RBroadcasterRType_EAiNavigatorEvent;
+  using ListenerNavigatorType = moho::RListenerRType_EAiNavigatorEvent;
+
+  alignas(BroadcasterNavigatorType) unsigned char gBroadcasterNavigatorTypeStorage[sizeof(BroadcasterNavigatorType)];
+  bool gBroadcasterNavigatorTypeConstructed = false;
+
+  alignas(ListenerNavigatorType) unsigned char gListenerNavigatorTypeStorage[sizeof(ListenerNavigatorType)];
+  bool gListenerNavigatorTypeConstructed = false;
+
+  [[nodiscard]] BroadcasterNavigatorType* AcquireBroadcasterNavigatorType()
+  {
+    if (!gBroadcasterNavigatorTypeConstructed) {
+      new (gBroadcasterNavigatorTypeStorage) BroadcasterNavigatorType();
+      gBroadcasterNavigatorTypeConstructed = true;
+    }
+
+    return reinterpret_cast<BroadcasterNavigatorType*>(gBroadcasterNavigatorTypeStorage);
+  }
+
+  [[nodiscard]] ListenerNavigatorType* AcquireListenerNavigatorType()
+  {
+    if (!gListenerNavigatorTypeConstructed) {
+      new (gListenerNavigatorTypeStorage) ListenerNavigatorType();
+      gListenerNavigatorTypeConstructed = true;
+    }
+
+    return reinterpret_cast<ListenerNavigatorType*>(gListenerNavigatorTypeStorage);
+  }
+
+  void cleanup_RBroadcasterRType_EAiNavigatorEvent()
+  {
+    if (!gBroadcasterNavigatorTypeConstructed) {
+      return;
+    }
+
+    AcquireBroadcasterNavigatorType()->~BroadcasterNavigatorType();
+    gBroadcasterNavigatorTypeConstructed = false;
+  }
+
+  void cleanup_RListenerRType_EAiNavigatorEvent()
+  {
+    if (!gListenerNavigatorTypeConstructed) {
+      return;
+    }
+
+    AcquireListenerNavigatorType()->~ListenerNavigatorType();
+    gListenerNavigatorTypeConstructed = false;
+  }
+
+  [[nodiscard]] gpg::RType* CachedBroadcasterEAiNavigatorEventType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(BroadcasterEventTag<EAiNavigatorEvent>));
+    }
+    return cached;
+  }
+} // namespace
 
 std::size_t SNavPath::Count() const noexcept
 {
@@ -151,3 +250,87 @@ IAiNavigator::~IAiNavigator()
 {
   mListenerNode.ListUnlink();
 }
+
+/**
+ * Address: 0x005A7B60 (FUN_005A7B60, Moho::IAiNavigator::MemberDeserialize)
+ *
+ * What it does:
+ * Loads IAiNavigator broadcaster listener payload through reflected
+ * `Broadcaster<EAiNavigatorEvent>` metadata.
+ */
+void IAiNavigator::MemberDeserialize(IAiNavigator* const object, gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Read(
+    CachedBroadcasterEAiNavigatorEventType(),
+    object ? static_cast<void*>(&object->mListenerNode) : nullptr,
+    ownerRef
+  );
+}
+
+/**
+ * Address: 0x005A7BB0 (FUN_005A7BB0, Moho::IAiNavigator::MemberSerialize)
+ *
+ * What it does:
+ * Saves IAiNavigator broadcaster listener payload through reflected
+ * `Broadcaster<EAiNavigatorEvent>` metadata.
+ */
+void IAiNavigator::MemberSerialize(const IAiNavigator* const object, gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Write(
+    CachedBroadcasterEAiNavigatorEventType(),
+    object ? static_cast<const void*>(&object->mListenerNode) : nullptr,
+    ownerRef
+  );
+}
+
+/**
+ * Address: 0x00BCC9A0 (FUN_00BCC9A0)
+ *
+ * What it does:
+ * Registers the broadcaster reflection lane for `EAiNavigatorEvent` and
+ * installs process-exit cleanup.
+ */
+int moho::register_RBroadcasterRType_EAiNavigatorEvent()
+{
+  auto* const type = AcquireBroadcasterNavigatorType();
+  gpg::PreRegisterRType(typeid(moho::BroadcasterEventTag<moho::EAiNavigatorEvent>), type);
+  return std::atexit(&cleanup_RBroadcasterRType_EAiNavigatorEvent);
+}
+
+/**
+ * Address: 0x00BCC9C0 (FUN_00BCC9C0)
+ *
+ * What it does:
+ * Registers the listener reflection lane for `EAiNavigatorEvent` and installs
+ * process-exit cleanup.
+ */
+int moho::register_RListenerRType_EAiNavigatorEvent()
+{
+  auto* const type = AcquireListenerNavigatorType();
+  gpg::PreRegisterRType(typeid(moho::Listener<moho::EAiNavigatorEvent>), type);
+  return std::atexit(&cleanup_RListenerRType_EAiNavigatorEvent);
+}
+
+namespace
+{
+  struct IAiNavigatorReflectionBootstrap
+  {
+    IAiNavigatorReflectionBootstrap()
+    {
+      (void)moho::register_RBroadcasterRType_EAiNavigatorEvent();
+      (void)moho::register_RListenerRType_EAiNavigatorEvent();
+    }
+  };
+
+  [[maybe_unused]] IAiNavigatorReflectionBootstrap gIAiNavigatorReflectionBootstrap;
+} // namespace

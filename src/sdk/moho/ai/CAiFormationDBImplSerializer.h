@@ -15,6 +15,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0059C670 (FUN_0059C670, Moho::CAiFormationDBImplSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `CAiFormationDBImpl::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0059C680 (FUN_0059C680, Moho::CAiFormationDBImplSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `CAiFormationDBImpl::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x0059CBA0 (FUN_0059CBA0)
      *
      * What it does:
@@ -46,4 +62,13 @@ namespace moho
     "CAiFormationDBImplSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiFormationDBImplSerializer) == 0x14, "CAiFormationDBImplSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCC1D0 (FUN_00BCC1D0, register_CAiFormationDBImplSerializer)
+   *
+   * What it does:
+   * Initializes the global formation-DB serializer helper callbacks and
+   * installs process-exit cleanup.
+   */
+  void register_CAiFormationDBImplSerializer();
 } // namespace moho

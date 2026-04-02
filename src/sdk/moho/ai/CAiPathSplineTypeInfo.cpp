@@ -1,6 +1,7 @@
 #include "moho/ai/CAiPathSplineTypeInfo.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -10,6 +11,32 @@ using namespace moho;
 
 namespace
 {
+  alignas(CAiPathSplineTypeInfo) unsigned char gCAiPathSplineTypeInfoStorage[sizeof(CAiPathSplineTypeInfo)] = {};
+  bool gCAiPathSplineTypeInfoConstructed = false;
+
+  [[nodiscard]] CAiPathSplineTypeInfo* AcquireCAiPathSplineTypeInfo()
+  {
+    if (!gCAiPathSplineTypeInfoConstructed) {
+      new (gCAiPathSplineTypeInfoStorage) CAiPathSplineTypeInfo();
+      gCAiPathSplineTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<CAiPathSplineTypeInfo*>(gCAiPathSplineTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x005B2340 (FUN_005B2340, preregister_CAiPathSplineTypeInfo)
+   *
+   * What it does:
+   * Constructs and preregisters startup RTTI descriptor for `CAiPathSpline`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CAiPathSplineTypeInfo()
+  {
+    CAiPathSplineTypeInfo* const typeInfo = AcquireCAiPathSplineTypeInfo();
+    gpg::PreRegisterRType(typeid(CAiPathSpline), typeInfo);
+    return typeInfo;
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiPathSplineType()
   {
     if (!CAiPathSpline::sType) {
@@ -76,6 +103,22 @@ namespace
       spline->~CAiPathSpline();
     }
   }
+
+  /**
+   * Address: 0x00BF74E0 (FUN_00BF74E0, cleanup_CAiPathSplineTypeInfo)
+   *
+   * What it does:
+   * Tears down startup-owned `CAiPathSplineTypeInfo` reflection storage.
+   */
+  void cleanup_CAiPathSplineTypeInfo()
+  {
+    if (!gCAiPathSplineTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCAiPathSplineTypeInfo()->~CAiPathSplineTypeInfo();
+    gCAiPathSplineTypeInfoConstructed = false;
+  }
 } // namespace
 
 /**
@@ -104,3 +147,29 @@ void CAiPathSplineTypeInfo::Init()
   gpg::RType::Init();
   Finish();
 }
+
+/**
+ * Address: 0x00BCD330 (FUN_00BCD330, register_CAiPathSplineTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters startup RTTI descriptor for `CAiPathSpline` and
+ * installs process-exit cleanup.
+ */
+int moho::register_CAiPathSplineTypeInfo()
+{
+  (void)preregister_CAiPathSplineTypeInfo();
+  return std::atexit(&cleanup_CAiPathSplineTypeInfo);
+}
+
+namespace
+{
+  struct CAiPathSplineTypeInfoBootstrap
+  {
+    CAiPathSplineTypeInfoBootstrap()
+    {
+      (void)moho::register_CAiPathSplineTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CAiPathSplineTypeInfoBootstrap gCAiPathSplineTypeInfoBootstrap;
+} // namespace

@@ -5,6 +5,7 @@
 
 #include "CTask.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/EAiResult.h"
 
 namespace moho
 {
@@ -57,15 +58,34 @@ namespace moho
 
     // 0x18: reserved/unknown dword (all observed constructors clear it to zero).
     std::uint32_t mReserved18;
-    Unit* mUnit;                       // 0x1C
-    Sim* mSim;                         // 0x20
-    ETaskState mTaskState;             // 0x24
-    CCommandTask** mDispatchLinkOwner; // 0x28
-    CCommandTask* mDispatchLinkNext;   // 0x2C
+    Unit* mUnit;                  // 0x1C
+    Sim* mSim;                    // 0x20
+    ETaskState mTaskState;        // 0x24
+    EAiResult* mDispatchResult;   // 0x28
+    EAiResult mLinkResult;        // 0x2C
   };
 
   class CCommandTaskSerializer
   {
+  public:
+    /**
+     * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
+     *
+     * What it does:
+     * Loads base-task state, unit/sim pointers, task state, and dispatch-result
+     * lanes while pre-tracking the in-object result value pointer.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00608DF0 (FUN_00608DF0, Moho::CCommandTaskSerializer::Serialize)
+     *
+     * What it does:
+     * Saves base-task state, unit/sim pointers, task state, and dispatch-result
+     * lanes while pre-registering the in-object result value pointer.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
   public:
     /**
      * Address: 0x0060BA20 (FUN_0060BA20, sub_60BA20)
@@ -112,11 +132,9 @@ namespace moho
   static_assert(offsetof(CCommandTask, mSim) == 0x20, "CCommandTask::mSim offset must be 0x20");
   static_assert(offsetof(CCommandTask, mTaskState) == 0x24, "CCommandTask::mTaskState offset must be 0x24");
   static_assert(
-    offsetof(CCommandTask, mDispatchLinkOwner) == 0x28, "CCommandTask::mDispatchLinkOwner offset must be 0x28"
+    offsetof(CCommandTask, mDispatchResult) == 0x28, "CCommandTask::mDispatchResult offset must be 0x28"
   );
-  static_assert(
-    offsetof(CCommandTask, mDispatchLinkNext) == 0x2C, "CCommandTask::mDispatchLinkNext offset must be 0x2C"
-  );
+  static_assert(offsetof(CCommandTask, mLinkResult) == 0x2C, "CCommandTask::mLinkResult offset must be 0x2C");
   static_assert(sizeof(CCommandTaskSerializer) == 0x14, "CCommandTaskSerializer size must be 0x14");
   static_assert(sizeof(CCommandTaskTypeInfo) == 0x64, "CCommandTaskTypeInfo size must be 0x64");
 } // namespace moho

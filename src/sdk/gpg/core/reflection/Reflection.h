@@ -15,9 +15,28 @@
 
 namespace moho
 {
+  enum class ESquadClass : std::int32_t;
+  enum EMauiEventType : std::int32_t;
+  class CPlatoon;
   class CTaskThread;
+  class CAcquireTargetTask;
   class CLuaConOutputHandler;
+  class CEconomyEvent;
+  class CUnitCommand;
+  class Entity;
+  class CScriptObject;
+  class CSndParams;
+  class CRandomStream;
+  class IdPool;
+  class RRuleGameRules;
+  struct RUnitBlueprint;
+  class Unit;
 } // namespace moho
+
+namespace LuaPlus
+{
+  class LuaState;
+} // namespace LuaPlus
 
 namespace gpg
 {
@@ -27,7 +46,29 @@ namespace gpg
   class RField;
   class REnumType;
   class RIndexed;
-  struct SerHelperBase;
+  struct SerHelperBase
+  {
+    SerHelperBase* mNext;
+    SerHelperBase* mPrev;
+
+    /**
+     * Address: 0x00402400 (FUN_00402400, gpg::SerHelperBase::SerHelperBase)
+     *
+     * What it does:
+     * Unlinks this helper node from its current intrusive list links and then
+     * rewires it to a self-linked singleton.
+     */
+    SerHelperBase();
+
+    /**
+     * Address: 0x004027D0 (FUN_004027D0, duplicate self-link helper)
+     *
+     * What it does:
+     * Performs the same unlink-and-self-link sequence as the constructor.
+     */
+    void ResetLinks();
+  };
+  static_assert(sizeof(SerHelperBase) == 0x8, "SerHelperBase size must be 0x8");
 
   /**
    * C-string comparator for map keys.
@@ -72,6 +113,15 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x004012C0 (FUN_004012C0)
+     * PDB name: sub_4012C0
+     *
+     * What it does:
+     * Initializes the base vftable lane for reflected objects.
+     */
+    RObject() noexcept;
+
+    /**
      * Address: 0x00A82547
      * VFTable SLOT: 0
      */
@@ -103,16 +153,88 @@ namespace gpg
     void* mObj;
     RType* mType;
 
-    // RRef(T*);
-    // RRef(void* ptr, gpg::RType* type) : mObj{ ptr }, mType{ type } {}
+    /**
+     * Address: 0x00401280 (FUN_00401280)
+     *
+     * What it does:
+     * Initializes an empty reflection reference `{nullptr, nullptr}`.
+     */
+    RRef() noexcept;
 
-    msvc8::string GetLexical() const;        // 0x004A35D0
-    bool SetLexical(const char*) const;      // 0x004A3600
-    const char* GetTypeName() const;         // gpgcore.dll
-    RRef operator[](unsigned int ind) const; // 0x004A3610
-    size_t GetCount() const;                 // 0x004A3630
-    const RType* GetRType() const;           // 0x004A3650
-    const RIndexed* IsIndexed() const;       // 0x004A3660
+    /**
+     * Address: 0x00401290 (FUN_00401290)
+     *
+     * What it does:
+     * Initializes a reflection reference from explicit object/type lanes.
+     */
+    RRef(void* ptr, gpg::RType* type) noexcept;
+
+    /**
+     * Address: 0x004012B0 (FUN_004012B0)
+     *
+     * What it does:
+     * Returns the raw referenced object pointer lane.
+     */
+    [[nodiscard]] void* GetObject() const noexcept;
+
+    /**
+     * Address: 0x004A35D0 (FUN_004A35D0)
+     *
+     * What it does:
+     * Reads the reference value as lexical text through the bound `RType`.
+     */
+    msvc8::string GetLexical() const;
+
+    /**
+     * Address: 0x004A3600 (FUN_004A3600)
+     *
+     * What it does:
+     * Writes one lexical text value through the bound `RType`.
+     */
+    bool SetLexical(const char*) const;
+    /**
+     * Address: 0x00406690 (FUN_00406690)
+     *
+     * What it does:
+     * Returns reflected type name for this reference, or `"null"` when untyped.
+     */
+    const char* GetName() const;
+
+    const char* GetTypeName() const
+    {
+      return GetName();
+    }
+    /**
+     * Address: 0x004A3610 (FUN_004A3610)
+     *
+     * What it does:
+     * Returns the indexed child reference at `ind`.
+     */
+    RRef operator[](unsigned int ind) const;
+
+    /**
+     * Address: 0x004A3630 (FUN_004A3630)
+     *
+     * What it does:
+     * Returns indexed element count for this reference, or zero when unindexed.
+     */
+    size_t GetCount() const;
+
+    /**
+     * Address: 0x004A3650 (FUN_004A3650)
+     *
+     * What it does:
+     * Returns the bound runtime reflection type descriptor.
+     */
+    const RType* GetRType() const;
+
+    /**
+     * Address: 0x004A3660 (FUN_004A3660)
+     *
+     * What it does:
+     * Returns indexed-view support for the bound type.
+     */
+    const RIndexed* IsIndexed() const;
     const RIndexed* IsPointer() const;       // 0x004CC9E0
     int GetNumBases() const;                 // gpgcore.dll
     RRef GetBase(int ind) const;             // gpgcore.dll
@@ -120,6 +242,15 @@ namespace gpg
     RRef GetField(int ind) const;            // gpgcore.dll
     const char* GetFieldName(int ind) const; // gpgcore.dll
     void Delete();                           // 0x008D8800
+
+    /**
+     * Address: 0x004C1690 (FUN_004C1690, gpg::RRef::CastLuaState)
+     *
+     * What it does:
+     * Upcasts this reflected reference to `LuaPlus::LuaState` and returns null
+     * when the runtime type is not LuaState-compatible.
+     */
+    [[nodiscard]] LuaPlus::LuaState* CastLuaState();
   };
   static_assert(sizeof(RRef) == 0x08, "RRef must be 0x08");
 
@@ -156,7 +287,7 @@ namespace gpg
   RType* LookupRType(const std::type_info& typeInfo);
 
   /**
-   * Address: 0x1001BBC0 (gpgcore.dll)
+   * Address: 0x008DF850 (FUN_008DF850), 0x1001BBC0 (gpgcore.dll)
    *
    * type_info const &, gpg::RType *
    *
@@ -194,14 +325,158 @@ namespace gpg
   RType* REF_FindTypeNamed(const char* name);
 
   /**
-   * Address: 0x008DBF60
+   * Address: 0x008D9590 (FUN_008D9590, gpg::REF_UpcastPtr)
    *
    * gpg::RRef const &, gpg::RType const *
    *
    * What it does:
-   * Upcasts a reflected object reference to a requested base type when valid.
+   * Recursively walks base-type lanes and returns one upcasted reflected pointer
+   * reference when a compatible base is found.
    */
   RRef REF_UpcastPtr(const RRef& source, const RType* targetType);
+
+  /**
+   * Address: 0x00403020 (FUN_00403020, gpg::RRef_uint)
+   *
+   * What it does:
+   * Builds a reflected reference for an `unsigned int` object pointer.
+   */
+  RRef* RRef_uint(RRef* out, unsigned int* value);
+
+  /**
+   * Address: 0x00402D30 (FUN_00402D30, sub_402D30)
+   *
+   * What it does:
+   * Wrapper that assigns `RRef_uint` output lanes into the provided `RRef`.
+   */
+  RRef* AssignUIntRef(RRef* out, unsigned int* value);
+
+  /**
+   * Address: 0x00593BC0 (FUN_00593BC0, gpg::RRef_ESquadClass)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::ESquadClass` value pointer.
+   */
+  RRef* RRef_ESquadClass(RRef* out, moho::ESquadClass* value);
+
+  /**
+   * Address: 0x00704040 (FUN_00704040, sub_704040)
+   *
+   * What it does:
+   * Wrapper that assigns `RRef_ESquadClass` output lanes into provided `RRef`.
+   */
+  RRef* AssignESquadClassRef(RRef* out, moho::ESquadClass* value);
+
+  /**
+   * Address: 0x00795E00 (FUN_00795E00, gpg::RRef_EMauiEventType)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::EMauiEventType` value pointer.
+   */
+  RRef* RRef_EMauiEventType(RRef* out, moho::EMauiEventType* value);
+
+  /**
+   * Address: 0x0040C030 (FUN_0040C030, gpg::RRef_CTaskThread_P)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CTaskThread` object pointer.
+   */
+  RRef* RRef_CTaskThread(RRef* out, moho::CTaskThread* value);
+
+  /**
+   * Address: 0x005A2A40 (FUN_005A2A40, gpg::RRef_Unit)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::Unit` object pointer with
+   * derived-type normalization.
+   */
+  RRef* RRef_Unit(RRef* out, moho::Unit* value);
+
+  /**
+   * Address: 0x00526C80 (FUN_00526C80, gpg::RRef_RUnitBlueprint)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::RUnitBlueprint` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_RUnitBlueprint(RRef* out, moho::RUnitBlueprint* value);
+
+  /**
+   * Address: 0x00511940 (FUN_00511940, gpg::RRef_RRuleGameRules)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::RRuleGameRules` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_RRuleGameRules(RRef* out, moho::RRuleGameRules* value);
+
+  /**
+   * Address: 0x005F5280 (FUN_005F5280, gpg::RRef_CUnitCommand)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CUnitCommand` object pointer
+   * with derived-type normalization.
+   */
+  RRef* RRef_CUnitCommand(RRef* out, moho::CUnitCommand* value);
+
+  /**
+   * Address: 0x004041F0 (FUN_004041F0, gpg::RRef_IdPool)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::IdPool` object pointer.
+   */
+  RRef* RRef_IdPool(RRef* out, moho::IdPool* value);
+
+  /**
+   * Address: 0x00404180 (FUN_00404180, sub_404180)
+   *
+   * What it does:
+   * Wrapper that assigns `RRef_IdPool` output lanes into the provided `RRef`.
+   */
+  RRef* AssignIdPoolRef(RRef* out, moho::IdPool* value);
+
+  /**
+   * Address: 0x0040F600 (FUN_0040F600, gpg::RRef_CRandomStream)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CRandomStream` object pointer.
+   */
+  RRef* RRef_CRandomStream(RRef* out, moho::CRandomStream* value);
+
+  /**
+   * Address: 0x0040F590 (FUN_0040F590, sub_40F590)
+   *
+   * What it does:
+   * Wrapper that assigns `RRef_CRandomStream` output lanes into provided `RRef`.
+   */
+  RRef* AssignCRandomStreamRef(RRef* out, moho::CRandomStream* value);
+
+  /**
+   * Address: 0x00705120 (FUN_00705120, gpg::RRef_CPlatoon)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CPlatoon` pointer with
+   * derived-type normalization.
+   */
+  RRef* RRef_CPlatoon(RRef* out, moho::CPlatoon* value);
+
+  /**
+   * Address: 0x004220D0 (FUN_004220D0, gpg::RRef_CLuaConOutputHandler)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CLuaConOutputHandler` object
+   * pointer with derived-type normalization.
+   */
+  RRef* RRef_CLuaConOutputHandler(RRef* out, moho::CLuaConOutputHandler* value);
+
+  /**
+   * Address: 0x004C16D0 (FUN_004C16D0, gpg::RRef_LuaState)
+   *
+   * What it does:
+   * Builds a reflected reference for `LuaPlus::LuaState` and preserves dynamic
+   * runtime owner type when the pointed object is derived.
+   */
+  RRef* RRef_LuaState(RRef* out, LuaPlus::LuaState* value);
 
   class RField
   {
@@ -232,6 +507,25 @@ namespace gpg
     using ctor_ref_func_t = RRef (*)(void*);
     using mov_ref_func_t = RRef (*)(void*, RRef*);
     using dtr_func_t = void (*)(void*);
+
+    static RType* sType;
+
+    /**
+     * Address: 0x008DD950 (FUN_008DD950, ??0RType@gpg@@QAE@XZ_0)
+     *
+     * What it does:
+     * Initializes base reflection descriptor lanes to empty defaults:
+     * no handlers, zero size/version, and empty base/field vectors.
+     */
+    RType();
+
+    /**
+     * Address: 0x00401350 (FUN_00401350, gpg::RType::StaticGetClass)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for `gpg::RType`.
+     */
+    [[nodiscard]] static RType* StaticGetClass();
 
     /**
      * In binary: returns the family descriptor (descriptor for gpg::RType).
@@ -350,6 +644,22 @@ namespace gpg
      * Address: 0x008DF960
      */
     void RegisterType();
+
+    /**
+     * Address: 0x0040DFA0 (FUN_0040DFA0, gpg::RType::AddField_float)
+     *
+     * What it does:
+     * Appends one reflected `float` field descriptor.
+     */
+    RField* AddFieldFloat(const char* name, int offset);
+
+    /**
+     * Address: 0x0040E020 (FUN_0040E020, gpg::RType::AddField_uint)
+     *
+     * What it does:
+     * Appends one reflected `unsigned int` field descriptor.
+     */
+    RField* AddFieldUInt(const char* name, int offset);
 
     /**
      * Binary-search a field by its name.
@@ -563,10 +873,24 @@ namespace gpg
     /**
      * In binary:
      *
-     * Address: 0x00418120
-     * VFTable SLOT: 2
+     * Address: 0x004180A0 (FUN_004180A0)
+     *
+     * What it does:
+     * Constructs enum-type reflection state, zeroes prefix/options lanes, and
+     * installs the `REnumType` virtual surface.
      */
-    ~REnumType() override = default;
+    REnumType();
+
+    /**
+     * In binary:
+     *
+     * Address: 0x00418120 (FUN_00418120)
+     * VFTable SLOT: 2
+     *
+     * What it does:
+     * Releases enum option storage and tears down inherited `RType` lanes.
+     */
+    ~REnumType() override;
 
     /**
      * In binary:
@@ -688,6 +1012,12 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x0040C8B0 (FUN_0040C8B0)
+     * Demangled: sub_40C8B0
+     */
+    RPointerType();
+
+    /**
      * Address: 0x0040CBD0 (FUN_0040CBD0)
      * Demangled: sub_40CBD0
      */
@@ -734,6 +1064,174 @@ namespace gpg
   static_assert(sizeof(RPointerType<moho::CTaskThread>) == 0x68, "RPointerType<CTaskThread> size must be 0x68");
 
   /**
+   * VFTABLE: 0x00E1E7CC
+   * COL:  0x00E75ED0
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::CAcquireTargetTask> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x005DE390 (FUN_005DE390)
+     * Demangled: gpg::RPointerType_CAcquireTargetTask::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x005DDF20 (FUN_005DDF20)
+     * Demangled: gpg::RPointerType_CAcquireTargetTask::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x005DE0B0 (FUN_005DE0B0)
+     * Demangled: gpg::RPointerType_CAcquireTargetTask::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x005DE230 (FUN_005DE230)
+     * Demangled: gpg::RPointerType_CAcquireTargetTask::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x005DE240 (FUN_005DE240)
+     * Demangled: gpg::RPointerType_CAcquireTargetTask::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x005DE080 (FUN_005DE080)
+     * Demangled: gpg::RPointerType_CAcquireTargetTask::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(
+    sizeof(RPointerType<moho::CAcquireTargetTask>) == 0x68, "RPointerType<CAcquireTargetTask> size must be 0x68"
+  );
+
+  /**
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::Entity> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x0067E750 (FUN_0067E750)
+     * Demangled: gpg::RPointerType_Entity::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x0067E320 (FUN_0067E320)
+     * Demangled: gpg::RPointerType_Entity::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x0067E4B0 (FUN_0067E4B0)
+     * Demangled: gpg::RPointerType_Entity::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x0067E630 (FUN_0067E630)
+     * Demangled: gpg::RPointerType_Entity::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0067E640 (FUN_0067E640)
+     * Demangled: gpg::RPointerType_Entity::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x0067E480 (FUN_0067E480)
+     * Demangled: gpg::RPointerType_Entity::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RPointerType<moho::Entity>) == 0x68, "RPointerType<Entity> size must be 0x68");
+
+  /**
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::CEconomyEvent> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x006B2920 (FUN_006B2920)
+     * Demangled: gpg::RPointerType_CEconomyEvent::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x006B2510 (FUN_006B2510)
+     * Demangled: gpg::RPointerType_CEconomyEvent::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x006B26A0 (FUN_006B26A0)
+     * Demangled: gpg::RPointerType_CEconomyEvent::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x006B2820 (FUN_006B2820)
+     * Demangled: gpg::RPointerType_CEconomyEvent::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x006B2830 (FUN_006B2830)
+     * Demangled: gpg::RPointerType_CEconomyEvent::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x006B2670 (FUN_006B2670)
+     * Demangled: gpg::RPointerType_CEconomyEvent::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(
+    sizeof(RPointerType<moho::CEconomyEvent>) == 0x68, "RPointerType<CEconomyEvent> size must be 0x68"
+  );
+
+  /**
    * VFTABLE: 0x00E017C0
    * COL:  0x00E5DD44
    * Source hints:
@@ -743,6 +1241,12 @@ namespace gpg
   class RPointerType<moho::CLuaConOutputHandler> final : public RPointerTypeBase
   {
   public:
+    /**
+     * Address: 0x004212A0 (FUN_004212A0)
+     * Demangled: gpg::RPointerType_CLuaConOutputHandler::RPointerType
+     */
+    RPointerType();
+
     /**
      * Address: 0x004215C0 (FUN_004215C0)
      * Demangled: gpg::RPointerType_CLuaConOutputHandler::dtr
@@ -779,6 +1283,9 @@ namespace gpg
 
     /**
      * Address: 0x00421310 (FUN_00421310)
+     * Address: 0x00421620 (FUN_00421620, sub_421620 helper lane)
+     * Address: 0x00421660 (FUN_00421660, sub_421660 helper lane)
+     * Address: 0x00421670 (FUN_00421670, sub_421670 helper lane)
      * Demangled: gpg::RPointerType_CLuaConOutputHandler::Init
      */
     void Init() override;
@@ -790,4 +1297,116 @@ namespace gpg
   static_assert(
     sizeof(RPointerType<moho::CLuaConOutputHandler>) == 0x68, "RPointerType<CLuaConOutputHandler> size must be 0x68"
   );
+
+  /**
+   * VFTABLE: 0x00E092D0
+   * COL:  0x00E631BC
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::CScriptObject> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x004C8A00 (FUN_004C8A00)
+     * Demangled: gpg::RPointerType_CScriptObject::dtr
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x004C85F0 (FUN_004C85F0)
+     * Demangled: gpg::RPointerType_CScriptObject::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x004C8780 (FUN_004C8780)
+     * Demangled: gpg::RPointerType_CScriptObject::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x004C8900 (FUN_004C8900)
+     * Demangled: gpg::RPointerType_CScriptObject::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x004C8910 (FUN_004C8910)
+     * Demangled: gpg::RPointerType_CScriptObject::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x004C8750 (FUN_004C8750)
+     * Demangled: gpg::RPointerType_CScriptObject::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RPointerType<moho::CScriptObject>) == 0x68, "RPointerType<CScriptObject> size must be 0x68");
+
+  /**
+   * VFTABLE: 0x00E0BAF8
+   * COL:  0x00E648D4
+   * Source hints:
+   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  template <>
+  class RPointerType<moho::CSndParams> final : public RPointerTypeBase
+  {
+  public:
+    /**
+     * Address: 0x004E5FD0 (FUN_004E5FD0)
+     * Demangled: sub_4E5FD0
+     */
+    ~RPointerType() override;
+
+    /**
+     * Address: 0x004E5BC0 (FUN_004E5BC0)
+     * Demangled: gpg::RPointerType_CSndParams::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x004E5D50 (FUN_004E5D50)
+     * Demangled: gpg::RPointerType_CSndParams::GetLexical
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const RRef& ref) const override;
+
+    /**
+     * Address: 0x004E5ED0 (FUN_004E5ED0)
+     * Demangled: gpg::RPointerType_CSndParams::IsIndexed
+     */
+    [[nodiscard]]
+    const RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x004E5EE0 (FUN_004E5EE0)
+     * Demangled: gpg::RPointerType_CSndParams::IsPointer
+     */
+    [[nodiscard]]
+    const RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x004E5D20 (FUN_004E5D20)
+     * Demangled: gpg::RPointerType_CSndParams::Init
+     */
+    void Init() override;
+
+  protected:
+    [[nodiscard]]
+    RType* GetPointeeType() const override;
+  };
+  static_assert(sizeof(RPointerType<moho::CSndParams>) == 0x68, "RPointerType<CSndParams> size must be 0x68");
 } // namespace gpg

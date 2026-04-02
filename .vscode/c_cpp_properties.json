@@ -1,0 +1,34 @@
+{
+    "configurations": [
+        {
+            "name": "x86",
+            "includePath": [
+                "${workspaceFolder}/src/sdk",
+                "${workspaceFolder}/dependencies/zlib-1.2.3/include",
+                "${workspaceFolder}/dependencies/lua-lang/include",
+                "${workspaceFolder}/**",
+                "${vcpkgRoot}/x86-windows/include"
+            ],
+            "defines": [
+                "WIN32",
+                "_DEBUG",
+                "_CONSOLE",
+                "UNICODE",
+                "_UNICODE",
+                "NOMINMAX",
+                "WIN32_LEAN_AND_MEAN"
+            ],
+            "compilerArgs": [
+                "/DWIN32",
+                "/D_DEBUG",
+                "/D_CONSOLE"
+            ],
+            "windowsSdkVersion": "10.0.22000.0",
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-msvc-x86"
+        }
+    ],
+    "version": 4
+}

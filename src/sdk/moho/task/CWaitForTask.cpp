@@ -61,46 +61,22 @@ namespace
    * Address: 0x004CA7E0 (FUN_004CA7E0, CWaitForTaskSerializer::Deserialize callback)
    * Chain:   0x004CC3B0 (FUN_004CC3B0)
    */
-  void DeserializeCWaitForTask(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void DeserializeCWaitForTask(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
   {
     auto* const task = reinterpret_cast<CWaitForTask*>(objectPtr);
     GPG_ASSERT(task != nullptr);
-
-    gpg::RType* const baseTaskType = CachedCTaskType();
-    GPG_ASSERT(baseTaskType && baseTaskType->serLoadFunc_);
-    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    baseTaskType->serLoadFunc_(archive, objectPtr, baseTaskType->version_, &owner);
-
-    gpg::RType* const weakLinkType = CachedWeakPtrSTaskEventLinkageType();
-    GPG_ASSERT(weakLinkType && weakLinkType->serLoadFunc_);
-    weakLinkType->serLoadFunc_(archive, reinterpret_cast<int>(&task->mEventLinkRef), weakLinkType->version_, &owner);
-
-    gpg::RType* const luaObjectType = CachedLuaObjectType();
-    GPG_ASSERT(luaObjectType && luaObjectType->serLoadFunc_);
-    luaObjectType->serLoadFunc_(archive, reinterpret_cast<int>(&task->mEventObject), luaObjectType->version_, &owner);
+    task->MemberDeserialize(archive);
   }
 
   /**
    * Address: 0x004CA7F0 (FUN_004CA7F0, CWaitForTaskSerializer::Serialize callback)
    * Chain:   0x004CC460 (FUN_004CC460)
    */
-  void SerializeCWaitForTask(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void SerializeCWaitForTask(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
   {
     auto* const task = reinterpret_cast<CWaitForTask*>(objectPtr);
     GPG_ASSERT(task != nullptr);
-    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-
-    gpg::RType* const baseTaskType = CachedCTaskType();
-    GPG_ASSERT(baseTaskType && baseTaskType->serSaveFunc_);
-    baseTaskType->serSaveFunc_(archive, objectPtr, baseTaskType->version_, &owner);
-
-    gpg::RType* const weakLinkType = CachedWeakPtrSTaskEventLinkageType();
-    GPG_ASSERT(weakLinkType && weakLinkType->serSaveFunc_);
-    weakLinkType->serSaveFunc_(archive, reinterpret_cast<int>(&task->mEventLinkRef), weakLinkType->version_, &owner);
-
-    gpg::RType* const luaObjectType = CachedLuaObjectType();
-    GPG_ASSERT(luaObjectType && luaObjectType->serSaveFunc_);
-    luaObjectType->serSaveFunc_(archive, reinterpret_cast<int>(&task->mEventObject), luaObjectType->version_, &owner);
+    task->MemberSerialize(archive);
   }
 } // namespace
 
@@ -156,6 +132,64 @@ int CWaitForTask::Execute()
   }
 
   return -1;
+}
+
+/**
+ * Address: 0x004CC3B0 (FUN_004CC3B0, Moho::CWaitForTask::MemberSerialize in export label)
+ */
+void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  gpg::RType* taskType = CTask::sType;
+  if (!taskType) {
+    taskType = gpg::LookupRType(typeid(CTask));
+    CTask::sType = taskType;
+  }
+
+  gpg::RType* weakLinkType = WeakPtr<STaskEventLinkage>::sType;
+  if (!weakLinkType) {
+    weakLinkType = gpg::LookupRType(typeid(WeakPtr<STaskEventLinkage>));
+    WeakPtr<STaskEventLinkage>::sType = weakLinkType;
+  }
+
+  gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
+  if (!luaObjectType) {
+    luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
+    LuaPlus::LuaObject::sType = luaObjectType;
+  }
+
+  gpg::RRef ownerRef{};
+  archive->Read(taskType, this, ownerRef);
+  archive->Read(weakLinkType, &mEventLinkRef, ownerRef);
+  archive->Read(luaObjectType, &mEventObject, ownerRef);
+}
+
+/**
+ * Address: 0x004CC460 (FUN_004CC460, Moho::CWaitForTask::MemberDeserialize in export label)
+ */
+void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive)
+{
+  gpg::RType* taskType = CTask::sType;
+  if (!taskType) {
+    taskType = gpg::LookupRType(typeid(CTask));
+    CTask::sType = taskType;
+  }
+
+  gpg::RType* weakLinkType = WeakPtr<STaskEventLinkage>::sType;
+  if (!weakLinkType) {
+    weakLinkType = gpg::LookupRType(typeid(WeakPtr<STaskEventLinkage>));
+    WeakPtr<STaskEventLinkage>::sType = weakLinkType;
+  }
+
+  gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
+  if (!luaObjectType) {
+    luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
+    LuaPlus::LuaObject::sType = luaObjectType;
+  }
+
+  gpg::RRef ownerRef{};
+  archive->Write(taskType, this, ownerRef);
+  archive->Write(weakLinkType, &mEventLinkRef, ownerRef);
+  archive->Write(luaObjectType, &mEventObject, ownerRef);
 }
 
 /**

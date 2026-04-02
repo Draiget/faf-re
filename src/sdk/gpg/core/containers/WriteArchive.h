@@ -175,6 +175,16 @@ namespace gpg
         void Write(const gpg::RType* type, const void* object, const gpg::RRef& ownerRef);
 
         /**
+         * Address: 0x009523F0 (FUN_009523F0)
+         * Demangled: public: class gpg::WriteArchive & __thiscall gpg::WriteArchive::PreCreatedPtr(class gpg::RRef const &)
+         *
+         * What it does:
+         * Registers one already-created object pointer in tracked-pointer state
+         * so subsequent pointer writes reference it as an existing entry.
+         */
+        WriteArchive& PreCreatedPtr(const gpg::RRef& objectRef);
+
+        /**
          * Address: 0x00953200 (FUN_00953200)
          * Demangled: gpg::WriteArchive::WriteRefCounts
          *
@@ -182,6 +192,15 @@ namespace gpg
          * Emits a type-handle table reference or introduces a new type handle.
          */
         void WriteRefCounts(const gpg::RType* type);
+
+        /**
+         * Address: 0x0040F970 (FUN_0040F970, gpg::WriteArchive::WriteValue)
+         *
+         * What it does:
+         * Reads one numeric lane from a legacy value payload and forwards it to
+         * `WriteFloat`.
+         */
+        WriteArchive* WriteValue(const void* valueLane, int unusedTag);
 
     protected:
         std::map<const RType*, int> mRefCounts;

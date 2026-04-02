@@ -1,8 +1,10 @@
 #include "SSTIArmyVariableData.h"
 
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -66,30 +68,63 @@ namespace
     type->serSaveFunc_(archive, PointerToArchiveInt(object), type->version_, ownerRef);
   }
 
-  /**
-   * Address: 0x00550A00 (FUN_00550A00, Moho::SSTIArmyVariableDataSerializer::Deserialize callback)
-   *
-   * What it does:
-   * Archive callback thunk that routes to SSTIArmyVariableData::SerializeLoadBody.
-   */
-  void SSTIArmyVariableDataSerializerLoadThunk(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  alignas(moho::SSTIArmyVariableDataTypeInfo)
+    unsigned char gSSTIArmyVariableDataTypeInfoStorage[sizeof(moho::SSTIArmyVariableDataTypeInfo)]{};
+  bool gSSTIArmyVariableDataTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::SSTIArmyVariableDataTypeInfo& AcquireSSTIArmyVariableDataTypeInfo()
   {
-    auto* const data = reinterpret_cast<moho::SSTIArmyVariableData*>(objectPtr);
-    GPG_ASSERT(data != nullptr);
-    data->SerializeLoadBody(archive, ownerRef);
+    if (!gSSTIArmyVariableDataTypeInfoConstructed) {
+      new (gSSTIArmyVariableDataTypeInfoStorage) moho::SSTIArmyVariableDataTypeInfo();
+      gSSTIArmyVariableDataTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<moho::SSTIArmyVariableDataTypeInfo*>(gSSTIArmyVariableDataTypeInfoStorage);
   }
 
-  /**
-   * Address: 0x00550A10 (FUN_00550A10, Moho::SSTIArmyVariableDataSerializer::Serialize callback)
-   *
-   * What it does:
-   * Archive callback thunk that routes to SSTIArmyVariableData::SerializeSaveBody.
-   */
-  void SSTIArmyVariableDataSerializerSaveThunk(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  void CleanupSSTIArmyVariableDataTypeInfoAtexit()
   {
-    const auto* const data = reinterpret_cast<const moho::SSTIArmyVariableData*>(objectPtr);
-    GPG_ASSERT(data != nullptr);
-    data->SerializeSaveBody(archive, ownerRef);
+    if (!gSSTIArmyVariableDataTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireSSTIArmyVariableDataTypeInfo().~SSTIArmyVariableDataTypeInfo();
+    gSSTIArmyVariableDataTypeInfoConstructed = false;
+  }
+
+  moho::SSTIArmyVariableDataSerializer gSSTIArmyVariableDataSerializer;
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperNext = self;
+    helper.mHelperPrev = self;
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
+  {
+    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
+      helper.mHelperNext->mPrev = helper.mHelperPrev;
+      helper.mHelperPrev->mNext = helper.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperPrev = self;
+    helper.mHelperNext = self;
+    return self;
+  }
+
+  void CleanupSSTIArmyVariableDataSerializerAtexit()
+  {
+    (void)UnlinkHelperNode(gSSTIArmyVariableDataSerializer);
   }
 } // namespace
 
@@ -207,15 +242,51 @@ namespace moho
   }
 
   /**
+   * Address: 0x00550A00 (FUN_00550A00, Moho::SSTIArmyVariableDataSerializer::Deserialize callback)
+   *
+   * What it does:
+   * Archive callback thunk forwarding into `SSTIArmyVariableData::SerializeLoadBody`.
+   */
+  void SSTIArmyVariableDataSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    auto* const data = reinterpret_cast<SSTIArmyVariableData*>(objectPtr);
+    GPG_ASSERT(data != nullptr);
+    data->SerializeLoadBody(archive, ownerRef);
+  }
+
+  /**
+   * Address: 0x00550A10 (FUN_00550A10, Moho::SSTIArmyVariableDataSerializer::Serialize callback)
+   *
+   * What it does:
+   * Archive callback thunk forwarding into `SSTIArmyVariableData::SerializeSaveBody`.
+   */
+  void SSTIArmyVariableDataSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const data = reinterpret_cast<const SSTIArmyVariableData*>(objectPtr);
+    GPG_ASSERT(data != nullptr);
+    data->SerializeSaveBody(archive, ownerRef);
+  }
+
+  /**
    * Address: 0x00550D90 (FUN_00550D90, sub_550D90)
    */
   void SSTIArmyVariableDataSerializer::RegisterSerializeFunctions()
   {
     if (mSerLoadFunc == nullptr) {
-      mSerLoadFunc = &SSTIArmyVariableDataSerializerLoadThunk;
+      mSerLoadFunc = &SSTIArmyVariableDataSerializer::Deserialize;
     }
     if (mSerSaveFunc == nullptr) {
-      mSerSaveFunc = &SSTIArmyVariableDataSerializerSaveThunk;
+      mSerSaveFunc = &SSTIArmyVariableDataSerializer::Serialize;
     }
 
     gpg::RType* const type = gpg::LookupRType(typeid(SSTIArmyVariableData));
@@ -223,6 +294,31 @@ namespace moho
     type->serLoadFunc_ = mSerLoadFunc;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  /**
+   * Address: 0x00BC9B10 (FUN_00BC9B10, register_SSTIArmyVariableDataSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer helper links/callbacks for
+   * `SSTIArmyVariableData` and schedules process-exit cleanup.
+   */
+  void register_SSTIArmyVariableDataSerializer()
+  {
+    InitializeHelperNode(gSSTIArmyVariableDataSerializer);
+    gSSTIArmyVariableDataSerializer.mSerLoadFunc = &SSTIArmyVariableDataSerializer::Deserialize;
+    gSSTIArmyVariableDataSerializer.mSerSaveFunc = &SSTIArmyVariableDataSerializer::Serialize;
+    gSSTIArmyVariableDataSerializer.RegisterSerializeFunctions();
+    (void)std::atexit(&CleanupSSTIArmyVariableDataSerializerAtexit);
+  }
+
+  /**
+   * Address: 0x005508C0 (FUN_005508C0, startup typeinfo constructor lane)
+   */
+  SSTIArmyVariableDataTypeInfo::SSTIArmyVariableDataTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(SSTIArmyVariableData), this);
   }
 
   /**
@@ -247,4 +343,40 @@ namespace moho
     gpg::RType::Init();
     Finish();
   }
+
+  /**
+   * Address: 0x00BC9AF0 (FUN_00BC9AF0, register_SSTIArmyVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs startup-owned `SSTIArmyVariableDataTypeInfo` storage and
+   * registers process-exit teardown.
+   */
+  void register_SSTIArmyVariableDataTypeInfo()
+  {
+    (void)AcquireSSTIArmyVariableDataTypeInfo();
+    (void)std::atexit(&CleanupSSTIArmyVariableDataTypeInfoAtexit);
+  }
 } // namespace moho
+
+namespace
+{
+  struct SSTIArmyVariableDataTypeInfoBootstrap
+  {
+    SSTIArmyVariableDataTypeInfoBootstrap()
+    {
+      moho::register_SSTIArmyVariableDataTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] SSTIArmyVariableDataTypeInfoBootstrap gSSTIArmyVariableDataTypeInfoBootstrap;
+
+  struct SSTIArmyVariableDataSerializerBootstrap
+  {
+    SSTIArmyVariableDataSerializerBootstrap()
+    {
+      moho::register_SSTIArmyVariableDataSerializer();
+    }
+  };
+
+  [[maybe_unused]] SSTIArmyVariableDataSerializerBootstrap gSSTIArmyVariableDataSerializerBootstrap;
+} // namespace

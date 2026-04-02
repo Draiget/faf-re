@@ -7,7 +7,10 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "moho/sim/Sim.h"
+#include "moho/unit/core/Unit.h"
 #include "String.h"
+#include "lua/LuaObject.h"
 
 using namespace gpg;
 
@@ -26,6 +29,32 @@ namespace
   const char* SafeTypeName(const RType* const type)
   {
     return type ? type->GetName() : "null";
+  }
+
+  [[nodiscard]] RType* CachedLuaStateType()
+  {
+    static RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(LuaPlus::LuaState));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSimType()
+  {
+    if (moho::Sim::sType == nullptr) {
+      moho::Sim::sType = gpg::LookupRType(typeid(moho::Sim));
+    }
+    return moho::Sim::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUnitType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::Unit));
+    }
+    return cached;
   }
 
   [[noreturn]] void ThrowReadFailure(std::FILE* const file)
@@ -264,6 +293,152 @@ void ReadArchive::Read(const RType* const type, void* const object, const RRef& 
       "Error detected in archive: data for object of type \"%s\" did not terminate properly.", SafeTypeName(type)
     ));
   }
+}
+
+/**
+ * Address: 0x004C1520 (FUN_004C1520, gpg::ReadArchive::ReadPointer_LuaState)
+ *
+ * What it does:
+ * Reads one tracked pointer lane and upcasts it to `LuaPlus::LuaState`,
+ * raising `SerializationError` when the pointer is not LuaState-compatible.
+ */
+ReadArchive* ReadArchive::ReadPointer_LuaState(LuaPlus::LuaState** const outValue, const RRef* const ownerRef)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  const TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  if (!source.mObj) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  LuaPlus::LuaState* const asState = source.CastLuaState();
+  *outValue = asState;
+  if (*outValue) {
+    return this;
+  }
+
+  const char* const expectedName = SafeTypeName(CachedLuaStateType());
+  const char* const actualName = source.GetTypeName();
+  ThrowSerializationError(STR_Printf(
+    "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+    "instead",
+    expectedName ? expectedName : "LuaState",
+    actualName ? actualName : "null"
+  ));
+  return this;
+}
+
+/**
+ * Address: 0x00584FB0 (FUN_00584FB0, gpg::ReadArchive::ReadPointer_Sim)
+ *
+ * What it does:
+ * Reads one tracked pointer lane and upcasts it to `moho::Sim`,
+ * raising `SerializationError` when the pointer is not Sim-compatible.
+ */
+ReadArchive* ReadArchive::ReadPointer_Sim(moho::Sim** const outValue, const RRef* const ownerRef)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  const TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  if (!source.mObj) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSimType());
+  *outValue = static_cast<moho::Sim*>(upcast.mObj);
+  if (*outValue) {
+    return this;
+  }
+
+  const char* const expectedName = SafeTypeName(CachedSimType());
+  const char* const actualName = source.GetTypeName();
+  ThrowSerializationError(STR_Printf(
+    "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+    "instead",
+    expectedName ? expectedName : "Sim",
+    actualName ? actualName : "null"
+  ));
+  return this;
+}
+
+/**
+ * Address: 0x005A2900 (FUN_005A2900, gpg::ReadArchive::ReadPointer_Unit)
+ *
+ * What it does:
+ * Reads one tracked pointer lane and upcasts it to `moho::Unit`,
+ * raising `SerializationError` when the pointer is not Unit-compatible.
+ */
+ReadArchive* ReadArchive::ReadPointer_Unit(moho::Unit** const outValue, const RRef* const ownerRef)
+{
+  if (!outValue) {
+    return this;
+  }
+
+  const RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  const TrackedPointerInfo& tracked = gpg::ReadRawPointer(this, owner);
+
+  RRef source{};
+  source.mObj = tracked.object;
+  source.mType = tracked.type;
+
+  if (!source.mObj) {
+    *outValue = nullptr;
+    return this;
+  }
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedUnitType());
+  *outValue = static_cast<moho::Unit*>(upcast.mObj);
+  if (*outValue) {
+    return this;
+  }
+
+  const char* const expectedName = SafeTypeName(CachedUnitType());
+  const char* const actualName = source.GetTypeName();
+  ThrowSerializationError(STR_Printf(
+    "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+    "instead",
+    expectedName ? expectedName : "Unit",
+    actualName ? actualName : "null"
+  ));
+  return this;
+}
+
+/**
+ * Address: 0x00953B30 (FUN_00953B30)
+ * Demangled: public: class gpg::ReadArchive & __thiscall gpg::ReadArchive::TrackPointer(class gpg::RRef const &)
+ *
+ * What it does:
+ * Appends one tracked-pointer table lane for an object that already exists
+ * at the time its serializer starts reading nested payload.
+ */
+ReadArchive& ReadArchive::TrackPointer(const RRef& objectRef)
+{
+  TrackedPointerInfo tracked{};
+  tracked.object = objectRef.mObj;
+  tracked.type = objectRef.mType;
+  tracked.state = TrackedPointerState::Owned;
+  tracked.sharedObject = nullptr;
+  tracked.sharedControl = nullptr;
+  mTrackedPtrs.push_back(tracked);
+  return *this;
 }
 
 /**

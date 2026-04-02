@@ -16,10 +16,24 @@ namespace
     out.mType = moho::CArmyImpl::StaticGetClass();
     return out;
   }
+
+  moho::CArmyImplTypeInfo gCArmyImplTypeInfo;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x006FE3D0 (FUN_006FE3D0, Moho::CArmyImplTypeInfo::CArmyImplTypeInfo)
+   *
+   * IDA signature:
+   * gpg::RType *Moho::CArmyImplTypeInfo::CArmyImplTypeInfo();
+   */
+  CArmyImplTypeInfo::CArmyImplTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CArmyImpl), this);
+  }
+
   /**
    * Address: 0x006FE480 (FUN_006FE480, Moho::CArmyImplTypeInfo::dtr)
    */
@@ -102,4 +116,28 @@ namespace moho
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
+
+  /**
+   * Address: 0x00BD9C00 (FUN_00BD9C00, register_CArmyImplTypeInfo)
+   *
+   * What it does:
+   * Forces CArmyImpl RTTI preregistration bootstrap.
+   */
+  void register_CArmyImplTypeInfo()
+  {
+    (void)gCArmyImplTypeInfo;
+  }
 } // namespace moho
+
+namespace
+{
+  struct CArmyImplTypeInfoBootstrap
+  {
+    CArmyImplTypeInfoBootstrap()
+    {
+      moho::register_CArmyImplTypeInfo();
+    }
+  };
+
+  CArmyImplTypeInfoBootstrap gCArmyImplTypeInfoBootstrap;
+} // namespace

@@ -230,6 +230,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x00440280 (FUN_00440280, Moho::CD3DVertexSheet::HasVertexStreamAvailable)
+   */
+  bool CD3DVertexSheet::HasVertexStreamAvailable()
+  {
+    constexpr std::uint32_t kStaticUsage = 1u;
+
+    const std::uint32_t streamCount = static_cast<std::uint32_t>(mStreams.size());
+    for (std::uint32_t streamIndex = 0; streamIndex < streamCount; ++streamIndex) {
+      if (mStreams[streamIndex]->mBuffer.get()->GetContext()->usage_ != kStaticUsage) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Address: 0x004403F0 (FUN_004403F0)
    *
    * std::uint32_t

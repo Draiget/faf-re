@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004818C0 (FUN_004818C0, Moho::INetNATTraversalProviderTypeInfo::INetNATTraversalProviderTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters reflection metadata for
+     * `INetNATTraversalProvider`.
+     */
+    INetNATTraversalProviderTypeInfo();
+
+    /**
      * Address: 0x00481950 (FUN_00481950, Moho::INetNATTraversalProviderTypeInfo::dtr)
      *
      * What it does:
@@ -41,4 +50,13 @@ namespace moho
   static_assert(
     sizeof(INetNATTraversalProviderTypeInfo) == 0x64, "INetNATTraversalProviderTypeInfo size must be 0x64"
   );
+
+  /**
+   * Address: 0x00BC4D70 (FUN_00BC4D70, register_INetNATTraversalProviderTypeInfo)
+   *
+   * What it does:
+   * Ensures INetNATTraversalProvider type-info singleton construction and
+   * registers process-exit teardown.
+   */
+  void register_INetNATTraversalProviderTypeInfo();
 } // namespace moho

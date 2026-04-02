@@ -45,6 +45,14 @@ namespace gpg
         void Read(char* buf, size_t size) const;
 
         /**
+         * Address: 0x00445590 (FUN_00445590)
+         *
+         * What it does:
+         * Reads one 32-bit integer and returns it by value.
+         */
+        [[nodiscard]] int ReadInt32() const;
+
+        /**
          * Address: 0x004CCDD0 (FUN_004CCDD0)
          *
          * What it does:

@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005A3190 (FUN_005A3190, ctor)
+     *
+     * What it does:
+     * Preregisters `IAiNavigator` RTTI so lookup resolves to this type helper.
+     */
+    IAiNavigatorTypeInfo();
+
+    /**
      * Address: 0x005A3220 (FUN_005A3220, scalar deleting thunk)
      *
      * VFTable SLOT: 2
@@ -37,5 +45,14 @@ namespace moho
   };
 
   static_assert(sizeof(IAiNavigatorTypeInfo) == 0x64, "IAiNavigatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCC6A0 (FUN_00BCC6A0)
+   *
+   * What it does:
+   * Constructs startup-owned `IAiNavigatorTypeInfo` storage and installs
+   * process-exit cleanup.
+   */
+  int register_IAiNavigatorTypeInfo();
 } // namespace moho
 

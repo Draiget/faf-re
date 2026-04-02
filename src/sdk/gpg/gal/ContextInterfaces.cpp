@@ -178,6 +178,19 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x00442050 (FUN_00442050, sub_442050)
+     *
+     * What it does:
+     * Copies render-target width/height/format lanes from another context.
+     */
+    RenderTargetContext::RenderTargetContext(const RenderTargetContext& other)
+        : width_(other.width_),
+          height_(other.height_),
+          format_(other.format_)
+    {
+    }
+
+    /**
      * Address: 0x008E65A0 (FUN_008E65A0)
      *
      * What it does:
@@ -224,6 +237,28 @@ namespace gpg::gal
      * Scalar-deleting destructor thunk owner for index-buffer context handles.
      */
     IndexBufferContext::~IndexBufferContext() = default;
+
+    /**
+     * What it does:
+     * Initializes one output-context payload with empty/default handle lanes.
+     */
+    OutputContext::OutputContext() = default;
+
+    /**
+     * Address: 0x00430160 (FUN_00430160)
+     *
+     * OutputContext const &
+     *
+     * What it does:
+     * Copies one output-context payload and retains shared-handle ownership.
+     */
+    OutputContext::OutputContext(const OutputContext& other)
+        : cubeTarget(other.cubeTarget),
+          face(other.face),
+          surface(other.surface),
+          texture(other.texture)
+    {
+    }
 
     /**
      * Address: 0x008E8250 (FUN_008E8250)

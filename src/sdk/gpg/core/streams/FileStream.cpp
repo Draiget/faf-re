@@ -158,7 +158,7 @@ void FileStream::DoOpen(const char* const file, const Mode accessKind, const uns
  * What it does:
  * Returns current logical stream position adjusted by unread/read-buffer and pending-write windows.
  */
-size_t FileStream::VirtTell(const Mode mode)
+std::uint64_t FileStream::VirtTell(const Mode mode)
 {
     if ((mode & mAccessKind) == 0) {
         throw std::invalid_argument("Invalid mode for Tell()");
@@ -178,7 +178,7 @@ size_t FileStream::VirtTell(const Mode mode)
         logicalPosition += static_cast<LONGLONG>(mWriteHead - mWriteStart);
     }
 
-    return static_cast<size_t>(logicalPosition);
+    return static_cast<std::uint64_t>(logicalPosition);
 }
 
 /**
@@ -187,7 +187,7 @@ size_t FileStream::VirtTell(const Mode mode)
  * What it does:
  * Flushes pending write bytes, seeks by origin/mode with read-window compensation, and clears local windows.
  */
-size_t FileStream::VirtSeek(const Mode mode, const SeekOrigin orig, const size_t pos)
+std::uint64_t FileStream::VirtSeek(const Mode mode, const SeekOrigin orig, const std::int64_t pos)
 {
     if ((mode & mAccessKind) == 0) {
         throw std::invalid_argument("Invalid mode for Seek()");
@@ -220,7 +220,7 @@ size_t FileStream::VirtSeek(const Mode mode, const SeekOrigin orig, const size_t
     mWriteHead = nullptr;
     mWriteEnd = nullptr;
 
-    return static_cast<size_t>(filePointer.QuadPart);
+    return static_cast<std::uint64_t>(filePointer.QuadPart);
 }
 
 /**

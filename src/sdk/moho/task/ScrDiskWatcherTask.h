@@ -12,6 +12,12 @@ namespace LuaPlus
   class LuaState;
 }
 
+namespace gpg
+{
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+} // namespace gpg
+
 namespace moho
 {
   class ScrDiskWatcherTask : public CTask
@@ -27,6 +33,35 @@ namespace moho
      * callbacks through the provided Lua state.
      */
     explicit ScrDiskWatcherTask(LuaPlus::LuaState* luaState);
+
+    /**
+     * Address: 0x004C0AB0 (FUN_004C0AB0, ScrDiskWatcherTask construct callback)
+     *
+     * What it does:
+     * Constructs one `ScrDiskWatcherTask` from archived LuaState pointer lane
+     * and returns it through unowned construct-result storage.
+     */
+    static void Construct(
+      gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result
+    );
+
+    /**
+     * Address: 0x004C11F0 (FUN_004C11F0, ScrDiskWatcherTask delete callback)
+     *
+     * What it does:
+     * Deletes one constructed `ScrDiskWatcherTask` object through virtual dtor.
+     */
+    static void Delete(void* objectPtr);
+
+    /**
+     * Address: 0x004C0940 (FUN_004C0940, ScrDiskWatcherTask save-construct callback)
+     *
+     * What it does:
+     * Saves LuaState constructor-args lane as unowned tracked pointer.
+     */
+    static void SaveConstructArgs(
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result
+    );
 
     /**
      * Address: 0x004C0C20 (FUN_004C0C20, scalar deleting thunk)
@@ -65,8 +100,8 @@ namespace moho
     virtual void RegisterSaveConstructArgsFunction();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
   };
 
@@ -83,8 +118,8 @@ namespace moho
     virtual void RegisterConstructFunction();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::construct_func_t mSerConstructFunc;
     gpg::RType::delete_func_t mDeleteFunc;
   };
@@ -110,6 +145,15 @@ namespace moho
      * Slot: 9
      */
     void Init() override;
+
+  private:
+    /**
+     * Address: 0x004C1150 (FUN_004C1150, Moho::ScrDiskWatcherTaskTypeInfo::AddBase_CTask)
+     *
+     * What it does:
+     * Adds reflected `CTask` base lane to `ScrDiskWatcherTask` type metadata.
+     */
+    static void AddBase_CTask(gpg::RType* typeInfo);
   };
 
   static_assert(sizeof(ScrDiskWatcherTask) == 0x50, "ScrDiskWatcherTask size must be 0x50");
@@ -118,6 +162,34 @@ namespace moho
   );
   static_assert(offsetof(ScrDiskWatcherTask, mLuaState) == 0x1C, "ScrDiskWatcherTask::mLuaState offset must be 0x1C");
   static_assert(offsetof(ScrDiskWatcherTask, mListener) == 0x20, "ScrDiskWatcherTask::mListener offset must be 0x20");
+  static_assert(
+    offsetof(ScrDiskWatcherTaskSaveConstruct, mHelperNext) == 0x04,
+    "ScrDiskWatcherTaskSaveConstruct::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(ScrDiskWatcherTaskSaveConstruct, mHelperPrev) == 0x08,
+    "ScrDiskWatcherTaskSaveConstruct::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(ScrDiskWatcherTaskSaveConstruct, mSerSaveConstructArgsFunc) == 0x0C,
+    "ScrDiskWatcherTaskSaveConstruct::mSerSaveConstructArgsFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(ScrDiskWatcherTaskConstruct, mHelperNext) == 0x04,
+    "ScrDiskWatcherTaskConstruct::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(ScrDiskWatcherTaskConstruct, mHelperPrev) == 0x08,
+    "ScrDiskWatcherTaskConstruct::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(ScrDiskWatcherTaskConstruct, mSerConstructFunc) == 0x0C,
+    "ScrDiskWatcherTaskConstruct::mSerConstructFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(ScrDiskWatcherTaskConstruct, mDeleteFunc) == 0x10,
+    "ScrDiskWatcherTaskConstruct::mDeleteFunc offset must be 0x10"
+  );
   static_assert(sizeof(ScrDiskWatcherTaskSaveConstruct) == 0x10, "ScrDiskWatcherTaskSaveConstruct size must be 0x10");
   static_assert(sizeof(ScrDiskWatcherTaskConstruct) == 0x14, "ScrDiskWatcherTaskConstruct size must be 0x14");
   static_assert(sizeof(ScrDiskWatcherTaskTypeInfo) == 0x64, "ScrDiskWatcherTaskTypeInfo size must be 0x64");

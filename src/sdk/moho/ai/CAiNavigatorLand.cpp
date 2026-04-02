@@ -2,7 +2,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/IAiSteering.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/unit/core/Unit.h"
@@ -78,6 +80,101 @@ namespace
     cell.z = static_cast<std::int16_t>(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
     return cell;
   }
+
+  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
+  {
+    if (!CAiNavigatorImpl::sType) {
+      CAiNavigatorImpl::sType = gpg::LookupRType(typeid(CAiNavigatorImpl));
+    }
+    return CAiNavigatorImpl::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAiPathNavigatorType()
+  {
+    if (!CAiPathNavigator::sType) {
+      CAiPathNavigator::sType = gpg::LookupRType(typeid(CAiPathNavigator));
+    }
+    return CAiPathNavigator::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakUnitType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(WeakPtr<Unit>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSAiNavigatorGoalType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(SAiNavigatorGoal));
+    }
+    return cached;
+  }
+
+  template <typename TObject>
+  [[nodiscard]] TObject* ReadPointerWithType(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef,
+    gpg::RType* const expectedType
+  )
+  {
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    const gpg::RRef source{tracked.object, tracked.type};
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    return static_cast<TObject*>(upcast.mObj);
+  }
+
+  template <typename TObject>
+  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType)
+  {
+    gpg::RRef ref{};
+    ref.mObj = nullptr;
+    ref.mType = staticType;
+    if (!object) {
+      return ref;
+    }
+
+    gpg::RType* dynamicType = staticType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!derived) {
+      ref.mObj = object;
+      ref.mType = dynamicType ? dynamicType : staticType;
+      return ref;
+    }
+
+    ref.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    ref.mType = dynamicType;
+    return ref;
+  }
+
+  template <typename TObject>
+  void WritePointerWithType(
+    gpg::WriteArchive* const archive,
+    TObject* const object,
+    gpg::RType* const staticType,
+    const gpg::TrackedPointerState state,
+    const gpg::RRef& ownerRef
+  )
+  {
+    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
+  }
 } // namespace
 
 gpg::RType* CAiNavigatorLand::sType = nullptr;
@@ -117,6 +214,89 @@ CAiNavigatorLand::~CAiNavigatorLand()
 
   delete mPathNavigator;
   mPathNavigator = nullptr;
+}
+
+/**
+ * Address: 0x005A8F40 (FUN_005A8F40, Moho::CAiNavigatorLand::MemberDeserialize)
+ *
+ * What it does:
+ * Loads base navigator state, owned path-navigator pointer, destination-unit
+ * weak link, and goal rectangle payload.
+ */
+void CAiNavigatorLand::MemberDeserialize(CAiNavigatorLand* const object, gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Read(CachedCAiNavigatorImplType(), object, ownerRef);
+
+  CAiPathNavigator* const loadedPathNavigator =
+    ReadPointerWithType<CAiPathNavigator>(archive, ownerRef, CachedCAiPathNavigatorType());
+
+  if (object) {
+    CAiPathNavigator* const oldPathNavigator = object->mPathNavigator;
+    object->mPathNavigator = loadedPathNavigator;
+    if (oldPathNavigator) {
+      delete oldPathNavigator;
+    }
+  } else if (loadedPathNavigator) {
+    delete loadedPathNavigator;
+  }
+
+  WeakPtr<Unit> destinationUnit{};
+  archive->Read(
+    CachedWeakUnitType(),
+    object ? static_cast<void*>(&object->mDestinationUnit) : static_cast<void*>(&destinationUnit),
+    ownerRef
+  );
+
+  SAiNavigatorGoal goal{};
+  archive->Read(
+    CachedSAiNavigatorGoalType(),
+    object ? static_cast<void*>(&object->mGoal) : static_cast<void*>(&goal),
+    ownerRef
+  );
+}
+
+/**
+ * Address: 0x005A9030 (FUN_005A9030, Moho::CAiNavigatorLand::MemberSerialize)
+ *
+ * What it does:
+ * Saves base navigator state, owned path-navigator pointer,
+ * destination-unit weak link, and goal rectangle payload.
+ */
+void CAiNavigatorLand::MemberSerialize(const CAiNavigatorLand* const object, gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Write(CachedCAiNavigatorImplType(), object, ownerRef);
+
+  WritePointerWithType(
+    archive,
+    object ? object->mPathNavigator : nullptr,
+    CachedCAiPathNavigatorType(),
+    gpg::TrackedPointerState::Owned,
+    ownerRef
+  );
+
+  const WeakPtr<Unit> destinationUnit{};
+  archive->Write(
+    CachedWeakUnitType(),
+    object ? static_cast<const void*>(&object->mDestinationUnit) : static_cast<const void*>(&destinationUnit),
+    ownerRef
+  );
+
+  const SAiNavigatorGoal goal{};
+  archive->Write(
+    CachedSAiNavigatorGoalType(),
+    object ? static_cast<const void*>(&object->mGoal) : static_cast<const void*>(&goal),
+    ownerRef
+  );
 }
 
 /**

@@ -70,6 +70,22 @@ namespace moho
      */
     void ReadData();
 
+    /**
+     * Address: 0x005B96A0 (FUN_005B96A0, Moho::CAiPersonality::MemberDeserialize)
+     *
+     * What it does:
+     * Loads reflected CAiPersonality state fields from one read archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005B9DD0 (FUN_005B9DD0, Moho::CAiPersonality::MemberSerialize)
+     *
+     * What it does:
+     * Saves reflected CAiPersonality state fields into one write archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   public:
     static gpg::RType* sType;
 
@@ -166,6 +182,23 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<CAiPersonality>) == 0x08,
     "CScrLuaMetatableFactory<CAiPersonality> size must be 0x08"
   );
+
+  /**
+   * Address: 0x00BCD6A0 (FUN_00BCD6A0)
+   *
+   * What it does:
+   * Allocates and stores the startup Lua metatable-factory index for
+   * `CAiPersonality`.
+   */
+  int register_CScrLuaMetatableFactory_CAiPersonality_Index();
+
+  /**
+   * Address: 0x00BCD6C0 (FUN_00BCD6C0)
+   *
+   * What it does:
+   * Installs process-exit cleanup for one startup-owned AI reflection slot.
+   */
+  int register_CAiPersonalityStartupCleanup();
 
   /**
    * VFTABLE: 0x00E1D2D0

@@ -1,14 +1,31 @@
 #include "moho/script/CUnitScriptTaskTypeInfo.h"
 
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/utils/Global.h"
 #include "moho/script/CUnitScriptTask.h"
 
 using namespace moho;
 
 namespace
 {
+  using TypeInfo = CUnitScriptTaskTypeInfo;
+
+  alignas(TypeInfo) unsigned char gCUnitScriptTaskTypeInfoStorage[sizeof(TypeInfo)];
+  bool gCUnitScriptTaskTypeInfoConstructed = false;
+
+  [[nodiscard]] TypeInfo& AcquireTypeInfo()
+  {
+    if (!gCUnitScriptTaskTypeInfoConstructed) {
+      new (gCUnitScriptTaskTypeInfoStorage) TypeInfo();
+      gCUnitScriptTaskTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<TypeInfo*>(gCUnitScriptTaskTypeInfoStorage);
+  }
+
   [[nodiscard]] gpg::RType* CachedCUnitScriptTaskType()
   {
     gpg::RType* type = CUnitScriptTask::sType;
@@ -106,6 +123,18 @@ namespace
   }
 } // namespace
 
+namespace moho
+{
+/**
+ * Address: 0x00622D20 (FUN_00622D20)
+ */
+gpg::RType* register_CUnitScriptTaskTypeInfo()
+{
+  TypeInfo& typeInfo = AcquireTypeInfo();
+  gpg::PreRegisterRType(typeid(CUnitScriptTask), &typeInfo);
+  return &typeInfo;
+}
+
 /**
  * Address: 0x00622DE0 (FUN_00622DE0, scalar deleting thunk)
  */
@@ -139,3 +168,40 @@ void CUnitScriptTaskTypeInfo::Init()
 
   Finish();
 }
+
+/**
+ * Address: 0x00BFA410 (FUN_00BFA410)
+ */
+void cleanup_CUnitScriptTaskTypeInfo()
+{
+  if (!gCUnitScriptTaskTypeInfoConstructed) {
+    return;
+  }
+
+  auto& typeInfo = *reinterpret_cast<TypeInfo*>(gCUnitScriptTaskTypeInfoStorage);
+  typeInfo.fields_.clear();
+  typeInfo.bases_.clear();
+}
+
+/**
+ * Address: 0x00BD1960 (FUN_00BD1960)
+ */
+int register_CUnitScriptTaskTypeInfo_AtExit()
+{
+  (void)register_CUnitScriptTaskTypeInfo();
+  return std::atexit(&cleanup_CUnitScriptTaskTypeInfo);
+}
+} // namespace moho
+
+namespace
+{
+  struct CUnitScriptTaskTypeInfoBootstrap
+  {
+    CUnitScriptTaskTypeInfoBootstrap()
+    {
+      (void)moho::register_CUnitScriptTaskTypeInfo_AtExit();
+    }
+  };
+
+  CUnitScriptTaskTypeInfoBootstrap gCUnitScriptTaskTypeInfoBootstrap;
+} // namespace

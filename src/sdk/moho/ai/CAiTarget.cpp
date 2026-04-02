@@ -2,12 +2,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <typeinfo>
 
 #include "moho/command/SSTITarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/lua/SCR_ToLua.h"
+#include "moho/script/CScriptEvent.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -60,6 +63,49 @@ namespace
       cached = gpg::LookupRType(typeid(Wm3::Vector3f));
     }
     return cached;
+  }
+
+  [[nodiscard]] const char* ToAiTargetTypeLexical(const EAiTargetType targetType) noexcept
+  {
+    switch (targetType) {
+      case EAiTargetType::AITARGET_Entity:
+        return "Entity";
+      case EAiTargetType::AITARGET_Ground:
+        return "Ground";
+      default:
+        return "None";
+    }
+  }
+
+  [[nodiscard]] EAiTargetType ParseAiTargetTypeLexical(const char* const lexical) noexcept
+  {
+    if (!lexical) {
+      return EAiTargetType::AITARGET_None;
+    }
+
+    if (std::strcmp(lexical, "Entity") == 0 || std::strcmp(lexical, "AITARGET_Entity") == 0) {
+      return EAiTargetType::AITARGET_Entity;
+    }
+    if (std::strcmp(lexical, "Ground") == 0 || std::strcmp(lexical, "AITARGET_Ground") == 0) {
+      return EAiTargetType::AITARGET_Ground;
+    }
+    return EAiTargetType::AITARGET_None;
+  }
+
+  [[nodiscard]] Wm3::Vec3f ReadVector3FromLuaObject(const LuaPlus::LuaObject& object) noexcept
+  {
+    Wm3::Vec3f out = Wm3::Vec3f::Zero();
+    if (!object.IsTable()) {
+      return out;
+    }
+
+    const LuaPlus::LuaObject xObject = object[1];
+    const LuaPlus::LuaObject yObject = object[2];
+    const LuaPlus::LuaObject zObject = object[3];
+    out.x = static_cast<float>(xObject.GetNumber());
+    out.y = static_cast<float>(yObject.GetNumber());
+    out.z = static_cast<float>(zObject.GetNumber());
+    return out;
   }
 } // namespace
 
@@ -338,4 +384,62 @@ void CAiTarget::EncodeToSSTITarget(SSTITarget& out) const
   out.mType = EAiTargetType::AITARGET_None;
   out.mEntityId = kMissingTargetEntityId;
   out.mPos = Wm3::Vec3f::Zero();
+}
+
+/**
+ * Address: 0x005E2EC0 (FUN_005E2EC0, Moho::SCR_ToLua<Moho::CAiTarget>)
+ *
+ * What it does:
+ * Serializes one AI target payload into Lua table form.
+ */
+void moho::SCR_ToLua_CAiTarget(LuaPlus::LuaObject& outObject, LuaPlus::LuaState* const state, const CAiTarget& target)
+{
+  outObject.AssignNewTable(state, 2, 0);
+  outObject.SetString("Type", ToAiTargetTypeLexical(target.targetType));
+
+  if (target.targetType == EAiTargetType::AITARGET_Entity) {
+    if (Entity* const entity = target.targetEntity.GetObjectPtr(); entity != nullptr) {
+      outObject.SetObject("Entity", entity->mLuaObj);
+    }
+    return;
+  }
+
+  if (target.targetType == EAiTargetType::AITARGET_Ground) {
+    const LuaPlus::LuaObject positionObject = SCR_ToLua<Wm3::Vector3<float>>(state, target.position);
+    outObject.SetObject("Position", positionObject);
+  }
+}
+
+/**
+ * Address: 0x005E3000 (FUN_005E3000, Moho::SCR_FromLuaCopy<Moho::CAiTarget>)
+ *
+ * What it does:
+ * Parses one Lua target table (`Type` + payload fields) into `outTarget`.
+ */
+void moho::SCR_FromLuaCopy_CAiTarget(CAiTarget& outTarget, const LuaPlus::LuaObject& object)
+{
+  const LuaPlus::LuaObject typeObject = object.GetByName("Type");
+  const EAiTargetType parsedType = ParseAiTargetTypeLexical(typeObject.GetString());
+
+  if (parsedType == EAiTargetType::AITARGET_Entity) {
+    const LuaPlus::LuaObject entityObject = object.GetByName("Entity");
+    Entity* const entity = SCR_FromLua_Entity(entityObject, object.GetActiveState());
+    outTarget.UpdateTarget(entity);
+    return;
+  }
+
+  if (parsedType == EAiTargetType::AITARGET_Ground) {
+    const LuaPlus::LuaObject positionObject = object.GetByName("Position");
+    outTarget.targetType = EAiTargetType::AITARGET_Ground;
+    outTarget.targetEntity.ClearLinkState();
+    outTarget.position = ReadVector3FromLuaObject(positionObject);
+    outTarget.targetPoint = -1;
+    outTarget.targetIsMobile = false;
+    return;
+  }
+
+  outTarget.targetType = EAiTargetType::AITARGET_None;
+  outTarget.targetEntity.ClearLinkState();
+  outTarget.targetPoint = -1;
+  outTarget.targetIsMobile = false;
 }

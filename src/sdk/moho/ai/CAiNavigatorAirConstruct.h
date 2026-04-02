@@ -7,6 +7,7 @@
 namespace gpg
 {
   struct SerHelperBase;
+  class SerConstructResult;
 }
 
 namespace moho
@@ -18,6 +19,23 @@ namespace moho
   class CAiNavigatorAirConstruct
   {
   public:
+    /**
+     * Address: 0x005A5630 (FUN_005A5630, construct callback)
+     *
+     * What it does:
+     * Allocates one `CAiNavigatorAir` and publishes it as unowned construct
+     * result payload.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x005A7ED0 (FUN_005A7ED0, delete callback)
+     *
+     * What it does:
+     * Deletes one constructed `CAiNavigatorAir` object when present.
+     */
+    static void Deconstruct(void* object);
+
     /**
      * Address: 0x005A74D0 (FUN_005A74D0)
      *
@@ -50,5 +68,14 @@ namespace moho
     "CAiNavigatorAirConstruct::mDeleteCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiNavigatorAirConstruct) == 0x14, "CAiNavigatorAirConstruct size must be 0x14");
+
+  /**
+   * Address: 0x00BCC840 (FUN_00BCC840, register_CAiNavigatorAirConstruct)
+   *
+   * What it does:
+   * Initializes the global CAiNavigatorAir construct helper callbacks and
+   * installs process-exit cleanup.
+   */
+  int register_CAiNavigatorAirConstruct();
 } // namespace moho
 

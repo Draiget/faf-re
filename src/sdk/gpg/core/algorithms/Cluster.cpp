@@ -107,7 +107,7 @@ namespace
      * What it does:
      * Strict-weak ordering comparator used for occupation cache keys.
      */
-    [[nodiscard]] bool OccupationKeyLess_00931460(const OccupationCacheKey& lhs, const OccupationCacheKey& rhs)
+    [[nodiscard]] bool OccupationKeyLess(const OccupationCacheKey& lhs, const OccupationCacheKey& rhs)
     {
         return std::memcmp(lhs.mBytes.data(), rhs.mBytes.data(), lhs.mBytes.size()) < 0;
     }
@@ -118,7 +118,7 @@ namespace
      * What it does:
      * Computes hash value for subcluster cache keys.
      */
-    [[nodiscard]] std::uint32_t HashSubclusterKey_00931500(const SubclusterCacheKey& key)
+    [[nodiscard]] std::uint32_t HashSubclusterKey(const SubclusterCacheKey& key)
     {
         return HashBytesSalted(key.mBytes.data(), key.mBytes.size(), kSubclusterKeySalt);
     }
@@ -129,7 +129,7 @@ namespace
      * What it does:
      * Strict-weak ordering comparator used for subcluster cache keys.
      */
-    [[nodiscard]] bool SubclusterKeyLess_00931560(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs)
+    [[nodiscard]] bool SubclusterKeyLess(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs)
     {
         return std::memcmp(lhs.mBytes.data(), rhs.mBytes.data(), lhs.mBytes.size()) < 0;
     }
@@ -140,7 +140,7 @@ namespace
      * What it does:
      * Computes hash value for occupation cache keys.
      */
-    [[nodiscard]] std::uint32_t HashOccupationKey_00932080(const OccupationCacheKey& key)
+    [[nodiscard]] std::uint32_t HashOccupationKey(const OccupationCacheKey& key)
     {
         return HashBytesSalted(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
     }
@@ -149,7 +149,7 @@ namespace
     {
         [[nodiscard]] std::size_t operator()(const OccupationCacheKey& key) const noexcept
         {
-            return static_cast<std::size_t>(ScrambleParkMiller(HashOccupationKey_00932080(key)));
+            return static_cast<std::size_t>(ScrambleParkMiller(HashOccupationKey(key)));
         }
     };
 
@@ -157,7 +157,7 @@ namespace
     {
         [[nodiscard]] bool operator()(const OccupationCacheKey& lhs, const OccupationCacheKey& rhs) const noexcept
         {
-            return !OccupationKeyLess_00931460(lhs, rhs) && !OccupationKeyLess_00931460(rhs, lhs);
+            return !OccupationKeyLess(lhs, rhs) && !OccupationKeyLess(rhs, lhs);
         }
     };
 
@@ -165,7 +165,7 @@ namespace
     {
         [[nodiscard]] std::size_t operator()(const SubclusterCacheKey& key) const noexcept
         {
-            return static_cast<std::size_t>(ScrambleParkMiller(HashSubclusterKey_00931500(key)));
+            return static_cast<std::size_t>(ScrambleParkMiller(HashSubclusterKey(key)));
         }
     };
 
@@ -173,7 +173,7 @@ namespace
     {
         [[nodiscard]] bool operator()(const SubclusterCacheKey& lhs, const SubclusterCacheKey& rhs) const noexcept
         {
-            return !SubclusterKeyLess_00931560(lhs, rhs) && !SubclusterKeyLess_00931560(rhs, lhs);
+            return !SubclusterKeyLess(lhs, rhs) && !SubclusterKeyLess(rhs, lhs);
         }
     };
 
@@ -299,7 +299,7 @@ namespace
      * What it does:
      * Finds an occupation-key cache entry.
      */
-    [[nodiscard]] CacheLookupResult FindOccupationCacheEntry_00932B70(
+    [[nodiscard]] CacheLookupResult FindOccupationCacheEntry(
         void* const cacheTreeBase,
         const gpg::HaStar::OccupationData& occupationData
     )
@@ -323,7 +323,7 @@ namespace
      * What it does:
      * Finds a subcluster-key cache entry.
      */
-    [[nodiscard]] CacheLookupResult FindSubclusterCacheEntry_00932C60(
+    [[nodiscard]] CacheLookupResult FindSubclusterCacheEntry(
         void* const cacheTreeBase,
         const gpg::HaStar::SubclusterData& subclusterData
     )
@@ -347,7 +347,7 @@ namespace
      * What it does:
      * Inserts an occupation-key cache entry and reports insertion status.
      */
-    [[nodiscard]] CacheInsertResult InsertOccupationCacheEntry_009348A0(
+    [[nodiscard]] CacheInsertResult InsertOccupationCacheEntry(
         void* const cacheTreeBase,
         const gpg::HaStar::OccupationData& occupationData,
         gpg::HaStar::Cluster::Data* const clusterData
@@ -374,7 +374,7 @@ namespace
      * What it does:
      * Inserts a subcluster-key cache entry and reports insertion status.
      */
-    [[nodiscard]] CacheInsertResult InsertSubclusterCacheEntry_00934BE0(
+    [[nodiscard]] CacheInsertResult InsertSubclusterCacheEntry(
         void* const cacheTreeBase,
         const gpg::HaStar::SubclusterData& subclusterData,
         gpg::HaStar::Cluster::Data* const clusterData
@@ -411,14 +411,14 @@ namespace
             return outCluster;
         }
 
-        const CacheLookupResult found = FindOccupationCacheEntry_00932B70(cacheTreeBase, *occupationData);
+        const CacheLookupResult found = FindOccupationCacheEntry(cacheTreeBase, *occupationData);
         if (found.mFound) {
             SetClusterData(*outCluster, found.mData);
             return outCluster;
         }
 
         gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(*occupationData);
-        const CacheInsertResult inserted = InsertOccupationCacheEntry_009348A0(cacheTreeBase, *occupationData, built.mData);
+        const CacheInsertResult inserted = InsertOccupationCacheEntry(cacheTreeBase, *occupationData, built.mData);
         if (!inserted.mInserted) {
             gpg::HandleAssertFailure(
                 "ins.second",
@@ -448,14 +448,14 @@ namespace
         }
 
         void* const cacheTreeBase = ResolveCacheTreeBaseFromSubclusterPtr(subclusterTree);
-        const CacheLookupResult found = FindSubclusterCacheEntry_00932C60(cacheTreeBase, *subclusterData);
+        const CacheLookupResult found = FindSubclusterCacheEntry(cacheTreeBase, *subclusterData);
         if (found.mFound) {
             SetClusterData(*outCluster, found.mData);
             return outCluster;
         }
 
         gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(*subclusterData);
-        const CacheInsertResult inserted = InsertSubclusterCacheEntry_00934BE0(cacheTreeBase, *subclusterData, built.mData);
+        const CacheInsertResult inserted = InsertSubclusterCacheEntry(cacheTreeBase, *subclusterData, built.mData);
         if (!inserted.mInserted) {
             gpg::HandleAssertFailure(
                 "ins.second",

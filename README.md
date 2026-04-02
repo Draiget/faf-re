@@ -69,29 +69,34 @@ python scripts/recovery_coverage.py --dump-excluded-external-csv decomp/recovery
 python scripts/detect_boost_patch_version.py --mode binary --binary-file bin/external/ForgedAlliance.exe
 ```
 
-Snapshot (2026-03-26):
+Current coverage snapshot (2026-04-02):
 
-- Reconstructed FAF functions: `3,766/67,153 (5.61%)`
-- Scoped (`moho + gpg + external`, with Boost + zlib excluded): `2,961/13,217 (22.40%)`
-- External dependencies excluded from scoped denominator: `Boost 6/217 (2.76%), zlib 0/15 (0.00%)`
-- zlib exclusion rationale: in-binary calls to `inflate/deflate` resolve to internal FAF.exe addresses (no zlib imports).
-- External entries excluded (no body evidence): `356`
-- Boost address inventory: `decomp/recovery/reports/boost_function_inventory_2026-03-26.csv`
-- Boost exclusion summary: `decomp/recovery/reports/boost_function_inventory_2026-03-26.md`
-- zlib linkage audit: `decomp/recovery/reports/zlib_linkage_audit_2026-03-26.md`
+- Total FAF functions: `67,153`
+- Recovered FAF functions in source annotations: `11,433/67,153 (17.03%)`
+- Scoped coverage (`moho+gpg+external`): `4,910/13,217 (37.15%)`
+- Annotated addresses under `src/sdk/**`: `11,719` (`FA: 11,433`, `non-FA: 286`)
 
 Namespace split:
 
-- `moho`: `2,425/8,717 (27.82%)`
-- `gpg`: `473/2,172 (21.78%)`
-- `external`: `63/2,340 (2.69%)`
+- `moho`: `4,030/8,717 (46.23%)`
+- `gpg`: `702/2,172 (32.32%)`
+- `external`: `178/2,328 (7.65%)`
 
 External dependency split:
 
-- `wxWidgets`: `20/1,359 (1.47%)`
-- `MSVC STL/CRT`: `4/398 (1.01%)`
-- `WildMagic`: `28/387 (7.24%)`
-- `LuaPlus/Lua`: `11/184 (5.98%)`
+- `wxWidgets`: `88/1,359 (6.48%)`
+- `MSVC STL/CRT`: `28/398 (7.04%)`
+- `WildMagic`: `36/387 (9.30%)`
+- `LuaPlus/Lua`: `26/184 (14.13%)`
+
+Recovery DB snapshot (2026-04-02, `fa_full_2026_03_26`):
+
+- Exported done: `67,162`
+- Recovered: `19,316`
+- Pending: `46,849`
+- Blocked: `1,024`
+- In progress: `22`
+- Coverage: `28.76%`
 
 ## Projects
 

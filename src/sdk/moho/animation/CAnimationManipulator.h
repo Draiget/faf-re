@@ -8,8 +8,15 @@
 #include "moho/containers/BitStorage32.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 
+namespace gpg
+{
+  class SerConstructResult;
+}
+
 namespace moho
 {
+  class Unit;
+
   using SAniManipBitStorage = SBitStorage32;
 
   struct SAniManipOwnerLink
@@ -135,6 +142,23 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0063F220 (FUN_0063F220, Moho::CAnimationManipulatorConstruct::Construct)
+     *
+     * What it does:
+     * Allocates one `CAnimationManipulator`, runs constructor setup, and
+     * returns an unowned reflected reference through `SerConstructResult`.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectStorage, int version, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x00642340 (FUN_00642340, Moho::CAnimationManipulatorConstruct::Deconstruct)
+     *
+     * What it does:
+     * Runs deleting-dtor teardown for one constructed `CAnimationManipulator`.
+     */
+    static void Deconstruct(void* objectPtr);
+
+    /**
      * Address: 0x00641E70 (FUN_00641E70, sub_641E70)
      * Slot: 0
      *
@@ -154,6 +178,26 @@ namespace moho
   class CAnimationManipulatorSerializer
   {
   public:
+    /**
+     * Address: 0x0063F2C0 (FUN_0063F2C0, Moho::CAnimationManipulatorSerializer::Deserialize)
+     *
+     * What it does:
+     * Loads `CAnimationManipulator` serialization payload (base IAniManipulator
+     * lane, goal-link lane, bit-mask lane, shared animation resource, and
+     * playback/flag scalars) into an existing object.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0063F2D0 (FUN_0063F2D0, Moho::CAnimationManipulatorSerializer::Serialize)
+     *
+     * What it does:
+     * Saves `CAnimationManipulator` serialization payload (base IAniManipulator
+     * lane, goal-link lane, bit-mask lane, shared animation resource, and
+     * playback/flag scalars) from an existing object.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     /**
      * Address: 0x00641EF0 (FUN_00641EF0, sub_641EF0)
      * Slot: 0

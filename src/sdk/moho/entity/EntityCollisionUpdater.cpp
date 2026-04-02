@@ -156,6 +156,13 @@ namespace
   };
   static_assert(sizeof(BoxBoxContactManifold) == 0x28, "BoxBoxContactManifold size must be 0x28");
 
+  /**
+   * Address: 0x00474830 (FUN_00474830, box-vs-box SAT manifold helper)
+   *
+   * What it does:
+   * Runs SAT overlap checks for two OBBs and returns witness points, penetration
+   * normal, and depth for the best separating axis candidate.
+   */
   [[nodiscard]] bool ComputeBoxBoxContactManifold(
     const Wm3::Box3f& lhs, const Wm3::Box3f& rhs, BoxBoxContactManifold* outManifold
   ) noexcept

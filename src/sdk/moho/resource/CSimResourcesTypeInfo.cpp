@@ -1,12 +1,37 @@
 #include "moho/resource/CSimResourcesTypeInfo.h"
 
+#include <cstdlib>
 #include <new>
+#include <typeinfo>
 
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 
 namespace
 {
+  alignas(moho::CSimResourcesTypeInfo) unsigned char gCSimResourcesTypeInfoStorage[sizeof(moho::CSimResourcesTypeInfo)];
+  bool gCSimResourcesTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CSimResourcesTypeInfo& AcquireCSimResourcesTypeInfo()
+  {
+    if (!gCSimResourcesTypeInfoConstructed) {
+      new (gCSimResourcesTypeInfoStorage) moho::CSimResourcesTypeInfo();
+      gCSimResourcesTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<moho::CSimResourcesTypeInfo*>(gCSimResourcesTypeInfoStorage);
+  }
+
+  void cleanup_CSimResourcesTypeInfo()
+  {
+    if (!gCSimResourcesTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCSimResourcesTypeInfo().~CSimResourcesTypeInfo();
+    gCSimResourcesTypeInfoConstructed = false;
+  }
+
   [[nodiscard]] gpg::RRef MakeCSimResourcesRef(moho::CSimResources* const object)
   {
     gpg::RRef out{};
@@ -14,10 +39,29 @@ namespace
     out.mType = moho::resource_reflection::ResolveCSimResourcesType();
     return out;
   }
+
+  struct CSimResourcesTypeInfoStartup
+  {
+    CSimResourcesTypeInfoStartup()
+    {
+      moho::register_CSimResourcesTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CSimResourcesTypeInfoStartup gCSimResourcesTypeInfoStartup;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00546A20 (FUN_00546A20, Moho::CSimResourcesTypeInfo::CSimResourcesTypeInfo)
+   */
+  CSimResourcesTypeInfo::CSimResourcesTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CSimResources), this);
+  }
+
   /**
    * Address: 0x00546AD0 (FUN_00546AD0, Moho::CSimResourcesTypeInfo::dtr)
    */
@@ -93,5 +137,14 @@ namespace moho
   {
     auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
     object->~CSimResources();
+  }
+
+  /**
+   * Address: 0x00BC96B0 (FUN_00BC96B0, register_CSimResourcesTypeInfo)
+   */
+  void register_CSimResourcesTypeInfo()
+  {
+    (void)AcquireCSimResourcesTypeInfo();
+    (void)std::atexit(&cleanup_CSimResourcesTypeInfo);
   }
 } // namespace moho

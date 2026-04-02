@@ -6,7 +6,7 @@ namespace moho
   {
     // Primary vftable (2 entries)
   public:
-    virtual void sub_A82547() = 0;   // 0xA82547 (slot 0)
-    virtual void sub_A82547_1() = 0; // 0xA82547 (slot 1)
+    virtual void OnSessionEvent0() = 0;   // 0xA82547 (slot 0)
+    virtual void OnSessionEvent1() = 0; // 0xA82547 (slot 1)
   };
 } // namespace moho

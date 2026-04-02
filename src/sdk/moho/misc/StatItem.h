@@ -25,16 +25,32 @@ namespace moho
     kString = 3,
   };
 
-  struct StatHeapBlock
+  enum class EPulseMode : std::int32_t
   {
-    void* data{nullptr};
-    std::uint32_t size{0};
-    std::uint32_t capacity{0};
+    kNone = 0,
+    kTick = 1,
+    kFrame = 0x7FFFFFFF,
+  };
+
+  struct StatSamplePoint
+  {
+    std::int32_t frameIndex{0};
+    float value{0.0f};
+  };
+  static_assert(sizeof(StatSamplePoint) == 0x08, "StatSamplePoint size must be 0x08");
+
+  struct StatSampleBuffer
+  {
+    StatSamplePoint* begin{nullptr};
+    StatSamplePoint* end{nullptr};
+    StatSamplePoint* capacityEnd{nullptr};
 
     void Reset() noexcept;
-    ~StatHeapBlock() noexcept;
+    void Clear() noexcept;
+    [[nodiscard]] std::size_t Size() const noexcept;
+    ~StatSampleBuffer() noexcept;
   };
-  static_assert(sizeof(StatHeapBlock) == 0x0C, "StatHeapBlock size must be 0x0C");
+  static_assert(sizeof(StatSampleBuffer) == 0x0C, "StatSampleBuffer size must be 0x0C");
 
   class StatItem : public TDatTreeItem<StatItem>
   {
@@ -90,6 +106,55 @@ namespace moho
     [[nodiscard]] std::int32_t Release(std::int32_t value);
 
     /**
+     * Address: 0x00418B00 (FUN_00418B00, Moho::StatItem::Clear)
+     *
+     * What it does:
+     * Clears this stat item's current payload and optionally clears descendants.
+     */
+    void Clear(bool recursive);
+
+    /**
+     * Address: 0x00418A90 (FUN_00418A90, Moho::StatItem::ClearChildren)
+     *
+     * What it does:
+     * Applies pulse-mode clear rules on this node and recursively visits child
+     * nodes.
+     */
+    void ClearChildren(std::int32_t pulseMode);
+
+    /**
+     * Address: 0x00419090 (FUN_00419090, Moho::StatItem::SerializeList)
+     *
+     * What it does:
+     * Serializes owned child pointers as a null-terminated list.
+     */
+    void SerializeList(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00419110 (FUN_00419110, Moho::StatItem::DeserializeList)
+     *
+     * What it does:
+     * Loads owned child pointers until a null terminator and reattaches them.
+     */
+    void DeserializeList(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0041AD70 (FUN_0041AD70, Moho::StatItem::MemberDeserialize)
+     *
+     * What it does:
+     * Loads stat payload lanes, name, pulse mode, and owned children from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0041AEE0 (FUN_0041AEE0, Moho::StatItem::MemberSerialize)
+     *
+     * What it does:
+     * Saves stat payload lanes, name, pulse mode, and owned children to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
      * Address: 0x0040D2D0 (FUN_0040D2D0, Moho::StatItem::Synchronize2)
      */
     void SynchronizeAsInt();
@@ -123,8 +188,8 @@ namespace moho
 
     msvc8::string mScratchValue; // +0x48
 
-    std::uint32_t mHeapTag;     // +0x64
-    StatHeapBlock mHeapStorage; // +0x68..+0x73
+    std::uint32_t mSampleTag{0};      // +0x64
+    StatSampleBuffer mSampleHistory;  // +0x68..+0x73
 
     msvc8::string mName; // +0x74
 
@@ -132,8 +197,8 @@ namespace moho
     volatile std::int32_t mUseRealtimeSlot{0}; // +0x94
     boost::mutex mLock;                        // +0x98
   };
-  static_assert(offsetof(StatItem, mHeapTag) == 0x64, "StatItem::mHeapTag offset must be 0x64");
-  static_assert(offsetof(StatItem, mHeapStorage) == 0x68, "StatItem::mHeapStorage offset must be 0x68");
+  static_assert(offsetof(StatItem, mSampleTag) == 0x64, "StatItem::mSampleTag offset must be 0x64");
+  static_assert(offsetof(StatItem, mSampleHistory) == 0x68, "StatItem::mSampleHistory offset must be 0x68");
   static_assert(offsetof(StatItem, mName) == 0x74, "StatItem::mName offset must be 0x74");
   static_assert(sizeof(StatItem) == 0xA0u, "StatItem size must be 0xA0");
 
@@ -159,6 +224,88 @@ namespace moho
     gpg::RType::save_func_t mSerSaveFunc;
   };
   static_assert(sizeof(StatItemSerializer) == 0x14, "StatItemSerializer size must be 0x14");
+  static_assert(offsetof(StatItemSerializer, mNext) == 0x04, "StatItemSerializer::mNext offset must be 0x04");
+  static_assert(offsetof(StatItemSerializer, mPrev) == 0x08, "StatItemSerializer::mPrev offset must be 0x08");
+  static_assert(offsetof(StatItemSerializer, mSerLoadFunc) == 0x0C, "StatItemSerializer::mSerLoadFunc offset must be 0x0C");
+  static_assert(offsetof(StatItemSerializer, mSerSaveFunc) == 0x10, "StatItemSerializer::mSerSaveFunc offset must be 0x10");
+
+  /**
+   * VFTABLE: 0x00E010B4
+   * COL: 0x00E5DB04
+   */
+  class EStatTypePrimitiveSerializer
+  {
+  public:
+    /**
+     * Address: 0x004192B0 (FUN_004192B0, gpg::PrimitiveSerHelper<Moho::EStatType,int>::Init)
+     *
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected `EStatType`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
+  };
+  static_assert(
+    offsetof(EStatTypePrimitiveSerializer, mHelperNext) == 0x04,
+    "EStatTypePrimitiveSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(EStatTypePrimitiveSerializer, mHelperPrev) == 0x08,
+    "EStatTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(EStatTypePrimitiveSerializer, mSerLoadFunc) == 0x0C,
+    "EStatTypePrimitiveSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EStatTypePrimitiveSerializer, mSerSaveFunc) == 0x10,
+    "EStatTypePrimitiveSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(EStatTypePrimitiveSerializer) == 0x14, "EStatTypePrimitiveSerializer size must be 0x14");
+
+  /**
+   * VFTABLE: 0x00E010F4
+   * COL: 0x00E5DA04
+   */
+  class EPulseModePrimitiveSerializer
+  {
+  public:
+    /**
+     * Address: 0x00419350 (FUN_00419350, gpg::PrimitiveSerHelper<Moho::EPulseMode,int>::Init)
+     *
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected `EPulseMode`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
+  };
+  static_assert(
+    offsetof(EPulseModePrimitiveSerializer, mHelperNext) == 0x04,
+    "EPulseModePrimitiveSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(EPulseModePrimitiveSerializer, mHelperPrev) == 0x08,
+    "EPulseModePrimitiveSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(EPulseModePrimitiveSerializer, mSerLoadFunc) == 0x0C,
+    "EPulseModePrimitiveSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EPulseModePrimitiveSerializer, mSerSaveFunc) == 0x10,
+    "EPulseModePrimitiveSerializer::mSerSaveFunc offset must be 0x10"
+  );
+  static_assert(sizeof(EPulseModePrimitiveSerializer) == 0x14, "EPulseModePrimitiveSerializer size must be 0x14");
 
   /**
    * VFTABLE: 0x00E01104
@@ -167,6 +314,14 @@ namespace moho
   class StatItemTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x004184B0 (FUN_004184B0, Moho::StatItemTypeInfo::StatItemTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for `StatItem`.
+     */
+    StatItemTypeInfo();
+
     /**
      * Address: 0x00418560 (FUN_00418560, sub_418560)
      * Slot: 2
@@ -188,6 +343,82 @@ namespace moho
   static_assert(sizeof(StatItemTypeInfo) == 0x64, "StatItemTypeInfo size must be 0x64");
 
   /**
+   * VFTABLE: 0x00E01084
+   * COL: 0x00E5DB68
+   */
+  class EStatTypeTypeInfo final : public gpg::REnumType
+  {
+  public:
+    /**
+     * Address: 0x004181C0 (FUN_004181C0, Moho::EStatTypeTypeInfo::EStatTypeTypeInfo)
+     */
+    EStatTypeTypeInfo();
+
+    /**
+     * Address: 0x00418250 (FUN_00418250, Moho::EStatTypeTypeInfo::dtr)
+     * Slot: 2
+     */
+    ~EStatTypeTypeInfo() override;
+
+    /**
+     * Address: 0x00418240 (FUN_00418240, Moho::EStatTypeTypeInfo::GetName)
+     * Slot: 3
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00418220 (FUN_00418220, Moho::EStatTypeTypeInfo::Init)
+     * Slot: 9
+     */
+    void Init() override;
+
+  private:
+    /**
+     * Address: 0x00418280 (FUN_00418280, Moho::EStatTypeTypeInfo::AddEnums)
+     */
+    void AddEnums();
+  };
+  static_assert(sizeof(EStatTypeTypeInfo) == 0x78, "EStatTypeTypeInfo size must be 0x78");
+
+  /**
+   * VFTABLE: 0x00E010B4
+   * COL: 0x00E5DAE0
+   */
+  class EPulseModeTypeInfo final : public gpg::REnumType
+  {
+  public:
+    /**
+     * Address: 0x00418340 (FUN_00418340, Moho::EPulseModeTypeInfo::EPulseModeTypeInfo)
+     */
+    EPulseModeTypeInfo();
+
+    /**
+     * Address: 0x004183D0 (FUN_004183D0, Moho::EPulseModeTypeInfo::dtr)
+     * Slot: 2
+     */
+    ~EPulseModeTypeInfo() override;
+
+    /**
+     * Address: 0x004183C0 (FUN_004183C0, Moho::EPulseModeTypeInfo::GetName)
+     * Slot: 3
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x004183A0 (FUN_004183A0, Moho::EPulseModeTypeInfo::Init)
+     * Slot: 9
+     */
+    void Init() override;
+
+  private:
+    /**
+     * Address: 0x00418400 (FUN_00418400, Moho::EPulseModeTypeInfo::AddEnums)
+     */
+    void AddEnums();
+  };
+  static_assert(sizeof(EPulseModeTypeInfo) == 0x78, "EPulseModeTypeInfo size must be 0x78");
+
+  /**
    * VFTABLE: 0x00E01054
    * COL: 0x00E5DBF0
    */
@@ -195,6 +426,11 @@ namespace moho
   class StatsRType<StatItem> final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x0041A750 (FUN_0041A750, Moho::StatsRType_StatItem::StatsRType_StatItem)
+     */
+    StatsRType();
+
     /**
      * Address: 0x0041A800 (FUN_0041A800, sub_41A800)
      * Slot: 2

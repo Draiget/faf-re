@@ -6,7 +6,7 @@ namespace moho
 {
   /**
    * Address evidence:
-   * - 0x00723BD0: ESquadClassTypeInfo::Init registers lexical options.
+   * - 0x00723BD0: ESquadClassTypeInfo::AddEnums registers lexical options.
    *
    * What it does:
    * Encodes platoon squad-role classification used by AI platoon queries.

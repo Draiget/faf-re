@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E40A0 (FUN_005E40A0, SAiReservedTransportBoneSerializer::Deserialize)
+     *
+     * What it does:
+     * Deserializes one `SAiReservedTransportBone` payload from archive lanes.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005E40B0 (FUN_005E40B0, SAiReservedTransportBoneSerializer::Serialize)
+     *
+     * What it does:
+     * Serializes one `SAiReservedTransportBone` payload into archive lanes.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005E8F70 (FUN_005E8F70)
      *
      * What it does:
@@ -53,4 +69,13 @@ namespace moho
     sizeof(SAiReservedTransportBoneSerializer) == 0x14,
     "SAiReservedTransportBoneSerializer size must be 0x14"
   );
+
+  /**
+   * Address: 0x00BCED90 (FUN_00BCED90, register_SAiReservedTransportBoneSerializer)
+   *
+   * What it does:
+   * Registers serializer callbacks for `SAiReservedTransportBone` and installs
+   * process-exit cleanup.
+   */
+  int register_SAiReservedTransportBoneSerializer();
 } // namespace moho

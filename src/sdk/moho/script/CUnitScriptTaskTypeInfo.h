@@ -37,5 +37,29 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitScriptTaskTypeInfo) == 0x64, "CUnitScriptTaskTypeInfo size must be 0x64");
-} // namespace moho
 
+  /**
+   * Address: 0x00622D20 (FUN_00622D20)
+   *
+   * What it does:
+   * Constructs/preregisters the static CUnitScriptTask type descriptor.
+   */
+  [[nodiscard]] gpg::RType* register_CUnitScriptTaskTypeInfo();
+
+  /**
+   * Address: 0x00BFA410 (FUN_00BFA410)
+   *
+   * What it does:
+   * Clears preregistered CUnitScriptTask typeinfo base/field vectors for
+   * process teardown.
+   */
+  void cleanup_CUnitScriptTaskTypeInfo();
+
+  /**
+   * Address: 0x00BD1960 (FUN_00BD1960)
+   *
+   * What it does:
+   * Registers CUnitScriptTask typeinfo and schedules process-exit cleanup.
+   */
+  int register_CUnitScriptTaskTypeInfo_AtExit();
+} // namespace moho

@@ -10,6 +10,7 @@ namespace gpg
 {
   class ReadArchive;
   class RType;
+  class WriteArchive;
 } // namespace gpg
 
 namespace moho
@@ -70,6 +71,21 @@ namespace moho
      * `mEnabled`, `mGrid`, `mLastTickUpdated`) from archive payload.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00770090 (FUN_00770090, Moho::CIntelPosHandle::MemberSerialize)
+     *
+     * gpg::WriteArchive *
+     *
+     * IDA signature:
+     * void __usercall Moho::CIntelPosHandle::MemberSerialize(
+     *   Moho::CIntelPosHandle *this@<edi>, gpg::WriteArchive *archive@<esi>);
+     *
+     * What it does:
+     * Serializes base position-watch fields (`mLastPos`, `mRadius`, `mEnabled`,
+     * `mGrid`, `mLastTickUpdated`) into archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x0076F180 (FUN_0076F180)

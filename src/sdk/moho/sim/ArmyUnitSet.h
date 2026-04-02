@@ -28,6 +28,15 @@ namespace moho
     [[nodiscard]] static Unit* UnitFromEntry(Entity* entity) noexcept;
     [[nodiscard]] static const Unit* UnitFromEntry(const Entity* entity) noexcept;
 
+    /**
+     * Address: 0x005796A0 (FUN_005796A0, Moho::EntitySetTemplate_Entity::~EntitySetTemplate_Entity)
+     *
+     * What it does:
+     * Releases heap-backed set storage (if any), restores inline-vector lanes,
+     * and unlinks this intrusive node from its current ring.
+     */
+    ~SEntitySetTemplateUnit() noexcept;
+
     [[nodiscard]] bool Empty() const noexcept;
     [[nodiscard]] std::size_t Size() const noexcept;
     void Clear() noexcept;
@@ -38,6 +47,15 @@ namespace moho
     [[nodiscard]] bool ContainsUnit(const Unit* unit) const noexcept;
     [[nodiscard]] bool AddUnit(Unit* unit);
     [[nodiscard]] bool RemoveUnit(Unit* unit);
+
+    /**
+     * Address: 0x00704070 (FUN_00704070, Moho::EntitySetTemplate_Entity::AddRange)
+     *
+     * What it does:
+     * Iterates one `Entity*` range, resolves live `Unit*` owners, and inserts
+     * them into this sorted unit set.
+     */
+    void AddRange(Entity* const* start, Entity* const* end);
 
     void AddUnits(const EntitySetTemplate<Unit>& source);
     void CopyTo(EntitySetTemplate<Unit>& out) const;

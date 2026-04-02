@@ -20,6 +20,15 @@ namespace moho
   [[nodiscard]] bool RuntimeTypeEquals(const RuntimeTypeInfo& lhs, const RuntimeTypeInfo& rhs) noexcept;
 
   /**
+   * Address: 0x00401250 (FUN_00401250)
+   *
+   * What it does:
+   * Compares optional RTTI descriptor pointers with identity/null fast paths
+   * before deferring to `type_info::operator==`.
+   */
+  [[nodiscard]] bool RuntimeTypePtrEquals(const RuntimeTypeInfo* lhs, const RuntimeTypeInfo* rhs) noexcept;
+
+  /**
    * Address: 0x00A8242D (`?name@type_info@@QBEPBDPAU__type_info_node@@@Z`, `type_info::name`)
    *
    * Returns canonical runtime type name.

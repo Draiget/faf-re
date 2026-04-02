@@ -5,8 +5,36 @@
 #include "moho/misc/Stats.h"
 #include "moho/sim/CArmyStats.h"
 
+namespace
+{
+  moho::CArmyStatsTypeInfo gCArmyStatsTypeInfo;
+}
+
 namespace moho
 {
+  /**
+   * Address: 0x0070DDF0 (FUN_0070DDF0, sub_70DDF0)
+   *
+   * IDA signature:
+   * gpg::RType *sub_70DDF0();
+   */
+  CArmyStatsTypeInfo::CArmyStatsTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CArmyStats), this);
+  }
+
+  /**
+   * Address: 0x00BDA180 (FUN_00BDA180, sub_BDA180)
+   *
+   * What it does:
+   * Forces CArmyStats RTTI preregistration bootstrap.
+   */
+  void register_CArmyStatsTypeInfo()
+  {
+    (void)gCArmyStatsTypeInfo;
+  }
+
   /**
    * Address: 0x0070DE80 (FUN_0070DE80, Moho::CArmyStatsTypeInfo::dtr)
    */
@@ -54,3 +82,16 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 } // namespace moho
+
+namespace
+{
+  struct CArmyStatsTypeInfoBootstrap
+  {
+    CArmyStatsTypeInfoBootstrap()
+    {
+      moho::register_CArmyStatsTypeInfo();
+    }
+  };
+
+  CArmyStatsTypeInfoBootstrap gCArmyStatsTypeInfoBootstrap;
+} // namespace

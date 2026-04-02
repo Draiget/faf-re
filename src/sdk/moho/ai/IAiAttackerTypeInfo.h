@@ -26,5 +26,13 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCE7B0 (FUN_00BCE7B0, sub_BCE7B0)
+   *
+   * What it does:
+   * Registers `IAiAttacker` type-info and installs process-exit cleanup.
+   */
+  int register_IAiAttackerTypeInfo();
+
   static_assert(sizeof(IAiAttackerTypeInfo) == 0x64, "IAiAttackerTypeInfo size must be 0x64");
 } // namespace moho

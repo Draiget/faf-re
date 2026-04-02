@@ -36,5 +36,14 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCE460 (FUN_00BCE460, register_IAiSteeringTypeInfo)
+   *
+   * What it does:
+   * Registers the `IAiSteering` RTTI type-info object and installs process-exit
+   * cleanup.
+   */
+  int register_IAiSteeringTypeInfo();
+
   static_assert(sizeof(IAiSteeringTypeInfo) == 0x64, "IAiSteeringTypeInfo size must be 0x64");
 } // namespace moho

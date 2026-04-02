@@ -21,6 +21,14 @@ namespace gpg::gal
         RenderTargetContext();
 
         /**
+         * Address: 0x00442050 (FUN_00442050, sub_442050)
+         *
+         * What it does:
+         * Copies render-target width/height/format lanes from another context.
+         */
+        RenderTargetContext(const RenderTargetContext& other);
+
+        /**
          * Address: 0x00442080 (FUN_00442080)
          *
          * What it does:

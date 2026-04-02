@@ -1,5 +1,7 @@
 #include "moho/ai/CAiNavigatorAirTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiNavigatorAir.h"
@@ -8,6 +10,19 @@ using namespace moho;
 
 namespace
 {
+  alignas(CAiNavigatorAirTypeInfo) unsigned char gCAiNavigatorAirTypeInfoStorage[sizeof(CAiNavigatorAirTypeInfo)] = {};
+  bool gCAiNavigatorAirTypeInfoConstructed = false;
+
+  [[nodiscard]] CAiNavigatorAirTypeInfo* AcquireCAiNavigatorAirTypeInfo()
+  {
+    if (!gCAiNavigatorAirTypeInfoConstructed) {
+      new (gCAiNavigatorAirTypeInfoStorage) CAiNavigatorAirTypeInfo();
+      gCAiNavigatorAirTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<CAiNavigatorAirTypeInfo*>(gCAiNavigatorAirTypeInfoStorage);
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
   {
     gpg::RType* type = CAiNavigatorImpl::sType;
@@ -17,7 +32,34 @@ namespace
     }
     return type;
   }
+
+  /**
+   * Address: 0x00BF6EE0 (FUN_00BF6EE0)
+   *
+   * What it does:
+   * Tears down startup-owned `CAiNavigatorAirTypeInfo` storage.
+   */
+  void cleanup_CAiNavigatorAirTypeInfo()
+  {
+    if (!gCAiNavigatorAirTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCAiNavigatorAirTypeInfo()->~CAiNavigatorAirTypeInfo();
+    gCAiNavigatorAirTypeInfoConstructed = false;
+  }
 } // namespace
+
+/**
+ * Address: 0x005A5460 (FUN_005A5460, ctor)
+ *
+ * What it does:
+ * Preregisters `CAiNavigatorAir` RTTI so lookup resolves to this type helper.
+ */
+CAiNavigatorAirTypeInfo::CAiNavigatorAirTypeInfo()
+{
+  gpg::PreRegisterRType(typeid(CAiNavigatorAir), this);
+}
 
 /**
  * Address: 0x005A54F0 (FUN_005A54F0, scalar deleting thunk)
@@ -50,4 +92,30 @@ void CAiNavigatorAirTypeInfo::Init()
 
   Finish();
 }
+
+/**
+ * Address: 0x00BCC820 (FUN_00BCC820)
+ *
+ * What it does:
+ * Constructs startup-owned `CAiNavigatorAirTypeInfo` storage and installs
+ * process-exit cleanup.
+ */
+int moho::register_CAiNavigatorAirTypeInfo()
+{
+  (void)AcquireCAiNavigatorAirTypeInfo();
+  return std::atexit(&cleanup_CAiNavigatorAirTypeInfo);
+}
+
+namespace
+{
+  struct CAiNavigatorAirTypeInfoBootstrap
+  {
+    CAiNavigatorAirTypeInfoBootstrap()
+    {
+      (void)moho::register_CAiNavigatorAirTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CAiNavigatorAirTypeInfoBootstrap gCAiNavigatorAirTypeInfoBootstrap;
+} // namespace
 

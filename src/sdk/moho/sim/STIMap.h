@@ -6,15 +6,18 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Vector.h"
+#include "moho/sim/CBackgroundTaskControl.h"
 #include "lua/LuaObject.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SMinMax.h"
 #include "wm3/AABB.h"
+#include "wm3/Vector2.h"
 
 namespace moho
 {
   class COGrid;
+  class CGeomSolid3;
 
   struct CHeightFieldMinMaxGrid
   {
@@ -118,6 +121,18 @@ namespace moho
     std::uint16_t GetHeightAt(std::int32_t x, std::int32_t z) const;
 
     /**
+     * Address: 0x00478470 (FUN_00478470, Moho::CHeightField::GetArrayAt)
+     *
+     * int x, int z
+     *
+     * What it does:
+     * Returns pointer to the base height-word sample at `(x,z)` without
+     * additional bounds checks.
+     */
+    [[nodiscard]]
+    std::uint16_t* GetArrayAt(std::int32_t x, std::int32_t z);
+
+    /**
      * Address: 0x0044FB90 (FUN_0044FB90)
      *
      * float x, float z
@@ -130,6 +145,112 @@ namespace moho
      */
     [[nodiscard]]
     float GetElevation(float x, float z) const;
+
+    /**
+     * Address: 0x00476260 (FUN_00476260, Moho::CHeightField::UpdateError)
+     *
+     * gpg::Rect2<int>
+     *
+     * IDA signature:
+     * unsigned int __userpurge Moho::CHeightField::UpdateError@<eax>(
+     *   Moho::CHeightField *this@<esi>, int x0, int z0, int x1, int z1);
+     *
+     * What it does:
+     * Rebuilds terrain error tiers for a changed rectangle with no progress
+     * callback handle.
+     */
+    void UpdateError(gpg::Rect2i rect);
+
+    /**
+     * Address: 0x004762E0 (FUN_004762E0, Moho::CHeightField::UpdateError)
+     *
+     * Moho::CBackgroundTaskControl &, gpg::Rect2<int>
+     *
+     * IDA signature:
+     * struct_iGrid *__userpurge Moho::CHeightField::UpdateError@<eax>(
+     *   Moho::CHeightField *this@<esi>,
+     *   struct gpg::BinaryReader *loadControl,
+     *   int x0, int z0, int x1, int z1);
+     *
+     * What it does:
+     * Rebuilds terrain error tiers for a changed rectangle while pumping the
+     * background-load progress control path.
+     */
+    void UpdateError(CBackgroundTaskControl& loadControl, gpg::Rect2i rect);
+
+    /**
+     * Address: 0x00478040 (FUN_00478040, Moho::CHeightField::Rescale)
+     *
+     * float scale
+     *
+     * What it does:
+     * Scales all 16-bit terrain height samples by `scale` and clamps each result
+     * to `[0, 65535]`.
+     */
+    void Rescale(float scale);
+
+    /**
+     * Address: 0x00476BB0 (FUN_00476BB0, Moho::CHeightField::UpdateBounds)
+     *
+     * gpg::Rect2<int>
+     *
+     * What it does:
+     * Recomputes tiered min/max bounds for all hierarchy levels touched by the
+     * changed base-height rectangle.
+     */
+    void UpdateBounds(gpg::Rect2i rect);
+
+    /**
+     * Address: 0x00477E10 (FUN_00477E10, Moho::CHeightField::SetElevationRect)
+     *
+     * gpg::Rect2<int> const &, float const *
+     *
+     * What it does:
+     * Writes clamped 16-bit heights into the requested rectangle and refreshes
+     * impacted tier bounds.
+     */
+    void SetElevationRect(const gpg::Rect2i& rect, const float* source);
+
+    /**
+     * Address: 0x00477F10 (FUN_00477F10, Moho::CHeightField::SetElevationRectRaw)
+     *
+     * gpg::Rect2<int> const &, unsigned short const *, int
+     *
+     * What it does:
+     * Copies raw 16-bit source heights into the requested rectangle and refreshes
+     * impacted tier bounds.
+     */
+    void SetElevationRectRaw(
+      const gpg::Rect2i& rect,
+      const std::uint16_t* source,
+      std::int32_t sourceRowStride
+    );
+
+    /**
+     * Address: 0x00478010 (FUN_00478010, Moho::CHeightField::CopyHeightsRectFrom)
+     *
+     * Moho::CHeightField const *, gpg::Rect2<int> const &
+     *
+     * What it does:
+     * Copies one rectangle of raw heights from another field using the source
+     * row stride.
+     */
+    void CopyHeightsRectFrom(const CHeightField* source, const gpg::Rect2i& rect);
+
+    /**
+     * Address: 0x00475DA0 (FUN_00475DA0)
+     *
+     * int x, int z, int tier
+     *
+     * IDA signature:
+     * void __userpurge Moho::CHeightField::GetTierBounds(
+     *   Moho::CHeightField *this@<edx>, Wm3::Vector2f *out@<esi>, int x, int tier, int z@<eax>);
+     *
+     * What it does:
+     * Returns tier-cell min/max heights scaled into world units (`x=min`, `y=max`).
+     */
+    [[nodiscard]]
+    Wm3::Vec2f GetTierBounds(std::int32_t x, std::int32_t z, std::int32_t tier) const;
 
     /**
      * Address: 0x00475BF0 (FUN_00475BF0)
@@ -162,6 +283,18 @@ namespace moho
     Wm3::AxisAlignedBox3f GetTierBox(std::int32_t x, std::int32_t z, std::int32_t tier) const;
 
     /**
+     * Address: 0x00478280 (FUN_00478280, Moho::CHeightField::ConvexIntersection)
+     *
+     * Moho::CGeomSolid3 const&
+     *
+     * What it does:
+     * Computes world-space AABB covering terrain cells intersecting the input
+     * convex solid.
+     */
+    [[nodiscard]]
+    Wm3::AxisAlignedBox3f ConvexIntersection(const CGeomSolid3& solid) const;
+
+    /**
      * Address: 0x004776E0 (FUN_004776E0)
      *
      * Wm3::Vector3<float> const&, Wm3::Vector3<float> const&, float&, float&
@@ -192,6 +325,23 @@ namespace moho
     Wm3::Vec3f Intersection(const GeomLine3& line, CGeomHitResult* res) const;
 
   private:
+    /**
+     * Address: 0x00476330 (FUN_00476330, Moho::CHeightField::UpdateError)
+     *
+     * Moho::CBackgroundTaskControl &, int x0, int z0, int x1, int z1
+     *
+     * What it does:
+     * Computes per-tier geometric error values for the affected region and
+     * propagates conservative maxima upward through higher tiers.
+     */
+    void UpdateError(
+      CBackgroundTaskControl& loadControl,
+      std::int32_t x0,
+      std::int32_t z0,
+      std::int32_t x1,
+      std::int32_t z1
+    );
+
     /**
      * Address: 0x00477030 (FUN_00477030)
      *

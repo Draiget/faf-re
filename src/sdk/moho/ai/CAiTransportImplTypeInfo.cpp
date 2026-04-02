@@ -1,5 +1,7 @@
 #include "moho/ai/CAiTransportImplTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiTransportImpl.h"
@@ -8,6 +10,29 @@ using namespace moho;
 
 namespace
 {
+  alignas(CAiTransportImplTypeInfo) unsigned char gCAiTransportImplTypeInfoStorage[sizeof(CAiTransportImplTypeInfo)];
+  bool gCAiTransportImplTypeInfoConstructed = false;
+
+  [[nodiscard]] CAiTransportImplTypeInfo* AcquireCAiTransportImplTypeInfo()
+  {
+    if (!gCAiTransportImplTypeInfoConstructed) {
+      new (gCAiTransportImplTypeInfoStorage) CAiTransportImplTypeInfo();
+      gCAiTransportImplTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<CAiTransportImplTypeInfo*>(gCAiTransportImplTypeInfoStorage);
+  }
+
+  void cleanup_CAiTransportImplTypeInfo()
+  {
+    if (!gCAiTransportImplTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCAiTransportImplTypeInfo()->~CAiTransportImplTypeInfo();
+    gCAiTransportImplTypeInfoConstructed = false;
+  }
+
   [[nodiscard]] gpg::RType* CachedIAiTransportType()
   {
     if (!IAiTransport::sType) {
@@ -48,4 +73,19 @@ void CAiTransportImplTypeInfo::Init()
   AddBase(baseField);
 
   Finish();
+}
+
+/**
+ * Address: 0x00BCEEF0 (FUN_00BCEEF0, register_CAiTransportImplTypeInfo)
+ *
+ * What it does:
+ * Registers `CAiTransportImpl` type-info object and installs process-exit
+ * cleanup.
+ */
+int moho::register_CAiTransportImplTypeInfo()
+{
+  auto* const type = AcquireCAiTransportImplTypeInfo();
+  gpg::PreRegisterRType(typeid(CAiTransportImpl), type);
+  CAiTransportImpl::sType = type;
+  return std::atexit(&cleanup_CAiTransportImplTypeInfo);
 }

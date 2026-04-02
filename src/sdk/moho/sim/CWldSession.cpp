@@ -9,36 +9,22 @@
 #include <new>
 
 #include "gpg/core/utils/Logging.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/resource/RResId.h"
+#include "moho/render/d3d/CD3DFont.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/ui/IUIManager.h"
+#include "moho/unit/core/UserUnit.h"
 
 namespace moho
 {
-  class CD3DFont
-  {
-  public:
-    /**
-     * Address: 0x00425290 (FUN_00425290,
-     * ?Create@CD3DFont@Moho@@SA?AV?$CountedPtr@VCD3DFont@Moho@@@2@HVStrArg@gpg@@@Z)
-     */
-    static boost::SharedPtrRaw<CD3DFont> Create(std::int32_t pointSize, const char* faceName);
-
-    /**
-     * Address: slot-0 release callsite in 0x00824810.
-     */
-    virtual void Release(std::int32_t destroyNow) = 0;
-
-  public:
-    std::int32_t mRefCount; // +0x04
-  };
-
   class UICommandGraph
   {
   public:
@@ -318,6 +304,55 @@ namespace moho
         first->mBlueprintId.mySize = 0;
         first->mBlueprintId.bx.buf[0] = '\0';
         ++first;
+      }
+    }
+
+    struct StrategicIconAuxView
+    {
+      std::uint8_t mUnknown00[0x38];
+      boost::shared_ptr<CD3DBatchTexture> mPauseRestTexture;   // +0x38
+      boost::shared_ptr<CD3DBatchTexture> mStunnedRestTexture; // +0x40
+
+      /**
+       * Address: 0x0085EA60 (FUN_0085EA60, struct_IconAux::GetStunIcons)
+       *
+       * What it does:
+       * Imports strategic icon Lua tables and refreshes pause/stunned overlay
+       * rest textures for one icon-aux runtime object.
+       */
+      void LoadPauseAndStunnedRestTextures(CWldSession* session);
+    };
+
+    static_assert(
+      offsetof(StrategicIconAuxView, mPauseRestTexture) == 0x38,
+      "StrategicIconAuxView::mPauseRestTexture offset must be 0x38"
+    );
+    static_assert(
+      offsetof(StrategicIconAuxView, mStunnedRestTexture) == 0x40,
+      "StrategicIconAuxView::mStunnedRestTexture offset must be 0x40"
+    );
+
+    /**
+     * Address: 0x0085EA60 (FUN_0085EA60, struct_IconAux::GetStunIcons)
+     *
+     * What it does:
+     * Imports strategic icon Lua tables and refreshes pause/stunned overlay
+     * rest textures for one icon-aux runtime object.
+     */
+    void StrategicIconAuxView::LoadPauseAndStunnedRestTextures(CWldSession* const session)
+    {
+      LuaPlus::LuaObject iconTable = SCR_Import(session->mState, "/lua/ui/game/strategicIcons.lua");
+      LuaPlus::LuaObject pauseIcons = iconTable.GetByName("PauseIcons");
+      LuaPlus::LuaObject pauseRest = pauseIcons.GetByName("PauseRest");
+      if (pauseRest.IsString()) {
+        mPauseRestTexture = CD3DBatchTexture::FromFile(pauseRest.GetString(), 0u);
+      }
+
+      iconTable = SCR_Import(session->mState, "/lua/ui/game/strategicIcons.lua");
+      LuaPlus::LuaObject stunnedIcons = iconTable.GetByName("StunnedIcons");
+      LuaPlus::LuaObject stunnedRest = stunnedIcons.GetByName("StunnedRest");
+      if (stunnedRest.IsString()) {
+        mStunnedRestTexture = CD3DBatchTexture::FromFile(stunnedRest.GetString(), 0u);
       }
     }
 
@@ -798,6 +833,25 @@ namespace moho
         parent = parent->mParent;
       }
       return parent;
+    }
+
+    [[nodiscard]] UserEntity* DecodeSelectedUserEntity(const SSelectionWeakRefUserEntity& weakRef)
+    {
+      if (!weakRef.mOwnerLinkSlot) {
+        return nullptr;
+      }
+
+      constexpr std::uintptr_t kSelectionOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+      static_assert(kSelectionOwnerLinkOffset == 0x08, "UserEntity selection weak-link offset must stay 0x08");
+#endif
+
+      const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+      if (raw < kSelectionOwnerLinkOffset) {
+        return nullptr;
+      }
+
+      return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
     }
 
     [[nodiscard]] SessionSaveSourceNode* GetSaveSourceTreeHead(const CWldSession* const session)
@@ -1485,10 +1539,10 @@ namespace moho
     FocusArmy = -1;
     IsGameOver = 0;
 
-    selectedUnitUnknownPtr1 = nullptr;
-    selectedUnitListPtr = nullptr;
-    selectedUnitCount1 = 0;
-    selectedUnitCount2 = 0;
+    mSelection.mAllocProxy = nullptr;
+    mSelection.mHead = nullptr;
+    mSelection.mSize = 0;
+    mSelection.mSizeMirrorOrUnused = 0;
 
     CursorWorldPos.x = 0.0f;
     CursorWorldPos.y = 0.0f;
@@ -1719,6 +1773,35 @@ namespace moho
 
     if (mCurThread) {
       mCurThread->UserFrame();
+    }
+  }
+
+  /**
+   * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
+   */
+  void CWldSession::GetSelectionUnits(msvc8::vector<UserUnit*>& outUnits) const
+  {
+    outUnits.clear();
+
+    const SSelectionNodeUserEntity* const head = mSelection.mHead;
+    if (!head) {
+      return;
+    }
+
+    for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
+      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      if (!entity) {
+        continue;
+      }
+
+      UserUnit* const userUnit = entity->IsUserUnit();
+      if (!userUnit) {
+        continue;
+      }
+
+      if (std::find(outUnits.begin(), outUnits.end(), userUnit) == outUnits.end()) {
+        outUnits.push_back(userUnit);
+      }
     }
   }
 

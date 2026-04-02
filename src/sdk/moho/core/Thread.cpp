@@ -3,33 +3,57 @@
 #include "platform/Platform.h"
 using namespace moho;
 
-uint32_t gDefaultThreadId;
+namespace
+{
+  std::uint32_t dwThreadId = 0;
+}
 
+/**
+ * Address: 0x00413AA0 (FUN_00413AA0)
+ *
+ * What it does:
+ * Captures the current thread id as the process main-thread lane.
+ */
 void moho::THREAD_InitInvoke()
 {
-  gDefaultThreadId = GetCurrentThreadId();
+  dwThreadId = GetCurrentThreadId();
 }
 
+/**
+ * Address: 0x00413AB0 (FUN_00413AB0)
+ *
+ * What it does:
+ * Returns true when called from the captured main thread.
+ */
 bool moho::THREAD_IsMainThread()
 {
-  return gDefaultThreadId == GetCurrentThreadId();
+  return GetCurrentThreadId() == dwThreadId;
 }
 
+/**
+ * Address: 0x00413AD0 (FUN_00413AD0)
+ *
+ * What it does:
+ * Returns the cached main-thread id lane.
+ */
 uint32_t moho::THREAD_GetMainThreadId()
 {
-  return gDefaultThreadId;
+  return dwThreadId;
 }
 
-void moho::THREAD_InvokeAsync(const boost::function<void(), std::allocator<void>>& fn, const uint32_t threadId)
+/**
+ * Address: 0x00413B70 (FUN_00413B70)
+ *
+ * boost::function<void(),std::allocator<void>>,uint32_t
+ *
+ * What it does:
+ * Queues one callback as APC on the resolved target thread.
+ */
+void moho::THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, const uint32_t threadId)
 {
   const DWORD tid = ResolveTid(threadId);
   const HANDLE hThread = ::OpenThread(kThreadAccessFa, FALSE, tid);
   if (!hThread) {
-    // Fallback: run inline if thread handle cannot be opened
-    try {
-      if (fn)
-        fn();
-    } catch (...) {}
     return;
   }
 
@@ -37,10 +61,6 @@ void moho::THREAD_InvokeAsync(const boost::function<void(), std::allocator<void>
   auto pair = static_cast<void**>(::operator new(8, std::nothrow));
   if (!pair) {
     ::CloseHandle(hThread);
-    try {
-      if (fn)
-        fn();
-    } catch (...) {}
     return;
   }
 
@@ -48,10 +68,6 @@ void moho::THREAD_InvokeAsync(const boost::function<void(), std::allocator<void>
   if (!raw) {
     ::operator delete(pair);
     ::CloseHandle(hThread);
-    try {
-      if (fn)
-        fn();
-    } catch (...) {}
     return;
   }
 
@@ -65,16 +81,19 @@ void moho::THREAD_InvokeAsync(const boost::function<void(), std::allocator<void>
   ::CloseHandle(hThread);
 }
 
-void moho::THREAD_InvokeWait(const boost::function<void(), std::allocator<void>>& fn, const uint32_t threadId)
+/**
+ * Address: 0x00413C50 (FUN_00413C50)
+ *
+ * boost::function<void(),std::allocator<void>>,uint32_t
+ *
+ * What it does:
+ * Queues one callback as APC and blocks until completion is signaled.
+ */
+void moho::THREAD_InvokeWait(boost::function<void(), std::allocator<void>> fn, const uint32_t threadId)
 {
   const DWORD tid = ResolveTid(threadId);
   const HANDLE hThread = ::OpenThread(kThreadAccessFa, FALSE, tid);
   if (!hThread) {
-    // As in async tail: inline fallback if thread unavailable
-    try {
-      if (fn)
-        fn();
-    } catch (...) {}
     return;
   }
 
@@ -84,10 +103,6 @@ void moho::THREAD_InvokeWait(const boost::function<void(), std::allocator<void>>
   auto pair = static_cast<void**>(::operator new(8, std::nothrow));
   if (!pair) {
     ::CloseHandle(hThread);
-    try {
-      if (fn)
-        fn();
-    } catch (...) {}
     ctx.end();
     return;
   }
@@ -96,10 +111,6 @@ void moho::THREAD_InvokeWait(const boost::function<void(), std::allocator<void>>
   if (!raw) {
     ::operator delete(pair);
     ::CloseHandle(hThread);
-    try {
-      if (fn)
-        fn();
-    } catch (...) {}
     ctx.end();
     return;
   }
@@ -116,6 +127,12 @@ void moho::THREAD_InvokeWait(const boost::function<void(), std::allocator<void>>
   ctx.end();
 }
 
+/**
+ * Address: 0x004141A0 (FUN_004141A0)
+ *
+ * What it does:
+ * Selects one cpu from the process affinity mask and pins the current thread.
+ */
 void moho::THREAD_SetAffinity(const bool preferLowest) noexcept
 {
   DWORD_PTR procMask = 0;
@@ -159,6 +176,12 @@ void moho::THREAD_SetAffinity(const bool preferLowest) noexcept
   }
 }
 
+/**
+ * Address: 0x00413AE0 (FUN_00413AE0)
+ *
+ * What it does:
+ * Runs one APC callback payload and frees transport storage.
+ */
 void __stdcall moho::pfnAPC(const ULONG_PTR dwData)
 {
   // pair[0] = box (InvokePayload*), pair[1] = WaitCtx*
@@ -171,11 +194,9 @@ void __stdcall moho::pfnAPC(const ULONG_PTR dwData)
   auto* ctx = static_cast<WaitCtx*>(pair[1]);
 
   if (box) {
-    try {
-      if (box->fn)
-        box->fn();
-    } catch (...) { /* swallow */
-    }
+    if (box->fn)
+      box->fn();
+
     // Explicitly call dtor then free the 32-byte box
     box->~InvokePayload();
     ::operator delete(box);
@@ -193,8 +214,8 @@ DWORD moho::ResolveTid(const std::uint32_t threadId) noexcept
   if (threadId) {
     return threadId;
   }
-  if (gDefaultThreadId) {
-    return gDefaultThreadId;
+  if (dwThreadId) {
+    return dwThreadId;
   }
   return ::GetCurrentThreadId();
 }

@@ -289,6 +289,106 @@ void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const 
 }
 
 /**
+ * Address: 0x0053C550 (FUN_0053C550, Moho::CClientBase::UpdateState)
+ *
+ * What it does:
+ * Pumps queued per-client command-stream data up to `beat`, enforces
+ * command-source ownership, and forwards authorized packets to output pipe.
+ */
+void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::PipeStream* const outPipe)
+{
+  static constexpr uint32_t kInvalidCommandSource = 0xFFu;
+
+  if (mEjected) {
+    return;
+  }
+
+  bool hasCommandSource = mCommandSourceId != kInvalidCommandSource;
+  if (hasCommandSource) {
+    update->SetCommandSource(mCommandSourceId);
+  }
+
+  CMessage message{};
+  mPipe.VirtFlush();
+
+  while (static_cast<int32_t>(mDispatchedBeat - static_cast<uint32_t>(beat)) < 0) {
+    if (mEjectPending) {
+      int earliestEjectBeat = static_cast<int>(mQueuedBeat);
+      for (const SEjectRequest& request : mEjectRequests) {
+        if (request.mAfterBeat < earliestEjectBeat) {
+          earliestEjectBeat = request.mAfterBeat;
+        }
+      }
+
+      if (static_cast<int32_t>(mDispatchedBeat - static_cast<uint32_t>(earliestEjectBeat)) >= 0) {
+        CMessage terminateSourceMessage{ECmdStreamOp::CMDST_CommandSourceTerminated};
+        for (unsigned int source = mValidCommandSources.GetNext(std::numeric_limits<unsigned int>::max());
+             source < mValidCommandSources.Max();
+             source = mValidCommandSources.GetNext(source)) {
+          update->SetCommandSource(source);
+          outPipe->Write(terminateSourceMessage.mBuff.start_, terminateSourceMessage.mBuff.Size());
+        }
+
+        mValidCommandSources = BVIntSet{};
+        mEjected = true;
+        break;
+      }
+    }
+
+    while (true) {
+      if (!message.ReadMessage(&mPipe)) {
+        return;
+      }
+
+      CMessageStream stream(message, CMessageStream::Access::kReadOnly);
+      const ECmdStreamOp op = static_cast<ECmdStreamOp>(message.GetType().raw());
+
+      if (op == ECmdStreamOp::CMDST_Advance) {
+        gpg::BinaryReader reader(&stream);
+        int32_t beatDelta = 0;
+        reader.ReadExact(beatDelta);
+        mDispatchedBeat += static_cast<uint32_t>(beatDelta);
+        break;
+      }
+
+      if (op == ECmdStreamOp::CMDST_SetCommandSource) {
+        gpg::BinaryReader reader(&stream);
+        uint8_t claimedSource = 0;
+        reader.ReadExact(claimedSource);
+
+        if (!mValidCommandSources.Contains(claimedSource)) {
+          gpg::Logf(
+            "Client %d:%s claiming command source %d, but not authorized for it.",
+            mIndex,
+            mNickname.c_str(),
+            claimedSource
+          );
+          hasCommandSource = false;
+          mCommandSourceId = kInvalidCommandSource;
+        } else {
+          mCommandSourceId = claimedSource;
+          update->SetCommandSource(claimedSource);
+          hasCommandSource = true;
+        }
+
+        continue;
+      }
+
+      if (hasCommandSource) {
+        outPipe->Write(message.mBuff.start_, message.mBuff.Size());
+
+        if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {
+          mValidCommandSources.Remove(mCommandSourceId);
+          mValidCommandSources.Finalize();
+          hasCommandSource = false;
+          mCommandSourceId = kInvalidCommandSource;
+        }
+      }
+    }
+  }
+}
+
+/**
  * Address: 0x0053C960 (FUN_0053C960)
  */
 bool CClientBase::NoEjectionPending()
