@@ -4,10 +4,16 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
-#include "gpg/core/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/sim/CIntelGrid.h"
+#include "moho/sim/SSTIArmyVariableData.h"
 #include "wm3/Vector3.h"
+
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -78,15 +84,22 @@ namespace moho
     boost::shared_ptr<CIntelGrid> mOmniReconGrid;     // 0x68
     boost::shared_ptr<CIntelGrid> mRciReconGrid;      // 0x70
     boost::shared_ptr<CIntelGrid> mSciReconGrid;      // 0x78
-    // 0x80..0x1DF is the copied SSTIArmyVariableData blob.
-    std::uint8_t mArmyVariableDataPrefix_0080_00E0[0x60]{};
-    Set mAlliesSet; // 0xE0 (SSTIArmyVariableData::mAllies)
-    std::uint8_t mArmyVariableDataSuffix_0100_01E0[0xE0]{};
+    SSTIArmyVariableData mVarDat; // 0x80
     std::uint32_t mVariableDataWord_01E0; // 0x1E0 (ctor writes zero)
     CWldSession* mSession;                // 0x1E4
     // Runtime-only tail members (constructor/destructor touch +0x1EC..+0x20C).
     std::uint8_t mRuntimeTail_01E8_0210[0x28]{};
   };
+
+  /**
+   * Address: 0x008B9920 (FUN_008B9920, Moho::ARMY_FromLuaState)
+   * Mangled: ?ARMY_FromLuaState@Moho@@YAPAVUserArmy@1@PAVLuaState@LuaPlus@@VLuaObject@4@@Z
+   *
+   * What it does:
+   * Resolves one Lua user-army selector (1-based numeric index or army name)
+   * to one `UserArmy*` in the active world session.
+   */
+  [[nodiscard]] UserArmy* USER_ResolveArmyFromLuaState(LuaPlus::LuaState* state, const LuaPlus::LuaObject& armyObject);
 
   static_assert(sizeof(boost::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
   static_assert(offsetof(UserArmy, mArmyName) == 0x04, "UserArmy::mArmyName offset must be 0x04");
@@ -100,21 +113,22 @@ namespace moho
   static_assert(offsetof(UserArmy, mOmniReconGrid) == 0x68, "UserArmy::mOmniReconGrid offset must be 0x68");
   static_assert(offsetof(UserArmy, mRciReconGrid) == 0x70, "UserArmy::mRciReconGrid offset must be 0x70");
   static_assert(offsetof(UserArmy, mSciReconGrid) == 0x78, "UserArmy::mSciReconGrid offset must be 0x78");
-  static_assert(offsetof(UserArmy, mAlliesSet) == 0xE0, "UserArmy::mAlliesSet offset must be 0xE0");
+  static_assert(offsetof(UserArmy, mVarDat) == 0x80, "UserArmy::mVarDat offset must be 0x80");
   static_assert(
-    offsetof(UserArmy, mAlliesSet) + offsetof(Set, baseWordIndex) == 0xE0,
-    "UserArmy::mAlliesSet.baseWordIndex offset must be 0xE0"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) == 0xE0,
+    "UserArmy::mVarDat.mAllies offset must be 0xE0"
   );
   static_assert(
-    offsetof(UserArmy, mAlliesSet) + offsetof(Set, meta) == 0xE4, "UserArmy::mAlliesSet.meta offset must be 0xE4"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, meta) == 0xE4,
+    "UserArmy::mVarDat.mAllies.meta offset must be 0xE4"
   );
   static_assert(
-    offsetof(UserArmy, mAlliesSet) + offsetof(Set, items_begin) == 0xE8,
-    "UserArmy::mAlliesSet.items_begin offset must be 0xE8"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, items_begin) == 0xE8,
+    "UserArmy::mVarDat.mAllies.items_begin offset must be 0xE8"
   );
   static_assert(
-    offsetof(UserArmy, mAlliesSet) + offsetof(Set, items_end) == 0xEC,
-    "UserArmy::mAlliesSet.items_end offset must be 0xEC"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, items_end) == 0xEC,
+    "UserArmy::mVarDat.mAllies.items_end offset must be 0xEC"
   );
   static_assert(
     offsetof(UserArmy, mVariableDataWord_01E0) == 0x1E0, "UserArmy::mVariableDataWord_01E0 offset must be 0x1E0"

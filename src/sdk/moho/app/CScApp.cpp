@@ -760,6 +760,7 @@ bool CScApp::Init()
     return false;
   }
 
+  moho::USER_EnsureDocumentDirectories();
   moho::UI_Init();
   if (!CreateDevice()) {
     return false;

@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "../../gpg/core/utils/BoostUtils.h"
+#include "../containers/TDatList.h"
 #include "../misc/StatItem.h"
 #include "../misc/Stats.h"
 
@@ -64,11 +65,7 @@ namespace moho
   };
   static_assert(sizeof(ArmyNameIndexTree) == 0x10, "ArmyNameIndexTree size must be 0x10");
 
-  struct ArmyAuxListNode
-  {
-    ArmyAuxListNode* next;
-    ArmyAuxListNode* prev;
-  };
+  using ArmyAuxListNode = TDatListItem<void, void>;
   static_assert(sizeof(ArmyAuxListNode) == 0x08, "ArmyAuxListNode size must be 0x08");
 
   class CArmyStatItem : public StatItem
@@ -128,6 +125,24 @@ namespace moho
      * VFTable SLOT: 0
      */
     void Delete(const char* statPath) override;
+
+    /**
+     * Address: 0x00704FD0 (FUN_00704FD0, sub_704FD0)
+     *
+     * What it does:
+     * Resolves one string-stat path through the CArmyStats name-index cache and
+     * creates/caches missing entries on demand.
+     */
+    [[nodiscard]] CArmyStatItem* GetStringItemCached(gpg::StrArg statPath);
+
+    /**
+     * Address: 0x00704000 (FUN_00704000, sub_704000)
+     *
+     * What it does:
+     * Resolves one string-stat path through the cached lookup and writes one
+     * string value to that stat item.
+     */
+    void SetStringValueByPath(gpg::StrArg statPath, const msvc8::string& value);
 
   private:
     /**

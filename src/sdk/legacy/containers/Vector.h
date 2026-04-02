@@ -3,8 +3,12 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <algorithm>
 #include <memory>
+#include <new>
 #include <type_traits>
+#include <stdexcept>
 #include <vector>
 
 #ifndef MSVC8_VECTOR_DISABLE_FREE
@@ -31,6 +35,1122 @@ namespace msvc8
         {
         }
     };
+
+    namespace detail
+    {
+        /**
+         * Runtime cursor for legacy vector<bool>-style word/bit iteration.
+         *
+         * Layout:
+         *   +0x00: word pointer
+         *   +0x04: bit index inside word [0..31]
+         */
+        struct vector_bool_word_cursor
+        {
+            std::uint32_t* word;
+            std::uint32_t bit;
+
+            /**
+             * Address: 0x004467E0 (FUN_004467E0)
+             * Address: 0x004469B0 (FUN_004469B0)
+             *
+             * What it does:
+             * Advances the cursor to the next 32-bit storage word.
+             */
+            vector_bool_word_cursor& AdvanceWord() noexcept
+            {
+                word += 1;
+                return *this;
+            }
+
+            /**
+             * Address: 0x004467F0 (FUN_004467F0)
+             * Address: 0x004469C0 (FUN_004469C0)
+             * Address: 0x00446A40 (FUN_00446A40)
+             *
+             * What it does:
+             * Advances one bit, carrying to the next word when the bit lane reaches 31.
+             */
+            vector_bool_word_cursor& Increment() noexcept
+            {
+                if (bit >= 31u) {
+                    word += 1;
+                    bit = 0u;
+                } else {
+                    ++bit;
+                }
+                return *this;
+            }
+
+            /**
+             * Address: 0x00446810 (FUN_00446810)
+             * Address: 0x004469E0 (FUN_004469E0)
+             * Address: 0x00446A20 (FUN_00446A20)
+             *
+             * What it does:
+             * Moves one bit backward, borrowing from the previous word when bit lane is 0.
+             */
+            vector_bool_word_cursor& Decrement() noexcept
+            {
+                if (bit != 0u) {
+                    --bit;
+                } else {
+                    word -= 1;
+                    bit = 31u;
+                }
+                return *this;
+            }
+        };
+
+        static_assert(sizeof(vector_bool_word_cursor) == 0x08, "vector_bool_word_cursor size must be 0x08");
+
+        /**
+         * Address: 0x00446830 (FUN_00446830)
+         *
+         * What it does:
+         * Returns cursor inequality by comparing both word and bit lanes.
+         */
+        [[nodiscard]] inline bool CursorNotEqual(
+            const vector_bool_word_cursor& lhs,
+            const vector_bool_word_cursor& rhs
+        ) noexcept
+        {
+            return lhs.word != rhs.word || lhs.bit != rhs.bit;
+        }
+
+        /**
+         * Address: 0x00446A00 (FUN_00446A00)
+         *
+         * What it does:
+         * Returns cursor equality by comparing both word and bit lanes.
+         */
+        [[nodiscard]] inline bool CursorEqual(
+            const vector_bool_word_cursor& lhs,
+            const vector_bool_word_cursor& rhs
+        ) noexcept
+        {
+            return lhs.word == rhs.word && lhs.bit == rhs.bit;
+        }
+
+        /**
+         * Address: 0x00443F60 (FUN_00443F60)
+         * Address: 0x004440D0 (FUN_004440D0)
+         * Address: 0x00444F80 (FUN_00444F80)
+         * Address: 0x00445430 (FUN_00445430)
+         * Address: 0x00446AB0 (FUN_00446AB0)
+         * Address: 0x00446BD0 (FUN_00446BD0)
+         * Address: 0x00446C90 (FUN_00446C90)
+         *
+         * What it does:
+         * Fills `count` 32-bit words in `destination` using one dereferenced source word.
+         */
+        template <class WordT>
+        [[nodiscard]] inline const WordT* FillWordsFromValuePointer(
+            const WordT* const valueWordPtr,
+            WordT* const destination,
+            const std::size_t count
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "FillWordsFromValuePointer expects 32-bit words");
+            if (count != 0u) {
+                std::fill_n(destination, count, *valueWordPtr);
+            }
+            return valueWordPtr;
+        }
+
+        /**
+         * Address: 0x00446AC0 (FUN_00446AC0)
+         * Address: 0x00446C10 (FUN_00446C10)
+         * Address: 0x00446CB0 (FUN_00446CB0)
+         * Address: 0x00445B50 (FUN_00445B50)
+         * Address: 0x00445FA0 (FUN_00445FA0)
+         * Address: 0x00446450 (FUN_00446450)
+         * Address: 0x00446780 (FUN_00446780)
+         * Address: 0x00446DC0 (FUN_00446DC0)
+         * Address: 0x00446E00 (FUN_00446E00)
+         * Address: 0x00446EC0 (FUN_00446EC0)
+         *
+         * What it does:
+         * Repeats one source word into destination for `remainingWords` iterations
+         * and returns the final remaining-word count (always zero after completion).
+         */
+        template <class WordT>
+        [[nodiscard]] inline std::size_t CopyValueWordLoop(
+            std::size_t remainingWords,
+            const WordT* const sourceWordPtr,
+            WordT* destination
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "CopyValueWordLoop expects 32-bit words");
+            while (remainingWords != 0u) {
+                *destination = *sourceWordPtr;
+                ++destination;
+                --remainingWords;
+            }
+            return remainingWords;
+        }
+
+        /**
+         * Address: 0x00446AE0 (FUN_00446AE0)
+         * Address: 0x00446B30 (FUN_00446B30)
+         * Address: 0x00446B80 (FUN_00446B80)
+         * Address: 0x00446BE0 (FUN_00446BE0)
+         * Address: 0x00445970 (FUN_00445970)
+         * Address: 0x00445B00 (FUN_00445B00)
+         * Address: 0x00445BE0 (FUN_00445BE0)
+         * Address: 0x00445C20 (FUN_00445C20)
+         * Address: 0x00445D50 (FUN_00445D50)
+         * Address: 0x00445E10 (FUN_00445E10)
+         * Address: 0x00445ED0 (FUN_00445ED0)
+         * Address: 0x00445F20 (FUN_00445F20)
+         * Address: 0x004464D0 (FUN_004464D0)
+         * Address: 0x004465E0 (FUN_004465E0)
+         * Address: 0x00446660 (FUN_00446660)
+         * Address: 0x004466F0 (FUN_004466F0)
+         * Address: 0x00446CD0 (FUN_00446CD0)
+         * Address: 0x00446D00 (FUN_00446D00)
+         * Address: 0x00446D30 (FUN_00446D30)
+         * Address: 0x00446D80 (FUN_00446D80)
+         * Address: 0x00446E90 (FUN_00446E90)
+         *
+         * What it does:
+         * Moves one half-open source word range `[sourceBegin, sourceEnd)` into
+         * `destination` and returns one-past the last written destination word.
+         */
+        template <class WordT>
+        [[nodiscard]] inline WordT* MoveWordRange(
+            WordT* const destination,
+            const WordT* const sourceBegin,
+            const WordT* const sourceEnd
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "MoveWordRange expects 32-bit words");
+            const std::size_t wordCount = static_cast<std::size_t>(sourceEnd - sourceBegin);
+            if (wordCount != 0u) {
+                std::memmove(destination, sourceBegin, wordCount * sizeof(WordT));
+            }
+            return destination + wordCount;
+        }
+
+        /**
+         * Address: 0x00445C60 (FUN_00445C60)
+         * Address: 0x00445D90 (FUN_00445D90)
+         * Address: 0x00445E50 (FUN_00445E50)
+         * Address: 0x00445F70 (FUN_00445F70)
+         * Address: 0x00446520 (FUN_00446520)
+         * Address: 0x00446630 (FUN_00446630)
+         * Address: 0x004466B0 (FUN_004466B0)
+         * Address: 0x00446750 (FUN_00446750)
+         *
+         * What it does:
+         * Moves one source word range `[sourceBegin, sourceEnd)` so the copied block
+         * ends at `destinationEnd`, and returns the destination begin pointer.
+         */
+        template <class WordT>
+        [[nodiscard]] inline WordT* MoveWordRangeToEnd(
+            WordT* const destinationEnd,
+            const WordT* const sourceBegin,
+            const WordT* const sourceEnd
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "MoveWordRangeToEnd expects 32-bit words");
+            const std::size_t wordCount = static_cast<std::size_t>(sourceEnd - sourceBegin);
+            WordT* const destinationBegin = destinationEnd - wordCount;
+            if (wordCount != 0u) {
+                std::memmove(destinationBegin, sourceBegin, wordCount * sizeof(WordT));
+            }
+            return destinationBegin;
+        }
+
+        /**
+         * Address: 0x00445B30 (FUN_00445B30)
+         * Address: 0x00445F10 (FUN_00445F10)
+         * Address: 0x00446430 (FUN_00446430)
+         * Address: 0x004466E0 (FUN_004466E0)
+         * Address: 0x00446D70 (FUN_00446D70)
+         * Address: 0x00446DF0 (FUN_00446DF0)
+         * Address: 0x00446E80 (FUN_00446E80)
+         *
+         * What it does:
+         * Dereferences one value-pointer slot, fills `count` words in destination,
+         * and returns the dereferenced value pointer.
+         */
+        template <class WordT>
+        [[nodiscard]] inline const WordT* FillWordsFromReferencedValuePointer(
+            const WordT* const* const referencedValuePtr,
+            WordT* const destination,
+            const std::size_t count
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "FillWordsFromReferencedValuePointer expects 32-bit words");
+            const WordT* const valuePtr = *referencedValuePtr;
+            if (count != 0u) {
+                std::fill_n(destination, count, *valuePtr);
+            }
+            return valuePtr;
+        }
+
+        /**
+         * Address: 0x00445C50 (FUN_00445C50)
+         * Address: 0x00445D80 (FUN_00445D80)
+         * Address: 0x00445E40 (FUN_00445E40)
+         * Address: 0x00445F50 (FUN_00445F50)
+         * Address: 0x00446500 (FUN_00446500)
+         * Address: 0x00446610 (FUN_00446610)
+         * Address: 0x00446690 (FUN_00446690)
+         * Address: 0x00446720 (FUN_00446720)
+         *
+         * What it does:
+         * Fills one destination word range `[destinationBegin, destinationEnd)` from
+         * one source value pointer and returns destination end.
+         */
+        template <class WordT>
+        [[nodiscard]] inline WordT* FillWordRangeFromValuePointer(
+            WordT* destinationBegin,
+            WordT* const destinationEnd,
+            const WordT* const valueWordPtr
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "FillWordRangeFromValuePointer expects 32-bit words");
+            while (destinationBegin != destinationEnd) {
+                *destinationBegin = *valueWordPtr;
+                ++destinationBegin;
+            }
+            return destinationBegin;
+        }
+
+        /**
+         * Address: 0x00446B10 (FUN_00446B10)
+         * Address: 0x00446B60 (FUN_00446B60)
+         * Address: 0x00446BB0 (FUN_00446BB0)
+         *
+         * What it does:
+         * Moves `wordCount` 32-bit words from `source` into `destination`.
+         */
+        template <class WordT>
+        [[nodiscard]] inline WordT* MoveWords(
+            const WordT* const source,
+            const std::size_t wordCount,
+            WordT* const destination
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "MoveWords expects 32-bit words");
+            std::memmove(destination, source, wordCount * sizeof(WordT));
+            return destination;
+        }
+
+        /**
+         * Address: 0x004462D0 (FUN_004462D0)
+         * Address: 0x00446410 (FUN_00446410)
+         * Address: 0x004464A0 (FUN_004464A0)
+         * Address: 0x00446E20 (FUN_00446E20)
+         * Address: 0x00446E40 (FUN_00446E40)
+         * Address: 0x00446E60 (FUN_00446E60)
+         *
+         * What it does:
+         * Moves `wordCount` words from `source` to `destination` and returns one
+         * passthrough tag argument unchanged.
+         */
+        template <class WordT, class TagT>
+        [[nodiscard]] inline TagT MoveWordsAndReturnTag(
+            const WordT* const source,
+            WordT* const destination,
+            const std::size_t wordCount,
+            const TagT passthroughTag
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "MoveWordsAndReturnTag expects 32-bit words");
+            std::memmove(destination, source, wordCount * sizeof(WordT));
+            return passthroughTag;
+        }
+
+        /**
+         * Address: 0x004462C0 (FUN_004462C0)
+         * Address: 0x00446320 (FUN_00446320)
+         * Address: 0x00446400 (FUN_00446400)
+         * Address: 0x00446490 (FUN_00446490)
+         * Address: 0x00446510 (FUN_00446510)
+         * Address: 0x00446620 (FUN_00446620)
+         * Address: 0x004466A0 (FUN_004466A0)
+         * Address: 0x00446740 (FUN_00446740)
+         *
+         * What it does:
+         * Returns the high-byte lane from one 32-bit word.
+         */
+        [[nodiscard]] inline std::uint8_t HighByteOfWord(const std::uint32_t value) noexcept
+        {
+            return static_cast<std::uint8_t>((value >> 8) & 0xFFu);
+        }
+
+        /**
+         * Address: 0x00446EF0 (FUN_00446EF0)
+         *
+         * What it does:
+         * Returns true when `value` is non-zero and has exactly one bit set.
+         */
+        [[nodiscard]] inline bool IsSingleBitSetNonZero(const std::uint32_t value) noexcept
+        {
+            return value != 0u && ((value & (value - 1u)) == 0u);
+        }
+
+        /**
+         * Address: 0x00446F10 (FUN_00446F10)
+         *
+         * What it does:
+         * Returns index of the highest set bit in a non-zero 32-bit value.
+         */
+        [[nodiscard]] inline int HighestSetBitIndex(std::uint32_t value) noexcept
+        {
+            assert(value != 0u);
+            int index = 0;
+            while ((value >>= 1u) != 0u) {
+                ++index;
+            }
+            return index;
+        }
+
+        /**
+         * Address: 0x00446DB0 (FUN_00446DB0)
+         *
+         * What it does:
+         * Returns one integer argument unchanged.
+         */
+        [[nodiscard]] inline int IdentityInt(const int value) noexcept
+        {
+            return value;
+        }
+
+        /**
+         * Runtime dword-lane view with one leading 32-bit metadata lane.
+         *
+         * Layout:
+         *   +0x00: metadata/prefix lane
+         *   +0x04: begin
+         *   +0x08: end
+         *   +0x0C: capacity end
+         */
+        struct dword_lane_vector_view
+        {
+            std::uint32_t prefix;
+            std::uint32_t* begin;
+            std::uint32_t* end;
+            std::uint32_t* capacityEnd;
+        };
+
+        static_assert(sizeof(dword_lane_vector_view) == 0x10, "dword_lane_vector_view size must be 0x10");
+
+        /**
+         * Address: 0x00443C10 (FUN_00443C10)
+         * Address: 0x00443EF0 (FUN_00443EF0)
+         * Address: 0x00444050 (FUN_00444050)
+         *
+         * What it does:
+         * Initializes begin/end/capacity dword lanes for one requested word count.
+         */
+        template <class ThrowTooLongFn, class AllocateWordsFn>
+        [[nodiscard]] inline bool InitializeDwordLanes(
+            dword_lane_vector_view* const view,
+            const std::size_t wordCount,
+            ThrowTooLongFn throwTooLong,
+            AllocateWordsFn allocateWords
+        )
+        {
+            if (wordCount > 0x3FFFFFFFu) {
+                throwTooLong();
+            }
+
+            std::uint32_t* const words = (wordCount != 0u)
+                ? static_cast<std::uint32_t*>(allocateWords(static_cast<unsigned int>(wordCount)))
+                : static_cast<std::uint32_t*>(::operator new(0));
+
+            view->begin = words;
+            view->end = words;
+            view->capacityEnd = words + wordCount;
+            return true;
+        }
+
+        /**
+         * Address: 0x004443C0 (FUN_004443C0)
+         *
+         * What it does:
+         * Inserts `count` copies of `fillValue` at `insertAt` in one legacy dword
+         * lane vector, preserving VC8 growth/shift behavior.
+         */
+        template <class ThrowTooLongFn, class AllocateWordsFn>
+        [[nodiscard]] inline std::uint32_t* InsertFillWordsIntoLanes(
+            dword_lane_vector_view* const view,
+            std::uint32_t* insertAt,
+            const std::size_t count,
+            const std::uint32_t fillValue,
+            ThrowTooLongFn throwTooLong,
+            AllocateWordsFn allocateWords
+        )
+        {
+            if (count == 0u) {
+                return insertAt;
+            }
+
+            const std::size_t currentSize = static_cast<std::size_t>(view->end - view->begin);
+            const std::size_t currentCapacity = static_cast<std::size_t>(view->capacityEnd - view->begin);
+            const std::size_t insertIndex = static_cast<std::size_t>(insertAt - view->begin);
+
+            if (count > (0x3FFFFFFFu - currentSize)) {
+                throwTooLong();
+            }
+
+            if (currentCapacity >= currentSize + count) {
+                const std::size_t tailCount = static_cast<std::size_t>(view->end - insertAt);
+                if (tailCount < count) {
+                    MoveWordRange(insertAt + count, insertAt, view->end);
+                    view->end += count;
+                    FillWordsFromValuePointer(&fillValue, insertAt, count);
+                    return insertAt;
+                }
+
+                MoveWordRange(view->end, view->end - count, view->end);
+                view->end += count;
+                MoveWordRange(insertAt + count, insertAt, view->end - count);
+                FillWordsFromValuePointer(&fillValue, insertAt, count);
+                return insertAt;
+            }
+
+            std::size_t newCapacity = currentCapacity + (currentCapacity >> 1);
+            if (newCapacity < (currentSize + count)) {
+                newCapacity = currentSize + count;
+            }
+            if (newCapacity > 0x3FFFFFFFu) {
+                newCapacity = currentSize + count;
+            }
+
+            std::uint32_t* const newBegin = (newCapacity != 0u)
+                ? static_cast<std::uint32_t*>(allocateWords(static_cast<unsigned int>(newCapacity)))
+                : static_cast<std::uint32_t*>(::operator new(0));
+            std::uint32_t* const newInsert = newBegin + insertIndex;
+
+            MoveWordRange(newBegin, view->begin, view->begin + insertIndex);
+            FillWordsFromValuePointer(&fillValue, newInsert, count);
+            MoveWordRange(newInsert + count, insertAt, view->end);
+
+            if (view->begin != nullptr) {
+                ::operator delete(view->begin);
+            }
+
+            view->begin = newBegin;
+            view->end = newBegin + (currentSize + count);
+            view->capacityEnd = newBegin + newCapacity;
+            return newInsert;
+        }
+
+        /**
+         * Address: 0x00444800 (FUN_00444800)
+         * Address: 0x00444AC0 (FUN_00444AC0)
+         *
+         * What it does:
+         * Inserts one word value at `insertAt` in one legacy dword lane vector.
+         */
+        template <class ThrowTooLongFn, class AllocateWordsFn>
+        [[nodiscard]] inline std::uint32_t* InsertOneWordIntoLanes(
+            dword_lane_vector_view* const view,
+            std::uint32_t* const insertAt,
+            const std::uint32_t value,
+            ThrowTooLongFn throwTooLong,
+            AllocateWordsFn allocateWords
+        )
+        {
+            return InsertFillWordsIntoLanes(view, insertAt, 1u, value, throwTooLong, allocateWords);
+        }
+
+        /**
+         * Address: 0x00444780 (FUN_00444780)
+         *
+         * What it does:
+         * Stores bit-count prefix, trims extra words through caller-provided eraser,
+         * and masks tail bits in the last retained word.
+         */
+        template <class EraseWordRangeFn>
+        [[nodiscard]] inline std::uint32_t NormalizeBitCountAndTrimTail(
+            dword_lane_vector_view* const view,
+            const std::uint32_t bitCount,
+            EraseWordRangeFn eraseWordRange
+        )
+        {
+            const std::size_t requiredWordCount = static_cast<std::size_t>((bitCount + 31u) >> 5u);
+            if (view->begin != nullptr) {
+                const std::size_t currentWordCount = static_cast<std::size_t>(view->end - view->begin);
+                if (requiredWordCount < currentWordCount) {
+                    eraseWordRange(view, view->begin + requiredWordCount, view->end);
+                }
+            }
+
+            view->prefix = bitCount;
+            const std::uint32_t trailingBits = bitCount & 0x1Fu;
+            if (trailingBits != 0u && requiredWordCount != 0u && view->begin != nullptr) {
+                view->begin[requiredWordCount - 1u] &= ((1u << trailingBits) - 1u);
+            }
+            return bitCount;
+        }
+
+        /**
+         * Address: 0x00444E90 (FUN_00444E90)
+         *
+         * What it does:
+         * Ensures logical word count by delegating grow/erase operations while
+         * preserving legacy pointer-lane update ordering.
+         */
+        template <class GrowWordsFn, class EraseWordRangeFn>
+        [[nodiscard]] inline std::size_t EnsureWordCountInLanes(
+            dword_lane_vector_view* const view,
+            const std::size_t desiredWordCount,
+            const std::uint32_t fillWord,
+            GrowWordsFn growWords,
+            EraseWordRangeFn eraseWordRange
+        )
+        {
+            const std::size_t currentWordCount =
+                (view->begin != nullptr) ? static_cast<std::size_t>(view->end - view->begin) : 0u;
+
+            if (desiredWordCount > currentWordCount) {
+                growWords(view, view->end, desiredWordCount - currentWordCount, fillWord);
+            } else if (view->begin != nullptr && desiredWordCount < currentWordCount) {
+                eraseWordRange(view, view->begin + desiredWordCount, view->end);
+            }
+            return desiredWordCount;
+        }
+
+        /**
+         * Address: 0x00444240 (FUN_00444240)
+         * Address: 0x00444E80 (FUN_00444E80)
+         *
+         * What it does:
+         * Copies one 32-bit word-pointer lane from a source slot into destination.
+         */
+        [[nodiscard]] inline std::uint32_t** CopyWordPointerSlot(
+            std::uint32_t** const destination,
+            std::uint32_t* const* const sourceSlot
+        ) noexcept
+        {
+            *destination = *sourceSlot;
+            return destination;
+        }
+
+        /**
+         * Address: 0x00444DB0 (FUN_00444DB0)
+         * Address: 0x00444DE0 (FUN_00444DE0)
+         * Address: 0x00444E30 (FUN_00444E30)
+         * Address: 0x004453E0 (FUN_004453E0)
+         * Address: 0x00445110 (FUN_00445110)
+         * Address: 0x00445140 (FUN_00445140)
+         * Address: 0x00445170 (FUN_00445170)
+         * Address: 0x00445390 (FUN_00445390)
+         *
+         * What it does:
+         * Stores one 32-bit word pointer lane and returns the destination slot.
+         */
+        [[nodiscard]] inline std::uint32_t** SetWordPointer(
+            std::uint32_t** const destination,
+            std::uint32_t* const value
+        ) noexcept
+        {
+            *destination = value;
+            return destination;
+        }
+
+        /**
+         * Address: 0x00446FA0 (FUN_00446FA0)
+         *
+         * What it does:
+         * Zeros one 32-bit slot and returns the same slot pointer.
+         */
+        [[nodiscard]] inline std::uint32_t* ZeroWordSlot(std::uint32_t* const slot) noexcept
+        {
+            *slot = 0u;
+            return slot;
+        }
+
+        /**
+         * Address: 0x00444DF0 (FUN_00444DF0)
+         * Address: 0x00445080 (FUN_00445080)
+         * Address: 0x00445360 (FUN_00445360)
+         *
+         * What it does:
+         * Initializes a vector<bool>-style cursor from a word pointer and clears bit lane.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* SetCursorWordAndClearBit(
+            vector_bool_word_cursor* const cursor,
+            std::uint32_t* const word
+        ) noexcept
+        {
+            cursor->word = word;
+            cursor->bit = 0u;
+            return cursor;
+        }
+
+        /**
+         * Address: 0x00443CA0 (FUN_00443CA0)
+         *
+         * What it does:
+         * Loads one source word slot into a cursor and clears its bit lane.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* SetCursorFromWordSlotAndClearBit(
+            vector_bool_word_cursor* const cursor,
+            std::uint32_t* const* const sourceSlot
+        ) noexcept
+        {
+            cursor->word = *sourceSlot;
+            cursor->bit = 0u;
+            return cursor;
+        }
+
+        /**
+         * Address: 0x004467B0 (FUN_004467B0)
+         *
+         * What it does:
+         * Copies one source cursor bit value into destination cursor bit lane.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* CopyBitAtCursor(
+            vector_bool_word_cursor* const destination,
+            const vector_bool_word_cursor& source
+        ) noexcept
+        {
+            const std::uint32_t sourceMask = (1u << source.bit);
+            const std::uint32_t destinationMask = (1u << destination->bit);
+            if ((*source.word & sourceMask) == 0u) {
+                *destination->word &= ~destinationMask;
+            } else {
+                *destination->word |= destinationMask;
+            }
+            return destination;
+        }
+
+        /**
+         * Address: 0x00446330 (FUN_00446330)
+         * Address: 0x00445A70 (FUN_00445A70)
+         *
+         * What it does:
+         * Copies bits from one source cursor range into destination cursor range
+         * in forward order and stores resulting destination cursor.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* CopyBitCursorRangeForward(
+            vector_bool_word_cursor* const outDestinationCursor,
+            vector_bool_word_cursor sourceCursor,
+            const vector_bool_word_cursor sourceEnd,
+            vector_bool_word_cursor destinationCursor
+        ) noexcept
+        {
+            while (sourceCursor.word != sourceEnd.word || sourceCursor.bit != sourceEnd.bit) {
+                const std::uint32_t sourceMask = (1u << sourceCursor.bit);
+                const std::uint32_t destinationMask = (1u << destinationCursor.bit);
+                if ((*sourceCursor.word & sourceMask) != 0u) {
+                    *destinationCursor.word |= destinationMask;
+                } else {
+                    *destinationCursor.word &= ~destinationMask;
+                }
+
+                if (destinationCursor.bit >= 31u) {
+                    destinationCursor.bit = 0u;
+                    ++destinationCursor.word;
+                } else {
+                    ++destinationCursor.bit;
+                }
+
+                if (sourceCursor.bit >= 31u) {
+                    sourceCursor.bit = 0u;
+                    ++sourceCursor.word;
+                } else {
+                    ++sourceCursor.bit;
+                }
+            }
+
+            *outDestinationCursor = destinationCursor;
+            return outDestinationCursor;
+        }
+
+        /**
+         * Address: 0x004463A0 (FUN_004463A0)
+         * Address: 0x00445AD0 (FUN_00445AD0)
+         *
+         * What it does:
+         * Sets or clears each bit in destination cursor range from one boolean slot
+         * and returns resulting destination word pointer.
+         */
+        [[nodiscard]] inline std::uint32_t* FillBitCursorRangeFromBooleanSlot(
+            const bool* const sourceBoolean,
+            vector_bool_word_cursor destinationCursor,
+            const vector_bool_word_cursor destinationEnd
+        ) noexcept
+        {
+            const bool setBit = (*sourceBoolean != false);
+            while (destinationCursor.word != destinationEnd.word || destinationCursor.bit != destinationEnd.bit) {
+                const std::uint32_t destinationMask = (1u << destinationCursor.bit);
+                if (setBit) {
+                    *destinationCursor.word |= destinationMask;
+                } else {
+                    *destinationCursor.word &= ~destinationMask;
+                }
+
+                if (destinationCursor.bit >= 31u) {
+                    destinationCursor.bit = 0u;
+                    ++destinationCursor.word;
+                } else {
+                    ++destinationCursor.bit;
+                }
+            }
+
+            return destinationCursor.word;
+        }
+
+        /**
+         * Address: 0x00446550 (FUN_00446550)
+         * Address: 0x00445CE0 (FUN_00445CE0)
+         *
+         * What it does:
+         * Copies bits from one source cursor range into destination cursor range
+         * in reverse order and stores resulting destination cursor.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* CopyBitCursorRangeBackward(
+            vector_bool_word_cursor* const outDestinationCursor,
+            const vector_bool_word_cursor sourceBegin,
+            vector_bool_word_cursor sourceEnd,
+            vector_bool_word_cursor destinationEnd
+        ) noexcept
+        {
+            while (sourceBegin.word != sourceEnd.word || sourceBegin.bit != sourceEnd.bit) {
+                if (sourceEnd.bit != 0u) {
+                    --sourceEnd.bit;
+                } else {
+                    --sourceEnd.word;
+                    sourceEnd.bit = 31u;
+                }
+
+                if (destinationEnd.bit != 0u) {
+                    --destinationEnd.bit;
+                } else {
+                    --destinationEnd.word;
+                    destinationEnd.bit = 31u;
+                }
+
+                const std::uint32_t sourceMask = (1u << sourceEnd.bit);
+                const std::uint32_t destinationMask = (1u << destinationEnd.bit);
+                if ((*sourceEnd.word & sourceMask) != 0u) {
+                    *destinationEnd.word |= destinationMask;
+                } else {
+                    *destinationEnd.word &= ~destinationMask;
+                }
+            }
+
+            *outDestinationCursor = destinationEnd;
+            return outDestinationCursor;
+        }
+
+        /**
+         * Address: 0x00444DC0 (FUN_00444DC0)
+         * Address: 0x00444E40 (FUN_00444E40)
+         * Address: 0x00444E70 (FUN_00444E70)
+         * Address: 0x00445180 (FUN_00445180)
+         *
+         * What it does:
+         * Stores `base + wordOffset` into one pointer destination slot.
+         */
+        [[nodiscard]] inline std::uint32_t** SetWordPointerFromBaseOffset(
+            std::uint32_t** const destination,
+            std::uint32_t* const base,
+            const int wordOffset
+        ) noexcept
+        {
+            *destination = base + wordOffset;
+            return destination;
+        }
+
+        /**
+         * Address: 0x00443E60 (FUN_00443E60)
+         * Address: 0x00443FC0 (FUN_00443FC0)
+         *
+         * What it does:
+         * Executes one insertion lane and then rebinds output pointer to the same
+         * logical word offset in possibly reallocated storage.
+         */
+        template <class InsertAtWordFn>
+        [[nodiscard]] inline std::uint32_t** RebindWordPointerAfterInsert(
+            std::uint32_t** const outPointer,
+            dword_lane_vector_view* const view,
+            std::uint32_t* const sourceWord,
+            InsertAtWordFn insertAtWord
+        )
+        {
+            int sourceWordOffset = 0;
+            if (view->begin != nullptr && view->end != view->begin) {
+                sourceWordOffset = static_cast<int>(sourceWord - view->begin);
+            }
+
+            insertAtWord(view, sourceWord);
+            *outPointer = view->begin + sourceWordOffset;
+            return outPointer;
+        }
+
+        /**
+         * Address: 0x00445060 (FUN_00445060)
+         * Address: 0x00445100 (FUN_00445100)
+         * Address: 0x00445150 (FUN_00445150)
+         * Address: 0x004453A0 (FUN_004453A0)
+         * Address: 0x004453C0 (FUN_004453C0)
+         * Address: 0x00445370 (FUN_00445370)
+         * Address: 0x00445380 (FUN_00445380)
+         * Address: 0x00445460 (FUN_00445460)
+         *
+         * What it does:
+         * Adds one word offset to an existing pointer slot in place.
+         */
+        [[nodiscard]] inline std::uint32_t** AdvanceWordPointerInPlace(
+            std::uint32_t** const destination,
+            const int wordOffset
+        ) noexcept
+        {
+            *destination += wordOffset;
+            return destination;
+        }
+
+        /**
+         * Address: 0x00444DD0 (FUN_00444DD0)
+         * Address: 0x00444E50 (FUN_00444E50)
+         * Address: 0x00445070 (FUN_00445070)
+         * Address: 0x00445120 (FUN_00445120)
+         *
+         * What it does:
+         * Returns the signed word-distance between two pointers.
+         */
+        [[nodiscard]] inline int WordPointerDistance(
+            const std::uint32_t* const lhs,
+            const std::uint32_t* const rhs
+        ) noexcept
+        {
+            return static_cast<int>(lhs - rhs);
+        }
+
+        /**
+         * Address: 0x00445130 (FUN_00445130)
+         * Address: 0x004453B0 (FUN_004453B0)
+         * Address: 0x00445480 (FUN_00445480)
+         *
+         * What it does:
+         * Returns pointer equality for one-word iterator lanes.
+         */
+        [[nodiscard]] inline bool WordPointerEqual(
+            const std::uint32_t* const lhs,
+            const std::uint32_t* const rhs
+        ) noexcept
+        {
+            return lhs == rhs;
+        }
+
+        /**
+         * Address: 0x00446F90 (FUN_00446F90)
+         *
+         * What it does:
+         * Returns pointer-lane strict-less relation.
+         */
+        [[nodiscard]] inline bool WordPointerLess(
+            const std::uint32_t* const lhs,
+            const std::uint32_t* const rhs
+        ) noexcept
+        {
+            return lhs < rhs;
+        }
+
+        /**
+         * Address: 0x00445160 (FUN_00445160)
+         * Address: 0x004453F0 (FUN_004453F0)
+         *
+         * What it does:
+         * Returns pointer inequality for one-word iterator lanes.
+         */
+        [[nodiscard]] inline bool WordPointerNotEqual(
+            const std::uint32_t* const lhs,
+            const std::uint32_t* const rhs
+        ) noexcept
+        {
+            return lhs != rhs;
+        }
+
+        /**
+         * Address: 0x00445A00 (FUN_00445A00)
+         * Address: 0x00445A20 (FUN_00445A20)
+         * Address: 0x00445A40 (FUN_00445A40)
+         * Address: 0x00445A50 (FUN_00445A50)
+         * Address: 0x00445A60 (FUN_00445A60)
+         *
+         * What it does:
+         * Swaps two 32-bit word lanes in place.
+         */
+        template <class WordT>
+        [[nodiscard]] inline WordT* SwapWordLanes(WordT* const lhs, WordT* const rhs) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "SwapWordLanes expects 32-bit words");
+            const WordT tmp = *lhs;
+            *lhs = *rhs;
+            *rhs = tmp;
+            return lhs;
+        }
+
+        /**
+         * Address: 0x00444E00 (FUN_00444E00)
+         * Address: 0x00445090 (FUN_00445090)
+         *
+         * What it does:
+         * Advances vector<bool>-style cursor by a signed bit delta.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* AdvanceCursorBits(
+            vector_bool_word_cursor* const cursor,
+            const int bitDelta
+        ) noexcept
+        {
+            if (bitDelta != 0) {
+                if (bitDelta >= 0 || cursor->bit >= static_cast<std::uint32_t>(-bitDelta)) {
+                    const std::uint32_t advancedBits =
+                        static_cast<std::uint32_t>(static_cast<int>(cursor->bit) + bitDelta);
+                    cursor->word += advancedBits >> 5;
+                    cursor->bit = advancedBits & 0x1Fu;
+                } else {
+                    const int advancedBits = static_cast<int>(cursor->bit) + bitDelta;
+                    cursor->word += -1 - ((-1 - advancedBits) >> 5);
+                    cursor->bit = static_cast<std::uint32_t>(advancedBits) & 0x1Fu;
+                }
+            }
+
+            return cursor;
+        }
+
+        /**
+         * Address: 0x00443CB0 (FUN_00443CB0)
+         *
+         * What it does:
+         * Loads one source word slot into a cursor, clears bit lane, then advances
+         * by signed bit delta.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* SetCursorFromWordSlotAndAdvanceBits(
+            vector_bool_word_cursor* const cursor,
+            std::uint32_t* const* const sourceSlot,
+            const int bitDelta
+        ) noexcept
+        {
+            SetCursorFromWordSlotAndClearBit(cursor, sourceSlot);
+            if (bitDelta != 0) {
+                AdvanceCursorBits(cursor, bitDelta);
+            }
+            return cursor;
+        }
+
+        /**
+         * Address: 0x00444190 (FUN_00444190)
+         *
+         * What it does:
+         * Copies one cursor and applies a signed bit offset to the copy.
+         */
+        [[nodiscard]] inline vector_bool_word_cursor* CopyCursorAndAdvance(
+            vector_bool_word_cursor* const destination,
+            const vector_bool_word_cursor& source,
+            const int bitDelta
+        ) noexcept
+        {
+            *destination = source;
+            AdvanceCursorBits(destination, bitDelta);
+            return destination;
+        }
+
+        /**
+         * Address: 0x00444E10 (FUN_00444E10)
+         * Address: 0x004450E0 (FUN_004450E0)
+         *
+         * What it does:
+         * Computes signed bit distance from `from` cursor to `to` cursor.
+         */
+        [[nodiscard]] inline int CursorBitDistance(
+            const vector_bool_word_cursor& from,
+            const vector_bool_word_cursor& to
+        ) noexcept
+        {
+            return static_cast<int>(to.bit + 32 * (to.word - from.word) - from.bit);
+        }
+
+        /**
+         * Address: 0x00444F60 (FUN_00444F60)
+         * Address: 0x00445410 (FUN_00445410)
+         *
+         * What it does:
+         * Returns word span count when begin pointer is present; otherwise returns zero.
+         */
+        [[nodiscard]] inline std::size_t WordSpanCountFromOptionalBegin(
+            const std::uint32_t* const begin,
+            const std::uint32_t* const end
+        ) noexcept
+        {
+            if (begin == 0) {
+                return 0u;
+            }
+
+            return static_cast<std::size_t>(end - begin);
+        }
+
+        /**
+         * Address: 0x00444F00 (FUN_00444F00)
+         *
+         * What it does:
+         * Erases one shifted word range `[source, endWord)` into `destination`,
+         * updates `endWord`, and stores destination as the return iterator slot.
+         */
+        template <class WordT>
+        [[nodiscard]] inline WordT** EraseWordRangeAndStoreDestination(
+            WordT** const destinationOut,
+            WordT*& endWord,
+            WordT* const destination,
+            const WordT* const source
+        ) noexcept
+        {
+            static_assert(sizeof(WordT) == sizeof(std::uint32_t), "EraseWordRangeAndStoreDestination expects 32-bit words");
+            if (destination != source) {
+                const std::size_t wordCount = static_cast<std::size_t>(endWord - source);
+                if (wordCount != 0u) {
+                    std::memmove(destination, source, wordCount * sizeof(WordT));
+                }
+                endWord = destination + wordCount;
+            }
+
+            *destinationOut = destination;
+            return destinationOut;
+        }
+
+        /**
+         * Address: 0x00444FB0 (FUN_00444FB0)
+         *
+         * What it does:
+         * Returns the legacy `-1` sentinel lane used by VC8 vector<bool> helpers.
+         */
+        [[nodiscard]] inline int NegativeOneSentinel() noexcept
+        {
+            return -1;
+        }
+
+        /**
+         * Address: 0x00444FC0 (FUN_00444FC0)
+         *
+         * What it does:
+         * Converts bit count to storage-word count using 32-bit words.
+         */
+        [[nodiscard]] inline std::size_t BitCountToWordCount(const std::size_t bitCount) noexcept
+        {
+            return (bitCount + 31u) >> 5;
+        }
+
+        /**
+         * Address: 0x00444FD0 (FUN_00444FD0)
+         *
+         * What it does:
+         * Throws `std::length_error` with the VC8 vector<bool> overflow message.
+         */
+        [[noreturn]] inline void ThrowVectorBoolTooLong()
+        {
+            throw std::length_error("vector<bool> too long");
+        }
+    } // namespace detail
 
     /**
      * MSVC8-compatible vector with fixed ABI (16 bytes).
@@ -67,6 +1187,21 @@ namespace msvc8
     		last_(nullptr),
     		end_(nullptr)
     	{
+        }
+
+        /**
+         * Address: 0x00442B50 (FUN_00442B50)
+         * Address: 0x00443090 (FUN_00443090)
+         * Address: 0x00443290 (FUN_00443290)
+         * Address: 0x00443390 (FUN_00443390)
+         *
+         * What it does:
+         * Resets data-range pointer lanes while preserving allocator/proxy lane.
+         */
+        void reset_range_lanes_preserve_proxy() noexcept {
+            first_ = nullptr;
+            last_ = nullptr;
+            end_ = nullptr;
         }
 
         /**
@@ -149,23 +1284,64 @@ namespace msvc8
             return *this;
         }
 
-        T* begin() const noexcept {
-	        return first_;
-        }
-        T* end()   const noexcept {
-	        return last_;
-        }
+        /**
+         * Address: 0x004433D0 (FUN_004433D0)
+         * Address: 0x00443E40 (FUN_00443E40)
+         * Address: 0x00444330 (FUN_00444330)
+         *
+         * What it does:
+         * Returns the first element pointer lane (`first_`).
+         */
+        T* begin() const noexcept { return first_; }
+
+        /**
+         * Address: 0x004433E0 (FUN_004433E0)
+         * Address: 0x00443E50 (FUN_00443E50)
+         * Address: 0x00444340 (FUN_00444340)
+         *
+         * What it does:
+         * Returns the one-past-end pointer lane (`last_`).
+         */
+        T* end() const noexcept { return last_; }
         [[nodiscard]] bool empty() const noexcept {
 	        return first_ == last_;
         }
+        /**
+         * Address: 0x00442B90 (FUN_00442B90)
+         * Address: 0x004430E0 (FUN_004430E0)
+         * Address: 0x004432D0 (FUN_004432D0)
+         * Address: 0x004433F0 (FUN_004433F0)
+         *
+         * What it does:
+         * Returns element count from retained `[first_, last_)` range.
+         */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
         }
+        /**
+         * Address: 0x00443E20 (FUN_00443E20)
+         * Address: 0x00443FA0 (FUN_00443FA0)
+         *
+         * What it does:
+         * Returns reserved element capacity from retained `[first_, end_)` range.
+         */
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
         }
         T& operator[](std::size_t i) const noexcept {
 	        return first_[i];
+        }
+        /**
+         * Address: 0x00442BB0 (FUN_00442BB0)
+         * Address: 0x00443100 (FUN_00443100)
+         * Address: 0x004432F0 (FUN_004432F0)
+         * Address: 0x00443410 (FUN_00443410)
+         *
+         * What it does:
+         * Returns raw pointer to element slot at `index` in the active range.
+         */
+        T* ptr_at(std::size_t index) const noexcept {
+            return first_ + index;
         }
         T* data() const noexcept {
 	        return first_;
@@ -192,7 +1368,12 @@ namespace msvc8
         }
 
         /**
-         * Resize to new_size; value-initialize or fill with 'value' when growing
+         * Address: 0x004430D0 (FUN_004430D0, forwarding lane)
+         * Address: 0x00443B80 (FUN_00443B80)
+         *
+         * What it does:
+         * Resizes logical element count to `newSize` by erasing tail elements when
+         * shrinking or value-initializing appended slots when growing.
          */
         void resize(std::size_t newSize) {
             const std::size_t cur = size();
@@ -227,6 +1408,12 @@ namespace msvc8
 
         /**
          * Clear all elements; keep capacity
+         *
+         * Address: 0x00443350 (FUN_00443350)
+         * Address: 0x004434A0 (FUN_004434A0)
+         *
+         * What it does:
+         * Collapses logical range to empty by rebasing `last_` to `first_`.
          */
         void clear() noexcept {
             destroy_all();
@@ -235,6 +1422,13 @@ namespace msvc8
 
         /**
          * Push by const&
+         *
+         * Address: 0x00443300 (FUN_00443300)
+         * Address: 0x00443420 (FUN_00443420)
+         *
+         * What it does:
+         * Appends one value at the end, growing capacity when the active range
+         * reaches `end_`.
          */
         void push_back(const T& value) {
             ensure_grow_for(1);
@@ -316,6 +1510,11 @@ namespace msvc8
          * Erase one element at position `pos`.
          * Shifts the tail left by 1, destroys the last duplicated slot,
          * and returns iterator to the position of erased element.
+         *
+         * Address: 0x00443470 (FUN_00443470)
+         * Address: 0x00443EA0 (FUN_00443EA0)
+         * Address: 0x00444000 (FUN_00444000)
+         * Address: 0x00444360 (FUN_00444360)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -323,7 +1522,11 @@ namespace msvc8
             const std::size_t tail = static_cast<std::size_t>(last_ - next);
             if (tail) {
                 if constexpr (std::is_trivially_copyable_v<T>) {
-                    std::memmove(pos, next, tail * sizeof(T));
+                    if constexpr (sizeof(T) == sizeof(std::uint32_t)) {
+                        detail::MoveWords(next, tail, pos);
+                    } else {
+                        std::memmove(pos, next, tail * sizeof(T));
+                    }
                 } else {
                     for (std::size_t i = 0; i < tail; ++i)
                         pos[i] = std::move(next[i]);
@@ -348,7 +1551,11 @@ namespace msvc8
             const std::size_t tail = static_cast<std::size_t>(last_ - last);
             if (tail) {
                 if constexpr (std::is_trivially_copyable_v<T>) {
-                    std::memmove(first, last, tail * sizeof(T));
+                    if constexpr (sizeof(T) == sizeof(std::uint32_t)) {
+                        detail::MoveWords(last, tail, first);
+                    } else {
+                        std::memmove(first, last, tail * sizeof(T));
+                    }
                 } else {
                     for (std::size_t i = 0; i < tail; ++i)
                         first[i] = std::move(last[i]);
@@ -470,6 +1677,15 @@ namespace msvc8
 
         /**
          * Deallocate buffer if owned/allowed
+         *
+         * Address: 0x004433A0 (FUN_004433A0)
+         * Address: 0x004439A0 (FUN_004439A0)
+         * Address: 0x00443C50 (FUN_00443C50)
+         * Address: 0x00443F30 (FUN_00443F30)
+         * Address: 0x004440A0 (FUN_004440A0)
+         *
+         * What it does:
+         * Frees retained heap storage and clears all pointer lanes.
          */
         void deallocate_all() noexcept {
 #if MSVC8_VECTOR_DISABLE_FREE
@@ -482,6 +1698,115 @@ namespace msvc8
 #endif
         }
 
+    public:
+        /**
+         * Address: 0x004439D0 (FUN_004439D0)
+         *
+         * What it does:
+         * Returns `this` unchanged in trivial legacy lane wrappers that carry one
+         * extra ignored tag argument.
+         */
+        [[nodiscard]] static void* identity_this_with_tag(void* const self, int) noexcept
+        {
+            return self;
+        }
+
+        /**
+         * Address: 0x004439E0 (FUN_004439E0)
+         * Address: 0x004442F0 (FUN_004442F0)
+         *
+         * What it does:
+         * Returns `this` unchanged in trivial legacy lane wrappers.
+         */
+        [[nodiscard]] static void* identity_this(void* const self) noexcept
+        {
+            return self;
+        }
+
+        /**
+         * Address: 0x00444300 (FUN_00444300)
+         * Address: 0x00444670 (FUN_00444670)
+         * Address: 0x00444A80 (FUN_00444A80)
+         * Address: 0x00444D60 (FUN_00444D60)
+         *
+         * What it does:
+         * Releases one heap block through the legacy VC8 delete lane.
+         */
+        static void delete_heap_block(void* const ptr) noexcept
+        {
+            ::operator delete(ptr);
+        }
+
+        /**
+         * Address: 0x00444310 (FUN_00444310)
+         * Address: 0x00444680 (FUN_00444680)
+         * Address: 0x00444A90 (FUN_00444A90)
+         * Address: 0x00444D70 (FUN_00444D70)
+         *
+         * What it does:
+         * Allocates one raw 4-byte-slot heap block for `count` elements, preserving
+         * the zero-count path that still routes through `operator new(0)`.
+         */
+        [[nodiscard]] static void* allocate_dword_slots(const std::size_t count)
+        {
+            if (count == 0) {
+                return ::operator new(0);
+            }
+
+            return ::operator new(sizeof(std::uint32_t) * count);
+        }
+
+        /**
+         * Address: 0x00445B80 (FUN_00445B80)
+         * Address: 0x00445C90 (FUN_00445C90)
+         * Address: 0x00445DC0 (FUN_00445DC0)
+         * Address: 0x00445E80 (FUN_00445E80)
+         *
+         * What it does:
+         * Allocates one raw 4-byte-slot heap block with explicit overflow guard.
+         */
+        [[nodiscard]] static void* allocate_dword_slots_checked(const std::size_t count)
+        {
+            if (count > (static_cast<std::size_t>(-1) / sizeof(std::uint32_t))) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(sizeof(std::uint32_t) * count);
+        }
+
+        /**
+         * Address: 0x00444250 (FUN_00444250)
+         * Address: 0x00444350 (FUN_00444350)
+         * Address: 0x004447E0 (FUN_004447E0)
+         * Address: 0x00444F50 (FUN_00444F50)
+         * Address: 0x00444FA0 (FUN_00444FA0)
+         * Address: 0x00445040 (FUN_00445040)
+         * Address: 0x00445050 (FUN_00445050)
+         * Address: 0x00444AB0 (FUN_00444AB0)
+         *
+         * What it does:
+         * Returns legacy max-element sentinel used by VC8 vector growth checks.
+         */
+        [[nodiscard]] static constexpr std::size_t max_elements_sentinel() noexcept
+        {
+            return 0x3FFFFFFFu;
+        }
+
+        /**
+         * Address: 0x00444270 (FUN_00444270)
+         * Address: 0x004445E0 (FUN_004445E0)
+         * Address: 0x004449F0 (FUN_004449F0)
+         * Address: 0x00444CD0 (FUN_00444CD0)
+         *
+         * What it does:
+         * Throws `std::length_error` with the legacy VC8 vector overflow message.
+         */
+        [[noreturn]] static void throw_too_long()
+        {
+            throw std::length_error("vector<T> too long");
+        }
+
+    private:
         /**
          * Reallocate to exactly new_cap, preserving elements
          */

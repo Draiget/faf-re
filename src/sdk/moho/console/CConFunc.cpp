@@ -7,6 +7,20 @@ moho::CConFunc::CConFunc() noexcept
   mHandlerOrValue = 0u;
 }
 
+/**
+ * Address: 0x0041E5C0 (FUN_0041E5C0, ??0CConFunc@Moho@@QAE@PBD0@Z)
+ *
+ * const char* name, const char* description, Callback callback
+ *
+ * What it does:
+ * Initializes base command metadata/registration, then stores callback.
+ */
+moho::CConFunc::CConFunc(const char* const name, const char* const description, const Callback callback) noexcept
+  : CConCommand(name, description)
+{
+  mHandlerOrValue = reinterpret_cast<std::uintptr_t>(callback);
+}
+
 void moho::CConFunc::InitializeRecovered(const char* description, const char* name, Callback callback) noexcept
 {
   mName = name;

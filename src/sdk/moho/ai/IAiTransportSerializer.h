@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E4880 (FUN_005E4880, IAiTransportSerializer::Deserialize)
+     *
+     * What it does:
+     * Loads `IAiTransport` broadcaster event-list lanes.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005E4890 (FUN_005E4890, IAiTransportSerializer::Serialize)
+     *
+     * What it does:
+     * Saves `IAiTransport` broadcaster event-list lanes.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005E9530 (FUN_005E9530)
      *
      * What it does:
@@ -48,4 +64,13 @@ namespace moho
     "IAiTransportSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(IAiTransportSerializer) == 0x14, "IAiTransportSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCEEB0 (FUN_00BCEEB0, register_IAiTransportSerializer)
+   *
+   * What it does:
+   * Registers serializer callbacks for `IAiTransport` and installs process-exit
+   * cleanup.
+   */
+  int register_IAiTransportSerializer();
 } // namespace moho

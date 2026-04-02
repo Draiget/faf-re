@@ -7,6 +7,7 @@
 
 namespace gpg
 {
+  class RField;
   class RType;
 }
 
@@ -39,6 +40,18 @@ namespace moho
      * Base blueprint post-load hook; default implementation is empty.
      */
     void OnInitBlueprint();
+  };
+
+  class RBlueprintTypeInfo final
+  {
+  public:
+    /**
+     * Address: 0x0050DCF0 (FUN_0050DCF0, Moho::RBlueprintTypeInfo::AddFields)
+     *
+     * What it does:
+     * Registers reflected field lanes for the base `RBlueprint` layout.
+     */
+    static gpg::RField* AddFields(gpg::RType* typeInfo);
   };
 
   static_assert(offsetof(RBlueprint, mOwner) == 0x04, "RBlueprint::mOwner offset must be 0x04");

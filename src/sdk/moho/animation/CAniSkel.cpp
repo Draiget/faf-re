@@ -14,28 +14,6 @@ namespace
   {
     void operator()(const moho::CAniSkel*) const noexcept {}
   };
-
-  void InitializeDefaultSkeletonStorage(moho::CAniDefaultSkel& skeleton)
-  {
-    // 0x0054A390 seeds a single default bone/name entry and parent index -1.
-    static constexpr const char* kDefaultBoneName = "";
-
-    skeleton.mFile.reset();
-    skeleton.mBones = msvc8::vector<moho::SAniSkelBone>{};
-    skeleton.mBoneNameToIndex = msvc8::vector<moho::SAniSkelBoneNameIndex>{};
-
-    moho::SAniSkelBone defaultBone{};
-    defaultBone.mBoneName = kDefaultBoneName;
-    defaultBone.mParentBoneIndex = -1;
-    skeleton.mBones.push_back(defaultBone);
-
-    moho::SAniSkelBoneNameIndex nameIndex{};
-    nameIndex.mBoneName = kDefaultBoneName;
-    nameIndex.mBoneIndex = 0;
-    skeleton.mBoneNameToIndex.push_back(nameIndex);
-
-    skeleton.UpdateBoneBounds();
-  }
 } // namespace
 
 namespace moho
@@ -129,12 +107,6 @@ namespace moho
   boost::shared_ptr<const CAniSkel> CAniSkel::GetDefaultSkeleton()
   {
     static CAniDefaultSkel defaultSkeleton{};
-    static const bool initialized = [] {
-      InitializeDefaultSkeletonStorage(defaultSkeleton);
-      return true;
-    }();
-
-    (void)initialized;
     return boost::shared_ptr<const CAniSkel>(static_cast<const CAniSkel*>(&defaultSkeleton), NoDeleteAniSkel{});
   }
 

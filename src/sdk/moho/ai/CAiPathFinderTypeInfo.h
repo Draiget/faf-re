@@ -37,4 +37,31 @@ namespace moho
   };
 
   static_assert(sizeof(CAiPathFinderTypeInfo) == 0x64, "CAiPathFinderTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCCD50 (FUN_00BCCD50, register_CAiPathFinderTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI descriptor for `CAiPathFinder` and
+   * installs process-exit cleanup.
+   */
+  int register_CAiPathFinderTypeInfo();
+
+  /**
+   * Address: 0x00BCCDB0 (FUN_00BCCDB0, register_Rect2iListTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters reflected `std::list<gpg::Rect2<int>>` type-info
+   * and installs process-exit cleanup.
+   */
+  int register_Rect2iListTypeInfo();
+
+  /**
+   * Address: 0x00BCCDD0 (FUN_00BCCDD0, register_CAiPathFinderStartupStatsCleanup)
+   *
+   * What it does:
+   * Installs process-exit cleanup for one startup-owned AI path-finder stats
+   * slot.
+   */
+  int register_CAiPathFinderStartupStatsCleanup();
 } // namespace moho

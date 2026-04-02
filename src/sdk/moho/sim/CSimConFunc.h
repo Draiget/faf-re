@@ -21,6 +21,9 @@ namespace moho
       SEntitySetTemplateUnit* selectedUnits
     );
 
+    CSimConFunc() noexcept;
+    CSimConFunc(bool requiresCheat, const char* name, Callback handler) noexcept;
+
     /**
      * Address: 0x007347F0 (FUN_007347F0, sub_7347F0)
      *

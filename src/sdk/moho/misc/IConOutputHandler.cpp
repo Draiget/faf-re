@@ -6,6 +6,14 @@ namespace
 }
 
 /**
+ * Address: 0x0041E8F0 (FUN_0041E8F0)
+ *
+ * What it does:
+ * Sets up the base console-output handler as a singleton-style intrusive list node.
+ */
+moho::IConOutputHandler::IConOutputHandler() noexcept = default;
+
+/**
  * Address: 0x00F58F44 (consoleoutputhandlers)
  *
  * What it does:

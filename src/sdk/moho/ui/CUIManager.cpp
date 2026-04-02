@@ -266,6 +266,7 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
     }
   }
 
+  STAT_Frame();
   UI_UpdateCommandFeedbackBlips(deltaSeconds);
 }
 

@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00546A20 (FUN_00546A20, Moho::CSimResourcesTypeInfo::CSimResourcesTypeInfo)
+     *
+     * What it does:
+     * Initializes the base reflection type state and preregisters RTTI
+     * ownership for `CSimResources`.
+     */
+    CSimResourcesTypeInfo();
+
+    /**
      * Address: 0x00546AD0 (FUN_00546AD0, Moho::CSimResourcesTypeInfo::dtr)
      * Slot: 2
      */
@@ -80,6 +89,15 @@ namespace moho
      */
     static void Destruct(void* objectPtr);
   };
+
+  /**
+   * Address: 0x00BC96B0 (FUN_00BC96B0, register_CSimResourcesTypeInfo)
+   *
+   * What it does:
+   * Constructs startup-owned `CSimResourcesTypeInfo` storage and registers
+   * process-exit teardown.
+   */
+  void register_CSimResourcesTypeInfo();
 
   static_assert(sizeof(CSimResourcesTypeInfo) == 0x64, "CSimResourcesTypeInfo size must be 0x64");
 } // namespace moho

@@ -1,8 +1,48 @@
 #include "moho/sim/RRuleGameRulesTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/sim/RRuleGameRules.h"
+
+namespace
+{
+  using TypeInfo = moho::RRuleGameRulesTypeInfo;
+
+  alignas(TypeInfo) unsigned char gRRuleGameRulesTypeInfoStorage[sizeof(TypeInfo)];
+  bool gRRuleGameRulesTypeInfoConstructed = false;
+
+  [[nodiscard]] TypeInfo& AcquireRRuleGameRulesTypeInfo()
+  {
+    if (!gRRuleGameRulesTypeInfoConstructed) {
+      new (gRRuleGameRulesTypeInfoStorage) TypeInfo();
+      gRRuleGameRulesTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<TypeInfo*>(gRRuleGameRulesTypeInfoStorage);
+  }
+
+  void cleanup_RRuleGameRulesTypeInfo()
+  {
+    if (!gRRuleGameRulesTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireRRuleGameRulesTypeInfo().~TypeInfo();
+    gRRuleGameRulesTypeInfoConstructed = false;
+  }
+
+  struct RRuleGameRulesTypeInfoBootstrap
+  {
+    RRuleGameRulesTypeInfoBootstrap()
+    {
+      (void)moho::register_RRuleGameRulesTypeInfoStartup();
+    }
+  };
+
+  RRuleGameRulesTypeInfoBootstrap gRRuleGameRulesTypeInfoBootstrap;
+} // namespace
 
 namespace moho
 {
@@ -14,6 +54,15 @@ namespace moho
       sType = gpg::LookupRType(typeid(RRuleGameRules));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x0052B4A0 (FUN_0052B4A0, Moho::RRuleGameRulesTypeInfo::RRuleGameRulesTypeInfo)
+   */
+  RRuleGameRulesTypeInfo::RRuleGameRulesTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(RRuleGameRules), this);
   }
 
   /**
@@ -37,5 +86,14 @@ namespace moho
     size_ = sizeof(RRuleGameRules);
     gpg::RType::Init();
     Finish();
+  }
+
+  /**
+   * Address: 0x00BC8ED0 (FUN_00BC8ED0, register_RRuleGameRulesTypeInfoStartup)
+   */
+  int register_RRuleGameRulesTypeInfoStartup()
+  {
+    (void)AcquireRRuleGameRulesTypeInfo();
+    return std::atexit(&cleanup_RRuleGameRulesTypeInfo);
   }
 } // namespace moho

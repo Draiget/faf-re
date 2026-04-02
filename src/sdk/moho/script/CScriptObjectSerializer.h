@@ -15,6 +15,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004C79E0 (FUN_004C79E0, Moho::CScriptObjectSerializer::Deserialize)
+     *
+     * What it does:
+     * Serializer load thunk forwarding into `CScriptObject::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x004C79F0 (FUN_004C79F0, Moho::CScriptObjectSerializer::Serialize)
+     *
+     * What it does:
+     * Serializer save thunk forwarding into `CScriptObject::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x004C7D50 (FUN_004C7D50, gpg::SerSaveLoadHelper_CSCriptObject::Init)
      *
      * What it does:

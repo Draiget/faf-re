@@ -41,4 +41,13 @@ namespace moho
       "CAiBrainConstruct::mConstructCallback offset must be 0x0C");
   static_assert(offsetof(CAiBrainConstruct, mDeleteCallback) == 0x10, "CAiBrainConstruct::mDeleteCallback offset must be 0x10");
   static_assert(sizeof(CAiBrainConstruct) == 0x14, "CAiBrainConstruct size must be 0x14");
+
+  /**
+   * Address: 0x00BCB3F0 (FUN_00BCB3F0, sub_BCB3F0)
+   *
+   * What it does:
+   * Initializes the startup `CAiBrainConstruct` serializer-helper node,
+   * installs construct/delete callbacks, and schedules cleanup at exit.
+   */
+  int register_CAiBrainConstructStartup();
 } // namespace moho

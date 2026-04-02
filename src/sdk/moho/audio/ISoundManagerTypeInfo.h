@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00760A90 (FUN_00760A90, Moho::ISoundManagerTypeInfo::ISoundManagerTypeInfo)
+     * Slot: constructor
+     *
+     * What it does:
+     * Constructs and preregisters `ISoundManager` reflection type metadata.
+     */
+    ISoundManagerTypeInfo();
+
+    /**
      * Address: 0x00760B20 (FUN_00760B20, Moho::ISoundManagerTypeInfo::dtr)
      * Slot: 2
      */
@@ -36,6 +45,22 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00C01470 (FUN_00C01470, cleanup_ISoundManagerTypeInfo)
+   *
+   * What it does:
+   * Releases process-exit `ISoundManagerTypeInfo` field/base vector storage.
+   */
+  void cleanup_ISoundManagerTypeInfo();
+
+  /**
+   * Address: 0x00BDC4A0 (FUN_00BDC4A0, register_ISoundManagerTypeInfo)
+   *
+   * What it does:
+   * Forces `ISoundManagerTypeInfo` startup construction and installs `atexit`
+   * cleanup.
+   */
+  int register_ISoundManagerTypeInfo();
+
   static_assert(sizeof(ISoundManagerTypeInfo) == 0x64, "ISoundManagerTypeInfo size must be 0x64");
 } // namespace moho
-

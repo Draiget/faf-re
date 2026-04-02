@@ -12,6 +12,13 @@
 #include "moho/sim/ArmyUnitSet.h"
 #include "wm3/Quaternion.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class SerConstructResult;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class RUnitBlueprint;
@@ -78,6 +85,43 @@ namespace moho
   class CAiTransportImpl : public IAiTransport
   {
   public:
+    /**
+     * Address: 0x005E5300 (FUN_005E5300, Moho::CAiTransportImpl::CAiTransportImpl)
+     * Address: 0x005E5670 (FUN_005E5670, Moho::CAiTransportImpl::CAiTransportImpl)
+     * Mangled: ??0CAiTransportImpl@Moho@@AAE@XZ
+     * Mangled: ??0CAiTransportImpl@Moho@@QAE@PAVUnit@1@@Z
+     *
+     * What it does:
+     * Initializes transport runtime lanes, and when `unit` is provided also
+     * derives category flags, attach-point buckets, and entity-set registry links.
+     */
+    explicit CAiTransportImpl(Unit* unit = nullptr);
+
+    /**
+     * Address: 0x005E8500 (FUN_005E8500, Moho::CAiTransportImpl::MemberConstruct)
+     *
+     * What it does:
+     * Allocates one `CAiTransportImpl` instance and publishes it via
+     * `SerConstructResult::SetUnowned`.
+     */
+    static void MemberConstruct(gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x005EEE30 (FUN_005EEE30, Moho::CAiTransportImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Loads runtime transport state lanes from the read archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005EF1F0 (FUN_005EF1F0, Moho::CAiTransportImpl::MemberSerialize)
+     *
+     * What it does:
+     * Saves runtime transport state lanes into the write archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     /**
      * Address: 0x005E8280 (FUN_005E8280, scalar deleting thunk)
      * Address: 0x005E5C10 (FUN_005E5C10, core dtor)
@@ -381,6 +425,15 @@ namespace moho
     bool TransportIsTeleportBeaconReady() const override;
 
   private:
+    /**
+     * Address: 0x005E4930 (FUN_005E4930, Moho::CAiTransportImpl::SetUpAttachPoints)
+     *
+     * What it does:
+     * Scans transport skeleton bones and buckets attach indices by bone-name
+     * tag into launch/class/generic attach vectors.
+     */
+    void SetUpAttachPoints();
+
     /**
      * Address: 0x005E5120 (FUN_005E5120)
      */

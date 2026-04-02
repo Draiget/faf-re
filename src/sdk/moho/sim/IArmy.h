@@ -37,6 +37,24 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
+     * Address: 0x005517A0 (FUN_005517A0, Moho::IArmy::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes the fixed `SSTIArmyConstantData` (+0x00) and
+     * `SSTIArmyVariableData` (+0x80) lanes of the IArmy payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00551820 (FUN_00551820, Moho::IArmy::MemberSerialize)
+     *
+     * What it does:
+     * Serializes the fixed `SSTIArmyConstantData` (+0x00) and
+     * `SSTIArmyVariableData` (+0x80) lanes of the IArmy payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
      * Binary evidence summary:
      * - Address: 0x00550B20 (FUN_00550B20): IArmy typeinfo size is 0x1E0.
      * - Address: 0x00703E40 (FUN_00703E40): SimArmy registers IArmy as base at offset +0x08.

@@ -205,6 +205,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00542550 (FUN_00542550, Moho::LaunchInfoBaseSerializer::Deserialize)
+     *
+     * What it does:
+     * Archive callback thunk forwarding into LaunchInfoBase load body.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00542560 (FUN_00542560, Moho::LaunchInfoBaseSerializer::Serialize)
+     *
+     * What it does:
+     * Archive callback thunk forwarding into LaunchInfoBase save body.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00543190 (FUN_00543190, sub_543190)
      *
      * What it does:
@@ -213,12 +229,37 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };
 
+  /**
+   * Address: 0x00BC94C0 (FUN_00BC94C0, register_LaunchInfoBaseSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer helper links/callbacks for `LaunchInfoBase`
+   * and schedules process-exit cleanup.
+   */
+  void register_LaunchInfoBaseSerializer();
+
+  static_assert(
+    offsetof(LaunchInfoBaseSerializer, mHelperNext) == 0x04,
+    "LaunchInfoBaseSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(LaunchInfoBaseSerializer, mHelperPrev) == 0x08,
+    "LaunchInfoBaseSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(LaunchInfoBaseSerializer, mSerLoadFunc) == 0x0C,
+    "LaunchInfoBaseSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(LaunchInfoBaseSerializer, mSerSaveFunc) == 0x10,
+    "LaunchInfoBaseSerializer::mSerSaveFunc offset must be 0x10"
+  );
   static_assert(sizeof(LaunchInfoBaseSerializer) == 0x14, "LaunchInfoBaseSerializer size must be 0x14");
 } // namespace moho
 

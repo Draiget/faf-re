@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006FD970 (FUN_006FD970, Moho::SimArmyTypeInfo::SimArmyTypeInfo)
+     *
+     * What it does:
+     * Initializes RTTI preregistration state for SimArmy metadata.
+     */
+    SimArmyTypeInfo();
+
+    /**
      * Address: 0x006FDA00 (FUN_006FDA00, Moho::SimArmyTypeInfo::dtr)
      *
      * What it does:

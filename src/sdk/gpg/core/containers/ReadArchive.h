@@ -14,6 +14,17 @@ namespace msvc8
   struct string;
 }
 
+namespace LuaPlus
+{
+  class LuaState;
+}
+
+namespace moho
+{
+  class Sim;
+  class Unit;
+}
+
 namespace gpg
 {
   class RIndexed;
@@ -162,6 +173,42 @@ namespace gpg
     void Read(const gpg::RType* type, void* object, const gpg::RRef& ownerRef);
 
     /**
+     * Address: 0x004C1520 (FUN_004C1520, gpg::ReadArchive::ReadPointer_LuaState)
+     *
+     * What it does:
+     * Reads one tracked pointer lane and upcasts it to `LuaPlus::LuaState`,
+     * throwing `SerializationError` on pointee-type mismatch.
+     */
+    ReadArchive* ReadPointer_LuaState(LuaPlus::LuaState** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00584FB0 (FUN_00584FB0, gpg::ReadArchive::ReadPointer_Sim)
+     *
+     * What it does:
+     * Reads one tracked pointer lane and upcasts it to `moho::Sim`,
+     * throwing `SerializationError` on pointee-type mismatch.
+     */
+    ReadArchive* ReadPointer_Sim(moho::Sim** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005A2900 (FUN_005A2900, gpg::ReadArchive::ReadPointer_Unit)
+     *
+     * What it does:
+     * Reads one tracked pointer lane and upcasts it to `moho::Unit`,
+     * throwing `SerializationError` on pointee-type mismatch.
+     */
+    ReadArchive* ReadPointer_Unit(moho::Unit** outValue, const gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00953B30 (FUN_00953B30)
+     * Demangled: public: class gpg::ReadArchive & __thiscall gpg::ReadArchive::TrackPointer(class gpg::RRef const &)
+     *
+     * What it does:
+     * Appends one pre-tracked pointer entry for an already-constructed object.
+     */
+    ReadArchive& TrackPointer(const gpg::RRef& objectRef);
+
+    /**
      * Address: 0x00952F10 (FUN_00952F10)
      * Demangled: gpg::ReadArchive::ReadTypeHandle
      *
@@ -181,6 +228,23 @@ namespace gpg
     friend void ReadPointerShared_SSessionSaveData(
       boost::SharedPtrRaw<moho::SSessionSaveData>& outPointer, ReadArchive* archive, const RRef& ownerRef
     );
+    friend void
+    ReadPointerShared_CAniPose(boost::SharedPtrRaw<moho::CAniPose>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+    friend void
+    ReadPointerShared_CAniSkel(boost::SharedPtrRaw<moho::CAniSkel>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+    friend void ReadPointerShared_Stats_StatItem(
+      boost::SharedPtrRaw<moho::Stats<moho::StatItem>>& outPointer, ReadArchive* archive, const RRef& ownerRef
+    );
+    friend void ReadPointerShared_ISimResources(
+      boost::SharedPtrRaw<moho::ISimResources>& outPointer, ReadArchive* archive, const RRef& ownerRef
+    );
+    friend void
+    ReadPointerShared_CIntelGrid(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+    friend void ReadPointerShared_RScmResource(
+      boost::SharedPtrRaw<moho::RScmResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
+    );
+    friend void
+    ReadPointerShared_STrigger(boost::SharedPtrRaw<moho::STrigger>& outPointer, ReadArchive* archive, const RRef& ownerRef);
   };
   static_assert(sizeof(ReadArchive) == 0x38, "ReadArchive size must be 0x38");
 

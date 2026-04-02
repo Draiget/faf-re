@@ -28,6 +28,19 @@ namespace moho
   VTransform::VTransform(const VTransform& rhs) noexcept = default;
 
   /**
+   * Address: 0x00470B60 (FUN_00470B60, Moho::VTransform::operator=)
+   *
+   * What it does:
+   * Copies quaternion + translation lanes from rhs.
+   */
+  VTransform& VTransform::operator=(const VTransform& rhs) noexcept
+  {
+    orient_ = rhs.orient_;
+    pos_ = rhs.pos_;
+    return *this;
+  }
+
+  /**
    * Address: 0x0046FBF0 (FUN_0046FBF0)
    *
    * What it does:
@@ -48,6 +61,29 @@ namespace moho
     };
     Wm3::MultiplyQuaternionVector(&inverted.pos_, negatedPosition, inverted.orient_);
     return inverted;
+  }
+
+  /**
+   * Address: 0x00491200 (FUN_00491200, Moho::VTransform::Apply)
+   *
+   * Wm3::Vector3<float> const &,Wm3::Vector3<float> *
+   *
+   * What it does:
+   * Rotates one input vector by orientation, adds translation, and writes
+   * the transformed point to caller output.
+   */
+  Wm3::Vec3f* VTransform::Apply(const Wm3::Vec3f& source, Wm3::Vec3f* const outPoint) const noexcept
+  {
+    if (outPoint == nullptr) {
+      return nullptr;
+    }
+
+    Wm3::Vec3f rotated{};
+    Wm3::MultiplyQuaternionVector(&rotated, source, orient_);
+    outPoint->x = pos_.x + rotated.x;
+    outPoint->y = pos_.y + rotated.y;
+    outPoint->z = pos_.z + rotated.z;
+    return outPoint;
   }
 
   /**

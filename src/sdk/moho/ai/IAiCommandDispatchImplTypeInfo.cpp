@@ -1,5 +1,7 @@
 #include "moho/ai/IAiCommandDispatchImplTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/ai/IAiCommandDispatch.h"
@@ -12,6 +14,51 @@ using namespace moho;
 
 namespace
 {
+  alignas(IAiCommandDispatchImplTypeInfo)
+  unsigned char gIAiCommandDispatchImplTypeInfoStorage[sizeof(IAiCommandDispatchImplTypeInfo)] = {};
+  bool gIAiCommandDispatchImplTypeInfoConstructed = false;
+
+  [[nodiscard]] IAiCommandDispatchImplTypeInfo* AcquireIAiCommandDispatchImplTypeInfo()
+  {
+    return reinterpret_cast<IAiCommandDispatchImplTypeInfo*>(gIAiCommandDispatchImplTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00599130 (FUN_00599130, constructor lane for IAiCommandDispatchImplTypeInfo)
+   *
+   * What it does:
+   * Constructs startup-owned `IAiCommandDispatchImplTypeInfo` storage and
+   * preregisters RTTI for `IAiCommandDispatchImpl`.
+   */
+  [[nodiscard]] gpg::RType* construct_IAiCommandDispatchImplTypeInfo()
+  {
+    if (!gIAiCommandDispatchImplTypeInfoConstructed) {
+      IAiCommandDispatchImplTypeInfo* const typeInfo =
+        new (gIAiCommandDispatchImplTypeInfoStorage) IAiCommandDispatchImplTypeInfo();
+      gpg::PreRegisterRType(typeid(IAiCommandDispatchImpl), typeInfo);
+      gIAiCommandDispatchImplTypeInfoConstructed = true;
+    }
+
+    return AcquireIAiCommandDispatchImplTypeInfo();
+  }
+
+  /**
+   * Address: 0x00BF6660 (FUN_00BF6660, cleanup_IAiCommandDispatchImplTypeInfo)
+   *
+   * What it does:
+   * Tears down startup-owned IAiCommandDispatchImpl type-info storage by
+   * running the `gpg::RType` destructor lane.
+   */
+  void cleanup_IAiCommandDispatchImplTypeInfoStorage()
+  {
+    if (!gIAiCommandDispatchImplTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireIAiCommandDispatchImplTypeInfo()->gpg::RType::~RType();
+    gIAiCommandDispatchImplTypeInfoConstructed = false;
+  }
+
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = CCommandTask::sType;
@@ -85,3 +132,28 @@ void IAiCommandDispatchImplTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x00BCBEA0 (FUN_00BCBEA0, register_IAiCommandDispatchImplTypeInfo)
+ *
+ * What it does:
+ * Constructs/preregisters startup RTTI storage for
+ * `IAiCommandDispatchImpl` and installs process-exit cleanup.
+ */
+int moho::register_IAiCommandDispatchImplTypeInfo()
+{
+  (void)construct_IAiCommandDispatchImplTypeInfo();
+  return std::atexit(&cleanup_IAiCommandDispatchImplTypeInfoStorage);
+}
+
+namespace
+{
+  struct IAiCommandDispatchImplTypeInfoBootstrap
+  {
+    IAiCommandDispatchImplTypeInfoBootstrap()
+    {
+      (void)moho::register_IAiCommandDispatchImplTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] IAiCommandDispatchImplTypeInfoBootstrap gIAiCommandDispatchImplTypeInfoBootstrap;
+} // namespace

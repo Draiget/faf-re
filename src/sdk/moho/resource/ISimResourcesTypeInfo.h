@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00546EF0 (FUN_00546EF0, Moho::ISimResourcesTypeInfo::ISimResourcesTypeInfo)
+     *
+     * What it does:
+     * Initializes base reflection state and preregisters RTTI ownership for
+     * `ISimResources`.
+     */
+    ISimResourcesTypeInfo();
+
+    /**
      * Address: 0x00546F80 (FUN_00546F80, Moho::ISimResourcesTypeInfo::dtr)
      * Slot: 2
      */
@@ -45,6 +54,15 @@ namespace moho
      */
     static void AddBase_IResources(gpg::RType* typeInfo);
   };
+
+  /**
+   * Address: 0x00BC97D0 (FUN_00BC97D0, register_ISimResourcesTypeInfo)
+   *
+   * What it does:
+   * Constructs startup-owned `ISimResourcesTypeInfo` storage and registers
+   * process-exit teardown.
+   */
+  void register_ISimResourcesTypeInfo();
 
   static_assert(sizeof(ISimResourcesTypeInfo) == 0x64, "ISimResourcesTypeInfo size must be 0x64");
 } // namespace moho

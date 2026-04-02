@@ -82,11 +82,8 @@ namespace moho
     void DestroyHandle(CDecalHandle* handle);
 
     /**
-     * Address: 0x00403A30 (FUN_00403A30, sub_403A30)
-     * Address: 0x00403D20 (FUN_00403D20, sub_403D20)
-     *
      * What it does:
-     * Advances the IdPool rolling recycle window by one tick, including oldest-slot pop.
+     * Delegates one recycle-window tick to `IdPool::Update`.
      */
     void AdvanceIdPoolWindow();
 

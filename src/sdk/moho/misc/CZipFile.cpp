@@ -344,6 +344,13 @@ namespace
     return result;
   }
 
+  /**
+   * Address: 0x0046D960 (FUN_0046D960, std::map_string_uint::find)
+   *
+   * What it does:
+   * Finds one canonical zip-entry name in the name-index map and returns the
+   * map head sentinel when no exact match exists.
+   */
   [[nodiscard]]
   const moho::SZipFileNameIndexMapNode* NameIndexMapFind(
     const moho::SZipFileNameIndexMap& map, const msvc8::string& canonicalPath
@@ -421,14 +428,14 @@ namespace
     }
 
     if (entry.mCachedDataOffset >= 0) {
-      (void)stream.VirtSeek(
-        gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::size_t>(entry.mCachedDataOffset)
+      (void)stream.Seek(
+        gpg::Stream::OriginBegin, static_cast<std::int64_t>(entry.mCachedDataOffset)
       );
       return true;
     }
 
-    (void)stream.VirtSeek(
-      gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::size_t>(entry.mLocalHeaderOffset)
+    (void)stream.Seek(
+      gpg::Stream::OriginBegin, static_cast<std::int64_t>(entry.mLocalHeaderOffset)
     );
 
     moho::SZipLocalFileHeader localHeader{};
@@ -449,16 +456,15 @@ namespace
       return false;
     }
 
-    const std::size_t dataOffset = stream.VirtTell(gpg::Stream::ModeReceive) +
-                                   static_cast<std::size_t>(localHeader.mFileNameLength) +
-                                   static_cast<std::size_t>(localHeader.mExtraFieldLength);
-    if (dataOffset > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
+    const std::uint64_t skipSize = static_cast<std::uint64_t>(localHeader.mFileNameLength) +
+                                   static_cast<std::uint64_t>(localHeader.mExtraFieldLength);
+    const std::uint64_t dataOffset = stream.Seek(gpg::Stream::OriginCurr, static_cast<std::int64_t>(skipSize));
+    if (dataOffset > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max())) {
       entry.mLocalHeaderOffset = kInvalidZipOffset;
       return false;
     }
 
     entry.mCachedDataOffset = static_cast<std::int32_t>(dataOffset);
-    (void)stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, dataOffset);
     return true;
   }
 } // namespace
@@ -485,10 +491,13 @@ namespace moho
       return;
     }
 
-    const std::size_t fileSize = zipStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginEnd, 0);
-    const std::size_t tailBytesToRead = std::min(fileSize, kZipDirectoryScanTailLimit);
-    const std::size_t tailStartOffset = fileSize - tailBytesToRead;
-    (void)zipStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, tailStartOffset);
+    const std::uint64_t fileSize = zipStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginEnd, 0);
+    const std::size_t tailBytesToRead =
+      static_cast<std::size_t>(std::min<std::uint64_t>(fileSize, kZipDirectoryScanTailLimit));
+    const std::uint64_t tailStartOffset = fileSize - tailBytesToRead;
+    (void)zipStream->VirtSeek(
+      gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::int64_t>(tailStartOffset)
+    );
 
     std::vector<char> tailBytes(tailBytesToRead);
     if (tailBytesToRead != 0) {
@@ -501,12 +510,12 @@ namespace moho
       return;
     }
 
-    const std::size_t endOfCentralDirectoryAbsoluteOffset =
+    const std::uint64_t endOfCentralDirectoryAbsoluteOffset =
       tailStartOffset + endOfCentralDirectoryOffsetInTail;
     (void)zipStream->VirtSeek(
       gpg::Stream::ModeReceive,
       gpg::Stream::OriginBegin,
-      endOfCentralDirectoryAbsoluteOffset
+      static_cast<std::int64_t>(endOfCentralDirectoryAbsoluteOffset)
     );
 
     gpg::BinaryReader reader(zipStream.get());
@@ -530,7 +539,7 @@ namespace moho
     (void)zipStream->VirtSeek(
       gpg::Stream::ModeReceive,
       gpg::Stream::OriginBegin,
-      static_cast<std::size_t>(endOfCentralDirectory.mCentralDirectoryOffset)
+      static_cast<std::int64_t>(endOfCentralDirectory.mCentralDirectoryOffset)
     );
 
     mEntries.reserve(endOfCentralDirectory.mTotalEntries);
@@ -565,7 +574,9 @@ namespace moho
       const std::size_t trailingSkipSize = static_cast<std::size_t>(directoryHeader.mExtraFieldLength) +
                                            static_cast<std::size_t>(directoryHeader.mFileCommentLength);
       if (trailingSkipSize != 0) {
-        (void)zipStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginCurr, trailingSkipSize);
+        (void)zipStream->VirtSeek(
+          gpg::Stream::ModeReceive, gpg::Stream::OriginCurr, static_cast<std::int64_t>(trailingSkipSize)
+        );
       }
 
       if ((parsedEntry->mGeneralPurposeFlags & kZipDataDescriptorFlag) != 0) {

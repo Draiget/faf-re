@@ -26,6 +26,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004C9570 (FUN_004C9570, ??0CLuaTask@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes Lua task ownership on the provided thread stack, adopts one
+     * pending `LuaState*` lane from `newState`, and binds back-reference.
+     */
+    CLuaTask(CTaskThread* thread, LuaPlus::LuaState** newState);
+
+    /**
      * Address: 0x004C9990 (FUN_004C9990, scalar deleting thunk)
      * Address: 0x004C9610 (FUN_004C9610, non-deleting body)
      *
@@ -41,6 +50,22 @@ namespace moho
      * returns next wake tick (-1 on completion/error).
      */
     int Execute() override;
+
+    /**
+     * Address: 0x004CC2B0 (FUN_004CC2B0, Moho::CLuaTask::MemberDeserialize)
+     *
+     * What it does:
+     * Loads base `CTask` lane, owned `LuaState*`, and resume-argument count.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x004CC320 (FUN_004CC320, Moho::CLuaTask::MemberSerialize)
+     *
+     * What it does:
+     * Saves base `CTask` lane, owned `LuaState*`, and resume-argument count.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
 
   public:
     // 0x18: reserved/unknown dword (constructor 0x004C9570 does not initialize it).
@@ -121,4 +146,38 @@ namespace moho
   static_assert(sizeof(CLuaTaskConstruct) == 0x14, "CLuaTaskConstruct size must be 0x14");
   static_assert(sizeof(CLuaTaskSerializer) == 0x14, "CLuaTaskSerializer size must be 0x14");
   static_assert(sizeof(CLuaTaskTypeInfo) == 0x64, "CLuaTaskTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x004C9D00 (FUN_004C9D00, cfunc_ForkThread)
+   *
+   * What it does:
+   * Unwraps Lua binding callback context and forwards to `cfunc_ForkThreadL`.
+   */
+  int cfunc_ForkThread(lua_State* luaContext);
+
+  /**
+   * Address: 0x004C9D80 (FUN_004C9D80, cfunc_ForkThreadL)
+   *
+   * What it does:
+   * Spawns one Lua task thread from function + args and returns the coroutine
+   * thread object to the calling state.
+   */
+  int cfunc_ForkThreadL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CAB90 (FUN_004CAB90, cfunc_ResumeThread)
+   *
+   * What it does:
+   * Unwraps binding context and forwards to `cfunc_ResumeThreadL`.
+   */
+  int cfunc_ResumeThread(lua_State* luaContext);
+
+  /**
+   * Address: 0x004CAC10 (FUN_004CAC10, cfunc_ResumeThreadL)
+   *
+   * What it does:
+   * Validates one coroutine-thread argument, clears thread wait staging, and
+   * resumes a ForkThread-created task thread on the next scheduler frame.
+   */
+  int cfunc_ResumeThreadL(LuaPlus::LuaState* state);
 } // namespace moho

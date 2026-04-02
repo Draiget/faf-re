@@ -19,6 +19,16 @@ namespace moho
     CConFunc() noexcept;
 
     /**
+     * Address: 0x0041E5C0 (FUN_0041E5C0, ??0CConFunc@Moho@@QAE@PBD0@Z)
+     *
+     * const char* name, const char* description, Callback callback
+     *
+     * What it does:
+     * Runs base command initialization/registration and stores callback payload.
+     */
+    CConFunc(const char* name, const char* description, Callback callback) noexcept;
+
+    /**
      * Address: <synthetic initializer built from CConCommand registration shape>
      *
      * const char* description, const char* name, Callback callback

@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005B6A80 (FUN_005B6A80, Moho::CAiPersonalitySerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `CAiPersonality::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005B6A90 (FUN_005B6A90, Moho::CAiPersonalitySerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `CAiPersonality::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005B9350 (FUN_005B9350)
      *
      * What it does:
@@ -52,4 +68,31 @@ namespace moho
     "CAiPersonalitySerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiPersonalitySerializer) == 0x14, "CAiPersonalitySerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCD5A0 (FUN_00BCD5A0)
+   *
+   * What it does:
+   * Preregisters startup RTTI for the legacy AI `SValuePair` lane and installs
+   * process-exit cleanup.
+   */
+  int register_SValuePairTypeInfo();
+
+  /**
+   * Address: 0x00BCD5C0 (FUN_00BCD5C0, register_SValuePairSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callbacks for `SValuePair` and installs
+   * process-exit helper unlink cleanup.
+   */
+  int register_SValuePairSerializer();
+
+  /**
+   * Address: 0x00BCD660 (FUN_00BCD660, register_CAiPersonalitySerializer)
+   *
+   * What it does:
+   * Initializes global CAiPersonality serializer helper callbacks and installs
+   * process-exit cleanup.
+   */
+  int register_CAiPersonalitySerializer();
 } // namespace moho

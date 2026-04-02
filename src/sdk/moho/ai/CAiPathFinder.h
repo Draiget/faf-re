@@ -49,6 +49,8 @@ namespace moho
     AIPATHSEARCH_Leader = 3,
   };
 
+  using ESearchType = EAiPathSearchType;
+
   /**
    * VFTABLE: 0x00E1C338
    * COL:  0x00E72290
@@ -215,6 +217,22 @@ namespace moho
      * Returns latest result cell payload.
      */
     void GetResultCell(HPathCell* outCell) const override;
+
+    /**
+     * Address: 0x005ABED0 (FUN_005ABED0, Moho::CAiPathFinder::MemberDeserialize)
+     *
+     * What it does:
+     * Reads serialized CAiPathFinder state lanes from archive storage.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
+
+    /**
+     * Address: 0x005AC150 (FUN_005AC150, Moho::CAiPathFinder::MemberSerialize)
+     *
+     * What it does:
+     * Writes serialized CAiPathFinder state lanes to archive storage.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
 
   private:
     void ClearRectHistory();

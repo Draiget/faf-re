@@ -18,6 +18,14 @@ namespace
   bool gSimInterlocked = false;
   ISTIDriver* gActiveSimDriver = nullptr;
 
+  boost::mutex& DriverMutexRef(SDriverMutex& lockCell)
+  {
+    if (lockCell.lock == nullptr) {
+      lockCell.lock = new boost::mutex();
+    }
+    return *lockCell.lock;
+  }
+
   bool AreGeomCameraVectorsEqual(const msvc8::vector<GeomCamera3>& lhs, const msvc8::vector<GeomCamera3>& rhs)
   {
     if (lhs.size() != rhs.size()) {
@@ -163,6 +171,8 @@ CSimDriver::CSimDriver(
   , mSimSpeedSamples{}
   , mCurrentSimRate(10)
 {
+  mLock.lock = new boost::mutex();
+
   mPendingSyncFilter.focusArmy = static_cast<int32_t>(commandSourceId);
   mActiveSyncFilter.focusArmy = static_cast<int32_t>(commandSourceId);
 
@@ -177,7 +187,7 @@ CSimDriver::CSimDriver(
   // 0x0073D260 creates the simulation bootstrap thread. The full function
   // still depends on additional lifted classes; for now we preserve state flow.
   mCreateSimThread = new boost::thread([this]() {
-    boost::mutex::scoped_lock lock(mLock.lock);
+    boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
     if (mStopCreateSimThread) {
       mState = EDriverState::Stopped;
       mStateChanged.notify_all();
@@ -204,6 +214,8 @@ CSimDriver::~CSimDriver()
   }
 
   ShutDown();
+  delete mLock.lock;
+  mLock.lock = nullptr;
 
   if (mConnectionEvent) {
     CloseHandle(mConnectionEvent);
@@ -402,7 +414,7 @@ HANDLE CSimDriver::GetSyncDataAvailableEvent()
  */
 void CSimDriver::SetArmyIndex(const int armyIndex)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   if (mPendingSyncFilter.focusArmy == armyIndex) {
     return;
   }
@@ -411,13 +423,18 @@ void CSimDriver::SetArmyIndex(const int armyIndex)
   MarkFirstConnectionActivityLocked();
 }
 
+void CSimDriver::SetPendingFocusArmyRaw(const std::int32_t focusArmy) noexcept
+{
+  mPendingSyncFilter.focusArmy = focusArmy;
+}
+
 /**
  * Address: 0x0073B240 (FUN_0073B240), ISTIDriver slot 16
  * Updates the pending sync-filter option flag.
  */
 void CSimDriver::SetSyncFilterOptionFlag(const bool value)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mPendingSyncFilter.optionFlag = value;
 }
 
@@ -427,7 +444,7 @@ void CSimDriver::SetSyncFilterOptionFlag(const bool value)
  */
 void CSimDriver::SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   if (!AreGeomCameraVectorsEqual(mPendingSyncFilter.geoCams, geoCams)) {
     mPendingSyncFilter.geoCams = geoCams;
   }
@@ -440,7 +457,7 @@ void CSimDriver::SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams)
  */
 void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   (void)SSyncFilterMaskBlock::Equals(mPendingSyncFilter.maskA, block);
 }
 
@@ -450,7 +467,7 @@ void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
  */
 void CSimDriver::SetSyncFilterMaskB(const SSyncFilterMaskBlock& block)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   if (SSyncFilterMaskBlock::Equals(mPendingSyncFilter.maskB, block)) {
     return;
   }
@@ -464,7 +481,7 @@ void CSimDriver::SetSyncFilterMaskB(const SSyncFilterMaskBlock& block)
  */
 void CSimDriver::DisconnectClients()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mClientManager->Disconnect();
   MarkFirstConnectionActivityLocked();
 }
@@ -475,7 +492,7 @@ void CSimDriver::DisconnectClients()
  */
 void CSimDriver::ShutDown()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
 
   if (mSimThread) {
     mStopSimThread = true;
@@ -523,7 +540,7 @@ void CSimDriver::NoOp() {}
  */
 void CSimDriver::Dispatch()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
 
   if (mWantsToSave) {
     CSaveGameRequestImpl* request = mSaveGameRequest;
@@ -575,7 +592,7 @@ void CSimDriver::Dispatch()
  */
 void CSimDriver::IncrementOutstandingRequests()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   ++mOutstandingRequests;
 }
 
@@ -585,7 +602,7 @@ void CSimDriver::IncrementOutstandingRequests()
  */
 void CSimDriver::DecrementOutstandingRequestsAndSignal()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   if (--mOutstandingRequests == 0) {
     mLastSyncCycleTime = mTimer.ElapsedCycles();
   }
@@ -600,7 +617,7 @@ void CSimDriver::DecrementOutstandingRequestsAndSignal()
  */
 bool CSimDriver::HasSyncData()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   return !mSyncDataQueue.Empty();
 }
 
@@ -612,7 +629,7 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
 {
   outSyncData = nullptr;
 
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   while (mSyncDataQueue.Empty()) {
     lock.unlock();
     PerformNextEvent();
@@ -649,7 +666,7 @@ double CSimDriver::GetSimSpeed()
  */
 void CSimDriver::RequestPause()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->RequestPause();
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -661,7 +678,7 @@ void CSimDriver::RequestPause()
  */
 void CSimDriver::Resume()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->Resume();
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -673,7 +690,7 @@ void CSimDriver::Resume()
  */
 void CSimDriver::SingleStep()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SingleStep();
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -685,7 +702,7 @@ void CSimDriver::SingleStep()
  */
 void CSimDriver::CreateUnit(const uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, const float heading)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->CreateUnit(armyIndex, id, pos, heading);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -697,7 +714,7 @@ void CSimDriver::CreateUnit(const uint32_t armyIndex, const RResId& id, const SC
  */
 void CSimDriver::CreateProp(const char* id, const Wm3::Vec3f& loc)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->CreateProp(id, loc);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -709,7 +726,7 @@ void CSimDriver::CreateProp(const char* id, const Wm3::Vec3f& loc)
  */
 void CSimDriver::DestroyEntity(const EntId entityId)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->DestroyEntity(entityId);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -721,7 +738,7 @@ void CSimDriver::DestroyEntity(const EntId entityId)
  */
 void CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->WarpEntity(entityId, transform);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -733,7 +750,7 @@ void CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
  */
 void CSimDriver::ProcessInfoPair(void* id, const char* key, const char* val)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->ProcessInfoPair(id, key, val);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -747,7 +764,7 @@ void CSimDriver::IssueCommand(
   const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, const bool clear
 )
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->IssueCommand(entities, data, clear);
   ForwardCommandResultLocked();
 }
@@ -760,7 +777,7 @@ void CSimDriver::IssueFactoryCommand(
   const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, const bool clear
 )
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->IssueFactoryCommand(entities, data, clear);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -772,7 +789,7 @@ void CSimDriver::IssueFactoryCommand(
  */
 void CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->IncreaseCommandCount(id, count);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -784,7 +801,7 @@ void CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
  */
 void CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->DecreaseCommandCount(id, count);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -796,7 +813,7 @@ void CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
  */
 void CSimDriver::SetCommandTarget(const CmdId id, const SSTITarget& target)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SetCommandTarget(id, target);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -808,7 +825,7 @@ void CSimDriver::SetCommandTarget(const CmdId id, const SSTITarget& target)
  */
 void CSimDriver::SetCommandType(const CmdId id, const EUnitCommandType type)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SetCommandType(id, type);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -822,7 +839,7 @@ void CSimDriver::SetCommandCells(
   const CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target
 )
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->SetCommandCells(id, cells, target);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -834,7 +851,7 @@ void CSimDriver::SetCommandCells(
  */
 void CSimDriver::RemoveCommandFromUnitQueue(const CmdId id, const EntId unitId)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->RemoveCommandFromUnitQueue(id, unitId);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -846,7 +863,7 @@ void CSimDriver::RemoveCommandFromUnitQueue(const CmdId id, const EntId unitId)
  */
 void CSimDriver::ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->ExecuteLuaInSim(lua, args);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -860,7 +877,7 @@ void CSimDriver::LuaSimCallback(
   const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
 )
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->LuaSimCallback(fnName, args, entities);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -877,7 +894,7 @@ void CSimDriver::ExecuteDebugCommand(
   const BVSet<EntId, EntIdUniverse>& entities
 )
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->ExecuteDebugCommand(command, worldPos, focusArmy, entities);
   MarkFirstConnectionActivityLocked();
   ForwardCommandResultLocked();
@@ -889,7 +906,7 @@ void CSimDriver::ExecuteDebugCommand(
  */
 Sim* CSimDriver::ProcessEvents()
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   ++mInterlockRefCount;
   mInterlockedMode = true;
 
@@ -917,7 +934,7 @@ void CSimDriver::ReleaseInterlockRef()
  */
 void CSimDriver::RequestSaveGame(CSaveGameRequestImpl* request)
 {
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mSaveGameRequest = request;
   mStateChanged.notify_all();
   ++mOutstandingRequests;
@@ -937,7 +954,7 @@ void CSimDriver::DrawNetworkStats(
   (void)scaleX;
   (void)scaleY;
 
-  boost::mutex::scoped_lock lock(mLock.lock);
+  boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   // 0x0073DFE0 builds a multi-column network table and renders it with
   // D3D font batching ("Courier New", columns ping/maxsp/data/behind/avail).
   // Full lifting is blocked until CD3DPrimBatcher/CD3DFont surfaces are
@@ -951,7 +968,7 @@ void CSimDriver::DrawNetworkStats(
 DWORD CSimDriver::PerformNextEvent()
 {
   {
-    boost::mutex::scoped_lock lock(mLock.lock);
+    boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
     mClientManager->DoBeat();
   }
 

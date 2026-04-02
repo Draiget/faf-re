@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
@@ -20,6 +22,141 @@ namespace
   constexpr std::uint64_t kUnitPathFlag = 0x1000000ull;
   constexpr std::uint64_t kUnitPathingBusyFlag = 0x800000ull;
   constexpr std::uint64_t kUnitPatrolStallFlag = 0x2000000ull;
+
+  gpg::RType* gNavigatorStateType = nullptr;
+  gpg::RType* gPathFinderType = nullptr;
+  gpg::RType* gNavPathType = nullptr;
+  gpg::RType* gHPathCellType = nullptr;
+  gpg::RType* gNavGoalType = nullptr;
+  gpg::RType* gLayerType = nullptr;
+  gpg::RType* gSimType = nullptr;
+  gpg::RType* gWeakUnitType = nullptr;
+  gpg::RType* gVector3Type = nullptr;
+  gpg::RType* gSearchType = nullptr;
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
+  {
+    if (!slot) {
+      slot = gpg::LookupRType(typeid(TObject));
+    }
+    return slot;
+  }
+
+  [[nodiscard]] gpg::RType* CachedNavigatorStateType()
+  {
+    return CachedType<EAiPathNavigatorState>(gNavigatorStateType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAiPathFinderType()
+  {
+    if (!CAiPathFinder::sType) {
+      CAiPathFinder::sType = CachedType<CAiPathFinder>(gPathFinderType);
+    }
+    return CAiPathFinder::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedNavPathType()
+  {
+    return CachedType<SNavPath>(gNavPathType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedHPathCellType()
+  {
+    return CachedType<HPathCell>(gHPathCellType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedNavGoalType()
+  {
+    return CachedType<SAiNavigatorGoal>(gNavGoalType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedLayerType()
+  {
+    return CachedType<ELayer>(gLayerType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedSimType()
+  {
+    if (!Sim::sType) {
+      Sim::sType = CachedType<Sim>(gSimType);
+    }
+    return Sim::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedWeakUnitType()
+  {
+    return CachedType<WeakPtr<Unit>>(gWeakUnitType);
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3Type()
+  {
+    return CachedType<Wm3::Vector3f>(gVector3Type);
+  }
+
+  [[nodiscard]] gpg::RType* CachedSearchType()
+  {
+    return CachedType<EAiPathSearchType>(gSearchType);
+  }
+
+  template <typename TObject>
+  [[nodiscard]] TObject* ReadPointerWithType(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
+  {
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    return static_cast<TObject*>(upcast.mObj);
+  }
+
+  template <typename TObject>
+  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = staticType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType ? dynamicType : staticType;
+      return out;
+    }
+
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  template <typename TObject>
+  void WritePointerWithType(
+    gpg::WriteArchive* const archive,
+    TObject* const object,
+    gpg::RType* const staticType,
+    const gpg::TrackedPointerState state,
+    const gpg::RRef& owner
+  )
+  {
+    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    gpg::WriteRawPointer(archive, objectRef, state, owner);
+  }
 
   struct UnitLayerTokenView
   {
@@ -928,5 +1065,130 @@ bool CAiPathNavigator::CanPathTo(const SAiNavigatorGoal& goal, Wm3::Vector3f* co
   const SOCellPos anchor = GoalAnchorCell(goal);
   *outTargetPos = ToWorldPos(anchor, *unit, *footprint);
   return true;
+}
+
+/**
+ * Address: 0x005B0F10 (FUN_005B0F10, Moho::CAiPathNavigator::MemberDeserialize)
+ */
+void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+
+  if (version >= 1) {
+    archive->Read(CachedNavigatorStateType(), &mState, owner);
+  }
+
+  CAiPathFinder* const loadedPathFinder = ReadPointerWithType<CAiPathFinder>(archive, owner, CachedCAiPathFinderType());
+  CAiPathFinder* const oldPathFinder = mPathFinder;
+  mPathFinder = loadedPathFinder;
+  if (oldPathFinder) {
+    delete oldPathFinder;
+  }
+
+  archive->Read(CachedNavPathType(), &mPath, owner);
+  archive->Read(CachedHPathCellType(), &mCurrentPos, owner);
+  archive->Read(CachedHPathCellType(), &mTargetPos, owner);
+
+  HPathCell blockedCell{};
+  archive->Read(CachedHPathCellType(), &blockedCell, owner);
+  std::memcpy(&mLastBlockedCell, &blockedCell, sizeof(blockedCell));
+
+  archive->Read(CachedNavGoalType(), &mGoal, owner);
+  archive->Read(CachedLayerType(), &mLastPathLayerToken, owner);
+  mSim = ReadPointerWithType<Sim>(archive, owner, CachedSimType());
+
+  archive->ReadInt(&mLastPathNodeIndex);
+  archive->ReadInt(&mPathSearchFailCount);
+  archive->ReadInt(&mPathRetryDelayFrames);
+  archive->ReadInt(&mNoForwardDistanceFailCount);
+  archive->ReadFloat(&mRepathDistanceThreshold);
+
+  unsigned int lastRepathTickRaw = 0;
+  archive->ReadUInt(&lastRepathTickRaw);
+  mLastRepathTick = static_cast<std::int32_t>(lastRepathTickRaw);
+
+  archive->ReadInt(&mNoProgressTickCount);
+
+  unsigned int lastFormationSyncTickRaw = 0;
+  archive->ReadUInt(&lastFormationSyncTickRaw);
+  mLastFormationSyncTick = static_cast<std::int32_t>(lastFormationSyncTickRaw);
+
+  archive->Read(CachedWeakUnitType(), &mLeaderLink, owner);
+  archive->Read(CachedVector3Type(), &mLeaderTargetPos, owner);
+
+  bool boolValue = false;
+  archive->ReadBool(&boolValue);
+  mIsInFormation = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mLeaderBusy = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mHasLeaderTargetPos = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mHasForwardProbe = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mRepathRequested = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mUseExtendedPathProbe = boolValue ? 1u : 0u;
+  archive->ReadBool(&boolValue);
+  mTargetWithinOneCell = boolValue ? 1u : 0u;
+  archive->Read(CachedSearchType(), &mPathRequestMode, owner);
+  archive->ReadInt(&mPathRequestCountdown);
+  archive->ReadInt(&mTickBucket7);
+  archive->ReadInt(&mTickBucket13);
+}
+
+/**
+ * Address: 0x005B12A0 (FUN_005B12A0, Moho::CAiPathNavigator::MemberSerialize)
+ */
+void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const int version)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef owner{};
+
+  if (version >= 1) {
+    archive->Write(CachedNavigatorStateType(), &mState, owner);
+  }
+
+  WritePointerWithType(archive, mPathFinder, CachedCAiPathFinderType(), gpg::TrackedPointerState::Owned, owner);
+  archive->Write(CachedNavPathType(), &mPath, owner);
+  archive->Write(CachedHPathCellType(), &mCurrentPos, owner);
+  archive->Write(CachedHPathCellType(), &mTargetPos, owner);
+
+  HPathCell blockedCell{};
+  std::memcpy(&blockedCell, &mLastBlockedCell, sizeof(blockedCell));
+  archive->Write(CachedHPathCellType(), &blockedCell, owner);
+
+  archive->Write(CachedNavGoalType(), &mGoal, owner);
+  archive->Write(CachedLayerType(), &mLastPathLayerToken, owner);
+  WritePointerWithType(archive, mSim, CachedSimType(), gpg::TrackedPointerState::Unowned, owner);
+
+  archive->WriteInt(mLastPathNodeIndex);
+  archive->WriteInt(mPathSearchFailCount);
+  archive->WriteInt(mPathRetryDelayFrames);
+  archive->WriteInt(mNoForwardDistanceFailCount);
+  archive->WriteFloat(mRepathDistanceThreshold);
+  archive->WriteUInt(static_cast<unsigned int>(mLastRepathTick));
+  archive->WriteInt(mNoProgressTickCount);
+  archive->WriteUInt(static_cast<unsigned int>(mLastFormationSyncTick));
+  archive->Write(CachedWeakUnitType(), &mLeaderLink, owner);
+  archive->Write(CachedVector3Type(), &mLeaderTargetPos, owner);
+  archive->WriteBool(mIsInFormation != 0u);
+  archive->WriteBool(mLeaderBusy != 0u);
+  archive->WriteBool(mHasLeaderTargetPos != 0u);
+  archive->WriteBool(mHasForwardProbe != 0u);
+  archive->WriteBool(mRepathRequested != 0u);
+  archive->WriteBool(mUseExtendedPathProbe != 0u);
+  archive->WriteBool(mTargetWithinOneCell != 0u);
+  archive->Write(CachedSearchType(), &mPathRequestMode, owner);
+  archive->WriteInt(mPathRequestCountdown);
+  archive->WriteInt(mTickBucket7);
+  archive->WriteInt(mTickBucket13);
 }
 

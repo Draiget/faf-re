@@ -5,7 +5,6 @@
 #include "gpg/core/utils/Global.h"
 using namespace gpg;
 
-
 /**
  * Address: 0x00956DB0 (FUN_00956DB0)
  *
@@ -13,20 +12,21 @@ using namespace gpg;
  * Initializes stream read/write window pointers to null.
  */
 Stream::Stream()
-    : mReadStart(nullptr),
-      mReadHead(nullptr),
-      mReadEnd(nullptr),
-      mWriteStart(nullptr),
-      mWriteHead(nullptr),
-      mWriteEnd(nullptr)
-{
-}
+  : mReadStart(nullptr)
+  , mReadHead(nullptr)
+  , mReadEnd(nullptr)
+  , mWriteStart(nullptr)
+  , mWriteHead(nullptr)
+  , mWriteEnd(nullptr)
+{}
 
 /**
+ * Address: 0x00956DD0 (FUN_00956DD0, non-deleting dtor lane)
  * Address: 0x00956E20 (FUN_00956E20)
  *
  * What it does:
- * Owns deleting-destructor lane for Stream base and conditionally frees `this`.
+ * Resets Stream vftable in the base dtor lane and owns deleting-dtor dispatch
+ * for scalar delete.
  */
 Stream::~Stream() = default;
 
@@ -37,7 +37,7 @@ Stream::~Stream() = default;
  * Constructs the standard "Unsupported stream operation." logic_error payload.
  */
 Stream::UnsupportedOperation::UnsupportedOperation()
-    : std::logic_error{ std::string{"Unsupported stream operation."} }
+  : std::logic_error{std::string{"Unsupported stream operation."}}
 {}
 
 /**
@@ -46,8 +46,9 @@ Stream::UnsupportedOperation::UnsupportedOperation()
  * What it does:
  * Default seek-position query lane throws UnsupportedOperation.
  */
-size_t Stream::VirtTell(Mode) {
-    throw UnsupportedOperation{};
+std::uint64_t Stream::VirtTell(Mode)
+{
+  throw UnsupportedOperation{};
 }
 
 /**
@@ -56,8 +57,9 @@ size_t Stream::VirtTell(Mode) {
  * What it does:
  * Default seek lane throws UnsupportedOperation.
  */
-size_t Stream::VirtSeek(Mode, SeekOrigin, size_t) {
-    throw UnsupportedOperation{};
+std::uint64_t Stream::VirtSeek(Mode, SeekOrigin, std::int64_t)
+{
+  throw UnsupportedOperation{};
 }
 
 /**
@@ -66,8 +68,9 @@ size_t Stream::VirtSeek(Mode, SeekOrigin, size_t) {
  * What it does:
  * Default read lane throws UnsupportedOperation.
  */
-size_t Stream::VirtRead(char*, size_t) {
-    throw UnsupportedOperation{};
+size_t Stream::VirtRead(char*, size_t)
+{
+  throw UnsupportedOperation{};
 }
 
 /**
@@ -76,8 +79,9 @@ size_t Stream::VirtRead(char*, size_t) {
  * What it does:
  * Default non-blocking read forwards to VirtRead.
  */
-size_t Stream::VirtReadNonBlocking(char* buf, size_t len) {
-    return VirtRead(buf, len);
+size_t Stream::VirtReadNonBlocking(char* buf, size_t len)
+{
+  return VirtRead(buf, len);
 }
 
 /**
@@ -86,8 +90,9 @@ size_t Stream::VirtReadNonBlocking(char* buf, size_t len) {
  * What it does:
  * Default unget lane throws UnsupportedOperation.
  */
-void Stream::VirtUnGetByte(int unknown) {
-    throw UnsupportedOperation{};
+void Stream::VirtUnGetByte(int unknown)
+{
+  throw UnsupportedOperation{};
 }
 
 /**
@@ -96,8 +101,9 @@ void Stream::VirtUnGetByte(int unknown) {
  * What it does:
  * Default end-of-stream query returns false.
  */
-bool Stream::VirtAtEnd() {
-    return false;
+bool Stream::VirtAtEnd()
+{
+  return false;
 }
 
 /**
@@ -106,8 +112,9 @@ bool Stream::VirtAtEnd() {
  * What it does:
  * Default write lane throws UnsupportedOperation.
  */
-void Stream::VirtWrite(const char* data, size_t size) {
-    throw UnsupportedOperation{};
+void Stream::VirtWrite(const char* data, size_t size)
+{
+  throw UnsupportedOperation{};
 }
 
 /**
@@ -127,13 +134,26 @@ void Stream::VirtFlush() {}
 void Stream::VirtClose(Mode) {}
 
 /**
+ * Address: 0x0046BED0 (FUN_0046BED0, __imp_?Seek@Stream@gpg@@QAE_KW4Mode@12@W4SeekOrigin@12@_J@Z)
+ *
+ * What it does:
+ * Non-virtual receive-lane seek wrapper that forwards to `VirtSeek` with
+ * `ModeReceive`.
+ */
+std::uint64_t Stream::Seek(const SeekOrigin origin, const std::int64_t pos)
+{
+  return VirtSeek(ModeReceive, origin, pos);
+}
+
+/**
  * Address: 0x006E5A10 (FUN_006E5A10)
  *
  * What it does:
  * Writes string bytes including trailing NUL via inline buffer or virtual write fallback.
  */
-void Stream::Write(const msvc8::string& str) {
-    Write(str.c_str(), str.size() + 1);
+void Stream::Write(const msvc8::string& str)
+{
+  Write(str.c_str(), str.size() + 1);
 }
 
 /**
@@ -142,14 +162,15 @@ void Stream::Write(const msvc8::string& str) {
  * What it does:
  * Writes one byte span via inline buffer fast path or virtual write fallback.
  */
-void Stream::Write(const char* buf, const size_t size) {
-    if (size > LeftToWrite()) {
-        VirtWrite(buf, size);
-        return;
-    }
+void Stream::Write(const char* buf, const size_t size)
+{
+  if (size > LeftToWrite()) {
+    VirtWrite(buf, size);
+    return;
+  }
 
-    memcpy(mWriteHead, buf, size);
-    mWriteHead += size;
+  memcpy(mWriteHead, buf, size);
+  mWriteHead += size;
 }
 
 /**
@@ -158,9 +179,27 @@ void Stream::Write(const char* buf, const size_t size) {
  * What it does:
  * Writes one NUL-terminated C-string including terminator.
  */
-void Stream::Write(const char* buf) {
-    const auto len = strlen(buf) + 1;
-    Write(buf, len);
+void Stream::Write(const char* buf)
+{
+  const auto len = strlen(buf) + 1;
+  Write(buf, len);
+}
+
+/**
+ * Address: 0x004455B0 (FUN_004455B0)
+ *
+ * What it does:
+ * Writes one 32-bit integer through inline-buffer fast path or virtual write fallback.
+ */
+void Stream::WriteInt32(const std::int32_t value)
+{
+  if (static_cast<unsigned int>(mWriteEnd - mWriteHead) < sizeof(value)) {
+    VirtWrite(reinterpret_cast<const char*>(&value), sizeof(value));
+    return;
+  }
+
+  *reinterpret_cast<std::int32_t*>(mWriteHead) = value;
+  mWriteHead += sizeof(value);
 }
 
 /**
@@ -171,17 +210,18 @@ void Stream::Write(const char* buf) {
  */
 bool Stream::CloseNoThrow(const Mode access)
 {
-    try {
-        VirtClose(access);
-        return true;
-    } catch (...) {
-        return false;
-    }
-}
-
-bool Stream::Close(const Mode access) {
+  try {
     VirtClose(access);
     return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+bool Stream::Close(const Mode access)
+{
+  VirtClose(access);
+  return true;
 }
 
 /**
@@ -190,14 +230,15 @@ bool Stream::Close(const Mode access) {
  * What it does:
  * Reads one byte span from inline read window or virtual read fallback.
  */
-size_t Stream::Read(char* buf, size_t size) {
-    if (size > BytesRead()) {
-        size = VirtRead(buf, size);
-    } else if (size) {
-        memcpy(buf, mReadHead, size);
-        mReadHead += size;
-    }
-    return size;
+size_t Stream::Read(char* buf, size_t size)
+{
+  if (size > BytesRead()) {
+    size = VirtRead(buf, size);
+  } else if (size) {
+    memcpy(buf, mReadHead, size);
+    mReadHead += size;
+  }
+  return size;
 }
 
 /**
@@ -208,49 +249,51 @@ size_t Stream::Read(char* buf, size_t size) {
  */
 void Stream::UnGetByte(const int value)
 {
-    char* const readHead = mReadHead;
-    if (readHead == mReadStart) {
-        VirtUnGetByte(value);
-        return;
-    }
+  char* const readHead = mReadHead;
+  if (readHead == mReadStart) {
+    VirtUnGetByte(value);
+    return;
+  }
 
-    const int previousValue = static_cast<unsigned char>(*(readHead - 1));
-    if (value != previousValue) {
-        throw std::invalid_argument("Invalid argument to Stream::UnGetByte()");
-    }
+  const int previousValue = static_cast<unsigned char>(*(readHead - 1));
+  if (value != previousValue) {
+    throw std::invalid_argument("Invalid argument to Stream::UnGetByte()");
+  }
 
-    mReadHead = readHead - 1;
+  mReadHead = readHead - 1;
 }
 
 void gpg::UnGetByteChecked(Stream& stream, const int value)
 {
-    stream.UnGetByte(value);
+  stream.UnGetByte(value);
 }
 
-size_t Stream::ReadNonBlocking(char* buf, size_t size) {
-    if (size > BytesRead()) {
-        size = VirtReadNonBlocking(buf, size);
-    } else if (size) {
-        memcpy(buf, mReadHead, size);
-        mReadHead += size;
-    }
-    return size;
+size_t Stream::ReadNonBlocking(char* buf, size_t size)
+{
+  if (size > BytesRead()) {
+    size = VirtReadNonBlocking(buf, size);
+  } else if (size) {
+    memcpy(buf, mReadHead, size);
+    mReadHead += size;
+  }
+  return size;
 }
 
-int8_t Stream::GetByte() {
-    if (mReadHead != mReadEnd) {
-        const unsigned char c = static_cast<unsigned char>(*mReadHead);
-        ++mReadHead;
-        return static_cast<int8_t>(c);
-    }
+int8_t Stream::GetByte()
+{
+  if (mReadHead != mReadEnd) {
+    const unsigned char c = static_cast<unsigned char>(*mReadHead);
+    ++mReadHead;
+    return static_cast<int8_t>(c);
+  }
 
-    unsigned char b = 0;
-    const size_t got = VirtRead(reinterpret_cast<char*>(&b), 1u);
-    if (got == 1u) {
-        return static_cast<int8_t>(b);
-    }
+  unsigned char b = 0;
+  const size_t got = VirtRead(reinterpret_cast<char*>(&b), 1u);
+  if (got == 1u) {
+    return static_cast<int8_t>(b);
+  }
 
-    return -1;
+  return -1;
 }
 
 /**
@@ -260,21 +303,20 @@ int8_t Stream::GetByte() {
  * Initializes writer state around a target stream and configured line-ending mode.
  */
 TextWriter::TextWriter(Stream* const stream, const int mode)
-    : mStream(stream),
-      mMode(mode),
-      mSawCarriageReturn(false)
-{
-}
+  : mStream(stream)
+  , mMode(mode)
+  , mSawCarriageReturn(false)
+{}
 
 void TextWriter::WriteByte(const char value)
 {
-    if (mStream->mWriteHead == mStream->mWriteEnd) {
-        mStream->VirtWrite(&value, 1);
-        return;
-    }
+  if (mStream->mWriteHead == mStream->mWriteEnd) {
+    mStream->VirtWrite(&value, 1);
+    return;
+  }
 
-    *mStream->mWriteHead = value;
-    ++mStream->mWriteHead;
+  *mStream->mWriteHead = value;
+  ++mStream->mWriteHead;
 }
 
 /**
@@ -285,26 +327,26 @@ void TextWriter::WriteByte(const char value)
  */
 void TextWriter::WriteNewline()
 {
-    switch (mMode) {
-    case 0:
-    case 1:
-        WriteByte('\n');
-        return;
-    case 2:
-        WriteByte('\r');
-        WriteByte('\n');
-        return;
-    case 3:
-        WriteByte('\r');
-        return;
-    default:
-        HandleAssertFailure(
-            "Reached the supposably unreachable.",
-            40,
-            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\streams\\TextWriter.cpp"
-        );
-        return;
-    }
+  switch (mMode) {
+  case 0:
+  case 1:
+    WriteByte('\n');
+    return;
+  case 2:
+    WriteByte('\r');
+    WriteByte('\n');
+    return;
+  case 3:
+    WriteByte('\r');
+    return;
+  default:
+    HandleAssertFailure(
+      "Reached the supposably unreachable.",
+      40,
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\streams\\TextWriter.cpp"
+    );
+    return;
+  }
 }
 
 /**
@@ -315,28 +357,28 @@ void TextWriter::WriteNewline()
  */
 void TextWriter::WriteChar(const char value)
 {
-    if (mMode == 0) {
-        WriteByte(value);
-        return;
-    }
-
-    if (value == '\n') {
-        if (mSawCarriageReturn) {
-            mSawCarriageReturn = false;
-            return;
-        }
-        WriteNewline();
-        return;
-    }
-
-    if (value == '\r') {
-        mSawCarriageReturn = true;
-        WriteNewline();
-        return;
-    }
-
-    mSawCarriageReturn = false;
+  if (mMode == 0) {
     WriteByte(value);
+    return;
+  }
+
+  if (value == '\n') {
+    if (mSawCarriageReturn) {
+      mSawCarriageReturn = false;
+      return;
+    }
+    WriteNewline();
+    return;
+  }
+
+  if (value == '\r') {
+    mSawCarriageReturn = true;
+    WriteNewline();
+    return;
+  }
+
+  mSawCarriageReturn = false;
+  WriteByte(value);
 }
 
 /**
@@ -347,13 +389,13 @@ void TextWriter::WriteChar(const char value)
  */
 void TextWriter::WriteCString(const char* value)
 {
-    if (!value) {
-        return;
-    }
+  if (!value) {
+    return;
+  }
 
-    for (char ch = *value; ch != '\0'; ch = *++value) {
-        WriteChar(ch);
-    }
+  for (char ch = *value; ch != '\0'; ch = *++value) {
+    WriteChar(ch);
+  }
 }
 
 /**
@@ -364,11 +406,11 @@ void TextWriter::WriteCString(const char* value)
  */
 void TextWriter::WriteString(const msvc8::string& value)
 {
-    const char* const raw = value.data();
-    const std::size_t length = value.size();
-    for (std::size_t i = 0; i < length; ++i) {
-        WriteChar(raw[i]);
-    }
+  const char* const raw = value.data();
+  const std::size_t length = value.size();
+  for (std::size_t i = 0; i < length; ++i) {
+    WriteChar(raw[i]);
+  }
 }
 
 /**
@@ -379,10 +421,10 @@ void TextWriter::WriteString(const msvc8::string& value)
  */
 void TextWriter::Printf(const char* const format, ...)
 {
-    va_list va;
-    va_start(va, format);
-    const char* formatRef = format;
-    const msvc8::string rendered = STR_Va(formatRef, va);
-    va_end(va);
-    WriteString(rendered);
+  va_list va;
+  va_start(va, format);
+  const char* formatRef = format;
+  const msvc8::string rendered = STR_Va(formatRef, va);
+  va_end(va);
+  WriteString(rendered);
 }

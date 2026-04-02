@@ -60,6 +60,24 @@ namespace moho
     gpg::RRef GetDerivedObjectRef() override;
 
     /**
+     * Address: 0x00624450 (FUN_00624450, Moho::CUnitScriptTask::MemberDeserialize)
+     *
+     * What it does:
+     * Loads command-task/script-object base lanes plus source-command and Lua
+     * payload members from archive storage.
+     */
+    static void MemberDeserialize(gpg::ReadArchive* archive, CUnitScriptTask* task, int version);
+
+    /**
+     * Address: 0x00624550 (FUN_00624550, Moho::CUnitScriptTask::MemberSerialize)
+     *
+     * What it does:
+     * Saves command-task/script-object base lanes plus source-command and Lua
+     * payload members into archive storage.
+     */
+    static void MemberSerialize(CUnitScriptTask* task, gpg::WriteArchive* archive, int version);
+
+    /**
      * Address: 0x00622FC0 (FUN_00622FC0, CUnitScriptTask primary-slot update)
      *
      * VFTable SLOT: 1 (primary CTask/CCommandTask chain)
@@ -95,4 +113,3 @@ namespace moho
     offsetof(CUnitScriptTask, mTaskScriptPath) == 0x9C, "CUnitScriptTask::mTaskScriptPath offset must be 0x9C"
   );
 } // namespace moho
-

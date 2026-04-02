@@ -375,6 +375,18 @@ namespace moho
     AudioEngineImpl* mImpl; // +0x00
 
     /**
+     * Address: 0x004D9410 (FUN_004D9410, ??0AudioEngine@Moho@@AAE@VStrArg@gpg@@@Z)
+     *
+     * gpg::StrArg voicePath
+     *
+     * What it does:
+     * Allocates/binds `AudioEngineImpl`, initializes XACT runtime state, loads
+     * sound banks from the supplied voice path, and applies startup listener /
+     * category settings.
+     */
+    explicit AudioEngine(gpg::StrArg voicePath);
+
+    /**
      * Address: 0x004D9340 (FUN_004D9340, ?Create@AudioEngine@Moho@@SA?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@VStrArg@gpg@@@Z)
      *
      * gpg::StrArg voicePath
@@ -452,6 +464,7 @@ namespace moho
 
     /**
      * Address: 0x004D9A60 (FUN_004D9A60)
+     * Address: 0x0128E866 (FUN_0128E866, patch_AudioEngine_Calculate3D)
      *
      * Wm3::Vector3<float> const *, AudioEngine *, IXACTCue *
      *
@@ -462,6 +475,15 @@ namespace moho
   };
 
   extern SoundConfiguration* sSoundConfiguration;
+
+  /**
+   * Address: 0x004D8810 (FUN_004D8810, func_HandleSoundEvent)
+   *
+   * What it does:
+   * Handles XACT notification events and emits diagnostic logs for variable
+   * changes, GUI connection state, and wavebank preparation failures.
+   */
+  void __stdcall func_HandleSoundEvent(const std::uint8_t* eventData);
 
   /**
    * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)

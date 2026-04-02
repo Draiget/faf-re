@@ -5,6 +5,13 @@
 
 #include "moho/misc/WeakPtr.h"
 
+namespace gpg
+{
+  class RType;
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Entity;
@@ -24,6 +31,8 @@ namespace moho
    */
   struct SEntAttachInfo
   {
+    inline static gpg::RType* sType = nullptr;
+
     WeakPtr<Entity> mAttachTargetWeak; // +0x00
 
     std::int32_t mParentBoneIndex; // +0x08
@@ -82,6 +91,22 @@ namespace moho
       info.mRelativePosZ = 0.0f;
       return info;
     }
+
+    /**
+     * Address: 0x0067ED40 (FUN_0067ED40, Moho::SEntAttachInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes weak-parent linkage, bone indices, and relative attach transform payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0067EDD0 (FUN_0067EDD0, Moho::SEntAttachInfo::MemberSerialize)
+     *
+     * What it does:
+     * Serializes weak-parent linkage, bone indices, and relative attach transform payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   static_assert(sizeof(SEntAttachInfo) == 0x2C, "SEntAttachInfo size must be 0x2C");

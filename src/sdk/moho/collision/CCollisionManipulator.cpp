@@ -1,5 +1,7 @@
 #include "CCollisionManipulator.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <cmath>
 #include <cstdint>
 #include <new>
@@ -23,6 +25,35 @@ namespace
   constexpr std::uint32_t kTerrainCollisionNotifiedMask = 0x0002u;
   constexpr float kOrientationCollisionThreshold = 0.1f;
   constexpr int kCollisionManipulatorPrecedence = 99;
+
+  alignas(moho::CCollisionManipulatorTypeInfo)
+    std::byte gCCollisionManipulatorTypeInfoStorage[sizeof(moho::CCollisionManipulatorTypeInfo)]{};
+  bool gCCollisionManipulatorTypeInfoConstructed = false;
+  moho::CCollisionManipulatorSerializer gCCollisionManipulatorSerializer;
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mNext);
+  }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mNext = self;
+    helper.mPrev = self;
+  }
+
+  [[nodiscard]] moho::CCollisionManipulatorTypeInfo& AcquireCCollisionManipulatorTypeInfo()
+  {
+    if (!gCCollisionManipulatorTypeInfoConstructed) {
+      new (gCCollisionManipulatorTypeInfoStorage) moho::CCollisionManipulatorTypeInfo();
+      gCCollisionManipulatorTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<moho::CCollisionManipulatorTypeInfo*>(gCCollisionManipulatorTypeInfoStorage);
+  }
 
   gpg::RType* CachedCCollisionManipulatorType()
   {
@@ -491,4 +522,93 @@ namespace moho
     AddIAniManipulatorBase(this);
     Finish();
   }
+
+  /**
+   * Address: 0x006378F0 (FUN_006378F0, preregister_CCollisionManipulatorTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI metadata for `CCollisionManipulator`.
+   */
+  gpg::RType* preregister_CCollisionManipulatorTypeInfo()
+  {
+    CCollisionManipulatorTypeInfo& typeInfo = AcquireCCollisionManipulatorTypeInfo();
+    gpg::PreRegisterRType(typeid(CCollisionManipulator), &typeInfo);
+    return &typeInfo;
+  }
+
+  /**
+   * Address: 0x00BFAB10 (FUN_00BFAB10, cleanup_CCollisionManipulatorTypeInfo)
+   *
+   * What it does:
+   * Tears down startup-owned RTTI metadata for `CCollisionManipulator`.
+   */
+  void cleanup_CCollisionManipulatorTypeInfo()
+  {
+    if (!gCCollisionManipulatorTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCCollisionManipulatorTypeInfo().~CCollisionManipulatorTypeInfo();
+    gCCollisionManipulatorTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BFAB70 (FUN_00BFAB70, cleanup_CCollisionManipulatorSerializer)
+   *
+   * What it does:
+   * Unlinks the global serializer helper node from the intrusive serializer
+   * helper list and rewires it as a self-linked singleton.
+   */
+  gpg::SerHelperBase* cleanup_CCollisionManipulatorSerializer()
+  {
+    gCCollisionManipulatorSerializer.mNext->mPrev = gCCollisionManipulatorSerializer.mPrev;
+    gCCollisionManipulatorSerializer.mPrev->mNext = gCCollisionManipulatorSerializer.mNext;
+
+    gpg::SerHelperBase* const self = HelperSelfNode(gCCollisionManipulatorSerializer);
+    gCCollisionManipulatorSerializer.mPrev = self;
+    gCCollisionManipulatorSerializer.mNext = self;
+    return self;
+  }
+
+  /**
+   * Address: 0x00BD2720 (FUN_00BD2720, register_CCollisionManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes global `CCollisionManipulatorSerializer` callback lanes,
+   * binds load/save callbacks into RTTI, and installs process-exit cleanup.
+   */
+  void register_CCollisionManipulatorSerializer()
+  {
+    InitializeHelperNode(gCCollisionManipulatorSerializer);
+    gCCollisionManipulatorSerializer.mSerLoadFunc = &DeserializeCCollisionManipulator;
+    gCCollisionManipulatorSerializer.mSerSaveFunc = &SerializeCCollisionManipulator;
+    gCCollisionManipulatorSerializer.RegisterSerializeFunctions();
+    (void)std::atexit(reinterpret_cast<void (*)()>(&cleanup_CCollisionManipulatorSerializer));
+  }
+
+  /**
+   * Address: 0x00BD2700 (FUN_00BD2700, register_CCollisionManipulatorTypeInfoAtexit)
+   *
+   * What it does:
+   * Preregisters `CCollisionManipulator` RTTI and installs process-exit cleanup.
+   */
+  int register_CCollisionManipulatorTypeInfoAtexit()
+  {
+    (void)preregister_CCollisionManipulatorTypeInfo();
+    return std::atexit(&cleanup_CCollisionManipulatorTypeInfo);
+  }
 } // namespace moho
+
+namespace
+{
+  struct CCollisionManipulatorTypeInfoBootstrap
+  {
+    CCollisionManipulatorTypeInfoBootstrap()
+    {
+      (void)moho::register_CCollisionManipulatorTypeInfoAtexit();
+      moho::register_CCollisionManipulatorSerializer();
+    }
+  };
+
+  [[maybe_unused]] CCollisionManipulatorTypeInfoBootstrap gCCollisionManipulatorTypeInfoBootstrap;
+} // namespace

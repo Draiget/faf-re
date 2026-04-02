@@ -79,11 +79,7 @@ void CNetTCPServerImpl::CloseSocket()
 }
 
 /**
- * Address: <synthetic host-build wrapper>
- *
- * Binary evidence:
- * - 0x00483390 (FUN_00483390, NET_CreateTCPServer)
- * - 0x1007D1A0 (sub_1007D1A0, NET_CreateTCPServer)
+ * Address: 0x00483210 (FUN_00483210)
  *
  * What it does:
  * Initializes CNetTCPServerImpl around already-open listening socket.

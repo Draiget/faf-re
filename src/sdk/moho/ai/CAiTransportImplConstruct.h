@@ -6,6 +6,8 @@
 
 namespace gpg
 {
+  class ReadArchive;
+  class SerConstructResult;
   struct SerHelperBase;
 }
 
@@ -18,6 +20,22 @@ namespace moho
   class CAiTransportImplConstruct
   {
   public:
+    /**
+     * Address: 0x005E84F0 (FUN_005E84F0, Moho::CAiTransportImplConstruct::Construct)
+     *
+     * What it does:
+     * Forwards construct callback flow into `CAiTransportImpl::MemberConstruct`.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x005EC380 (FUN_005EC380, Moho::CAiTransportImplConstruct::Deconstruct)
+     *
+     * What it does:
+     * Deletes one constructed `CAiTransportImpl` object.
+     */
+    static void Deconstruct(void* objectPtr);
+
     /**
      * Address: 0x005E9BB0 (FUN_005E9BB0)
      *
@@ -50,4 +68,13 @@ namespace moho
     "CAiTransportImplConstruct::mDeleteCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiTransportImplConstruct) == 0x14, "CAiTransportImplConstruct size must be 0x14");
+
+  /**
+   * Address: 0x00BCEF10 (FUN_00BCEF10, register_CAiTransportImplConstruct)
+   *
+   * What it does:
+   * Registers construct/delete callbacks for `CAiTransportImpl` and installs
+   * process-exit cleanup.
+   */
+  void register_CAiTransportImplConstruct();
 } // namespace moho

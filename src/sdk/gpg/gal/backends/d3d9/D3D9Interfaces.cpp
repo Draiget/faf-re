@@ -317,7 +317,9 @@ namespace gpg::gal
             void* frameEventQuery = nullptr;
         };
 
+#if defined(MOHO_ABI_MSVC8_COMPAT)
         static_assert(sizeof(DeviceD3D9BackendObject) == 0x84, "DeviceD3D9BackendObject size must be 0x84");
+#endif
 
         struct OutputContextD3D9RuntimeView final
         {
@@ -2012,9 +2014,7 @@ namespace gpg::gal
 
         [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
         {
-            char codeText[16] = {};
-            std::snprintf(codeText, sizeof(codeText), "%08lX", static_cast<unsigned long>(code));
-            throw Error(MakeShortString(file), line, MakeShortString(codeText));
+            throw Error(MakeShortString(file), line, MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code))));
         }
 
         int ResolveVertexShaderProfileToken(const char* const profileName) noexcept
@@ -2071,6 +2071,32 @@ namespace gpg::gal
             }
 
             return 5;
+        }
+
+        /**
+         * Address: 0x008F1480 (FUN_008F1480, func_CheckAdapters)
+         *
+         * What it does:
+         * Validates setup adapter selection against the requested device-context
+         * head configuration.
+         */
+        [[maybe_unused]] void CheckAdapterSelectionForSetup(DeviceD3D9& device, const DeviceContext& context)
+        {
+            device.Func1();
+
+            const DeviceD3D9RuntimeView& runtime = AsDeviceD3D9Runtime(device);
+            const unsigned int headCount = static_cast<unsigned int>(context.GetHeadCount());
+            const unsigned int adapterCount = static_cast<unsigned int>(runtime.adapters.size());
+
+            if (headCount > adapterCount)
+            {
+                ThrowGalError("DeviceD3D9.cpp", 1229, "invalid head count");
+            }
+
+            if ((headCount > 1U) && (context.mAdapter != 0U))
+            {
+                ThrowGalError("DeviceD3D9.cpp", 1235, "invalid primary adapter index");
+            }
         }
 
         void CheckHardwareInstancingSupport(DeviceD3D9& device, const D3DCAPS9& caps)
@@ -2588,6 +2614,15 @@ namespace gpg::gal
             }
         }
 
+        /**
+         * Address family:
+         * - 0x00432290 (FUN_00432290, shared vector tear-down helper)
+         * - 0x00942380 lane in d3d9 runtime
+         *
+         * What it does:
+         * Destroys all `EffectMacro` elements, frees vector storage, and clears
+         * first/last/end pointers.
+         */
         void DestroyEffectMacroStorage(EffectContextLane54Runtime& runtime) noexcept
         {
             if (runtime.first != nullptr)
@@ -2601,10 +2636,24 @@ namespace gpg::gal
             runtime.end = nullptr;
         }
 
+        [[noreturn]] void ThrowEffectMacroVectorLengthError()
+        {
+            throw std::length_error("effect-macro vector too long");
+        }
+
+        /**
+         * Address family:
+         * - 0x00432240 (FUN_00432240, shared vector reserve helper)
+         * - 0x00942330 lane in d3d9 runtime
+         *
+         * What it does:
+         * Reserves contiguous `EffectMacro` storage for `elementCount` entries
+         * and initializes first/last/end pointers.
+         */
         bool TryReserveEffectMacroStorage(
             EffectContextLane54Runtime& runtime,
             const std::size_t elementCount
-        ) noexcept
+        )
         {
             if (elementCount == 0U)
             {
@@ -2612,6 +2661,11 @@ namespace gpg::gal
                 runtime.last = nullptr;
                 runtime.end = nullptr;
                 return false;
+            }
+
+            if (elementCount > 0x04444444U)
+            {
+                ThrowEffectMacroVectorLengthError();
             }
 
             try
@@ -3568,7 +3622,7 @@ namespace gpg::gal
      * Applies D3D9 backend teardown lanes and deletes one startup-allocated
      * backend object instance.
      */
-    void DeviceD3D9::sub_8F37F0()
+    void DeviceD3D9::DestroyBackendObject()
     {
         auto& runtime = AsDeviceD3D9Runtime(*this);
 

@@ -1,5 +1,9 @@
 #include "UserArmy.h"
 
+#include <cstring>
+#include <string>
+
+#include "lua/LuaObject.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/CWldSession.h"
@@ -12,6 +16,11 @@ namespace moho
     {
       return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
     }
+
+    constexpr const char* kInvalidArmyMessage = "Invalid army %d";
+    constexpr const char* kInvalidArmyOneBasedMessage = "Invalid army %d. (Use a 1-based index)";
+    constexpr const char* kUnknownArmyMessage = "Unknown army: %s";
+    constexpr const char* kUnexpectedArmyTypeMessage = "Unexpected type for army object";
   } // namespace
 
   /**
@@ -38,10 +47,13 @@ namespace moho
     if (armyIndex == 0xFFFFFFFFu) {
       return false;
     }
-    if (!mAlliesSet.items_begin || !mAlliesSet.items_end) {
+
+    const Set& allies = mVarDat.mAllies;
+    if (!allies.items_begin || !allies.items_end) {
       return false;
     }
-    return mAlliesSet.Contains(armyIndex);
+
+    return allies.Contains(armyIndex);
   }
 
   /**
@@ -108,5 +120,58 @@ namespace moho
     Wm3::Vec3f cellPos = worldPos;
     const GridPos gridCell(&cellPos, exploredGrid->mGridSize);
     return CanSeeCell(gridCell.x, gridCell.z, gridMask);
+  }
+
+  /**
+   * Address: 0x008B9920 (FUN_008B9920, Moho::ARMY_FromLuaState)
+   * Mangled: ?ARMY_FromLuaState@Moho@@YAPAVUserArmy@1@PAVLuaState@LuaPlus@@VLuaObject@4@@Z
+   *
+   * What it does:
+   * Resolves one Lua user-army selector (1-based numeric index or army name)
+   * to one `UserArmy*` in the active world session.
+   */
+  UserArmy* USER_ResolveArmyFromLuaState(LuaPlus::LuaState* const state, const LuaPlus::LuaObject& armyObject)
+  {
+    CWldSession* const session = WLD_GetActiveSession();
+    if (!session) {
+      return nullptr;
+    }
+
+    const msvc8::vector<UserArmy*>& userArmies = session->userArmies;
+    const int armyCount = static_cast<int>(userArmies.size());
+    UserArmy* resolved = nullptr;
+
+    if (armyObject.IsNumber()) {
+      const int requestedArmy = armyObject.GetInteger();
+      const int zeroBasedArmy = requestedArmy - 1;
+      if (zeroBasedArmy < 0) {
+        LuaPlus::LuaState::Error(state, kInvalidArmyOneBasedMessage, requestedArmy);
+      } else if (zeroBasedArmy >= armyCount || (resolved = userArmies[static_cast<std::size_t>(zeroBasedArmy)]) == nullptr) {
+        LuaPlus::LuaState::Error(state, kInvalidArmyMessage, zeroBasedArmy);
+      }
+      return resolved;
+    }
+
+    if (armyObject.IsString()) {
+      const char* const requestedNameCStr = armyObject.GetString();
+      const std::string requestedName = requestedNameCStr ? requestedNameCStr : "";
+
+      for (int index = 0; index < armyCount; ++index) {
+        UserArmy* const candidate = userArmies[static_cast<std::size_t>(index)];
+        const char* const candidateName = candidate ? candidate->mArmyName.c_str() : nullptr;
+        if (candidateName != nullptr && _stricmp(candidateName, requestedName.c_str()) == 0) {
+          resolved = candidate;
+          break;
+        }
+      }
+
+      if (!resolved) {
+        LuaPlus::LuaState::Error(state, kUnknownArmyMessage, requestedName.c_str());
+      }
+      return resolved;
+    }
+
+    LuaPlus::LuaState::Error(state, kUnexpectedArmyTypeMessage);
+    return nullptr;
   }
 } // namespace moho

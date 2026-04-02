@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00546D30 (FUN_00546D30, Moho::IResourcesTypeInfo::IResourcesTypeInfo)
+     *
+     * What it does:
+     * Initializes base reflection state and preregisters RTTI ownership for
+     * `IResources`.
+     */
+    IResourcesTypeInfo();
+
+    /**
      * Address: 0x00546DC0 (FUN_00546DC0, Moho::IResourcesTypeInfo::dtr)
      * Slot: 2
      */
@@ -35,6 +44,15 @@ namespace moho
      */
     void Init() override;
   };
+
+  /**
+   * Address: 0x00BC97B0 (FUN_00BC97B0, register_IResourcesTypeInfo)
+   *
+   * What it does:
+   * Constructs startup-owned `IResourcesTypeInfo` storage and registers
+   * process-exit teardown.
+   */
+  void register_IResourcesTypeInfo();
 
   static_assert(sizeof(IResourcesTypeInfo) == 0x64, "IResourcesTypeInfo size must be 0x64");
 } // namespace moho

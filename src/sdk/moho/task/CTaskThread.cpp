@@ -2,22 +2,54 @@
 
 #include <exception>
 #include <new>
+#include <string>
 #include <stdexcept>
 #include <typeinfo>
 
 #include "CTask.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/StatItem.h"
 
 using namespace moho;
 
 gpg::RType* CTaskThread::sType = nullptr;
+gpg::RType* CTaskThread::sPointerType = nullptr;
+gpg::RType* CTaskStage::sType = nullptr;
 moho::CTaskStage* moho::sUserStage = nullptr;
 
 namespace
 {
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
+  {
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
+    }
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
+  }
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
+  }
+
   gpg::RType* CachedCTaskThreadType()
   {
     gpg::RType* cached = CTaskThread::sType;
@@ -170,11 +202,45 @@ namespace
   }
 
   /**
+   * Address: 0x0040D7D0 (FUN_0040D7D0, gpg::RRef::Upcast_CTaskStage)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `CTaskStage` and returns the
+   * resulting object pointer (or null on mismatch).
+   */
+  [[nodiscard]] CTaskStage* UpcastCTaskStageRef(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskStageType());
+    return static_cast<CTaskStage*>(upcast.mObj);
+  }
+
+  /**
    * Address: 0x0040D650 (FUN_0040D650, func_ReadArchive_CTaskStagePtr)
    */
   CTaskStage* DeserializeTaskStagePointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
   {
-    return ReadTypedPointer<CTaskStage>(archive, ownerRef, CachedCTaskStageType());
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    CTaskStage* const stage = UpcastCTaskStageRef(source);
+    if (stage) {
+      return stage;
+    }
+
+    const char* const expected = CachedCTaskStageType() ? CachedCTaskStageType()->GetName() : "<unknown>";
+    const char* const actual = source.GetTypeName();
+    const msvc8::string msg = gpg::STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expected ? expected : "<unknown>",
+      actual ? actual : "null"
+    );
+    throw std::runtime_error(msg.c_str());
   }
 
   /**
@@ -186,26 +252,70 @@ namespace
   }
 
   /**
-   * Address: 0x0040B800 (FUN_0040B800, func_ReadArchive_CTaskThreadPtr)
+   * Address: 0x0040C1B0 (FUN_0040C1B0, gpg::RRef::Upcast_CTaskThread)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `CTaskThread` and returns the
+   * resulting object pointer (or null on mismatch).
    */
-  CTaskThread* DeserializeTaskThreadPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] CTaskThread* UpcastCTaskThreadRef(const gpg::RRef& source)
   {
-    return ReadTypedPointer<CTaskThread>(archive, ownerRef, CachedCTaskThreadType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskThreadType());
+    return static_cast<CTaskThread*>(upcast.mObj);
+  }
+
+  /**
+   * Address: 0x0040B800 (FUN_0040B800, gpg::ReadArchive::ReadPointerOwned_CTaskThread)
+   *
+   * What it does:
+   * Reads one tracked pointer lane, enforces owned-pointer transition
+   * (`Unowned -> Owned`), and upcasts to `CTaskThread`.
+   */
+  CTaskThread* ReadOwnedTaskThreadPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  {
+    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    if (tracked.state != gpg::TrackedPointerState::Unowned) {
+      throw gpg::SerializationError("Ownership conflict while loading archive");
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    CTaskThread* const thread = UpcastCTaskThreadRef(source);
+    if (!thread) {
+      const char* const expected = CachedCTaskThreadType()->GetName();
+      const char* const actual = source.GetTypeName();
+      const msvc8::string msg = gpg::STR_Printf(
+        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+        "instead",
+        expected ? expected : "CTaskThread",
+        actual ? actual : "null"
+      );
+      throw gpg::SerializationError(msg.c_str());
+    }
+
+    tracked.state = gpg::TrackedPointerState::Owned;
+    return thread;
   }
 
   /**
    * Address: 0x0040BC20 (FUN_0040BC20, func_RRefCTaskThread)
    */
-  gpg::RRef SerializeTaskThreadPointer(CTaskThread* thread)
+  gpg::RRef SerializeTaskThreadPointer(const CTaskThread* thread)
   {
-    return MakeDerivedRef(thread, CachedCTaskThreadType());
+    return MakeDerivedRef(const_cast<CTaskThread*>(thread), CachedCTaskThreadType());
   }
 
   gpg::RType* CachedCTaskStageType()
   {
-    static gpg::RType* cached = nullptr;
+    gpg::RType* cached = CTaskStage::sType;
     if (!cached) {
       cached = gpg::LookupRType(typeid(CTaskStage));
+      CTaskStage::sType = cached;
     }
     return cached;
   }
@@ -215,12 +325,7 @@ namespace
     if (!stage) {
       return;
     }
-
-    stage->mThreads.mPrev = &stage->mThreads;
-    stage->mThreads.mNext = &stage->mThreads;
-    stage->mStagedThreads.mPrev = &stage->mStagedThreads;
-    stage->mStagedThreads.mNext = &stage->mStagedThreads;
-    stage->mActive = true;
+    new (stage) CTaskStage();
   }
 
   gpg::RRef MakeTaskStageRef(CTaskStage* const stage)
@@ -403,34 +508,31 @@ namespace
   }
 
   /**
-   * Address: 0x004095F0 (FUN_004095F0, Moho::CTaskThreadSerializer::Deserialize)
+   * Address: 0x004095F0 (FUN_004095F0, CTaskThread serializer callback body)
    */
-  void DeserializeCTaskThread(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void DeserializeCTaskThreadCallback(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
   {
     auto* const thread = reinterpret_cast<CTaskThread*>(objectPtr);
     GPG_ASSERT(thread != nullptr);
+    if (!thread) {
+      return;
+    }
 
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    thread->mStage = DeserializeTaskStagePointer(archive, owner);
-    archive->ReadInt(&thread->mPendingFrames);
-    archive->ReadBool(&thread->mStaged);
-    DeserializeTaskStack(archive, thread, owner);
+    thread->MemberDeserialize(archive, ownerRef);
   }
 
   /**
-   * Address: 0x00409610 (FUN_00409610, Moho::CTaskThreadSerializer::Serialize)
+   * Address: 0x00409610 (FUN_00409610, CTaskThread serializer callback body)
    */
-  void SerializeCTaskThread(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void SerializeCTaskThreadCallback(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef)
   {
     auto* const thread = reinterpret_cast<CTaskThread*>(objectPtr);
     GPG_ASSERT(thread != nullptr);
+    if (!thread) {
+      return;
+    }
 
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    const gpg::RRef stageRef = SerializeTaskStagePointer(thread->mStage);
-    gpg::WriteRawPointer(archive, stageRef, gpg::TrackedPointerState::Unowned, owner);
-    archive->WriteInt(thread->mPendingFrames);
-    archive->WriteBool(thread->mStaged);
-    SerializeTaskStack(archive, thread, owner);
+    thread->MemberSerialize(archive, ownerRef);
   }
 
   /**
@@ -442,23 +544,7 @@ namespace
     GPG_ASSERT(stage != nullptr);
 
     archive->ReadBool(&stage->mActive);
-    const gpg::RRef nullOwner{};
-
-    while (true) {
-      CTaskThread* const thread = DeserializeTaskThreadPointer(archive, nullOwner);
-      if (!thread) {
-        break;
-      }
-      thread->ListLinkBefore(&stage->mThreads);
-    }
-
-    while (true) {
-      CTaskThread* const thread = DeserializeTaskThreadPointer(archive, nullOwner);
-      if (!thread) {
-        break;
-      }
-      thread->ListLinkBefore(&stage->mStagedThreads);
-    }
+    stage->DeserializeThreads(archive);
   }
 
   /**
@@ -470,26 +556,96 @@ namespace
     GPG_ASSERT(stage != nullptr);
 
     archive->WriteBool(stage->mActive);
-    const gpg::RRef nullOwner{};
-    auto* const mainListEnd = reinterpret_cast<CTaskThread*>(&stage->mThreads);
-    auto* const stagedListEnd = reinterpret_cast<CTaskThread*>(&stage->mStagedThreads);
-
-    for (auto* node = static_cast<CTaskThread*>(stage->mThreads.mNext); node != mainListEnd;
-         node = static_cast<CTaskThread*>(node->mNext)) {
-      const gpg::RRef threadRef = SerializeTaskThreadPointer(node);
-      gpg::WriteRawPointer(archive, threadRef, gpg::TrackedPointerState::Owned, nullOwner);
-    }
-    const gpg::RRef nullThread = SerializeTaskThreadPointer(nullptr);
-    gpg::WriteRawPointer(archive, nullThread, gpg::TrackedPointerState::Owned, nullOwner);
-
-    for (auto* node = static_cast<CTaskThread*>(stage->mStagedThreads.mNext); node != stagedListEnd;
-         node = static_cast<CTaskThread*>(node->mNext)) {
-      const gpg::RRef threadRef = SerializeTaskThreadPointer(node);
-      gpg::WriteRawPointer(archive, threadRef, gpg::TrackedPointerState::Owned, nullOwner);
-    }
-    gpg::WriteRawPointer(archive, nullThread, gpg::TrackedPointerState::Owned, nullOwner);
+    stage->SerializeThreads(archive);
   }
 } // namespace
+
+/**
+ * Address: 0x0040AC80 (FUN_0040AC80, Moho::InstanceCounter<Moho::CTaskThread>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for task-thread
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CTaskThread>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  if (!engineStats) {
+    return nullptr;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CTaskThread).name());
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
+
+/**
+ * Address: 0x0040CF90 (FUN_0040CF90, Moho::CTaskThread::MemberDeserialize)
+ *
+ * What it does:
+ * Loads stage pointer, pending-frame counter, staged flag, and task stack.
+ */
+void CTaskThread::MemberDeserialize(gpg::ReadArchive* const archive, gpg::RRef* const ownerRef)
+{
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  mStage = DeserializeTaskStagePointer(archive, owner);
+  archive->ReadInt(&mPendingFrames);
+  archive->ReadBool(&mStaged);
+  DeserializeTaskStack(archive, this, owner);
+}
+
+/**
+ * Address: 0x0040CFE0 (FUN_0040CFE0, Moho::CTaskThread::MemberSerialize)
+ *
+ * What it does:
+ * Saves stage pointer, pending-frame counter, staged flag, and task stack.
+ */
+void CTaskThread::MemberSerialize(gpg::WriteArchive* const archive, gpg::RRef* const ownerRef)
+{
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  const gpg::RRef stageRef = SerializeTaskStagePointer(mStage);
+  gpg::WriteRawPointer(archive, stageRef, gpg::TrackedPointerState::Unowned, owner);
+  archive->WriteInt(mPendingFrames);
+  archive->WriteBool(mStaged);
+  SerializeTaskStack(archive, this, owner);
+}
+
+/**
+ * Address: 0x004095F0 (FUN_004095F0, Moho::CTaskThreadSerializer::Deserialize)
+ */
+void CTaskThreadSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef)
+{
+  DeserializeCTaskThreadCallback(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x00409610 (FUN_00409610, Moho::CTaskThreadSerializer::Serialize)
+ */
+void CTaskThreadSerializer::Serialize(
+  gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+)
+{
+  SerializeCTaskThreadCallback(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x0040C5F0 (FUN_0040C5F0, Moho::CTaskThread::GetPointerType)
+ */
+gpg::RType* CTaskThread::GetPointerType()
+{
+  gpg::RType* cached = sPointerType;
+  if (!cached) {
+    cached = gpg::LookupRType(typeid(CTaskThread*));
+    sPointerType = cached;
+  }
+  return cached;
+}
 
 /**
  * Address: 0x00409050 (FUN_00409050, ??0CTaskThread@Moho@@QAE@@Z)
@@ -504,6 +660,7 @@ CTaskThread::CTaskThread(CTaskStage* const stage)
   , mPendingFrames(0)
   , mStaged(false)
 {
+  AddStatCounter(InstanceCounter<CTaskThread>::GetStatItem(), 1);
   ListLinkBefore(&stage->mThreads);
 }
 
@@ -517,6 +674,7 @@ CTaskThread::CTaskThread(CTaskStage* const stage)
 CTaskThread::~CTaskThread()
 {
   PopTaskStack(this);
+  AddStatCounter(InstanceCounter<CTaskThread>::GetStatItem(), -1);
   ClearTaskEventLinks(this);
   ListUnlink();
 }
@@ -569,6 +727,21 @@ void CTaskThread::Unstage()
 
   ListLinkBefore(&mStage->mThreads);
   mStaged = false;
+}
+
+/**
+ * Address: 0x00409910 (FUN_00409910, ??0CTaskStage@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes both intrusive thread-list sentinels and marks stage active.
+ */
+CTaskStage::CTaskStage()
+{
+  mThreads.mPrev = &mThreads;
+  mThreads.mNext = &mThreads;
+  mStagedThreads.mPrev = &mStagedThreads;
+  mStagedThreads.mNext = &mStagedThreads;
+  mActive = true;
 }
 
 /**
@@ -639,6 +812,59 @@ void CTaskStage::UserFrame()
 }
 
 /**
+ * Address: 0x00409CE0 (FUN_00409CE0, Moho::CTaskStage::SerializeThreads)
+ *
+ * What it does:
+ * Writes owned thread-pointer lanes for main list and staged list, each
+ * terminated by a null pointer lane.
+ */
+void CTaskStage::SerializeThreads(gpg::WriteArchive* const archive) const
+{
+  const gpg::RRef nullOwner{};
+  auto* const mainEnd = reinterpret_cast<const CTaskThread*>(&mThreads);
+  auto* const stagedEnd = reinterpret_cast<const CTaskThread*>(&mStagedThreads);
+
+  for (auto* node = static_cast<const CTaskThread*>(mThreads.mNext); node != mainEnd;
+       node = static_cast<const CTaskThread*>(node->mNext)) {
+    const gpg::RRef threadRef = SerializeTaskThreadPointer(node);
+    gpg::WriteRawPointer(archive, threadRef, gpg::TrackedPointerState::Owned, nullOwner);
+  }
+
+  const gpg::RRef nullThread = SerializeTaskThreadPointer(nullptr);
+  gpg::WriteRawPointer(archive, nullThread, gpg::TrackedPointerState::Owned, nullOwner);
+
+  for (auto* node = static_cast<const CTaskThread*>(mStagedThreads.mNext); node != stagedEnd;
+       node = static_cast<const CTaskThread*>(node->mNext)) {
+    const gpg::RRef threadRef = SerializeTaskThreadPointer(node);
+    gpg::WriteRawPointer(archive, threadRef, gpg::TrackedPointerState::Owned, nullOwner);
+  }
+
+  gpg::WriteRawPointer(archive, nullThread, gpg::TrackedPointerState::Owned, nullOwner);
+}
+
+/**
+ * Address: 0x00409DB0 (FUN_00409DB0, Moho::CTaskStage::DeserializeThreads)
+ *
+ * What it does:
+ * Reads owned thread-pointer lanes and relinks decoded nodes into stage main
+ * list followed by stage staged-list.
+ */
+void CTaskStage::DeserializeThreads(gpg::ReadArchive* const archive)
+{
+  const gpg::RRef nullOwner{};
+
+  while (CTaskThread* const thread = ReadOwnedTaskThreadPointer(archive, nullOwner)) {
+    thread->ListUnlink();
+    thread->ListLinkBefore(&mThreads);
+  }
+
+  while (CTaskThread* const thread = ReadOwnedTaskThreadPointer(archive, nullOwner)) {
+    thread->ListUnlink();
+    thread->ListLinkBefore(&mStagedThreads);
+  }
+}
+
+/**
  * Address: 0x0040A630 (FUN_0040A630, sub_40A630)
  */
 void CTaskThreadConstruct::RegisterConstructFunction()
@@ -656,9 +882,9 @@ void CTaskThreadSerializer::RegisterSerializeFunctions()
 {
   gpg::RType* const type = CachedCTaskThreadType();
   GPG_ASSERT(type->serLoadFunc_ == nullptr);
-  type->serLoadFunc_ = &DeserializeCTaskThread;
+  type->serLoadFunc_ = &CTaskThreadSerializer::Deserialize;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
-  type->serSaveFunc_ = &SerializeCTaskThread;
+  type->serSaveFunc_ = &CTaskThreadSerializer::Serialize;
 }
 
 /**
@@ -694,6 +920,18 @@ void CTaskStageSerializer::RegisterSerializeFunctions()
   type->serLoadFunc_ = &DeserializeCTaskStage;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = &SerializeCTaskStage;
+}
+
+/**
+ * Address: 0x004097B0 (FUN_004097B0, ??0CTaskStageTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Constructs and preregisters RTTI descriptor for `CTaskStage`.
+ */
+CTaskStageTypeInfo::CTaskStageTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(CTaskStage), this);
 }
 
 /**

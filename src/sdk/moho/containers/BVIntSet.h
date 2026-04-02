@@ -8,6 +8,8 @@
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 }
 
 namespace moho
@@ -34,6 +36,23 @@ namespace moho
   static_assert(offsetof(BVIntSetAddResult, mWasInserted) == 0x8, "BVIntSetAddResult::mWasInserted offset must be 0x8");
   static_assert(sizeof(BVIntSetAddResult) == 0xC, "BVIntSetAddResult size must be 0xC");
 
+  /**
+   * Address: 0x00401050 (FUN_00401050)
+   * Address: 0x00401070 (FUN_00401070)
+   *
+   * What it does:
+   * Packs `{owner, value}` into a BVIntSet index pair.
+   */
+  [[nodiscard]] BVIntSetIndex MakeBVIntSetIndex(BVIntSet* owner, unsigned int value) noexcept;
+
+  /**
+   * Address: 0x00401060 (FUN_00401060)
+   *
+   * What it does:
+   * Compares two BVIntSet index values by the value lane.
+   */
+  [[nodiscard]] bool BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept;
+
   struct BVIntSet
   {
     static gpg::RType* sType;
@@ -51,6 +70,7 @@ namespace moho
      * Copy-constructs the set storage from another BVIntSet.
      */
     BVIntSet(const BVIntSet& set);
+    BVIntSet& operator=(const BVIntSet& set);
 
     /**
      * Number of buckets currently allocated.
@@ -78,6 +98,22 @@ namespace moho
     [[nodiscard]] unsigned int Max() const;
 
     /**
+     * Address: 0x004010A0 (FUN_004010A0)
+     *
+     * What it does:
+     * Returns the first valid iterator/index pair for this set.
+     */
+    [[nodiscard]] BVIntSetIndex BeginIndex();
+
+    /**
+     * Address: 0x004010C0 (FUN_004010C0)
+     *
+     * What it does:
+     * Returns the past-end iterator/index pair for this set.
+     */
+    [[nodiscard]] BVIntSetIndex EndIndex();
+
+    /**
      * Address: 0x004010E0 (FUN_004010E0)
      * Address: 0x100010A0
      *
@@ -103,7 +139,7 @@ namespace moho
     [[nodiscard]] unsigned int Count() const;
 
     /**
-     * Address: <lifted helper from FUN_0053D360 command-source gate>
+     * Address: 0x004035F0 (FUN_004035F0, Moho::BVIntSet::Contains)
      *
      * What it does:
      * Returns whether `val` bit is present in this set.
@@ -117,6 +153,14 @@ namespace moho
      * Find the next present value strictly greater than 'val', or Max() if none.
      */
     [[nodiscard]] unsigned int GetNext(unsigned int val) const;
+
+    /**
+     * Address: 0x00401830 (FUN_00401830)
+     *
+     * What it does:
+     * Finds the previous present value strictly below `val`.
+     */
+    [[nodiscard]] unsigned int GetPrev(unsigned int val) const;
 
     /**
      * Address: 0x004018A0 (FUN_004018A0)
@@ -167,6 +211,38 @@ namespace moho
     [[nodiscard]] bool Equals(const BVIntSet* other) const;
 
     /**
+     * Address: 0x00401CB0 (FUN_00401CB0)
+     *
+     * What it does:
+     * Computes the union of `*this` and `rhs` into `out`.
+     */
+    [[nodiscard]] BVIntSet* Union(BVIntSet* out, const BVIntSet* rhs) const;
+
+    /**
+     * Address: 0x00401E30 (FUN_00401E30)
+     *
+     * What it does:
+     * Computes the symmetric difference of `*this` and `rhs` into `out`.
+     */
+    [[nodiscard]] BVIntSet* ExclusiveOr(BVIntSet* out, const BVIntSet* rhs) const;
+
+    /**
+     * Address: 0x00401F60 (FUN_00401F60)
+     *
+     * What it does:
+     * Computes the intersection of `*this` and `rhs` into `out`, trimming empty edge buckets.
+     */
+    [[nodiscard]] BVIntSet* Intersect(BVIntSet* out, const BVIntSet* rhs) const;
+
+    /**
+     * Address: 0x00402110 (FUN_00402110)
+     *
+     * What it does:
+     * Computes `*this & ~rhs` into `out` and finalizes the result.
+     */
+    [[nodiscard]] BVIntSet* Subtract(BVIntSet* out, const BVIntSet* rhs) const;
+
+    /**
      * Address: 0x004036A0 (FUN_004036A0)
      *
      * Add single value; returns whether it was newly inserted.
@@ -180,6 +256,28 @@ namespace moho
      */
     [[nodiscard]] bool Remove(unsigned int val);
 
+    /**
+     * Address: 0x004032A0 (FUN_004032A0, Moho::BVIntSet::MemberDeserialize)
+     *
+     * IDA signature:
+     * void __usercall Moho::BVIntSet::MemberDeserialize(Moho::BVIntSet *a1@<eax>, gpg::ReadArchive *a3@<esi>);
+     *
+     * What it does:
+     * Reads the base word index and packed word vector payload from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x004032F0 (FUN_004032F0, Moho::BVIntSet::MemberSerialize)
+     *
+     * IDA signature:
+     * void __usercall Moho::BVIntSet::MemberSerialize(Moho::BVIntSet *a1@<eax>, BinaryWriteArchive *a2@<esi>);
+     *
+     * What it does:
+     * Writes the base word index and packed word vector payload to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
   private:
     /**
      * Mask bits in range [loBit, hiBit), both in 0..32.
@@ -190,4 +288,12 @@ namespace moho
   static_assert(offsetof(BVIntSet, mReservedMetaWord) == 0x04, "BVIntSet::mReservedMetaWord offset must be 0x04");
   static_assert(offsetof(BVIntSet, mWords) == 0x08, "BVIntSet::mWords offset must be 0x08");
   static_assert(sizeof(BVIntSet) == 0x20, "BVIntSet size must be 0x20");
+
+  /**
+   * Address: 0x00401CA0 (FUN_00401CA0)
+   *
+   * What it does:
+   * Returns whether two sets differ.
+   */
+  [[nodiscard]] bool operator!=(const BVIntSet& lhs, const BVIntSet& rhs) noexcept;
 } // namespace moho

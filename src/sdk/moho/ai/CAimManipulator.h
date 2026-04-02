@@ -2,6 +2,7 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 
 namespace LuaPlus
@@ -13,12 +14,22 @@ namespace LuaPlus
 namespace moho
 {
   /**
+   * Address: 0x010A6396 (?dbg_Ballistics@Moho@@3_NA)
+   *
+   * What it does:
+   * Global debug toggle for ballistic aim diagnostics.
+   */
+  extern bool dbg_Ballistics;
+
+  /**
    * VFTABLE: 0x00E213C0
    * COL:  0x00E7AC30
    */
   class CAimManipulator
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00630200
      * Slot: 0
@@ -32,6 +43,22 @@ namespace moho
      * Demangled: Moho::CAimManipulator::AimManip
      */
     virtual void AimManip() = 0;
+
+    /**
+     * Address: 0x00633730 (FUN_00633730, Moho::CAimManipulator::MemberDeserialize)
+     *
+     * What it does:
+     * Loads serialized `CAimManipulator` member lanes from archive state.
+     */
+    static void MemberDeserialize(CAimManipulator* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006339D0 (FUN_006339D0, Moho::CAimManipulator::MemberSerialize)
+     *
+     * What it does:
+     * Saves serialized `CAimManipulator` member lanes into archive state.
+     */
+    static void MemberSerialize(const CAimManipulator* object, gpg::WriteArchive* archive);
   };
 
   /**

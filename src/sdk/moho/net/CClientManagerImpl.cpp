@@ -959,6 +959,12 @@ void CClientManagerImpl::UpdateStates(const int beat)
   {
     std::scoped_lock lock(mLock);
 
+    for (CClientBase* const client : mClients) {
+      if (client != nullptr) {
+        client->UpdateState(beat, &mMarshaller, &mStream);
+      }
+    }
+
     CMessage dispatchedMessage{EClientMsg::CLIMSG_Dispatched};
     CMessageStream dispatchedStream{dispatchedMessage};
     dispatchedStream.Write(beat);
@@ -969,6 +975,8 @@ void CClientManagerImpl::UpdateStates(const int beat)
       mDispatchedTimer.Reset();
     }
   }
+
+  mStream.VirtFlush();
 
   while (mStream.GetLength() != 0u) {
     CMessage nextMessage{};

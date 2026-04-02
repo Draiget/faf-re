@@ -1,5 +1,7 @@
 #include "moho/misc/SessionStartup.h"
 
+#include <Windows.h>
+
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -7,14 +9,21 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <typeinfo>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/client/Localization.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/SCR_String.h"
+#include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -24,8 +33,11 @@
 #include "moho/net/Common.h"
 #include "moho/net/INetTCPSocket.h"
 #include "moho/serialization/SaveGameFileHeader.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
+#include "lua/LuaTableIterator.h"
 
 namespace
 {
@@ -50,6 +62,85 @@ namespace
   };
 
   constexpr std::uint8_t kInvalidSourceIndex = 255u;
+  constexpr const char* kSessionSendChatMessageHelpText = "SessionSendChatMessage([client-or-clients,] message)";
+  constexpr const char* kNoActiveGameMessage = "GameSendChatMessage(): No active game.";
+  constexpr const char* kInvalidClientIndexMessage = "Invalid client index.  Must be between 1 and %d inclusive, not %d.";
+  constexpr const char* kInvalidClientSelectorMessage =
+    "Invalid value for client-or-clients.  Must be either a single integer or a table of integers.";
+  constexpr const char* kChatEncodeFailureMessage = "Can't encode message.";
+  constexpr const char* kChatMessageTooLongMessage = "Message too long.";
+  constexpr const char* kInternalSaveGameHelpText = "InternalSaveGame";
+
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
+  void EnsureDirectoryExistsOrThrow(const msvc8::string& directoryPath)
+  {
+    const std::wstring widePath = gpg::STR_Utf8ToWide(directoryPath.c_str());
+    if (::CreateDirectoryW(widePath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
+      throw std::runtime_error(gpg::STR_Printf("Unable to create directory %s", directoryPath.c_str()).c_str());
+    }
+  }
+
+  [[nodiscard]] gpg::RType* CachedSessionSaveDataType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::SSessionSaveData));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RRef MakeSessionSaveDataRef(moho::SSessionSaveData* const saveData)
+  {
+    gpg::RRef out{};
+    out.mObj = saveData;
+    out.mType = CachedSessionSaveDataType();
+    return out;
+  }
+
+  /**
+   * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
+   *
+   * What it does:
+   * Seeds one local command source, applies it to all army launch source sets,
+   * and binds a one-client local client-manager lane for single-player startup.
+   */
+  void SetupSinglePlayerCommandSourceLane(moho::SWldSessionInfo& sessionInfo, const char* playerName)
+  {
+    auto* const launchInfo = sessionInfo.mLaunchInfo.get();
+    if (launchInfo == nullptr) {
+      return;
+    }
+
+    const char* const localPlayerName = playerName != nullptr ? playerName : "";
+
+    moho::SSTICommandSource localCommandSource{};
+    localCommandSource.mIndex = 0u;
+    localCommandSource.mName = localPlayerName;
+    localCommandSource.mTimeouts = -1;
+    launchInfo->mCommandSources.mSrcs.push_back(localCommandSource);
+
+    sessionInfo.mSourceId = 0u;
+
+    moho::BVIntSet localSourceSet{};
+    (void)localSourceSet.Add(0u);
+    for (moho::BVIntSet& armySourceSet : launchInfo->mArmyLaunchInfo) {
+      armySourceSet = localSourceSet;
+    }
+
+    moho::IClientManager* const createdManager = moho::CLIENT_CreateClientManager(1u, nullptr, 0, true);
+    if (createdManager != sessionInfo.mClientManager && sessionInfo.mClientManager != nullptr) {
+      delete sessionInfo.mClientManager;
+    }
+    sessionInfo.mClientManager = createdManager;
+
+    if (sessionInfo.mClientManager != nullptr) {
+      sessionInfo.mClientManager->CreateLocalClient(localPlayerName, 0, 0, sessionInfo.mSourceId);
+    }
+  }
 
   /**
    * Address: 0x00875690 (FUN_00875690, func_OpenGPGNet)
@@ -274,6 +365,240 @@ namespace moho
     }
 
     return sessionInfo;
+  }
+
+  /**
+   * Address: 0x0088CBC0 (FUN_0088CBC0)
+   * Mangled:
+   * ?WLD_SetupSessionInfo@Moho@@YA?AV?$auto_ptr@USWldSessionInfo@Moho@@@std@@ABVLuaObject@LuaPlus@@@Z
+   *
+   * What it does:
+   * Builds one single-player session bootstrap payload from Lua launch data.
+   */
+  msvc8::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData)
+  {
+    boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
+    launchInfo->mCommandSources.mOriginalSource = 0;
+    launchInfo->mCheatsEnabled = USER_DebugFacilitiesEnabled();
+
+    const LuaPlus::LuaObject scenarioInfo = launchData["scenarioInfo"];
+    launchInfo->mScenarioInfo = SCR_ToString(scenarioInfo);
+    launchInfo->mGameMods = SCR_ToString(launchData["scenarioMods"]);
+
+    {
+      LuaPlus::LuaObject teamInfo = launchData["teamInfo"];
+      LuaPlus::LuaTableIterator teamIterator(&teamInfo, 1);
+      while (!teamIterator.m_isDone) {
+        launchInfo->mArmyLaunchInfo.push_back(BVIntSet{});
+        launchInfo->mStrVec.push_back(SCR_ToString(teamIterator.GetValue()));
+        teamIterator.Next();
+      }
+    }
+
+    {
+      const LuaPlus::LuaObject randomSeed = launchData["RandomSeed"];
+      if (randomSeed.IsNil()) {
+        launchInfo->mInitSeed = static_cast<std::int32_t>(gpg::time::GetSystemTimer().ElapsedCycles());
+      } else {
+        launchInfo->mInitSeed = randomSeed.GetInteger();
+      }
+    }
+
+    msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+    const char* const mapName = scenarioInfo["map"].GetString();
+    sessionInfo->mMapName = mapName != nullptr ? mapName : "";
+    sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
+    sessionInfo->mIsBeingRecorded = launchData["createReplay"].GetBoolean();
+    sessionInfo->mIsReplay = false;
+    sessionInfo->mIsMultiplayer = false;
+    sessionInfo->mClientManager = nullptr;
+    sessionInfo->mSourceId = kInvalidSourceIndex;
+
+    const char* const playerName = launchData["playerName"].GetString();
+    SetupSinglePlayerCommandSourceLane(*sessionInfo, playerName);
+    return sessionInfo;
+  }
+
+  /**
+   * Address: 0x0088DA80 (FUN_0088DA80, cfunc_SessionSendChatMessage)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_SessionSendChatMessageL`.
+   */
+  int cfunc_SessionSendChatMessage(lua_State* const luaContext)
+  {
+    return cfunc_SessionSendChatMessageL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x0088DB00 (FUN_0088DB00, cfunc_SessionSendChatMessageL)
+   *
+   * What it does:
+   * Validates optional chat recipient selector(s), serializes one Lua message
+   * payload to byte-stream form, enforces length cap, and broadcasts to the
+   * selected network clients.
+   */
+  int cfunc_SessionSendChatMessageL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 1 || argumentCount > 2) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kSessionSendChatMessageHelpText, 1, 2, argumentCount
+      );
+    }
+
+    ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+    if (activeDriver == nullptr) {
+      LuaPlus::LuaState::Error(state, kNoActiveGameMessage);
+      return 0;
+    }
+
+    CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+    if (clientManager == nullptr) {
+      LuaPlus::LuaState::Error(state, kNoActiveGameMessage);
+      return 0;
+    }
+
+    const int clientCount = static_cast<int>(clientManager->NumberOfClients());
+    int selectedClientMask = 0;
+
+    if (argumentCount <= 1) {
+      selectedClientMask = (1 << clientCount) - 1;
+    } else {
+      const int clientSelectorType = lua_type(rawState, 1);
+      if (clientSelectorType == LUA_TNUMBER) {
+        const LuaPlus::LuaStackObject selectorArg(state, 1);
+        const int clientIndex = selectorArg.GetInteger();
+        if (clientIndex < 1 || clientIndex > clientCount) {
+          LuaPlus::LuaState::Error(state, kInvalidClientIndexMessage, clientCount, clientIndex);
+        }
+        selectedClientMask = (1 << (clientIndex - 1));
+      } else if (clientSelectorType == LUA_TTABLE) {
+        const LuaPlus::LuaStackObject selectorArg(state, 1);
+        LuaPlus::LuaObject selectorObject(selectorArg);
+        LuaPlus::LuaTableIterator selectorIt(&selectorObject, 1);
+        while (!selectorIt.m_isDone) {
+          LuaPlus::LuaObject& selectorValue = selectorIt.GetValue();
+          if (!selectorValue.IsNumber()) {
+            LuaPlus::LuaState::Error(state, kInvalidClientSelectorMessage);
+          }
+
+          const int clientIndex = selectorValue.GetInteger();
+          if (clientIndex < 1 || clientIndex > clientCount) {
+            LuaPlus::LuaState::Error(state, kInvalidClientIndexMessage, clientCount, clientIndex);
+          }
+
+          selectedClientMask |= (1 << (clientIndex - 1));
+          selectorIt.Next();
+        }
+      } else {
+        LuaPlus::LuaState::Error(state, kInvalidClientSelectorMessage);
+      }
+    }
+
+    gpg::MemBufferStream messageStream(256u);
+    const LuaPlus::LuaStackObject messageArg(state, lua_gettop(rawState));
+    LuaPlus::LuaObject messageObject(messageArg);
+    if (!const_cast<LuaPlus::LuaObject&>(messageObject).ToByteStream(messageStream)) {
+      LuaPlus::LuaState::Error(state, kChatEncodeFailureMessage);
+    }
+
+    const std::size_t encodedSize = messageStream.BytesWritten();
+    if (encodedSize > 0x400u) {
+      LuaPlus::LuaState::Error(state, kChatMessageTooLongMessage);
+    }
+
+    const gpg::MemBuffer<const char> encodedMessage = gpg::CopyMemBuffer(messageStream.mWriteStart, encodedSize);
+    for (int clientIndex = 0; clientIndex < clientCount; ++clientIndex) {
+      if ((selectedClientMask & (1 << clientIndex)) == 0) {
+        continue;
+      }
+
+      IClient* const client = clientManager->GetClient(clientIndex);
+      if (client != nullptr) {
+        client->ReceiveChat(encodedMessage);
+      }
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x00881AB0 (FUN_00881AB0, cfunc_InternalSaveGame)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_InternalSaveGameL`.
+   */
+  int cfunc_InternalSaveGame(lua_State* const luaContext)
+  {
+    return cfunc_InternalSaveGameL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x00881B30 (FUN_00881B30, cfunc_InternalSaveGameL)
+   *
+   * What it does:
+   * Validates one save request payload from Lua, seeds `CSaveGameRequestImpl`
+   * archive lanes with shared `SSessionSaveData`, and queues request dispatch
+   * on the active sim driver.
+   */
+  int cfunc_InternalSaveGameL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kInternalSaveGameHelpText, 3, argumentCount);
+    }
+
+    const msvc8::string saveGameDirectory = USER_GetSaveGameDir();
+    EnsureDirectoryExistsOrThrow(saveGameDirectory);
+
+    const LuaPlus::LuaStackObject savePathArg(state, 1);
+    const char* const savePath = lua_tostring(rawState, 1);
+    if (savePath == nullptr) {
+      savePathArg.TypeError("string");
+    }
+
+    const msvc8::string saveTargetDirectory = FILE_Dir(savePath);
+    EnsureDirectoryExistsOrThrow(saveTargetDirectory);
+
+    ISTIDriver* const driver = SIM_GetActiveDriver();
+    if (driver == nullptr) {
+      LuaPlus::LuaState::Error(state, "No session to save!");
+    }
+
+    const LuaPlus::LuaStackObject sessionNameArg(state, 2);
+    const char* const sessionName = lua_tostring(rawState, 2);
+    if (sessionName == nullptr) {
+      sessionNameArg.TypeError("string");
+    }
+
+    const LuaPlus::LuaStackObject completionArg(state, 3);
+    const LuaPlus::LuaObject completionCallback(completionArg);
+
+    auto* const request = new CSaveGameRequestImpl(savePath, sessionName, completionCallback);
+
+    CWldSession* const session = WLD_GetActiveSession();
+    const boost::shared_ptr<SSessionSaveData> saveData =
+      session != nullptr ? session->GetSaveData() : boost::shared_ptr<SSessionSaveData>{};
+
+    gpg::WriteArchive* const archive = request->GetArchive();
+    gpg::WriteRawPointer(archive, MakeSessionSaveDataRef(saveData.get()), gpg::TrackedPointerState::Shared, NullOwnerRef());
+    archive->EndSection(false);
+
+    driver->RequestSaveGame(request);
+    return 0;
   }
 
   /**

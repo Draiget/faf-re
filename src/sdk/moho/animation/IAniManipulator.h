@@ -16,6 +16,8 @@ namespace moho
   {
     std::int32_t mBoneIndex; // +0x00
     std::int32_t mFlags;     // +0x04
+
+    static gpg::RType* sType;
   };
 
   static_assert(offsetof(SAniManipBinding, mBoneIndex) == 0x00, "SAniManipBinding::mBoneIndex offset must be 0x00");
@@ -134,6 +136,24 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0063BA10 (FUN_0063BA10, Moho::IAniManipulatorSerializer::Deserialize)
+     *
+     * What it does:
+     * Deserializes IAniManipulator base serialization fields
+     * (`CScriptEvent`, enabled flag, owner pointers, precedence, watch-bones).
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0063BA20 (FUN_0063BA20, Moho::IAniManipulatorSerializer::Serialize)
+     *
+     * What it does:
+     * Serializes IAniManipulator base serialization fields
+     * (`CScriptEvent`, enabled flag, owner pointers, precedence, watch-bones).
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x0063C540 (FUN_0063C540, sub_63C540)
      * Slot: 0
      *
@@ -187,4 +207,44 @@ namespace moho
   static_assert(sizeof(IAniManipulator) == 0x80, "IAniManipulator size must be 0x80");
   static_assert(sizeof(IAniManipulatorSerializer) == 0x14, "IAniManipulatorSerializer size must be 0x14");
   static_assert(sizeof(IAniManipulatorTypeInfo) == 0x64, "IAniManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x0063B480 (FUN_0063B480, sub_63B480)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI storage for IAniManipulator.
+   */
+  [[nodiscard]] gpg::RType* register_IAniManipulatorTypeInfo_00();
+
+  /**
+   * Address: 0x00BFADC0 (FUN_00BFADC0, sub_BFADC0)
+   *
+   * What it does:
+   * Releases startup-owned IAniManipulator RTTI storage.
+   */
+  void cleanup_IAniManipulatorTypeInfo();
+
+  /**
+   * Address: 0x00BD2C20 (FUN_00BD2C20, sub_BD2C20)
+   *
+   * What it does:
+   * Registers IAniManipulator RTTI startup ownership and installs exit cleanup.
+   */
+  int register_IAniManipulatorTypeInfo_AtExit();
+
+  /**
+   * Address: 0x00BFAE20 (FUN_00BFAE20, Moho::IAniManipulatorSerializer::~IAniManipulatorSerializer)
+   *
+   * What it does:
+   * Unlinks IAniManipulator serializer helper node from the intrusive helper list.
+   */
+  gpg::SerHelperBase* cleanup_IAniManipulatorSerializer();
+
+  /**
+   * Address: 0x00BD2C40 (FUN_00BD2C40, register_IAniManipulatorSerializer)
+   *
+   * What it does:
+   * Initializes IAniManipulator serializer helper callbacks and installs exit cleanup.
+   */
+  void register_IAniManipulatorSerializer();
 } // namespace moho

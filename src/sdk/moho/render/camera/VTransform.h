@@ -36,7 +36,13 @@ namespace moho
      */
     VTransform(const VTransform& rhs) noexcept;
 
-    VTransform& operator=(const VTransform& rhs) noexcept = default;
+    /**
+     * Address: 0x00470B60 (FUN_00470B60, Moho::VTransform::operator=)
+     *
+     * What it does:
+     * Copies quaternion + translation lanes from rhs.
+     */
+    VTransform& operator=(const VTransform& rhs) noexcept;
 
     /**
      * Address: 0x0046FBF0 (FUN_0046FBF0)
@@ -45,6 +51,17 @@ namespace moho
      * Returns rigid-transform inverse using quaternion conjugate + rotated negated translation.
      */
     [[nodiscard]] VTransform Inverse() const noexcept;
+
+    /**
+     * Address: 0x00491200 (FUN_00491200, Moho::VTransform::Apply)
+     *
+     * Wm3::Vector3<float> const &,Wm3::Vector3<float> *
+     *
+     * What it does:
+     * Rotates one input vector by orientation, adds translation, and writes
+     * the transformed point to caller output.
+     */
+    Wm3::Vec3f* Apply(const Wm3::Vec3f& source, Wm3::Vec3f* outPoint) const noexcept;
 
     /**
      * Address: 0x00549C20 (FUN_00549C20)

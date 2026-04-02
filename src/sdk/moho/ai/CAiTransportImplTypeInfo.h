@@ -36,5 +36,14 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCEEF0 (FUN_00BCEEF0, register_CAiTransportImplTypeInfo)
+   *
+   * What it does:
+   * Registers `CAiTransportImpl` type-info object and installs process-exit
+   * cleanup.
+   */
+  int register_CAiTransportImplTypeInfo();
+
   static_assert(sizeof(CAiTransportImplTypeInfo) == 0x64, "CAiTransportImplTypeInfo size must be 0x64");
 } // namespace moho

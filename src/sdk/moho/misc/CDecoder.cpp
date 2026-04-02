@@ -206,6 +206,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x0128CC00 (FUN_0128CC00, Moho__CDecoder__DecodeMessage)
+   *
+   * What it does:
+   * Builds a read-only message stream view and dispatches only
+   * `CMDST_Advance` / `CMDST_SetCommandSource`; all other opcodes throw.
+   */
+  void CDecoder::DecodeMessagePatched(const CMessage& message)
+  {
+    CMessageStream stream(const_cast<CMessage*>(&message), CMessageStream::Access::kReadOnly);
+    gpg::BinaryReader reader(&stream);
+
+    const auto opcode = static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(message.mBuff[0]));
+    switch (opcode) {
+    case ECmdStreamOp::CMDST_Advance:
+      DecodeAdvance(reader);
+      return;
+    case ECmdStreamOp::CMDST_SetCommandSource:
+      DecodeSetCommandSource(reader);
+      return;
+    default:
+      break;
+    }
+
+    ThrowDecoderError(
+      gpg::STR_Printf("Unexpected opcode in command stream: 0x%02x", static_cast<std::uint8_t>(opcode))
+    );
+  }
+
+  /**
    * Address: 0x006E4440 (FUN_006E4440)
    */
   void CDecoder::DecodeSetCommandSource(gpg::BinaryReader& reader)

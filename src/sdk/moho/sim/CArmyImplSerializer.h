@@ -15,6 +15,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00701000 (FUN_00701000, Moho::CArmyImplSerializer::Deserialize)
+     *
+     * What it does:
+     * Reflection load callback that forwards to `CArmyImpl::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00701010 (FUN_00701010, Moho::CArmyImplSerializer::Serialize)
+     *
+     * What it does:
+     * Reflection save callback that forwards to `CArmyImpl::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00701DD0 (FUN_00701DD0, gpg::SerSaveLoadHelper_CArmyImpl::Init)
      *
      * What it does:
@@ -42,4 +58,13 @@ namespace moho
     offsetof(CArmyImplSerializer, mSaveCallback) == 0x10, "CArmyImplSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CArmyImplSerializer) == 0x14, "CArmyImplSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BD9C20 (FUN_00BD9C20, register_CArmyImplSerializer)
+   *
+   * What it does:
+   * Initializes serializer callback lanes for `CArmyImpl` and binds them into
+   * reflected RTTI.
+   */
+  void register_CArmyImplSerializer();
 } // namespace moho

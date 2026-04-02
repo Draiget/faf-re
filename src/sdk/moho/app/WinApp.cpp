@@ -1,5 +1,7 @@
 #include "WinApp.h"
 
+#include "platform/Platform.h"
+
 #include <DbgHelp.h>
 
 #include <algorithm>
@@ -16,10 +18,9 @@
 #include <new>
 #include <sstream>
 #include <string>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
-
-#include "platform/Platform.h"
 
 #include <float.h>
 #include <commctrl.h>
@@ -88,9 +89,1123 @@ namespace
   constexpr char kMiniDmpSenderDtorExport[] = "??1MiniDmpSender@@UAE@XZ";
   constexpr char kMiniDmpSenderSetCallbackExport[] = "?setCallback@MiniDmpSender@@QAEXP6A_NIPAX0@Z@Z";
   constexpr char kMiniDmpSenderCreateReportExport[] = "?createReport@MiniDmpSender@@QAEXPAU_EXCEPTION_POINTERS@@@Z";
+  std::wstring sLegacyErrorReportOutputDir{};
+
+  /**
+   * Address: 0x004A0EC0 (FUN_004A0EC0, sub_4A0EC0)
+   *
+   * What it does:
+   * Returns the inline-buffer subobject pointer (`this + 4`) for one recovered
+   * legacy wide-string layout view.
+   */
+  struct LegacyWideStringObjectView
+  {
+    std::uint32_t allocatorState = 0;
+    union
+    {
+      wchar_t* heap = nullptr;
+      wchar_t inlineBuffer[8];
+    } storage;
+    std::uint32_t length = 0;
+    std::uint32_t capacity = 7;
+  };
+
+#if defined(_M_IX86)
+  static_assert(sizeof(LegacyWideStringObjectView) == 0x1C, "LegacyWideStringObjectView size must be 0x1C");
+#endif
+
+  [[maybe_unused]] wchar_t* GetLegacyWideStringInlineBufferSubobject(LegacyWideStringObjectView* const value) noexcept
+  {
+    return reinterpret_cast<wchar_t*>(&(value->storage));
+  }
+
+  /**
+   * Address: 0x004A1020 (FUN_004A1020, sub_4A1020)
+   *
+   * What it does:
+   * Returns the process-global error-report output directory wide string.
+   */
+  [[maybe_unused]] std::wstring* GetLegacyErrorReportOutputDirStorage() noexcept
+  {
+    return &sLegacyErrorReportOutputDir;
+  }
+
+  /**
+   * Address: 0x004A1920 (FUN_004A1920, sub_4A1920)
+   *
+   * What it does:
+   * Assigns one zero-terminated wide string into the destination string.
+   */
+  [[maybe_unused]] std::wstring* AssignWideStringFromNullTerminatedInput(
+    std::wstring* const destination,
+    const wchar_t* const source
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+    const wchar_t* const safeSource = (source != nullptr) ? source : L"";
+    destination->assign(safeSource, std::wcslen(safeSource));
+    return destination;
+  }
+
+  /**
+   * Address: 0x004A17B0 (FUN_004A17B0, sub_4A17B0)
+   *
+   * What it does:
+   * Initializes one local wide string into empty SSO state, then assigns from
+   * one zero-terminated wide source.
+   */
+  [[maybe_unused]] std::wstring* InitializeAndAssignWideStringFromNullTerminatedInput(
+    std::wstring* const destination,
+    const wchar_t* const source
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+    destination->clear();
+    return AssignWideStringFromNullTerminatedInput(destination, source);
+  }
+
+  /**
+   * Address: 0x004A17F0 (FUN_004A17F0, sub_4A17F0)
+   *
+   * What it does:
+   * Assigns the global error-report output directory from one zero-terminated
+   * wide source.
+   */
+  [[maybe_unused]] std::wstring* AssignErrorReportOutputDirFromNullTerminatedInput(const wchar_t* const source)
+  {
+    return AssignWideStringFromNullTerminatedInput(GetLegacyErrorReportOutputDirStorage(), source);
+  }
+
+  /**
+   * Address: 0x004A1AE0 (FUN_004A1AE0)
+   * Mangled: ?append@wstring@std@@QAEAAV12@ABV12@II@Z
+   *
+   * What it does:
+   * Appends a clamped substring range from `source` into `destination`.
+   */
+  [[maybe_unused]] std::wstring* AppendWideSubstringRangeClamped(
+    std::wstring* const destination,
+    const std::wstring& source,
+    std::size_t count,
+    const std::size_t sourceOffset
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+    if (sourceOffset > source.size()) {
+      throw std::out_of_range("wstring::append sourceOffset");
+    }
+
+    const std::size_t available = source.size() - sourceOffset;
+    if (count > available) {
+      count = available;
+    }
+
+    destination->append(source, sourceOffset, count);
+    return destination;
+  }
+
+  /**
+   * Address: 0x004A19E0 (FUN_004A19E0)
+   * Mangled: ??Ywstring@std@@VQAEAAV01@PB_W@Z
+   *
+   * What it does:
+   * Appends one wide source range into destination while preserving overlapping
+   * source semantics.
+   */
+  [[maybe_unused]] std::wstring* AppendWideRangePreservingOverlap(
+    std::wstring* const destination,
+    const wchar_t* const source,
+    const std::size_t sourceLength
+  )
+  {
+    if (destination == nullptr || source == nullptr) {
+      return destination;
+    }
+
+    const wchar_t* const destinationData = destination->data();
+    const wchar_t* const destinationEnd = destinationData + destination->size();
+    if (source >= destinationData && source < destinationEnd) {
+      const std::size_t sourceOffset = static_cast<std::size_t>(source - destinationData);
+      return AppendWideSubstringRangeClamped(destination, *destination, sourceLength, sourceOffset);
+    }
+
+    destination->append(source, sourceLength);
+    return destination;
+  }
+
+  /**
+   * Address: 0x004A1820 (FUN_004A1820, sub_4A1820)
+   *
+   * What it does:
+   * Appends one zero-terminated wide source to the destination string.
+   */
+  [[maybe_unused]] std::wstring* AppendWideStringFromNullTerminatedInputA(
+    std::wstring* const destination,
+    const wchar_t* const source
+  )
+  {
+    const wchar_t* const safeSource = (source != nullptr) ? source : L"";
+    return AppendWideRangePreservingOverlap(destination, safeSource, std::wcslen(safeSource));
+  }
+
+  /**
+   * Address: 0x004A18F0 (FUN_004A18F0, sub_4A18F0)
+   *
+   * What it does:
+   * Duplicate zero-terminated wide append helper.
+   */
+  [[maybe_unused]] std::wstring* AppendWideStringFromNullTerminatedInputB(
+    std::wstring* const destination,
+    const wchar_t* const source
+  )
+  {
+    return AppendWideStringFromNullTerminatedInputA(destination, source);
+  }
+
+  /**
+   * Address: 0x004A1870 (FUN_004A1870, sub_4A1870)
+   *
+   * What it does:
+   * Returns whether the global error-report output directory is empty.
+   */
+  [[maybe_unused]] bool IsLegacyErrorReportOutputDirEmpty() noexcept
+  {
+    return GetLegacyErrorReportOutputDirStorage()->empty();
+  }
+
+  /**
+   * Address: 0x004A1950 (FUN_004A1950)
+   * Mangled: ?compare@?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@QBEHPB_W@Z
+   *
+   * What it does:
+   * Lexicographically compares up to `lhsRequestedLength` characters from one
+   * wide string against one raw wide range and returns `-1/0/1`.
+   */
+  [[maybe_unused]] int CompareWideStringPrefixRange(
+    std::size_t lhsRequestedLength,
+    const std::wstring* const lhs,
+    const std::size_t rhsLength,
+    const wchar_t* const rhs
+  ) noexcept
+  {
+    if (lhs == nullptr || rhs == nullptr) {
+      return (lhs == nullptr) ? ((rhs == nullptr) ? 0 : -1) : 1;
+    }
+
+    std::size_t lhsLength = lhsRequestedLength;
+    if (lhs->size() < lhsLength) {
+      lhsLength = lhs->size();
+    }
+
+    std::size_t compareCount = lhsLength;
+    if (compareCount > rhsLength) {
+      compareCount = rhsLength;
+    }
+
+    for (std::size_t i = 0; i < compareCount; ++i) {
+      const wchar_t left = (*lhs)[i];
+      const wchar_t right = rhs[i];
+      if (left != right) {
+        return (left < right) ? -1 : 1;
+      }
+    }
+
+    if (lhsLength >= rhsLength) {
+      return (lhsLength != rhsLength) ? 1 : 0;
+    }
+    return -1;
+  }
+
+  /**
+   * Address: 0x004A1880 (FUN_004A1880, sub_4A1880)
+   *
+   * What it does:
+   * Compares one wide string against one zero-terminated wide source.
+   */
+  [[maybe_unused]] int CompareWideStringWithNullTerminatedInput(
+    const std::wstring* const lhs,
+    const wchar_t* const rhs
+  ) noexcept
+  {
+    const wchar_t* const safeRhs = (rhs != nullptr) ? rhs : L"";
+    return CompareWideStringPrefixRange(
+      (lhs != nullptr) ? lhs->size() : 0U,
+      lhs,
+      std::wcslen(safeRhs),
+      safeRhs
+    );
+  }
+
+  /**
+   * Address: 0x004A1850 (FUN_004A1850, sub_4A1850)
+   *
+   * What it does:
+   * Returns a pointer to one character index in a recovered legacy wide-string
+   * object view (SSO-aware).
+   */
+  [[maybe_unused]] wchar_t* GetLegacyWideStringCharacterPointer(
+    LegacyWideStringObjectView* const value,
+    const std::uint32_t index
+  ) noexcept
+  {
+    if (value == nullptr) {
+      return nullptr;
+    }
+    if (value->capacity < 8U) {
+      return GetLegacyWideStringInlineBufferSubobject(value) + index;
+    }
+    return value->storage.heap + index;
+  }
+
+  struct LegacyWideStringVectorAccessorView
+  {
+    std::uint32_t reserved = 0;
+    LegacyWideStringObjectView* first = nullptr;
+  };
+
+  /**
+   * Address: 0x004A18B0 (FUN_004A18B0, sub_4A18B0)
+   *
+   * What it does:
+   * Returns one legacy wide-string element pointer by index from a recovered
+   * vector-storage accessor view.
+   */
+  [[maybe_unused]] LegacyWideStringObjectView* GetLegacyWideStringElementPointerByIndex(
+    const std::uint32_t index,
+    const LegacyWideStringVectorAccessorView* const accessor
+  ) noexcept
+  {
+    if (accessor == nullptr || accessor->first == nullptr) {
+      return nullptr;
+    }
+    return accessor->first + index;
+  }
+
+  /**
+   * Address: 0x004A18C0 (FUN_004A18C0, sub_4A18C0)
+   *
+   * What it does:
+   * Resets one legacy wide-string pointer-slot to null.
+   */
+  [[maybe_unused]] LegacyWideStringObjectView** ResetLegacyWideStringPointerSlotA(
+    LegacyWideStringObjectView** const pointerSlot
+  ) noexcept
+  {
+    if (pointerSlot != nullptr) {
+      *pointerSlot = nullptr;
+    }
+    return pointerSlot;
+  }
+
+  /**
+   * Address: 0x004A18D0 (FUN_004A18D0, sub_4A18D0)
+   *
+   * What it does:
+   * Loads one legacy wide-string pointer-slot value.
+   */
+  [[maybe_unused]] LegacyWideStringObjectView* LoadLegacyWideStringPointerSlotA(
+    LegacyWideStringObjectView* const* const pointerSlot
+  ) noexcept
+  {
+    return (pointerSlot != nullptr) ? *pointerSlot : nullptr;
+  }
+
+  /**
+   * Address: 0x004A18E0 (FUN_004A18E0, sub_4A18E0)
+   *
+   * What it does:
+   * Advances one legacy wide-string pointer-slot by one element stride.
+   */
+  [[maybe_unused]] LegacyWideStringObjectView** AdvanceLegacyWideStringPointerSlotByOneElement(
+    LegacyWideStringObjectView** const pointerSlot
+  ) noexcept
+  {
+    if (pointerSlot != nullptr && *pointerSlot != nullptr) {
+      *pointerSlot = reinterpret_cast<LegacyWideStringObjectView*>(
+        reinterpret_cast<std::byte*>(*pointerSlot) + sizeof(LegacyWideStringObjectView)
+      );
+    }
+    return pointerSlot;
+  }
+
+  /**
+   * Address: 0x004A19C0 (FUN_004A19C0, sub_4A19C0)
+   *
+   * What it does:
+   * Duplicate legacy wide-string pointer-slot load helper.
+   */
+  [[maybe_unused]] LegacyWideStringObjectView* LoadLegacyWideStringPointerSlotB(
+    LegacyWideStringObjectView* const* const pointerSlot
+  ) noexcept
+  {
+    return LoadLegacyWideStringPointerSlotA(pointerSlot);
+  }
+
+  /**
+   * Address: 0x004A19D0 (FUN_004A19D0, sub_4A19D0)
+   *
+   * What it does:
+   * Duplicate legacy wide-string pointer-slot reset helper.
+   */
+  [[maybe_unused]] LegacyWideStringObjectView** ResetLegacyWideStringPointerSlotB(
+    LegacyWideStringObjectView** const pointerSlot
+  ) noexcept
+  {
+    return ResetLegacyWideStringPointerSlotA(pointerSlot);
+  }
+
+  /**
+   * Address: 0x004A1BF0 (FUN_004A1BF0)
+   * Mangled:
+   * ??$?H_WU?$char_traits@_W@std@@V?$allocator@_W@1@@std@@YA?AV?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@0@ABV10@PB_W@Z
+   *
+   * What it does:
+   * Builds `lhs + rhs` for one wide-string plus zero-terminated wide literal.
+   */
+  [[maybe_unused]] std::wstring BuildWideStringPlusWideLiteral(
+    const std::wstring& lhs,
+    const wchar_t* const rhs
+  )
+  {
+    std::wstring tmp(lhs);
+    const wchar_t* const safeRhs = (rhs != nullptr) ? rhs : L"";
+    tmp += safeRhs;
+    return tmp;
+  }
+
+  /**
+   * Address: 0x004A1D50 (FUN_004A1D50)
+   * Mangled:
+   * ??$?H_WU?$char_traits@_W@std@@V?$allocator@_W@1@@std@@YA?AV?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@0@ABV10@0@Z
+   *
+   * What it does:
+   * Builds `lhs + rhs` for one wide-string plus wide-string pair.
+   */
+  [[maybe_unused]] std::wstring BuildWideStringPlusWideString(const std::wstring& lhs, const std::wstring& rhs)
+  {
+    std::wstring tmp(lhs);
+    tmp.append(rhs, 0, std::wstring::npos);
+    return tmp;
+  }
+
+  /**
+   * Address: 0x004A1E10 (FUN_004A1E10, j__strrchr)
+   *
+   * What it does:
+   * Forwards one C-string reverse-character search to CRT `strrchr`.
+   */
+  [[maybe_unused]] char* FindLastCharacterInCString(char* const text, const int character) noexcept
+  {
+    return std::strrchr(text, character);
+  }
+
+  struct LegacyByteVectorStorageView
+  {
+    std::uint8_t* first = nullptr;
+    std::uint8_t* last = nullptr;
+    std::uint8_t* end = nullptr;
+  };
+
+#if defined(_M_IX86)
+  static_assert(sizeof(LegacyByteVectorStorageView) == 0x0C, "LegacyByteVectorStorageView size must be 0x0C");
+#endif
+
+  [[nodiscard]] std::size_t LegacyByteVectorSizeBytes(const LegacyByteVectorStorageView* const storage) noexcept
+  {
+    if (storage == nullptr || storage->first == nullptr) {
+      return 0;
+    }
+    return static_cast<std::size_t>(storage->last - storage->first);
+  }
+
+  [[nodiscard]] std::size_t LegacyByteVectorCapacityBytes(const LegacyByteVectorStorageView* const storage) noexcept
+  {
+    if (storage == nullptr || storage->first == nullptr) {
+      return 0;
+    }
+    return static_cast<std::size_t>(storage->end - storage->first);
+  }
+
+  /**
+   * Address: 0x004A2FD0 (FUN_004A2FD0, sub_4A2FD0)
+   *
+   * What it does:
+   * Resets one byte-vector storage triplet to null pointers.
+   */
+  [[maybe_unused]] LegacyByteVectorStorageView* ResetLegacyByteVectorStorage(LegacyByteVectorStorageView* const storage)
+    noexcept
+  {
+    if (storage != nullptr) {
+      storage->first = nullptr;
+      storage->last = nullptr;
+      storage->end = nullptr;
+    }
+    return storage;
+  }
+
+  /**
+   * Address: 0x004A3280 (FUN_004A3280, sub_4A3280)
+   *
+   * What it does:
+   * Writes `base + offset` into one output pointer slot.
+   */
+  [[maybe_unused]] std::uint8_t** WritePointerWithByteOffset(
+    std::uint8_t* const base,
+    std::uint8_t** const outPointer,
+    const std::uint32_t offset
+  ) noexcept
+  {
+    if (outPointer != nullptr) {
+      *outPointer = (base != nullptr) ? (base + offset) : nullptr;
+    }
+    return outPointer;
+  }
+
+  /**
+   * Address: 0x004A3290 (FUN_004A3290, sub_4A3290)
+   *
+   * What it does:
+   * Returns capacity bytes (`end - first`) for one byte-vector storage view.
+   */
+  [[maybe_unused]] std::uint32_t GetLegacyByteVectorCapacityBytes(const LegacyByteVectorStorageView* const storage)
+    noexcept
+  {
+    if (storage == nullptr || storage->first == nullptr) {
+      return 0;
+    }
+    return static_cast<std::uint32_t>(storage->end - storage->first);
+  }
+
+  /**
+   * Address: 0x004A32A0 (FUN_004A32A0, sub_4A32A0)
+   *
+   * What it does:
+   * Assigns one 32-bit slot value.
+   */
+  [[maybe_unused]] std::uint32_t* AssignUint32Slot(std::uint32_t* const slot, const std::uint32_t value) noexcept
+  {
+    if (slot != nullptr) {
+      *slot = value;
+    }
+    return slot;
+  }
+
+  /**
+   * Address: 0x004A32B0 (FUN_004A32B0, sub_4A32B0)
+   *
+   * What it does:
+   * Adds one 32-bit delta into one slot.
+   */
+  [[maybe_unused]] std::uint32_t* AddUint32SlotDelta(std::uint32_t* const slot, const std::uint32_t delta) noexcept
+  {
+    if (slot != nullptr) {
+      *slot += delta;
+    }
+    return slot;
+  }
+
+  /**
+   * Address: 0x004A32C0 (FUN_004A32C0, sub_4A32C0)
+   *
+   * What it does:
+   * Returns whether two 32-bit slot values differ.
+   */
+  [[maybe_unused]] bool AreUint32SlotsDifferent(
+    const std::uint32_t* const lhs, const std::uint32_t* const rhs
+  ) noexcept
+  {
+    if (lhs == nullptr || rhs == nullptr) {
+      return lhs != rhs;
+    }
+    return *lhs != *rhs;
+  }
+
+  /**
+   * Address: 0x004A32E0 (FUN_004A32E0, sub_4A32E0)
+   *
+   * What it does:
+   * Duplicate 32-bit slot assignment helper.
+   */
+  [[maybe_unused]] std::uint32_t* AssignUint32SlotDuplicate(std::uint32_t* const slot, const std::uint32_t value)
+    noexcept
+  {
+    return AssignUint32Slot(slot, value);
+  }
+
+  /**
+   * Address: 0x004A32F0 (FUN_004A32F0, sub_4A32F0)
+   *
+   * What it does:
+   * Duplicate 32-bit slot delta-add helper.
+   */
+  [[maybe_unused]] std::uint32_t* AddUint32SlotDeltaDuplicate(
+    std::uint32_t* const slot,
+    const std::uint32_t delta
+  ) noexcept
+  {
+    return AddUint32SlotDelta(slot, delta);
+  }
+
+  /**
+   * Address: 0x004A3300 (FUN_004A3300, sub_4A3300)
+   *
+   * What it does:
+   * Returns whether two 32-bit slot values are equal.
+   */
+  [[maybe_unused]] bool AreUint32SlotsEqual(const std::uint32_t* const lhs, const std::uint32_t* const rhs) noexcept
+  {
+    if (lhs == nullptr || rhs == nullptr) {
+      return lhs == rhs;
+    }
+    return *lhs == *rhs;
+  }
+
+  /**
+   * Address: 0x004A3070 (FUN_004A3070, sub_4A3070)
+   *
+   * What it does:
+   * Writes the current begin pointer into an output pointer slot.
+   */
+  [[maybe_unused]] std::uint8_t** WriteLegacyByteVectorBeginPointer(
+    const LegacyByteVectorStorageView* const storage,
+    std::uint8_t** const outPointer
+  ) noexcept
+  {
+    return WritePointerWithByteOffset(storage != nullptr ? storage->first : nullptr, outPointer, 0);
+  }
+
+  /**
+   * Address: 0x004A3080 (FUN_004A3080, sub_4A3080)
+   *
+   * What it does:
+   * Writes the current end-of-used-range pointer into an output pointer slot.
+   */
+  [[maybe_unused]] std::uint8_t** WriteLegacyByteVectorLastPointer(
+    const LegacyByteVectorStorageView* const storage,
+    std::uint8_t** const outPointer
+  ) noexcept
+  {
+    return WritePointerWithByteOffset(storage != nullptr ? storage->last : nullptr, outPointer, 0);
+  }
+
+  /**
+   * Address: 0x004A3090 (FUN_004A3090, sub_4A3090)
+   *
+   * What it does:
+   * Moves one tail byte range to `destination`, updates `last`, and writes the
+   * destination pointer to the output slot.
+   */
+  [[maybe_unused]] std::uint8_t** MoveLegacyByteVectorTailAndWriteDestination(
+    LegacyByteVectorStorageView* const storage,
+    std::uint8_t** const outPointer,
+    std::uint8_t* const destination,
+    std::uint8_t* const source
+  ) noexcept
+  {
+    if (storage == nullptr) {
+      if (outPointer != nullptr) {
+        *outPointer = destination;
+      }
+      return outPointer;
+    }
+
+    if (destination != source && source != nullptr && storage->last != nullptr) {
+      const std::ptrdiff_t tailSize = storage->last - source;
+      std::uint8_t* const newLast = destination + tailSize;
+      if (tailSize > 0) {
+        std::memmove(destination, source, static_cast<std::size_t>(tailSize));
+      }
+      storage->last = newLast;
+    }
+
+    if (outPointer != nullptr) {
+      *outPointer = destination;
+    }
+    return outPointer;
+  }
+
+  /**
+   * Address: 0x004A3320 (FUN_004A3320, sub_4A3320)
+   *
+   * What it does:
+   * Moves one byte range `[sourceBegin, sourceEnd)` into `destination` when
+   * range length is positive and returns destination end.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenPositiveLength(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    const std::ptrdiff_t length = sourceEnd - sourceBegin;
+    std::uint8_t* const destinationEnd = destination + length;
+    if (length > 0) {
+      std::memmove(destination, sourceBegin, static_cast<std::size_t>(length));
+    }
+    return destinationEnd;
+  }
+
+  /**
+   * Address: 0x004A3350 (FUN_004A3350, sub_4A3350)
+   *
+   * What it does:
+   * Moves one byte range `[sourceBegin, sourceEnd)` into `destination` when
+   * range length is non-zero and returns destination end.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenNonZeroLength(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    const std::ptrdiff_t length = sourceEnd - sourceBegin;
+    std::uint8_t* const destinationEnd = destination + length;
+    if (sourceBegin != sourceEnd) {
+      std::memmove(destination, sourceBegin, static_cast<std::size_t>(length));
+    }
+    return destinationEnd;
+  }
+
+  /**
+   * Address: 0x004A3380 (FUN_004A3380, sub_4A3380)
+   *
+   * What it does:
+   * Fills one byte range `[begin, end)` with one source byte.
+   */
+  [[maybe_unused]] std::uint8_t* FillByteRangeWithSourceValue(
+    std::uint8_t* begin,
+    const std::uint8_t* const end,
+    const std::uint8_t* const sourceValue
+  ) noexcept
+  {
+    while (begin != end) {
+      *begin = *sourceValue;
+      ++begin;
+    }
+    return begin;
+  }
+
+  /**
+   * Address: 0x004A33A0 (FUN_004A33A0, sub_4A33A0)
+   *
+   * What it does:
+   * Moves one byte range `[sourceBegin, sourceEnd)` so it ends at
+   * `destinationEnd` and returns the moved-range begin pointer.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeToEndWhenPositiveLength(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destinationEnd
+  ) noexcept
+  {
+    const std::ptrdiff_t length = sourceEnd - sourceBegin;
+    std::uint8_t* const destinationBegin = destinationEnd - length;
+    if (length > 0) {
+      std::memmove(destinationBegin, sourceBegin, static_cast<std::size_t>(length));
+    }
+    return destinationBegin;
+  }
+
+  /**
+   * Address: 0x004A33D0 (FUN_004A33D0, sub_4A33D0)
+   *
+   * What it does:
+   * Returns input value unchanged.
+   */
+  [[maybe_unused]] int ReturnIdentityInt(const int value) noexcept
+  {
+    return value;
+  }
+
+  /**
+   * Address: 0x004A33E0 (FUN_004A33E0, sub_4A33E0)
+   *
+   * What it does:
+   * Duplicate positive-length forward byte-range move helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenPositiveLengthDuplicate(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    return MoveByteRangeForwardWhenPositiveLength(sourceBegin, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x004A3410 (FUN_004A3410, sub_4A3410)
+   *
+   * What it does:
+   * Duplicate non-zero-length forward byte-range move helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenNonZeroLengthDuplicateA(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    return MoveByteRangeForwardWhenNonZeroLength(sourceBegin, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x004A3440 (FUN_004A3440, sub_4A3440)
+   *
+   * What it does:
+   * Duplicate byte-range fill helper.
+   */
+  [[maybe_unused]] std::uint8_t* FillByteRangeWithSourceValueDuplicate(
+    std::uint8_t* begin,
+    const std::uint8_t* const end,
+    const std::uint8_t* const sourceValue
+  ) noexcept
+  {
+    return FillByteRangeWithSourceValue(begin, end, sourceValue);
+  }
+
+  /**
+   * Address: 0x004A3460 (FUN_004A3460, sub_4A3460)
+   *
+   * What it does:
+   * Returns high byte from low 16-bit lane of the input integer.
+   */
+  [[maybe_unused]] std::uint8_t ExtractHighByteFromLowWord(const std::uint32_t value) noexcept
+  {
+    return static_cast<std::uint8_t>((value >> 8) & 0xFFu);
+  }
+
+  /**
+   * Address: 0x004A3470 (FUN_004A3470, sub_4A3470)
+   *
+   * What it does:
+   * Duplicate move-range-to-end helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeToEndWhenPositiveLengthDuplicateA(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destinationEnd
+  ) noexcept
+  {
+    return MoveByteRangeToEndWhenPositiveLength(sourceBegin, sourceEnd, destinationEnd);
+  }
+
+  /**
+   * Address: 0x004A34A0 (FUN_004A34A0, sub_4A34A0)
+   *
+   * What it does:
+   * Duplicate non-zero-length forward byte-range move helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenNonZeroLengthDuplicateB(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    return MoveByteRangeForwardWhenNonZeroLength(sourceBegin, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x004A34D0 (FUN_004A34D0, sub_4A34D0)
+   *
+   * What it does:
+   * Duplicate move-range-to-end helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeToEndWhenPositiveLengthDuplicateB(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destinationEnd
+  ) noexcept
+  {
+    return MoveByteRangeToEndWhenPositiveLength(sourceBegin, sourceEnd, destinationEnd);
+  }
+
+  /**
+   * Address: 0x004A3500 (FUN_004A3500, sub_4A3500)
+   *
+   * What it does:
+   * Duplicate non-zero-length forward byte-range move helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenNonZeroLengthDuplicateC(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    return MoveByteRangeForwardWhenNonZeroLength(sourceBegin, sourceEnd, destination);
+  }
+
+  /**
+   * Address: 0x004A3530 (FUN_004A3530, sub_4A3530)
+   *
+   * What it does:
+   * Duplicate non-zero-length forward byte-range move helper.
+   */
+  [[maybe_unused]] std::uint8_t* MoveByteRangeForwardWhenNonZeroLengthDuplicateD(
+    const std::uint8_t* const sourceBegin,
+    const std::uint8_t* const sourceEnd,
+    std::uint8_t* const destination
+  ) noexcept
+  {
+    return MoveByteRangeForwardWhenNonZeroLength(sourceBegin, sourceEnd, destination);
+  }
+
+  struct LegacyUint32PairEmitterView
+  {
+    std::uint32_t reserved0 = 0;
+    std::uint32_t secondValue = 0;
+    std::uint32_t firstBase = 0;
+  };
+
+  struct LegacyUint32PairView
+  {
+    std::uint32_t first = 0;
+    std::uint32_t second = 0;
+  };
+
+#if defined(_M_IX86)
+  static_assert(sizeof(LegacyUint32PairEmitterView) == 0x0C, "LegacyUint32PairEmitterView size must be 0x0C");
+  static_assert(sizeof(LegacyUint32PairView) == 0x08, "LegacyUint32PairView size must be 0x08");
+#endif
+
+  /**
+   * Address: 0x004A35B0 (FUN_004A35B0, sub_4A35B0)
+   *
+   * What it does:
+   * Writes one 32-bit pair where `first = firstBase + delta` and
+   * `second = secondValue`.
+   */
+  [[maybe_unused]] LegacyUint32PairView* WriteAdjustedUint32PairFromEmitter(
+    const LegacyUint32PairEmitterView* const emitter,
+    LegacyUint32PairView* const outPair,
+    const std::uint32_t delta
+  ) noexcept
+  {
+    if (outPair == nullptr) {
+      return nullptr;
+    }
+
+    if (emitter == nullptr) {
+      outPair->first = delta;
+      outPair->second = 0;
+      return outPair;
+    }
+
+    outPair->first = emitter->firstBase + delta;
+    outPair->second = emitter->secondValue;
+    return outPair;
+  }
+
+  /**
+   * Address: 0x004A30D0 (FUN_004A30D0, sub_4A30D0)
+   *
+   * What it does:
+   * Inserts `count` fill-bytes at `insertPosition` in one legacy byte-vector
+   * storage view and returns the insertion-start pointer.
+   */
+  [[maybe_unused]] std::uint8_t* InsertFillBytesIntoLegacyByteVectorStorage(
+    LegacyByteVectorStorageView* const storage,
+    std::uint8_t* insertPosition,
+    const std::uint32_t count,
+    const std::uint8_t fillValue
+  )
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const std::size_t currentSize = LegacyByteVectorSizeBytes(storage);
+    const std::size_t currentCapacity = LegacyByteVectorCapacityBytes(storage);
+    if (count == 0U) {
+      return storage->last;
+    }
+    if (currentSize > (std::numeric_limits<std::size_t>::max() - static_cast<std::size_t>(count))) {
+      throw std::length_error("LegacyByteVectorStorageView too long");
+    }
+
+    std::size_t insertOffset = 0;
+    if (storage->first != nullptr) {
+      if (insertPosition == nullptr || insertPosition < storage->first) {
+        insertOffset = 0;
+      } else if (insertPosition > storage->last) {
+        insertOffset = currentSize;
+      } else {
+        insertOffset = static_cast<std::size_t>(insertPosition - storage->first);
+      }
+    }
+
+    const std::size_t newSize = currentSize + static_cast<std::size_t>(count);
+    if (newSize > currentCapacity) {
+      std::size_t grownCapacity = 0;
+      if (currentCapacity <= ((std::numeric_limits<std::size_t>::max() - currentCapacity) / 2U)) {
+        grownCapacity = currentCapacity + (currentCapacity / 2U);
+      }
+      if (grownCapacity < newSize) {
+        grownCapacity = newSize;
+      }
+
+      auto* const newBuffer = static_cast<std::uint8_t*>(::operator new(grownCapacity));
+      if (insertOffset != 0U && storage->first != nullptr) {
+        std::memmove(newBuffer, storage->first, insertOffset);
+      }
+
+      std::memset(newBuffer + insertOffset, fillValue, count);
+
+      if (currentSize > insertOffset && storage->first != nullptr) {
+        const std::size_t trailingSize = currentSize - insertOffset;
+        std::memmove(newBuffer + insertOffset + count, storage->first + insertOffset, trailingSize);
+      }
+
+      if (storage->first != nullptr) {
+        ::operator delete(storage->first);
+      }
+      storage->first = newBuffer;
+      storage->last = newBuffer + newSize;
+      storage->end = newBuffer + grownCapacity;
+      return newBuffer + insertOffset;
+    }
+
+    insertPosition = storage->first + insertOffset;
+    const std::size_t trailingSize = currentSize - insertOffset;
+    if (trailingSize != 0U) {
+      std::memmove(insertPosition + count, insertPosition, trailingSize);
+    }
+    std::memset(insertPosition, fillValue, count);
+    storage->last = storage->first + newSize;
+    return insertPosition;
+  }
+
+  /**
+   * Address: 0x004A2FF0 (FUN_004A2FF0, sub_4A2FF0)
+   *
+   * What it does:
+   * Resizes one legacy byte-vector storage view to `requestedSize`, filling
+   * newly-grown bytes with `fillValue`.
+   */
+  [[maybe_unused]] void ResizeLegacyByteVectorStorage(
+    LegacyByteVectorStorageView* const storage,
+    const std::size_t requestedSize,
+    const std::uint8_t fillValue
+  )
+  {
+    if (storage == nullptr) {
+      return;
+    }
+
+    const std::size_t currentSize = LegacyByteVectorSizeBytes(storage);
+    if (currentSize >= requestedSize) {
+      if (storage->first != nullptr && requestedSize < currentSize && (storage->first + requestedSize) != storage->last) {
+        storage->last = storage->first + requestedSize;
+      }
+      return;
+    }
+
+    InsertFillBytesIntoLegacyByteVectorStorage(
+      storage,
+      storage->last,
+      static_cast<std::uint32_t>(requestedSize - currentSize),
+      fillValue
+    );
+  }
+
+  /**
+   * Address: 0x004A2FE0 (FUN_004A2FE0, sub_4A2FE0)
+   *
+   * What it does:
+   * Wrapper that forwards to byte-vector resize helper with zero fill.
+   */
+  [[maybe_unused]] void ResizeLegacyByteVectorStorageWithZeroFill(
+    LegacyByteVectorStorageView* const storage,
+    const std::size_t requestedSize
+  )
+  {
+    ResizeLegacyByteVectorStorage(storage, requestedSize, 0);
+  }
+
+  [[maybe_unused]] void DestroyLegacyByteVectorStorage(LegacyByteVectorStorageView* const storage) noexcept
+  {
+    if (storage != nullptr && storage->first != nullptr) {
+      ::operator delete(storage->first);
+      storage->first = nullptr;
+      storage->last = nullptr;
+      storage->end = nullptr;
+    }
+  }
+
+  struct ParsedRegistryPathView
+  {
+    HKEY rootKey = HKEY_CURRENT_USER;
+    char* subKey = nullptr;
+    const char* valueName = nullptr;
+  };
+
+  [[nodiscard]] HKEY ResolveRegistryRootKey(const char* const rootKeyName) noexcept
+  {
+    if (rootKeyName == nullptr) {
+      return HKEY_CURRENT_USER;
+    }
+    if (_stricmp(rootKeyName, "HKEY_CLASSES_ROOT") == 0) {
+      return HKEY_CLASSES_ROOT;
+    }
+    if (_stricmp(rootKeyName, "HKEY_CURRENT_USER") == 0) {
+      return HKEY_CURRENT_USER;
+    }
+    if (_stricmp(rootKeyName, "HKEY_LOCAL_MACHINE") == 0) {
+      return HKEY_LOCAL_MACHINE;
+    }
+    if (_stricmp(rootKeyName, "HKEY_USERS") == 0) {
+      return HKEY_USERS;
+    }
+    if (_stricmp(rootKeyName, "HKEY_CURRENT_CONFIG") == 0) {
+      return HKEY_CURRENT_CONFIG;
+    }
+    if (_stricmp(rootKeyName, "HKEY_DYN_DATA") == 0) {
+      return reinterpret_cast<HKEY>(static_cast<std::uintptr_t>(0x80000006u));
+    }
+    if (_stricmp(rootKeyName, "HKEY_PERFORMANCE_DATA") == 0) {
+      return HKEY_PERFORMANCE_DATA;
+    }
+    return HKEY_CURRENT_USER;
+  }
+
+  [[nodiscard]] ParsedRegistryPathView ParseRegistryPathInPlace(char* const mutablePath) noexcept
+  {
+    ParsedRegistryPathView parsed{};
+    if (mutablePath == nullptr) {
+      return parsed;
+    }
+
+    char* subKey = std::strchr(mutablePath, '\\');
+    const char* valueName = subKey;
+    if (subKey != nullptr) {
+      ++subKey;
+      subKey[-1] = '\0';
+
+      char* const lastSeparator = FindLastCharacterInCString(subKey, '\\');
+      if (lastSeparator != nullptr) {
+        *lastSeparator = '\0';
+        valueName = lastSeparator + 1;
+      } else {
+        valueName = subKey;
+        subKey = nullptr;
+      }
+    } else {
+      valueName = nullptr;
+      subKey = nullptr;
+    }
+
+    parsed.rootKey = ResolveRegistryRootKey(mutablePath);
+    parsed.subKey = subKey;
+    parsed.valueName = valueName;
+    return parsed;
+  }
 
   using BugSplatAttachmentCallbackFn = bool(__cdecl*)(std::uint32_t, void*, void*);
-  void sub_BF0280();
+  void DestroyBugSplatMiniDmpSenderAtExit();
 
   [[nodiscard]]
   moho::WWinLogWindow* CreateLogWindowRuntime()
@@ -244,7 +1359,7 @@ namespace
       const msvc8::string versionText = gpg::STR_Printf("%i", 3620);
       api_.Construct(&sender_, "gaspowered", "SupremeCommander", versionText.c_str(), nullptr, 0x20u);
       isRegistered_ = true;
-      (void)std::atexit(&sub_BF0280);
+      (void)std::atexit(&DestroyBugSplatMiniDmpSenderAtExit);
       return true;
     }
 
@@ -260,10 +1375,11 @@ namespace
     void SetOutputDir(const wchar_t* const outputDir)
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      outputDir_.assign(outputDir != nullptr ? outputDir : L"");
-      if (!outputDir_.empty() && outputDir_.back() != kPathSeparator) {
-        outputDir_.push_back(kPathSeparator);
+      AssignErrorReportOutputDirFromNullTerminatedInput(outputDir);
+      if (!IsLegacyErrorReportOutputDirEmpty() && sLegacyErrorReportOutputDir.back() != kPathSeparator) {
+        (void)AppendWideStringFromNullTerminatedInputA(&sLegacyErrorReportOutputDir, L"\\");
       }
+      outputDir_ = sLegacyErrorReportOutputDir;
     }
 
     [[nodiscard]]
@@ -280,11 +1396,15 @@ namespace
       }
 
       std::lock_guard<std::mutex> lock(mutex_);
-      const std::wstring candidate(file);
-      const auto existing = std::find(files_.begin(), files_.end(), candidate);
-      if (existing == files_.end()) {
-        files_.push_back(candidate);
+      for (const std::wstring& existing : files_) {
+        if (CompareWideStringWithNullTerminatedInput(&existing, file) == 0) {
+          return;
+        }
       }
+
+      std::wstring candidate{};
+      (void)InitializeAndAssignWideStringFromNullTerminatedInput(&candidate, file);
+      files_.push_back(candidate);
     }
 
     [[nodiscard]]
@@ -330,9 +1450,7 @@ namespace
   [[nodiscard]]
   std::wstring BuildDxdiagCommandLine(const std::wstring& outputPath)
   {
-    std::wstring commandLine(kDxdiagCommandPrefix);
-    commandLine.append(outputPath);
-    return commandLine;
+    return BuildWideStringPlusWideLiteral(std::wstring(kDxdiagCommandPrefix), outputPath.c_str());
   }
 
   [[nodiscard]]
@@ -441,6 +1559,21 @@ namespace
     return static_cast<float>(wakeupTimer.ElapsedMilliseconds());
   }
 
+  /**
+   * Address: 0x0040D820 (FUN_0040D820, func_round)
+   *
+   * float
+   *
+   * What it does:
+   * Applies x87 `frndint` rounding, then adjusts down by one when the original
+   * value is below the rounded lane (floor-equivalent in default rounding mode).
+   */
+  [[nodiscard]] int FloorFrndintAdjustDown(const float value) noexcept
+  {
+    const float rounded = std::nearbyintf(value);
+    return static_cast<int>(rounded) + ((value < rounded) ? -1 : 0);
+  }
+
   DWORD ComputeWaitTimeoutMs()
   {
     const float remainingMs = wakeupTimerDur - ProbeWakeTimerMs();
@@ -452,7 +1585,7 @@ namespace
       return INFINITE;
     }
 
-    return static_cast<DWORD>(std::lround(remainingMs));
+    return static_cast<DWORD>(FloorFrndintAdjustDown(remainingMs));
   }
 
   void WxPumpToIdleAndExit()
@@ -690,6 +1823,13 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x004A1740 (FUN_004A1740, sub_4A1740)
+   *
+   * What it does:
+   * Enables BugSplat reporting when `/bugreport` is present, otherwise keeps
+   * BugSplat enabled unless `/nobugreport` is present.
+   */
   [[nodiscard]]
   bool ShouldUseBugSplatPath()
   {
@@ -758,12 +1898,12 @@ namespace
   }
 
   /**
-   * Address: 0x00BF0280 (FUN_00BF0280, sub_BF0280)
+   * Address: 0x00BF0280 (FUN_00BF0280, DestroyBugSplatMiniDmpSenderAtExit)
    *
    * What it does:
    * Process-exit callback that tears down the process-global BugSplat sender.
    */
-  void sub_BF0280()
+  void DestroyBugSplatMiniDmpSenderAtExit()
   {
     sBugSplatMiniDmpSenderRegistry.DestroyAtProcessExit();
   }
@@ -1165,8 +2305,9 @@ void moho::PLAT_CreateGameLogForReport()
   const char* const appShortName = (sSupComApp != nullptr && !sSupComApp->shortName.empty())
                                      ? sSupComApp->shortName.c_str()
                                      : "SupCom";
-  const std::wstring logFilePath =
-    GetErrorReportOutputDirSnapshot() + gpg::STR_Utf8ToWide(appShortName) + L".sclog";
+  const std::wstring logFilePrefix =
+    BuildWideStringPlusWideString(GetErrorReportOutputDirSnapshot(), gpg::STR_Utf8ToWide(appShortName));
+  const std::wstring logFilePath = BuildWideStringPlusWideLiteral(logFilePrefix, L".sclog");
 
   HANDLE logFileHandle =
     ::CreateFileW(logFilePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -1379,6 +2520,182 @@ msvc8::string moho::PLAT_FormatCallstack(
 
   formatted.assign_owned(assembled);
   return formatted;
+}
+
+/**
+ * Address: 0x004A25D0 (FUN_004A25D0)
+ * Mangled:
+ * ?PLAT_UnDecorateSymbolName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PBD_N@Z
+ *
+ * What it does:
+ * Converts one decorated symbol into undecorated text under the shared
+ * symbol-handler mutex, with optional underscore stripping.
+ */
+msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
+{
+  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+
+  msvc8::string result;
+  if (name == nullptr) {
+    result.assign_owned("");
+    return result;
+  }
+
+  CHAR outputString[1024]{};
+  const DWORD flags = stripLeadingUnderscore ? 0x1000u : 0u;
+  if (::UnDecorateSymbolName(name, outputString, 0x3FFu, flags) != 0) {
+    result.assign_owned(outputString);
+  } else {
+    result.assign_owned(name);
+  }
+  return result;
+}
+
+/**
+ * Address: 0x004A1F10 (FUN_004A1F10)
+ *
+ * What it does:
+ * Writes one registry value at `keyPath` using raw byte payload and explicit
+ * registry value type.
+ */
+bool moho::PLAT_SetRegistryValue(
+  const char* const keyPath,
+  const std::uint8_t* const data,
+  const std::uint32_t dataSize,
+  const std::uint32_t valueType
+)
+{
+  if (keyPath == nullptr) {
+    return false;
+  }
+
+  LegacyByteVectorStorageView keyBuffer{};
+  (void)ResetLegacyByteVectorStorage(&keyBuffer);
+  ResizeLegacyByteVectorStorageWithZeroFill(&keyBuffer, std::strlen(keyPath) + 1U);
+
+  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.first);
+  std::strcpy(mutableKeyPath, keyPath);
+  const ParsedRegistryPathView parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
+
+  HKEY openedKey = nullptr;
+  if (::RegCreateKeyExA(
+        parsedPath.rootKey,
+        parsedPath.subKey,
+        0,
+        nullptr,
+        0,
+        0xF003Fu,
+        nullptr,
+        &openedKey,
+        nullptr
+      ) != ERROR_SUCCESS) {
+    gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
+    DestroyLegacyByteVectorStorage(&keyBuffer);
+    return false;
+  }
+
+  if (::RegSetValueExA(
+        openedKey,
+        parsedPath.valueName,
+        0,
+        valueType,
+        reinterpret_cast<const BYTE*>(data),
+        dataSize
+      ) != ERROR_SUCCESS) {
+    (void)::RegCloseKey(openedKey);
+    gpg::Logf("PLAT_SetRegistryValue: Unable to write registry key \"%s\"", keyPath);
+    DestroyLegacyByteVectorStorage(&keyBuffer);
+    return false;
+  }
+
+  (void)::RegCloseKey(openedKey);
+  DestroyLegacyByteVectorStorage(&keyBuffer);
+  return true;
+}
+
+/**
+ * Address: 0x004A2F60 (FUN_004A2F60)
+ *
+ * What it does:
+ * Writes one 32-bit DWORD registry value.
+ */
+bool moho::PLAT_SetRegistryValueDword(const char* const keyPath, const std::uint32_t value)
+{
+  return PLAT_SetRegistryValue(
+    keyPath,
+    reinterpret_cast<const std::uint8_t*>(&value),
+    sizeof(value),
+    REG_DWORD
+  );
+}
+
+/**
+ * Address: 0x004A2F80 (FUN_004A2F80)
+ *
+ * What it does:
+ * Writes one zero-terminated string registry value; null input writes an
+ * empty string payload.
+ */
+bool moho::PLAT_SetRegistryValueString(const char* const value, const char* const keyPath)
+{
+  const char* const safeValue = (value != nullptr) ? value : "";
+  return PLAT_SetRegistryValue(
+    keyPath,
+    reinterpret_cast<const std::uint8_t*>(safeValue),
+    static_cast<std::uint32_t>(std::strlen(safeValue) + 1U),
+    REG_SZ
+  );
+}
+
+/**
+ * Address: 0x004A2D40 (FUN_004A2D40)
+ *
+ * What it does:
+ * Reads one registry value payload into `outData` and returns byte count read.
+ * Binary behavior clamps read size to 0x100 bytes.
+ */
+std::uint32_t moho::PLAT_GetRegistryValue(
+  const char* const keyPath, void* const outData, const std::uint32_t maxDataBytes
+)
+{
+  (void)maxDataBytes;
+  if (keyPath == nullptr || outData == nullptr) {
+    return 0;
+  }
+
+  LegacyByteVectorStorageView keyBuffer{};
+  (void)ResetLegacyByteVectorStorage(&keyBuffer);
+  ResizeLegacyByteVectorStorageWithZeroFill(&keyBuffer, std::strlen(keyPath) + 1U);
+
+  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.first);
+  std::strcpy(mutableKeyPath, keyPath);
+  const ParsedRegistryPathView parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
+
+  HKEY openedKey = nullptr;
+  if (::RegOpenKeyExA(parsedPath.rootKey, parsedPath.subKey, 0, 0x20019u, &openedKey) != ERROR_SUCCESS) {
+    gpg::Logf("PLAT_GetRegistryValue: Unable to open registry key \"%s\"", keyPath);
+    DestroyLegacyByteVectorStorage(&keyBuffer);
+    return 0;
+  }
+
+  DWORD bytesRead = 0x100u;
+  if (::RegQueryValueExA(
+        openedKey,
+        parsedPath.valueName,
+        nullptr,
+        nullptr,
+        reinterpret_cast<LPBYTE>(outData),
+        &bytesRead
+      ) != ERROR_SUCCESS) {
+    (void)::RegCloseKey(openedKey);
+    gpg::Logf("PLAT_GetRegistryValue: Unable to read registry key \"%s\"", keyPath);
+    DestroyLegacyByteVectorStorage(&keyBuffer);
+    return 0;
+  }
+
+  (void)::RegCloseKey(openedKey);
+  DestroyLegacyByteVectorStorage(&keyBuffer);
+  return bytesRead;
 }
 
 /**

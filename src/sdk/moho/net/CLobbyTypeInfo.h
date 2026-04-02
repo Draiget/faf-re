@@ -12,6 +12,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007C0820 (FUN_007C0820, Moho::CLobbyTypeInfo::CLobbyTypeInfo)
+     *
+     * What it does:
+     * Constructs `CLobby` reflection type-info and preregisters RTTI mapping.
+     */
+    CLobbyTypeInfo();
+
+    /**
      * Address: 0x007C08C0 (FUN_007C08C0, Moho::CLobbyTypeInfo::dtr)
      *
      * What it does:

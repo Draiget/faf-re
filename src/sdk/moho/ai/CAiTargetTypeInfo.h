@@ -34,5 +34,13 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BCEC30 (FUN_00BCEC30, register_CAiTargetTypeInfo)
+   *
+   * What it does:
+   * Registers `CAiTarget` type-info object and installs process-exit cleanup.
+   */
+  int register_CAiTargetTypeInfo();
+
   static_assert(sizeof(CAiTargetTypeInfo) == 0x64, "CAiTargetTypeInfo size must be 0x64");
 } // namespace moho

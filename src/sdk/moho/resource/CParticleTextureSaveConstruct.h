@@ -6,11 +6,16 @@
 
 namespace gpg
 {
+  class RRef;
   struct SerHelperBase;
+  class SerSaveConstructArgsResult;
+  class WriteArchive;
 } // namespace gpg
 
 namespace moho
 {
+  class CParticleTexture;
+
   /**
    * VFTABLE: 0x00E06260
    * COL: 0x00E614E8
@@ -18,6 +23,21 @@ namespace moho
   class CParticleTextureSaveConstruct
   {
   public:
+    /**
+     * Address: 0x0048F010 (FUN_0048F010, Moho::CParticleTextureSaveConstruct::Construct)
+     *
+     * What it does:
+     * Writes `CParticleTexture` save-construct args (`mTexturePath`) into the
+     * archive and marks result payload as unowned.
+     */
+    static void Construct(
+      gpg::WriteArchive* archive,
+      CParticleTexture* texture,
+      int version,
+      gpg::RRef* ownerRef,
+      gpg::SerSaveConstructArgsResult* result
+    );
+
     /**
      * Address: 0x0048F9B0 (FUN_0048F9B0, gpg::SerSaveConstructHelper_CParticleTexture::Init)
      *
@@ -31,6 +51,23 @@ namespace moho
     gpg::SerHelperBase* mHelperPrev;
     gpg::RType::save_construct_args_func_t mSerSaveConstructArgsFunc;
   };
+
+  /**
+   * Address: 0x00BEFDD0 (FUN_00BEFDD0, Moho::CParticleTextureSaveConstruct::~CParticleTextureSaveConstruct)
+   *
+   * What it does:
+   * Unlinks the save-construct helper node from the intrusive helper list.
+   */
+  gpg::SerHelperBase* cleanup_CParticleTextureSaveConstruct();
+
+  /**
+   * Address: 0x00BC5270 (FUN_00BC5270, register_CParticleTextureSaveConstruct)
+   *
+   * What it does:
+   * Initializes callback slots for the global save-construct helper and
+   * schedules teardown.
+   */
+  void register_CParticleTextureSaveConstruct();
 
   static_assert(
     offsetof(CParticleTextureSaveConstruct, mHelperNext) == 0x04,

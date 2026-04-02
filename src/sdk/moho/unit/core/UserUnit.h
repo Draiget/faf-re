@@ -31,9 +31,9 @@ namespace moho
     /**
      * Address: 0x008BF990
      * Slot: 0
-     * Demangled: sub_8BF990
+     * Demangled: DestroyUserUnit
      */
-    virtual void sub_8BF990() = 0;
+    virtual void DestroyUserUnit() = 0;
 
     /**
      * Address: 0x008C0A30

@@ -13,7 +13,16 @@ namespace boost
 
 namespace moho
 {
+  class StatItem;
+  template <class T>
+  class Stats;
+  class CAniSkel;
+  class CAniPose;
+  class CIntelGrid;
+  class ISimResources;
   class LaunchInfoBase;
+  class RScmResource;
+  struct STrigger;
   struct SSessionSaveData;
 } // namespace moho
 
@@ -98,6 +107,90 @@ namespace gpg
   void ReadPointerShared_SSessionSaveData(
     boost::SharedPtrRaw<moho::SSessionSaveData>& outPointer, ReadArchive* archive, const RRef& ownerRef
   );
+
+  /**
+   * Address: 0x0055F990 (FUN_0055F990)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<CAniPose>`, promotes
+   * unowned lanes to shared ownership, and validates pointee type.
+   */
+  void
+  ReadPointerShared_CAniPose(boost::SharedPtrRaw<moho::CAniPose>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+
+  /**
+   * Address: 0x0054FF20 (FUN_0054FF20)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<CAniSkel>`, promotes
+   * unowned lanes to shared ownership, and validates pointee type.
+   */
+  void
+  ReadPointerShared_CAniSkel(boost::SharedPtrRaw<moho::CAniSkel>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+
+  /**
+   * Address: 0x0055F780 (FUN_0055F780)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<Stats<StatItem>>`,
+   * promotes unowned lanes to shared ownership, and validates pointee type.
+   */
+  void ReadPointerShared_Stats_StatItem(
+    boost::SharedPtrRaw<moho::Stats<moho::StatItem>>& outPointer, ReadArchive* archive, const RRef& ownerRef
+  );
+
+  /**
+   * Address: 0x00757900 (FUN_00757900)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<ISimResources>`,
+   * promotes unowned lanes to shared ownership, and validates pointee type.
+   */
+  void ReadPointerShared_ISimResources(
+    boost::SharedPtrRaw<moho::ISimResources>& outPointer, ReadArchive* archive, const RRef& ownerRef
+  );
+
+  /**
+   * Address: 0x00551CC0 (FUN_00551CC0)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<CIntelGrid>`,
+   * promotes unowned lanes to shared ownership, and validates pointee type.
+   */
+  void
+  ReadPointerShared_CIntelGrid(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+
+  /**
+   * Address: 0x005CE220 (FUN_005CE220, gpg::ReadArchive::ReadPointerShared_CIntelGrid2)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<CIntelGrid>` for the
+   * legacy CIntelPosHandle serializer lane, promoting unowned entries to shared
+   * ownership and validating pointee type.
+   */
+  void
+  ReadPointerShared_CIntelGrid2(boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* archive, const RRef& ownerRef);
+
+  /**
+   * Address: 0x0055A5D0 (FUN_0055A5D0)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<RScmResource>`,
+   * promotes unowned lanes to shared ownership, and validates pointee type.
+   */
+  void ReadPointerShared_RScmResource(
+    boost::SharedPtrRaw<moho::RScmResource>& outPointer, ReadArchive* archive, const RRef& ownerRef
+  );
+
+  /**
+   * Address: 0x007142F0 (FUN_007142F0)
+   *
+   * What it does:
+   * Reads one tracked pointer lane as `boost::shared_ptr<STrigger>`,
+   * promotes unowned lanes to shared ownership, and validates pointee type.
+   */
+  void
+  ReadPointerShared_STrigger(boost::SharedPtrRaw<moho::STrigger>& outPointer, ReadArchive* archive, const RRef& ownerRef);
 
   /**
    * Address: 0x00953320 (FUN_00953320)

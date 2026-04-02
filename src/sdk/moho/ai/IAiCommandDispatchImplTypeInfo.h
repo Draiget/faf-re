@@ -37,5 +37,13 @@ namespace moho
   };
 
   static_assert(sizeof(IAiCommandDispatchImplTypeInfo) == 0x64, "IAiCommandDispatchImplTypeInfo size must be 0x64");
-} // namespace moho
 
+  /**
+   * Address: 0x00BCBEA0 (FUN_00BCBEA0, register_IAiCommandDispatchImplTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup RTTI storage for
+   * `IAiCommandDispatchImpl` and installs process-exit cleanup.
+   */
+  int register_IAiCommandDispatchImplTypeInfo();
+} // namespace moho

@@ -1,5 +1,10 @@
 #pragma once
 
+namespace gpg
+{
+  class RType;
+} // namespace gpg
+
 namespace moho
 {
   class Entity;
@@ -12,6 +17,8 @@ namespace moho
   class EntityMotor
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00694AB0 (FUN_00694AB0, Moho::Motor::Func1)
      *
@@ -40,4 +47,6 @@ namespace moho
 #if defined(_M_IX86)
   static_assert(sizeof(EntityMotor) == 0x04, "EntityMotor size must be 0x04");
 #endif
+
+  using Motor = EntityMotor;
 } // namespace moho

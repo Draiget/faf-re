@@ -25,11 +25,32 @@ namespace gpg
         type* mBegin{ nullptr };
         type* mEnd{ nullptr };
 
-        /** Default ctor - empty view. */
+        /**
+         * Address: 0x00442A70 (FUN_00442A70)
+         * Address: 0x00442A90 (FUN_00442A90)
+         * Address: 0x00442B00 (FUN_00442B00)
+         *
+         * What it does:
+         * Initializes one mem-buffer view as empty (null owner + null bounds).
+         */
         MemBuffer() noexcept = default;
 
-        /** Copy ctor - shallow copy (shares ownership). */
+        /**
+         * Address: 0x00442B10 (FUN_00442B10)
+         *
+         * What it does:
+         * Performs one shallow copy of the mem-buffer payload lanes.
+         */
         MemBuffer(const MemBuffer& cpy) noexcept = default;
+
+        /**
+         * Address: 0x0042D1A0 (FUN_0042D1A0, __imp_??1?$MemBuffer@$$CBD@gpg@@QAE@XZ)
+         * Address: 0x0042D1E0 (FUN_0042D1E0, __imp_??1?$MemBuffer@D@gpg@@QAE@XZ)
+         *
+         * What it does:
+         * Releases one shared ownership lane for the buffer/control block.
+         */
+        ~MemBuffer() noexcept = default;
 
         /** Converting copy ctor (e.g. MemBuffer<char> -> MemBuffer<const char>). */
         template <class U, std::enable_if_t<std::is_convertible_v<U*, type*>, int> = 0>
@@ -45,25 +66,34 @@ namespace gpg
             : mData{ ptr }, mBegin{ begin }, mEnd{ end } {
         }
 
-        /** Construct from owner + length (range is [ptr.get(), ptr.get()+len)). */
+        /**
+         * Address: 0x0045B4C0 (FUN_0045B4C0, gpg::MemBuffer<char>::MemBuffer<char>)
+         * Address: 0x0046D9D0 (FUN_0046D9D0, gpg::MemBuffer<char const>::MemBuffer<char const>)
+         *
+         * What it does:
+         * Copies one shared owner lane and sets view bounds to
+         * `[ptr.get(), ptr.get() + len)`.
+         */
         MemBuffer(boost::shared_ptr<type> ptr, std::size_t len) noexcept
             : mData{ ptr }, mBegin{ ptr.get() }, mEnd{ ptr.get() + len } {
         }
 
-        /** Get pointer to subrange start with bounds check for [start, start+len). */
+        /**
+         * Address family:
+         * - 0x004313E0 (FUN_004313E0, `MemBuffer<char>::GetPtr`)
+         * - 0x00431520 (FUN_00431520, `MemBuffer<const char>::GetPtr`)
+         *
+         * What it does:
+         * Returns `mBegin + start` and throws `std::range_error` when
+         * `[start, start + len)` crosses `mEnd`.
+         */
         type* GetPtr(std::size_t start, std::size_t len) const
         {
-            if (mBegin == nullptr) {
-                if (start == 0 && len == 0) {
-                    return nullptr;
-                }
-                throw std::range_error("MemBuffer::GetPtr: null buffer");
-            }
-            type* p = mBegin + start;
-            if (p < mBegin || p > mEnd || p + len > mEnd) {
+            type* const result = &mBegin[start];
+            if (&result[len] > mEnd) {
                 throw std::range_error("Out of bound access in MemBuffer<>::GetPtr()");
             }
-            return p;
+            return result;
         }
 
         /** Create a sub-buffer view [start, start+len). */
@@ -74,7 +104,12 @@ namespace gpg
             return MemBuffer{ this->mData, b, e };
         }
 
-        /** Reset to empty; releases shared ownership. */
+        /**
+         * Address: 0x00442AB0 (FUN_00442AB0)
+         *
+         * What it does:
+         * Releases one retained shared owner and clears begin/end bounds.
+         */
         void Reset() noexcept
         {
             this->mData.reset();
@@ -82,7 +117,12 @@ namespace gpg
             this->mEnd = nullptr;
         }
 
-        /** Size in elements. */
+        /**
+         * Address: 0x00442A80 (FUN_00442A80)
+         *
+         * What it does:
+         * Returns the element-count distance between end and begin lanes.
+         */
         std::size_t Size() const noexcept
         {
             return static_cast<std::size_t>(mEnd - mBegin);
@@ -105,7 +145,12 @@ namespace gpg
         operator type* () noexcept { return mBegin; }
         operator const type* () const noexcept { return mBegin; }
 
-        /** Raw data accessors. */
+        /**
+         * Address: 0x00442AA0 (FUN_00442AA0)
+         *
+         * What it does:
+         * Returns the begin-lane pointer for direct raw access.
+         */
         type* data() noexcept { return mBegin; }
         const type* data() const noexcept { return mBegin; }
 
@@ -166,7 +211,7 @@ namespace gpg
          * What it does:
          * Returns current read/write offset based on mode (`ModeReceive` or `ModeSend`).
          */
-        size_t VirtTell(Mode mode) override;
+        std::uint64_t VirtTell(Mode mode) override;
 
         /**
          * Address: 0x008E6140 (FUN_008E6140)
@@ -174,7 +219,7 @@ namespace gpg
          * What it does:
          * Seeks read/write cursors by mode and origin, growing writable storage and zero-filling gaps when needed.
          */
-        size_t VirtSeek(Mode mode, SeekOrigin origin, size_t pos) override;
+        std::uint64_t VirtSeek(Mode mode, SeekOrigin origin, std::int64_t pos) override;
 
         /**
          * Address: 0x008E5A50 (FUN_008E5A50)

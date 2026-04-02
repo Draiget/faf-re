@@ -34,6 +34,9 @@ namespace moho
 #endif
 
   public:
+    static gpg::RType* sType;
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x00408C90 (scalar deleting thunk)
      * Address: 0x00408CB0 (FUN_00408CB0, non-deleting body)

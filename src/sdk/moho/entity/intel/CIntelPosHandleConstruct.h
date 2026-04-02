@@ -27,17 +27,13 @@ namespace moho
     virtual void RegisterConstructFunction();
 
   public:
-    gpg::SerHelperBase* mHelperNext;
-    gpg::SerHelperBase* mHelperPrev;
+    gpg::SerHelperBase mHelperLinks; // +0x04 (intrusive helper node)
     gpg::RType::construct_func_t mConstructCallback;
     gpg::RType::delete_func_t mDeleteCallback;
   };
 
   static_assert(
-    offsetof(CIntelPosHandleConstruct, mHelperNext) == 0x04, "CIntelPosHandleConstruct::mHelperNext offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CIntelPosHandleConstruct, mHelperPrev) == 0x08, "CIntelPosHandleConstruct::mHelperPrev offset must be 0x08"
+    offsetof(CIntelPosHandleConstruct, mHelperLinks) == 0x04, "CIntelPosHandleConstruct::mHelperLinks offset must be 0x04"
   );
   static_assert(
     offsetof(CIntelPosHandleConstruct, mConstructCallback) == 0x0C,
@@ -49,3 +45,4 @@ namespace moho
   );
   static_assert(sizeof(CIntelPosHandleConstruct) == 0x14, "CIntelPosHandleConstruct size must be 0x14");
 } // namespace moho
+

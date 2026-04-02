@@ -1,21 +1,83 @@
 #include "WxRuntimeTypes.h"
 
+#include <Windows.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cwchar>
 #include <filesystem>
+#include <memory>
 #include <new>
 #include <system_error>
 #include <unordered_map>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/console/CConCommand.h"
+#include "moho/render/d3d/CD3DDevice.h"
 
 namespace
 {
   constexpr std::uintptr_t kInlineHeadLinkSentinelMax = 0x10000u;
   void* gCLogAdditionEventClassInfoTable[1] = {nullptr};
+  void* gWxWindowBaseClassInfoTable[1] = {nullptr};
+  void* gWxWindowClassInfoTable[1] = {nullptr};
+  void* gWxImageHandlerClassInfoTable[1] = {nullptr};
+  void* gWxPngHandlerClassInfoTable[1] = {nullptr};
+
+  struct WxObjectRuntimeView
+  {
+    void* vtable = nullptr;
+    void* refData = nullptr;
+  };
+
+  /**
+   * Address: 0x0042B9D0 (FUN_0042B9D0)
+   *
+   * What it does:
+   * Shared wx-object unref tail used by destructor paths that only clear
+   * ref-data ownership.
+   */
+  void RunWxObjectUnrefTail(WxObjectRuntimeView* const object) noexcept
+  {
+    if (object == nullptr) {
+      return;
+    }
+    object->refData = nullptr;
+  }
+
+  void ReleaseWxStringSharedPayload(wxStringRuntime& value) noexcept
+  {
+    std::int32_t* const sharedPrefixWords = reinterpret_cast<std::int32_t*>(value.m_pchData) - 3;
+    const std::int32_t sharedRefCount = sharedPrefixWords[0];
+    if (sharedRefCount != -1) {
+      sharedPrefixWords[0] = sharedRefCount - 1;
+      if (sharedRefCount == 1) {
+        ::operator delete(sharedPrefixWords);
+      }
+    }
+  }
+
+  void ReleaseD3DDeviceRef(void* const device) noexcept
+  {
+    if (device == nullptr) {
+      return;
+    }
+
+    void** const vtable = *reinterpret_cast<void***>(device);
+    if (vtable == nullptr || vtable[1] == nullptr) {
+      return;
+    }
+
+    using ReleaseFn = void(__thiscall*)(void*, unsigned int);
+    auto const release = reinterpret_cast<ReleaseFn>(vtable[1]);
+    release(device, 1u);
+  }
 
   [[nodiscard]] bool IsInlineHeadLinkSentinel(moho::ManagedWindowSlot** const ownerHeadLink) noexcept
   {
@@ -252,6 +314,74 @@ namespace
 
   std::uintptr_t gNextSupComFramePseudoHandle = kFirstSupComFramePseudoHandle;
   std::unordered_map<const WSupComFrame*, SupComFrameState> gSupComFrameStateByFrame{};
+  struct WxTopLevelWindowRuntimeState
+  {
+    std::int32_t fsOldX = 0;
+    std::int32_t fsOldY = 0;
+    std::int32_t fsOldWidth = 0;
+    std::int32_t fsOldHeight = 0;
+    std::uint8_t flag34 = 0;
+  };
+
+  struct WxDialogRuntimeState
+  {
+    void* parentWindow = nullptr;
+    std::int32_t windowId = -1;
+    wxPoint position{};
+    wxSize size{};
+    long style = 0;
+    std::wstring title{};
+    std::wstring name{};
+  };
+
+  std::unordered_map<const wxTopLevelWindowRuntime*, WxTopLevelWindowRuntimeState>
+    gWxTopLevelWindowRuntimeStateByWindow{};
+  std::unordered_map<const wxDialogRuntime*, WxDialogRuntimeState> gWxDialogRuntimeStateByDialog{};
+
+  struct WxTreeListNodeRuntimeState
+  {
+    WxTreeListNodeRuntimeState* parent = nullptr;
+    std::vector<WxTreeListNodeRuntimeState*> children{};
+    wxTreeItemDataRuntime* itemData = nullptr;
+    bool hasChildrenFlag = false;
+    bool isExpanded = false;
+    std::vector<msvc8::string> columnText{};
+  };
+
+  struct WxTreeListRuntimeState
+  {
+    wxWindowBase* parentWindow = nullptr;
+    std::int32_t windowId = -1;
+    wxPoint position{};
+    wxSize size{};
+    long style = 0;
+    std::wstring name{};
+    std::vector<wxTreeListColumnInfoRuntime> columns{};
+    std::vector<std::unique_ptr<WxTreeListNodeRuntimeState>> nodeStorage{};
+    WxTreeListNodeRuntimeState* rootNode = nullptr;
+  };
+
+  std::unordered_map<const wxTreeListCtrlRuntime*, WxTreeListRuntimeState> gWxTreeListRuntimeStateByControl{};
+
+  struct WxWindowBaseRuntimeState
+  {
+    std::int32_t minWidth = -1;
+    std::int32_t minHeight = -1;
+    std::int32_t maxWidth = -1;
+    std::int32_t maxHeight = -1;
+    long windowStyle = 0;
+    long extraStyle = 0;
+    unsigned long nativeHandle = 0;
+    std::int32_t windowId = -1;
+    wxWindowBase* parentWindow = nullptr;
+    bool themeEnabled = false;
+    std::uint8_t bitfields = 0;
+    std::wstring windowName{};
+    void* dropTarget = nullptr;
+  };
+
+  std::unordered_map<const wxWindowBase*, WxWindowBaseRuntimeState> gWxWindowBaseStateByWindow{};
+  wxWindowBase* gCapturedWindow = nullptr;
   bool gSplashPngHandlerInitialized = false;
 
   [[nodiscard]] std::uintptr_t AllocateSupComFramePseudoHandle() noexcept
@@ -265,6 +395,81 @@ namespace
   {
     const auto it = gSupComFrameStateByFrame.find(frame);
     return it != gSupComFrameStateByFrame.end() ? &it->second : nullptr;
+  }
+
+  [[nodiscard]] const WxTopLevelWindowRuntimeState* FindWxTopLevelWindowRuntimeState(
+    const wxTopLevelWindowRuntime* const window
+  ) noexcept
+  {
+    const auto it = gWxTopLevelWindowRuntimeStateByWindow.find(window);
+    return it != gWxTopLevelWindowRuntimeStateByWindow.end() ? &it->second : nullptr;
+  }
+
+  [[nodiscard]] WxTopLevelWindowRuntimeState& EnsureWxTopLevelWindowRuntimeState(
+    const wxTopLevelWindowRuntime* const window
+  )
+  {
+    return gWxTopLevelWindowRuntimeStateByWindow[window];
+  }
+
+  [[nodiscard]] WxDialogRuntimeState& EnsureWxDialogRuntimeState(const wxDialogRuntime* const dialog)
+  {
+    return gWxDialogRuntimeStateByDialog[dialog];
+  }
+
+  [[nodiscard]] WxTreeListRuntimeState& EnsureWxTreeListRuntimeState(const wxTreeListCtrlRuntime* const treeControl)
+  {
+    return gWxTreeListRuntimeStateByControl[treeControl];
+  }
+
+  [[nodiscard]] const WxTreeListRuntimeState* FindWxTreeListRuntimeState(
+    const wxTreeListCtrlRuntime* const treeControl
+  ) noexcept
+  {
+    const auto it = gWxTreeListRuntimeStateByControl.find(treeControl);
+    return it != gWxTreeListRuntimeStateByControl.end() ? &it->second : nullptr;
+  }
+
+  [[nodiscard]] WxTreeListNodeRuntimeState* AllocateTreeListNode(
+    WxTreeListRuntimeState& state,
+    WxTreeListNodeRuntimeState* const parentNode,
+    const msvc8::string& rootText
+  )
+  {
+    auto node = std::make_unique<WxTreeListNodeRuntimeState>();
+    node->parent = parentNode;
+    node->columnText.resize(3);
+    node->columnText[0] = rootText;
+
+    WxTreeListNodeRuntimeState* const rawNode = node.get();
+    state.nodeStorage.push_back(std::move(node));
+    if (parentNode != nullptr) {
+      parentNode->children.push_back(rawNode);
+    }
+    return rawNode;
+  }
+
+  [[nodiscard]] WxTreeListNodeRuntimeState* ResolveTreeListNode(const wxTreeItemIdRuntime& item) noexcept
+  {
+    return static_cast<WxTreeListNodeRuntimeState*>(item.mNode);
+  }
+
+  [[nodiscard]] const WxTreeListNodeRuntimeState* ResolveTreeListNodeConst(const wxTreeItemIdRuntime& item) noexcept
+  {
+    return static_cast<const WxTreeListNodeRuntimeState*>(item.mNode);
+  }
+
+  [[nodiscard]] const WxWindowBaseRuntimeState* FindWxWindowBaseRuntimeState(
+    const wxWindowBase* const window
+  ) noexcept
+  {
+    const auto it = gWxWindowBaseStateByWindow.find(window);
+    return it != gWxWindowBaseStateByWindow.end() ? &it->second : nullptr;
+  }
+
+  [[nodiscard]] WxWindowBaseRuntimeState& EnsureWxWindowBaseRuntimeState(const wxWindowBase* const window)
+  {
+    return gWxWindowBaseStateByWindow[window];
   }
 
   [[nodiscard]] SupComFrameState& EnsureSupComFrameState(const WSupComFrame* const frame)
@@ -301,6 +506,8 @@ namespace
 
     bool Destroy() override
     {
+      gWxTopLevelWindowRuntimeStateByWindow.erase(this);
+      gWxWindowBaseStateByWindow.erase(this);
       gSupComFrameStateByFrame.erase(this);
       delete this;
       return true;
@@ -312,18 +519,17 @@ namespace
       return true;
     }
 
-    void SetTitle(const void* const title) override
+    void SetTitle(const wxStringRuntime& title) override
     {
       SupComFrameState& state = EnsureSupComFrameState(this);
-      const auto* const titleRuntime = static_cast<const wxStringRuntime*>(title);
-      state.title.assign(titleRuntime != nullptr ? titleRuntime->c_str() : L"");
+      state.title.assign(title.c_str());
     }
 
-    void SetName(const void* const name) override
+    void SetName(const wxStringRuntime& name) override
     {
+      wxWindowBase::SetName(name);
       SupComFrameState& state = EnsureSupComFrameState(this);
-      const auto* const nameRuntime = static_cast<const wxStringRuntime*>(name);
-      state.name.assign(nameRuntime != nullptr ? nameRuntime->c_str() : L"");
+      state.name.assign(name.c_str());
     }
 
     void SetWindowStyleFlag(const long style) override
@@ -373,7 +579,7 @@ namespace
       return state != nullptr ? static_cast<unsigned long>(state->pseudoWindowHandle) : 0u;
     }
 
-    void DoGetClientSize(std::int32_t* const outWidth, std::int32_t* const outHeight) override
+    void DoGetClientSize(std::int32_t* const outWidth, std::int32_t* const outHeight) const override
     {
       if (outWidth != nullptr) {
         *outWidth = 0;
@@ -484,6 +690,60 @@ namespace
     }
   };
 
+  struct DwordLaneRuntimeView
+  {
+    std::uint32_t lane00 = 0;
+  };
+
+  static_assert(offsetof(DwordLaneRuntimeView, lane00) == 0x0, "DwordLaneRuntimeView::lane00 offset must be 0x0");
+  static_assert(sizeof(DwordLaneRuntimeView) == 0x4, "DwordLaneRuntimeView size must be 0x4");
+
+  /**
+   * Address: 0x004A3670 (FUN_004A3670)
+   *
+   * What it does:
+   * Returns the leading 32-bit lane from one unknown runtime pod view.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneA(const DwordLaneRuntimeView* const view) noexcept
+  {
+    return view->lane00;
+  }
+
+  /**
+   * Address: 0x004A3680 (FUN_004A3680)
+   *
+   * What it does:
+   * Returns the leading 32-bit lane from one unknown runtime pod view.
+   */
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneB(const DwordLaneRuntimeView* const view) noexcept
+  {
+    return view->lane00;
+  }
+
+  struct FourDwordBlockRuntimeView
+  {
+    std::int32_t lane00 = 0;
+    std::int32_t lane04 = 0;
+    std::int32_t lane08 = 0;
+    std::int32_t lane0C = 0;
+  };
+
+  static_assert(sizeof(FourDwordBlockRuntimeView) == 0x10, "FourDwordBlockRuntimeView size must be 0x10");
+
+  /**
+   * Address: 0x004A36D0 (FUN_004A36D0)
+   *
+   * What it does:
+   * Clears one four-dword runtime block used by wx region rectangle vectors.
+   */
+  [[maybe_unused]] void ClearFourDwordBlock(FourDwordBlockRuntimeView* const view) noexcept
+  {
+    view->lane00 = 0;
+    view->lane04 = 0;
+    view->lane08 = 0;
+    view->lane0C = 0;
+  }
+
   class SplashScreenRuntimeImpl final : public moho::SplashScreenRuntime
   {
   public:
@@ -510,10 +770,1328 @@ namespace
   };
 } // namespace
 
+void* wxTopLevelWindowRootRuntime::sm_classInfo[1] = {nullptr};
+
+/**
+ * Address: 0x004A3690 (FUN_004A3690)
+ * Mangled: ??0wxClientData@@QAE@@Z
+ *
+ * What it does:
+ * Constructs one `wxClientData` runtime lane.
+ */
+wxClientDataRuntime::wxClientDataRuntime()
+{
+  ResetRuntimeVTable();
+}
+
+/**
+ * Address: 0x004A36A0 (FUN_004A36A0)
+ *
+ * What it does:
+ * Rebinds this object to the `wxClientData` runtime vtable lane.
+ */
+void wxClientDataRuntime::ResetRuntimeVTable() noexcept
+{
+}
+
+/**
+ * Address: 0x004A36B0 (FUN_004A36B0)
+ *
+ * What it does:
+ * Implements the deleting-dtor thunk lane for `wxClientData`.
+ */
+wxClientDataRuntime* wxClientDataRuntime::DeleteWithFlag(
+  wxClientDataRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  object->ResetRuntimeVTable();
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+  return object;
+}
+
+/**
+ * Address: 0x004A3710 (FUN_004A3710)
+ * Mangled: ??0wxTopLevelWindowMSW@@QAE@@Z
+ *
+ * What it does:
+ * Constructs one top-level-window runtime base lane and resets fullscreen
+ * state bookkeeping.
+ */
+wxTopLevelWindowRuntime::wxTopLevelWindowRuntime()
+{
+  WxTopLevelWindowRuntimeState& state = EnsureWxTopLevelWindowRuntimeState(this);
+  state.fsOldX = 0;
+  state.fsOldY = 0;
+  state.fsOldWidth = 0;
+  state.fsOldHeight = 0;
+  ResetTopLevelFlag34();
+}
+
+/**
+ * Address: 0x004A36E0 (FUN_004A36E0)
+ *
+ * What it does:
+ * Resets one top-level-window runtime flag lane.
+ */
+void wxTopLevelWindowRuntime::ResetTopLevelFlag34() noexcept
+{
+  EnsureWxTopLevelWindowRuntimeState(this).flag34 = 0;
+}
+
+/**
+ * Address: 0x004A36F0 (FUN_004A36F0)
+ * Mangled: ?IsTopLevel@wxTopLevelWindowBase@@UBE_NXZ
+ *
+ * What it does:
+ * Reports this runtime lane as a top-level wx window.
+ */
+bool wxTopLevelWindowRuntime::IsTopLevel() const
+{
+  return true;
+}
+
+/**
+ * Address: 0x004A3700 (FUN_004A3700)
+ * Mangled: ?IsOneOfBars@wxTopLevelWindowBase@@MBE_NPBVwxWindow@@@Z
+ *
+ * What it does:
+ * Base implementation reports the queried window as not one of frame bars.
+ */
+bool wxTopLevelWindowRuntime::IsOneOfBars(const void* const window) const
+{
+  (void)window;
+  return false;
+}
+
+/**
+ * Address: 0x004A3770 (FUN_004A3770)
+ * Mangled: ?IsFullScreen@wxTopLevelWindowMSW@@UBE_NXZ
+ *
+ * What it does:
+ * Returns one cached fullscreen-visible flag.
+ */
+bool wxTopLevelWindowRuntime::IsFullScreen() const
+{
+  const WxTopLevelWindowRuntimeState* const state = FindWxTopLevelWindowRuntimeState(this);
+  return state != nullptr && state->flag34 != 0;
+}
+
+/**
+ * Address: 0x004A3780 (FUN_004A3780)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for top-level-window runtime
+ * lanes.
+ */
+wxTopLevelWindowRuntime* wxTopLevelWindowRuntime::DeleteWithFlag(
+  wxTopLevelWindowRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  gWxTopLevelWindowRuntimeStateByWindow.erase(object);
+  object->~wxTopLevelWindowRuntime();
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+  return object;
+}
+
+/**
+ * Address: 0x004A37A0 (FUN_004A37A0)
+ * Mangled: ??0wxTopLevelWindow@@QAE@@Z
+ *
+ * What it does:
+ * Constructs one `wxTopLevelWindow` runtime layer and reapplies base
+ * top-level init.
+ */
+wxTopLevelWindowRootRuntime::wxTopLevelWindowRootRuntime()
+  : wxTopLevelWindowRuntime()
+{
+  ResetTopLevelFlag34();
+}
+
+/**
+ * Address: 0x004A3800 (FUN_004A3800)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for `wxTopLevelWindow`.
+ */
+wxTopLevelWindowRootRuntime* wxTopLevelWindowRootRuntime::DeleteWithFlag(
+  wxTopLevelWindowRootRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  return reinterpret_cast<wxTopLevelWindowRootRuntime*>(
+    wxTopLevelWindowRuntime::DeleteWithFlag(reinterpret_cast<wxTopLevelWindowRuntime*>(object), deleteFlags)
+  );
+}
+
+/**
+ * Address: 0x004A3820 (FUN_004A3820)
+ *
+ * What it does:
+ * Runs the non-deleting top-level-window teardown thunk.
+ */
+wxTopLevelWindowRootRuntime* wxTopLevelWindowRootRuntime::DestroyWithoutDelete(
+  wxTopLevelWindowRootRuntime* const object
+) noexcept
+{
+  return DeleteWithFlag(object, 0);
+}
+
+void wxControlContainerRuntime::Initialize(const bool acceptsFocusRecursion) noexcept
+{
+  mAcceptsFocusRecursion = acceptsFocusRecursion ? 1 : 0;
+}
+
+void* wxDialogRuntime::sm_classInfo[1] = {nullptr};
+
+/**
+ * Address: 0x004A3860 (FUN_004A3860)
+ * Mangled: ??0wxDialogBase@@QAE@@Z
+ *
+ * What it does:
+ * Builds one dialog-base runtime lane, initializes control-container
+ * storage, then runs dialog-base init.
+ */
+wxDialogBaseRuntime::wxDialogBaseRuntime()
+  : wxTopLevelWindowRootRuntime()
+{
+  mControlContainer.Initialize(false);
+  InitRuntime();
+}
+
+void wxDialogBaseRuntime::InitRuntime() noexcept
+{
+}
+
+/**
+ * Address: 0x004A38C0 (FUN_004A38C0)
+ *
+ * What it does:
+ * Runs non-deleting teardown for dialog-base runtime lanes.
+ */
+wxDialogBaseRuntime* wxDialogBaseRuntime::DestroyWithoutDelete(wxDialogBaseRuntime* const object) noexcept
+{
+  return reinterpret_cast<wxDialogBaseRuntime*>(
+    wxTopLevelWindowRuntime::DeleteWithFlag(reinterpret_cast<wxTopLevelWindowRuntime*>(object), 0)
+  );
+}
+
+/**
+ * Address: 0x004A38D0 (FUN_004A38D0)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for dialog-base runtime lanes.
+ */
+wxDialogBaseRuntime* wxDialogBaseRuntime::DeleteWithFlag(
+  wxDialogBaseRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  gWxDialogRuntimeStateByDialog.erase(reinterpret_cast<const wxDialogRuntime*>(object));
+  return reinterpret_cast<wxDialogBaseRuntime*>(
+    wxTopLevelWindowRuntime::DeleteWithFlag(
+      reinterpret_cast<wxTopLevelWindowRuntime*>(object),
+      deleteFlags
+    )
+  );
+}
+
+/**
+ * Address: 0x004A3900 (FUN_004A3900)
+ * Mangled: ??0wxDialog@@QAE@PAVwxWindow@@HABVwxString@@ABVwxPoint@@ABVwxSize@@J1@Z
+ *
+ * What it does:
+ * Builds one dialog runtime lane, then applies create/init arguments.
+ */
+wxDialogRuntime::wxDialogRuntime(
+  void* const parentWindow,
+  const std::int32_t windowId,
+  const wxStringRuntime& title,
+  const wxPoint& position,
+  const wxSize& size,
+  const long style,
+  const wxStringRuntime& name
+)
+  : wxDialogBaseRuntime()
+{
+  WxDialogRuntimeState& state = EnsureWxDialogRuntimeState(this);
+  state.parentWindow = parentWindow;
+  state.windowId = windowId;
+  state.position = position;
+  state.size = size;
+  state.style = style;
+  state.title.assign(title.c_str());
+  state.name.assign(name.c_str());
+}
+
+/**
+ * Address: 0x004A3970 (FUN_004A3970)
+ * Mangled: ?GetClassInfo@wxDialog@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the static class-info lane for dialog runtime RTTI checks.
+ */
+void* wxDialogRuntime::GetClassInfo() const
+{
+  return sm_classInfo;
+}
+
+/**
+ * Address: 0x004A3980 (FUN_004A3980)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for dialog runtime lanes.
+ */
+wxDialogRuntime* wxDialogRuntime::DeleteWithFlag(wxDialogRuntime* const object, const std::uint8_t deleteFlags) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  gWxDialogRuntimeStateByDialog.erase(object);
+  return reinterpret_cast<wxDialogRuntime*>(
+    wxDialogBaseRuntime::DeleteWithFlag(reinterpret_cast<wxDialogBaseRuntime*>(object), deleteFlags)
+  );
+}
+
+/**
+ * Address: 0x004A39A0 (FUN_004A39A0)
+ *
+ * What it does:
+ * Clears this item-id to the null value.
+ */
+void wxTreeItemIdRuntime::Reset() noexcept
+{
+  mNode = nullptr;
+}
+
+/**
+ * Address: 0x004A39B0 (FUN_004A39B0)
+ *
+ * What it does:
+ * Reports whether this item-id currently references a valid node.
+ */
+bool wxTreeItemIdRuntime::IsValid() const noexcept
+{
+  return mNode != nullptr;
+}
+
+/**
+ * Address: 0x004A39C0 (FUN_004A39C0)
+ *
+ * What it does:
+ * Constructs one tree-item payload lane with null item data.
+ */
+wxTreeItemDataRuntime::wxTreeItemDataRuntime()
+  : wxClientDataRuntime()
+{
+  mPayload = nullptr;
+}
+
+/**
+ * Address: 0x004A39F0 (FUN_004A39F0)
+ *
+ * What it does:
+ * Rebinds this object to the `wxClientData` base vtable lane.
+ */
+void wxTreeItemDataRuntime::ResetClientDataBaseVTable() noexcept
+{
+  ResetRuntimeVTable();
+}
+
+/**
+ * Address: 0x004A39D0 (FUN_004A39D0)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for tree-item payload lanes.
+ */
+wxTreeItemDataRuntime* wxTreeItemDataRuntime::DeleteWithFlag(
+  wxTreeItemDataRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  object->ResetClientDataBaseVTable();
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+  return object;
+}
+
+/**
+ * Address: 0x004A3A00 (FUN_004A3A00)
+ *
+ * What it does:
+ * Copies the primary tree-item-id lane into `outItem`.
+ */
+void wxTreeEventRuntime::GetItem(wxTreeItemIdRuntime* const outItem) const noexcept
+{
+  if (outItem != nullptr) {
+    *outItem = mItem;
+  }
+}
+
+/**
+ * Address: 0x004A3A10 (FUN_004A3A10)
+ *
+ * What it does:
+ * Returns the label storage lane for this tree event.
+ */
+wxStringRuntime* wxTreeEventRuntime::GetLabelStorage() noexcept
+{
+  return &mLabel;
+}
+
+/**
+ * Address: 0x004A3A20 (FUN_004A3A20)
+ *
+ * What it does:
+ * Returns the edit-cancelled flag lane for this tree event.
+ */
+bool wxTreeEventRuntime::IsEditCancelled() const noexcept
+{
+  return mEditCancelled != 0;
+}
+
+/**
+ * Address: 0x004A3A30 (FUN_004A3A30)
+ *
+ * What it does:
+ * Initializes one tree-list column descriptor from title/width/align and
+ * owner lane arguments.
+ */
+wxTreeListColumnInfoRuntime::wxTreeListColumnInfoRuntime(
+  const wxStringRuntime& title,
+  const std::int32_t width,
+  void* const ownerTreeControl,
+  const std::uint8_t shown,
+  const std::uint8_t alignment,
+  const std::int32_t userData
+)
+{
+  mRefData = nullptr;
+  mText = wxStringRuntime::Borrow(L"");
+  mShown = shown;
+  mAlignment = alignment;
+  mUserData = userData;
+  mText = title;
+  mWidth = width;
+  mImageIndex = -1;
+  mOwnerTreeControl = ownerTreeControl;
+}
+
+/**
+ * Address: 0x004A3AC0 (FUN_004A3AC0)
+ *
+ * What it does:
+ * Runs non-deleting teardown for one tree-list column descriptor lane.
+ */
+void wxTreeListColumnInfoRuntime::DestroyWithoutDelete() noexcept
+{
+  mRefData = nullptr;
+  mOwnerTreeControl = nullptr;
+}
+
+/**
+ * Address: 0x004A3B30 (FUN_004A3B30)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for tree-list column descriptors.
+ */
+wxTreeListColumnInfoRuntime* wxTreeListColumnInfoRuntime::DeleteWithFlag(
+  wxTreeListColumnInfoRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  object->DestroyWithoutDelete();
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+  return object;
+}
+
+void* wxTreeListCtrlRuntime::sm_classInfo[1] = {nullptr};
+
+/**
+ * Address: 0x004A3B50 (FUN_004A3B50)
+ * Mangled: ??0wxTreeListCtrl@@QAE@PAVwxWindow@@HABVwxPoint@@ABVwxSize@@JABVwxValidator@@ABVwxString@@@Z
+ *
+ * What it does:
+ * Initializes one tree-list control runtime lane with parent/style/name
+ * creation arguments.
+ */
+wxTreeListCtrlRuntime::wxTreeListCtrlRuntime(
+  wxWindowBase* const parentWindow,
+  const std::int32_t windowId,
+  const wxPoint& position,
+  const wxSize& size,
+  const long style,
+  const wxStringRuntime& name
+)
+{
+  WxTreeListRuntimeState& state = EnsureWxTreeListRuntimeState(this);
+  state.parentWindow = parentWindow;
+  state.windowId = windowId;
+  state.position = position;
+  state.size = size;
+  state.style = style;
+  state.name.assign(name.c_str());
+}
+
+/**
+ * Address: 0x004A3BD0 (FUN_004A3BD0)
+ *
+ * What it does:
+ * Runs non-deleting teardown for one tree-list control runtime lane.
+ */
+wxTreeListCtrlRuntime* wxTreeListCtrlRuntime::DestroyWithoutDelete(wxTreeListCtrlRuntime* const object) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  gWxTreeListRuntimeStateByControl.erase(object);
+  return object;
+}
+
+/**
+ * Address: 0x004A3BE0 (FUN_004A3BE0)
+ * Mangled: ?AddColumn@wxTreeListCtrl@@QAEXABVwxString@@I_NW4wxTreeListColumnAlign@@@Z
+ *
+ * What it does:
+ * Appends one tree-list column descriptor to this control.
+ */
+void wxTreeListCtrlRuntime::AddColumn(
+  const wxStringRuntime& title,
+  const std::uint32_t width,
+  const bool shown,
+  const std::uint8_t alignment
+)
+{
+  WxTreeListRuntimeState& state = EnsureWxTreeListRuntimeState(this);
+  state.columns.emplace_back(
+    title,
+    static_cast<std::int32_t>(width),
+    this,
+    shown ? 1u : 0u,
+    alignment,
+    0
+  );
+}
+
+/**
+ * Address: 0x004A3C50 (FUN_004A3C50)
+ * Mangled: ?GetWindowStyleFlag@wxTreeListCtrl@@UBEJXZ
+ *
+ * What it does:
+ * Returns the cached window-style flags for this tree-list control.
+ */
+long wxTreeListCtrlRuntime::GetWindowStyleFlag() const
+{
+  const WxTreeListRuntimeState* const state = FindWxTreeListRuntimeState(this);
+  return state != nullptr ? state->style : 0;
+}
+
+/**
+ * Address: 0x004A3C70 (FUN_004A3C70)
+ * Mangled: ?GetClassInfo@wxTreeListCtrl@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the static class-info lane for tree-list runtime RTTI checks.
+ */
+void* wxTreeListCtrlRuntime::GetClassInfo() const
+{
+  return sm_classInfo;
+}
+
+/**
+ * Address: 0x004A3C80 (FUN_004A3C80)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for tree-list control runtime
+ * lanes.
+ */
+wxTreeListCtrlRuntime* wxTreeListCtrlRuntime::DeleteWithFlag(
+  wxTreeListCtrlRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  DestroyWithoutDelete(object);
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+  return object;
+}
+
+wxTreeItemIdRuntime wxTreeListCtrlRuntime::AddRoot(const wxStringRuntime& text)
+{
+  WxTreeListRuntimeState& state = EnsureWxTreeListRuntimeState(this);
+  wxTreeItemIdRuntime item{};
+  const msvc8::string rootText = text.ToUtf8();
+  state.rootNode = AllocateTreeListNode(state, nullptr, rootText);
+  item.mNode = state.rootNode;
+  return item;
+}
+
+wxTreeItemIdRuntime wxTreeListCtrlRuntime::AppendItem(
+  const wxTreeItemIdRuntime& parentItem,
+  const wxStringRuntime& text
+)
+{
+  WxTreeListRuntimeState& state = EnsureWxTreeListRuntimeState(this);
+  wxTreeItemIdRuntime item{};
+
+  WxTreeListNodeRuntimeState* const parentNode = ResolveTreeListNode(parentItem);
+  if (parentNode == nullptr) {
+    return AddRoot(text);
+  }
+
+  const msvc8::string nodeText = text.ToUtf8();
+  item.mNode = AllocateTreeListNode(state, parentNode, nodeText);
+  return item;
+}
+
+void wxTreeListCtrlRuntime::Expand(const wxTreeItemIdRuntime& item) noexcept
+{
+  WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
+  if (node == nullptr) {
+    return;
+  }
+  node->isExpanded = true;
+}
+
+void wxTreeListCtrlRuntime::Collapse(const wxTreeItemIdRuntime& item) noexcept
+{
+  WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
+  if (node == nullptr) {
+    return;
+  }
+  node->isExpanded = false;
+}
+
+bool wxTreeListCtrlRuntime::IsExpanded(const wxTreeItemIdRuntime& item) const noexcept
+{
+  const WxTreeListNodeRuntimeState* const node = ResolveTreeListNodeConst(item);
+  return node != nullptr && node->isExpanded;
+}
+
+bool wxTreeListCtrlRuntime::HasChildren(const wxTreeItemIdRuntime& item) const noexcept
+{
+  const WxTreeListNodeRuntimeState* const node = ResolveTreeListNodeConst(item);
+  if (node == nullptr) {
+    return false;
+  }
+
+  return node->hasChildrenFlag || !node->children.empty();
+}
+
+void wxTreeListCtrlRuntime::SortChildren(const wxTreeItemIdRuntime& item)
+{
+  WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
+  if (node == nullptr || node->children.size() < 2u) {
+    return;
+  }
+
+  std::stable_sort(
+    node->children.begin(),
+    node->children.end(),
+    [](const WxTreeListNodeRuntimeState* const lhs, const WxTreeListNodeRuntimeState* const rhs) {
+      static const msvc8::string kEmptyText{};
+      const msvc8::string& lhsText = (lhs != nullptr && !lhs->columnText.empty()) ? lhs->columnText[0] : kEmptyText;
+      const msvc8::string& rhsText = (rhs != nullptr && !rhs->columnText.empty()) ? rhs->columnText[0] : kEmptyText;
+      return lhsText < rhsText;
+    }
+  );
+}
+
+void wxTreeListCtrlRuntime::SetItemData(const wxTreeItemIdRuntime& item, wxTreeItemDataRuntime* const itemData)
+{
+  WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
+  if (node == nullptr) {
+    return;
+  }
+  node->itemData = itemData;
+}
+
+wxTreeItemDataRuntime* wxTreeListCtrlRuntime::GetItemData(const wxTreeItemIdRuntime& item) const noexcept
+{
+  const WxTreeListNodeRuntimeState* const node = ResolveTreeListNodeConst(item);
+  return node != nullptr ? node->itemData : nullptr;
+}
+
+void wxTreeListCtrlRuntime::SetItemHasChildren(const wxTreeItemIdRuntime& item, const bool hasChildren) noexcept
+{
+  WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
+  if (node == nullptr) {
+    return;
+  }
+  node->hasChildrenFlag = hasChildren;
+}
+
+void wxTreeListCtrlRuntime::SetItemText(
+  const wxTreeItemIdRuntime& item,
+  const std::uint32_t column,
+  const wxStringRuntime& text
+)
+{
+  WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
+  if (node == nullptr) {
+    return;
+  }
+
+  if (node->columnText.size() <= column) {
+    node->columnText.resize(static_cast<std::size_t>(column) + 1u);
+  }
+  node->columnText[static_cast<std::size_t>(column)] = text.ToUtf8();
+}
+
+/**
+ * Address: 0x004A37F0 (FUN_004A37F0)
+ * Mangled: ?GetClassInfo@wxFrameBase@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the shared class-info lane used by frame/dialog/top-level
+ * `GetClassInfo` slot-0 entries.
+ */
+void** WX_FrameBaseGetClassInfo() noexcept
+{
+  return wxTopLevelWindowRootRuntime::sm_classInfo;
+}
+
+/**
+ * Address: 0x0099E8A0 (FUN_0099E8A0)
+ *
+ * What it does:
+ * Runs non-deleting frame-runtime teardown for frame-derived windows.
+ */
+wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(wxTopLevelWindowRuntime* const frame) noexcept
+{
+  if (frame == nullptr) {
+    return nullptr;
+  }
+
+  // Binary path sets the frame "destroyed" bit before delegating to shared
+  // frame-base teardown.
+  EnsureWxWindowBaseRuntimeState(frame).bitfields |= 0x8u;
+  return wxTopLevelWindowRuntime::DeleteWithFlag(frame, 0u);
+}
+
+/**
+ * Address: 0x0042B770 (FUN_0042B770)
+ * Mangled: ?GetClassInfo@wxWindowBase@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the static class-info lane for wxWindowBase runtime RTTI checks.
+ */
+void* wxWindowBase::GetClassInfo() const
+{
+  return gWxWindowBaseClassInfoTable;
+}
+
+/**
+ * Address: 0x0042B830 (FUN_0042B830)
+ * Mangled: ?ContainsHWND@wxWindow@@UBE_NK@Z
+ *
+ * What it does:
+ * Base implementation reports the queried native handle as not contained.
+ */
+bool wxWindowMswRuntime::ContainsHWND(const unsigned long nativeHandle) const
+{
+  (void)nativeHandle;
+  return false;
+}
+
+/**
+ * Address: 0x0042B840 (FUN_0042B840)
+ * Mangled: ?GetClassInfo@wxWindow@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the static class-info lane for wxWindow runtime RTTI checks.
+ */
+void* wxWindowMswRuntime::GetClassInfo() const
+{
+  return gWxWindowClassInfoTable;
+}
+
+namespace
+{
+  template <typename TWindow>
+  [[nodiscard]] wxWindowMswRuntime* AllocateWxMswWindowRuntime() noexcept
+  {
+    return new (std::nothrow) TWindow();
+  }
+
+  [[nodiscard]] bool EqualsWindowClassName(const wchar_t* const className, const wchar_t* const expected) noexcept
+  {
+    return className != nullptr && expected != nullptr && ::_wcsicmp(className, expected) == 0;
+  }
+
+  [[nodiscard]] wxWindowMswRuntime* CreateButtonRuntimeFromStyle(const signed char styleLane) noexcept
+  {
+    if (styleLane == 5 || styleLane == 6 || styleLane == 3 || styleLane == 2) {
+      return AllocateWxMswWindowRuntime<wxCheckBoxRuntime>();
+    }
+
+    if (styleLane == 9 || styleLane == 4) {
+      return AllocateWxMswWindowRuntime<wxControlRuntime>();
+    }
+
+    if (styleLane >= 0) {
+      switch (styleLane) {
+        case 11:
+        case 0:
+        case 1:
+        case 7:
+          return AllocateWxMswWindowRuntime<wxControlRuntime>();
+        default:
+          return nullptr;
+      }
+    }
+
+    return AllocateWxMswWindowRuntime<wxControlRuntime>();
+  }
+
+  [[nodiscard]] wxWindowMswRuntime* CreateRuntimeFromClassAndStyle(
+    const wchar_t* const className,
+    const signed char styleLane
+  ) noexcept
+  {
+    if (EqualsWindowClassName(className, L"BUTTON")) {
+      return CreateButtonRuntimeFromStyle(styleLane);
+    }
+
+    if (EqualsWindowClassName(className, L"COMBOBOX")) {
+      return AllocateWxMswWindowRuntime<wxControlRuntime>();
+    }
+
+    if (EqualsWindowClassName(className, L"EDIT")) {
+      return AllocateWxMswWindowRuntime<wxTextCtrlRuntime>();
+    }
+
+    if (EqualsWindowClassName(className, L"LISTBOX") ||
+        EqualsWindowClassName(className, L"SCROLLBAR") ||
+        EqualsWindowClassName(className, L"MSCTLS_UPDOWN32") ||
+        EqualsWindowClassName(className, L"MSCTLS_TRACKBAR32")) {
+      return AllocateWxMswWindowRuntime<wxControlRuntime>();
+    }
+
+    if (EqualsWindowClassName(className, L"STATIC")) {
+      if (styleLane == 0 || styleLane == 2 || styleLane == 11 || styleLane == 14) {
+        return AllocateWxMswWindowRuntime<wxControlRuntime>();
+      }
+      return nullptr;
+    }
+
+    return nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x0097D080 (FUN_0097D080)
+ * Mangled: ?CreateWindowFromHWND@wxWindow@@UAEPAV1@PAV1@K@Z
+ *
+ * What it does:
+ * Adapts one native Win32 HWND into the closest recovered wx runtime control
+ * wrapper and adopts HWND-derived attributes.
+ */
+void* wxWindowMswRuntime::CreateWindowFromHWND(void* const parent, const unsigned long nativeHandle)
+{
+  const HWND nativeWindow = reinterpret_cast<HWND>(nativeHandle);
+  if (nativeWindow == nullptr) {
+    return nullptr;
+  }
+
+  wchar_t windowClassName[64] = {};
+  const int classNameLength = ::GetClassNameW(
+    nativeWindow,
+    windowClassName,
+    static_cast<int>(sizeof(windowClassName) / sizeof(windowClassName[0]))
+  );
+  if (classNameLength <= 0) {
+    return nullptr;
+  }
+
+  const long windowStyle = static_cast<long>(::GetWindowLongW(nativeWindow, GWL_STYLE));
+  const signed char styleLane = static_cast<signed char>(windowStyle & 0xFF);
+  const std::int32_t windowId = static_cast<std::uint16_t>(::GetDlgCtrlID(nativeWindow));
+
+  wxWindowMswRuntime* const createdWindow = CreateRuntimeFromClassAndStyle(windowClassName, styleLane);
+  if (createdWindow == nullptr) {
+    return nullptr;
+  }
+
+  wxWindowBase* const parentWindow = static_cast<wxWindowBase*>(parent);
+  if (parentWindow != nullptr) {
+    parentWindow->AddChild(createdWindow);
+  }
+
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(createdWindow);
+  state.windowStyle = windowStyle;
+  state.nativeHandle = nativeHandle;
+  state.windowId = windowId;
+  state.parentWindow = parentWindow;
+
+  createdWindow->AdoptAttributesFromHWND();
+  createdWindow->SetupColours();
+  return createdWindow;
+}
+
+/**
+ * Address: 0x004A3830 (FUN_004A3830)
+ * Mangled: ?Command@wxControl@@UAEXAAVwxCommandEvent@@@Z
+ *
+ * What it does:
+ * Forwards one command-event dispatch into `ProcessCommand`.
+ */
+void wxControlRuntime::Command(void* const commandEvent)
+{
+  ProcessCommand(commandEvent);
+}
+
+/**
+ * Address: 0x004A3840 (FUN_004A3840)
+ * Mangled: ?MSWOnDraw@wxControl@@UAE_NPAPAX@Z
+ *
+ * What it does:
+ * Base implementation reports that no owner-draw handling was performed.
+ */
+bool wxControlRuntime::MSWOnDraw(void** const drawStruct)
+{
+  (void)drawStruct;
+  return false;
+}
+
+/**
+ * Address: 0x004A3850 (FUN_004A3850)
+ * Mangled: ?MSWOnMeasure@wxControl@@UAE_NPAPAX@Z
+ *
+ * What it does:
+ * Base implementation reports that no owner-measure handling was performed.
+ */
+bool wxControlRuntime::MSWOnMeasure(void** const measureStruct)
+{
+  (void)measureStruct;
+  return false;
+}
+
+/**
+ * Address: 0x0042B3E0 (FUN_0042B3E0)
+ * Mangled: ?SetTitle@wxWindowBase@@UAEXPBG@Z
+ *
+ * What it does:
+ * Base implementation accepts but ignores title updates.
+ */
+void wxWindowBase::SetTitle(const wxStringRuntime& title)
+{
+  (void)title;
+}
+
+/**
+ * Address: 0x0042B3F0 (FUN_0042B3F0)
+ * Mangled: ?GetTitle@wxWindowBase@@UBE?AVwxString@@XZ
+ *
+ * What it does:
+ * Returns an empty runtime wx string for base windows.
+ */
+wxStringRuntime wxWindowBase::GetTitle() const
+{
+  return wxStringRuntime::Borrow(L"");
+}
+
+/**
+ * Address: 0x0042B420 (FUN_0042B420)
+ * Mangled: ?SetLabel@wxWindowBase@@UAEXABVwxString@@@Z
+ *
+ * What it does:
+ * Forwards label updates to `SetTitle`.
+ */
+void wxWindowBase::SetLabel(const wxStringRuntime& label)
+{
+  SetTitle(label);
+}
+
+/**
+ * Address: 0x0042B430 (FUN_0042B430)
+ * Mangled: ?GetLabel@wxWindowBase@@UBE?AVwxString@@XZ
+ *
+ * What it does:
+ * Forwards label reads to `GetTitle`.
+ */
+wxStringRuntime wxWindowBase::GetLabel() const
+{
+  return GetTitle();
+}
+
+/**
+ * Address: 0x0042B450 (FUN_0042B450)
+ * Mangled: ?SetName@wxWindowBase@@UAEXABVwxString@@@Z
+ *
+ * What it does:
+ * Stores one runtime window-name value.
+ */
+void wxWindowBase::SetName(const wxStringRuntime& name)
+{
+  EnsureWxWindowBaseRuntimeState(this).windowName.assign(name.c_str());
+}
+
+/**
+ * Address: 0x0042B460 (FUN_0042B460)
+ * Mangled: ?GetName@wxWindowBase@@UBE?AVwxString@@XZ
+ *
+ * What it does:
+ * Returns the current runtime window-name value.
+ */
+wxStringRuntime wxWindowBase::GetName() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return wxStringRuntime::Borrow(state != nullptr ? state->windowName.c_str() : L"");
+}
+
+/**
+ * Address: 0x0042B4F0 (FUN_0042B4F0)
+ * Mangled: ?GetMinWidth@wxWindowBase@@UBEHXZ
+ */
+std::int32_t wxWindowBase::GetMinWidth() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->minWidth : -1;
+}
+
+/**
+ * Address: 0x0042B500 (FUN_0042B500)
+ * Mangled: ?GetMinHeight@wxWindowBase@@UBEHXZ
+ */
+std::int32_t wxWindowBase::GetMinHeight() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->minHeight : -1;
+}
+
+/**
+ * Address: 0x0042B510 (FUN_0042B510)
+ * Mangled: ?GetMaxSize@wxWindowBase@@UBE?AVwxSize@@XZ
+ */
+wxSize wxWindowBase::GetMaxSize() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr) {
+    return wxSize{-1, -1};
+  }
+
+  return wxSize{state->maxWidth, state->maxHeight};
+}
+
+/**
+ * Address: 0x0042B4A0 (FUN_0042B4A0)
+ *
+ * What it does:
+ * Returns client size by forwarding to `DoGetClientSize`.
+ */
+wxSize wxWindowBase::GetClientSize() const
+{
+  std::int32_t width = 0;
+  std::int32_t height = 0;
+  DoGetClientSize(&width, &height);
+  return wxSize{width, height};
+}
+
+/**
+ * Address: 0x0042B4D0 (FUN_0042B4D0)
+ *
+ * What it does:
+ * Returns best size by forwarding to `DoGetBestSize`.
+ */
+wxSize wxWindowBase::GetBestSize() const
+{
+  return DoGetBestSize();
+}
+
+/**
+ * Address: 0x0042B530 (FUN_0042B530)
+ * Mangled: ?GetBestVirtualSize@wxWindowBase@@UBE?AVwxSize@@XZ
+ */
+wxSize wxWindowBase::GetBestVirtualSize() const
+{
+  std::int32_t clientWidth = 0;
+  std::int32_t clientHeight = 0;
+  DoGetClientSize(&clientWidth, &clientHeight);
+
+  const wxSize bestSize = DoGetBestSize();
+  const std::int32_t width = clientWidth > bestSize.x ? clientWidth : bestSize.x;
+  const std::int32_t height = clientHeight > bestSize.y ? clientHeight : bestSize.y;
+  return wxSize{width, height};
+}
+
+/**
+ * Address: 0x0042B5B0 (FUN_0042B5B0)
+ * Mangled: ?SetWindowStyleFlag@wxWindowBase@@UAEXJ@Z
+ */
+void wxWindowBase::SetWindowStyleFlag(const long style)
+{
+  EnsureWxWindowBaseRuntimeState(this).windowStyle = style;
+}
+
+/**
+ * Address: 0x0042B5C0 (FUN_0042B5C0)
+ * Mangled: ?GetWindowStyleFlag@wxWindowBase@@UBEJXZ
+ */
+long wxWindowBase::GetWindowStyleFlag() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->windowStyle : 0;
+}
+
+/**
+ * Address: 0x0042B5F0 (FUN_0042B5F0)
+ * Mangled: ?IsRetained@wxWindowBase@@UBE_NXZ
+ */
+bool wxWindowBase::IsRetained() const
+{
+  return ((static_cast<unsigned long>(GetWindowStyleFlag()) >> 17) & 1u) != 0u;
+}
+
+/**
+ * Address: 0x0042B600 (FUN_0042B600)
+ * Mangled: ?SetExtraStyle@wxWindowBase@@UAEXJ@Z
+ */
+void wxWindowBase::SetExtraStyle(const long style)
+{
+  EnsureWxWindowBaseRuntimeState(this).extraStyle = style;
+}
+
+/**
+ * Address: 0x0042B610 (FUN_0042B610)
+ * Mangled: ?SetThemeEnabled@wxWindowBase@@UAEX_N@Z
+ */
+void wxWindowBase::SetThemeEnabled(const bool enabled)
+{
+  EnsureWxWindowBaseRuntimeState(this).themeEnabled = enabled;
+}
+
+/**
+ * Address: 0x0042B620 (FUN_0042B620)
+ * Mangled: ?GetThemeEnabled@wxWindowBase@@UBE_NXZ
+ */
+bool wxWindowBase::GetThemeEnabled() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr && state->themeEnabled;
+}
+
+/**
+ * Address: 0x0042B630 (FUN_0042B630)
+ * Mangled: ?SetFocusFromKbd@wxWindowBase@@UAEXXZ
+ */
+void wxWindowBase::SetFocusFromKbd()
+{
+  SetFocus();
+}
+
+/**
+ * Address: 0x0042B640 (FUN_0042B640)
+ * Mangled: ?AcceptsFocus@wxWindowBase@@UBE_NXZ
+ */
+bool wxWindowBase::AcceptsFocus() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  if (state == nullptr) {
+    return false;
+  }
+
+  const std::uint8_t bitfields = state->bitfields;
+  return (bitfields & 0x2u) != 0 && (bitfields & 0x4u) != 0;
+}
+
+/**
+ * Address: 0x0042B660 (FUN_0042B660)
+ * Mangled: ?AcceptsFocusFromKeyboard@wxWindowBase@@UBE_NXZ
+ */
+bool wxWindowBase::AcceptsFocusFromKeyboard() const
+{
+  return AcceptsFocus();
+}
+
+/**
+ * Address: 0x0042B670 (FUN_0042B670)
+ * Mangled: ?GetDefaultItem@wxWindowBase@@UBEPAVwxWindow@@XZ
+ */
+void* wxWindowBase::GetDefaultItem() const
+{
+  return nullptr;
+}
+
+/**
+ * Address: 0x0042B680 (FUN_0042B680)
+ * Mangled: ?SetDefaultItem@wxWindowBase@@UAEPAVwxWindow@@PAV2@@Z
+ */
+void* wxWindowBase::SetDefaultItem(void* const defaultItem)
+{
+  (void)defaultItem;
+  return nullptr;
+}
+
+/**
+ * Address: 0x0042B690 (FUN_0042B690)
+ * Mangled: ?SetTmpDefaultItem@wxWindowBase@@UAEXPAVwxWindow@@@Z
+ */
+void wxWindowBase::SetTmpDefaultItem(void* const defaultItem)
+{
+  (void)defaultItem;
+}
+
+/**
+ * Address: 0x0042B6E0 (FUN_0042B6E0)
+ * Mangled: ?HasCapture@wxWindowBase@@UBE_NXZ
+ */
+bool wxWindowBase::HasCapture() const
+{
+  return this == GetCapture();
+}
+
+wxWindowBase* wxWindowBase::GetCapture()
+{
+  return gCapturedWindow;
+}
+
+/**
+ * Address: 0x0042B700 (FUN_0042B700)
+ */
+void wxWindowBase::Update()
+{
+}
+
+/**
+ * Address: 0x0042B710 (FUN_0042B710)
+ */
+void wxWindowBase::Freeze()
+{
+}
+
+/**
+ * Address: 0x0042B720 (FUN_0042B720)
+ */
+void wxWindowBase::Thaw()
+{
+}
+
+/**
+ * Address: 0x0042B730 (FUN_0042B730)
+ * Mangled: ?PrepareDC@wxWindowBase@@UAEXAAVwxDC@@@Z
+ */
+void wxWindowBase::PrepareDC(void* const deviceContext)
+{
+  (void)deviceContext;
+}
+
+/**
+ * Address: 0x0042B740 (FUN_0042B740)
+ */
+bool wxWindowBase::ScrollLines(const std::int32_t lines)
+{
+  (void)lines;
+  return false;
+}
+
+/**
+ * Address: 0x0042B750 (FUN_0042B750)
+ */
+bool wxWindowBase::ScrollPages(const std::int32_t pages)
+{
+  (void)pages;
+  return false;
+}
+
+void wxWindowBase::SetDropTarget(void* const dropTarget)
+{
+  EnsureWxWindowBaseRuntimeState(this).dropTarget = dropTarget;
+}
+
+/**
+ * Address: 0x0042B760 (FUN_0042B760)
+ * Mangled: ?GetDropTarget@wxWindowBase@@UBEPAVwxDropTarget@@XZ
+ */
+void* wxWindowBase::GetDropTarget() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->dropTarget : nullptr;
+}
+
 msvc8::vector<moho::ManagedWindowSlot> moho::managedWindows{};
 msvc8::vector<moho::ManagedWindowSlot> moho::managedFrames{};
 wxWindowBase* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
+
+moho::wxDCRuntime::wxDCRuntime(wxWindowBase* const ownerWindow) noexcept : mOwnerWindow(ownerWindow)
+{
+}
+
+void moho::wxDCRuntime::SetBrush(const void* const brushToken) noexcept
+{
+  mActiveBrush = brushToken;
+}
+
+void moho::wxDCRuntime::DoGetSize(std::int32_t* const outWidth, std::int32_t* const outHeight) const noexcept
+{
+  if (mOwnerWindow != nullptr) {
+    mOwnerWindow->DoGetSize(outWidth, outHeight);
+    return;
+  }
+
+  if (outWidth != nullptr) {
+    *outWidth = 0;
+  }
+  if (outHeight != nullptr) {
+    *outHeight = 0;
+  }
+}
+
+void moho::wxDCRuntime::DoDrawRectangle(
+  const std::int32_t x,
+  const std::int32_t y,
+  const std::int32_t width,
+  const std::int32_t height
+) noexcept
+{
+  (void)x;
+  (void)y;
+  (void)width;
+  (void)height;
+  (void)mActiveBrush;
+}
+
+moho::wxPaintDCRuntime::wxPaintDCRuntime(wxWindowBase* const ownerWindow) noexcept : wxDCRuntime(ownerWindow)
+{
+}
+
+moho::wxPaintDCRuntime::~wxPaintDCRuntime() = default;
 
 bool moho::WX_EnsureSplashPngHandler()
 {
@@ -548,6 +2126,245 @@ moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(const char* const filenam
   msvc8::string splashPathText;
   splashPathText.assign_owned(splashPath.generic_string());
   return new (std::nothrow) SplashScreenRuntimeImpl(splashPathText, size);
+}
+
+void* moho::WD3DViewport::sm_eventTable[1] = {nullptr};
+
+/**
+ * Address: 0x00430980 (FUN_00430980)
+ * Mangled:
+ * ??0WD3DViewport@Moho@@QAE@PAVwxWindow@@VStrArg@gpg@@ABVwxPoint@@ABVwxSize@@@Z
+ *
+ * What it does:
+ * Converts the startup title lane to wide text for wx window creation flow,
+ * binds parent ownership, and clears retained D3D device reference storage.
+ */
+moho::WD3DViewport::WD3DViewport(
+  wxWindowBase* const parentWindow,
+  const char* const title,
+  const wxPoint& position,
+  const wxSize& size
+)
+{
+  (void)position;
+  (void)size;
+
+  const std::wstring wideTitle = gpg::STR_Utf8ToWide(title != nullptr ? title : "");
+  (void)wideTitle;
+
+  std::memset(mUnknown04To1C, 0, sizeof(mUnknown04To1C));
+  mEnabled = 0;
+  std::memset(mUnknown1ETo2B, 0, sizeof(mUnknown1ETo2B));
+  m_parent = parentWindow;
+  mD3DDevice = nullptr;
+}
+
+/**
+ * Address: 0x0042BA90 (FUN_0042BA90)
+ * Mangled: ??1WD3DViewport@Moho@@UAE@XZ
+ *
+ * What it does:
+ * Releases one held D3D-device reference before base window teardown.
+ */
+moho::WD3DViewport::~WD3DViewport()
+{
+  ReleaseD3DDeviceRef(mD3DDevice);
+  mD3DDevice = nullptr;
+}
+
+/**
+ * Address: 0x0042BAF0 (FUN_0042BAF0)
+ */
+void moho::WD3DViewport::D3DWindowOnDeviceInit()
+{
+}
+
+/**
+ * Address: 0x0042BB00 (FUN_0042BB00)
+ */
+void moho::WD3DViewport::D3DWindowOnDeviceRender()
+{
+}
+
+/**
+ * Address: 0x0042BB10 (FUN_0042BB10)
+ */
+void moho::WD3DViewport::D3DWindowOnDeviceExit()
+{
+}
+
+/**
+ * Address: 0x0042BB20 (FUN_0042BB20)
+ */
+void moho::WD3DViewport::RenderPreviewImage()
+{
+}
+
+/**
+ * Address: 0x0042BB30 (FUN_0042BB30)
+ */
+moho::WPreviewImageRuntime moho::WD3DViewport::GetPreviewImage() const
+{
+  return {};
+}
+
+/**
+ * Address: 0x0042BB50 (FUN_0042BB50)
+ */
+void* moho::WD3DViewport::GetPrimBatcher() const
+{
+  return nullptr;
+}
+
+/**
+ * Address: 0x00430970 (FUN_00430970)
+ * Mangled: ?GetEventTable@WD3DViewport@Moho@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Returns the static event-table lane for this viewport runtime type.
+ */
+const void* moho::WD3DViewport::GetEventTable() const
+{
+  return sm_eventTable;
+}
+
+namespace
+{
+  constexpr std::uintptr_t kWxBlackBrushToken = 1u;
+  constexpr std::uintptr_t kWxNullBrushToken = 0u;
+  constexpr std::uint16_t kClientHitTestCode = 1u;
+
+  void DrawBackgroundFill(moho::wxDCRuntime& deviceContext)
+  {
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+
+    deviceContext.SetBrush(reinterpret_cast<const void*>(kWxBlackBrushToken));
+    deviceContext.DoGetSize(&width, &height);
+    deviceContext.DoDrawRectangle(0, 0, width, height);
+    deviceContext.SetBrush(reinterpret_cast<const void*>(kWxNullBrushToken));
+  }
+
+  struct [[maybe_unused]] WD3DViewportPaintCallbackFrame
+  {
+    std::uint8_t mUnknown00To1F[0x20]{};
+    moho::wxDCRuntime* mDeviceContext = nullptr;
+  };
+
+  static_assert(
+    offsetof(WD3DViewportPaintCallbackFrame, mDeviceContext) == 0x20,
+    "WD3DViewportPaintCallbackFrame::mDeviceContext offset must be 0x20"
+  );
+
+  /**
+   * Address: 0x00430B70 (FUN_00430B70)
+   *
+   * What it does:
+   * Draws viewport background into the supplied paint DC when D3D device is
+   * missing or still in background-fallback mode.
+   */
+  [[maybe_unused]] void WD3DViewportPaintBackgroundFallback(WD3DViewportPaintCallbackFrame* const callbackFrame)
+  {
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    if (callbackFrame == nullptr || callbackFrame->mDeviceContext == nullptr) {
+      return;
+    }
+
+    if (device == nullptr || device->ShouldDrawViewportBackground()) {
+      DrawBackgroundFill(*callbackFrame->mDeviceContext);
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x00430A60 (FUN_00430A60)
+ * Mangled: ?DrawBackgroundImage@WD3DViewport@Moho@@AAEXAAVwxDC@@@Z
+ *
+ * What it does:
+ * Fills the viewport paint DC with a solid black rectangle.
+ */
+void moho::WD3DViewport::DrawBackgroundImage(wxDCRuntime& deviceContext)
+{
+  DrawBackgroundFill(deviceContext);
+}
+
+/**
+ * Address: 0x00430AC0 (FUN_00430AC0)
+ * Mangled: ?OnPaint@WD3DViewport@Moho@@QAEXAAVwxPaintEvent@@@Z
+ *
+ * What it does:
+ * Builds one paint DC, then renders through active D3D device when ready or
+ * draws fallback background.
+ */
+void moho::WD3DViewport::OnPaint(wxPaintEventRuntime& paintEvent)
+{
+  (void)paintEvent;
+  wxPaintDCRuntime paintDc(this);
+
+  CD3DDevice* const device = D3D_GetDevice();
+  if (gpg::gal::Device::IsReady() && device != nullptr) {
+    ReleaseD3DDeviceRef(mD3DDevice);
+    mD3DDevice = nullptr;
+    device->Paint();
+    return;
+  }
+
+  DrawBackgroundImage(paintDc);
+}
+
+/**
+ * Address: 0x00430B90 (FUN_00430B90)
+ * Mangled: ?MSWWindowProc@WD3DViewport@Moho@@UAEJIIJ@Z
+ *
+ * What it does:
+ * Handles cursor ownership handoff between wx and D3D, then delegates
+ * unhandled messages to base window dispatch.
+ */
+long moho::WD3DViewport::MSWWindowProc(
+  const unsigned int message, const unsigned int wParam, const long lParam
+)
+{
+  CD3DDevice* const device = D3D_GetDevice();
+  if (device != nullptr) {
+    const bool setCursorMessage = message == WM_SETCURSOR;
+    const bool clientHit = static_cast<std::uint16_t>(lParam & 0xFFFF) == kClientHitTestCode;
+
+    if (d3d_WindowsCursor) {
+      if (setCursorMessage && clientHit && device->IsCursorPixelSourceReady()) {
+        gpg::gal::Device::InitCursor();
+        (void)device->ShowCursor(device->IsCursorShowing());
+        return 1;
+      }
+    } else if (setCursorMessage && clientHit && (device->IsCursorPixelSourceReady() || !device->IsCursorShowing())) {
+      ::SetCursor(nullptr);
+      gpg::gal::Device::InitCursor();
+      (void)device->ShowCursor(device->IsCursorShowing());
+      return 1;
+    }
+  }
+
+  return WRenViewport::MSWWindowProc(message, wParam, lParam);
+}
+
+/**
+ * Address: 0x0042BB60 (FUN_0042BB60)
+ *
+ * What it does:
+ * Deleting-dtor thunk lane for `WD3DViewport`.
+ */
+static moho::WD3DViewport* DeleteWD3DViewportThunk(
+  moho::WD3DViewport* const viewport, const std::uint8_t deleteFlags
+)
+{
+  if (viewport == nullptr) {
+    return nullptr;
+  }
+
+  viewport->~WD3DViewport();
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(viewport);
+  }
+  return viewport;
 }
 
 namespace
@@ -628,6 +2445,102 @@ wxStringRuntime wxStringRuntime::Borrow(const wchar_t* const text) noexcept
   runtime.m_pchData = const_cast<wchar_t*>(text != nullptr ? text : L"");
   return runtime;
 }
+
+/**
+ * Address: 0x0042B870 (FUN_0042B870)
+ * Mangled: ??0wxImageHandler@@QAE@@Z
+ *
+ * What it does:
+ * Initializes name/extension/mime string lanes and sets type to invalid.
+ */
+wxImageHandlerRuntime::wxImageHandlerRuntime()
+{
+  mRefData = nullptr;
+  mName = wxStringRuntime::Borrow(L"");
+  mExtension = wxStringRuntime::Borrow(L"");
+  mMime = wxStringRuntime::Borrow(L"");
+  mType = 0;
+}
+
+void wxImageHandlerRuntime::SetDescriptor(
+  const wchar_t* const name,
+  const wchar_t* const extension,
+  const wchar_t* const mimeType,
+  const std::int32_t bitmapType
+) noexcept
+{
+  mName = wxStringRuntime::Borrow(name != nullptr ? name : L"");
+  mExtension = wxStringRuntime::Borrow(extension != nullptr ? extension : L"");
+  mMime = wxStringRuntime::Borrow(mimeType != nullptr ? mimeType : L"");
+  mType = bitmapType;
+}
+
+/**
+ * Address: 0x0042B8F0 (FUN_0042B8F0)
+ * Mangled: ?GetClassInfo@wxImageHandler@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the static class-info lane for wxImageHandler runtime RTTI checks.
+ */
+void* wxImageHandlerRuntime::GetClassInfo() const
+{
+  return gWxImageHandlerClassInfoTable;
+}
+
+void wxImageHandlerRuntime::ReleaseSharedWxString(wxStringRuntime& value) noexcept
+{
+  // Runtime wrappers keep wxString lanes as borrowed views; dropping one lane
+  // is represented by clearing the pointer.
+  value.m_pchData = nullptr;
+}
+
+/**
+ * Address: 0x0042B920 (FUN_0042B920)
+ *
+ * What it does:
+ * Releases runtime string lanes and clears shared ref-data ownership.
+ */
+wxImageHandlerRuntime::~wxImageHandlerRuntime()
+{
+  ReleaseSharedWxString(mMime);
+  ReleaseSharedWxString(mExtension);
+  ReleaseSharedWxString(mName);
+  RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(this));
+}
+
+/**
+ * Address: 0x0042B9E0 (FUN_0042B9E0)
+ * Mangled: ??0wxPNGHandler@@QAE@XZ
+ *
+ * What it does:
+ * Initializes the PNG handler descriptor (name, extension, mime, bitmap type).
+ */
+wxPngHandlerRuntime::wxPngHandlerRuntime()
+{
+  // wxBitmapType::wxBITMAP_TYPE_PNG in this runtime lane.
+  constexpr std::int32_t kBitmapTypePng = 15;
+  SetDescriptor(L"PNG file", L"png", L"image/png", kBitmapTypePng);
+}
+
+/**
+ * Address: 0x0042BA50 (FUN_0042BA50)
+ * Mangled: ?GetClassInfo@wxPNGHandler@@UBEPAVwxClassInfo@@XZ
+ *
+ * What it does:
+ * Returns the static class-info lane for wxPNGHandler runtime RTTI checks.
+ */
+void* wxPngHandlerRuntime::GetClassInfo() const
+{
+  return gWxPngHandlerClassInfoTable;
+}
+
+/**
+ * Address: 0x0042BA60 (FUN_0042BA60)
+ *
+ * What it does:
+ * Deleting-dtor thunk lane for `wxPNGHandler`; no extra teardown beyond base.
+ */
+wxPngHandlerRuntime::~wxPngHandlerRuntime() = default;
 
 wxColourRuntime wxColourRuntime::FromRgb(
   const std::uint8_t red, const std::uint8_t green, const std::uint8_t blue
@@ -848,6 +2761,58 @@ const wchar_t* moho::CWinLogLine::SeverityPrefix() const noexcept
     default:
       return L"INFO: ";
   }
+}
+
+/**
+ * Address: 0x00978FF0 (FUN_00978FF0, ??0wxEvent@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes one wxEvent runtime payload from `(eventId, eventType)` and
+ * clears ref/object/timestamp/flag lanes.
+ */
+wxEventRuntime::wxEventRuntime(const std::int32_t eventId, const std::int32_t eventType)
+  : mRefData(nullptr)
+  , mEventObject(nullptr)
+  , mEventType(eventType)
+  , mEventTimestamp(0)
+  , mEventId(eventId)
+  , mCallbackUserData(nullptr)
+  , mSkipped(0)
+  , mIsCommandEvent(0)
+  , mReserved1E(0)
+  , mReserved1F(0)
+{
+}
+
+/**
+ * Address: 0x00979090 (FUN_00979090, ??0wxCommandEvent@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes one wxCommandEvent payload on top of wxEvent runtime state and
+ * sets the command-event marker flag.
+ */
+wxCommandEventRuntime::wxCommandEventRuntime(const std::int32_t commandType, const std::int32_t eventId)
+  : wxEventRuntime(eventId, commandType)
+  , mCommandString(wxStringRuntime::Borrow(L""))
+  , mCommandInt(0)
+  , mExtraLong(0)
+  , mClientData(nullptr)
+  , mClientObject(nullptr)
+{
+  mIsCommandEvent = 1u;
+}
+
+/**
+ * Address: 0x006609B0 (FUN_006609B0, ??1wxCommandEvent@@QAE@@Z)
+ *
+ * What it does:
+ * Releases one shared command-string payload and clears wxEvent ref-data
+ * ownership via the base unref tail.
+ */
+wxCommandEventRuntime::~wxCommandEventRuntime()
+{
+  ReleaseWxStringSharedPayload(mCommandString);
+  RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(this));
 }
 
 /**
@@ -1408,6 +3373,223 @@ WSupComFrame* WX_CreateSupComFrame(
   auto* const frame = new WSupComFrameRuntime(title, position, size, style);
   frame->SetSizeHints(moho::wnd_MinDragWidth, moho::wnd_MinDragHeight, -1, -1, -1, -1);
   return frame;
+}
+
+namespace
+{
+  constexpr unsigned int kSupComFrameMessageSize = WM_SIZE;
+  constexpr unsigned int kSupComFrameMessageActivateApp = WM_ACTIVATEAPP;
+  constexpr unsigned int kSupComFrameMessageSysCommand = WM_SYSCOMMAND;
+  constexpr unsigned int kSupComFrameMessageExitSizeMove = WM_EXITSIZEMOVE;
+  constexpr unsigned int kSupComFrameSysCommandToggleLogDialog = 0x1u;
+  constexpr unsigned int kSupComFrameSysCommandLuaDebugger = 0x2u;
+  constexpr unsigned int kSupComFrameSysCommandKeyMenu = SC_KEYMENU;
+
+  constexpr const char* kSupComFrameWidthPreferenceKey = "Windows.Main.width";
+  constexpr const char* kSupComFrameHeightPreferenceKey = "Windows.Main.height";
+  constexpr const char* kSupComFrameMaximizedPreferenceKey = "Windows.Main.maximized";
+  constexpr const char* kSupComFrameToggleLogDialogCommand = "WIN_ToggleLogDialog";
+  constexpr const char* kSupComFrameLuaDebuggerCommand = "SC_LuaDebugger";
+  constexpr const char* kSupComFrameCursorLockPreferenceKey = "lock_fullscreen_cursor_to_window";
+
+  /**
+   * Address: 0x008CDBE0 (FUN_008CDBE0)
+   *
+   * What it does:
+   * Clamps SupCom frame client dimensions to drag minima, propagates size to
+   * the active viewport, then rebuilds one GAL context head and reinitializes
+   * D3D device state.
+   */
+  void SyncSupComFrameClientSizeAndViewport(WSupComFrame& frame)
+  {
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+    frame.DoGetClientSize(&width, &height);
+
+    if (width < moho::wnd_MinDragWidth) {
+      width = moho::wnd_MinDragWidth;
+    }
+    if (height < moho::wnd_MinDragHeight) {
+      height = moho::wnd_MinDragHeight;
+    }
+
+    frame.DoSetClientSize(width, height);
+    if (moho::ren_Viewport != nullptr) {
+      moho::ren_Viewport->DoSetSize(-1, -1, width, height, 0);
+    }
+
+    gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+    if (galDevice == nullptr) {
+      return;
+    }
+
+    gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
+    if (activeContext == nullptr) {
+      return;
+    }
+
+    gpg::gal::DeviceContext context(*activeContext);
+    if (context.GetHeadCount() > 0) {
+      gpg::gal::Head& head = context.GetHead(0);
+      head.mWidth = width;
+      head.mHeight = height;
+    }
+
+    moho::CD3DDevice* const d3dDevice = moho::D3D_GetDevice();
+    if (d3dDevice == nullptr) {
+      return;
+    }
+
+    d3dDevice->Clear();
+    d3dDevice->InitContext(&context);
+  }
+
+  /**
+   * Address: 0x008D1D70 (FUN_008D1D70)
+   *
+   * What it does:
+   * Applies cursor clipping for active SupCom frame focus: locks to main
+   * window rectangle when one windowed head is active and the cursor-lock
+   * option is enabled, otherwise clears clip bounds.
+   */
+  void UpdateSupComCursorClipForActivation()
+  {
+    gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+    if (galDevice == nullptr) {
+      return;
+    }
+
+    gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
+    if (activeContext == nullptr) {
+      return;
+    }
+
+    gpg::gal::DeviceContext context(*activeContext);
+    if (context.GetHeadCount() <= 0) {
+      return;
+    }
+
+    const gpg::gal::Head& head = context.GetHead(0);
+    RECT clipRect{};
+    RECT* clipRectPtr = nullptr;
+    if (
+      context.GetHeadCount() == 1 && head.mWindowed
+      && moho::OPTIONS_GetInt(kSupComFrameCursorLockPreferenceKey) == 1 && moho::sMainWindow != nullptr
+    ) {
+      const HWND mainWindowHandle =
+        reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+      if (mainWindowHandle != nullptr) {
+        ::GetWindowRect(mainWindowHandle, &clipRect);
+        clipRectPtr = &clipRect;
+      }
+    }
+
+    ::ClipCursor(clipRectPtr);
+  }
+} // namespace
+
+/**
+ * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
+ * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
+ *
+ * What it does:
+ * Handles SupCom frame resize/maximize/app-activation/system-command routing,
+ * persists window preference keys, and forwards unhandled messages to base
+ * frame dispatch.
+ */
+long WSupComFrame::MSWWindowProc(const unsigned int message, const unsigned int wParam, const long lParam)
+{
+  auto dispatchBase = [this, message, wParam, lParam]() -> long {
+    return wxTopLevelWindowRuntime::MSWWindowProc(message, wParam, lParam);
+  };
+
+  moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
+  if (!moho::sDeviceLock && moho::ren_Viewport != nullptr && gpg::gal::Device::IsReady()) {
+    if (gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance(); galDevice != nullptr) {
+      if (gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
+          activeContext != nullptr && activeContext->GetHeadCount() > 0) {
+        (void)activeContext->GetHead(0);
+      }
+    }
+
+    if (mPendingMaximizeSync != 0 && message == kSupComFrameMessageExitSizeMove) {
+      SyncSupComFrameClientSizeAndViewport(*this);
+
+      if (preferences != nullptr) {
+        const wxSize clientSize = GetClientSize();
+        preferences->SetInteger(msvc8::string(kSupComFrameWidthPreferenceKey), clientSize.x);
+        preferences->SetInteger(msvc8::string(kSupComFrameHeightPreferenceKey), clientSize.y);
+      }
+
+      if (moho::CD3DDevice* const d3dDevice = moho::D3D_GetDevice(); d3dDevice != nullptr) {
+        (void)d3dDevice->Clear2(false);
+      }
+
+      mPendingMaximizeSync = 0;
+    } else if (message == kSupComFrameMessageSize && wParam == SIZE_MAXIMIZED) {
+      SyncSupComFrameClientSizeAndViewport(*this);
+      if (preferences != nullptr) {
+        preferences->SetBoolean(msvc8::string(kSupComFrameMaximizedPreferenceKey), true);
+      }
+      mPersistedMaximizeSync = 1;
+    }
+
+    if (mPendingMaximizeSync == 0 && message == kSupComFrameMessageSize) {
+      if (wParam == SIZE_RESTORED && mPersistedMaximizeSync != 0) {
+        SyncSupComFrameClientSizeAndViewport(*this);
+        if (preferences != nullptr) {
+          const wxSize clientSize = GetClientSize();
+          preferences->SetInteger(msvc8::string(kSupComFrameWidthPreferenceKey), clientSize.x);
+          preferences->SetInteger(msvc8::string(kSupComFrameHeightPreferenceKey), clientSize.y);
+          preferences->SetBoolean(msvc8::string(kSupComFrameMaximizedPreferenceKey), false);
+        }
+        mPersistedMaximizeSync = 0;
+      }
+
+      return dispatchBase();
+    }
+  }
+
+  if (message == kSupComFrameMessageActivateApp) {
+    const bool isActive = wParam != 0;
+    mIsApplicationActive = isActive ? 1 : 0;
+    if (isActive) {
+      UpdateSupComCursorClipForActivation();
+    } else {
+      ::ClipCursor(nullptr);
+    }
+    return dispatchBase();
+  }
+
+  if (message != kSupComFrameMessageSysCommand) {
+    return dispatchBase();
+  }
+
+  if (wParam == kSupComFrameSysCommandToggleLogDialog) {
+    moho::CON_Execute(kSupComFrameToggleLogDialogCommand);
+    return dispatchBase();
+  }
+
+  if (wParam == kSupComFrameSysCommandLuaDebugger) {
+    moho::CON_Execute(kSupComFrameLuaDebuggerCommand);
+    return dispatchBase();
+  }
+
+  if (wParam != kSupComFrameSysCommandKeyMenu) {
+    return dispatchBase();
+  }
+
+  gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+  if (galDevice == nullptr) {
+    return dispatchBase();
+  }
+
+  gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
+  if (activeContext == nullptr || activeContext->GetHeadCount() <= 0 || !activeContext->GetHead(0).mWindowed) {
+    return dispatchBase();
+  }
+
+  return 0;
 }
 
 /**

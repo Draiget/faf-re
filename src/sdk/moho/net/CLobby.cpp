@@ -24,6 +24,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StringUtils.h"
+#include "moho/script/CScriptEvent.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTICommandSource.h"
@@ -51,10 +52,17 @@ namespace moho
   TConVar<msvc8::string> ConVar_lob_IgnoreNames{
     "lob_IgnoreNames", "Comma seperated list of player names to ignore.", &lob_IgnoreNames
   };
+
+  int cfunc_CLobbyMakeValidPlayerNameL(LuaPlus::LuaState* state);
+  int cfunc_ValidateIPAddressL(LuaPlus::LuaState* state);
+  int cfunc_ValidateIPAddress(lua_State* luaContext);
 } // namespace moho
 
 namespace
 {
+  constexpr const char* kCLobbyMakeValidPlayerNameHelp = "CLobbyMakeValidPlayerName(self, uid, name)";
+  constexpr const char* kValidateIPAddressHelp = "str = ValidateIPAddress(ipaddr)";
+
   struct LaunchPlayerOptionEntry
   {
     int32_t mSlotIndex{-1};
@@ -933,6 +941,95 @@ msvc8::string CLobby::MakeValidPlayerName(msvc8::string joiningName, const int32
   }
 
   return joiningName;
+}
+
+/**
+ * Address: 0x007C1950 (FUN_007C1950, cfunc_CLobbyMakeValidPlayerNameL)
+ *
+ * What it does:
+ * Validates `(self, uid, name)` Lua args, normalizes the requested name via
+ * `CLobby::MakeValidPlayerName`, and pushes the sanitized result.
+ */
+int moho::cfunc_CLobbyMakeValidPlayerNameL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected %d args, but got %d",
+      kCLobbyMakeValidPlayerNameHelp,
+      3,
+      argumentCount
+    );
+  }
+
+  LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
+  CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
+
+  LuaPlus::LuaStackObject uidArg(state, 2);
+  const char* const uidText = lua_tostring(state->m_state, 2);
+  if (uidText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&uidArg, "string");
+  }
+  const int32_t uid = std::atoi(uidText ? uidText : "");
+
+  LuaPlus::LuaStackObject nameArg(state, 3);
+  const char* const nameText = lua_tostring(state->m_state, 3);
+  if (nameText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&nameArg, "string");
+  }
+
+  const msvc8::string requestedName{nameText ? nameText : ""};
+  const msvc8::string validName = lobby->MakeValidPlayerName(requestedName, uid);
+  lua_pushstring(state->m_state, validName.c_str());
+  return 1;
+}
+
+/**
+ * Address: 0x007C8360 (FUN_007C8360, cfunc_ValidateIPAddressL)
+ *
+ * What it does:
+ * Validates one Lua `ipaddr` string, resolves host:port through `NET_GetAddrInfo`,
+ * and returns either `"A.B.C.D:port"` or `nil`.
+ */
+int moho::cfunc_ValidateIPAddressL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kValidateIPAddressHelp, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject ipAddressArg(state, 1);
+  const char* const ipAddressText = lua_tostring(state->m_state, 1);
+  if (ipAddressText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&ipAddressArg, "string");
+  }
+
+  u_long address = 0;
+  u_short port = 0;
+  if (NET_GetAddrInfo(ipAddressText, 0, false, address, port)) {
+    const msvc8::string host = NET_GetDottedOctetFromUInt32(address);
+    const msvc8::string hostAndPort = gpg::STR_Printf("%s:%d", host.c_str(), static_cast<int>(port));
+    lua_pushstring(state->m_state, hostAndPort.c_str());
+    (void)lua_gettop(state->m_state);
+  } else {
+    lua_pushnil(state->m_state);
+    (void)lua_gettop(state->m_state);
+  }
+
+  return 1;
+}
+
+/**
+ * Address: 0x007C82E0 (FUN_007C82E0, cfunc_ValidateIPAddress)
+ *
+ * What it does:
+ * Converts raw Lua callback context into `LuaPlus::LuaState` and forwards
+ * to `cfunc_ValidateIPAddressL`.
+ */
+int moho::cfunc_ValidateIPAddress(lua_State* const luaContext)
+{
+  return cfunc_ValidateIPAddressL(luaContext ? luaContext->stateUserData : nullptr);
 }
 
 /**

@@ -9,6 +9,16 @@
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/misc/WeakPtr.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+  class RRef;
+  class RType;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+} // namespace gpg
+
 namespace moho
 {
   class Unit;
@@ -16,6 +26,75 @@ namespace moho
   class CUnitCommandQueue : public Broadcaster
   {
   public:
+    /**
+     * Address: 0x006A4CD0 (FUN_006A4CD0, ??0CUnitCommandQueue@Moho@@QAE@PAVUnit@1@@Z)
+     *
+     * What it does:
+     * Initializes queue owner pointer, command lanes, and queue-head state.
+     */
+    explicit CUnitCommandQueue(Unit* unit);
+
+    /**
+     * Address: 0x006A4D40 (FUN_006A4D40, ??1CUnitCommandQueue@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Clears queued commands, releases weak-command storage, and unlinks the
+     * queue from broadcaster intrusive lanes.
+     */
+    ~CUnitCommandQueue();
+
+    /**
+     * Address: 0x006EE8C0 (FUN_006EE8C0,
+     * ?MemberSaveConstructArgs@CUnitCommandQueue@Moho@@AAEXAAVWriteArchive@gpg@@HABVRRef@4@AAVSerSaveConstructArgsResult@4@@Z)
+     *
+     * What it does:
+     * Saves construct payload (`Unit*` owner) as unowned tracked-pointer data.
+     */
+    void MemberSaveConstructArgs(
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
+    );
+
+    /**
+     * Address: 0x006EEAC0 (FUN_006EEAC0,
+     * ?MemberConstruct@CUnitCommandQueue@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
+     *
+     * What it does:
+     * Reads construct payload and allocates one `CUnitCommandQueue`.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerConstructResult& result
+    );
+
+    /**
+     * Address: 0x006F9690 (FUN_006F9690, sub_6F9690)
+     *
+     * What it does:
+     * Loads queue base/vector/type lanes and marks UI refresh state dirty.
+     */
+    void MemberDeserialize(gpg::ReadArchive& archive);
+
+    /**
+     * Address: 0x006F9750 (FUN_006F9750, sub_6F9750)
+     *
+     * What it does:
+     * Saves queue base/vector/type lanes and queue local counter lane.
+     */
+    void MemberSerialize(gpg::WriteArchive& archive) const;
+
+    /**
+     * Address: 0x006EDAA0 (FUN_006EDAA0, constructor preregisters RTTI)
+     *
+     * What it does:
+     * Resolves/refetches reflection descriptor for CUnitCommandQueue.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x006EDD30
      */
@@ -55,6 +134,8 @@ namespace moho
     void DestroyForUnitKillCleanup();
 
   public:
+    static gpg::RType* sType;
+
     Unit* mUnit;
     msvc8::vector<WeakPtr<CUnitCommand>> mCommandVec;
     EUnitCommandType mCommandType; // mirrors queue head command family

@@ -1206,16 +1206,12 @@ namespace gpg::gal
 
     [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
     {
-      char codeText[16] = {};
-      std::snprintf(codeText, sizeof(codeText), "%08lX", static_cast<unsigned long>(code));
-      throw Error(MakeShortString(file), line, MakeShortString(codeText));
+      throw Error(MakeShortString(file), line, MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code))));
     }
 
     msvc8::string MakeD3DErrorString(const HRESULT code)
     {
-      char codeText[16] = {};
-      std::snprintf(codeText, sizeof(codeText), "%08lX", static_cast<unsigned long>(code));
-      return MakeShortString(codeText);
+      return MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code)));
     }
 
     [[noreturn]] void ThrowDeviceD3D10Hresult(const int line, const HRESULT code)
@@ -2395,7 +2391,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlot_8F8D90(void** const slot) noexcept
+    [[maybe_unused]] int ReleaseComSlotVariant1(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2408,7 +2404,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlot_8F8DF0(void** const slot) noexcept
+    [[maybe_unused]] int ReleaseComSlotVariant2(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2421,7 +2417,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlot_8F8E10(void** const slot) noexcept
+    [[maybe_unused]] int ReleaseComSlotVariant3(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -2434,7 +2430,7 @@ namespace gpg::gal
      * What it does:
      * Releases one COM-like pointer lane (if present) and clears the slot.
      */
-    [[maybe_unused]] int ReleaseComSlot_8F8E30(void** const slot) noexcept
+    [[maybe_unused]] int ReleaseComSlotVariant4(void** const slot) noexcept
     {
       return ReleaseComSlotAndNull(slot);
     }
@@ -4933,7 +4929,7 @@ namespace gpg::gal
    * What it does:
    * Owns the deleting-destructor thunk path for D3D10 backend instances.
    */
-  void DeviceD3D10::sub_9005E0()
+  void DeviceD3D10::DestroyBackendObject()
   {
     auto* const backend = AsDeviceD3D10BackendObject(this);
     static_cast<void>(ResetDeviceD3D10Runtime(backend));

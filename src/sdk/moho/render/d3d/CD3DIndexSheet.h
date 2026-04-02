@@ -118,6 +118,14 @@ namespace moho
 
   private:
     /**
+     * Address: 0x0043F850 (FUN_0043F850)
+     *
+     * What it does:
+     * Returns true when retained index-buffer context type is the static token.
+     */
+    [[nodiscard]] bool IsStaticBufferType() const;
+
+    /**
      * Address: 0x0043F700 (FUN_0043F700)
      *
      * What it does:

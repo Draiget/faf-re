@@ -5,6 +5,7 @@
 
 #include "legacy/containers/String.h"
 #include "moho/sim/CSimConCommand.h"
+#include "moho/sim/CSimConVarInstanceBase.h"
 
 namespace moho
 {
@@ -18,6 +19,8 @@ namespace moho
   class CSimConVarBase : public CSimConCommand
   {
   public:
+    CSimConVarBase(bool requiresCheat, const char* name);
+
     /**
      * Address: 0x00734820 (FUN_00734820, sub_734820)
      *
@@ -45,6 +48,8 @@ namespace moho
      */
     virtual CSimConVarInstanceBase* CreateInstance() = 0; // slot 2
 
+    [[nodiscard]] static std::uint32_t AllocateSimConVarIndex() noexcept;
+
   public:
     std::uint32_t mIndex; // +0x0C
   };
@@ -57,6 +62,26 @@ namespace moho
   template <typename T>
   class TSimConVar : public CSimConVarBase
   {
+  public:
+    TSimConVar(bool requiresCheat, const char* name, const T& defaultValue)
+      : CSimConVarBase(requiresCheat, name)
+      , mDefaultValue(defaultValue)
+    {
+      mIndex = AllocateSimConVarIndex();
+    }
+
+    CSimConVarInstanceBase* CreateInstance() override
+    {
+      auto* const instance = new TSimConVarInstance<T>();
+      if (!instance) {
+        return nullptr;
+      }
+
+      instance->mName = mName;
+      instance->mValue = mDefaultValue;
+      return instance;
+    }
+
   public:
     T mDefaultValue; // 0x10
   };

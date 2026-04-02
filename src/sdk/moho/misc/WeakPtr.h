@@ -16,6 +16,11 @@ namespace msvc8
   class vector;
 }
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   template <class T>
@@ -34,6 +39,8 @@ namespace moho
   template <class T>
   struct WeakPtr
   {
+    inline static gpg::RType* sType = nullptr;
+
     // Owner link points at the owner's intrusive weak-link head slot.
     // Most owners use +sizeof(void*), but some recovered types have different
     // owner-link slot offsets (specialized via WeakPtrOwnerLinkOffset<T>).

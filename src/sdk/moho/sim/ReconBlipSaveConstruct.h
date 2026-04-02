@@ -45,4 +45,13 @@ namespace moho
     "ReconBlipSaveConstruct::mSaveConstructArgsCallback offset must be 0x0C"
   );
   static_assert(sizeof(ReconBlipSaveConstruct) == 0x10, "ReconBlipSaveConstruct size must be 0x10");
+
+  /**
+   * Address: 0x00BCDC70 (FUN_00BCDC70, register_ReconBlipSaveConstruct)
+   *
+   * What it does:
+   * Initializes recovered ReconBlip save-construct helper callback and binds it
+   * into reflected RTTI, then registers process-exit cleanup.
+   */
+  void register_ReconBlipSaveConstruct();
 } // namespace moho

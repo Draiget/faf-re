@@ -25,6 +25,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x00401250 (FUN_00401250)
+   *
+   * What it does:
+   * Compares optional runtime type pointers with identity/null short-circuiting.
+   */
+  bool RuntimeTypePtrEquals(const RuntimeTypeInfo* const lhs, const RuntimeTypeInfo* const rhs) noexcept
+  {
+    if (lhs == rhs) {
+      return true;
+    }
+    if (!lhs || !rhs) {
+      return false;
+    }
+    return *lhs == *rhs;
+  }
+
+  /**
    * Address: 0x00A824B4 (`?before@type_info@@QBEHABV1@@Z`, `type_info::before`)
    *
    * What it does:

@@ -9,6 +9,9 @@
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
+  class SerConstructResult;
 }
 
 namespace moho
@@ -26,6 +29,24 @@ namespace moho
 
   struct SSiloBuildInfo
   {
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x005D04A0 (FUN_005D04A0, Moho::SSiloBuildInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Loads one silo slot payload from archive lanes.
+     */
+    static void MemberDeserialize(gpg::ReadArchive* archive, SSiloBuildInfo* info);
+
+    /**
+     * Address: 0x005D04F0 (FUN_005D04F0, Moho::SSiloBuildInfo::MemberSerialize)
+     *
+     * What it does:
+     * Saves one silo slot payload into archive lanes.
+     */
+    static void MemberSerialize(const SSiloBuildInfo* info, gpg::WriteArchive* archive);
+
     UnitWeapon* mWeapon;           // +0x00
     std::int32_t mAmmo;            // +0x04
     std::int32_t mMaxStorageCount; // +0x08
@@ -52,6 +73,14 @@ namespace moho
   class CAiSiloBuildImpl : public IAiSiloBuild
   {
   public:
+    /**
+     * Address: 0x005CF5B0 (FUN_005CF5B0, ??0CAiSiloBuildImpl@Moho@@AAE@XZ)
+     *
+     * What it does:
+     * Constructs an empty silo-build implementation for archive load paths.
+     */
+    CAiSiloBuildImpl();
+
     /**
      * Address: 0x005CED30 (FUN_005CED30, ??0CAiSiloBuildImpl@Moho@@QAE@PAVUnit@1@@Z)
      *
@@ -152,6 +181,31 @@ namespace moho
      * VFTable SLOT: 11
      */
     void SiloStopBuild() override;
+
+    /**
+     * Address: 0x005CF850 (FUN_005CF850, Moho::CAiSiloBuildImpl::MemberConstruct)
+     *
+     * What it does:
+     * Allocates one silo-build implementation object for serializer construct
+     * callbacks and publishes it to the construct result.
+     */
+    static void MemberConstruct(gpg::SerConstructResult* result);
+
+    /**
+     * Address: 0x005D1080 (FUN_005D1080, Moho::CAiSiloBuildImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Loads reflected silo-build implementation state from archive lanes.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005D1230 (FUN_005D1230, Moho::CAiSiloBuildImpl::MemberSerialize)
+     *
+     * What it does:
+     * Saves reflected silo-build implementation state into archive lanes.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     static gpg::RType* sType;

@@ -70,7 +70,7 @@ namespace gpg
          * What it does:
          * Returns current logical stream position adjusted by unread/read-buffer and pending-write windows.
          */
-        size_t VirtTell(Mode mode) override;
+        std::uint64_t VirtTell(Mode mode) override;
 
         /**
          * Address: 0x00955DF0 (FUN_00955DF0)
@@ -78,7 +78,7 @@ namespace gpg
          * What it does:
          * Flushes pending write bytes, seeks by origin/mode with read-window compensation, and clears local windows.
          */
-        size_t VirtSeek(Mode mode, SeekOrigin orig, size_t pos) override;
+        std::uint64_t VirtSeek(Mode mode, SeekOrigin orig, std::int64_t pos) override;
 
         /**
          * Address: 0x00955F80 (FUN_00955F80)

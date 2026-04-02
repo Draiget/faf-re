@@ -84,7 +84,7 @@ namespace moho
    */
   struct SDriverMutex
   {
-    boost::mutex lock;
+    boost::mutex* lock = nullptr; // runtime-owned lock pointer
     uint8_t pad[3]{};
   };
   static_assert(sizeof(SDriverMutex) == 0x8, "SDriverMutex size must be 0x8");
@@ -204,6 +204,14 @@ namespace moho
      * Address: 0x0073B1B0 (FUN_0073B1B0)
      */
     void SetArmyIndex(int armyIndex) override;
+    /**
+     * Address context:
+     * - FAF patch callback `cfunc_SetFocusArmySim` writes this lane directly.
+     *
+     * What it does:
+     * Updates pending focus army without lock/event side effects.
+     */
+    void SetPendingFocusArmyRaw(std::int32_t focusArmy) noexcept;
     /**
      * Address: 0x0073B270 (FUN_0073B270)
      */

@@ -15,42 +15,16 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/time/Timer.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/Vector.h"
 #include "moho/math/Vector3f.h"
+#include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 
 namespace moho
 {
   // Address: 0x00F57E5C (ren_FrameTimeSeconds)
   extern float ren_FrameTimeSeconds;
-
-  class CD3DFont
-  {
-  public:
-    static boost::shared_ptr<CD3DFont> Create(std::int32_t pointSize, const char* faceName);
-    float GetAdvance(const char* text, std::int32_t flags);
-    Vector3f Render(
-      const char* text,
-      CD3DPrimBatcher* primBatcher,
-      const Vector3f& origin,
-      const Vector3f& xAxis,
-      const Vector3f& yAxis,
-      std::uint32_t color,
-      float glyphScale,
-      float maxAdvance
-    );
-
-  public:
-    std::uint8_t mPad00[0x10];
-    float mHeight; // +0x10
-    float mAscent; // +0x14
-    std::uint8_t mPad18[0x08];
-    float mExternalLeading; // +0x20
-  };
-
-  static_assert(offsetof(CD3DFont, mHeight) == 0x10, "CD3DFont::mHeight offset must be 0x10");
-  static_assert(offsetof(CD3DFont, mAscent) == 0x14, "CD3DFont::mAscent offset must be 0x14");
-  static_assert(offsetof(CD3DFont, mExternalLeading) == 0x20, "CD3DFont::mExternalLeading offset must be 0x20");
 
   namespace
   {
@@ -532,7 +506,9 @@ namespace moho
     primBatcher->SetTexture(whiteTexture);
     DrawPanelRect(*primBatcher, left, top, right, bottom, 0xFFFFFFFFu);
 
-    const boost::shared_ptr<CD3DFont> font = CD3DFont::Create(kFontPointSize, kFontFaceName);
+    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(kFontPointSize, kFontFaceName);
+    const boost::shared_ptr<CD3DFont> font = boost::SharedPtrFromRawRetained(rawFont);
+    rawFont.release();
 
     msvc8::vector<STimeBarEventRecord> events;
     TIME_CollectTimeBarEvents(events, ren_FrameTimeSeconds);

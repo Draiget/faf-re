@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
@@ -18,11 +19,28 @@
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/resource/RScmResource.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+
+  class SerSaveConstructArgsResult
+  {
+  public:
+    void SetUnowned(unsigned int value);
+  };
+} // namespace gpg
 
 namespace
 {
@@ -121,6 +139,13 @@ namespace
     return "/" + id.substr(start, underscorePos - start) + "_script.lua";
   }
 
+  /**
+   * Address: 0x00677360 (FUN_00677360, func_FindBlueprintScriptModule)
+   *
+   * What it does:
+   * Resolves blueprint script factory tables by trying blueprint-specific module/class
+   * first, then falling back to type-default `unit/projectile/prop` script modules.
+   */
   [[nodiscard]] LuaPlus::LuaObject
   ResolveBlueprintScriptFactory(moho::Sim* sim, const moho::REntityBlueprint* blueprint)
   {
@@ -214,6 +239,16 @@ namespace
     }
 
     return sim->mArmiesList[sourceIndex];
+  }
+
+  [[nodiscard]] moho::EntityCollisionSpatialGrid* ResolveEntityCollisionGrid(moho::Sim* sim) noexcept
+  {
+    if (!sim || !sim->mOGrid) {
+      return nullptr;
+    }
+
+    auto* const rawEntityGrid = reinterpret_cast<std::uint8_t*>(&sim->mOGrid->entityGrid);
+    return reinterpret_cast<moho::EntityCollisionSpatialGrid*>(rawEntityGrid + 0x04);
   }
 
   void RegisterEntityInDbIfMissing(moho::Sim* sim, moho::Entity* entity)
@@ -695,25 +730,6 @@ namespace
     return center;
   }
 
-  /**
-   * Address: 0x00678E90 (FUN_00678E90)
-   *
-   * What it does:
-   * Stores pending transform/scalar and links the coord-node into Sim list
-   * when it is currently detached.
-   */
-  void SetPendingTransformAndEnsureCoordLink(
-    moho::Entity& entity, const moho::EntityTransformPayload& pending, const float pendingAux
-  )
-  {
-    moho::WriteEntityTransformPayload(entity.PendingOrientation, entity.PendingPosition, pending);
-    entity.mPendingVelocityScale = pendingAux;
-
-    if (entity.SimulationRef && entity.mCoordNode.ListIsSingleton()) {
-      entity.mCoordNode.ListLinkBefore(&entity.SimulationRef->mCoordEntities);
-    }
-  }
-
   [[nodiscard]] std::uint32_t ReadBlueprintCategoryBitIndex(const moho::REntityBlueprint* blueprint) noexcept
   {
     return blueprint ? blueprint->mCategoryBitIndex : 0u;
@@ -917,6 +933,161 @@ namespace moho
   }
 
   /**
+   * Address: 0x0067B470 (FUN_0067B470,
+   * ?MemberSaveConstructArgs@Entity@Moho@@AAEXAAVWriteArchive@gpg@@HABVRRef@4@AAVSerSaveConstructArgsResult@4@@Z)
+   *
+   * What it does:
+   * Saves construct payload (`Sim*`) as an unowned tracked-pointer lane.
+   */
+  void Entity::MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
+  )
+  {
+    static gpg::RType* sSimType = nullptr;
+    if (!sSimType) {
+      sSimType = gpg::LookupRType(typeid(Sim));
+    }
+
+    gpg::RRef simRef{};
+    simRef.mObj = SimulationRef;
+    simRef.mType = SimulationRef ? sSimType : nullptr;
+
+    gpg::WriteRawPointer(&archive, simRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    result.SetUnowned(0u);
+  }
+
+  /**
+   * Address: 0x0067B570 (FUN_0067B570,
+   * ?MemberConstruct@Entity@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
+   *
+   * What it does:
+   * Reads construct payload (`Sim*`) and allocates one `Entity` with
+   * default entity collision-bucket flags (`0x800`).
+   */
+  void Entity::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  {
+    static gpg::RType* sSimType = nullptr;
+    static gpg::RType* sEntityType = nullptr;
+    if (!sSimType) {
+      sSimType = gpg::LookupRType(typeid(Sim));
+    }
+    if (!sEntityType) {
+      sEntityType = gpg::LookupRType(typeid(Entity));
+    }
+
+    Sim* ownerSim = nullptr;
+    const gpg::TrackedPointerInfo trackedOwner = gpg::ReadRawPointer(&archive, gpg::RRef{});
+    if (trackedOwner.object != nullptr) {
+      gpg::RRef sourceRef{};
+      sourceRef.mObj = trackedOwner.object;
+      sourceRef.mType = trackedOwner.type;
+      const gpg::RRef upcastOwner = gpg::REF_UpcastPtr(sourceRef, sSimType);
+      ownerSim = static_cast<Sim*>(upcastOwner.mObj);
+    }
+
+    (void)ownerSim;
+    Entity* const object = nullptr;
+    gpg::RRef objectRef{};
+    objectRef.mObj = object;
+    objectRef.mType = object ? object->GetClass() : sEntityType;
+    result.SetUnowned(objectRef, 0u);
+  }
+
+  /**
+   * Address: 0x006779E0 (FUN_006779E0)
+   *
+   * What it does:
+   * Initializes Entity storage for serializer-owned construction paths and
+   * links the entity node into `Sim::mCoordEntities`.
+   */
+  Entity::Entity(Sim* sim, const std::uint32_t collisionBucketFlags)
+    : CTask(nullptr, false)
+  {
+    std::memset(pad_011E, 0, sizeof(pad_011E));
+    std::memset(pad_0120, 0, sizeof(pad_0120));
+    std::memset(pad_0174, 0, sizeof(pad_0174));
+    std::memset(pad_01BB, 0, sizeof(pad_01BB));
+    std::memset(pad_01ED, 0, sizeof(pad_01ED));
+    std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
+    std::memset(pad_0258, 0, sizeof(pad_0258));
+
+    mCollisionCellSpan.mCellStartX = 0u;
+    mCollisionCellSpan.mCellStartZ = 0u;
+    mCollisionCellSpan.mCellWidth = 0u;
+    mCollisionCellSpan.mCellHeight = 0u;
+    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
+    mCollisionCellSpan.mReserved0C = 0u;
+    mCollisionCellSpan.mBucketFlags = collisionBucketFlags;
+
+    mCoordNode.ListUnlink();
+
+    id_ = static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid));
+    BluePrint = nullptr;
+    mTickCreated = 0u;
+    mReserved74 = 0u;
+
+    mMeshRef = {};
+    mMeshTypeClassId = 0;
+
+    mDrawScaleX = 1.0f;
+    mDrawScaleY = 1.0f;
+    mDrawScaleZ = 1.0f;
+
+    Health = 0.0f;
+    MaxHealth = 0.0f;
+    BeingBuilt = 0u;
+    Dead = 0u;
+    DirtySyncState = 0u;
+    mDestroyedByKill = 0u;
+
+    Orientation = {1.0f, 0.0f, 0.0f, 0.0f};
+    Position = {0.0f, 0.0f, 0.0f};
+    PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
+    PrevPosition = {0.0f, 0.0f, 0.0f};
+    mVelocityScale = 0.0f;
+    FractionCompleted = 0.0f;
+
+    mVisibilityState = 0u;
+    mFootprintLayer = 0;
+    mCurrentLayer = LAYER_None;
+    mUseAltFootprint = 0u;
+    mUseAltFootprintSecondary = 0u;
+
+    SimulationRef = sim;
+    ArmyRef = nullptr;
+
+    PendingOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
+    PendingPosition = {0.0f, 0.0f, 0.0f};
+    mPositionHistory = nullptr;
+    mPendingVelocityScale = 0.0f;
+    CollisionExtents = nullptr;
+
+    mAttachedEntities.clear();
+    mAttachInfo = SEntAttachInfo::MakeDetached();
+
+    mQueueRelinkBlocked = 0u;
+    DestroyQueuedFlag = 0u;
+    mOnDestroyDispatched = 0u;
+    mIntelManager = nullptr;
+    mVisibilityLayerFriendly = 2;
+    mVisibilityLayerEnemy = 2;
+    mVisibilityLayerNeutral = 2;
+    mVisibilityLayerDefault = 2;
+    mInterfaceCreated = 0u;
+    readinessFlags = 0;
+    mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
+    mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
+    mMotor = nullptr;
+
+    if (sim != nullptr) {
+      mCoordNode.ListLinkBefore(&sim->mCoordEntities);
+    }
+  }
+
+  /**
    * Address: 0x00677C90 (FUN_00677C90)
    *
    * What it does:
@@ -944,8 +1115,7 @@ namespace moho
     mCollisionCellSpan.mCellStartZ = 0u;
     mCollisionCellSpan.mCellWidth = 0u;
     mCollisionCellSpan.mCellHeight = 0u;
-    mCollisionCellSpan.mSpatialGrid =
-      (sim && sim->mOGrid) ? reinterpret_cast<EntityCollisionSpatialGrid*>(&sim->mOGrid->entityGrid) : nullptr;
+    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
     mCollisionCellSpan.mReserved0C = 0u;
     mCollisionCellSpan.mBucketFlags = collisionBucketFlags;
 
@@ -1010,6 +1180,100 @@ namespace moho
 
     BluePrint = blueprint;
     StandardInit(sim, entityId);
+  }
+
+  /**
+   * Address: 0x00677F40 (FUN_00677F40, ??0Entity@Moho@@QAE@ABVLuaObject@LuaPlus@@PAVSim@1@VEntId@1@H@Z)
+   *
+   * LuaPlus::LuaObject const &,Moho::Sim *,Moho::EntId
+   *
+   * IDA signature:
+   * LuaPlus::LuaObject *__userpurge Moho::Entity::Entity@<eax>(Moho::Sim *a1@<edi>, LuaPlus::LuaObject *result, LuaPlus::LuaObject *a2, unsigned int a4);
+   *
+   * What it does:
+   * Initializes Entity base state for Lua-side spawned entities, applies the
+   * default collision bucket mask `0x800`, then binds the provided Lua object.
+   */
+  Entity::Entity(const LuaPlus::LuaObject& luaObject, Sim* sim, const EntId entityId)
+    : CTask(nullptr, false)
+  {
+    std::memset(pad_011E, 0, sizeof(pad_011E));
+    std::memset(pad_0120, 0, sizeof(pad_0120));
+    std::memset(pad_0174, 0, sizeof(pad_0174));
+    std::memset(pad_01BB, 0, sizeof(pad_01BB));
+    std::memset(pad_01ED, 0, sizeof(pad_01ED));
+    std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
+    std::memset(pad_0258, 0, sizeof(pad_0258));
+
+    mCollisionCellSpan.mCellStartX = 0u;
+    mCollisionCellSpan.mCellStartZ = 0u;
+    mCollisionCellSpan.mCellWidth = 0u;
+    mCollisionCellSpan.mCellHeight = 0u;
+    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
+    mCollisionCellSpan.mReserved0C = 0u;
+    mCollisionCellSpan.mBucketFlags = 0x800u;
+
+    mCoordNode.ListUnlink();
+
+    id_ = static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid));
+    BluePrint = nullptr;
+    mTickCreated = 0u;
+    mReserved74 = 0u;
+
+    mMeshRef = {};
+    mMeshTypeClassId = 0;
+
+    mDrawScaleX = 1.0f;
+    mDrawScaleY = 1.0f;
+    mDrawScaleZ = 1.0f;
+
+    Health = 0.0f;
+    MaxHealth = 0.0f;
+    BeingBuilt = 0u;
+    Dead = 0u;
+    DirtySyncState = 0u;
+    mDestroyedByKill = 0u;
+
+    Orientation = {1.0f, 0.0f, 0.0f, 0.0f};
+    Position = {0.0f, 0.0f, 0.0f};
+    PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
+    PrevPosition = {0.0f, 0.0f, 0.0f};
+    mVelocityScale = 0.0f;
+    FractionCompleted = 0.0f;
+
+    mVisibilityState = 0u;
+    mFootprintLayer = 0;
+    mCurrentLayer = LAYER_None;
+    mUseAltFootprint = 0u;
+    mUseAltFootprintSecondary = 0u;
+
+    SimulationRef = nullptr;
+    ArmyRef = nullptr;
+
+    PendingOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
+    PendingPosition = {0.0f, 0.0f, 0.0f};
+    mPositionHistory = nullptr;
+    mPendingVelocityScale = 1.0f;
+    CollisionExtents = nullptr;
+
+    mAttachInfo = SEntAttachInfo::MakeDetached();
+
+    mQueueRelinkBlocked = 0u;
+    DestroyQueuedFlag = 0u;
+    mOnDestroyDispatched = 0u;
+    mIntelManager = nullptr;
+    mVisibilityLayerFriendly = 2;
+    mVisibilityLayerEnemy = 2;
+    mVisibilityLayerNeutral = 4;
+    mVisibilityLayerDefault = 2;
+    mInterfaceCreated = 0u;
+    readinessFlags = 0;
+    mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
+    mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
+    mMotor = nullptr;
+
+    StandardInit(sim, entityId);
+    SetLuaObject(luaObject);
   }
 
   /**
@@ -1173,6 +1437,29 @@ namespace moho
     }
 
     return static_cast<int>(end - begin);
+  }
+
+  /**
+   * Address: 0x00678CC0 (FUN_00678CC0, Moho::Entity::ResolveBoneIndex)
+   *
+   * What it does:
+   * Resolves one bone-name token through the current SCM skeleton, returning
+   * `-1` when the mesh/skeleton lane is missing.
+   */
+  int Entity::ResolveBoneIndex(const char* const boneName) const
+  {
+    auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj);
+    if (scmResource == nullptr) {
+      return -1;
+    }
+
+    const boost::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
+    const CAniSkel* const skel = skeleton.get();
+    if (skel == nullptr) {
+      return -1;
+    }
+
+    return skel->FindBoneIndex(boneName);
   }
 
   /**
@@ -1341,8 +1628,7 @@ namespace moho
    */
   void Entity::Warp(const VTransform& transform)
   {
-    const EntityTransformPayload pending = ReadEntityTransformPayload(transform);
-    SetPendingTransformAndEnsureCoordLink(*this, pending, 1.0f);
+    SetPendingTransform(transform, 1.0f);
     AdvanceCoords();
     AdvanceCoords();
 
@@ -1354,6 +1640,24 @@ namespace moho
         current.posZ,
       };
       mIntelManager->Update(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
+    }
+  }
+
+  /**
+   * Address: 0x00678E90 (FUN_00678E90, ?SetPendingTransform@Entity@Moho@@QAEXABVVTransform@2@M@Z)
+   *
+   * What it does:
+   * Stores pending transform/scalar and links the coord-node into Sim list
+   * when it is currently detached.
+   */
+  void Entity::SetPendingTransform(const VTransform& transform, const float pendingVelocityScale)
+  {
+    const EntityTransformPayload pending = ReadEntityTransformPayload(transform);
+    WriteEntityTransformPayload(PendingOrientation, PendingPosition, pending);
+    mPendingVelocityScale = pendingVelocityScale;
+
+    if (SimulationRef && mCoordNode.ListIsSingleton()) {
+      mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -1896,9 +2200,155 @@ namespace moho
     mVisibilityState = static_cast<std::uint8_t>(resolvedLayer != static_cast<int>(LAYER_Land));
   }
 
+  /**
+   * Address: 0x00692580 (FUN_00692580, Moho::ENTSCR_ResolveBoneIndex)
+   *
+   * What it does:
+   * Resolves one Lua bone identifier (integer index, string name, or optional
+   * nil lane) into one validated entity bone index.
+   */
+  int ENTSCR_ResolveBoneIndex(
+    Entity* const entity,
+    LuaPlus::LuaStackObject& boneIdentifier,
+    const bool allowNilAndSpecialIndices
+  )
+  {
+    if (!entity || !boneIdentifier.m_state || !boneIdentifier.m_state->m_state) {
+      return -1;
+    }
+
+    LuaPlus::LuaState* const state = boneIdentifier.m_state;
+    lua_State* const rawState = state->m_state;
+    const int stackIndex = boneIdentifier.m_stackIndex;
+
+    if (lua_type(rawState, stackIndex) == LUA_TNUMBER) {
+      if (lua_type(rawState, stackIndex) != LUA_TNUMBER) {
+        boneIdentifier.TypeError("integer");
+      }
+
+      const int boneIndex = static_cast<int>(lua_tonumber(rawState, stackIndex));
+      const int minBoneIndex = allowNilAndSpecialIndices ? -2 : 0;
+      const int boneCount = entity->GetBoneCount();
+      if (boneIndex < minBoneIndex || boneIndex >= boneCount) {
+        LuaPlus::LuaState::Error(
+          state,
+          "Invalid bone index of %d; must be bettern %d (inclusive) and %d (exclusive)",
+          boneIndex,
+          minBoneIndex,
+          boneCount
+        );
+      }
+      return boneIndex;
+    }
+
+    if (lua_isstring(rawState, stackIndex) != 0) {
+      const char* boneName = lua_tostring(rawState, stackIndex);
+      if (!boneName) {
+        boneIdentifier.TypeError("string");
+        boneName = "";
+      }
+
+      const int boneIndex = entity->ResolveBoneIndex(boneName);
+      if (boneIndex < 0) {
+        LuaPlus::LuaState::Error(state, "Invalid bone name \"%s\".", boneIdentifier.GetString());
+      }
+      return boneIndex;
+    }
+
+    if (allowNilAndSpecialIndices) {
+      if (lua_type(rawState, stackIndex) == LUA_TNIL) {
+        return -1;
+      }
+
+      LuaPlus::LuaState::Error(state, "Invalid bone identifier; must be a string or integer");
+      return -1;
+    }
+
+    LuaPlus::LuaState::Error(state, "Invalid bone identifier; must be a string, integer, or nil");
+    return -1;
+  }
+
+  /**
+   * Address: 0x0050B480 (FUN_0050B480, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@ABV?$Vector3@M@3@@Z)
+   *
+   * What it does:
+   * Builds an orientation quaternion whose forward axis follows `direction`,
+   * with fixed fallback quaternions for zero-length and vertical vectors.
+   */
+  Wm3::Quaternionf COORDS_Orient(const Wm3::Vector3f& direction) noexcept
+  {
+    Wm3::Vector3f forward = direction;
+    if (Wm3::Vector3f::Normalize(&forward) == 0.0f) {
+      return Wm3::Quaternionf::Identity();
+    }
+
+    Wm3::Vector3f right{forward.z, 0.0f, -forward.x};
+    if (Wm3::Vector3f::Normalize(&right) == 0.0f) {
+      constexpr float kHalfSqrtTwo = 0.70710677f;
+      const float yLane = direction.y > 0.0f ? -kHalfSqrtTwo : kHalfSqrtTwo;
+      return Wm3::Quaternionf{0.0f, kHalfSqrtTwo, yLane, 0.0f};
+    }
+
+    const Wm3::Vector3f up{
+      (forward.y * right.z) - (forward.z * right.y),
+      (forward.z * right.x) - (right.z * forward.x),
+      (right.y * forward.x) - (forward.y * right.x),
+    };
+
+    const float m00 = right.x;
+    const float m01 = right.y;
+    const float m02 = right.z;
+    const float m10 = up.x;
+    const float m11 = up.y;
+    const float m12 = up.z;
+    const float m20 = forward.x;
+    const float m21 = forward.y;
+    const float m22 = forward.z;
+
+    Wm3::Quaternionf orientation{};
+    const float trace = m00 + m11 + m22;
+    if (trace > 0.0f) {
+      const float s = std::sqrt(trace + 1.0f) * 2.0f;
+      orientation.w = 0.25f * s;
+      orientation.x = (m21 - m12) / s;
+      orientation.y = (m02 - m20) / s;
+      orientation.z = (m10 - m01) / s;
+    } else if (m00 > m11 && m00 > m22) {
+      const float s = std::sqrt(1.0f + m00 - m11 - m22) * 2.0f;
+      orientation.w = (m21 - m12) / s;
+      orientation.x = 0.25f * s;
+      orientation.y = (m01 + m10) / s;
+      orientation.z = (m02 + m20) / s;
+    } else if (m11 > m22) {
+      const float s = std::sqrt(1.0f + m11 - m00 - m22) * 2.0f;
+      orientation.w = (m02 - m20) / s;
+      orientation.x = (m01 + m10) / s;
+      orientation.y = 0.25f * s;
+      orientation.z = (m12 + m21) / s;
+    } else {
+      const float s = std::sqrt(1.0f + m22 - m00 - m11) * 2.0f;
+      orientation.w = (m10 - m01) / s;
+      orientation.x = (m02 + m20) / s;
+      orientation.y = (m12 + m21) / s;
+      orientation.z = 0.25f * s;
+    }
+
+    (void)orientation.Normalize();
+    return orientation;
+  }
+
+  /**
+   * Address: 0x0050AD80 (FUN_0050AD80, ?COORDS_LayerToString@Moho@@YAPBDW4ELayer@1@@Z)
+   *
+   * What it does:
+   * Maps canonical single-layer enum values to their text names and returns an
+   * empty string for mixed-bit layer masks.
+   */
   const char* Entity::LayerToString(const ELayer layer) noexcept
   {
     switch (layer) {
+    case LAYER_None:
+      return "None";
     case LAYER_Land:
       return "Land";
     case LAYER_Seabed:

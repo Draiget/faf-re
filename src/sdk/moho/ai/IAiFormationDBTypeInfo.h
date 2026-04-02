@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0059C3D0 (FUN_0059C3D0, ctor)
+     *
+     * What it does:
+     * Preregisters `IAiFormationDB` RTTI so lookup resolves to this type helper.
+     */
+    IAiFormationDBTypeInfo();
+
+    /**
      * Address: 0x0059C460 (FUN_0059C460, scalar deleting thunk)
      */
     ~IAiFormationDBTypeInfo() override;
@@ -27,4 +35,13 @@ namespace moho
   };
 
   static_assert(sizeof(IAiFormationDBTypeInfo) == 0x64, "IAiFormationDBTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCC190 (FUN_00BCC190)
+   *
+   * What it does:
+   * Constructs startup-owned `IAiFormationDBTypeInfo` storage and installs
+   * process-exit cleanup.
+   */
+  int register_IAiFormationDBTypeInfo();
 } // namespace moho

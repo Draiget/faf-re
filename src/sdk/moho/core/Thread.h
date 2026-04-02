@@ -22,48 +22,58 @@ namespace moho
     | 0x000003FF;                                            // thread-specific rights bits [0..9]
 
   /**
-   * Address: 0x100119F0
+   * Address: 0x00413AA0 (FUN_00413AA0)
    *
-   * @return
+   * What it does:
+   * Captures the current thread id as the process main-thread lane used by
+   * thread-invoke helpers.
    */
   void THREAD_InitInvoke();
 
   /**
-   * Address: 0x10011A00
+   * Address: 0x00413AB0 (FUN_00413AB0)
    *
-   * @return
+   * What it does:
+   * Returns true when called from the thread captured by
+   * `THREAD_InitInvoke()`.
    */
   bool THREAD_IsMainThread();
 
   /**
-   * Address: 0x10011A20
+   * Address: 0x00413AD0 (FUN_00413AD0)
    *
-   * @return
+   * What it does:
+   * Returns the cached main-thread id lane.
    */
   uint32_t THREAD_GetMainThreadId();
 
   /**
-   * Address: 0x10011AC0
+   * Address: 0x00413B70 (FUN_00413B70)
    *
-   * @param function
-   * @param threadId
-   * @return
+   * boost::function<void(),std::allocator<void>>,uint32_t
+   *
+   * What it does:
+   * Clones one callback and queues it as an APC to the resolved target thread.
    */
-  void THREAD_InvokeAsync(const boost::function<void(), std::allocator<void>>& fn, uint32_t threadId);
+  void THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, uint32_t threadId);
 
   /**
-   * Address: 0x10011BA0
+   * Address: 0x00413C50 (FUN_00413C50)
    *
-   * @param function
-   * @param threadId
-   * @return
+   * boost::function<void(),std::allocator<void>>,uint32_t
+   *
+   * What it does:
+   * Queues one callback as APC and blocks until the callback signals
+   * completion.
    */
-  void THREAD_InvokeWait(const boost::function<void(), std::allocator<void>>& fn, uint32_t threadId);
+  void THREAD_InvokeWait(boost::function<void(), std::allocator<void>> fn, uint32_t threadId);
 
   /**
-   * Address: 0x10012100
+   * Address: 0x004141A0 (FUN_004141A0)
    *
-   * @return
+   * What it does:
+   * Pins the current thread to one processor selected from the current process
+   * affinity mask.
    */
   void THREAD_SetAffinity(bool preferLowest) noexcept;
 
@@ -125,7 +135,11 @@ namespace moho
   };
 
   /**
-   * APC thunk: run payload->fn(), signal waiter (if any), destroy heap blocks.
+   * Address: 0x00413AE0 (FUN_00413AE0)
+   *
+   * What it does:
+   * APC thunk that runs one queued callback payload, signals optional waiting
+   * context, and releases heap payload storage.
    */
   VOID CALLBACK pfnAPC(ULONG_PTR dwData);
 

@@ -2,34 +2,146 @@
 
 #include <cstdint>
 #include <exception>
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
 
 using namespace moho;
 
 gpg::RType* CScriptObject::sType = nullptr;
+gpg::RType* CScriptObject::sPointerType = nullptr;
 
 namespace
 {
-  gpg::RType* GetCScriptObjectPointerType()
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CScriptObject*));
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
     }
-    return cached;
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
+  }
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
   }
 
   gpg::RRef MakeCScriptObjectPointerRef(CScriptObject* scriptObject)
   {
     gpg::RRef ref{};
     ref.mObj = scriptObject;
-    ref.mType = GetCScriptObjectPointerType();
+    ref.mType = CScriptObject::GetPointerType();
     return ref;
+  }
+
+  [[nodiscard]]
+  LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* const fieldName)
+  {
+    LuaPlus::LuaObject out;
+    if (!tableObject.IsTable()) {
+      return out;
+    }
+
+    LuaPlus::LuaState* const state = tableObject.GetActiveState();
+    if (!state) {
+      return out;
+    }
+
+    lua_State* const lstate = state->GetCState();
+    if (!lstate) {
+      return out;
+    }
+
+    const int stackTop = lua_gettop(lstate);
+    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
+    lua_pushstring(lstate, fieldName ? fieldName : "");
+    lua_gettable(lstate, -2);
+    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
+    lua_settop(lstate, stackTop);
+    return out;
+  }
+
+  [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
+  {
+    gpg::RRef out{};
+    if (!userDataObject.IsUserData()) {
+      return out;
+    }
+
+    lua_State* const lstate = userDataObject.GetActiveCState();
+    if (!lstate) {
+      return out;
+    }
+
+    const int stackTop = lua_gettop(lstate);
+    const_cast<LuaPlus::LuaObject&>(userDataObject).PushStack(lstate);
+    void* const rawUserData = lua_touserdata(lstate, -1);
+    if (rawUserData) {
+      out = *static_cast<gpg::RRef*>(rawUserData);
+    }
+    lua_settop(lstate, stackTop);
+    return out;
+  }
+
+  [[nodiscard]] CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
+  {
+    LuaPlus::LuaObject payload(object);
+    if (payload.IsTable()) {
+      payload = GetTableFieldByName(payload, "_c_object");
+    }
+
+    if (!payload.IsUserData()) {
+      return nullptr;
+    }
+
+    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
+    if (!userDataRef.mObj) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CScriptObject::GetPointerType());
+    return static_cast<CScriptObject**>(upcast.mObj);
+  }
+
+  void ClearWeakObjectChain(WeakObject& weakObject) noexcept
+  {
+    auto* cursor = reinterpret_cast<WeakObject::WeakLinkNodeView**>(weakObject.WeakLinkHeadSlot());
+    while (cursor && *cursor) {
+      WeakObject::WeakLinkNodeView* const node = *cursor;
+      *cursor = node->nextInOwner;
+      node->ownerLinkSlot = nullptr;
+      node->nextInOwner = nullptr;
+    }
+  }
+
+  gpg::RType* CachedLuaObjectType()
+  {
+    gpg::RType* cached = LuaPlus::LuaObject::sType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(LuaPlus::LuaObject));
+      LuaPlus::LuaObject::sType = cached;
+    }
+    return cached;
   }
 
   LuaPlus::LuaObject GetScriptObjectMetatable(LuaPlus::LuaState* state)
@@ -81,12 +193,41 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x004C7DC0 (FUN_004C7DC0, Moho::InstanceCounter<Moho::CScriptObject>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for CScriptObject
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CScriptObject>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  if (!engineStats) {
+    return nullptr;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CScriptObject).name());
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
+
+/**
  * Address: 0x004C6F70 (??0CScriptObject@Moho@@IAE@XZ)
  *
  * What it does:
- * Default-initializes CScriptObject storage without Lua factory binding.
+ * Initializes weak-link storage and tracks CScriptObject instance count.
  */
-CScriptObject::CScriptObject() = default;
+CScriptObject::CScriptObject()
+{
+  weakLinkHead_ = 0u;
+  AddStatCounter(InstanceCounter<CScriptObject>::GetStatItem(), 1);
+}
 
 /**
  * Address: 0x004C7010 (??0CScriptObject@Moho@@IAE@ABVLuaObject@LuaPlus@@000@Z)
@@ -105,12 +246,71 @@ CScriptObject::CScriptObject(
   CreateLuaObject(metaOrFactory, arg1, arg2, arg3);
 }
 
+/**
+ * Address: 0x004C7340 (FUN_004C7340, Moho::CScriptObject::~CScriptObject)
+ *
+ * What it does:
+ * Clears Lua `_c_object` back-reference, decrements tracked instance count,
+ * and unlinks all intrusive weak-reference nodes owned by this object.
+ */
+CScriptObject::~CScriptObject()
+{
+  if (cObject.m_state) {
+    CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(cObject);
+    if (scriptObjectSlot) {
+      *scriptObjectSlot = nullptr;
+    }
+  }
+
+  AddStatCounter(InstanceCounter<CScriptObject>::GetStatItem(), -1);
+  ClearWeakObjectChain(*static_cast<WeakObject*>(this));
+}
+
 gpg::RType* CScriptObject::StaticGetClass()
 {
   if (!sType) {
     sType = gpg::LookupRType(typeid(CScriptObject));
   }
   return sType;
+}
+
+/**
+ * Address: 0x004C8530 (FUN_004C8530, Moho::CScriptObject::GetPointerType)
+ */
+gpg::RType* CScriptObject::GetPointerType()
+{
+  gpg::RType* cached = sPointerType;
+  if (!cached) {
+    cached = gpg::LookupRType(typeid(CScriptObject*));
+    sPointerType = cached;
+  }
+  return cached;
+}
+
+/**
+ * Address: 0x004C8DC0 (FUN_004C8DC0, Moho::CScriptObject::MemberDeserialize)
+ */
+void CScriptObject::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  gpg::RRef ownerRef{};
+  gpg::RType* luaObjectType = CachedLuaObjectType();
+  archive->Read(luaObjectType, &cObject, ownerRef);
+
+  luaObjectType = CachedLuaObjectType();
+  archive->Read(luaObjectType, &mLuaObj, ownerRef);
+}
+
+/**
+ * Address: 0x004C8E40 (FUN_004C8E40, Moho::CScriptObject::MemberSerialize)
+ */
+void CScriptObject::MemberSerialize(gpg::WriteArchive* const archive)
+{
+  gpg::RRef ownerRef{};
+  gpg::RType* luaObjectType = CachedLuaObjectType();
+  archive->Write(luaObjectType, &cObject, ownerRef);
+
+  luaObjectType = CachedLuaObjectType();
+  archive->Write(luaObjectType, &mLuaObj, ownerRef);
 }
 
 /**

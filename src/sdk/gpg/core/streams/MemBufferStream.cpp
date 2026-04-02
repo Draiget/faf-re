@@ -252,20 +252,20 @@ void MemBufferStream::VirtFlush()
  * What it does:
  * Returns current read/write offset based on mode (`ModeReceive` or `ModeSend`).
  */
-size_t MemBufferStream::VirtTell(const Mode mode)
+std::uint64_t MemBufferStream::VirtTell(const Mode mode)
 {
     if (mode == ModeReceive) {
         if (mReadHead == nullptr || mReadStart == nullptr) {
             return 0;
         }
-        return static_cast<size_t>(mReadHead - mReadStart);
+        return static_cast<std::uint64_t>(mReadHead - mReadStart);
     }
 
     if (mode == ModeSend) {
         if (mWriteHead == nullptr || mWriteStart == nullptr) {
             return 0;
         }
-        return static_cast<size_t>(mWriteHead - mWriteStart);
+        return static_cast<std::uint64_t>(mWriteHead - mWriteStart);
     }
 
     throw std::invalid_argument(kTellInvalidMode);
@@ -341,11 +341,11 @@ void MemBufferStream::Resize(const std::uint64_t size)
  * What it does:
  * Seeks read/write cursors by mode and origin, growing writable storage and zero-filling gaps when needed.
  */
-size_t MemBufferStream::VirtSeek(const Mode mode, const SeekOrigin origin, const size_t pos)
+std::uint64_t MemBufferStream::VirtSeek(const Mode mode, const SeekOrigin origin, const std::int64_t pos)
 {
     SyncReadEndWithWriteHead();
 
-    const std::int64_t offset = static_cast<std::int64_t>(static_cast<std::int32_t>(pos));
+    const std::int64_t offset = pos;
     const std::int64_t currentReadOffset = (mReadHead != nullptr && mReadStart != nullptr)
         ? static_cast<std::int64_t>(mReadHead - mReadStart)
         : 0;
@@ -421,7 +421,7 @@ size_t MemBufferStream::VirtSeek(const Mode mode, const SeekOrigin origin, const
 
     mWriteHead = (mWriteStart != nullptr) ? (mWriteStart + static_cast<std::size_t>(writePos)) : nullptr;
     mReadHead = (mReadStart != nullptr) ? (mReadStart + static_cast<std::size_t>(readPos)) : nullptr;
-    return static_cast<size_t>(returnPos);
+    return static_cast<std::uint64_t>(returnPos);
 }
 
 /**

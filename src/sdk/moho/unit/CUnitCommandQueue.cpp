@@ -1,13 +1,72 @@
 #include "CUnitCommandQueue.h"
 
 #include <cstddef>
+#include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+
+  class SerSaveConstructArgsResult
+  {
+  public:
+    void SetUnowned(unsigned int value);
+  };
+} // namespace gpg
+
 namespace
 {
+  gpg::RType* gQueueBaseType = nullptr;
+  gpg::RType* gQueueWeakCommandVectorType = nullptr;
+  gpg::RType* gQueueCommandTypeEnumType = nullptr;
+  gpg::RType* gQueueUnitType = nullptr;
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cache)
+  {
+    if (cache == nullptr) {
+      cache = gpg::LookupRType(typeid(TObject));
+    }
+    GPG_ASSERT(cache != nullptr);
+    return cache;
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject* ReadTrackedPointerAs(gpg::ReadArchive& archive, gpg::RType*& cache)
+  {
+    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(&archive, gpg::RRef{});
+    if (tracked.object == nullptr) {
+      return nullptr;
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCachedType<TObject>(cache));
+    return static_cast<TObject*>(upcast.mObj);
+  }
+
+  [[nodiscard]] gpg::RRef MakeQueueRef(CUnitCommandQueue* const queue)
+  {
+    gpg::RRef out{};
+    out.mObj = queue;
+    out.mType = CUnitCommandQueue::StaticGetClass();
+    return out;
+  }
+
   void RefreshQueueHeadType(CUnitCommandQueue& queue)
   {
     if (queue.mCommandVec.empty()) {
@@ -66,6 +125,122 @@ namespace
     commandVec = msvc8::vector<WeakPtr<CUnitCommand>>{};
   }
 } // namespace
+
+gpg::RType* CUnitCommandQueue::sType = nullptr;
+
+/**
+ * Address: 0x006A4CD0 (FUN_006A4CD0, ??0CUnitCommandQueue@Moho@@QAE@PAVUnit@1@@Z)
+ *
+ * What it does:
+ * Initializes queue owner pointer, command lanes, and queue-head state.
+ */
+CUnitCommandQueue::CUnitCommandQueue(Unit* const unit)
+  : mUnit(unit)
+  , mCommandVec()
+  , mCommandType(EUnitCommandType::UNITCOMMAND_None)
+  , unk0(0)
+  , mNeedsRefresh(true)
+  , pad_25{0u, 0u, 0u}
+{}
+
+/**
+ * Address: 0x006A4D40 (FUN_006A4D40, ??1CUnitCommandQueue@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Clears queued commands, releases weak-command storage, and unlinks the
+ * queue from broadcaster intrusive lanes.
+ */
+CUnitCommandQueue::~CUnitCommandQueue()
+{
+  ClearCommandQueue();
+  ReleaseCommandVectorStorage(mCommandVec);
+  ListUnlink();
+}
+
+/**
+ * Address: 0x006EE8C0 (FUN_006EE8C0,
+ * ?MemberSaveConstructArgs@CUnitCommandQueue@Moho@@AAEXAAVWriteArchive@gpg@@HABVRRef@4@AAVSerSaveConstructArgsResult@4@@Z)
+ *
+ * What it does:
+ * Saves construct payload (`Unit*` owner) as unowned tracked-pointer data.
+ */
+void CUnitCommandQueue::MemberSaveConstructArgs(
+  gpg::WriteArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerSaveConstructArgsResult& result
+)
+{
+  gpg::RRef unitRef{};
+  unitRef.mObj = mUnit;
+  unitRef.mType = mUnit ? ResolveCachedType<Unit>(gQueueUnitType) : nullptr;
+  gpg::WriteRawPointer(&archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  result.SetUnowned(0u);
+}
+
+/**
+ * Address: 0x006EEAC0 (FUN_006EEAC0,
+ * ?MemberConstruct@CUnitCommandQueue@Moho@@CAXAAVReadArchive@gpg@@HABVRRef@4@AAVSerConstructResult@4@@Z)
+ *
+ * What it does:
+ * Reads construct payload and allocates one `CUnitCommandQueue`.
+ */
+void CUnitCommandQueue::MemberConstruct(
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef&,
+  gpg::SerConstructResult& result
+)
+{
+  Unit* const ownerUnit = ReadTrackedPointerAs<Unit>(archive, gQueueUnitType);
+  CUnitCommandQueue* const queue = new (std::nothrow) CUnitCommandQueue(ownerUnit);
+  result.SetUnowned(MakeQueueRef(queue), 0u);
+}
+
+/**
+ * Address: 0x006F9690 (FUN_006F9690, sub_6F9690)
+ *
+ * What it does:
+ * Loads queue base/vector/type lanes and marks UI refresh state dirty.
+ */
+void CUnitCommandQueue::MemberDeserialize(gpg::ReadArchive& archive)
+{
+  gpg::RRef ownerRef{};
+  archive.Read(ResolveCachedType<Broadcaster>(gQueueBaseType), this, ownerRef);
+  archive.Read(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
+  archive.Read(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
+
+  unsigned int decodedCounter = 0u;
+  archive.ReadUInt(&decodedCounter);
+  unk0 = static_cast<std::int32_t>(decodedCounter);
+  mNeedsRefresh = true;
+}
+
+/**
+ * Address: 0x006F9750 (FUN_006F9750, sub_6F9750)
+ *
+ * What it does:
+ * Saves queue base/vector/type lanes and queue local counter lane.
+ */
+void CUnitCommandQueue::MemberSerialize(gpg::WriteArchive& archive) const
+{
+  gpg::RRef ownerRef{};
+  archive.Write(ResolveCachedType<Broadcaster>(gQueueBaseType), this, ownerRef);
+  archive.Write(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
+  archive.Write(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
+  archive.WriteUInt(static_cast<unsigned int>(unk0));
+}
+
+/**
+ * Address: 0x006EDAA0 (FUN_006EDAA0, constructor preregisters RTTI)
+ *
+ * What it does:
+ * Resolves/refetches reflection descriptor for CUnitCommandQueue.
+ */
+gpg::RType* CUnitCommandQueue::StaticGetClass()
+{
+  return ResolveCachedType<CUnitCommandQueue>(sType);
+}
 
 /**
  * Address: 0x006EDD30 (FUN_006EDD30)

@@ -1,84 +1,155 @@
 #include "LuaTableIterator.h"
 
-#include "LuaObject.h"
+#include "LuaAssertion.h"
+
 using namespace LuaPlus;
 
-LuaTableIterator::LuaTableIterator(LuaObject* table, int reset) {
-	m_table = table;
-	m_isDone = false;
-
-	if (!table || !table->m_state || !table->IsTable()) {
-		m_isDone = true;
-		m_L = nullptr;
-		m_tableIndex = 0;
-		return;
-	}
-
-	LuaState* state = table->m_state;
-	m_L = state->m_state;
-
-	// Push table onto stack
-	table->PushStack(m_L);
-	m_tableIndex = lua_gettop(m_L);
-
-	// Push nil to start iteration
-	lua_pushnil(m_L);
-
-	// Try to get first key-value pair
-	if (lua_next(m_L, m_tableIndex) == 0) {
-		m_isDone = true;
-	}
-}
-
-LuaTableIterator::~LuaTableIterator() {
-	if (m_L && m_tableIndex > 0) {
-		// Clean up: if we're not done, pop the value and key
-		if (!m_isDone) {
-			lua_pop(m_L, 2); // pop value and key
+namespace
+{
+	[[nodiscard]]
+	bool LuaTableIteratorNext(
+		LuaState* const state,
+		LuaObject* const tableObj,
+		LuaObject* const keyObj,
+		LuaObject* const valueObj)
+	{
+		if (state == nullptr || tableObj == nullptr || keyObj == nullptr || valueObj == nullptr) {
+			return false;
 		}
-		// Pop the table
-		lua_settop(m_L, m_tableIndex - 1);
+
+		lua_State* const cState = state->GetCState();
+		if (cState == nullptr) {
+			return false;
+		}
+
+		const int32_t oldTop = lua_gettop(cState);
+		tableObj->PushStack(cState);
+		keyObj->PushStack(cState);
+		if (lua_next(cState, -2) == 0) {
+			lua_settop(cState, oldTop);
+			return false;
+		}
+
+		keyObj->m_object = *(cState->top - 2);
+		valueObj->m_object = *(cState->top - 1);
+		lua_settop(cState, oldTop);
+		return true;
+	}
+
+	[[noreturn]]
+	void ThrowInvalidIteratorState()
+	{
+		throw LuaAssertion("IsValid()");
 	}
 }
 
-LuaObject LuaTableIterator::GetKey() const {
-	if (m_isDone || !m_L) {
-		return {};
-	}
-
-	// Key is at stack index -2 (relative to top)
-	LuaObject key;
-	key.m_state = m_table->m_state;
-	// Access TObject directly from the stack
-	const StkId keySlot = m_L->top - 2;
-	key.m_object = *keySlot;
-	return key;
-}
-
-LuaObject LuaTableIterator::GetValue() const {
-	if (m_isDone || !m_L) {
-		return {};
-	}
-
-	// Value is at stack index -1 (top of stack)
-	LuaObject value;
-	value.m_state = m_table->m_state;
-	// Access TObject directly from the stack
-	const StkId valueSlot = m_L->top - 1;
-	value.m_object = *valueSlot;
-	return value;
-}
-
-void LuaTableIterator::Next() {
-	if (m_isDone || !m_L) {
+/**
+ * Address: 0x00457A40 (FUN_00457A40)
+ */
+LuaTableIterator::LuaTableIterator(LuaObject* const tableObj, const int doReset)
+	: m_tableObj(tableObj),
+	  m_keyObj(tableObj != nullptr ? tableObj->m_state : nullptr),
+	  m_valueObj(tableObj != nullptr ? tableObj->m_state : nullptr),
+	  m_isDone(false),
+	  m_pad2D{ 0, 0, 0 }
+{
+	if (m_tableObj == nullptr || !m_tableObj->IsTable()) {
+		if (m_tableObj != nullptr) {
+			m_tableObj->TypeError("iterate");
+		}
+		m_isDone = true;
 		return;
 	}
 
-	// Pop the value, keep the key for lua_next
-	lua_pop(m_L, 1);
-
-	// Get next key-value pair
-	if (lua_next(m_L, m_tableIndex) == 0) {
-		m_isDone = true;
+	if (doReset != 0) {
+		m_keyObj.AssignNil(m_tableObj->m_state);
+		if (!LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj)) {
+			m_isDone = true;
+		}
 	}
+}
+
+/**
+ * Address: 0x00457B10 (FUN_00457B10)
+ */
+LuaTableIterator::~LuaTableIterator() = default;
+
+/**
+ * Address: 0x00457B60 (FUN_00457B60)
+ */
+bool LuaTableIterator::Reset()
+{
+	if (m_tableObj == nullptr || m_tableObj->m_state == nullptr) {
+		m_isDone = true;
+		return false;
+	}
+
+	m_keyObj.AssignNil(m_tableObj->m_state);
+	const bool hasNext = LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj);
+	m_isDone = !hasNext;
+	return hasNext;
+}
+
+/**
+ * Address: 0x00457BA0 (FUN_00457BA0)
+ */
+bool LuaTableIterator::Next()
+{
+	if (m_isDone) {
+		ThrowInvalidIteratorState();
+	}
+
+	if (LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj)) {
+		return true;
+	}
+
+	m_isDone = true;
+	return false;
+}
+
+/**
+ * Address: 0x00457C00 (FUN_00457C00)
+ */
+bool LuaTableIterator::IsValid() const
+{
+	return !m_isDone;
+}
+
+/**
+ * Address: 0x00457C20 (FUN_00457C20)
+ */
+LuaTableIterator::operator bool() const
+{
+	return !m_isDone;
+}
+
+/**
+ * Address: 0x00457C10 (FUN_00457C10)
+ */
+LuaTableIterator& LuaTableIterator::operator++()
+{
+	Next();
+	return *this;
+}
+
+/**
+ * Address: 0x004A4F30 (FUN_004A4F30)
+ */
+LuaObject& LuaTableIterator::GetKey()
+{
+	if (m_isDone) {
+		ThrowInvalidIteratorState();
+	}
+	return m_keyObj;
+}
+
+/**
+ * Address: 0x00457C30 (FUN_00457C30)
+ */
+LuaObject& LuaTableIterator::GetValue()
+{
+	if (m_isDone) {
+		ThrowInvalidIteratorState();
+	}
+	return m_valueObj;
 }

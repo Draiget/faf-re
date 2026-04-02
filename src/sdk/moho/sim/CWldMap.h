@@ -23,6 +23,7 @@ namespace moho
 {
   class CBackgroundTaskControl;
   class ID3DTextureSheet;
+  class IWldTerrainRes;
 
   struct CWldPropEntry
   {
@@ -53,6 +54,22 @@ namespace moho
   static_assert(offsetof(CWldProps, mEntriesEnd) == 0x08, "CWldProps::mEntriesEnd offset must be 0x08");
   static_assert(offsetof(CWldProps, mEntriesCapacityEnd) == 0x0C, "CWldProps::mEntriesCapacityEnd offset must be 0x0C");
   static_assert(sizeof(CWldProps) == 0x10, "CWldProps size must be 0x10");
+
+  /**
+   * Address: 0x00892210 (FUN_00892210, ?WLD_CreateProps@Moho@@YAPAVCWldProps@1@XZ)
+   *
+   * What it does:
+   * Allocates one `CWldProps` object and clears entry-storage pointer lanes.
+   */
+  [[nodiscard]] CWldProps* WLD_CreateProps();
+
+  /**
+   * Address: 0x008A7B90 (FUN_008A7B90, ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
+   *
+   * What it does:
+   * Allocates one terrain-resource instance used by world map load/new flows.
+   */
+  [[nodiscard]] IWldTerrainRes* WLD_CreateTerrainRes();
 
   struct RWldMapPreviewChunk
   {
@@ -131,6 +148,16 @@ namespace moho
   {
   public:
     virtual ~IWldTerrainRes() = default;
+
+    /**
+     * Address: 0x008A1700 (CWldTerrainRes::Load implementation path)
+     *
+     * What it does:
+     * Loads terrain map data from stream payload and initializes runtime
+     * terrain state for the active world map.
+     */
+    [[nodiscard]]
+    virtual bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl) = 0;
 
     /**
      * Address: 0x0089E710 (FUN_0089E710, ?GetPlayableMapRect@IWldTerrainRes@Moho@@UBE?AV?$Rect2@H@gpg@@XZ)

@@ -67,7 +67,10 @@ namespace moho
     /**
      * Releases lists, socket/event, packet pool, NAT provider weak_ptr.
      *
-     * Address: 0x004899E0
+     * Address: 0x004899E0 (FUN_004899E0, deleting wrapper)
+     * Address: 0x00489BC0 (FUN_00489BC0)
+     * Address: 0x10083420 (sub_10083420, deleting wrapper)
+     * Address: 0x10083600 (sub_10083600, non-deleting destructor)
      * Slot: 0
      * Demangled: Moho::CNetUDPConnector::dtr
      */
@@ -90,6 +93,7 @@ namespace moho
      * 4) sets a "stopping" flag and signals worker event
      *
      * Address: 0x00489D20
+     * Address: 0x10083760 (sub_10083760)
      * Slot: 1
      * Demangled: Moho::CNetUDPConnector::Destroy
      */
@@ -108,6 +112,7 @@ namespace moho
 
     /**
      * Address: 0x0048B250
+     * Address: 0x10084C10 (sub_10084C10)
      * Slot: 3
      * Demangled: Moho::CNetUDPConnector::GetLocalPort
      */
@@ -127,6 +132,7 @@ namespace moho
 
     /**
      * Address: 0x0048B410
+     * Address: 0x10084DD0 (sub_10084DD0)
      * Slot: 5
      * Demangled: Moho::CNetUDPConnector::FindNextAddr
      */
@@ -134,6 +140,7 @@ namespace moho
 
     /**
      * Address: 0x0048B4F0
+     * Address: 0x10084EB0 (sub_10084EB0)
      * Slot: 6
      * Demangled: Moho::CNetUDPConnector::Accept
      */
@@ -141,6 +148,7 @@ namespace moho
 
     /**
      * Address: 0x0048B500
+     * Address: 0x10084EC0 (sub_10084EC0)
      * Slot: 7
      * Demangled: Moho::CNetUDPConnector::Reject
      */
@@ -159,6 +167,7 @@ namespace moho
 
     /**
      * Address: 0x0048B7F0
+     * Address: 0x100851A0 (sub_100851A0)
      * Slot: 9
      * Demangled: Moho::CNetUDPConnector::Push
      */
@@ -166,6 +175,7 @@ namespace moho
 
     /**
      * Address: 0x0048B9A0
+     * Address: 0x10085340 (sub_10085340)
      * Slot: 10
      * Demangled: Moho::CNetUDPConnector::SelectEvent
      */
@@ -207,12 +217,13 @@ namespace moho
     static int32_t ChooseTimeout(int32_t current, int32_t choice);
 
     /**
-     * Address: 0x0048A288 (FUN_0048A288)
+     * Address: 0x0048A280 (FUN_0048A280)
+     * Address: 0x0048A288 (SEH-prologue label inside FUN_0048A280)
      *
      * What it does:
      * Receives and dispatches UDP packets, recycling unconsumed buffers.
      */
-    int64_t ReceiveData();
+    void ReceiveData();
 
     /**
      * Address: 0x0048AA40 (FUN_0048AA40)
@@ -232,7 +243,7 @@ namespace moho
      * @param payload
      * @param payloadLen
      */
-    MOHO_FORCEINLINE void LogPacket(
+    void LogPacket(
       int direction,
       std::int64_t timestampUs,
       std::uint32_t addressHost,
@@ -240,6 +251,22 @@ namespace moho
       const void* payload,
       int payloadLen
     );
+
+    /**
+     * Address: 0x00485C10 (FUN_00485C10)
+     *
+     * What it does:
+     * Signals this connector's socket wake event.
+     */
+    bool SignalSocketEvent() noexcept;
+
+    /**
+     * Address: 0x00485C20 (FUN_00485C20)
+     *
+     * What it does:
+     * Relinks a connection's intrusive node to the front of connector list.
+     */
+    CNetUDPConnection& RelinkConnectionToFront(CNetUDPConnection& connection) noexcept;
 
     /**
      * Address: 0x00489ED0
@@ -282,8 +309,9 @@ namespace moho
 
   public:
     /**
-     * Address: 00489ED0
-     * @param packet
+     * Helper alias used by recovered callsites that map to `DisposePacket`.
+     *
+     * No standalone FA symbol; behavior is FA `0x00489ED0` (`DisposePacket`).
      */
     void AddPacket(SNetPacket* packet);
 

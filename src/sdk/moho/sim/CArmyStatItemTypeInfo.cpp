@@ -8,6 +8,8 @@
 
 namespace
 {
+  moho::CArmyStatItemTypeInfo gCArmyStatItemTypeInfo;
+
   [[nodiscard]] gpg::RRef MakeCArmyStatItemRef(moho::CArmyStatItem* const object)
   {
     gpg::RRef out{};
@@ -19,6 +21,30 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x0070B610 (FUN_0070B610, sub_70B610)
+   *
+   * IDA signature:
+   * gpg::RType *sub_70B610();
+   */
+  CArmyStatItemTypeInfo::CArmyStatItemTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CArmyStatItem), this);
+  }
+
+  /**
+   * Address: 0x00BDA100 (FUN_00BDA100, sub_BDA100)
+   *
+   * What it does:
+   * Forces CArmyStatItem RTTI preregistration bootstrap and mirrors CRT
+   * startup registration shape.
+   */
+  void register_CArmyStatItemTypeInfo()
+  {
+    (void)gCArmyStatItemTypeInfo;
+  }
+
   /**
    * Address: 0x0070B6C0 (FUN_0070B6C0, Moho::CArmyStatItemTypeInfo::dtr)
    */
@@ -113,3 +139,16 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 } // namespace moho
+
+namespace
+{
+  struct CArmyStatItemTypeInfoBootstrap
+  {
+    CArmyStatItemTypeInfoBootstrap()
+    {
+      moho::register_CArmyStatItemTypeInfo();
+    }
+  };
+
+  CArmyStatItemTypeInfoBootstrap gCArmyStatItemTypeInfoBootstrap;
+} // namespace

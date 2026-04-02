@@ -165,12 +165,28 @@ namespace moho
      */
     void ReadFromStream(SOCKET socket, u_long address, u_short port, gpg::PipeStream& stream);
 
-  private:
     /**
-     * Address: <synthetic host-build helper>
+     * Address: 0x004835F0 (FUN_004835F0)
      *
      * What it does:
-     * Releases live connection/partial lists and closes listener socket.
+     * Returns currently selected socket-event handle for this connector.
+     */
+    [[nodiscard]] HANDLE GetSelectedEventHandle() const noexcept;
+
+    // Source-side helper for connection work-frame bookkeeping.
+    STcpConnWorkList& WorkingList() noexcept
+    {
+      return mWorkingList;
+    }
+
+  private:
+    /**
+     * Address: 0x00484B40 (FUN_00484B40)
+     *
+     * What it does:
+     * Runs non-deleting connector cleanup body: drains connection objects,
+     * resets intrusive list heads, closes listener socket, and clears active
+     * work-link frames.
      */
     void CleanupConnectionsAndPartials();
 

@@ -10,6 +10,13 @@ namespace Wm3
   using Vector3f = Vector3<float>;
 } // namespace Wm3
 
+namespace gpg
+{
+  class RType;
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   struct Vector4f;
@@ -52,8 +59,26 @@ namespace moho
    */
   struct PositionHistory
   {
+    inline static gpg::RType* sType = nullptr;
+
     EntityTransformPayload samples[kEntityPositionHistorySampleCount];
     std::int32_t cursor;
+
+    /**
+     * Address: 0x0067EE60 (FUN_0067EE60, Moho::PositionHistory::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes 25 sampled transforms and the active cursor index.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0067EED0 (FUN_0067EED0, Moho::PositionHistory::MemberSerialize)
+     *
+     * What it does:
+     * Serializes 25 sampled transforms and the active cursor index.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
   using EntityPositionHistoryRing = PositionHistory;

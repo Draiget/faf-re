@@ -94,6 +94,19 @@ namespace Wm3
     Vector3<float>* dest, const Vector3<float>& vec, const Quaternion<float>& quat
   ) noexcept;
 
+  /**
+   * Address: 0x00428DB0 (FUN_00428DB0, Wm3::Vector3f::Add)
+   *
+   * Wm3::Vector3<float> const&, Wm3::Vector3<float>*, Wm3::Vector3<float> const&
+   *
+   * IDA signature:
+   * Wm3::Vector3f *__thiscall Wm3::Vector3f::Add(Wm3::Vector3f *this, Wm3::Vector3f *out, Wm3::Vector3f *rhs);
+   *
+   * What it does:
+   * Writes `lhs + rhs` into caller-provided `out` and returns `out`.
+   */
+  Vector3<float>* AddVector3f(const Vector3<float>& lhs, Vector3<float>* out, const Vector3<float>& rhs) noexcept;
+
   template <class T> struct Vector3
   {
     T x{};
@@ -152,11 +165,23 @@ namespace Wm3
       return (dx * dx) + (dy * dy) + (dz * dz);
     }
 
+    /**
+     * Address: 0x00452AD0 (FUN_00452AD0, Wm3::Vector3f::Dot)
+     *
+     * What it does:
+     * Returns 3D dot product `a.x*b.x + a.y*b.y + a.z*b.z`.
+     */
     static constexpr T Dot(const Vector3& a, const Vector3& b) noexcept
     {
       return a.x * b.x + a.y * b.y + a.z * b.z;
     }
 
+    /**
+     * Address: 0x00452BC0 (FUN_00452BC0, Wm3::Vector3f::Cross)
+     *
+     * What it does:
+     * Returns right-handed cross product `a x b`.
+     */
     static constexpr Vector3 Cross(const Vector3& a, const Vector3& b) noexcept
     {
       return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};

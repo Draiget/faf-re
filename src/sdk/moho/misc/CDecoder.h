@@ -75,6 +75,15 @@ namespace moho
     void DecodeMessage(const CMessage& message);
 
     /**
+     * Address: 0x0128CC00 (FUN_0128CC00, Moho__CDecoder__DecodeMessage)
+     *
+     * What it does:
+     * Patched minimal decode lane that accepts only command opcodes
+     * `CMDST_Advance` and `CMDST_SetCommandSource`.
+     */
+    void DecodeMessagePatched(const CMessage& message);
+
+    /**
      * Address: 0x006E4400 (FUN_006E4400)
      */
     void DecodeAdvance(gpg::BinaryReader& reader);

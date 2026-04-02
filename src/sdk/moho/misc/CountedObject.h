@@ -3,8 +3,34 @@
 #include <cstddef>
 #include <cstdint>
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
+  /**
+   * RTTI-only intrusive-counted pointer wrapper.
+   *
+   * Binary layout contract:
+   * - one raw pointee lane at +0x00
+   * - static `sType` cache lane for reflected descriptor lookup
+   */
+  template <class T>
+  struct CountedPtr
+  {
+    inline static gpg::RType* sType = nullptr;
+    T* tex = nullptr;
+  };
+
+  template <class T>
+  struct IntrusiveRefCountView
+  {
+    void* mVftable;
+    std::int32_t mRefCount;
+  };
+
   class CountedObject
   {
   public:
@@ -48,9 +74,13 @@ namespace moho
     [[nodiscard]] bool ReleaseReferenceAtomic() noexcept;
 
   protected:
-    CountedObject()
-      : mRefCount(0)
-    {}
+    /**
+     * Address: 0x004228D0 (FUN_004228D0, sub_4228D0)
+     *
+     * What it does:
+     * Initializes the base counted-object lanes and clears reference count.
+     */
+    CountedObject() noexcept;
 
   public:
     // Intrusive reference counter used by `CountedPtr<T>`-style ownership paths.

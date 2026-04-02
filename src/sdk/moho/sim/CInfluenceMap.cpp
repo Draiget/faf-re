@@ -9,11 +9,13 @@
 #include "gpg/core/algorithms/MD5.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/IAiReconDB.h"
+#include "moho/console/CConAlias.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/STIMap.h"
@@ -72,6 +74,66 @@ namespace
 
     return owner->Allies.Contains(static_cast<std::uint32_t>(source->ArmyId));
   }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug()
+  {
+    static moho::CConAlias sAlias;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_grid()
+  {
+    static moho::CConAlias sAlias;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_path_graph()
+  {
+    static moho::CConAlias sAlias;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_grid_type()
+  {
+    static moho::CConAlias sAlias;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_grid_army()
+  {
+    static moho::CConAlias sAlias;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug()
+  {
+    static moho::TSimConVar<bool> sVar(false, "imap_debug", false);
+    return sVar;
+  }
+
+  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug_grid()
+  {
+    static moho::TSimConVar<bool> sVar(false, "imap_debug_grid", false);
+    return sVar;
+  }
+
+  [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug_path_graph()
+  {
+    static moho::TSimConVar<bool> sVar(false, "imap_debug_path_graph", false);
+    return sVar;
+  }
+
+  [[nodiscard]] moho::TSimConVar<int>& SimConVar_imap_debug_grid_type()
+  {
+    static moho::TSimConVar<int> sVar(false, "imap_debug_grid_type", 0);
+    return sVar;
+  }
+
+  [[nodiscard]] moho::TSimConVar<int>& SimConVar_imap_debug_grid_army()
+  {
+    static moho::TSimConVar<int> sVar(false, "imap_debug_grid_army", -1);
+    return sVar;
+  }
 } // namespace
 
 namespace moho
@@ -111,6 +173,136 @@ namespace moho
       sType = gpg::LookupRType(typeid(CInfluenceMap));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x00BDA3E0 (FUN_00BDA3E0, register_imap_debug_ConAliasDef)
+   */
+  void register_imap_debug_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_imap_debug().InitializeRecovered(
+      "Toggle influence map debug info.",
+      "imap_debug",
+      "DoSimCommand imap_debug"
+    );
+  }
+
+  /**
+   * Address: 0x00BDA410 (FUN_00BDA410, register_imap_debug_SimConVarDef)
+   */
+  void register_imap_debug_SimConVarDef()
+  {
+    (void)SimConVar_imap_debug();
+  }
+
+  /**
+   * Address: 0x00BDA460 (FUN_00BDA460, register_imap_debug_grid_ConAliasDef)
+   */
+  void register_imap_debug_grid_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_imap_debug_grid().InitializeRecovered(
+      "Toggle influence map debug grid info.",
+      "imap_debug_grid",
+      "DoSimCommand imap_debug_grid"
+    );
+  }
+
+  /**
+   * Address: 0x00BDA490 (FUN_00BDA490, func_imap_debug_grid_SimConVarDef)
+   */
+  void func_imap_debug_grid_SimConVarDef()
+  {
+    (void)SimConVar_imap_debug_grid();
+  }
+
+  /**
+   * Address: 0x00BDA4E0 (FUN_00BDA4E0, register_imap_debug_path_graph_ConAliasDef)
+   */
+  void register_imap_debug_path_graph_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_imap_debug_path_graph().InitializeRecovered(
+      "Toggle map hints path graph.",
+      "imap_debug_path_graph",
+      "DoSimCommand imap_debug_path_graph"
+    );
+  }
+
+  /**
+   * Address: 0x00BDA510 (FUN_00BDA510, func_imap_debug_path_graph_SimConVarDef)
+   */
+  void func_imap_debug_path_graph_SimConVarDef()
+  {
+    (void)SimConVar_imap_debug_path_graph();
+  }
+
+  /**
+   * Address: 0x00BDA560 (FUN_00BDA560, register_imap_debug_grid_type_ConAliasDef)
+   */
+  void register_imap_debug_grid_type_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_imap_debug_grid_type().InitializeRecovered(
+      "Set influence map debug grid threat type.",
+      "imap_debug_grid_type",
+      "DoSimCommand imap_debug_grid_type"
+    );
+  }
+
+  /**
+   * Address: 0x00BDA590 (FUN_00BDA590, func_imap_debug_grid_type_SimConVarDef)
+   */
+  void func_imap_debug_grid_type_SimConVarDef()
+  {
+    (void)SimConVar_imap_debug_grid_type();
+  }
+
+  /**
+   * Address: 0x00BDA5E0 (FUN_00BDA5E0, register_imap_debug_grid_army_ConAliasDef)
+   */
+  void register_imap_debug_grid_army_ConAliasDef()
+  {
+    static bool sInitialized = false;
+    if (sInitialized) {
+      return;
+    }
+
+    sInitialized = true;
+    ConAlias_imap_debug_grid_army().InitializeRecovered(
+      "Set influence map debug grid for which army threat type.",
+      "imap_debug_grid_army",
+      "DoSimCommand imap_debug_grid_army"
+    );
+  }
+
+  /**
+   * Address: 0x00BDA610 (FUN_00BDA610, func_imap_debug_grid_army_SimConVarDef)
+   */
+  void func_imap_debug_grid_army_SimConVarDef()
+  {
+    (void)SimConVar_imap_debug_grid_army();
   }
 
   void SThreat::Clear() noexcept
@@ -294,6 +486,22 @@ namespace moho
 
     entries.erase(it);
     return true;
+  }
+
+  /**
+   * Address: 0x00715BC0 (FUN_00715BC0, ??0CInfluenceMap@Moho@@QAE@XZ)
+   */
+  CInfluenceMap::CInfluenceMap()
+    : mArmy(nullptr)
+    , mTotal(0)
+    , mWidth(0)
+    , mHeight(0)
+    , mGridSize(0)
+    , mBlipCells()
+    , mMapEntries()
+  {
+    mBlipCells.clear();
+    mMapEntries.clear();
   }
 
   /**
@@ -827,3 +1035,25 @@ namespace moho
     return category && category->ContainsBit(categoryBitIndex);
   }
 } // namespace moho
+
+namespace
+{
+  struct CInfluenceMapDebugBootstrap
+  {
+    CInfluenceMapDebugBootstrap()
+    {
+      moho::register_imap_debug_ConAliasDef();
+      moho::register_imap_debug_SimConVarDef();
+      moho::register_imap_debug_grid_ConAliasDef();
+      moho::func_imap_debug_grid_SimConVarDef();
+      moho::register_imap_debug_path_graph_ConAliasDef();
+      moho::func_imap_debug_path_graph_SimConVarDef();
+      moho::register_imap_debug_grid_type_ConAliasDef();
+      moho::func_imap_debug_grid_type_SimConVarDef();
+      moho::register_imap_debug_grid_army_ConAliasDef();
+      moho::func_imap_debug_grid_army_SimConVarDef();
+    }
+  };
+
+  CInfluenceMapDebugBootstrap gCInfluenceMapDebugBootstrap;
+} // namespace

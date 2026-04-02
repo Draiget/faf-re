@@ -40,6 +40,19 @@ namespace moho
     return UnitFromEntry(const_cast<Entity*>(entity));
   }
 
+  /**
+   * Address: 0x005796A0 (FUN_005796A0, Moho::EntitySetTemplate_Entity::~EntitySetTemplate_Entity)
+   *
+   * What it does:
+   * Releases heap-backed set storage, restores inline lanes, and unlinks this
+   * intrusive node from whatever ring currently owns it.
+   */
+  SEntitySetTemplateUnit::~SEntitySetTemplateUnit() noexcept
+  {
+    mVec.ResetStorageToInline();
+    this->ListUnlink();
+  }
+
   bool SEntitySetTemplateUnit::Empty() const noexcept
   {
     return mVec.begin() == mVec.end();
@@ -135,14 +148,23 @@ namespace moho
     return true;
   }
 
+  /**
+   * Address: 0x00704070 (FUN_00704070, Moho::EntitySetTemplate_Entity::AddRange)
+   *
+   * What it does:
+   * Iterates one `Entity*` range, converts each entry to a `Unit*` owner, and
+   * inserts it into this sorted set.
+   */
+  void SEntitySetTemplateUnit::AddRange(Entity* const* const start, Entity* const* const end)
+  {
+    for (Entity* const* it = start; it != end; ++it) {
+      (void)AddUnit(UnitFromEntry(*it));
+    }
+  }
+
   void SEntitySetTemplateUnit::AddUnits(const EntitySetTemplate<Unit>& source)
   {
-    for (Entity* const* it = source.begin(); it != source.end(); ++it) {
-      Unit* const unit = UnitFromEntry(*it);
-      if (unit) {
-        (void)AddUnit(unit);
-      }
-    }
+    AddRange(source.begin(), source.end());
   }
 
   void SEntitySetTemplateUnit::CopyTo(EntitySetTemplate<Unit>& out) const

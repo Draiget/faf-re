@@ -48,6 +48,23 @@ namespace gpg
 	msvc8::string STR_ToUpper(StrArg str); // 0x009389C0
 	void STR_NormalizeFilenameLowerSlash(msvc8::string& inOut);
 	void STR_NormalizeFilenameLowerSlash(std::string& inOut);
+
+	/**
+	 * Address: 0x0051E2E0 (FUN_0051E2E0, func_StringInitFilename)
+	 *
+	 * What it does:
+	 * Initializes destination string storage and canonicalizes one filename/path
+	 * (lowercase + separator normalization).
+	 */
+	msvc8::string* STR_InitFilename(msvc8::string* out, StrArg in);
+	msvc8::string* STR_SetFilename(msvc8::string* out, StrArg in);
+
+	/**
+	 * Address: 0x00458450 (FUN_00458450, gpg::STR_CanonizeFilename)
+	 *
+	 * What it does:
+	 * Lowercases one path and normalizes `/` separators to `\\`.
+	 */
 	void STR_CanonizeFilename(msvc8::string* out, StrArg in);
 	msvc8::string STR_TrimWhitespace(StrArg str); // 0x009388C0
 	msvc8::string STR_Printf(const char* args...); // 0x00938F10

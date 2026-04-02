@@ -46,6 +46,24 @@ namespace moho
     }
   } // namespace
 
+  /**
+   * Address: 0x00412DC0 (FUN_00412DC0)
+   *
+   * What it does:
+   * Copy-constructs background-task-aborted exception state.
+   */
+  XBackgroundTaskAborted::XBackgroundTaskAborted(const XBackgroundTaskAborted& other) noexcept
+    : std::exception(other)
+  {}
+
+  /**
+   * Address: 0x00412DE0 (FUN_00412DE0)
+   *
+   * What it does:
+   * Destroys background-task-aborted exception instance.
+   */
+  XBackgroundTaskAborted::~XBackgroundTaskAborted() noexcept = default;
+
   SWldScenarioLoadWakeSet::SWldScenarioLoadWakeSet()
     : mWakeEvent(CreateEventW(nullptr, FALSE, FALSE, nullptr))
     , mQueueSemaphore(CreateSemaphoreW(nullptr, 0, LONG_MAX, nullptr))
@@ -233,6 +251,47 @@ namespace moho
   }
 
   /**
+   * Address: 0x00412C70 (FUN_00412C70, func_UpdateLoadingProgress)
+   *
+   * What it does:
+   * Updates progress token, blocks while pause is requested, and throws
+   * `XBackgroundTaskAborted` when stop is requested.
+   */
+  void SWldScenarioLoadControl::UpdateLoadingProgress()
+  {
+    mMutex.lock();
+    mProgressToken = 0;
+
+    if (mStopRequested) {
+      mMutex.unlock();
+      throw XBackgroundTaskAborted{};
+    }
+
+    while (mPauseRequested) {
+      if (mState != EWldScenarioLoadControlState::kPaused) {
+        gpg::Logf("Background task \"%s\" paused.", mThreadName.c_str());
+        mState = EWldScenarioLoadControlState::kPaused;
+      }
+
+      mMutex.unlock();
+      mWakeSet.WaitOne();
+      mMutex.lock();
+
+      if (mStopRequested) {
+        mMutex.unlock();
+        throw XBackgroundTaskAborted{};
+      }
+    }
+
+    if (mState != EWldScenarioLoadControlState::kRunning) {
+      gpg::Logf("Background task \"%s\" resumed.", mThreadName.c_str());
+      mState = EWldScenarioLoadControlState::kRunning;
+    }
+
+    mMutex.unlock();
+  }
+
+  /**
    * Address: 0x00885460 (FUN_00885460)
    */
   SWldScenarioLoadTask* SWldScenarioLoadTask::Create(
@@ -302,6 +361,27 @@ namespace moho
     if (mWorkerThread) {
       delete mWorkerThread;
       mWorkerThread = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00413270 (FUN_00413270)
+   *
+   * What it does:
+   * Starts/resumes the worker and joins one active worker thread.
+   */
+  void SWldScenarioLoadTask::StartOrResumeAndJoin()
+  {
+    if (mControl != nullptr) {
+      mControl->StartOrResume(*this);
+    }
+
+    if (mWorkerThread != nullptr) {
+      mWorkerThread->join();
+
+      boost::thread* const worker = mWorkerThread;
+      mWorkerThread = nullptr;
+      delete worker;
     }
   }
 

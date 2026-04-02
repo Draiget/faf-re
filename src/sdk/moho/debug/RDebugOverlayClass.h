@@ -66,6 +66,16 @@ namespace moho
     msvc8::string mOverlayDescription;                        // +0x8C
   };
 
+  /**
+   * Address: 0x00651760 (FUN_00651760, GetDbgOverlays)
+   *
+   * What it does:
+   * Returns the process-global intrusive registry head for debug-overlay class
+   * overlays and lazily wires its atexit cleanup.
+   */
+  [[nodiscard]]
+  TDatListItem<RDebugOverlayClass, void>* GetDbgOverlays();
+
   static_assert(
     offsetof(RDebugOverlayClass, mOverlayClassPad0064) == 0x64,
     "RDebugOverlayClass::mOverlayClassPad0064 offset must be 0x64"

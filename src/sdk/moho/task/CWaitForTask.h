@@ -46,6 +46,22 @@ namespace moho
      */
     int Execute() override;
 
+    /**
+     * Address: 0x004CC3B0 (FUN_004CC3B0, Moho::CWaitForTask::MemberSerialize in export label)
+     *
+     * What it does:
+     * Loads base `CTask`, wait-link weak pointer, and Lua payload object from archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x004CC460 (FUN_004CC460, Moho::CWaitForTask::MemberDeserialize in export label)
+     *
+     * What it does:
+     * Saves base `CTask`, wait-link weak pointer, and Lua payload object to archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
+
   public:
     // 0x18: reserved/unknown dword (constructors 0x004CA470/0x004CA520 do not initialize it).
     std::uint32_t mReserved18;

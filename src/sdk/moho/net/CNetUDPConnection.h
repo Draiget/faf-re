@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <cstddef>
+
 #include "boost/weak_ptr.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/PipeStream.h"
@@ -83,11 +85,13 @@ namespace moho
 
     /**
      * Address: 0x00485D30
+     * Address: 0x1007F7E0 (sub_1007F7E0)
      */
     CNetUDPConnection(CNetUDPConnector& connector, u_long address, u_short port, ENetConnectionState state);
 
     /**
      * Address: 0x00486150
+     * Address: 0x1007FC10 (sub_1007FC10)
      */
     virtual ~CNetUDPConnection();
 
@@ -107,6 +111,38 @@ namespace moho
      * Address: 0x004865E0
      */
     void ProcessAnswer(const SNetPacket* pack);
+
+    /**
+     * Address: 0x00485BA0 (FUN_00485BA0)
+     *
+     * What it does:
+     * Returns current UDP connection state enum lane.
+     */
+    [[nodiscard]] ENetConnectionState GetConnectionState() const noexcept;
+
+    /**
+     * Address: 0x00485BB0 (FUN_00485BB0)
+     *
+     * What it does:
+     * Returns true while state is before errored (`< kNetStateErrored`).
+     */
+    [[nodiscard]] bool IsBeforeErroredState() const noexcept;
+
+    /**
+     * Address: 0x00485BD0 (FUN_00485BD0)
+     *
+     * What it does:
+     * Returns whether destroy was already requested.
+     */
+    [[nodiscard]] bool IsDestroyScheduled() const noexcept;
+
+    /**
+     * Address: 0x00485BC0 (FUN_00485BC0)
+     *
+     * What it does:
+     * Returns whether this connection is already fully destroyed.
+     */
+    [[nodiscard]] bool IsDestroyedFlagSet() const noexcept;
 
     /**
      * Address: 0x00486B10
@@ -144,11 +180,13 @@ namespace moho
     int GetSentTime(int64_t time);
 
     /**
+     * Address: 0x004882C0 (FUN_004882C0, inlined/chunk helper lane)
+     * Address: 0x0048AC40 (inlined helper inside FUN_0048AC40)
+     *
      * Helper extracted from inlined connector send loop.
      * Binary evidence:
+     * - FA 0x004882C0 (standalone chunk in this export set)
      * - FA 0x0048AC40 (sub_48AC40)
-     *
-     * There is no standalone FA function symbol at 0x004882C0.
      */
     int GetBacklogTimeout(int64_t time, int32_t& timeout);
 
@@ -156,15 +194,15 @@ namespace moho
      * Address: 0x004881F0
      */
     [[nodiscard]]
-    int64_t TimeSince(int64_t time) const;
+    int TimeSince(int64_t time) const;
 
     /**
      * Address: 0x00488300
      */
-    int64_t SendData();
+    int SendData();
 
     /**
-     * Address: 00488145
+     * Address: 0x00488145
      */
     template <class T>
     constexpr T ChooseTimeout(T cur, T candidate)
@@ -221,25 +259,31 @@ namespace moho
 
     /**
      * Address: 0x00487590
+     * Address: 0x10080FD0 (sub_10080FD0)
      */
     void FlushInput();
 
     /**
+     * Address: 0x004879E0 (FUN_004879E0, inlined/chunk helper lane)
+     * Address: 0x0048B7F0 (inlined helper inside FUN_0048B7F0)
+     *
      * Helper extracted from inlined connector push loop.
      * Binary evidence:
+     * - FA 0x004879E0 (standalone chunk in this export set)
      * - FA 0x0048B7F0 (CNetUDPConnector::Push)
-     *
-     * There is no standalone FA function symbol at 0x004879E0.
      */
     bool FlushOutput();
 
     /**
      * Address: 0x004876A0
+     * Address: 0x100810D0 (sub_100810D0)
+     * Address: 0x100813A0 (sub_100810D0, alias/chunk export)
      */
     void DispatchFromInput();
 
     /**
      * Address: 0x00487B90
+     * Address: 0x10081570 (sub_10081570)
      */
     void Debug();
 
@@ -250,29 +294,67 @@ namespace moho
     void AdoptPacket(const SNetPacket* packet);
 
     /**
+     * Address: 0x00485AA0 (FUN_00485AA0)
+     *
+     * What it does:
+     * Compares expected and received 32-byte nonce lanes.
+     */
+    static bool ReceiverNonceDiffers32(const char (&expected)[32], const char (&received)[32]) noexcept;
+
+    template <std::size_t N>
+    static bool ByteArrayDiffers(const char (&lhs)[N], const char (&rhs)[N]) noexcept
+    {
+      for (std::size_t i = 0; i < N; ++i) {
+        if (lhs[i] != rhs[i]) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Address: 0x00486110 (FUN_00486110)
+     *
+     * What it does:
+     * Unlinks this connection node from connector intrusive list.
+     */
+    void UnlinkFromConnectorList() noexcept;
+
+    /**
      * Address: 0x004874C0
      */
     void UpdatePingInfoFromPacket(const SNetPacket& packet);
 
+    /**
+     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+     */
     MOHO_FORCEINLINE bool InsertEarlySorted(SNetPacket* packet);
 
+    /**
+     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+     */
     MOHO_FORCEINLINE SNetPacket* EarlyPopFront();
 
+    /**
+     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+     */
     MOHO_FORCEINLINE void EarlyRebuildAckMask(uint16_t expected, uint32_t& mask);
 
+    /**
+     * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+     */
     MOHO_FORCEINLINE void ConsumePacketHeaderData(SNetPacket* packet);
 
+    /**
+     * Address: 0x00488D80 (inlined helper inside FUN_00488D80)
+     */
     MOHO_FORCEINLINE void InsertUnAckedSorted(SNetPacket* packet);
 
   public:
     // ...
-    // +0x410  ListEntry linkInConnector
-    // +0x42C  uint32_t state            // 0=Idle, 1=Init, 2=Active, 3=Closing?, 5=Retired
-    // +0xE40  uint8_t  flagBusy         // used as "not busy" filter
-    // +0xE41  uint8_t  flagDeleteNow    // immediate shutdown signal/flag
-    // vtable[0]: uint32_t RemoteAddrBE() const
-    // vtable[1]: uint16_t RemotePort()  const
-    // vtable[7]: void CloseOrRelease()
+    // +0x410  intrusive list node (connector-owned connection list link)
+    // +0x42C  ENetConnectionState
+    //          0=Pending, 1=Connecting, 2=Answering, 3=Establishing, 4=TimedOut, 5=Errored
 
     CNetUDPConnector* mConnector{nullptr};
     u_long mAddr{0};

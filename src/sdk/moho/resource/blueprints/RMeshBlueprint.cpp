@@ -10,26 +10,12 @@
 #include <system_error>
 #include <typeinfo>
 
+#include "moho/resource/RResId.h"
+
 namespace moho
 {
   namespace
   {
-    [[nodiscard]] std::string
-    CompleteResourcePath(const std::string_view sourcePath, const std::string_view resourceName)
-    {
-      if (resourceName.empty()) {
-        return {};
-      }
-
-      std::filesystem::path resourcePath{resourceName};
-      if (!resourcePath.is_absolute() && !sourcePath.empty()) {
-        const std::filesystem::path sourceFilePath{sourcePath};
-        resourcePath = sourceFilePath.parent_path() / resourcePath;
-      }
-
-      return resourcePath.lexically_normal().generic_string();
-    }
-
     [[nodiscard]] std::string ExtractMeshFamilyPrefix(const std::string_view sourcePath)
     {
       const std::size_t markerPos = sourcePath.rfind('_');
@@ -54,7 +40,10 @@ namespace moho
     )
     {
       if (!destination.empty()) {
-        destination.assign_owned(CompleteResourcePath(sourcePath, destination.view()));
+        msvc8::string sourcePathText;
+        sourcePathText.assign_owned(sourcePath);
+        const msvc8::string completedPath = RES_CompletePath(destination.c_str(), sourcePathText.c_str());
+        destination.assign_owned(completedPath.view());
         return;
       }
 
@@ -80,7 +69,8 @@ namespace moho
     const std::string sourcePrefix = ExtractMeshFamilyPrefix(sourcePath.view());
 
     if (!mMeshName.empty()) {
-      mMeshName.assign_owned(CompleteResourcePath(sourcePath.view(), mMeshName.view()));
+      const msvc8::string completedPath = RES_CompletePath(mMeshName.c_str(), sourcePath.c_str());
+      mMeshName.assign_owned(completedPath.view());
     } else {
       const std::string lodMeshName = sourcePrefix + "_lod" + std::to_string(lodIndex) + ".scm";
       if (ResourceFileExists(lodMeshName)) {

@@ -47,6 +47,37 @@ namespace moho
   };
 
   static_assert(sizeof(AdxmThreadStartupParams) == 0x18, "AdxmThreadStartupParams size must be 0x18");
+
+  /**
+   * Sofdec tag-window pair used by `mwsftag_*` search helpers.
+   * Layout is one pointer + one byte-count lane.
+   */
+  struct MwsfTagWindow
+  {
+    std::int8_t* data = nullptr;
+    std::int32_t size = 0;
+  };
+
+  static_assert(offsetof(MwsfTagWindow, data) == 0x0, "MwsfTagWindow::data offset must be 0x0");
+  static_assert(offsetof(MwsfTagWindow, size) == 0x4, "MwsfTagWindow::size offset must be 0x4");
+  static_assert(sizeof(MwsfTagWindow) == 0x8, "MwsfTagWindow size must be 0x8");
+
+  /**
+   * Partial runtime view for Sofdec SFD work-control subobject used by handle
+   * validation helper lanes.
+   *
+   * Evidence:
+   * - `FUN_00AD8E90` tests pointer at offset `+0x48` (`flibHn`).
+   */
+  struct SofdecSfdWorkctrlSubobj
+  {
+    std::uint8_t mUnknown00[0x48]{};
+    void* flibHn = nullptr;
+  };
+
+  static_assert(
+    offsetof(SofdecSfdWorkctrlSubobj, flibHn) == 0x48, "SofdecSfdWorkctrlSubobj::flibHn offset must be 0x48"
+  );
 } // namespace moho
 
 extern "C"
@@ -111,6 +142,15 @@ extern "C"
   void ADXM_ExecMain();
 
   /**
+   * Address: 0x00B0A390 (_ADXT_Init)
+   *
+   * What it does:
+   * Initializes ADXT middleware runtime subsystems on first-use and bumps
+   * ADXT init reference count.
+   */
+  void ADXT_Init();
+
+  /**
    * Address: 0x00AC9130 (_mwPlyInitSfdFx)
    *
    * IDA signature:
@@ -128,6 +168,100 @@ extern "C"
    * Shuts down movie Sofdec playback runtime when init reference count reaches 0.
    */
   void mwPlyFinishSfdFx();
+
+  /**
+   * Address: 0x00AC9540 (_MWSFLIB_SfdErrFunc)
+   *
+   * IDA signature:
+   * int __cdecl MWSFLIB_SfdErrFunc(int mwsfdHandle, int errorCode);
+   *
+   * What it does:
+   * Updates process-global Sofdec SFD error state (latest handle lanes plus
+   * bounded error-code history) and forwards formatted diagnostics into
+   * `MWSFSVM_Error`.
+   */
+  std::int32_t MWSFLIB_SfdErrFunc(std::int32_t mwsfdHandle, std::int32_t errorCode);
+
+  /**
+   * Address: 0x00AD8E90 (_SFLIB_CheckHn)
+   *
+   * IDA signature:
+   * int __cdecl SFLIB_CheckHn(struct_sofdec_sfd_workctrl_subobj* workctrlSubobj);
+   *
+   * What it does:
+   * Verifies that one Sofdec SFD work-control object and its `flibHn` lane are
+   * both non-null; returns `0` on success and `-1` on invalid input.
+   */
+  std::int32_t SFLIB_CheckHn(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+
+  /**
+   * Address: 0x00AC9A70 (_mwsftag_GetTag)
+   *
+   * What it does:
+   * Finds one named tag within one source tag window and writes the matched
+   * child window (`data,size`) to `outWindow`.
+   */
+  moho::MwsfTagWindow* mwsftag_GetTag(
+    moho::MwsfTagWindow* sourceWindow,
+    const char* tagName,
+    const char* userInfoTag,
+    moho::MwsfTagWindow* outWindow
+  );
+
+  /**
+   * Address: 0x00AC9AD0 (_mwsftag_GetIntVal)
+   *
+   * What it does:
+   * Reads one integer tag value from one tag window.
+   */
+  std::int32_t mwsftag_GetIntVal(
+    moho::MwsfTagWindow* sourceWindow,
+    const char* tagName,
+    const char* userInfoTag,
+    std::int32_t* outValue
+  );
+
+  /**
+   * Address: 0x00AC9C20 (_mwsftag_MoveNextTag)
+   *
+   * What it does:
+   * Advances one source window past the current child tag and emits the
+   * remaining window span.
+   */
+  std::int32_t mwsftag_MoveNextTag(
+    const moho::MwsfTagWindow* sourceWindow,
+    const moho::MwsfTagWindow* currentTagWindow,
+    moho::MwsfTagWindow* outRemainingWindow
+  );
+
+  /**
+   * Address: 0x00AC9ED0 (_MWSFD_CmpTime)
+   *
+   * What it does:
+   * Clamps negative time lanes to zero and forwards comparison to
+   * Sofdec runtime time-compare helper (`UTY_CmpTime`).
+   */
+  std::int32_t MWSFD_CmpTime(
+    std::int32_t leftTime,
+    std::int32_t timeUnit,
+    std::int32_t rightTime,
+    std::int32_t currentTime
+  );
+
+  /**
+   * Address: 0x00AC9D00 (_MWSFTAG_SearchTimedatFromChdat)
+   *
+   * What it does:
+   * Scans one chapter-data tag window for the active `TIMEDAT` span that
+   * contains the current playback time and returns that selected window.
+   */
+  std::int8_t* MWSFTAG_SearchTimedatFromChdat(
+    moho::MwsfTagWindow* chapterDataWindow,
+    std::int32_t compareArg0,
+    std::int32_t compareArg1,
+    std::int32_t baseTime,
+    moho::MwsfTagWindow* outTimedatWindow
+  );
 
   /**
    * Address: 0x00B06DC0 (_ADXM_Finish)

@@ -812,6 +812,20 @@ ScopedLogContext::~ScopedLogContext()
 }
 
 /**
+ * Address: 0x00937C00 (FUN_00937C00, gpg::LogMessage)
+ *
+ * What it does:
+ * Dispatches one preformatted message with explicit severity to registered targets.
+ */
+void gpg::LogMessage(const LogSeverity level, const msvc8::string& message)
+{
+    std::call_once(g_LogOnce, &InitLogSingleton);
+    if (g_LogCtx) {
+        g_LogCtx->Dispatch(static_cast<int>(level), message);
+    }
+}
+
+/**
  * Address: 0x00937CB0 (FUN_00937CB0)
  *
  * What it does:
@@ -919,6 +933,12 @@ FILETIME gpg::FileTimeLocal()
     return ftLocal;
 }
 
+/**
+ * Address: 0x00485CB0 (FUN_00485CB0, func_FileTimeToString)
+ *
+ * What it does:
+ * Converts microsecond timestamp to local `HH:MM:SS.mmm` text.
+ */
 msvc8::string gpg::FileTimeToString(const LONGLONG time)
 {
     FILETIME ft100ns{};

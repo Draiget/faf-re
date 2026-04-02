@@ -217,8 +217,8 @@ void CReplayClient::Start()
 
     CMessage emptyAdvance(ECmdStreamOp::CMDST_Advance);
     CMessageStream advanceStream(emptyAdvance);
-    const std::int32_t beatDelta = 0;
-    advanceStream.Write(beatDelta);
+    const std::int32_t beatDelta = 1;
+    advanceStream.WriteInt32(beatDelta);
     CClientBase::Process(emptyAdvance);
 
     Eject();

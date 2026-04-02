@@ -13,11 +13,14 @@ namespace moho
 
   struct STaskEventLinkage;
 
+#ifndef MOHO_WEAKPTR_OWNER_LINK_OFFSET_CTASKTHREAD_DEFINED
+#define MOHO_WEAKPTR_OWNER_LINK_OFFSET_CTASKTHREAD_DEFINED
   template <>
   struct WeakPtrOwnerLinkOffset<CTaskThread>
   {
     static constexpr std::uintptr_t value = 0x08;
   };
+#endif
 
   template <>
   struct WeakPtrOwnerLinkOffset<STaskEventLinkage>
@@ -55,9 +58,182 @@ namespace moho
     WeakPtr<STaskEventLinkage>::kOwnerLinkOffset == 0x08, "STaskEventLinkage weak-owner slot offset must be 0x08"
   );
 
+  class STaskEventLinkageSerializer
+  {
+  public:
+    /**
+     * Address: 0x004069A0 (FUN_004069A0, Moho::STaskEventLinkageSerializer::Deserialize)
+     * Alias:   0x00407900 (FUN_00407900, duplicate callback body)
+     *
+     * What it does:
+     * Loads `STaskEventLinkage::mThreadRef` through reflected
+     * `WeakPtr<CTaskThread>` serialization.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x004069F0 (FUN_004069F0, Moho::STaskEventLinkageSerializer::Serialize)
+     * Alias:   0x00407950 (FUN_00407950, duplicate callback body)
+     *
+     * What it does:
+     * Saves `STaskEventLinkage::mThreadRef` through reflected
+     * `WeakPtr<CTaskThread>` serialization.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00407240 (FUN_00407240, Moho::STaskEventLinkageSerializer::Init)
+     * Slot: 0
+     *
+     * What it does:
+     * Binds linkage serializer callbacks into RTTI for `STaskEventLinkage`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    void* mNext;
+    void* mPrev;
+    gpg::RType::load_func_t mSerLoadFunc;
+    gpg::RType::save_func_t mSerSaveFunc;
+  };
+
+  class STaskEventLinkageTypeInfo : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00406840 (FUN_00406840, Moho::STaskEventLinkageTypeInfo::STaskEventLinkageTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters RTTI descriptor for `STaskEventLinkage`.
+     */
+    STaskEventLinkageTypeInfo();
+
+    /**
+     * Address: 0x004068F0 (FUN_004068F0, Moho::STaskEventLinkageTypeInfo::dtr)
+     * Slot: 2
+     */
+    ~STaskEventLinkageTypeInfo() override;
+
+    /**
+     * Address: 0x004068E0 (FUN_004068E0, Moho::STaskEventLinkageTypeInfo::GetName)
+     * Slot: 3
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x004068A0 (FUN_004068A0, Moho::STaskEventLinkageTypeInfo::Init)
+     * Slot: 9
+     *
+     * What it does:
+     * Sets reflected size/callback lanes and finalizes the linkage RTTI type.
+     */
+    void Init() override;
+
+  private:
+    /**
+     * Address: 0x004077F0 (FUN_004077F0)
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x00407860 (FUN_00407860)
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x00407840 (FUN_00407840)
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x004078A0 (FUN_004078A0)
+     */
+    static void Destruct(void* objectStorage);
+  };
+
+  template <class T>
+  class RWeakPtrType;
+
+  class CTaskEvent;
+
+  template <>
+  class RWeakPtrType<STaskEventLinkage> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    /**
+     * Address: 0x00407EC0 (FUN_00407EC0, Moho::RWeakPtrType_STaskEventLinkage::dtr)
+     * Slot: 2
+     */
+    ~RWeakPtrType() override;
+
+    /**
+     * Address: 0x004072B0 (FUN_004072B0, Moho::RWeakPtrType_STaskEventLinkage::GetName)
+     * Slot: 3
+     *
+     * What it does:
+     * Builds/caches lexical type name `WeakPtr<STaskEventLinkage>`.
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
+
+    /**
+     * Address: 0x00407370 (FUN_00407370, Moho::RWeakPtrType_STaskEventLinkage::GetLexical)
+     * Slot: 4
+     *
+     * What it does:
+     * Returns `"NULL"` for empty weak pointers, otherwise wraps pointee lexical with brackets.
+     */
+    [[nodiscard]]
+    msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x00407500 (FUN_00407500, Moho::RWeakPtrType_STaskEventLinkage::IsIndexed)
+     * Slot: 6
+     */
+    [[nodiscard]]
+    const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x00407510 (FUN_00407510, Moho::RWeakPtrType_STaskEventLinkage::IsPointer)
+     * Slot: 7
+     */
+    [[nodiscard]]
+    const gpg::RIndexed* IsPointer() const override;
+
+    /**
+     * Address: 0x00407350 (FUN_00407350, Moho::RWeakPtrType_STaskEventLinkage::Init)
+     * Slot: 9
+     *
+     * What it does:
+     * Sets weak-pointer size/version metadata and serializer callback lanes.
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x00407550 (FUN_00407550, Moho::RWeakPtrType_STaskEventLinkage::SubscriptIndex)
+     */
+    [[nodiscard]]
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x00407520 (FUN_00407520, Moho::RWeakPtrType_STaskEventLinkage::GetCount)
+     */
+    [[nodiscard]]
+    size_t GetCount(void* obj) const override;
+  };
+
   class CTaskEvent
   {
   public:
+    /**
+     * Address: 0x00406C10 (FUN_00406C10, ??0CTaskEvent@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes default trigger state and self-linked wait-list sentinel.
+     */
+    CTaskEvent();
+
     /**
      * Address: 0x00406C30 (scalar deleting thunk)
      * Address: 0x00406C70 (FUN_00406C70, ??1CTaskEvent@Moho@@UAE@XZ)
@@ -155,6 +331,9 @@ namespace moho
     void Init() override;
   };
 
+  static_assert(sizeof(STaskEventLinkageSerializer) == 0x14, "STaskEventLinkageSerializer size must be 0x14");
+  static_assert(sizeof(STaskEventLinkageTypeInfo) == 0x64, "STaskEventLinkageTypeInfo size must be 0x64");
+  static_assert(sizeof(RWeakPtrType<STaskEventLinkage>) == 0x68, "RWeakPtrType<STaskEventLinkage> size must be 0x68");
   static_assert(sizeof(CTaskEventSerializer) == 0x14, "CTaskEventSerializer size must be 0x14");
   static_assert(sizeof(CTaskEventTypeInfo) == 0x64, "CTaskEventTypeInfo size must be 0x64");
 } // namespace moho

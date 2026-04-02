@@ -12,11 +12,18 @@
 
 namespace gpg
 {
+  class ReadArchive;
+  struct RRef;
+  class SerConstructResult;
+  class WriteArchive;
   class RType;
 } // namespace gpg
 
 namespace moho
 {
+  class CAniPose;
+  class RMeshBlueprint;
+  class RScmResource;
   class Sim;
   class Unit;
 
@@ -31,18 +38,40 @@ namespace moho
    */
   struct SPerArmyReconInfo
   {
-    std::uint8_t mNeedsFlush;          // +0x00
-    std::uint8_t pad_01_03[0x03];      // +0x01
-    std::uint32_t mReconFlags;         // +0x04
-    std::int32_t mMeshTypeClassId;     // +0x08
-    boost::SharedPtrRaw<void> mMesh;   // +0x0C
-    std::uint8_t mPriorPoseData[0x08]; // +0x14
-    std::uint8_t mPoseData[0x08];      // +0x1C
-    float mHealth;                     // +0x24
-    float mMaxHealth;                  // +0x28
-    float mFractionComplete;           // +0x2C
-    std::uint8_t mMaybeDead;           // +0x30
-    std::uint8_t pad_31_33[0x03];      // +0x31
+    std::uint8_t mNeedsFlush;                   // +0x00
+    std::uint8_t pad_01_03[0x03];               // +0x01
+    std::uint32_t mReconFlags;                  // +0x04
+    union
+    {
+      std::int32_t mMeshTypeClassId;            // +0x08
+      RMeshBlueprint* mStiMesh;                 // +0x08
+    };
+    boost::SharedPtrRaw<RScmResource> mMesh;    // +0x0C
+    boost::SharedPtrRaw<CAniPose> mPriorPose;   // +0x14
+    boost::SharedPtrRaw<CAniPose> mPose;        // +0x1C
+    float mHealth;                              // +0x24
+    float mMaxHealth;                           // +0x28
+    float mFractionComplete;                    // +0x2C
+    std::uint8_t mMaybeDead;                    // +0x30
+    std::uint8_t pad_31_33[0x03];               // +0x31
+
+    /**
+     * Address: 0x005C8DE0 (FUN_005C8DE0, Moho::SPerArmyReconInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes one per-army recon snapshot lane.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
+
+    /**
+     * Address: 0x005C8ED0 (FUN_005C8ED0, Moho::SPerArmyReconInfo::MemberSerialize)
+     *
+     * What it does:
+     * Serializes one per-army recon snapshot lane.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
+
+    static gpg::RType* sType;
   };
 
   static_assert(sizeof(SPerArmyReconInfo) == 0x34, "SPerArmyReconInfo size must be 0x34");
@@ -51,7 +80,10 @@ namespace moho
   static_assert(
     offsetof(SPerArmyReconInfo, mMeshTypeClassId) == 0x08, "SPerArmyReconInfo::mMeshTypeClassId offset must be 0x08"
   );
+  static_assert(offsetof(SPerArmyReconInfo, mStiMesh) == 0x08, "SPerArmyReconInfo::mStiMesh offset must be 0x08");
   static_assert(offsetof(SPerArmyReconInfo, mMesh) == 0x0C, "SPerArmyReconInfo::mMesh offset must be 0x0C");
+  static_assert(offsetof(SPerArmyReconInfo, mPriorPose) == 0x14, "SPerArmyReconInfo::mPriorPose offset must be 0x14");
+  static_assert(offsetof(SPerArmyReconInfo, mPose) == 0x1C, "SPerArmyReconInfo::mPose offset must be 0x1C");
   static_assert(offsetof(SPerArmyReconInfo, mHealth) == 0x24, "SPerArmyReconInfo::mHealth offset must be 0x24");
   static_assert(offsetof(SPerArmyReconInfo, mMaxHealth) == 0x28, "SPerArmyReconInfo::mMaxHealth offset must be 0x28");
   static_assert(
@@ -122,6 +154,19 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x005BED70 (FUN_005BED70, Moho::ReconBlip::ReconBlip)
+     *
+     * Sim *
+     *
+     * IDA signature:
+     * Moho::ReconBlip *__stdcall Moho::ReconBlip::ReconBlip(Moho::ReconBlip *this, Moho::Sim *sim);
+     *
+     * What it does:
+     * Constructs serializer-load baseline state for `ReconBlip`.
+     */
+    explicit ReconBlip(Sim* sim);
+
+    /**
      * Address: 0x005BE6E0 (FUN_005BE6E0)
      *
      * Unit *,Sim *,bool
@@ -135,6 +180,22 @@ namespace moho
      * initializes per-army recon state storage, and performs an initial refresh.
      */
     ReconBlip(Unit* sourceUnit, Sim* sim, bool fake);
+
+    /**
+     * Address: 0x005BFBE0 (FUN_005BFBE0, Moho::ReconBlip::MemberConstruct)
+     *
+     * gpg::ReadArchive &,int,gpg::RRef const &,gpg::SerConstructResult &
+     *
+     * What it does:
+     * Reads serializer construct args (`Sim*`), allocates one `ReconBlip`, and
+     * returns it as an unowned construct result.
+     */
+    static void MemberConstruct(
+      gpg::ReadArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerConstructResult& result
+    );
 
     /**
      * Address: 0x005BDE90 (FUN_005BDE90)

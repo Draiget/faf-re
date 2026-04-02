@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0076F040 (FUN_0076F040, Moho::CIntelPosHandleTypeInfo::CIntelPosHandleTypeInfo)
+     *
+     * What it does:
+     * Constructs `CIntelPosHandle` type-info storage and preregisters its RTTI mapping.
+     */
+    CIntelPosHandleTypeInfo();
+
+    /**
      * Address: 0x0076F0D0 (FUN_0076F0D0, Moho::CIntelPosHandleTypeInfo::dtr)
      * Slot: 2
      *
@@ -43,4 +51,20 @@ namespace moho
   };
 
   static_assert(sizeof(CIntelPosHandleTypeInfo) == 0x64, "CIntelPosHandleTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00C01E40 (FUN_00C01E40, cleanup_CIntelPosHandleTypeInfo)
+   *
+   * What it does:
+   * Runs process-exit teardown for startup `CIntelPosHandleTypeInfo` storage.
+   */
+  void cleanup_CIntelPosHandleTypeInfo();
+
+  /**
+   * Address: 0x00BDCC90 (FUN_00BDCC90, register_CIntelPosHandleTypeInfo)
+   *
+   * What it does:
+   * Builds startup `CIntelPosHandleTypeInfo` storage and installs process-exit cleanup.
+   */
+  void register_CIntelPosHandleTypeInfo();
 } // namespace moho

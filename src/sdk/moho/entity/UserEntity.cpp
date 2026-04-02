@@ -77,9 +77,9 @@ namespace
   {
     // 0x004DFC50 / 0x00406560: unlink chain head by nulling each node's prev/next.
     while (head) {
-      moho::UserEntityLinkNode* const next = head->next;
-      head->prev = nullptr;
-      head->next = nullptr;
+      moho::UserEntityLinkNode* const next = head->mNext;
+      head->mPrev = nullptr;
+      head->mNext = nullptr;
       head = next;
     }
   }

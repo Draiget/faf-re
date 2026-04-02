@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00622EA0 (FUN_00622EA0, Moho::CUnitScriptTaskSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive load flow into `CUnitScriptTask::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00622EC0 (FUN_00622EC0, Moho::CUnitScriptTaskSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive save flow into `CUnitScriptTask::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00623BB0 (FUN_00623BB0)
      *
      * What it does:
@@ -50,5 +66,22 @@ namespace moho
     "CUnitScriptTaskSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CUnitScriptTaskSerializer) == 0x14, "CUnitScriptTaskSerializer size must be 0x14");
-} // namespace moho
 
+  /**
+   * Address: 0x00BFA470 (FUN_00BFA470)
+   *
+   * What it does:
+   * Unlinks static `CUnitScriptTaskSerializer` helper node from the intrusive
+   * serializer helper list and restores self-links.
+   */
+  gpg::SerHelperBase* cleanup_CUnitScriptTaskSerializer();
+
+  /**
+   * Address: 0x00BD19A0 (FUN_00BD19A0)
+   *
+   * What it does:
+   * Initializes serializer callbacks for CUnitScriptTask and schedules
+   * process-exit helper unlink cleanup.
+   */
+  void register_CUnitScriptTaskSerializer();
+} // namespace moho

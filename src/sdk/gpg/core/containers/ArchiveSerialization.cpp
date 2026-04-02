@@ -5,8 +5,15 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/BoostWrappers.h"
+#include "moho/animation/CAniSkel.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/misc/LaunchInfoBase.h"
+#include "moho/misc/Stats.h"
+#include "moho/resource/ISimResources.h"
+#include "moho/resource/RScmResource.h"
+#include "moho/sim/CIntelGrid.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/SConditionTriggerTypes.h"
 #include "ReadArchive.h"
 #include "String.h"
 #include "WriteArchive.h"
@@ -59,6 +66,71 @@ namespace
       sType = gpg::LookupRType(typeid(moho::SSessionSaveData));
     }
     return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAniPoseType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::CAniPose));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCAniSkelType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::CAniSkel));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedRScmResourceType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::RScmResource));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSTriggerType()
+  {
+    gpg::RType* type = moho::STrigger::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::STrigger));
+      moho::STrigger::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedStatsStatItemType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedISimResourcesType()
+  {
+    gpg::RType* type = moho::ISimResources::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::ISimResources));
+      moho::ISimResources::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCIntelGridType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CIntelGrid));
+    }
+    return type;
   }
 
   [[nodiscard]] bool IsPointerCompatibleWithExpectedType(
@@ -362,6 +434,254 @@ void gpg::ReadPointerShared_SSessionSaveData(
   EnsureTrackedPointerSharedOwnership(tracked);
 
   gpg::RType* const expectedType = CachedSessionSaveDataType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x0055F990 (FUN_0055F990)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<CAniPose>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_CAniPose(
+  boost::SharedPtrRaw<moho::CAniPose>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedCAniPoseType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x0054FF20 (FUN_0054FF20)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<CAniSkel>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_CAniSkel(
+  boost::SharedPtrRaw<moho::CAniSkel>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedCAniSkelType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x0055F780 (FUN_0055F780)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<Stats<StatItem>>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_Stats_StatItem(
+  boost::SharedPtrRaw<moho::Stats<moho::StatItem>>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedStatsStatItemType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x00757900 (FUN_00757900)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<ISimResources>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_ISimResources(
+  boost::SharedPtrRaw<moho::ISimResources>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedISimResourcesType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x00551CC0 (FUN_00551CC0)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<CIntelGrid>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_CIntelGrid(
+  boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedCIntelGridType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x005CE220 (FUN_005CE220, gpg::ReadArchive::ReadPointerShared_CIntelGrid2)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<CIntelGrid>` for the
+ * legacy CIntelPosHandle serializer lane.
+ */
+void gpg::ReadPointerShared_CIntelGrid2(
+  boost::SharedPtrRaw<moho::CIntelGrid>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedCIntelGridType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x0055A5D0 (FUN_0055A5D0)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<RScmResource>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_RScmResource(
+  boost::SharedPtrRaw<moho::RScmResource>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedRScmResourceType();
+  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+    ThrowTypeMismatch(tracked, expectedType);
+  }
+
+  AssignRetainedRawSharedPointer(outPointer, tracked);
+}
+
+/**
+ * Address: 0x007142F0 (FUN_007142F0)
+ *
+ * What it does:
+ * Reads one tracked pointer lane as `boost::shared_ptr<STrigger>`,
+ * promotes unowned lanes to shared ownership, and validates pointee type.
+ */
+void gpg::ReadPointerShared_STrigger(
+  boost::SharedPtrRaw<moho::STrigger>& outPointer, ReadArchive* const archive, const RRef& ownerRef
+)
+{
+  if (!archive) {
+    ThrowSerializationError("Error detected in archive: null ReadArchive.");
+  }
+
+  TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
+  if (!tracked.object) {
+    outPointer.release();
+    return;
+  }
+
+  EnsureTrackedPointerSharedOwnership(tracked);
+
+  gpg::RType* const expectedType = CachedSTriggerType();
   if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
     ThrowTypeMismatch(tracked, expectedType);
   }

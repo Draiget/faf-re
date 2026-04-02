@@ -2,12 +2,20 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
+
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
 
 namespace moho
 {
   class Entity;
+  struct SEntitySetTemplateUnit;
   class Unit;
 
   struct CEntityDbListHead
@@ -84,6 +92,63 @@ namespace moho
     [[nodiscard]] msvc8::list<Entity*>& Entities() noexcept;
     [[nodiscard]] const msvc8::list<Entity*>& Entities() const noexcept;
 
+    /**
+     * What it does:
+     * Registers one intrusive entity-set node in the DB-owned set registry.
+     */
+    void RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept;
+
+    /**
+     * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberSerialize)
+     *
+     * What it does:
+     * Loads EntityDB-owned entity/id-pool/set payload lanes from a read archive.
+     */
+    void MemberSerialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006897F0 (FUN_006897F0, Moho::EntityDB::MemberDeserialize)
+     *
+     * What it does:
+     * Saves EntityDB-owned entity/id-pool/set payload lanes into a write archive.
+     */
+    void MemberDeserialize(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00684AA0 (FUN_00684AA0, Moho::EntityDB::SerEntities read lane)
+     *
+     * What it does:
+     * Reads the entity-id + owned-entity pointer stream until sentinel id `0xF0000000`.
+     */
+    void SerEntities(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006849C0 (FUN_006849C0, Moho::EntityDB::SerEntities write lane)
+     *
+     * What it does:
+     * Writes the entity-id + owned-entity pointer stream and appends sentinel id
+     * `0xF0000000`.
+     */
+    void SerEntities(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00684B40 (FUN_00684B40, Moho::EntityDB::SerSets read lane)
+     *
+     * What it does:
+     * Reads unowned `EntitySetBase` pointers and links them into the registered
+     * intrusive set list.
+     */
+    void SerSets(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00684BC0 (FUN_00684BC0, Moho::EntityDB::SerSets write lane)
+     *
+     * What it does:
+     * Writes registered intrusive `EntitySetBase` pointers as an unowned pointer
+     * stream terminated by `nullptr`.
+     */
+    void SerSets(gpg::WriteArchive* archive);
+
   private:
     CEntityDbAllUnitsNode* mAllUnits;          // +0x00
     std::uint8_t mIdFamilyPoolsOpaque[0x14]{}; // +0x04 (two map-like trees used by id alloc/find/release paths)
@@ -92,4 +157,73 @@ namespace moho
   };
 
   static_assert(sizeof(CEntityDb) == 0x50, "CEntityDb size must be 0x50");
+
+  /**
+   * VFTABLE: 0x00E27980
+   * COL: 0x00E8D0F0
+   */
+  class EntityDBSerializer
+  {
+  public:
+    /**
+     * Address: 0x00684910 (FUN_00684910, Moho::EntityDBSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive-load flow into `CEntityDb::MemberSerialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00684920 (FUN_00684920, Moho::EntityDBSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive-save flow into `CEntityDb::MemberDeserialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00688A90 (FUN_00688A90, Moho::EntityDBSerializer::RegisterSerializeFunctions)
+     *
+     * What it does:
+     * Binds `EntityDB` RTTI serializer callbacks.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mDeserialize;
+    gpg::RType::save_func_t mSerialize;
+  };
+  static_assert(
+    offsetof(EntityDBSerializer, mHelperNext) == 0x04, "EntityDBSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(EntityDBSerializer, mHelperPrev) == 0x08, "EntityDBSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(EntityDBSerializer, mDeserialize) == 0x0C, "EntityDBSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EntityDBSerializer, mSerialize) == 0x10, "EntityDBSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(EntityDBSerializer) == 0x14, "EntityDBSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BFCAD0 (FUN_00BFCAD0, Moho::EntityDBSerializer::~EntityDBSerializer)
+   *
+   * What it does:
+   * Unlinks `EntityDBSerializer` from the intrusive helper list and rewires
+   * self-links.
+   */
+  gpg::SerHelperBase* cleanup_EntityDBSerializer();
+
+  /**
+   * Address: 0x00BD51A0 (FUN_00BD51A0, register_EntityDBSerializer)
+   *
+   * What it does:
+   * Initializes the `EntityDBSerializer` helper callback lanes and installs
+   * process-exit cleanup.
+   */
+  int register_EntityDBSerializer();
 } // namespace moho

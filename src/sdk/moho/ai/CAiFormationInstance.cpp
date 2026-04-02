@@ -1,14 +1,131 @@
 #include "moho/ai/CAiFormationInstance.h"
 
 #include <cmath>
+#include <initializer_list>
 #include <new>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
 namespace
 {
+  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
+  {
+    for (const char* const name : names) {
+      if (!name) {
+        continue;
+      }
+
+      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
+        return type;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = ResolveTypeByAnyName({"CFormationInstance", "Moho::CFormationInstance"});
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSimType()
+  {
+    if (!moho::Sim::sType) {
+      moho::Sim::sType = gpg::LookupRType(typeid(moho::Sim));
+    }
+    return moho::Sim::sType;
+  }
+
+  [[nodiscard]] gpg::RRef MakeSimRef(moho::Sim* sim)
+  {
+    gpg::RRef out{};
+    gpg::RType* const staticType = CachedSimType();
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!sim || !staticType) {
+      out.mObj = sim;
+      return out;
+    }
+
+    gpg::RType* dynamicType = staticType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*sim));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = sim;
+      out.mType = dynamicType ? dynamicType : staticType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(sim) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  [[nodiscard]] moho::Sim* ReadPointerSim(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  {
+    if (!archive) {
+      return nullptr;
+    }
+
+    const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    gpg::RType* const expectedType = CachedSimType();
+    if (!expectedType || !tracked.type) {
+      return static_cast<moho::Sim*>(tracked.object);
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+    if (upcast.mObj) {
+      return static_cast<moho::Sim*>(upcast.mObj);
+    }
+
+    const char* const expected = expectedType->GetName();
+    const char* const actual = source.GetTypeName();
+    const msvc8::string message = gpg::STR_Printf(
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
+      expected ? expected : "Sim",
+      actual ? actual : "null"
+    );
+    throw gpg::SerializationError(message.c_str());
+  }
+
+  void WritePointerSim(gpg::WriteArchive* const archive, moho::Sim* const sim, const gpg::RRef& ownerRef)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef objectRef = MakeSimRef(sim);
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
   constexpr Wm3::Vec3f kZeroForwardVector{0.0f, 0.0f, 0.0f};
   constexpr Wm3::Quatf kZeroQuaternion{0.0f, 0.0f, 0.0f, 0.0f};
 
@@ -82,6 +199,52 @@ namespace moho
     if ((deleteFlags & 1) != 0) {
       ::operator delete(this);
     }
+  }
+
+  /**
+   * Address: 0x0059E950 (FUN_0059E950, Moho::CAiFormationInstance::MemberDeserialize)
+   *
+   * What it does:
+   * Reads serialized base-formation payload, then restores the `Sim*` lane as
+   * an unowned tracked pointer.
+   */
+  void CAiFormationInstance::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    gpg::RType* const baseType = CachedCFormationInstanceType();
+    GPG_ASSERT(baseType != nullptr);
+    if (baseType) {
+      archive->Read(baseType, this, owner);
+    }
+
+    mSim = ReadPointerSim(archive, owner);
+  }
+
+  /**
+   * Address: 0x0059E9B0 (FUN_0059E9B0, Moho::CAiFormationInstance::MemberSerialize)
+   *
+   * What it does:
+   * Writes serialized base-formation payload, then saves the `Sim*` lane as
+   * an unowned tracked pointer.
+   */
+  void CAiFormationInstance::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    gpg::RType* const baseType = CachedCFormationInstanceType();
+    GPG_ASSERT(baseType != nullptr);
+    if (baseType) {
+      archive->Write(baseType, this, owner);
+    }
+
+    WritePointerSim(archive, mSim, owner);
   }
 
   /**

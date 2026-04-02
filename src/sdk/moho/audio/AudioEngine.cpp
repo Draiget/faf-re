@@ -1,16 +1,25 @@
 #include "moho/audio/AudioEngine.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 
+#include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/render/camera/VTransform.h"
 
 moho::SoundConfiguration* moho::sSoundConfiguration = nullptr;
+
+namespace moho
+{
+  const char* func_SoundErrorCodeToMsg(int errorCode);
+}
 
 namespace
 {
@@ -18,15 +27,31 @@ namespace
   constexpr std::uint16_t kInvalidCategoryId = 0xFFFFu;
   constexpr float kDefaultCategoryVolume = 1.0f;
   constexpr const char* kGlobalCategoryName = "Global";
+  bool gSuppressXact3dApplyFailureWarning = true;
 
   struct AudioSoundBankLoader
   {
-    std::uint8_t mReserved00[0x10]; // +0x00
-    moho::IXACTSoundBank* mBank;    // +0x10
-    msvc8::string mName;            // +0x14
+    gpg::MemBuffer<char> mBuffer; // +0x00
+    moho::IXACTSoundBank* mBank;  // +0x10
+    msvc8::string mName;          // +0x14
+    moho::AudioEngineImpl* mEngine; // +0x30
+
+    /**
+     * Address: 0x004DA8E0 (FUN_004DA8E0, struct_SoundLoader::Load)
+     *
+     * gpg::StrArg
+     *
+     * What it does:
+     * Resolves one sound-bank path, reads the bank bytes, creates an XACT
+     * sound bank, and stores the base filename for diagnostics.
+     */
+    bool Load(gpg::StrArg soundBankPath);
   };
+  static_assert(offsetof(AudioSoundBankLoader, mBuffer) == 0x00, "AudioSoundBankLoader::mBuffer offset must be 0x00");
   static_assert(offsetof(AudioSoundBankLoader, mBank) == 0x10, "AudioSoundBankLoader::mBank offset must be 0x10");
   static_assert(offsetof(AudioSoundBankLoader, mName) == 0x14, "AudioSoundBankLoader::mName offset must be 0x14");
+  static_assert(offsetof(AudioSoundBankLoader, mEngine) == 0x30, "AudioSoundBankLoader::mEngine offset must be 0x30");
+  static_assert(sizeof(AudioSoundBankLoader) == 0x34, "AudioSoundBankLoader size must be 0x34");
 
   struct AudioCategoryVolumeNode
   {
@@ -222,6 +247,44 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x004DA8E0 (FUN_004DA8E0, struct_SoundLoader::Load)
+   *
+   * gpg::StrArg
+   *
+   * What it does:
+   * Resolves one sound-bank path, reads the bank bytes, creates an XACT
+   * sound bank, and stores the base filename for diagnostics.
+   */
+  bool AudioSoundBankLoader::Load(const gpg::StrArg soundBankPath)
+  {
+    moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+    msvc8::string mountedPath{};
+    const msvc8::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, soundBankPath, nullptr);
+
+    mBuffer = moho::DISK_ReadFile(resolvedPath->c_str());
+    if (mBuffer.mBegin == nullptr) {
+      gpg::Warnf("Error loading soundbank '%s'", soundBankPath);
+      return false;
+    }
+
+    const int createResult = mEngine->mInstance->CreateSoundBank(
+      mBuffer.mBegin,
+      static_cast<std::int32_t>(mBuffer.mEnd - mBuffer.mBegin),
+      0u,
+      0u,
+      &mBank
+    );
+    if (createResult < 0) {
+      gpg::Warnf("Error loading soundbank '%s': %s", soundBankPath, moho::func_SoundErrorCodeToMsg(createResult));
+      return false;
+    }
+
+    mName = moho::FILE_Base(soundBankPath, true);
+    gpg::Debugf("SND: Loaded SoundBank '%s'", mName.c_str());
+    return true;
+  }
+
   void InitMap1Head(moho::AudioMapStorage& map)
   {
     map.mAllocatorCookie = nullptr;
@@ -404,6 +467,17 @@ namespace
 
 namespace moho
 {
+  int func_AudioInitialize(IXACTEngine* engine, void* audioHandle);
+  void func_RetreiveXACTCOMInterface(AudioEngineImpl* impl);
+  void func_LoadSoundPath(AudioEngineImpl* impl, gpg::StrArg voicePath);
+  msvc8::string SND_GetVariableName(int variableId);
+
+  /**
+   * Address: 0x004D8A50 (FUN_004D8A50, func_SoundErrorCodeToMsg)
+   *
+   * What it does:
+   * Maps common HRESULT/XACT failure codes to stable diagnostic text.
+   */
   const char* func_SoundErrorCodeToMsg(int errorCode);
   int func_X3DAudioCalculate(
     const Audio3DEmitter* emitter,
@@ -411,6 +485,163 @@ namespace moho
     Audio3DDspSettings* settings,
     const void* audioHandle
   );
+
+  /**
+   * Address: 0x004D8A50 (FUN_004D8A50, func_SoundErrorCodeToMsg)
+   *
+   * What it does:
+   * Translates XACT/HRESULT error codes into user-facing warning strings.
+   */
+  const char* func_SoundErrorCodeToMsg(const int errorCode)
+  {
+    const std::uint32_t code = static_cast<std::uint32_t>(errorCode);
+    switch (code) {
+    case 0x8007000Eu:
+      return "Out of memory";
+    case 0x80004001u:
+      return "Not implemented";
+    case 0x80004005u:
+      return "Unknown error";
+    case 0x80070057u:
+      return "Invalid arg";
+
+    case 0x8AC70001u:
+      return "The engine is already initialized";
+    case 0x8AC70002u:
+      return "The engine has not been initialized";
+    case 0x8AC70003u:
+      return "The engine has expired (demo or pre-release version)";
+    case 0x8AC70004u:
+      return "No notification callback";
+    case 0x8AC70005u:
+      return "Notification already registered";
+    case 0x8AC70006u:
+      return "Invalid usage";
+    case 0x8AC70007u:
+      return "Invalid data";
+    case 0x8AC70008u:
+      return "Fail to play due to instance limit";
+    case 0x8AC70009u:
+      return "Global Settings not loaded";
+    case 0x8AC7000Au:
+      return "Invalid variable index";
+    case 0x8AC7000Bu:
+      return "Invalid category";
+    case 0x8AC7000Cu:
+      return "Invalid cue index";
+    case 0x8AC7000Du:
+      return "Invalid wave index";
+    case 0x8AC7000Eu:
+      return "Invalid track index";
+    case 0x8AC7000Fu:
+      return "Invalid sound offset or index";
+    case 0x8AC70010u:
+      return "Error reading a file";
+    case 0x8AC70011u:
+      return "Unknown event type";
+    case 0x8AC70012u:
+      return "Invalid call of method of function from callback";
+    case 0x8AC70013u:
+      return "No wavebank exists for desired operation";
+    case 0x8AC70014u:
+      return "Unable to select a variation";
+    case 0x8AC70015u:
+      return "There can be only one audition engine";
+    case 0x8AC70016u:
+      return "The wavebank is not prepared";
+    case 0x8AC70017u:
+      return "No audio device found on.";
+    case 0x8AC70018u:
+      return "Invalid entry count for channel maps";
+
+    case 0x8AC70101u:
+      return "Error writing a file during auditioning";
+    case 0x8AC70102u:
+      return "Missing a soundbank";
+    case 0x8AC70103u:
+      return "Missing an RPC curve";
+    case 0x8AC70104u:
+      return "Missing data for an audition command";
+    case 0x8AC70105u:
+      return "Unknown command";
+    case 0x8AC70106u:
+      return "Missing a DSP parameter";
+
+    default:
+      return "Unknown XACT Error";
+    }
+  }
+
+  namespace
+  {
+    struct SoundNotificationEventData
+    {
+      std::uint8_t mType;                                 // +0x00
+      std::array<std::uint8_t, 0x08> mReserved01{};      // +0x01
+      std::array<std::uint8_t, 0x04> mWaveBankToken{};   // +0x09
+      std::array<std::uint8_t, 0x06> mReserved0D{};      // +0x0D
+      std::array<std::uint8_t, 0x02> mVariableId{};      // +0x13
+      std::array<std::uint8_t, 0x04> mVariableValue{};   // +0x15
+
+      [[nodiscard]] std::uint16_t VariableId() const noexcept
+      {
+        std::uint16_t value = 0;
+        std::memcpy(&value, mVariableId.data(), sizeof(value));
+        return value;
+      }
+
+      [[nodiscard]] float VariableValue() const noexcept
+      {
+        float value = 0.0f;
+        std::memcpy(&value, mVariableValue.data(), sizeof(value));
+        return value;
+      }
+
+      [[nodiscard]] std::uint32_t WaveBankId() const noexcept
+      {
+        std::uint32_t value = 0;
+        std::memcpy(&value, mWaveBankToken.data(), sizeof(value));
+        return value;
+      }
+    };
+    static_assert(offsetof(SoundNotificationEventData, mType) == 0x00, "SoundNotificationEventData::mType offset must be 0x00");
+    static_assert(
+      offsetof(SoundNotificationEventData, mWaveBankToken) == 0x09,
+      "SoundNotificationEventData::mWaveBankToken offset must be 0x09"
+    );
+    static_assert(
+      offsetof(SoundNotificationEventData, mVariableId) == 0x13,
+      "SoundNotificationEventData::mVariableId offset must be 0x13"
+    );
+    static_assert(
+      offsetof(SoundNotificationEventData, mVariableValue) == 0x15,
+      "SoundNotificationEventData::mVariableValue offset must be 0x15"
+    );
+    static_assert(sizeof(SoundNotificationEventData) == 0x19, "SoundNotificationEventData size must be 0x19");
+
+    struct AudioNotificationDesc
+    {
+      std::uint8_t type;
+      std::uint8_t flags;
+      std::uint8_t reserved[0x18];
+    };
+
+    void RegisterNotificationOrWarn(AudioEngineImpl* const impl, const std::uint8_t notificationType)
+    {
+      if (impl == nullptr || impl->mInstance == nullptr) {
+        return;
+      }
+
+      AudioNotificationDesc notification{};
+      notification.type = notificationType;
+      notification.flags = 1u;
+
+      const int result = impl->mInstance->RegisterNotification(&notification);
+      if (result < 0) {
+        gpg::Warnf("SND: Error registering notification.\n%s", func_SoundErrorCodeToMsg(result));
+      }
+    }
+  } // namespace
 
   std::uint32_t SoundConfiguration::EngineCount() const
   {
@@ -434,6 +665,53 @@ namespace moho
     }
 
     return engine->mImpl;
+  }
+
+  /**
+   * Address: 0x004D8810 (FUN_004D8810, func_HandleSoundEvent)
+   *
+   * What it does:
+   * Handles XACT notification event payloads and emits diagnostics for
+   * variable-value changes, GUI connect/disconnect signals, and wavebank
+   * streaming state changes.
+   */
+  void __stdcall func_HandleSoundEvent(const std::uint8_t* const eventDataBytes)
+  {
+    if (eventDataBytes == nullptr) {
+      return;
+    }
+
+    const auto& eventData = *reinterpret_cast<const SoundNotificationEventData*>(eventDataBytes);
+    switch (eventData.mType) {
+    case 0x08:
+      gpg::Logf("SND: Local var changed %i = %f", eventData.VariableId(), eventData.VariableValue());
+      break;
+
+    case 0x09: {
+      const msvc8::string variableName = SND_GetVariableName(static_cast<int>(eventData.VariableId()));
+      gpg::Logf("SND: Global var changed [%s] = %f", variableName.c_str(), eventData.VariableValue());
+      break;
+    }
+
+    case 0x0A:
+      gpg::Logf("SND: Gui Connected");
+      break;
+
+    case 0x0B:
+      gpg::Logf("SND: Gui Disconnected");
+      break;
+
+    case 0x11:
+      gpg::Debugf("Wavebank prepared: %x", eventData.WaveBankId());
+      break;
+
+    case 0x12:
+      gpg::Logf("Error streaming from wavebank %x, invalid content", eventData.WaveBankId());
+      break;
+
+    default:
+      break;
+    }
   }
 
   /**
@@ -490,34 +768,87 @@ namespace moho
   }
 
   /**
+   * Address: 0x004D9410 (FUN_004D9410, ??0AudioEngine@Moho@@AAE@VStrArg@gpg@@@Z)
+   *
+   * gpg::StrArg voicePath
+   *
+   * What it does:
+   * Allocates and binds `AudioEngineImpl`, initializes XACT + 3D audio lanes,
+   * loads voice/sound path data, and applies startup listener/category state.
+   */
+  AudioEngine::AudioEngine(const gpg::StrArg voicePath)
+    : mImpl(nullptr)
+  {
+    SoundConfiguration* const configuration = sSoundConfiguration;
+    AudioEngineImpl* const previousImpl = mImpl;
+    mImpl = new AudioEngineImpl(this, configuration);
+    if (previousImpl != nullptr) {
+      previousImpl->~AudioEngineImpl();
+      operator delete(previousImpl);
+    }
+
+    if (configuration == nullptr || configuration->mNoSound != 0u || mImpl == nullptr) {
+      return;
+    }
+
+    func_RetreiveXACTCOMInterface(mImpl);
+    if (mImpl->mInstance == nullptr) {
+      return;
+    }
+
+    gpg::MD5Context md5Context{};
+    md5Context.Reset();
+    md5Context.Update(configuration->mGlobalSettingsStart, configuration->mGlobalSettingsLength);
+    const msvc8::string globalSettingsDigest = md5Context.Digest().ToString();
+    gpg::Logf("MD5 of global settings: %s", globalSettingsDigest.c_str());
+
+    const int initializeResult = mImpl->mInstance->Initialize(&configuration->mSpeakerConfiguration);
+    if (initializeResult < 0) {
+      gpg::Warnf("SND: Error initializing audio engine.\n%s", func_SoundErrorCodeToMsg(initializeResult));
+      configuration->mNoSound = 1u;
+      return;
+    }
+
+    const int audio3dResult = func_AudioInitialize(mImpl->mInstance, mImpl->mAudioHandle);
+    if (audio3dResult < 0) {
+      gpg::Warnf("SND: Error initializing 3D audio.\n%s", func_SoundErrorCodeToMsg(audio3dResult));
+      configuration->mNoSound = 1u;
+      return;
+    }
+
+    RegisterNotificationOrWarn(mImpl, 10u);
+    RegisterNotificationOrWarn(mImpl, 11u);
+    RegisterNotificationOrWarn(mImpl, 17u);
+    RegisterNotificationOrWarn(mImpl, 18u);
+
+    gpg::Logf("MEM: %i bytes SND", 0);
+    func_LoadSoundPath(mImpl, voicePath);
+
+    if (CFG_GetArgOption("/nomusic", 0, nullptr)) {
+      SetVolume("Music", 0.0f);
+    }
+
+    VTransform listenerTransform{};
+    listenerTransform.pos_.x = 0.0f;
+    listenerTransform.pos_.y = 0.0f;
+    listenerTransform.pos_.z = 0.0f;
+    SetListenerTransform(listenerTransform);
+  }
+
+  /**
    * Address: 0x004D9340 (FUN_004D9340, ?Create@AudioEngine@Moho@@SA?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@VStrArg@gpg@@@Z)
    *
    * gpg::StrArg voicePath
    *
    * What it does:
    * Ensures global audio configuration exists, creates one `AudioEngine`
-   * object with a typed `AudioEngineImpl`, and registers it into the
+   * object through the recovered constructor lane, and registers it into the
    * process-global engine lane used by `SND_Frame`/`SND_Mute`.
    */
   boost::shared_ptr<AudioEngine> AudioEngine::Create(const gpg::StrArg voicePath)
   {
-    (void)voicePath;
-
     SoundConfiguration* const configuration = EnsureSoundConfigurationForCreate();
-    AudioEngine* createdEngine = nullptr;
-
-    auto* const rawEngine = new AudioEngine{};
-    if (rawEngine != nullptr) {
-      rawEngine->mImpl = nullptr;
-
-      auto* const impl = new AudioEngineImpl(rawEngine, configuration);
-      if (impl != nullptr) {
-        rawEngine->mImpl = impl;
-        createdEngine = rawEngine;
-      } else {
-        delete rawEngine;
-      }
-    }
+    AudioEngine* const createdEngine = new AudioEngine(voicePath);
 
     boost::shared_ptr<AudioEngine> result(createdEngine);
     if (configuration != nullptr && createdEngine != nullptr) {
@@ -834,6 +1165,7 @@ namespace moho
 
   /**
    * Address: 0x004D9A60 (FUN_004D9A60)
+   * Address: 0x0128E866 (FUN_0128E866, patch_AudioEngine_Calculate3D)
    *
    * Wm3::Vector3<float> const *, AudioEngine *, IXACTCue *
    *
@@ -874,7 +1206,10 @@ namespace moho
 
     const int applyResult = ApplySettingsToCue(&impl->mSettings, cue);
     if (applyResult < 0) {
-      gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
+      if (gSuppressXact3dApplyFailureWarning) {
+        gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
+        gSuppressXact3dApplyFailureWarning = false;
+      }
     }
   }
 } // namespace moho

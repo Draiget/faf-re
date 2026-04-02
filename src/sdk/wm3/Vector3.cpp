@@ -198,4 +198,31 @@ Vector3<float>* MultiplyQuaternionVector(
     dest->z = vec.x * matrix[2][0] + vec.y * matrix[2][1] + vec.z * matrix[2][2];
     return dest;
 }
+
+/**
+ * Address: 0x00428DB0 (FUN_00428DB0, Wm3::Vector3f::Add)
+ *
+ * Wm3::Vector3<float> const&, Wm3::Vector3<float>*, Wm3::Vector3<float> const&
+ *
+ * IDA signature:
+ * Wm3::Vector3f *__thiscall Wm3::Vector3f::Add(Wm3::Vector3f *this, Wm3::Vector3f *out, Wm3::Vector3f *rhs);
+ *
+ * What it does:
+ * Writes `lhs + rhs` into caller-provided `out` and returns `out`.
+ */
+Vector3<float>* AddVector3f(
+    const Vector3<float>& lhs,
+    Vector3<float>* const out,
+    const Vector3<float>& rhs
+) noexcept
+{
+    if (!out) {
+        return nullptr;
+    }
+
+    out->x = lhs.x + rhs.x;
+    out->y = lhs.y + rhs.y;
+    out->z = lhs.z + rhs.z;
+    return out;
+}
 } // namespace Wm3

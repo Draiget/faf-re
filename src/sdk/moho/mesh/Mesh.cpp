@@ -5,11 +5,15 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/RScmResource.h"
+#include "gpg/core/utils/Logging.h"
 
 namespace
 {
@@ -165,7 +169,7 @@ namespace
   }
 
   [[nodiscard]] boost::shared_ptr<moho::RScmResource>
-  ResolveMeshResourceForLod(const msvc8::string& meshPath, moho::Mesh* const ownerWatcher)
+  ResolveMeshResourceForLod(const msvc8::string& meshPath, moho::CResourceWatcher* const ownerWatcher)
   {
     // Address chain: 0x007DCED0 -> 0x00539BA0 -> 0x004ABEE0 -> 0x004AA220.
     // Full resource-manager lifting is pending; keep the API seam typed.
@@ -174,20 +178,76 @@ namespace
     return {};
   }
 
-  [[nodiscard]] msvc8::string ResolveShaderAnnotationName(const msvc8::string& shaderName)
+  struct ShaderDictionaryEntry
   {
-    // Address chain: 0x007DC1B0 -> 0x007DBDB0.
-    // Full ShaderDictionary remap semantics are pending; keep default behavior:
-    // empty shader picks "Unit", otherwise keep provided shader key.
-    if (shaderName.empty()) {
-      return msvc8::string("Unit");
+    msvc8::string remappedShaderName;
+    std::int32_t sourceGeneration;
+  };
+
+  class ShaderDictionaryRuntime
+  {
+  public:
+    [[nodiscard]] static ShaderDictionaryRuntime& Instance() noexcept
+    {
+      static ShaderDictionaryRuntime runtime{};
+      return runtime;
     }
 
-    return msvc8::string(shaderName.view());
+    [[nodiscard]] std::int32_t CurrentGeneration() const noexcept
+    {
+      return mCurrentGeneration;
+    }
+
+    [[nodiscard]] const ShaderDictionaryEntry* Lookup(const msvc8::string& requestedShaderName) const
+    {
+      const auto it = mEntries.find(NormalizeKey(requestedShaderName));
+      if (it == mEntries.end()) {
+        return nullptr;
+      }
+
+      return &it->second;
+    }
+
+  private:
+    template <class TString>
+    [[nodiscard]] static std::string NormalizeKey(const TString& value)
+    {
+      const std::string_view view = value.view();
+      return std::string(view.begin(), view.end());
+    }
+
+    std::int32_t mCurrentGeneration = 0;
+    std::unordered_map<std::string, ShaderDictionaryEntry> mEntries{};
+  };
+
+  /**
+   * Address: 0x007DBDB0 (FUN_007DBDB0, sub_7DBDB0)
+   *
+   * What it does:
+   * Resolves one shader annotation through runtime shader remap dictionary
+   * and falls back to caller text (or "Unit" for empty names).
+   */
+  [[nodiscard]] msvc8::string ResolveShaderAnnotationName(const msvc8::string& shaderName)
+  {
+    const ShaderDictionaryRuntime& dictionary = ShaderDictionaryRuntime::Instance();
+    const ShaderDictionaryEntry* const dictionaryEntry = dictionary.Lookup(shaderName);
+    if (!dictionaryEntry) {
+      if (shaderName.empty()) {
+        return msvc8::string("Unit");
+      }
+
+      return msvc8::string(shaderName.view());
+    }
+
+    if (dictionaryEntry->sourceGeneration != dictionary.CurrentGeneration()) {
+      gpg::Warnf("Use of 'old' shader: %s", shaderName.raw_data_unsafe());
+    }
+
+    return msvc8::string(dictionaryEntry->remappedShaderName.view());
   }
 
   [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet>
-  ResolveMaterialTextureSheet(const msvc8::string& textureName, void* const resourceWatcher)
+  ResolveMaterialTextureSheet(const msvc8::string& textureName, moho::CResourceWatcher* const resourceWatcher)
   {
     // Address chain: 0x007DC1B0 -> D3D_GetDevice/GetResources -> resource lookup vfunc.
     // Device/resource interfaces are still being reconstructed; keep this seam typed.
@@ -199,7 +259,7 @@ namespace
   void AssignMaterialTextureSheet(
     boost::shared_ptr<moho::CD3DDynamicTextureSheet>& destination,
     const msvc8::string& textureName,
-    void* const resourceWatcher
+    moho::CResourceWatcher* const resourceWatcher
   )
   {
     if (textureName.empty()) {
@@ -281,26 +341,23 @@ namespace
 
   void RemoveLinkFromList(moho::MeshInstance::ListLink* const link) noexcept
   {
-    if (!link || !link->prev || !link->next) {
+    if (!link || !link->mPrev || !link->mNext) {
       return;
     }
 
-    link->prev->next = link->next;
-    link->next->prev = link->prev;
-    link->prev = link;
-    link->next = link;
+    link->ListUnlink();
   }
 
   void InsertLinkBefore(moho::MeshInstance::ListLink* const position, moho::MeshInstance::ListLink* const link) noexcept
   {
-    if (!position || !link || !position->prev) {
+    if (!position || !link || !position->mPrev) {
       return;
     }
 
-    link->prev = position->prev;
-    link->next = position;
-    position->prev->next = link;
-    position->prev = link;
+    link->mPrev = position->mPrev;
+    link->mNext = position;
+    position->mPrev->mNext = link;
+    position->mPrev = link;
   }
 
   [[nodiscard]] bool IsMeshCacheSentinelNode(const moho::MeshRendererMeshCacheNode* const node) noexcept
@@ -660,7 +717,7 @@ namespace
 
   void ResetLodBatchesForInstanceLinkList(moho::MeshInstance::ListLink& head) noexcept
   {
-    for (moho::MeshInstance::ListLink* link = head.next; link && link != &head; link = link->next) {
+    for (moho::MeshInstance::ListLink* link = head.mNext; link && link != &head; link = link->mNext) {
       moho::MeshInstance* const instance = MeshInstanceFromLink(link);
       if (!instance || !instance->mesh) {
         continue;
@@ -833,7 +890,7 @@ namespace moho
    * Builds one material from one mesh LOD blueprint descriptor.
    */
   boost::shared_ptr<MeshMaterial>
-  MeshMaterial::Create(const RMeshBlueprintLOD& blueprintLod, void* const resourceWatcher)
+  MeshMaterial::Create(const RMeshBlueprintLOD& blueprintLod, CResourceWatcher* const resourceWatcher)
   {
     return Create(
       blueprintLod.mShaderName,
@@ -860,7 +917,7 @@ namespace moho
     const msvc8::string& specularName,
     const msvc8::string& lookupName,
     const msvc8::string& secondaryName,
-    void* const resourceWatcher
+    CResourceWatcher* const resourceWatcher
   )
   {
     boost::shared_ptr<MeshMaterial> material(new MeshMaterial());
@@ -886,7 +943,7 @@ namespace moho
     const RMeshBlueprintLOD& blueprintLod,
     const boost::shared_ptr<RScmResource> previousResourceArg,
     const boost::shared_ptr<MeshMaterial> materialArg,
-    Mesh* const ownerWatcher
+    CResourceWatcher* const ownerWatcher
   )
     : useDissolve(0)
     , cutoff(1000.0f)
@@ -941,7 +998,7 @@ namespace moho
     const RMeshBlueprintLOD& blueprintLod,
     const boost::shared_ptr<RScmResource> previousResourceArg,
     const boost::shared_ptr<MeshMaterial> materialArg,
-    Mesh* const ownerWatcher
+    CResourceWatcher* const ownerWatcher
   )
   {
     Clear();
@@ -977,13 +1034,7 @@ namespace moho
    * ??0Mesh@Moho@@QAE@PBVRMeshBlueprint@1@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
    */
   Mesh::Mesh(const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg)
-    : watcherFlags(0)
-    , watchedBegin(watchedInlineStorage)
-    , watchedEnd(watchedInlineStorage)
-    , watchedStorageEnd(watchedInlineStorage + sizeof(watchedInlineStorage))
-    , watchedStorageOrigin(watchedInlineStorage)
-    , watchedInlineStorage{}
-    , bp(nullptr)
+    : bp(nullptr)
     , material()
     , unk2C(0)
     , lods()
@@ -1364,7 +1415,7 @@ namespace moho
     , meshEnvironmentTex()
     , anisotropiclookupTex()
     , insectlookupTex()
-    , instanceListHead{nullptr, nullptr}
+    , instanceListHead()
     , instanceListSize(0)
     , deltaFrame(0.0f)
     , instanceListStateFlags(0)
@@ -1373,8 +1424,7 @@ namespace moho
   {
     meshCacheTree.head = CreateMeshCacheTreeSentinel();
     meshes.head = CreateMeshBatchTreeSentinel();
-    instanceListHead.prev = &instanceListHead;
-    instanceListHead.next = &instanceListHead;
+    instanceListHead.ListResetLinks();
     gMeshRendererInstance = this;
   }
 

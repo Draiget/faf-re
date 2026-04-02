@@ -7,6 +7,16 @@
 namespace moho
 {
   /**
+   * Address: 0x0043F410 (FUN_0043F410, sub_43F410)
+   *
+   * What it does:
+   * Initializes vftable state and clears retained vertex-format ownership lanes.
+   */
+  CD3DVertexFormat::CD3DVertexFormat()
+    : mFormat()
+  {}
+
+  /**
    * Address: 0x0043CFC0 (FUN_0043CFC0)
    *
    * std::uint32_t
@@ -16,7 +26,7 @@ namespace moho
    * stores retained ownership.
    */
   CD3DVertexFormat::CD3DVertexFormat(const std::uint32_t formatCode)
-    : mFormat()
+    : CD3DVertexFormat()
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
@@ -26,6 +36,15 @@ namespace moho
     auto* const d3dDevice = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
     d3dDevice->CreateVertexFormat(&mFormat, formatCode);
   }
+
+  /**
+   * Address: 0x00440CB0 (FUN_00440CB0, non-deleting body)
+   * Address: 0x00440C70 (FUN_00440C70, deleting thunk)
+   *
+   * What it does:
+   * Releases retained gal vertex-format ownership lanes during destruction.
+   */
+  CD3DVertexFormat::~CD3DVertexFormat() = default;
 
   /**
    * Address: 0x0043F430 (FUN_0043F430)

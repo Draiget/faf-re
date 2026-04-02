@@ -43,6 +43,30 @@ namespace moho
     u_short GetPort() override;
 
     /**
+     * Address: 0x00483580 (FUN_00483580, Moho::CNetTCPConnection::GetSocket)
+     *
+     * What it does:
+     * Returns the owned WinSock socket handle.
+     */
+    [[nodiscard]] SOCKET GetSocket() const noexcept;
+
+    /**
+     * Address: 0x00483590 (FUN_00483590, Moho::CNetTCPConnection::GetState)
+     *
+     * What it does:
+     * Returns current TCP connection state enum lane.
+     */
+    [[nodiscard]] ENetConnectionState GetState() const noexcept;
+
+    /**
+     * Address: 0x004838B0 (FUN_004838B0)
+     *
+     * What it does:
+     * Attaches an accepted socket and transitions state to establishing.
+     */
+    void AdoptSocketAndSetEstablishing(SOCKET socket) noexcept;
+
+    /**
      * Address: 0x004835D0 (FUN_004835D0)
      * Address: 0x1007D3C0 (sub_1007D3C0)
      * Slot: 2
@@ -114,6 +138,7 @@ namespace moho
 
     /**
      * Address: 0x004837E0 (FUN_004837E0)
+     * Address: 0x00483A40 (FUN_00483A40, deleting destructor thunk)
      *
      * What it does:
      * Closes socket/streams and unlinks from connector intrusive list.
@@ -143,6 +168,14 @@ namespace moho
      * Attaches accepted socket stream payload to this connection.
      */
     void AdoptIncomingStream(SOCKET socket, gpg::PipeStream& stream);
+
+    /**
+     * Address: 0x00484640 (FUN_00484640, Moho::CNetTCPConnection::SelectSocket)
+     *
+     * What it does:
+     * Binds socket events (`FD_READ|FD_CONNECT|FD_CLOSE`) to `eventHandle`.
+     */
+    int SelectSocket(void* eventHandle);
 
   public:
     CNetTCPConnector* mConnector{nullptr};        // +0x418

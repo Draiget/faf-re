@@ -5,6 +5,17 @@
 namespace moho
 {
   /**
+   * Address: 0x004228D0 (FUN_004228D0, sub_4228D0)
+   *
+   * What it does:
+   * Initializes the base counted-object lanes and clears reference count.
+   */
+  CountedObject::CountedObject() noexcept
+    : mRefCount(0)
+  {}
+
+  /**
+   * Address: 0x004228C0 (FUN_004228C0, sub_4228C0 non-deleting body lane)
    * Address: 0x004228E0 (FUN_004228E0, scalar deleting destructor thunk)
    * Mangled: ??_GCountedObject@Moho@@UAEPAXI@Z
    *

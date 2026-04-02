@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005993C0 (FUN_005993C0, Moho::IAiCommandDispatchImplSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `IAiCommandDispatchImpl::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005993D0 (FUN_005993D0, Moho::IAiCommandDispatchImplSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `IAiCommandDispatchImpl::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005996D0 (FUN_005996D0)
      *
      * What it does:
@@ -50,5 +66,21 @@ namespace moho
     "IAiCommandDispatchImplSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(IAiCommandDispatchImplSerializer) == 0x14, "IAiCommandDispatchImplSerializer size must be 0x14");
-} // namespace moho
 
+  /**
+   * Address: 0x00BCBF00 (FUN_00BCBF00, register_IAiCommandDispatchImplSerializer)
+   *
+   * What it does:
+   * Initializes recovered serializer helper storage/callback lanes and installs
+   * process-exit unlink cleanup.
+   */
+  void register_IAiCommandDispatchImplSerializer();
+
+  /**
+   * Address: 0x00BCBF40 (FUN_00BCBF40, register_IAiCommandDispatchImplStartupStatsCleanup)
+   *
+   * What it does:
+   * Registers an atexit cleanup thunk for one startup-owned engine-stats slot.
+   */
+  int register_IAiCommandDispatchImplStartupStatsCleanup();
+} // namespace moho

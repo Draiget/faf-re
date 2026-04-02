@@ -10,6 +10,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007177B0 (FUN_007177B0, sub_7177B0)
+     *
+     * What it does:
+     * Preregisters InfluenceMapEntry RTTI with the reflection system.
+     */
+    InfluenceMapEntryTypeInfo();
+
+    /**
      * Address: 0x00717840 (FUN_00717840, Moho::InfluenceMapEntryTypeInfo::dtr)
      *
      * What it does:

@@ -1,13 +1,123 @@
 #pragma once
 
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <typeinfo>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
+#include "moho/sim/CSimConCommand.h"
 
 namespace moho
 {
+  namespace detail
+  {
+    [[nodiscard]] inline bool ParseBoolToken(const std::string_view token, bool& outValue) noexcept
+    {
+      const char* const text = token.data();
+      if (
+        token == "1" || gpg::STR_EqualsNoCase(text, "true") || gpg::STR_EqualsNoCase(text, "on")
+        || gpg::STR_EqualsNoCase(text, "yes")
+      ) {
+        outValue = true;
+        return true;
+      }
+      if (
+        token == "0" || gpg::STR_EqualsNoCase(text, "false") || gpg::STR_EqualsNoCase(text, "off")
+        || gpg::STR_EqualsNoCase(text, "no")
+      ) {
+        outValue = false;
+        return true;
+      }
+
+      return false;
+    }
+
+    template <typename T>
+    [[nodiscard]] bool ParseSimConValue(const std::string& token, T& outValue)
+    {
+      if constexpr (std::is_same_v<T, bool>) {
+        bool parsed = false;
+        if (!ParseBoolToken(token, parsed)) {
+          return false;
+        }
+        outValue = parsed;
+        return true;
+      } else if constexpr (std::is_same_v<T, int>) {
+        char* endPtr = nullptr;
+        errno = 0;
+        const long parsed = std::strtol(token.c_str(), &endPtr, 10);
+        if (endPtr == token.c_str() || (endPtr && *endPtr != '\0') || errno == ERANGE) {
+          return false;
+        }
+        if (parsed < static_cast<long>(std::numeric_limits<int>::min()) ||
+            parsed > static_cast<long>(std::numeric_limits<int>::max())) {
+          return false;
+        }
+        outValue = static_cast<int>(parsed);
+        return true;
+      } else if constexpr (std::is_same_v<T, float>) {
+        char* endPtr = nullptr;
+        errno = 0;
+        const float parsed = std::strtof(token.c_str(), &endPtr);
+        if (endPtr == token.c_str() || (endPtr && *endPtr != '\0') || errno == ERANGE) {
+          return false;
+        }
+        outValue = parsed;
+        return true;
+      } else if constexpr (std::is_same_v<T, std::uint8_t>) {
+        int parsed = 0;
+        if (!ParseSimConValue<int>(token, parsed)) {
+          return false;
+        }
+        if (parsed < 0 || parsed > 255) {
+          return false;
+        }
+        outValue = static_cast<std::uint8_t>(parsed);
+        return true;
+      } else if constexpr (std::is_same_v<T, msvc8::string>) {
+        outValue.assign_owned(token.c_str());
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    template <typename T>
+    void LogSimConValue(const char* const name, const T& value)
+    {
+      if constexpr (std::is_same_v<T, bool>) {
+        gpg::Logf("bool %s == %s", name ? name : "", value ? "on" : "off");
+      } else if constexpr (std::is_same_v<T, int>) {
+        gpg::Logf("int %s == %d", name ? name : "", value);
+      } else if constexpr (std::is_same_v<T, float>) {
+        gpg::Logf("float %s == %.4f", name ? name : "", value);
+      } else if constexpr (std::is_same_v<T, std::uint8_t>) {
+        gpg::Logf("uint8 %s == %d", name ? name : "", static_cast<int>(value));
+      } else if constexpr (std::is_same_v<T, msvc8::string>) {
+        gpg::Logf("string %s == %s", name ? name : "", value.c_str());
+      }
+    }
+
+    template <typename T>
+    [[nodiscard]] gpg::RType* CachedRType()
+    {
+      static gpg::RType* sType = nullptr;
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(T));
+      }
+      return sType;
+    }
+  } // namespace detail
+
   /**
    * VFTABLE: 0x00E198EC
    * COL:		0x00E6EAC0
@@ -60,6 +170,38 @@ namespace moho
   template <typename T>
   class TSimConVarInstance : public CSimConVarInstanceBase
   {
+  public:
+    int HandleConsoleCommand(void* commandArgs) override
+    {
+      auto* const args = static_cast<CSimConCommand::ParsedCommandArgs*>(commandArgs);
+      if (args != nullptr && args->size() >= 2u) {
+        T parsed{};
+        if (detail::ParseSimConValue<T>((*args)[1], parsed)) {
+          mValue = parsed;
+          return 1;
+        }
+      }
+
+      detail::LogSimConValue<T>(mName, mValue);
+      return 0;
+    }
+
+    void* GetValueStorage() override
+    {
+      return &mValue;
+    }
+
+    gpg::RRef* GetValueRef(gpg::RRef* outRef) override
+    {
+      if (!outRef) {
+        return nullptr;
+      }
+
+      outRef->mObj = &mValue;
+      outRef->mType = detail::CachedRType<T>();
+      return outRef;
+    }
+
   public:
     T mValue; // +0x08
   };

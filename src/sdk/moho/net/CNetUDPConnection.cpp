@@ -36,6 +36,50 @@ uint16_t CNetUDPConnection::GetPort()
 }
 
 /**
+ * Address: 0x00485BA0 (FUN_00485BA0)
+ *
+ * What it does:
+ * Returns the current UDP connection state lane.
+ */
+ENetConnectionState CNetUDPConnection::GetConnectionState() const noexcept
+{
+  return mState;
+}
+
+/**
+ * Address: 0x00485BB0 (FUN_00485BB0)
+ *
+ * What it does:
+ * Returns whether state is still before errored lane (`< kNetStateErrored`).
+ */
+bool CNetUDPConnection::IsBeforeErroredState() const noexcept
+{
+  return static_cast<int>(mState) < static_cast<int>(kNetStateErrored);
+}
+
+/**
+ * Address: 0x00485BD0 (FUN_00485BD0)
+ *
+ * What it does:
+ * Returns whether destroy was already requested.
+ */
+bool CNetUDPConnection::IsDestroyScheduled() const noexcept
+{
+  return mScheduleDestroy;
+}
+
+/**
+ * Address: 0x00485BC0 (FUN_00485BC0)
+ *
+ * What it does:
+ * Returns whether this connection has already been fully destroyed.
+ */
+bool CNetUDPConnection::IsDestroyedFlagSet() const noexcept
+{
+  return mDestroyed;
+}
+
+/**
  * Address: 0x00489550 (FUN_00489550)
  * Address: 0x10082F50 (sub_10082F50)
  *
@@ -119,10 +163,17 @@ void CNetUDPConnection::Write(NetDataSpan* data)
   }
 
 #if defined(_WIN32)
-  WSASetEvent(mConnector->event_);
+  mConnector->SignalSocketEvent();
 #endif
 }
 
+/**
+ * Address: 0x004893F0 (FUN_004893F0)
+ *
+ * What it does:
+ * Closes outbound stream/filter state once, marks output shutdown, and wakes the
+ * connector worker event.
+ */
 void CNetUDPConnection::Close()
 {
   boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
@@ -130,26 +181,40 @@ void CNetUDPConnection::Close()
     return;
   }
 
-  if (mOutputFilterStream != nullptr) {
-    mOutputFilterStream->VirtClose(gpg::Stream::ModeSend);
-    delete mOutputFilterStream;
+  if (mOutputFilterStream) {
+    mOutputFilterStream->VirtClose(gpg::Stream::ModeBoth);
+    auto* const oldFilter = mOutputFilterStream;
+    mOutputFilterStream = nullptr;
+    delete oldFilter;
   }
 
-  mPendingOutputData.VirtClose(gpg::Stream::ModeSend);
+  mPendingOutputData.VirtClose(gpg::Stream::ModeBoth);
   mOutputShutdown = true;
   mOutputFlushPending = false;
 
 #if defined(_WIN32)
-  WSASetEvent(mConnector->event_);
+  mConnector->SignalSocketEvent();
 #endif
 }
 
+/**
+ * Address: 0x004894C0 (FUN_004894C0)
+ *
+ * What it does:
+ * Formats the remote endpoint as "host:port".
+ */
 msvc8::string CNetUDPConnection::ToString()
 {
   const auto host = NET_GetHostName(mAddr);
   return gpg::STR_Printf("%s:%d", host.c_str(), static_cast<int>(mPort));
 }
 
+/**
+ * Address: 0x00489660 (FUN_00489660)
+ *
+ * What it does:
+ * Requests connection teardown, closes output path, and wakes the connector.
+ */
 void CNetUDPConnection::ScheduleDestroy()
 {
   boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
@@ -157,10 +222,18 @@ void CNetUDPConnection::ScheduleDestroy()
   mScheduleDestroy = true;
 
 #if defined(_WIN32)
-  WSASetEvent(mConnector->event_);
+  mConnector->SignalSocketEvent();
 #endif
 }
 
+/**
+ * Address: 0x00485D30 (FUN_00485D30)
+ * Address: 0x1007F7E0 (sub_1007F7E0)
+ *
+ * What it does:
+ * Initializes UDP connection transport state, inserts the connection into the
+ * connector list, and configures send compression/filtering.
+ */
 CNetUDPConnection::CNetUDPConnection(
   CNetUDPConnector& connector,
   const u_long address,
@@ -181,9 +254,8 @@ CNetUDPConnection::CNetUDPConnection(
   , // [esi+0x42C]
   mMessage()
 {
-  // Init timers and timestamps
-  // (ASM zeroes a lot of POD around; we rely on default ctor or explicit zeros above)
-  mLastSend.Reset();
+  // Binary initializes these timer slots to zero, not "now".
+  mLastSend.mTime = 0;
   mSendTime = 0;
   mLastRecv = 0;
   mLastKeepAlive = 0;
@@ -193,11 +265,8 @@ CNetUDPConnection::CNetUDPConnection(
   std::memset(mNonceB, 0, sizeof(mNonceB));
   mReserved494 = 0;
   mHandshakeTime = 0;
-
-  // Initialize sliding timings array (128 * 16 bytes in ASM via eh-vector-ctor)
-  for (auto& t : mTimings) {
-    t = {}; // zero-init one slot
-  }
+  mNextSerialNumber = 1;
+  mInResponseTo = 0;
 
   // Initialize MD5 accumulators
   mTotalBytesQueuedMD5.Reset();
@@ -227,29 +296,29 @@ CNetUDPConnection::CNetUDPConnection(
     // and set [mReadHead==mReadEnd==begin(), mWriteHead==mWriteStart==begin(), mWriteEnd==end()].
   }
 
-  mSendBy.Reset();
+  mSendBy.mTime = 0;
 
   // Link this connection into connector's intrusive list
   // ASM: uses node at +0x410; do the same in Attach().
-  connector.mConnections.push_front(this);
+  connector.RelinkConnectionToFront(*this);
 
   // Select SEND compression (controlled by Moho::net_CompressionMethod)
   switch (mOurCompressionMethod) {
   case NETCOMP_None:
-    // Log: "NET: using no compression for send"
-    gpg::Logf("NET: using no compression for send: %s", CNetUDPConnection::ToString().c_str());
+    gpg::Logf("NET: using no compression for sends to %s.", CNetUDPConnection::ToString().c_str());
     break;
   case NETCOMP_Deflate: {
-    gpg::Logf("NET: using deflate compression for send: %s", CNetUDPConnection::ToString().c_str());
+    gpg::Logf("NET: using deflate compression for sends to %s.", CNetUDPConnection::ToString().c_str());
 
     // Allocate filter (operator new 0x460 seen in asm).
     // Construct zlib filter for deflate (send path).
     const auto filterStream = new gpg::ZLibOutputFilterStream(&mPendingOutputData, gpg::FLOP_Deflate);
     if (filterStream) {
-      if (mOutputFilterStream) {
-        operator delete(mOutputFilterStream);
-      }
+      auto* const oldFilter = mOutputFilterStream;
       mOutputFilterStream = filterStream;
+      if (oldFilter) {
+        delete oldFilter;
+      }
     } else {
       gpg::Warnf("NET: failed to allocate ZLibOutputFilterStream, falling back to no compression");
       mOurCompressionMethod = NETCOMP_None;
@@ -267,6 +336,14 @@ CNetUDPConnection::CNetUDPConnection(
   mPingTime = 0.0f;
 }
 
+/**
+ * Address: 0x00486150 (FUN_00486150)
+ * Address: 0x1007FC10 (sub_1007FC10)
+ *
+ * What it does:
+ * Recycles queued packet nodes, tears down optional filter streams, and unlinks
+ * this connection from the connector intrusive list.
+ */
 CNetUDPConnection::~CNetUDPConnection()
 {
   constexpr int poolCap = 0x14u;
@@ -298,24 +375,37 @@ CNetUDPConnection::~CNetUDPConnection()
     it = mEarlyPackets.erase(it);
     recyclePacket(p);
   }
+
+  if (mFilterStream) {
+    delete mFilterStream;
+    mFilterStream = nullptr;
+  }
+
+  if (mOutputFilterStream) {
+    delete mOutputFilterStream;
+    mOutputFilterStream = nullptr;
+  }
+
+  // This node is linked into CNetUDPConnector::mConnections in ctor.
+  UnlinkFromConnectorList();
 }
 
-// 0x00486910
+/**
+ * Address: 0x00486910 (FUN_00486910)
+ *
+ * What it does:
+ * Transitions to established state, injects ConnMade marker into input stream,
+ * and configures inbound decompression filter.
+ */
 void CNetUDPConnection::CreateFilterStream()
 {
-  mState = kNetStateAnswering;
+  mState = kNetStateEstablishing;
 
   CMessage msg(ELobbyMsg::LOBMSG_ConnMade);
   mInputBuffer.Write(msg.mBuff.Data(), msg.mBuff.Size());
 
   if (mReceivedCompressionMethod == NETCOMP_None) {
     gpg::Logf("NET: using no compression for receives from %s", ToString().c_str());
-
-    // No filter needed on receive side; drop any old one.
-    if (mFilterStream) {
-      delete mFilterStream;
-      mFilterStream = nullptr;
-    }
     return;
   }
 
@@ -330,6 +420,13 @@ void CNetUDPConnection::CreateFilterStream()
   delete old;
 }
 
+/**
+ * Address: 0x00486380 (FUN_00486380)
+ *
+ * What it does:
+ * Validates CONNECT handshake packets, updates nonce/compression handshake
+ * state, and handles invalid state transitions.
+ */
 bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
 {
   const auto& pConnect = *reinterpret_cast<const SPacketBodyConnect*>(packet->data);
@@ -337,7 +434,11 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
   // Obsolete CONNECT: ignore
   if (pConnect.time <= mHandshakeTime) {
     if (net_DebugLevel) {
-      gpg::Logf("CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring obsolete CONNECT", GetPort(), ToString().c_str());
+      gpg::Logf(
+        "CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring obsolete CONNECT",
+        mConnector->GetLocalPort(),
+        ToString().c_str()
+      );
     }
     return true;
   }
@@ -350,7 +451,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring connect w/ unknown compression method (%u)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         static_cast<unsigned>(pConnect.comp)
       );
@@ -386,16 +487,15 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
   case kNetStateEstablishing: // 3
   case kNetStateTimedOut:     // 4
   {
-    // Move to Retired and shut down input.
-    mState = kNetStateTimedOut; // 5
+    mState = kNetStateErrored;
     mReceivedEndOfInput = true;
 
     // Close input side (ModeBoth per binary)
     mInputBuffer.Close(gpg::Stream::ModeBoth);
 
-    if (mConnector->event_) {
+    if (mConnector->mSelectedEvent) {
 #if defined(_WIN32)
-      WSASetEvent(mConnector->event_);
+      SetEvent(mConnector->mSelectedEvent);
 #endif
     }
     return false;
@@ -406,6 +506,12 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
   }
 }
 
+/**
+ * Address: 0x004865E0 (FUN_004865E0)
+ *
+ * What it does:
+ * Validates ANSWER handshake packets and completes negotiated receive setup.
+ */
 void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
 {
   const auto& pAnswer = *reinterpret_cast<const SPacketBodyAnswer*>(packet->data);
@@ -415,7 +521,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring wrong length ANSWER (got %d bytes, required %d)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         packet->mSize,
         92
@@ -427,17 +533,21 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
   // Obsolete ANSWER
   if (pAnswer.time <= mHandshakeTime) {
     if (net_DebugLevel) {
-      gpg::Logf("CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring obsolete ANSWER", GetPort(), ToString().c_str());
+      gpg::Logf(
+        "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring obsolete ANSWER",
+        mConnector->GetLocalPort(),
+        ToString().c_str()
+      );
     }
     return;
   }
 
   // Receiver nonce must match what we sent earlier
-  if (std::memcmp(mNonceA, pAnswer.receiverNonce, sizeof(mNonceA)) != 0) {
+  if (ReceiverNonceDiffers32(mNonceA, pAnswer.receiverNonce)) {
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER with wrong receiver nonce",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str()
       );
     }
@@ -449,7 +559,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessConnect(): ignoring answer w/ unknown compression method (%u)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         static_cast<unsigned>(pAnswer.comp)
       );
@@ -462,7 +572,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER on pending connection",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str()
       );
     }
@@ -473,7 +583,7 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring ANSWER on established connection",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str()
       );
     }
@@ -496,12 +606,14 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
   AdoptPacket(packet);
 
 #if defined(_WIN32)
-  WSASetEvent(mConnector->event_);
+  if (mConnector->mSelectedEvent) {
+    SetEvent(mConnector->mSelectedEvent);
+  }
 #endif
 }
 
 /**
- * Address: 0x00486B10 (Moho::CNetUDPConnection::ProcessAck)
+ * Address: 0x00486B10 (FUN_00486B10)
  *
  * What it does:
  * Validates peer ACK window, updates ping timing, releases acknowledged
@@ -513,7 +625,9 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
   case kNetStatePending: { // 0
     if (net_DebugLevel) {
       gpg::Logf(
-        "CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Pending connection.", GetPort(), ToString().c_str()
+        "CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Pending connection.",
+        mConnector->GetLocalPort(),
+        ToString().c_str()
       );
     }
     return false;
@@ -522,7 +636,7 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Connecting connection.",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str()
       );
     }
@@ -540,7 +654,9 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
   case kNetStateErrored: { // 5
     if (net_DebugLevel) {
       gpg::Logf(
-        "CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Errored connection.", GetPort(), ToString().c_str()
+        "CNetUDPConnection<%u,%s>::ProcessAck(): ignoring traffic on Errored connection.",
+        mConnector->GetLocalPort(),
+        ToString().c_str()
       );
     }
     return false;
@@ -557,7 +673,7 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessHeader(): ignoring acknowledgement of data we haven't sent (packet=%u, "
         "next=%u)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         static_cast<unsigned>(expected),
         static_cast<unsigned>(mNextSequenceNumber)
@@ -604,7 +720,7 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
 }
 
 /**
- * Address: 0x00486DB0 (Moho::CNetUDPConnection::ProcessData)
+ * Address: 0x00486DB0 (FUN_00486DB0)
  *
  * What it does:
  * Applies ACK processing, inserts/filters incoming DATA by sequence window,
@@ -627,7 +743,7 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessData(): ignoring repeat of old DATA (seqno=%d, expected=%d)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         static_cast<unsigned>(seq),
         static_cast<unsigned>(mExpectedSequenceNumber)
@@ -642,7 +758,7 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessData(): ignoring DATA from too far in the future (seqno=%d, expected=%d, "
         "delta=%d)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         static_cast<unsigned>(seq),
         static_cast<unsigned>(mExpectedSequenceNumber),
@@ -661,7 +777,7 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     if (net_DebugLevel) {
       gpg::Logf(
         "CNetUDPConnection<%u,%s>::ProcessData(): ignoring repeat of future DATA (seqno=%d, expected=%d)",
-        GetPort(),
+        mConnector->GetLocalPort(),
         ToString().c_str(),
         static_cast<unsigned>(seq),
         static_cast<unsigned>(mExpectedSequenceNumber)
@@ -681,7 +797,9 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     if (mReceivedEndOfInput) {
       if (net_DebugLevel) {
         gpg::Logf(
-          "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring DATA after end-of-stream", GetPort(), ToString().c_str()
+          "CNetUDPConnection<%u,%s>::ProcessAnswer(): ignoring DATA after end-of-stream",
+          mConnector->GetLocalPort(),
+          ToString().c_str()
         );
       }
 
@@ -715,6 +833,12 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
 #endif
 }
 
+/**
+ * Address: 0x00487310 (FUN_00487310)
+ *
+ * What it does:
+ * ACK wrapper that refreshes last receive timestamp on successful ACK handling.
+ */
 bool CNetUDPConnection::ProcessAck(const SNetPacket* packet)
 {
   if (!ProcessAckInternal(packet)) {
@@ -725,6 +849,12 @@ bool CNetUDPConnection::ProcessAck(const SNetPacket* packet)
   return true;
 }
 
+/**
+ * Address: 0x00487340 (FUN_00487340)
+ *
+ * What it does:
+ * KEEPALIVE wrapper that applies ACK handling and updates response tracking.
+ */
 bool CNetUDPConnection::ProcessKeepAlive(const SNetPacket* packet)
 {
   if (!ProcessAckInternal(packet)) {
@@ -736,6 +866,13 @@ bool CNetUDPConnection::ProcessKeepAlive(const SNetPacket* packet)
   return true;
 }
 
+/**
+ * Address: 0x00487370 (FUN_00487370)
+ *
+ * What it does:
+ * Processes remote GOODBYE by closing receive side and transitioning to errored
+ * end-of-input state when needed.
+ */
 bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
 {
   if (!ProcessAckInternal(packet)) {
@@ -766,6 +903,12 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
   return true;
 }
 
+/**
+ * Address: 0x00488170 (FUN_00488170)
+ *
+ * What it does:
+ * Calculates exponential resend delay (microseconds) clamped by net resend CVars.
+ */
 int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
 {
   const float baseMs = mPingTime * net_ResendPingMultiplier + static_cast<float>(net_ResendDelayBias);
@@ -806,6 +949,9 @@ int CNetUDPConnection::GetSentTime(const int64_t time)
 }
 
 /**
+ * Address: 0x004882C0 (FUN_004882C0, inlined/chunk helper lane)
+ * Address: 0x0048AC40 (inlined helper inside FUN_0048AC40)
+ *
  * What it does:
  * Helper used by connector send loop to convert per-connection backlog into
  * timeout ms against net_MaxBacklog.
@@ -826,16 +972,29 @@ int CNetUDPConnection::GetBacklogTimeout(const int64_t time, int32_t& timeout)
   return true;
 }
 
-int64_t CNetUDPConnection::TimeSince(const int64_t time) const
+/**
+ * Address: 0x004881F0 (FUN_004881F0)
+ *
+ * What it does:
+ * Returns non-negative milliseconds until `time` relative to connector clock.
+ */
+int CNetUDPConnection::TimeSince(const int64_t time) const
 {
   const int64_t since = (time - mConnector->GetTime()) / 1000;
   if (since < 0) {
     return 0;
   }
-  return since;
+  return static_cast<int>(since);
 }
 
-int64_t CNetUDPConnection::SendData()
+/**
+ * Address: 0x00488300 (FUN_00488300)
+ *
+ * What it does:
+ * Main per-connection send scheduler: emits control/data frames, retries
+ * unacked payloads, handles timeouts, and returns next wake timeout (ms).
+ */
+int CNetUDPConnection::SendData()
 {
   if (mDestroyed) {
     return -1;
@@ -882,7 +1041,11 @@ int64_t CNetUDPConnection::SendData()
 
     if (curTime - mLastRecv > 10'000'000) {
       if (net_DebugLevel) {
-        gpg::Logf("CNetUDPConnection<%u,%s>::SendData(): connection timed out.", GetPort(), ToString().c_str());
+        gpg::Logf(
+          "CNetUDPConnection<%u,%s>::SendData(): connection timed out.",
+          mConnector->GetLocalPort(),
+          ToString().c_str()
+        );
       }
       mState = kNetStateTimedOut;
       [[fallthrough]];
@@ -939,6 +1102,13 @@ int64_t CNetUDPConnection::SendData()
   }
 }
 
+/**
+ * Address: 0x00488730 (FUN_00488730)
+ *
+ * What it does:
+ * Determines whether payload/EOF packet emission is due given send windows and
+ * output flush state.
+ */
 bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs)
 {
   // Window check (16-bit arithmetic in asm)
@@ -972,6 +1142,12 @@ bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs)
   return mPendingOutputData.GetLength() != 0;
 }
 
+/**
+ * Address: 0x00488980 (FUN_00488980)
+ *
+ * What it does:
+ * Builds next DATA packet from pending output stream and updates send counters.
+ */
 SNetPacket* CNetUDPConnection::ReadPacket()
 {
   // clamp payload to wire limit
@@ -1021,6 +1197,12 @@ SNetPacket* CNetUDPConnection::ReadPacket()
   return packet;
 }
 
+/**
+ * Address: 0x00488810 (FUN_00488810)
+ *
+ * What it does:
+ * Builds a CONNECT control packet with current nonce/time/compression.
+ */
 SNetPacket* CNetUDPConnection::NewConnectPacket() const
 {
   constexpr auto payloadSize = sizeof(SPacketBodyConnect);
@@ -1041,6 +1223,12 @@ SNetPacket* CNetUDPConnection::NewConnectPacket() const
   return packet;
 }
 
+/**
+ * Address: 0x004888C0 (FUN_004888C0)
+ *
+ * What it does:
+ * Builds an ANSWER control packet with local/remote nonce fields.
+ */
 SNetPacket* CNetUDPConnection::NewAnswerPacket() const
 {
   constexpr auto payloadSize = sizeof(SPacketBodyAnswer);
@@ -1062,6 +1250,12 @@ SNetPacket* CNetUDPConnection::NewAnswerPacket() const
   return packet;
 }
 
+/**
+ * Address: 0x00488AA0 (FUN_00488AA0)
+ *
+ * What it does:
+ * Builds a GOODBYE control packet (empty payload).
+ */
 SNetPacket* CNetUDPConnection::NewGoodbyePacket() const
 {
   SNetPacket* packet = NewPacket(false, 0, PT_Goodbye);
@@ -1072,6 +1266,13 @@ SNetPacket* CNetUDPConnection::NewGoodbyePacket() const
   return packet;
 }
 
+/**
+ * Address: 0x00488B20 (FUN_00488B20)
+ *
+ * What it does:
+ * Allocates/reuses a packet node, resets metadata, and fills transport header
+ * fields with optional sequence inheritance.
+ */
 SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, const EPacketType state) const
 {
   // take from connector's pool or allocate
@@ -1109,6 +1310,13 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
   return pkt;
 }
 
+/**
+ * Address: 0x00488D80 (FUN_00488D80)
+ *
+ * What it does:
+ * Emits a packet to socket, updates resend/sequence/keepalive bookkeeping, and
+ * records send diagnostics.
+ */
 void CNetUDPConnection::SendPacket(SNetPacket* packet)
 {
   packet->header.mSerialNumber = mNextSerialNumber;
@@ -1129,6 +1337,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
 
   const int64_t nowUs = mConnector->GetTime();
   mConnector->LogPacket(0, nowUs, mAddr, mPort, payload, payloadLen);
+  mConnector->mSendStampBuffer.Add(0, nowUs, payloadLen);
 
   if (packet->header.mType == PT_Data) {
     ++packet->mResendCount;
@@ -1143,7 +1352,7 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   if (net_DebugLevel >= 2) {
     const auto pktStr = packet->ToString();
     const auto connStr = ToString();
-    const auto timeStr = gpg::FileTimeToString(gpg::time::GetTime());
+    const auto timeStr = gpg::FileTimeToString(nowUs);
     gpg::Debugf("%s: send %s, %s", timeStr.c_str(), connStr.c_str(), pktStr.c_str());
   }
 
@@ -1163,15 +1372,22 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   mSendTime = packet->mSize + GetSentTime(nowUs);
   mLastSend.mTime = nowUs;
 
-  if (packet->header.mType != PT_KeepAlive) {
+  if (packet->header.mType != PT_Ack) {
     mLastKeepAlive = nowUs;
   }
 
-  if (packet->header.mType == PT_Goodbye) {
+  if (packet->header.mType == PT_KeepAlive) {
     mKeepAliveFreqUs = 2'000'000; // 2s
   }
 }
 
+/**
+ * Address: 0x00487590 (FUN_00487590)
+ * Address: 0x10080FD0 (sub_10080FD0)
+ *
+ * What it does:
+ * Flushes receive filter/input stream while input is still open.
+ */
 void CNetUDPConnection::FlushInput()
 {
   if (!mScheduleDestroy && !mReceivedEndOfInput) {
@@ -1183,6 +1399,9 @@ void CNetUDPConnection::FlushInput()
 }
 
 /**
+ * Address: 0x004879E0 (FUN_004879E0, inlined/chunk helper lane)
+ * Address: 0x0048B7F0 (inlined helper inside FUN_0048B7F0)
+ *
  * What it does:
  * Flushes pending output/filter streams and snapshots currently flushed bytes.
  *
@@ -1205,6 +1424,7 @@ bool CNetUDPConnection::FlushOutput()
 /**
  * Address: 0x004876A0 (FUN_004876A0)
  * Address: 0x100810D0 (sub_100810D0)
+ * Address: 0x100813A0 (sub_100810D0, alias/chunk export)
  *
  * What it does:
  * Drains framed messages from input stream, updates dispatch stats, forwards to
@@ -1331,6 +1551,12 @@ void CNetUDPConnection::Debug()
   );
 }
 
+/**
+ * Address: 0x00488220 (FUN_00488220)
+ *
+ * What it does:
+ * Adopts peer serial as response target and schedules ACK deadline if idle.
+ */
 void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
 {
   mInResponseTo = packet->header.mSerialNumber;
@@ -1342,6 +1568,12 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
   }
 }
 
+/**
+ * Address: 0x004874C0 (FUN_004874C0)
+ *
+ * What it does:
+ * Updates rolling ping/jitter statistics from packet response serial timing.
+ */
 void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
 {
   if (!packet.header.mInResponseTo) {
@@ -1370,6 +1602,12 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
   }
 }
 
+/**
+ * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+ *
+ * What it does:
+ * Inserts DATA packet into future-queue sorted by sequence and rejects duplicates.
+ */
 bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
 {
   // Ensure the node is detached
@@ -1393,6 +1631,12 @@ bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
   return true;
 }
 
+/**
+ * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+ *
+ * What it does:
+ * Pops the oldest packet from the early/future queue.
+ */
 SNetPacket* CNetUDPConnection::EarlyPopFront()
 {
   if (mEarlyPackets.empty()) {
@@ -1404,6 +1648,12 @@ SNetPacket* CNetUDPConnection::EarlyPopFront()
   return p;
 }
 
+/**
+ * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+ *
+ * What it does:
+ * Recomputes ACK early-mask bits from queued future packet sequences.
+ */
 void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& mask)
 {
   mask = 0;
@@ -1415,6 +1665,13 @@ void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& m
   }
 }
 
+/**
+ * Address: 0x00486DB0 (inlined helper inside FUN_00486DB0)
+ *
+ * What it does:
+ * Consumes one in-order DATA packet payload into input pipeline and advances
+ * expected sequence/input-end state.
+ */
 void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet)
 {
   const uint16_t payloadLen = packet->header.mPayloadLength;
@@ -1453,6 +1710,34 @@ void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet)
   }
 }
 
+/**
+ * Address: 0x00485AA0 (FUN_00485AA0)
+ *
+ * What it does:
+ * Compares expected and received 32-byte nonce lanes.
+ */
+bool CNetUDPConnection::ReceiverNonceDiffers32(const char (&expected)[32], const char (&received)[32]) noexcept
+{
+  return ByteArrayDiffers(expected, received);
+}
+
+/**
+ * Address: 0x00486110 (FUN_00486110)
+ *
+ * What it does:
+ * Unlinks this connection node from the connector intrusive list.
+ */
+void CNetUDPConnection::UnlinkFromConnectorList() noexcept
+{
+  this->TDatListItem<CNetUDPConnection, void>::ListUnlink();
+}
+
+/**
+ * Address: 0x00488D80 (inlined helper inside FUN_00488D80)
+ *
+ * What it does:
+ * Inserts outbound DATA packet into resend queue ordered by scheduled send time.
+ */
 void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet)
 {
   const auto node = packet->ListUnlink();
@@ -1466,3 +1751,4 @@ void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet)
   // append at tail
   node->ListLinkBefore(mUnAckedPayloads.end().node());
 }
+

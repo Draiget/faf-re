@@ -15,6 +15,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0070E1F0 (FUN_0070E1F0, Moho::CArmyStatsSerializer::Deserialize)
+     *
+     * What it does:
+     * Reflection load callback that deserializes `CArmyStats` fields.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0070E200 (FUN_0070E200, Moho::CArmyStatsSerializer::Serialize)
+     *
+     * What it does:
+     * Reflection save callback that serializes `CArmyStats` fields.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x0070F5E0 (FUN_0070F5E0, gpg::SerSaveLoadHelper_CArmyStats::Init)
      *
      * What it does:

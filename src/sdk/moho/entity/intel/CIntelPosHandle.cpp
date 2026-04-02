@@ -1,12 +1,11 @@
 #include "CIntelPosHandle.h"
 
 #include <new>
-#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
-#include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/sim/CIntelGrid.h"
 
@@ -30,43 +29,6 @@ namespace
     return cached;
   }
 
-  [[noreturn]] void ThrowPointerTypeMismatch(gpg::RType* const expectedType, const gpg::RRef& source)
-  {
-    const char* const expected = expectedType ? expectedType->GetName() : "null";
-    const char* const actual = source.mType ? source.mType->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-      "instead",
-      expected,
-      actual
-    );
-    throw std::runtime_error(message.c_str());
-  }
-
-  [[nodiscard]]
-  boost::SharedPtrRaw<moho::CIntelGrid> ReadSharedIntelGridPointer(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return {};
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    gpg::RType* const expectedType = CachedCIntelGridType();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    if (!upcast.mObj) {
-      ThrowPointerTypeMismatch(expectedType, source);
-    }
-
-    boost::SharedPtrRaw<moho::CIntelGrid> out{};
-    out.px = static_cast<moho::CIntelGrid*>(upcast.mObj);
-    out.pi = nullptr;
-    return out;
-  }
-
   void RefreshGridCoverageAtPosition(moho::CIntelPosHandle& handle, const Wm3::Vec3f& worldPos)
   {
     const std::uint32_t savedRadius = handle.mRadius;
@@ -74,6 +36,15 @@ namespace
     handle.mLastPos = worldPos;
     handle.mRadius = savedRadius;
     handle.AddViz();
+  }
+
+  [[nodiscard]]
+  gpg::RRef MakeSharedIntelGridRef(moho::CIntelGrid* const intelGrid)
+  {
+    gpg::RRef out{};
+    out.mObj = intelGrid;
+    out.mType = CachedCIntelGridType();
+    return out;
   }
 } // namespace
 
@@ -179,9 +150,39 @@ namespace moho
     mEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
 
     mGrid.release();
-    mGrid = ReadSharedIntelGridPointer(archive, ownerRef);
+    gpg::ReadPointerShared_CIntelGrid2(mGrid, archive, ownerRef);
 
     archive->ReadInt(&mLastTickUpdated);
+  }
+
+  /**
+   * Address: 0x00770090 (FUN_00770090, Moho::CIntelPosHandle::MemberSerialize)
+   *
+   * gpg::WriteArchive *
+   *
+   * IDA signature:
+   * void __usercall Moho::CIntelPosHandle::MemberSerialize(
+   *   Moho::CIntelPosHandle *this@<edi>, gpg::WriteArchive *archive@<esi>);
+   *
+   * What it does:
+   * Serializes base position-watch fields (`mLastPos`, `mRadius`, `mEnabled`,
+   * `mGrid`, `mLastTickUpdated`) into archive payload.
+   */
+  void CIntelPosHandle::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Write(CachedVector3fType(), &mLastPos, ownerRef);
+    archive->WriteUInt(mRadius);
+    archive->WriteBool(mEnabled != 0u);
+
+    const gpg::RRef gridRef = MakeSharedIntelGridRef(mGrid.px);
+    gpg::WriteRawPointer(archive, gridRef, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WriteInt(mLastTickUpdated);
   }
 
   /**

@@ -37,4 +37,12 @@ namespace moho
   };
 
   static_assert(sizeof(CAiBrainTypeInfo) == 0x64, "CAiBrainTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BCB3D0 (FUN_00BCB3D0, register_Moho::CAiBrainTypeInfo)
+   *
+   * What it does:
+   * Ensures startup construction of `CAiBrainTypeInfo` and installs process-exit cleanup.
+   */
+  void register_CAiBrainTypeInfoStartup();
 } // namespace moho

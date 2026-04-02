@@ -164,6 +164,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00550A00 (FUN_00550A00, Moho::SSTIArmyVariableDataSerializer::Deserialize callback)
+     *
+     * What it does:
+     * Archive callback thunk forwarding into `SSTIArmyVariableData::SerializeLoadBody`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00550A10 (FUN_00550A10, Moho::SSTIArmyVariableDataSerializer::Serialize callback)
+     *
+     * What it does:
+     * Archive callback thunk forwarding into `SSTIArmyVariableData::SerializeSaveBody`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x00550D90 (FUN_00550D90, sub_550D90)
      * Slot: 0
      *
@@ -173,11 +189,20 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };
+
+  /**
+   * Address: 0x00BC9B10 (FUN_00BC9B10, register_SSTIArmyVariableDataSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer helper links/callbacks for
+   * `SSTIArmyVariableData` and schedules process-exit cleanup.
+   */
+  void register_SSTIArmyVariableDataSerializer();
 
   /**
    * VFTABLE: 0x00E17544
@@ -189,6 +214,15 @@ namespace moho
   class SSTIArmyVariableDataTypeInfo : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005508C0 (FUN_005508C0, startup typeinfo constructor lane)
+     *
+     * What it does:
+     * Initializes base reflection state and preregisters RTTI ownership for
+     * `SSTIArmyVariableData`.
+     */
+    SSTIArmyVariableDataTypeInfo();
+
     /**
      * Address: 0x00550950 (FUN_00550950, sub_550950)
      * Slot: 2
@@ -218,6 +252,31 @@ namespace moho
     void Init() override;
   };
 
+  /**
+   * Address: 0x00BC9AF0 (FUN_00BC9AF0, register_SSTIArmyVariableDataTypeInfo)
+   *
+   * What it does:
+   * Constructs startup-owned `SSTIArmyVariableDataTypeInfo` storage and
+   * registers process-exit teardown.
+   */
+  void register_SSTIArmyVariableDataTypeInfo();
+
+  static_assert(
+    offsetof(SSTIArmyVariableDataSerializer, mHelperNext) == 0x04,
+    "SSTIArmyVariableDataSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SSTIArmyVariableDataSerializer, mHelperPrev) == 0x08,
+    "SSTIArmyVariableDataSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SSTIArmyVariableDataSerializer, mSerLoadFunc) == 0x0C,
+    "SSTIArmyVariableDataSerializer::mSerLoadFunc offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SSTIArmyVariableDataSerializer, mSerSaveFunc) == 0x10,
+    "SSTIArmyVariableDataSerializer::mSerSaveFunc offset must be 0x10"
+  );
   static_assert(sizeof(SSTIArmyVariableDataSerializer) == 0x14, "SSTIArmyVariableDataSerializer size must be 0x14");
   static_assert(sizeof(SSTIArmyVariableDataTypeInfo) == 0x64, "SSTIArmyVariableDataTypeInfo size must be 0x64");
 } // namespace moho

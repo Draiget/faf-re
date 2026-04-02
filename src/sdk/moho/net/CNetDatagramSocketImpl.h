@@ -117,9 +117,10 @@ namespace moho
     HANDLE CreateEvent() override;
 
     /**
-     * Address: <synthetic host-build wrapper>
+     * Address: 0x0047F030 (FUN_0047F030)
      *
      * Binary evidence:
+     * - 0x0047F030 (FUN_0047F030, object-init lane)
      * - 0x0047F360 (FUN_0047F360, NET_OpenDatagramSocket)
      * - 0x0047F44E (inlined allocation/init block inside FUN_0047F360)
      * - 0x10079940 (Moho::NET_OpenDatagramSocket)
@@ -136,8 +137,7 @@ namespace moho
      *
      * What it does:
      * Initializes handler/socket/event fields for datagram-socket objects.
-     * In FA/Moho binaries this initialization is inlined in
-     * `NET_OpenDatagramSocket`.
+     * The same field-init lane is also emitted inline in `NET_OpenDatagramSocket`.
      */
     CNetDatagramSocketImpl(INetDatagramHandler* handler, SOCKET sock);
 

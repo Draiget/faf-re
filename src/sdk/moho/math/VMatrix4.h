@@ -2,6 +2,11 @@
 
 #include "Vector4f.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   /**
@@ -10,6 +15,8 @@ namespace moho
    */
   struct VMatrix4
   {
+    inline static gpg::RType* sType = nullptr;
+
     Vector4f r[4]; // rows
 
     /** Identity. */

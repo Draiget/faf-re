@@ -19,6 +19,22 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0059FE20 (FUN_0059FE20, Moho::CAiBuilderImplSerializer::Deserialize)
+     *
+     * What it does:
+     * Forwards archive loading into `CAiBuilderImpl::MemberDeserialize`.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0059FE30 (FUN_0059FE30, Moho::CAiBuilderImplSerializer::Serialize)
+     *
+     * What it does:
+     * Forwards archive saving into `CAiBuilderImpl::MemberSerialize`.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005A06D0 (FUN_005A06D0)
      *
      * What it does:
@@ -50,4 +66,13 @@ namespace moho
     "CAiBuilderImplSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiBuilderImplSerializer) == 0x14, "CAiBuilderImplSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BCC320 (FUN_00BCC320, register_CAiBuilderImplSerializer)
+   *
+   * What it does:
+   * Initializes the global builder serializer helper callbacks and installs
+   * process-exit cleanup.
+   */
+  void register_CAiBuilderImplSerializer();
 } // namespace moho

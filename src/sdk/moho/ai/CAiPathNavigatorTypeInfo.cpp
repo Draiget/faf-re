@@ -1,6 +1,7 @@
 #include "moho/ai/CAiPathNavigatorTypeInfo.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -10,6 +11,19 @@ using namespace moho;
 
 namespace
 {
+  alignas(CAiPathNavigatorTypeInfo) unsigned char gCAiPathNavigatorTypeInfoStorage[sizeof(CAiPathNavigatorTypeInfo)] = {};
+  bool gCAiPathNavigatorTypeInfoConstructed = false;
+
+  [[nodiscard]] CAiPathNavigatorTypeInfo* AcquireCAiPathNavigatorTypeInfo()
+  {
+    if (!gCAiPathNavigatorTypeInfoConstructed) {
+      new (gCAiPathNavigatorTypeInfoStorage) CAiPathNavigatorTypeInfo();
+      gCAiPathNavigatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<CAiPathNavigatorTypeInfo*>(gCAiPathNavigatorTypeInfoStorage);
+  }
+
   [[nodiscard]] gpg::RType* CachedCAiPathNavigatorType()
   {
     if (!CAiPathNavigator::sType) {
@@ -76,6 +90,22 @@ namespace
       navigator->~CAiPathNavigator();
     }
   }
+
+  /**
+   * Address: 0x00BF7360 (FUN_00BF7360, cleanup_CAiPathNavigatorTypeInfo)
+   *
+   * What it does:
+   * Tears down the recovered static `CAiPathNavigatorTypeInfo` storage.
+   */
+  void cleanup_CAiPathNavigatorTypeInfo()
+  {
+    if (!gCAiPathNavigatorTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireCAiPathNavigatorTypeInfo()->~CAiPathNavigatorTypeInfo();
+    gCAiPathNavigatorTypeInfoConstructed = false;
+  }
 } // namespace
 
 /**
@@ -104,3 +134,29 @@ void CAiPathNavigatorTypeInfo::Init()
   gpg::RType::Init();
   Finish();
 }
+
+/**
+ * Address: 0x00BCD020 (FUN_00BCD020, register_CAiPathNavigatorTypeInfo)
+ *
+ * What it does:
+ * Forces startup construction of `CAiPathNavigatorTypeInfo` and installs
+ * process-exit cleanup.
+ */
+void moho::register_CAiPathNavigatorTypeInfo()
+{
+  (void)AcquireCAiPathNavigatorTypeInfo();
+  (void)std::atexit(&cleanup_CAiPathNavigatorTypeInfo);
+}
+
+namespace
+{
+  struct CAiPathNavigatorTypeInfoBootstrap
+  {
+    CAiPathNavigatorTypeInfoBootstrap()
+    {
+      moho::register_CAiPathNavigatorTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CAiPathNavigatorTypeInfoBootstrap gCAiPathNavigatorTypeInfoBootstrap;
+} // namespace

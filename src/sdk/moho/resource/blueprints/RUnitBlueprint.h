@@ -5,6 +5,7 @@
 
 #include "legacy/containers/Vector.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/resource/RResId.h"
 #include "moho/sim/SMinMax.h"
 
@@ -21,18 +22,20 @@ namespace moho
    * Reflection type init for `RUnitBlueprintGeneral` (`sizeof = 0x84`).
    *
    * Evidence:
-   * - 0x00520660 (FUN_00520660) registers `CapCost` at +0x7C.
+   * - 0x00520660 (FUN_00520660) registers `CommandCaps` at +0x00,
+   *   `ToggleCaps` at +0x04, and `CapCost` at +0x7C.
    */
   struct RUnitBlueprintGeneral
   {
-    std::uint8_t pad_0000_0008[0x08]; // +0x00 (command-capability words, name unresolved)
-    RResId UpgradesTo;                // +0x08
-    RResId UpgradesFrom;              // +0x24
-    RResId UpgradesFromBase;          // +0x40
-    RResId SeedUnit;                  // +0x5C
-    std::int32_t QuickSelectPriority; // +0x78
-    float CapCost;                    // +0x7C
-    std::int32_t SelectionPriority;   // +0x80
+    ERuleBPUnitCommandCaps CommandCaps; // +0x00
+    ERuleBPUnitToggleCaps ToggleCaps;   // +0x04
+    RResId UpgradesTo;                  // +0x08
+    RResId UpgradesFrom;                // +0x24
+    RResId UpgradesFromBase;            // +0x40
+    RResId SeedUnit;                    // +0x5C
+    std::int32_t QuickSelectPriority;   // +0x78
+    float CapCost;                      // +0x7C
+    std::int32_t SelectionPriority;     // +0x80
   };
 
   /**
@@ -687,6 +690,12 @@ namespace moho
     "RUnitBlueprintGeneral::SelectionPriority offset must be 0x80"
   );
   static_assert(sizeof(RUnitBlueprintGeneral) == 0x84, "RUnitBlueprintGeneral size must be 0x84");
+  static_assert(
+    offsetof(RUnitBlueprintGeneral, CommandCaps) == 0x00, "RUnitBlueprintGeneral::CommandCaps offset must be 0x00"
+  );
+  static_assert(
+    offsetof(RUnitBlueprintGeneral, ToggleCaps) == 0x04, "RUnitBlueprintGeneral::ToggleCaps offset must be 0x04"
+  );
 
   static_assert(
     offsetof(RUnitBlueprintDisplay, DisplayName) == 0x00, "RUnitBlueprintDisplay::DisplayName offset must be 0x00"

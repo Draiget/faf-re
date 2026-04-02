@@ -55,9 +55,9 @@ namespace gal {
       /**
        * Address: 0x009005E0
        * Slot: 0
-       * Demangled: sub_9005E0
+       * Demangled: DestroyBackendObject
        */
-      virtual void sub_9005E0();
+      virtual void DestroyBackendObject();
       /**
        * Address: 0x008F86B0
        * Slot: 1

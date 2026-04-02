@@ -1,5 +1,6 @@
 #include "moho/misc/LaunchInfoBase.h"
 
+#include <cstdlib>
 #include <cstdint>
 #include <typeinfo>
 #include <utility>
@@ -101,20 +102,60 @@ namespace
   moho::LaunchInfoBaseTypeInfo gLaunchInfoBaseTypeInfo;
   moho::LaunchInfoBaseSerializer gLaunchInfoBaseSerializer;
 
-  void EnsureLaunchInfoBaseRegistered()
-  {
-    static const bool kRegistered = []() {
-      gpg::PreRegisterRType(typeid(moho::LaunchInfoBase), &gLaunchInfoBaseTypeInfo);
-      gLaunchInfoBaseSerializer.mNext = nullptr;
-      gLaunchInfoBaseSerializer.mPrev = nullptr;
-      gLaunchInfoBaseSerializer.mSerLoadFunc = &LoadLaunchInfoBase;
-      gLaunchInfoBaseSerializer.mSerSaveFunc = &SaveLaunchInfoBase;
-      gLaunchInfoBaseSerializer.RegisterSerializeFunctions();
-      return true;
-    }();
+  bool gLaunchInfoBaseTypeRegistered = false;
 
-    (void)kRegistered;
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&helper.mHelperNext);
   }
+
+  template <typename THelper>
+  void InitializeHelperNode(THelper& helper) noexcept
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperNext = self;
+    helper.mHelperPrev = self;
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkHelperNode(THelper& helper) noexcept
+  {
+    if (helper.mHelperNext != nullptr && helper.mHelperPrev != nullptr) {
+      helper.mHelperNext->mPrev = helper.mHelperPrev;
+      helper.mHelperPrev->mNext = helper.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper.mHelperPrev = self;
+    helper.mHelperNext = self;
+    return self;
+  }
+
+  void EnsureLaunchInfoBaseTypeRegistered()
+  {
+    if (gLaunchInfoBaseTypeRegistered) {
+      return;
+    }
+
+    gpg::PreRegisterRType(typeid(moho::LaunchInfoBase), &gLaunchInfoBaseTypeInfo);
+    gLaunchInfoBaseTypeRegistered = true;
+  }
+
+  void CleanupLaunchInfoBaseSerializerAtexit()
+  {
+    (void)UnlinkHelperNode(gLaunchInfoBaseSerializer);
+  }
+
+  struct LaunchInfoBaseSerializerBootstrap
+  {
+    LaunchInfoBaseSerializerBootstrap()
+    {
+      moho::register_LaunchInfoBaseSerializer();
+    }
+  };
+
+  [[maybe_unused]] LaunchInfoBaseSerializerBootstrap gLaunchInfoBaseSerializerBootstrap;
 } // namespace
 
 namespace moho
@@ -123,7 +164,7 @@ namespace moho
 
   gpg::RType* LaunchInfoBase::StaticGetClass()
   {
-    EnsureLaunchInfoBaseRegistered();
+    EnsureLaunchInfoBaseTypeRegistered();
     if (!sType) {
       sType = gpg::LookupRType(typeid(LaunchInfoBase));
     }
@@ -286,6 +327,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x00542550 (FUN_00542550, Moho::LaunchInfoBaseSerializer::Deserialize)
+   *
+   * What it does:
+   * Archive callback thunk forwarding into LaunchInfoBase load body.
+   */
+  void LaunchInfoBaseSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    LoadLaunchInfoBase(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00542560 (FUN_00542560, Moho::LaunchInfoBaseSerializer::Serialize)
+   *
+   * What it does:
+   * Archive callback thunk forwarding into LaunchInfoBase save body.
+   */
+  void LaunchInfoBaseSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    SaveLaunchInfoBase(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
    * Address: 0x00543190 (FUN_00543190, sub_543190)
    *
    * What it does:
@@ -298,6 +371,23 @@ namespace moho
     type->serLoadFunc_ = mSerLoadFunc;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerSaveFunc;
+  }
+
+  /**
+   * Address: 0x00BC94C0 (FUN_00BC94C0, register_LaunchInfoBaseSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer helper links/callbacks for `LaunchInfoBase`
+   * and schedules process-exit cleanup.
+   */
+  void register_LaunchInfoBaseSerializer()
+  {
+    EnsureLaunchInfoBaseTypeRegistered();
+    InitializeHelperNode(gLaunchInfoBaseSerializer);
+    gLaunchInfoBaseSerializer.mSerLoadFunc = &LaunchInfoBaseSerializer::Deserialize;
+    gLaunchInfoBaseSerializer.mSerSaveFunc = &LaunchInfoBaseSerializer::Serialize;
+    gLaunchInfoBaseSerializer.RegisterSerializeFunctions();
+    (void)std::atexit(&CleanupLaunchInfoBaseSerializerAtexit);
   }
 
   /**

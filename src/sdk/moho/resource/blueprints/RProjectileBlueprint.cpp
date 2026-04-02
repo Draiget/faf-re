@@ -2,37 +2,15 @@
 
 #include <algorithm>
 #include <cstring>
-#include <filesystem>
 #include <limits>
 #include <new>
-#include <string>
-#include <string_view>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "moho/resource/RResId.h"
 
 namespace moho
 {
-  namespace
-  {
-    [[nodiscard]] std::string
-    CompleteResourcePath(const std::string_view sourceName, const std::string_view resourceName)
-    {
-      if (resourceName.empty()) {
-        return {};
-      }
-
-      std::filesystem::path resourcePath{resourceName};
-      if (!resourcePath.is_absolute() && !sourceName.empty()) {
-        const std::filesystem::path sourcePath{sourceName};
-        resourcePath = sourcePath.parent_path() / resourcePath;
-      }
-
-      return resourcePath.lexically_normal().generic_string();
-    }
-
-  } // namespace
-
   gpg::RType* RProjectileBlueprint::sType = nullptr;
 
   /**
@@ -130,8 +108,8 @@ namespace moho
   {
     REntityBlueprint::OnInitBlueprint();
 
-    std::string completedMeshPath = CompleteResourcePath(mSource.view(), Display.MeshBlueprint.name.view());
+    msvc8::string completedMeshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
     gpg::STR_NormalizeFilenameLowerSlash(completedMeshPath);
-    Display.MeshBlueprint.name.assign_owned(completedMeshPath);
+    Display.MeshBlueprint.name.assign_owned(completedMeshPath.view());
   }
 } // namespace moho

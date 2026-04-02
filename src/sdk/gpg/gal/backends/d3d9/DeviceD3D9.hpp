@@ -7,6 +7,7 @@
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/gal/Device.hpp"
 #include "legacy/containers/String.h"
 
 namespace gpg {
@@ -41,14 +42,14 @@ namespace gal {
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\DeviceD3D9.cpp
      */
-    class DeviceD3D9 {
+    class DeviceD3D9 : public Device {
     public:
       /**
        * Address: 0x008F37F0
        * Slot: 0
-       * Demangled: sub_8F37F0
+       * Demangled: DestroyBackendObject
        */
-      virtual void sub_8F37F0();
+      virtual void DestroyBackendObject();
       /**
        * Address: 0x008E81D0 (FUN_008E81D0)
        * Slot: 1

@@ -7,6 +7,11 @@
 #include "gpg/core/containers/String.h"
 #include "moho/containers/SCoordsVec2.h"
 
+namespace LuaPlus
+{
+  class LuaState;
+}
+
 namespace moho
 {
   class CAiFormationInstance;
@@ -40,6 +45,42 @@ namespace moho
   using SFormationUnitWeakRefSet = gpg::fastvector_n<SFormationUnitWeakRef, 10>;
   static_assert(sizeof(SFormationUnitWeakRef) == 0x04, "SFormationUnitWeakRef size must be 0x04");
   static_assert(sizeof(SFormationUnitWeakRefSet) == 0x38, "SFormationUnitWeakRefSet size must be 0x38");
+
+  /**
+   * Address: 0x00575A30 (FUN_00575A30, ?FORMATION_GetNumScripts@Moho@@YAIPAVLuaState@LuaPlus@@W4EFormationType@1@@Z)
+   *
+   * What it does:
+   * Loads `/lua/formations.lua`, resolves a formation bucket table, and returns
+   * the number of scripts in that bucket.
+   */
+  unsigned int FORMATION_GetNumScripts(LuaPlus::LuaState* state, EFormationType formationType);
+
+  /**
+   * Address: 0x00575BD0 (FUN_00575BD0, ?FORMATION_GetScriptName@Moho@@YAPBDPAVLuaState@LuaPlus@@HW4EFormationType@1@@Z)
+   *
+   * What it does:
+   * Loads `/lua/formations.lua`, resolves a formation bucket table, and returns
+   * one script-name string for the requested index.
+   */
+  const char* FORMATION_GetScriptName(LuaPlus::LuaState* state, int scriptIndex, EFormationType formationType);
+
+  /**
+   * Address: 0x00575DB0 (FUN_00575DB0, ?FORMATION_GetScriptIndex@Moho@@YAHPAVLuaState@LuaPlus@@VStrArg@gpg@@W4EFormationType@1@@Z)
+   *
+   * What it does:
+   * Loads `/lua/formations.lua`, resolves a formation bucket table, and returns
+   * the zero-based index for one script name (`-1` when missing).
+   */
+  int FORMATION_GetScriptIndex(LuaPlus::LuaState* state, gpg::StrArg scriptName, EFormationType formationType);
+
+  /**
+   * Address: 0x00576350 (FUN_00576350, ?FORMATION_PickBestFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
+   *
+   * What it does:
+   * Calls `/lua/formations.lua` helper `PickBestFinalFormationIndex` and returns
+   * the selected formation index.
+   */
+  int FORMATION_PickBestFormation(LuaPlus::LuaState* state, EFormationType formationType, float radius);
 
   /**
    * VFTABLE: 0x00E1B45C

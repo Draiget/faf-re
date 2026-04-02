@@ -33,6 +33,24 @@ namespace moho
     ~CAiNavigatorAir() override;
 
     /**
+     * Address: 0x005A9100 (FUN_005A9100, Moho::CAiNavigatorAir::MemberDeserialize)
+     *
+     * What it does:
+     * Loads base navigator state, destination weak link, current target, goal
+     * position, and formation-tracking flag.
+     */
+    static void MemberDeserialize(CAiNavigatorAir* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005A91F0 (FUN_005A91F0, Moho::CAiNavigatorAir::MemberSerialize)
+     *
+     * What it does:
+     * Saves base navigator state, destination weak link, current target, goal
+     * position, and formation-tracking flag.
+     */
+    static void MemberSerialize(const CAiNavigatorAir* object, gpg::WriteArchive* archive);
+
+    /**
      * Address: 0x005A4C60 (FUN_005A4C60)
      *
      * VFTable SLOT: 2

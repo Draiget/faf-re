@@ -1,105 +1,94 @@
-﻿// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-#include "legacy/containers/String.h"
+#include <cstddef>
 
-namespace gpg
-{
-  class REnumType;
-  class RIndexed;
-  class RRef;
-  class RType;
-} // namespace gpg
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
-  /**
-   * VFTABLE: 0x00E213F0
-   * COL:  0x00E7AB34
-   * Source hints:
-   *  - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
-   */
-  class CAimManipulatorTypeInfo
+  class CAimManipulatorTypeInfo final : public gpg::RType
   {
   public:
     /**
-     * Address: 0x00401370
-     * Slot: 0
-     * Demangled: public: virtual class gpg::RType near * __thiscall gpg::RType::GetClass(void)const
+     * Address: 0x0062FED0 (FUN_0062FED0, Moho::CAimManipulatorTypeInfo::CAimManipulatorTypeInfo)
+     *
+     * What it does:
+     * Initializes RTTI base lanes and preregisters `CAimManipulator` type metadata.
      */
-    virtual gpg::RType* GetClass() const = 0;
+    CAimManipulatorTypeInfo();
 
     /**
-     * Address: 0x00401390
-     * Slot: 1
-     * Demangled: public: virtual class gpg::RRef __thiscall gpg::RType::GetDerivedObjectRef(void)
-     */
-    virtual gpg::RRef GetDerivedObjectRef() = 0;
-
-    /**
-     * Address: 0x0062FF80
+     * Address: 0x0062FF80 (FUN_0062FF80, scalar deleting thunk)
      * Slot: 2
-     * Demangled: Moho::CAimManipulatorTypeInfo::dtr
      */
-    virtual ~CAimManipulatorTypeInfo();
+    ~CAimManipulatorTypeInfo() override;
 
     /**
-     * Address: 0x0062FF70
+     * Address: 0x0062FF70 (FUN_0062FF70, Moho::CAimManipulatorTypeInfo::GetName)
      * Slot: 3
-     * Demangled: Moho::CAimManipulatorTypeInfo::GetName
      */
-    virtual const char* GetName() const = 0;
+    [[nodiscard]] const char* GetName() const override;
 
     /**
-     * Address: 0x008DB100
-     * Slot: 4
-     * Demangled: public: virtual class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char>>
-     * __thiscall gpg::RType::GetLexical(class gpg::RRef const near &)const
-     */
-    virtual msvc8::string GetLexical(gpg::RRef const&) const = 0;
-
-    /**
-     * Address: 0x008D86E0
-     * Slot: 5
-     * Demangled: public: virtual bool __thiscall gpg::RType::SetLexical(class gpg::RRef const near &,char const near
-     * *)const
-     */
-    virtual bool SetLexical(gpg::RRef const&, char const*) const = 0;
-
-    /**
-     * Address: 0x004013B0
-     * Slot: 6
-     * Demangled: public: virtual struct gpg::RIndexed const near * __thiscall gpg::RType::IsIndexed(void)const
-     */
-    virtual gpg::RIndexed const* IsIndexed() const = 0;
-
-    /**
-     * Address: 0x004013C0
-     * Slot: 7
-     * Demangled: public: virtual struct gpg::RIndexed const near * __thiscall gpg::RType::IsPointer(void)const
-     */
-    virtual gpg::RIndexed const* IsPointer() const = 0;
-
-    /**
-     * Address: 0x004013D0
-     * Slot: 8
-     * Demangled: public: virtual class gpg::REnumType const near * __thiscall gpg::RType::IsEnumType(void)const
-     */
-    virtual gpg::REnumType const* IsEnumType() const = 0;
-
-    /**
-     * Address: 0x0062FF30
+     * Address: 0x0062FF30 (FUN_0062FF30, Moho::CAimManipulatorTypeInfo::Init)
      * Slot: 9
-     * Demangled: Moho::CAimManipulatorTypeInfo::Init
+     *
+     * What it does:
+     * Initializes reflection metadata for `CAimManipulator` (`sizeof = 0x110`)
+     * and installs known callback lanes.
      */
-    virtual void Init() = 0;
+    void Init() override;
+
+  private:
+    /**
+     * Address: 0x00632EA0 (FUN_00632EA0, Moho::CAimManipulatorTypeInfo::NewRef)
+     *
+     * What it does:
+     * Creates a reflected owned-reference lane for `CAimManipulator`.
+     */
+    static gpg::RRef NewRef();
 
     /**
-     * Address: 0x008DF4A0
-     * Slot: 10
-     * Demangled: protected: virtual void __thiscall gpg::RType::Finish(void)
+     * Address: 0x00632F40 (FUN_00632F40, Moho::CAimManipulatorTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Creates a reflected in-place reference lane for `CAimManipulator`.
      */
-    virtual void Finish() = 0;
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x00632F20 (FUN_00632F20, Moho::CAimManipulatorTypeInfo::Delete)
+     *
+     * What it does:
+     * Deleting-dtor callback lane for reflected `CAimManipulator` storage.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x00632FB0 (FUN_00632FB0, Moho::CAimManipulatorTypeInfo::Destruct)
+     *
+     * What it does:
+     * Non-deleting destructor callback lane for reflected `CAimManipulator` storage.
+     */
+    static void Destruct(void* objectStorage);
+
+    /**
+     * Address: 0x00632FD0 (FUN_00632FD0, Moho::CAimManipulatorTypeInfo::AddBase_IAniManipulator)
+     *
+     * What it does:
+     * Registers `IAniManipulator` as reflection base for `CAimManipulator`.
+     */
+    static void AddBase_IAniManipulator(gpg::RType* typeInfo);
   };
+
+  static_assert(sizeof(CAimManipulatorTypeInfo) == 0x64, "CAimManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BD2270 (FUN_00BD2270, register_CAimManipulatorTypeInfo)
+   *
+   * What it does:
+   * Registers `CAimManipulator` RTTI startup owner and installs process-exit
+   * cleanup for its static storage.
+   */
+  void register_CAimManipulatorTypeInfo();
 } // namespace moho

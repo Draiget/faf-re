@@ -4,15 +4,22 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <type_traits>
 #include <typeinfo>
 
 #include "CArmyStats.h"
+#include "CPlatoon.h"
 #include "CInfluenceMap.h"
 #include "CSimArmyEconomyInfo.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/reflection/SerializationError.h"
+#include "moho/ai/CAiBrain.h"
+#include "moho/ai/CAiReconDBImpl.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/sim/ArmyUnitSetVectorReflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/core/Unit.h"
@@ -48,23 +55,16 @@ namespace
     pool.platoons.ResetStorageToInline();
   }
 
-  struct IntrusiveListNode
-  {
-    IntrusiveListNode* next;
-    IntrusiveListNode* prev;
-  };
-
-  static_assert(sizeof(IntrusiveListNode) == 0x08, "IntrusiveListNode size must be 0x08");
+  using IntrusiveListNode = moho::IntrusiveNode;
 
   void UnlinkIntrusiveNode(IntrusiveListNode& node)
   {
-    if (node.next != nullptr && node.prev != nullptr) {
-      node.next->prev = node.prev;
-      node.prev->next = node.next;
+    if (node.mNext != nullptr && node.mPrev != nullptr) {
+      node.ListUnlink();
+      return;
     }
 
-    node.next = &node;
-    node.prev = &node;
+    node.ListResetLinks();
   }
 
   struct PointerTriplet
@@ -151,13 +151,12 @@ namespace
       return;
     }
 
-    IntrusiveListNode* node = sentinel->next;
-    sentinel->next = sentinel;
-    sentinel->prev = sentinel;
+    IntrusiveListNode* node = sentinel->mNext;
+    sentinel->ListResetLinks();
     owner.count = 0;
 
     while (node != sentinel) {
-      IntrusiveListNode* const next = node->next;
+      IntrusiveListNode* const next = node->mNext;
       operator delete(node);
       node = next;
     }
@@ -313,6 +312,350 @@ namespace
   {
     // Evidence: FUN_006FDE70 targets (this + 0x17C), modeled as CArmyImpl::RuntimeWordVectorWithMeta.
     return &army->RuntimeWordVectorWithMeta;
+  }
+
+  struct UnitCategorySetVectorView
+  {
+    moho::SEntitySetTemplateUnit* begin;
+    moho::SEntitySetTemplateUnit* end;
+    moho::SEntitySetTemplateUnit* capacityEnd;
+  };
+
+  static_assert(sizeof(UnitCategorySetVectorView) == 0x0C, "UnitCategorySetVectorView size must be 0x0C");
+  static_assert(
+    offsetof(UnitCategorySetVectorView, begin) == 0x00, "UnitCategorySetVectorView::begin offset must be 0x00"
+  );
+  static_assert(offsetof(UnitCategorySetVectorView, end) == 0x04, "UnitCategorySetVectorView::end offset must be 0x04");
+  static_assert(
+    offsetof(UnitCategorySetVectorView, capacityEnd) == 0x08,
+    "UnitCategorySetVectorView::capacityEnd offset must be 0x08"
+  );
+
+  constexpr const char* kCAiBrainTypeNames[] = {"Moho::CAiBrain", "CAiBrain"};
+  constexpr const char* kCAiReconDBImplTypeNames[] = {"Moho::CAiReconDBImpl", "CAiReconDBImpl"};
+  constexpr const char* kIAiReconDBTypeNames[] = {"Moho::IAiReconDB", "IAiReconDB"};
+  constexpr const char* kCEconomyTypeNames[] = {"Moho::CEconomy", "CEconomy"};
+  constexpr const char* kPathQueueTypeNames[] = {"Moho::PathQueue", "PathQueue"};
+  constexpr const char* kCPlatoonTypeNames[] = {"Moho::CPlatoon", "CPlatoon"};
+  constexpr const char* kEntitySetTemplateUnitVectorTypeNames[] = {
+    "vector<Moho::EntitySetTemplate<Moho::Unit>>",
+    "vector<Moho::EntitySetTemplate<Moho::Unit> >",
+    "vector<EntitySetTemplate<Unit>>"
+  };
+
+  gpg::RType* gSimType = nullptr;
+  gpg::RType* gCAiBrainType = nullptr;
+  gpg::RType* gCAiReconDBImplType = nullptr;
+  gpg::RType* gIAiReconDBType = nullptr;
+  gpg::RType* gCEconomyType = nullptr;
+  gpg::RType* gCArmyStatsType = nullptr;
+  gpg::RType* gCInfluenceMapType = nullptr;
+  gpg::RType* gPathQueueType = nullptr;
+  gpg::RType* gCPlatoonType = nullptr;
+  gpg::RType* gEntitySetTemplateUnitVectorType = nullptr;
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
+  {
+    if (!slot) {
+      slot = gpg::LookupRType(typeid(TObject));
+    }
+    return slot;
+  }
+
+  template <std::size_t NameCount>
+  [[nodiscard]] gpg::RType* ResolveTypeByNames(gpg::RType*& slot, const char* const (&typeNames)[NameCount])
+  {
+    if (slot) {
+      return slot;
+    }
+
+    for (const char* const typeName : typeNames) {
+      if (!typeName || !*typeName) {
+        continue;
+      }
+
+      slot = gpg::REF_FindTypeNamed(typeName);
+      if (slot != nullptr) {
+        return slot;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveSimType()
+  {
+    return CachedType<moho::Sim>(gSimType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCAiBrainType()
+  {
+    return ResolveTypeByNames(gCAiBrainType, kCAiBrainTypeNames);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCAiReconDBImplType()
+  {
+    return ResolveTypeByNames(gCAiReconDBImplType, kCAiReconDBImplTypeNames);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveIAiReconDBType()
+  {
+    return ResolveTypeByNames(gIAiReconDBType, kIAiReconDBTypeNames);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCEconomyType()
+  {
+    return ResolveTypeByNames(gCEconomyType, kCEconomyTypeNames);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCArmyStatsType()
+  {
+    return CachedType<moho::CArmyStats>(gCArmyStatsType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCInfluenceMapType()
+  {
+    return CachedType<moho::CInfluenceMap>(gCInfluenceMapType);
+  }
+
+  [[nodiscard]] gpg::RType* ResolvePathQueueType()
+  {
+    return ResolveTypeByNames(gPathQueueType, kPathQueueTypeNames);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCPlatoonType()
+  {
+    return ResolveTypeByNames(gCPlatoonType, kCPlatoonTypeNames);
+  }
+
+  /**
+   * Address: 0x005949D0 (FUN_005949D0, gpg::RRef::Upcast_CPlatoon)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `CPlatoon` and returns the
+   * resulting object pointer (or null on mismatch).
+   */
+  [[nodiscard]] moho::CPlatoon* UpcastCPlatoonRef(const gpg::RRef& source)
+  {
+    return static_cast<moho::CPlatoon*>(gpg::REF_UpcastPtr(source, ResolveCPlatoonType()).mObj);
+  }
+
+  /**
+   * Address: 0x007040E0 (FUN_007040E0, gpg::ReadArchive::ReadPointerOwned_CPlatoon)
+   *
+   * What it does:
+   * Reads one tracked pointer lane, enforces owned-pointer transition
+   * (`Unowned -> Owned`), and upcasts to `CPlatoon`.
+   */
+  [[nodiscard]] moho::CPlatoon* ReadOwnedCPlatoonPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  {
+    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    if (tracked.state != gpg::TrackedPointerState::Unowned) {
+      throw gpg::SerializationError("Ownership conflict while loading archive");
+    }
+
+    gpg::RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+
+    moho::CPlatoon* const platoon = UpcastCPlatoonRef(source);
+    if (!platoon) {
+      gpg::RType* expectedType = moho::CPlatoon::sType;
+      if (!expectedType) {
+        expectedType = gpg::LookupRType(typeid(moho::CPlatoon));
+        moho::CPlatoon::sType = expectedType;
+      }
+
+      const char* const expectedName = expectedType ? expectedType->GetName() : "CPlatoon";
+      const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
+      const msvc8::string message = gpg::STR_Printf(
+        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+        "instead",
+        expectedName ? expectedName : "CPlatoon",
+        actualName ? actualName : "null"
+      );
+      throw gpg::SerializationError(message.c_str());
+    }
+
+    tracked.state = gpg::TrackedPointerState::Owned;
+    return platoon;
+  }
+
+  /**
+   * Address: 0x007041F0 (FUN_007041F0, sub_7041F0)
+   *
+   * What it does:
+   * Writes one `CPlatoon` tracked-pointer lane as `Owned` through archive
+   * pointer serialization.
+   */
+  void WriteOwnedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
+  {
+    gpg::RRef objectRef{};
+    gpg::RRef_CPlatoon(&objectRef, platoon);
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, ownerRef);
+  }
+
+  /**
+   * Address: 0x00705A50 (FUN_00705A50, sub_705A50)
+   * Alias:   0x00704220 (FUN_00704220, sub_704220)
+   * Alias:   0x00704C30 (FUN_00704C30, sub_704C30)
+   *
+   * What it does:
+   * Writes one `CPlatoon` tracked-pointer lane as `Unowned` through archive
+   * pointer serialization.
+   */
+  void WriteUnownedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
+  {
+    gpg::RRef objectRef{};
+    gpg::RRef_CPlatoon(&objectRef, platoon);
+    gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitVectorType()
+  {
+    if (!gEntitySetTemplateUnitVectorType) {
+      gEntitySetTemplateUnitVectorType = gpg::ResolveEntitySetTemplateUnitVectorType();
+      if (!gEntitySetTemplateUnitVectorType) {
+        gEntitySetTemplateUnitVectorType =
+          ResolveTypeByNames(gEntitySetTemplateUnitVectorType, kEntitySetTemplateUnitVectorTypeNames);
+      }
+    }
+    return gEntitySetTemplateUnitVectorType;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* ResolveDynamicTypeOr(gpg::RType* const fallbackType, const TObject* const object)
+  {
+    if (object == nullptr) {
+      return fallbackType;
+    }
+
+    if constexpr (std::is_polymorphic_v<TObject>) {
+      if (gpg::RType* const dynamicType = gpg::LookupRType(typeid(*object)); dynamicType != nullptr) {
+        return dynamicType;
+      }
+    }
+
+    return fallbackType;
+  }
+
+  void PromoteTrackedPointerToOwned(gpg::TrackedPointerInfo& tracked)
+  {
+    if (tracked.object == nullptr) {
+      return;
+    }
+
+    if (tracked.state == gpg::TrackedPointerState::Unowned) {
+      tracked.state = gpg::TrackedPointerState::Owned;
+      return;
+    }
+
+    GPG_ASSERT(tracked.state == gpg::TrackedPointerState::Owned);
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject* DecodeTrackedPointer(const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType)
+  {
+    if (tracked.object == nullptr) {
+      return nullptr;
+    }
+
+    if (expectedType != nullptr && tracked.type != nullptr) {
+      gpg::RRef source{};
+      source.mObj = tracked.object;
+      source.mType = tracked.type;
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
+      return static_cast<TObject*>(upcast.mObj);
+    }
+
+    return static_cast<TObject*>(tracked.object);
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject*
+  ReadPointerTyped(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* const expectedType, bool owned)
+  {
+    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
+    if (owned) {
+      PromoteTrackedPointerToOwned(tracked);
+    }
+    return DecodeTrackedPointer<TObject>(tracked, expectedType);
+  }
+
+  template <class TObject>
+  void WritePointerTyped(
+    gpg::WriteArchive* const archive,
+    const TObject* const object,
+    gpg::RType* const objectType,
+    const gpg::TrackedPointerState trackedState,
+    const gpg::RRef& owner
+  )
+  {
+    gpg::RRef objectRef{};
+    objectRef.mObj = const_cast<TObject*>(object);
+    objectRef.mType = (object != nullptr) ? objectType : nullptr;
+    gpg::WriteRawPointer(archive, objectRef, trackedState, owner);
+  }
+
+  template <std::size_t SlotIndex, class TObject>
+  void ReplaceDeletingDtorOwnedPointer(TObject*& field, TObject* const value)
+  {
+    TObject* const prior = field;
+    if (prior == value) {
+      return;
+    }
+
+    field = value;
+    CallDeletingDestructorSlot<SlotIndex>(prior);
+  }
+
+  template <class TObject>
+  void ReplaceDeleteOwnedPointer(TObject*& field, TObject* const value)
+  {
+    TObject* const prior = field;
+    if (prior == value) {
+      return;
+    }
+
+    field = value;
+    delete prior;
+  }
+
+  void ReplaceEconomyOwnedPointer(moho::CSimArmyEconomyInfo*& field, moho::CSimArmyEconomyInfo* const value)
+  {
+    moho::CSimArmyEconomyInfo* prior = field;
+    if (prior == value) {
+      return;
+    }
+
+    field = value;
+    DestroyArmyEconomyInfo(prior);
+  }
+
+  void ReplacePathFinderOwnedPointer(void*& field, void* const value)
+  {
+    void* prior = field;
+    if (prior == value) {
+      return;
+    }
+
+    field = value;
+    DestroyPathFinder(prior);
+  }
+
+  [[nodiscard]] UnitCategorySetVectorView& UnitCategorySetVector(moho::CArmyImpl& army)
+  {
+    return *reinterpret_cast<UnitCategorySetVectorView*>(&army.UnitCategorySetsBegin);
+  }
+
+  [[nodiscard]] const UnitCategorySetVectorView& UnitCategorySetVector(const moho::CArmyImpl& army)
+  {
+    return *reinterpret_cast<const UnitCategorySetVectorView*>(&army.UnitCategorySetsBegin);
   }
 
   [[nodiscard]] moho::BVIntSet& AsBVIntSet(moho::Set& set) noexcept
@@ -492,26 +835,6 @@ namespace
     return msvc8::string(numeric);
   }
 
-  [[nodiscard]] moho::StatItem* ResolveArmyDebugStatItem(moho::CArmyStats* armyStats, const msvc8::string& statName)
-  {
-    if (armyStats == nullptr || statName.empty()) {
-      return nullptr;
-    }
-
-    return armyStats->TraverseTables(statName.data(), true);
-  }
-
-  void SetStatItemStringValue(moho::StatItem* statItem, const msvc8::string& value)
-  {
-    if (statItem == nullptr) {
-      return;
-    }
-
-    boost::mutex::scoped_lock lock(statItem->mLock);
-    statItem->mType = moho::EStatType::kString;
-    statItem->mValue.assign(value, 0, msvc8::string::npos);
-  }
-
   [[nodiscard]] moho::SEntitySetTemplateUnit* ResolveCategorySetForUnit(moho::CArmyImpl* army, moho::Unit* unit)
   {
     if (army == nullptr || unit == nullptr) {
@@ -674,6 +997,170 @@ namespace moho
   CSimArmyEconomyInfo* CArmyImpl::GetEconomy()
   {
     return EconomyInfo;
+  }
+
+  /**
+   * Address: 0x007010B0 (FUN_007010B0, Moho::CArmyImpl::DeserializePlatoons)
+   */
+  void CArmyImpl::DeserializePlatoons(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    while (true) {
+      CPlatoon* const platoon = ReadOwnedCPlatoonPointer(archive, owner);
+      if (!platoon) {
+        break;
+      }
+
+      PlatoonPool.platoons.PushBack(platoon);
+    }
+  }
+
+  /**
+   * Address: 0x00701130 (FUN_00701130, Moho::CArmyImpl::SerializePlatoons)
+   */
+  void CArmyImpl::SerializePlatoons(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    for (CPlatoon* const* it = PlatoonPool.platoons.begin(); it != PlatoonPool.platoons.end(); ++it) {
+      WriteOwnedCPlatoonPointer(archive, *it, owner);
+    }
+
+    WriteUnownedCPlatoonPointer(archive, nullptr, owner);
+  }
+
+  /**
+   * Address: 0x00705BE0 (FUN_00705BE0, Moho::CArmyImpl::MemberDeserialize)
+   */
+  void CArmyImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(SimArmy::StaticGetClass(), static_cast<SimArmy*>(this), owner);
+
+    Simulation = ReadPointerTyped<Sim>(archive, owner, ResolveSimType(), false);
+    ReplaceDeletingDtorOwnedPointer<2>(AiBrain, ReadPointerTyped<CAiBrain>(archive, owner, ResolveCAiBrainType(), true));
+    ReplaceDeletingDtorOwnedPointer<0>(
+      AiReconDb, ReadPointerTyped<CAiReconDBImpl>(archive, owner, ResolveCAiReconDBImplType(), true)
+    );
+    ReplaceEconomyOwnedPointer(EconomyInfo, ReadPointerTyped<CSimArmyEconomyInfo>(archive, owner, ResolveCEconomyType(), true));
+
+    archive->ReadString(&ArmyPlans);
+
+    ReplaceDeleteOwnedPointer(Stats, ReadPointerTyped<CArmyStats>(archive, owner, ResolveCArmyStatsType(), true));
+    ReplaceDeleteOwnedPointer(
+      InfluenceMap, ReadPointerTyped<CInfluenceMap>(archive, owner, ResolveCInfluenceMapType(), true)
+    );
+    ReplacePathFinderOwnedPointer(PathFinder, ReadPointerTyped<void>(archive, owner, ResolvePathQueueType(), true));
+
+    gpg::RType* const categoryVectorType = ResolveEntitySetTemplateUnitVectorType();
+    GPG_ASSERT(categoryVectorType != nullptr);
+    if (categoryVectorType != nullptr) {
+      archive->Read(categoryVectorType, &UnitCategorySetVector(*this), owner);
+    }
+
+    archive->ReadUInt(&UnitCategoryBaseIndex);
+    archive->ReadUInt(&UnitCategoryMaxIndex);
+    archive->ReadFloat(&UnitCapacity);
+
+    bool ignoreUnitCap = false;
+    archive->ReadBool(&ignoreUnitCap);
+    IgnoreUnitCapFlag = static_cast<std::uint8_t>(ignoreUnitCap);
+
+    archive->ReadInt(&PathCapacityLand);
+    archive->ReadInt(&PathCapacitySea);
+    archive->ReadInt(&PathCapacityBoth);
+    DeserializePlatoons(archive);
+  }
+
+  /**
+   * Address: 0x00705E40 (FUN_00705E40, Moho::CArmyImpl::MemberSerialize)
+   */
+  void CArmyImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(SimArmy::StaticGetClass(), static_cast<const SimArmy*>(this), owner);
+
+    WritePointerTyped(
+      archive,
+      Simulation,
+      ResolveDynamicTypeOr(ResolveSimType(), Simulation),
+      gpg::TrackedPointerState::Unowned,
+      owner
+    );
+    WritePointerTyped(
+      archive,
+      AiBrain,
+      ResolveDynamicTypeOr(ResolveCAiBrainType(), AiBrain),
+      gpg::TrackedPointerState::Owned,
+      owner
+    );
+
+    gpg::RType* reconType = ResolveIAiReconDBType();
+    if (!reconType) {
+      reconType = ResolveCAiReconDBImplType();
+    }
+    WritePointerTyped(
+      archive,
+      AiReconDb,
+      ResolveDynamicTypeOr(reconType, AiReconDb),
+      gpg::TrackedPointerState::Owned,
+      owner
+    );
+
+    WritePointerTyped(
+      archive,
+      EconomyInfo,
+      ResolveCEconomyType(),
+      gpg::TrackedPointerState::Owned,
+      owner
+    );
+    archive->WriteString(const_cast<msvc8::string*>(&ArmyPlans));
+
+    WritePointerTyped(
+      archive,
+      Stats,
+      ResolveDynamicTypeOr(ResolveCArmyStatsType(), Stats),
+      gpg::TrackedPointerState::Owned,
+      owner
+    );
+    WritePointerTyped(
+      archive,
+      InfluenceMap,
+      ResolveDynamicTypeOr(ResolveCInfluenceMapType(), InfluenceMap),
+      gpg::TrackedPointerState::Owned,
+      owner
+    );
+    WritePointerTyped(archive, PathFinder, ResolvePathQueueType(), gpg::TrackedPointerState::Owned, owner);
+
+    gpg::RType* const categoryVectorType = ResolveEntitySetTemplateUnitVectorType();
+    GPG_ASSERT(categoryVectorType != nullptr);
+    if (categoryVectorType != nullptr) {
+      archive->Write(categoryVectorType, &UnitCategorySetVector(*this), owner);
+    }
+
+    archive->WriteUInt(UnitCategoryBaseIndex);
+    archive->WriteUInt(UnitCategoryMaxIndex);
+    archive->WriteFloat(UnitCapacity);
+    archive->WriteBool(IgnoreUnitCapFlag != 0);
+    archive->WriteInt(PathCapacityLand);
+    archive->WriteInt(PathCapacitySea);
+    archive->WriteInt(PathCapacityBoth);
+    SerializePlatoons(archive);
   }
 
   /**
@@ -952,9 +1439,9 @@ namespace moho
     const msvc8::string squadClassKey = debugPrefix + "_SquadClass";
     const msvc8::string aiPlanKey = debugPrefix + "_AIPlan";
 
-    SetStatItemStringValue(ResolveArmyDebugStatItem(Stats, platoonNameKey), GetPlatoonName(platoon));
-    SetStatItemStringValue(ResolveArmyDebugStatItem(Stats, squadClassKey), GetSquadClassLexical(squadClass));
-    SetStatItemStringValue(ResolveArmyDebugStatItem(Stats, aiPlanKey), GetPlatoonAiPlan(platoon));
+    Stats->SetStringValueByPath(platoonNameKey.data(), GetPlatoonName(platoon));
+    Stats->SetStringValueByPath(squadClassKey.data(), GetSquadClassLexical(squadClass));
+    Stats->SetStringValueByPath(aiPlanKey.data(), GetPlatoonAiPlan(platoon));
   }
 
   /**

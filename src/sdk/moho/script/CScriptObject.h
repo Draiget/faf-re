@@ -49,6 +49,7 @@ namespace moho
 
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
 
     [[nodiscard]]
     static gpg::RType* StaticGetClass();
@@ -67,10 +68,11 @@ namespace moho
     virtual gpg::RRef GetDerivedObjectRef() = 0;
 
     /**
-     * Address: 0x4C6FF0
+     * Address: 0x004C7340 (FUN_004C7340, Moho::CScriptObject::~CScriptObject)
+     * Deleting destructor thunk: 0x004C6FF0 (FUN_004C6FF0, Moho::CScriptObject::dtr)
      * VFTable SLOT: 2
      */
-    virtual ~CScriptObject() = default;
+    virtual ~CScriptObject();
 
     /**
      * Address: 0x4C70A0
@@ -121,6 +123,30 @@ namespace moho
      */
     [[nodiscard]]
     int TaskTick();
+
+    /**
+     * Address: 0x004C8530 (FUN_004C8530, Moho::CScriptObject::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected pointer type descriptor for `CScriptObject*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
+
+    /**
+     * Address: 0x004C8DC0 (FUN_004C8DC0, Moho::CScriptObject::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `cObject` and `mLuaObj` lanes from archive using LuaObject reflected type.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x004C8E40 (FUN_004C8E40, Moho::CScriptObject::MemberSerialize)
+     *
+     * What it does:
+     * Saves `cObject` and `mLuaObj` lanes into archive using LuaObject reflected type.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
 
     /**
      * Address: 0x00581AA0

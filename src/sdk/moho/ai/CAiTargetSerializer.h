@@ -33,6 +33,15 @@ namespace moho
     gpg::RType::save_func_t mSaveCallback; // +0x10
   };
 
+  /**
+   * Address: 0x00BCEC50 (FUN_00BCEC50, register_CAiTargetSerializer)
+   *
+   * What it does:
+   * Registers `CAiTarget` serializer callbacks and installs process-exit
+   * cleanup.
+   */
+  int register_CAiTargetSerializer();
+
   static_assert(
     offsetof(CAiTargetSerializer, mHelperNext) == 0x04, "CAiTargetSerializer::mHelperNext offset must be 0x04"
   );

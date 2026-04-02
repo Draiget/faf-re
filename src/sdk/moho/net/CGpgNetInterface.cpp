@@ -102,6 +102,29 @@ boost::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
 }
 
 /**
+ * Address: 0x007B9AC0 (FUN_007B9AC0, Moho::GPGNET_ReportDesync)
+ *
+ * What it does:
+ * Sends one GPGNet `"Desync"` command carrying beat/army ids and both hash
+ * strings from one desync record.
+ */
+void moho::GPGNET_ReportDesync(
+  const int beat, const int army, const msvc8::string& hash1, const msvc8::string& hash2
+)
+{
+  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  if (!active) {
+    return;
+  }
+
+  const SNetCommandArg beatArg(beat);
+  const SNetCommandArg armyArg(army);
+  const SNetCommandArg hash1Arg(hash1);
+  const SNetCommandArg hash2Arg(hash2);
+  active->WriteCommandWith4Args("Desync", &beatArg, &armyArg, &hash1Arg, &hash2Arg);
+}
+
+/**
  * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
  *
  * What it does:

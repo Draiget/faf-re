@@ -6,6 +6,8 @@
 
 namespace gpg
 {
+  class ReadArchive;
+  class SerConstructResult;
   struct SerHelperBase;
 } // namespace gpg
 
@@ -18,6 +20,25 @@ namespace moho
   class CAiPersonalityConstruct
   {
   public:
+    /**
+     * Address: 0x005B69E0 (FUN_005B69E0)
+     *
+     * What it does:
+     * Allocates a `CAiPersonality`, wraps it in `gpg::RRef`, and returns it to
+     * the serialization construct result as an unowned object.
+     */
+    static void Construct(
+      gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result
+    );
+
+    /**
+     * Address: 0x005B9580 (FUN_005B9580)
+     *
+     * What it does:
+     * Deletes one `CAiPersonality` object created through the construct path.
+     */
+    static void Deconstruct(void* object);
+
     /**
      * Address: 0x005B92D0 (FUN_005B92D0)
      *
@@ -52,4 +73,13 @@ namespace moho
     "CAiPersonalityConstruct::mDeleteCallback offset must be 0x10"
   );
   static_assert(sizeof(CAiPersonalityConstruct) == 0x14, "CAiPersonalityConstruct size must be 0x14");
+
+  /**
+   * Address: 0x00BCD620 (FUN_00BCD620, register_CAiPersonalityConstruct)
+   *
+   * What it does:
+   * Initializes the global personality construct helper and installs
+   * process-exit cleanup.
+   */
+  int register_CAiPersonalityConstruct();
 } // namespace moho

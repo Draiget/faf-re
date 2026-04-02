@@ -28,6 +28,15 @@ namespace moho
     void InitializeRecovered(const char* description, const char* name, const char* aliasCommandText);
 
     /**
+     * Address: 0x00BFE370/FUN_00BFE370-family cleanup lanes
+     *
+     * What it does:
+     * Resets alias command-text storage and tears down command registration for
+     * startup-owned cleanup thunks.
+     */
+    void ShutdownRecovered();
+
+    /**
      * Address: 0x0041E6A0 (FUN_0041E6A0)
      *
      * What it does:

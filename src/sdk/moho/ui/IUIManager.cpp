@@ -190,3 +190,47 @@ bool moho::UI_StartJoinLobbyUI(
     }
   );
 }
+
+/**
+ * Address: 0x0083D500 (FUN_0083D500, ?UI_ShowDesyncDialog@Moho@@YAXHABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z)
+ *
+ * What it does:
+ * Builds one Lua table from desync payload strings and invokes
+ * `/lua/ui/uimain.lua:ShowDesyncDialog(sessionTick, payloadTable)`.
+ */
+void moho::UI_ShowDesyncDialog(const int sessionTick, const msvc8::vector<msvc8::string>& payloadLines)
+{
+  try {
+    CUIManager* const manager = g_UIManager;
+    LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+    if (state == nullptr) {
+      return;
+    }
+
+    LuaPlus::LuaObject payloadTable;
+    payloadTable.AssignNewTable(state, 0, 0);
+
+    const msvc8::string* const begin = payloadLines.begin();
+    const msvc8::string* const end = payloadLines.end();
+    if (begin != nullptr && end != nullptr) {
+      int payloadIndex = 1;
+      for (const msvc8::string* it = begin; it != end; ++it, ++payloadIndex) {
+        payloadTable.SetString(payloadIndex, it->c_str() != nullptr ? it->c_str() : "");
+      }
+    }
+
+    const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+    const LuaPlus::LuaObject showDesyncDialogObj = uiMainModule["ShowDesyncDialog"];
+    if (!showDesyncDialogObj.IsFunction()) {
+      showDesyncDialogObj.TypeError("call");
+    }
+
+    LuaPlus::LuaFunction<void> showDesyncDialogFn(showDesyncDialogObj);
+    showDesyncDialogFn(sessionTick, payloadTable);
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/uimain.lua:ShowDesyncDialog': %s",
+      exception.what() != nullptr ? exception.what() : ""
+    );
+  }
+}

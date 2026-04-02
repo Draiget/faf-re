@@ -5,6 +5,7 @@
 
 #include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
+#include "moho/containers/TDatList.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/WeakObject.h"
 #include "moho/render/camera/VTransform.h"
@@ -28,11 +29,7 @@ namespace moho
   };
   static_assert(sizeof(SCreateEntityParams) == 0x0C, "SCreateEntityParams size must be 0x0C");
 
-  struct UserEntityLinkNode
-  {
-    UserEntityLinkNode* prev;
-    UserEntityLinkNode* next;
-  };
+  using UserEntityLinkNode = TDatListItem<void, void>;
   static_assert(sizeof(UserEntityLinkNode) == 0x08, "UserEntityLinkNode size must be 0x08");
 
   struct UserEntitySpatialDbEntry

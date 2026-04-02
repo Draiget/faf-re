@@ -14,6 +14,22 @@ namespace moho
     IMessageReceiver* mReceivers[256]{};
 
     /**
+     * Address: 0x0047C240 (FUN_0047C240, Moho::CMessageDispatcher::CMessageDispatcher)
+     *
+     * What it does:
+     * Initializes receiver-linkage sentinel and clears 256-byte receiver table.
+     */
+    CMessageDispatcher();
+
+    /**
+     * Address: 0x0047C280 (FUN_0047C280, Moho::CMessageDispatcher::~CMessageDispatcher)
+     *
+     * What it does:
+     * Unlinks and deletes all receiver linkages owned by this dispatcher.
+     */
+    ~CMessageDispatcher();
+
+    /**
      * Address: 0x0047C360
      * @param lower
      * @param upper
@@ -26,6 +42,14 @@ namespace moho
      * @param linkage
      */
     void RemoveLinkage(SMsgReceiverLinkage* linkage);
+
+    /**
+     * Address: 0x0047C400 (FUN_0047C400, Moho::CMessageDispatcher::RemoveReceiver)
+     *
+     * What it does:
+     * Finds and removes one range receiver linkage matching `(lower, upper, rec)`.
+     */
+    void RemoveReceiver(unsigned int lower, unsigned int upper, IMessageReceiver* rec);
 
     /**
      * Address: 0x0047C4D0
@@ -55,8 +79,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0047C37A
-     * NOTE: Inlined
+     * Address: 0x0047BC90 (FUN_0047BC90)
+     * Address: 0x0047C37A (inlined ctor lane in FUN_0047C360)
      *
      * @param lower
      * @param upper
@@ -64,6 +88,15 @@ namespace moho
      * @param dispatcher
      */
     SMsgReceiverLinkage(unsigned int lower, unsigned int upper, IMessageReceiver* rec, CMessageDispatcher* dispatcher);
+
+    /**
+     * Address: 0x0047C320 (FUN_0047C320, non-deleting destructor lane)
+     * Address: 0x0047C2E0 (FUN_0047C2E0, deleting-destructor thunk)
+     *
+     * What it does:
+     * Unlinks linkage from both intrusive-list lanes before destruction.
+     */
+    ~SMsgReceiverLinkage();
 
     void ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher) override;
 

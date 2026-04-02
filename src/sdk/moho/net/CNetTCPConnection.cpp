@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "CMessageStream.h"
 #include "CNetTCPConnector.h"
 #include "Common.h"
 #include "ELobbyMsg.h"
@@ -9,6 +10,125 @@
 #include "gpg/core/utils/Logging.h"
 
 using namespace moho;
+
+namespace
+{
+  void AppendToPipeStream(gpg::PipeStream& stream, const char* const bytes, const size_t byteCount)
+  {
+    char* const writeHead = stream.mWriteHead;
+    const size_t capacity = static_cast<size_t>(stream.mWriteEnd - writeHead);
+    if (byteCount > capacity) {
+      stream.VirtWrite(bytes, byteCount);
+      return;
+    }
+
+    if (byteCount != 0) {
+      std::memcpy(writeHead, bytes, byteCount);
+      stream.mWriteHead += byteCount;
+    }
+  }
+
+  void AppendMessageToPipeStream(gpg::PipeStream& stream, const CMessage& message)
+  {
+    AppendToPipeStream(stream, message.mBuff.start_, message.mBuff.Size());
+  }
+
+  void DispatchConnectionEvent(CNetTCPConnection& connection, const ELobbyMsg messageType)
+  {
+    CMessage event{messageType};
+    connection.Dispatch(&event);
+  }
+
+  void QueueConnectorLocalPortHandshake(CNetTCPConnection& connection)
+  {
+    CMessage handshake{MessageType{0}};
+    CMessageStream payload{handshake};
+
+    const auto localPort = static_cast<std::uint16_t>(connection.mConnector->GetLocalPort());
+    payload.Write(reinterpret_cast<const char*>(&localPort), sizeof(localPort));
+    AppendMessageToPipeStream(connection.mOutputStream, handshake);
+  }
+
+  struct STcpConnWorkFrame
+  {
+    STcpConnWorkList* owner{nullptr};
+    STcpConnWorkFrame* next{nullptr};
+  };
+  static_assert(sizeof(STcpConnWorkFrame) == 0x8, "STcpConnWorkFrame size must be 0x8");
+
+  STcpConnWorkFrame* AsWorkFrame(STcpConnWorkList* const link) noexcept
+  {
+    return reinterpret_cast<STcpConnWorkFrame*>(link);
+  }
+
+  STcpConnWorkList* AsWorkListLink(STcpConnWorkFrame* const frame) noexcept
+  {
+    return reinterpret_cast<STcpConnWorkList*>(frame);
+  }
+
+  void LinkConnectorWorkFrame(STcpConnWorkList& owner, STcpConnWorkFrame& frame) noexcept
+  {
+    frame.owner = &owner;
+    frame.next = AsWorkFrame(owner.next);
+    owner.next = AsWorkListLink(&frame);
+  }
+
+  void UnlinkConnectorWorkFrame(STcpConnWorkFrame& frame) noexcept
+  {
+    STcpConnWorkList* const owner = frame.owner;
+    if (!owner) {
+      return;
+    }
+
+    STcpConnWorkFrame* prev = nullptr;
+    STcpConnWorkFrame* cur = AsWorkFrame(owner->next);
+    while (cur) {
+      if (cur == &frame) {
+        if (prev) {
+          prev->next = cur->next;
+        } else {
+          owner->next = AsWorkListLink(cur->next);
+        }
+        frame.owner = nullptr;
+        frame.next = nullptr;
+        return;
+      }
+      prev = cur;
+      cur = cur->next;
+    }
+
+    frame.owner = nullptr;
+    frame.next = nullptr;
+  }
+
+  class ScopedConnectorWorkFrame
+  {
+  public:
+    explicit ScopedConnectorWorkFrame(CNetTCPConnector* const connector) noexcept
+      : mLinked(connector != nullptr)
+    {
+      if (connector) {
+        LinkConnectorWorkFrame(connector->WorkingList(), mFrame);
+      }
+    }
+
+    ~ScopedConnectorWorkFrame()
+    {
+      if (mLinked) {
+        UnlinkConnectorWorkFrame(mFrame);
+      }
+    }
+
+    [[nodiscard]] bool IsAlive() const noexcept
+    {
+      return !mLinked || mFrame.owner != nullptr;
+    }
+
+  private:
+    bool mLinked{false};
+    STcpConnWorkFrame mFrame{};
+  };
+} // namespace
 
 /**
  * Address: 0x004835B0 (FUN_004835B0)
@@ -32,6 +152,34 @@ u_long CNetTCPConnection::GetAddr()
 u_short CNetTCPConnection::GetPort()
 {
   return mPort;
+}
+
+/**
+ * Address: 0x00483580 (FUN_00483580, Moho::CNetTCPConnection::GetSocket)
+ */
+SOCKET CNetTCPConnection::GetSocket() const noexcept
+{
+  return mSocket;
+}
+
+/**
+ * Address: 0x00483590 (FUN_00483590, Moho::CNetTCPConnection::GetState)
+ */
+ENetConnectionState CNetTCPConnection::GetState() const noexcept
+{
+  return mState;
+}
+
+/**
+ * Address: 0x004838B0 (FUN_004838B0)
+ *
+ * What it does:
+ * Attaches an accepted socket and transitions state to establishing.
+ */
+void CNetTCPConnection::AdoptSocketAndSetEstablishing(const SOCKET socket) noexcept
+{
+  mSocket = socket;
+  mState = kNetStateEstablishing;
 }
 
 /**
@@ -69,18 +217,7 @@ void CNetTCPConnection::Write(NetDataSpan* const data)
 {
   const auto* const begin = reinterpret_cast<const char*>(data->start);
   const size_t size = static_cast<size_t>(data->end - data->start);
-
-  char* const writeHead = mOutputStream.mWriteHead;
-  const size_t capacity = static_cast<size_t>(mOutputStream.mWriteEnd - writeHead);
-  if (size > capacity) {
-    mOutputStream.VirtWrite(begin, size);
-    return;
-  }
-
-  if (size != 0) {
-    std::memcpy(writeHead, begin, size);
-    mOutputStream.mWriteHead += size;
-  }
+  AppendToPipeStream(mOutputStream, begin, size);
 }
 
 /**
@@ -160,14 +297,16 @@ CNetTCPConnection::CNetTCPConnection(
 
   if (mConnector) {
     mConnector->mConnections.push_back(this);
-    if (mConnector->mHandle) {
-      ::WSAEventSelect(mSocket, mConnector->mHandle, FD_READ | FD_CONNECT | FD_CLOSE);
+    const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
+    if (connectorEvent) {
+      ::WSAEventSelect(mSocket, connectorEvent, FD_READ | FD_CONNECT | FD_CLOSE);
     }
   }
 }
 
 /**
  * Address: 0x004837E0 (FUN_004837E0)
+ * Address: 0x00483A40 (FUN_00483A40, deleting destructor thunk)
  *
  * What it does:
  * Closes socket/streams and unlinks from connector intrusive list.
@@ -197,6 +336,8 @@ CNetTCPConnection::~CNetTCPConnection()
  */
 void CNetTCPConnection::Pull()
 {
+  ScopedConnectorWorkFrame workFrame{mConnector};
+
   if (mScheduleDestroy) {
     delete this;
     return;
@@ -213,53 +354,68 @@ void CNetTCPConnection::Pull()
     timeout.tv_usec = 0;
 
     const int selected = ::select(0, nullptr, &writeFds, &exceptFds, &timeout);
-    if (selected > 0) {
-      if (FD_ISSET(mSocket, &writeFds)) {
-        gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): connection succeeded", NET_GetHostName(mAddr).c_str(), mPort);
-        mState = kNetStateEstablishing;
-        CMessage connMade{ELobbyMsg::LOBMSG_ConnMade};
-        mInputStream.Write(connMade.mBuff.start_, connMade.mBuff.Size());
-      } else if (FD_ISSET(mSocket, &exceptFds)) {
-        gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): connection failed", NET_GetHostName(mAddr).c_str(), mPort);
-        mState = kNetStateErrored;
-        CMessage connFailed{ELobbyMsg::LOBMSG_ConnFailed};
-        Dispatch(&connFailed);
-      }
+    if (selected == 0) {
+      return;
     }
+
+    if (FD_ISSET(mSocket, &writeFds)) {
+      gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): connection succeeded", NET_GetHostName(mAddr).c_str(), mPort);
+      mState = kNetStateEstablishing;
+
+      CMessage connMade{ELobbyMsg::LOBMSG_ConnMade};
+      AppendMessageToPipeStream(mInputStream, connMade);
+    } else if (FD_ISSET(mSocket, &exceptFds)) {
+      gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): connection failed", NET_GetHostName(mAddr).c_str(), mPort);
+      mState = kNetStateErrored;
+      DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnFailed);
+      return;
+    }
+
+    QueueConnectorLocalPortHandshake(*this);
+  } else if (mState == kNetStateTimedOut) {
+    if (mPushFailed) {
+      mState = kNetStateErrored;
+      DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnLostErrored);
+    }
+    return;
   }
 
   if (mState != kNetStateEstablishing) {
     return;
   }
 
+  bool recvFailedWithError = false;
   char recvBuf[kNetTcpIoChunkSize];
-  while (!mPullFailed) {
-    const int received = ::recv(mSocket, recvBuf, static_cast<int>(sizeof(recvBuf)), 0);
-    if (received < 0) {
-      if (::WSAGetLastError() == WSAEWOULDBLOCK) {
+  if (!mPullFailed) {
+    while (!mPullFailed) {
+      const int received = ::recv(mSocket, recvBuf, static_cast<int>(sizeof(recvBuf)), 0);
+      if (received < 0) {
+        if (::WSAGetLastError() == WSAEWOULDBLOCK) {
+          break;
+        }
+
+        gpg::Logf(
+          "CNetTCPConnection<%s:%d>::Pull(): recv() failed: %s",
+          NET_GetHostName(mAddr).c_str(),
+          mPort,
+          NET_GetWinsockErrorString()
+        );
+        mInputStream.Close(gpg::Stream::ModeSend);
+        mPullFailed = 1;
+        recvFailedWithError = true;
         break;
       }
 
-      gpg::Logf(
-        "CNetTCPConnection<%s:%d>::Pull(): recv() failed: %s",
-        NET_GetHostName(mAddr).c_str(),
-        mPort,
-        NET_GetWinsockErrorString()
-      );
-      mInputStream.Close(gpg::Stream::ModeSend);
-      mPullFailed = 1;
-      break;
-    }
+      mTimer.Reset();
+      if (received == 0) {
+        gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): at end of stream.", NET_GetHostName(mAddr).c_str(), mPort);
+        mInputStream.Close(gpg::Stream::ModeSend);
+        mPullFailed = 1;
+        break;
+      }
 
-    mTimer.Reset();
-    if (received == 0) {
-      gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): at end of stream.", NET_GetHostName(mAddr).c_str(), mPort);
-      mInputStream.Close(gpg::Stream::ModeSend);
-      mPullFailed = 1;
-      break;
+      AppendToPipeStream(mInputStream, recvBuf, static_cast<size_t>(received));
     }
-
-    mInputStream.Write(recvBuf, static_cast<size_t>(received));
   }
 
   while (mDatagram.Read(&mInputStream)) {
@@ -274,19 +430,28 @@ void CNetTCPConnection::Pull()
         mPort
       );
     }
+
+    if (!workFrame.IsAlive()) {
+      return;
+    }
+
     mDatagram.Clear();
+
+    if (mScheduleDestroy) {
+      delete this;
+      return;
+    }
   }
 
-  if (mPullFailed && mState != kNetStateErrored) {
-    mState = kNetStateTimedOut;
-    CMessage msg{ELobbyMsg::LOBMSG_ConnLostEof};
-    Dispatch(&msg);
-  }
-
-  if (mPushFailed && mState != kNetStateErrored) {
+  if (recvFailedWithError || mPushFailed) {
     mState = kNetStateErrored;
-    CMessage msg{ELobbyMsg::LOBMSG_ConnLostErrored};
-    Dispatch(&msg);
+    DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnLostErrored);
+    return;
+  }
+
+  if (mInputStream.Empty()) {
+    mState = kNetStateTimedOut;
+    DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnLostEof);
   }
 }
 
@@ -347,8 +512,11 @@ void CNetTCPConnection::Push()
 
       gpg::Logf("CNetTCPConnection::Push: send() failed: %s", NET_GetWinsockErrorString());
       mPushFailed = 1;
-      if (mConnector && mConnector->mHandle) {
-        ::SetEvent(mConnector->mHandle);
+      if (mConnector) {
+        const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
+        if (connectorEvent) {
+          ::SetEvent(connectorEvent);
+        }
       }
       return;
     }
@@ -390,4 +558,12 @@ void CNetTCPConnection::AdoptIncomingStream(const SOCKET socket, gpg::PipeStream
     }
     mInputStream.Write(temp, chunk);
   }
+}
+
+/**
+ * Address: 0x00484640 (FUN_00484640, Moho::CNetTCPConnection::SelectSocket)
+ */
+int CNetTCPConnection::SelectSocket(void* const eventHandle)
+{
+  return ::WSAEventSelect(mSocket, static_cast<WSAEVENT>(eventHandle), FD_READ | FD_CONNECT | FD_CLOSE);
 }

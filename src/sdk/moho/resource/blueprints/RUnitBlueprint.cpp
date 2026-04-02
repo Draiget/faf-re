@@ -4,13 +4,13 @@
 #include <array>
 #include <cmath>
 #include <cstring>
-#include <filesystem>
 #include <limits>
 #include <string>
 #include <string_view>
 
 #include "moho/entity/Entity.h"
 #include "moho/path/SNamedFootprint.h"
+#include "moho/resource/RResId.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "gpg/core/containers/String.h"
@@ -72,22 +72,6 @@ namespace moho
     [[nodiscard]] EFootprintFlags LookupFootprintFlags(const ERuleBPUnitMovementType motionType) noexcept
     {
       return static_cast<EFootprintFlags>(kFootprintFlagsByMotion[ToMotionIndex(motionType)]);
-    }
-
-    [[nodiscard]] std::string
-    CompleteResourcePath(const std::string_view sourceName, const std::string_view resourceName)
-    {
-      if (resourceName.empty()) {
-        return {};
-      }
-
-      std::filesystem::path resourcePath{resourceName};
-      if (!resourcePath.is_absolute() && !sourceName.empty()) {
-        const std::filesystem::path sourcePath{sourceName};
-        resourcePath = sourcePath.parent_path() / resourcePath;
-      }
-
-      return resourcePath.lexically_normal().generic_string();
     }
 
     void AssignNormalizedFilename(msvc8::string& destination, const std::string_view filename)
@@ -211,9 +195,9 @@ namespace moho
     }
 
     if (!Display.MeshBlueprint.name.empty()) {
-      std::string meshPath = CompleteResourcePath(mSource.view(), Display.MeshBlueprint.name.view());
+      msvc8::string meshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
       gpg::STR_NormalizeFilenameLowerSlash(meshPath);
-      Display.MeshBlueprint.name.assign_owned(meshPath);
+      Display.MeshBlueprint.name.assign_owned(meshPath.view());
     }
 
     if (Display.IconName.name.empty()) {

@@ -1,9 +1,97 @@
 #include "moho/net/CLobbyTypeInfo.h"
 
+#include <cstdlib>
+#include <new>
+#include <typeinfo>
+
 #include "moho/net/CLobby.h"
+
+#pragma init_seg(lib)
+
+namespace
+{
+  template <class TTypeInfo>
+  struct TypeInfoStorage
+  {
+    alignas(TTypeInfo) unsigned char bytes[sizeof(TTypeInfo)];
+    bool constructed;
+  };
+
+  template <class TTypeInfo>
+  [[nodiscard]] TTypeInfo& EnsureTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
+  {
+    if (!storage.constructed) {
+      new (storage.bytes) TTypeInfo();
+      storage.constructed = true;
+    }
+
+    return *reinterpret_cast<TTypeInfo*>(storage.bytes);
+  }
+
+  template <class TTypeInfo>
+  void DestroyTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
+  {
+    if (!storage.constructed) {
+      return;
+    }
+
+    reinterpret_cast<TTypeInfo*>(storage.bytes)->~TTypeInfo();
+    storage.constructed = false;
+  }
+
+  TypeInfoStorage<moho::CLobbyTypeInfo> gCLobbyTypeInfoStorage{};
+
+  [[nodiscard]] moho::CLobbyTypeInfo& GetCLobbyTypeInfo() noexcept
+  {
+    return EnsureTypeInfo(gCLobbyTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00C039C0 (FUN_00C039C0, Moho::CLobbyTypeInfo::~CLobbyTypeInfo)
+   *
+   * What it does:
+   * Runs startup-registered teardown for the global CLobby type descriptor.
+   */
+  void cleanup_CLobbyTypeInfo()
+  {
+    DestroyTypeInfo(gCLobbyTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00BDFE30 (FUN_00BDFE30, register_CLobbyTypeInfo)
+   *
+   * What it does:
+   * Constructs the global CLobby type descriptor and wires teardown into CRT
+   * `atexit`.
+   */
+  void register_CLobbyTypeInfo()
+  {
+    (void)GetCLobbyTypeInfo();
+    (void)std::atexit(&cleanup_CLobbyTypeInfo);
+  }
+
+  struct CLobbyTypeInfoRegistration
+  {
+    CLobbyTypeInfoRegistration()
+    {
+      register_CLobbyTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] CLobbyTypeInfoRegistration gCLobbyTypeInfoRegistration;
+} // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x007C0820 (FUN_007C0820, Moho::CLobbyTypeInfo::CLobbyTypeInfo)
+   */
+  CLobbyTypeInfo::CLobbyTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CLobby), this);
+  }
+
   /**
    * Address: 0x007C08C0 (FUN_007C08C0, Moho::CLobbyTypeInfo::dtr)
    */

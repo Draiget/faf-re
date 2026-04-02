@@ -64,6 +64,35 @@ namespace moho
      */
     SurfaceHandle& GetSurface(SurfaceHandle& outSurface) override;
 
+  private:
+    /**
+     * Address: 0x0043EF10 (FUN_0043EF10, sub_43EF10)
+     *
+     * What it does:
+     * Releases retained render-target surface ownership and clears handle lanes.
+     */
+    void ReleaseSurfaceHandle();
+
+  public:
+    /**
+     * Address: 0x0043EDF0 (FUN_0043EDF0, sub_43EDF0)
+     *
+     * What it does:
+     * Rebuilds render-target surface ownership from retained context lanes.
+     */
+    bool RecreateFromContext();
+
+    /**
+     * Address: 0x0043EF50 (FUN_0043EF50, sub_43EF50)
+     *
+     * CD3DDevice *,int,int,int
+     *
+     * What it does:
+     * Clears current surface ownership, updates owner/context dimensions, and
+     * rebuilds one render-target surface.
+     */
+    bool ConfigureAndRecreate(CD3DDevice* ownerDevice, int width, int height, int format);
+
   public:
     TDatListItem<CD3DRenderTarget, void> mLink;         // +0x04
     CD3DDevice* mOwnerDevice;                           // +0x0C

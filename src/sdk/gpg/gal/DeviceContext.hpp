@@ -24,6 +24,16 @@ namespace gpg::gal
         explicit DeviceContext(std::int32_t deviceType = 1);
 
         /**
+         * Address: 0x00430480 (FUN_00430480)
+         *
+         * DeviceContext const &
+         *
+         * What it does:
+         * Copies one device-context payload, including all configured heads.
+         */
+        DeviceContext(const DeviceContext& other);
+
+        /**
          * Address: 0x00430570 (FUN_00430570)
          *
          * What it does:

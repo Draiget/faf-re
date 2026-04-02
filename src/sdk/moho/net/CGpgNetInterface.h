@@ -368,6 +368,15 @@ namespace moho
   [[nodiscard]] boost::shared_ptr<CGpgNetInterface> GPGNET_GetPtr();
 
   /**
+   * Address: 0x007B9AC0 (FUN_007B9AC0, Moho::GPGNET_ReportDesync)
+   *
+   * What it does:
+   * Sends one `"Desync"` command with `(beat, army, hash1, hash2)` payload over
+   * the active process-global GPGNet interface (when available).
+   */
+  void GPGNET_ReportDesync(int beat, int army, const msvc8::string& hash1, const msvc8::string& hash2);
+
+  /**
    * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
    *
    * What it does:

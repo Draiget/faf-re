@@ -5,6 +5,11 @@
 #include "boost/shared_ptr.h"
 #include "INetNATTraversalHandler.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   /**
@@ -14,6 +19,10 @@ namespace moho
   class INetNATTraversalProvider
   {
   public:
+    static gpg::RType* sType;
+
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
     /**
      * Address: 0x00A82547 (_purecall)
      * Slot: 0

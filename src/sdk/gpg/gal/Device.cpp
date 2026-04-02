@@ -1,6 +1,7 @@
 #include "Device.hpp"
 #include "DeviceContext.hpp"
 #include "Error.hpp"
+#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 
 namespace gpg::gal
 {
@@ -16,6 +17,23 @@ namespace gpg::gal
                 msvc8::string(message)
             );
         }
+
+        /**
+         * Address: 0x00432310 (FUN_00432310)
+         *
+         * What it does:
+         * Returns the number of `Head` elements currently stored in one vector lane.
+         */
+        [[nodiscard]] int CountHeadVectorEntries(const msvc8::vector<Head>& heads) noexcept
+        {
+            const Head* const start = heads.begin();
+            if (start == nullptr)
+            {
+                return 0;
+            }
+
+            return static_cast<int>(heads.end() - start);
+        }
     }
 
     /**
@@ -30,6 +48,29 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x00430480 (FUN_00430480)
+     *
+     * DeviceContext const &
+     *
+     * What it does:
+     * Copies one device-context payload, including all configured heads.
+     */
+    DeviceContext::DeviceContext(const DeviceContext& other)
+        : mDeviceType(other.mDeviceType),
+          mValidate(other.mValidate),
+          mAdapter(other.mAdapter),
+          mVSync(other.mVSync),
+          mHWBasedInstancing(other.mHWBasedInstancing),
+          mSupportsFloat16(other.mSupportsFloat16),
+          mVertexShaderProfile(other.mVertexShaderProfile),
+          mPixelShaderProfile(other.mPixelShaderProfile),
+          mMaxPrimitiveCount(other.mMaxPrimitiveCount),
+          mMaxVertexCount(other.mMaxVertexCount),
+          mHeads(other.mHeads)
+    {
+    }
+
+    /**
      * Address: 0x008E6730 (FUN_008E6730)
      *
      * What it does:
@@ -38,6 +79,20 @@ namespace gpg::gal
     Device* Device::GetInstance()
     {
         return sDeviceD3D;
+    }
+
+    /**
+     * Address family:
+     * - used by 0x0042EA00 (FUN_0042EA00)
+     * - used by 0x0042EA30 (FUN_0042EA30)
+     * - used by 0x0042EAE0 (FUN_0042EAE0)
+     *
+     * What it does:
+     * Returns true when the global active device singleton is available.
+     */
+    bool Device::IsReady()
+    {
+        return sDeviceD3D != nullptr;
     }
 
     /**
@@ -67,6 +122,23 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x0042EAE0 (FUN_0042EAE0)
+     *
+     * What it does:
+     * Forwards one cursor initialization request to the active backend device.
+     */
+    void Device::InitCursor()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        auto* const device = static_cast<DeviceD3D9*>(GetInstance());
+        device->InitCursor();
+    }
+
+    /**
      * Address: 0x008E66E0 (FUN_008E66E0)
      *
      * What it does:
@@ -74,13 +146,7 @@ namespace gpg::gal
      */
     int DeviceContext::GetHeadCount() const
     {
-        const Head* const start = mHeads.begin();
-        if (start == nullptr)
-        {
-            return 0;
-        }
-
-        return static_cast<int>(mHeads.end() - start);
+        return CountHeadVectorEntries(mHeads);
     }
 
     /**

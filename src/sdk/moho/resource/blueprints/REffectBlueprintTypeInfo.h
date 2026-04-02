@@ -15,6 +15,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0050F020 (FUN_0050F020, Moho::REffectBlueprintTypeInfo::REffectBlueprintTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters the reflection descriptor for
+     * `REffectBlueprint`.
+     */
+    REffectBlueprintTypeInfo();
+
+    /**
      * Address: 0x0050F0C0 (FUN_0050F0C0, scalar deleting destructor thunk)
      * Slot: 2
      */
@@ -35,7 +44,23 @@ namespace moho
      * publishes base effect-blueprint fields.
      */
     void Init() override;
+
+    /**
+     * Address: 0x0050F160 (FUN_0050F160, Moho::REffectBlueprintTypeInfo::AddFields)
+     *
+     * What it does:
+     * Registers reflected `REffectBlueprint` field lanes and field metadata text.
+     */
+    void AddFields();
   };
+
+  /**
+   * Address: 0x00BC8050 (FUN_00BC8050, register_REffectBlueprintTypeInfo)
+   *
+   * What it does:
+   * Materializes and startup-registers `REffectBlueprintTypeInfo`.
+   */
+  void register_REffectBlueprintTypeInfo();
 
   static_assert(sizeof(REffectBlueprintTypeInfo) == 0x64, "REffectBlueprintTypeInfo size must be 0x64");
 } // namespace moho
