@@ -54,15 +54,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedEmitterCurveType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REmitterBlueprintCurve));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedRResIdType()
   {
     static gpg::RType* cached = nullptr;
@@ -118,6 +109,19 @@ namespace
   {
     typeInfo->fields_.push_back(gpg::RField(fieldName, fieldType, offset, 3, description));
     return &typeInfo->fields_.back();
+  }
+
+  [[nodiscard]] gpg::RField* AddEmitterCurveFieldWithDescription(
+    gpg::RType* const typeInfo,
+    const char* const fieldName,
+    const int offset,
+    const char* const description
+  )
+  {
+    gpg::RField* const field = typeInfo->AddFieldEmitterBlueprintCurve(fieldName, offset);
+    field->v4 = 3;
+    field->mDesc = description;
+    return field;
   }
 
   void AddEffectBase(gpg::RType* const typeInfo)
@@ -226,33 +230,32 @@ namespace moho
   void REmitterBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
     AddFieldWithDescription(typeInfo, "BlueprintId", CachedRResIdType(), 0x08, "Blueprint ID");
-    AddFieldWithDescription(typeInfo, "SizeCurve", CachedEmitterCurveType(), 0x28, "Size of emitter over time");
-    AddFieldWithDescription(typeInfo, "XDirectionCurve", CachedEmitterCurveType(), 0x40, "X direction");
-    AddFieldWithDescription(typeInfo, "YDirectionCurve", CachedEmitterCurveType(), 0x58, "Y direction");
-    AddFieldWithDescription(typeInfo, "ZDirectionCurve", CachedEmitterCurveType(), 0x70, "Z direction");
-    AddFieldWithDescription(typeInfo, "EmitRateCurve", CachedEmitterCurveType(), 0x88, "EmitRateCurve");
-    AddFieldWithDescription(typeInfo, "LifetimeCurve", CachedEmitterCurveType(), 0xA0, "LifetimeCurve");
-    AddFieldWithDescription(typeInfo, "VelocityCurve", CachedEmitterCurveType(), 0xB8, "VelocityCurve");
-    AddFieldWithDescription(typeInfo, "XAccelCurve", CachedEmitterCurveType(), 0xD0, "XAccelCurve");
-    AddFieldWithDescription(typeInfo, "YAccelCurve", CachedEmitterCurveType(), 0xE8, "YAccelCurve");
-    AddFieldWithDescription(typeInfo, "ZAccelCurve", CachedEmitterCurveType(), 0x100, "ZAccelCurve");
-    AddFieldWithDescription(
+    AddEmitterCurveFieldWithDescription(typeInfo, "SizeCurve", 0x28, "Size of emitter over time");
+    AddEmitterCurveFieldWithDescription(typeInfo, "XDirectionCurve", 0x40, "X direction");
+    AddEmitterCurveFieldWithDescription(typeInfo, "YDirectionCurve", 0x58, "Y direction");
+    AddEmitterCurveFieldWithDescription(typeInfo, "ZDirectionCurve", 0x70, "Z direction");
+    AddEmitterCurveFieldWithDescription(typeInfo, "EmitRateCurve", 0x88, "EmitRateCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "LifetimeCurve", 0xA0, "LifetimeCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "VelocityCurve", 0xB8, "VelocityCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "XAccelCurve", 0xD0, "XAccelCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "YAccelCurve", 0xE8, "YAccelCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "ZAccelCurve", 0x100, "ZAccelCurve");
+    AddEmitterCurveFieldWithDescription(
       typeInfo,
       "ResistanceCurve",
-      CachedEmitterCurveType(),
       0x118,
       "drag coefficient (actually, the drag coefficient divied by the mass)"
     );
-    AddFieldWithDescription(typeInfo, "StartSizeCurve", CachedEmitterCurveType(), 0x130, "StartSizeCurve");
-    AddFieldWithDescription(typeInfo, "EndSizeCurve", CachedEmitterCurveType(), 0x148, "EndSizeCurve");
-    AddFieldWithDescription(typeInfo, "InitialRotationCurve", CachedEmitterCurveType(), 0x160, "InitialRotationCurve");
-    AddFieldWithDescription(typeInfo, "RotationRateCurve", CachedEmitterCurveType(), 0x178, "RotationRateCurve");
-    AddFieldWithDescription(typeInfo, "FrameRateCurve", CachedEmitterCurveType(), 0x190, "FrameRateCurve");
-    AddFieldWithDescription(typeInfo, "TextureSelectionCurve", CachedEmitterCurveType(), 0x1A8, "TextureSelectionCurve");
-    AddFieldWithDescription(typeInfo, "XPosCurve", CachedEmitterCurveType(), 0x1C0, "X Offset Curve");
-    AddFieldWithDescription(typeInfo, "YPosCurve", CachedEmitterCurveType(), 0x1D8, "Y Offset Curve");
-    AddFieldWithDescription(typeInfo, "ZPosCurve", CachedEmitterCurveType(), 0x1F0, "Z Offset Curve");
-    AddFieldWithDescription(typeInfo, "RampSelectionCurve", CachedEmitterCurveType(), 0x208, "RampSelectionCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "StartSizeCurve", 0x130, "StartSizeCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "EndSizeCurve", 0x148, "EndSizeCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "InitialRotationCurve", 0x160, "InitialRotationCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "RotationRateCurve", 0x178, "RotationRateCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "FrameRateCurve", 0x190, "FrameRateCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "TextureSelectionCurve", 0x1A8, "TextureSelectionCurve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "XPosCurve", 0x1C0, "X Offset Curve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "YPosCurve", 0x1D8, "Y Offset Curve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "ZPosCurve", 0x1F0, "Z Offset Curve");
+    AddEmitterCurveFieldWithDescription(typeInfo, "RampSelectionCurve", 0x208, "RampSelectionCurve");
     AddFieldWithDescription(typeInfo, "LocalVelocity", CachedBoolType(), 0x220, "Is velocity attached to bone");
     AddFieldWithDescription(typeInfo, "LocalAcceleration", CachedBoolType(), 0x221, "Is acceleration attached to bone");
     AddFieldWithDescription(typeInfo, "Gravity", CachedBoolType(), 0x222, "Gravity enabled?");
@@ -316,4 +319,3 @@ namespace moho
     (void)std::atexit(&cleanup_REmitterBlueprintTypeInfo);
   }
 } // namespace moho
-

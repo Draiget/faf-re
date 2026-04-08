@@ -4,6 +4,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 
 namespace gpg
@@ -73,6 +74,15 @@ namespace moho
   void SCR_RObjectToLuaMerge(const gpg::RRef& source, LuaPlus::LuaObject& destination);
 
   /**
+   * Address: 0x004CF4A0 (FUN_004CF4A0, ?SCR_RObjectToLua@Moho@@...)
+   *
+   * What it does:
+   * Builds one Lua object initialized as `nil` and merges a reflected source
+   * reference into it.
+   */
+  [[nodiscard]] LuaPlus::LuaObject SCR_RObjectToLua(const gpg::RRef& source, LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x004CF510 (FUN_004CF510, ?SCR_LuaBuildObject@Moho@@YA_NVLuaObject@LuaPlus@@ABVRRef@gpg@@_N@Z)
    *
    * What it does:
@@ -98,6 +108,45 @@ namespace moho
    * failures, and restores the caller's original Lua stack top.
    */
   [[nodiscard]] bool SCR_LuaDoString(const char* scriptText, LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CEA20 (FUN_004CEA20, ?SCR_LuaDoScript@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
+   *
+   * What it does:
+   * Executes one resolved script file through `func_LuaDoScript`, restores the
+   * caller's Lua stack top, and reports exceptions with file-context warnings.
+   */
+  [[nodiscard]] bool SCR_LuaDoScript(LuaPlus::LuaState* state, gpg::StrArg scriptPath, LuaPlus::LuaObject* outEnvironment);
+
+  /**
+   * Address: 0x004CECD0 (FUN_004CECD0, Moho::SCR_LuaDoFileConcat)
+   *
+   * What it does:
+   * Concatenates and executes one ordered Lua file list as a single chunk,
+   * optionally setting one table environment before execution.
+   */
+  void SCR_LuaDoFileConcat(
+    LuaPlus::LuaState* state,
+    LuaPlus::LuaObject* outEnvironment,
+    msvc8::vector<msvc8::string> files
+  );
+
+  /**
+   * Address: 0x004CE2C0 (FUN_004CE2C0, func_LuaDoScript)
+   *
+   * What it does:
+   * Resolves one script path, appends hook/mod overrides, then executes the
+   * concatenated file chain.
+   */
+  void func_LuaDoScript(LuaPlus::LuaState* state, const char* scriptPath, LuaPlus::LuaObject* outEnvironment);
+
+  /**
+   * Address: 0x004CDF60 (FUN_004CDF60, Moho::SCR_AddHookDirectory)
+   *
+   * What it does:
+   * Adds one hook-directory prefix used when resolving doscript hook variants.
+   */
+  void SCR_AddHookDirectory(const char* hookDirectory);
 
   class CScrLuaObjectFactory
   {
@@ -169,7 +218,24 @@ namespace moho
   static_assert(sizeof(CScrLuaObjectFactory) == 0x8, "CScrLuaObjectFactory must be 0x8");
 
   template <typename T>
-  class CScrLuaMetatableFactory;
+  class CScrLuaMetatableFactory : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance()
+    {
+      static CScrLuaMetatableFactory sInstance{};
+      return sInstance;
+    }
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override
+    {
+      return SCR_CreateSimpleMetatable(state);
+    }
+
+  private:
+    CScrLuaMetatableFactory() = default;
+  };
 
   template <>
   class CScrLuaMetatableFactory<CScriptObject*> final : public CScrLuaObjectFactory
@@ -200,4 +266,13 @@ namespace moho
   static_assert(
     sizeof(CScrLuaMetatableFactory<CScriptObject*>) == 0x8, "CScrLuaMetatableFactory<CScriptObject*> must be 0x8"
   );
+
+  /**
+   * Address: 0x00BC60D0 (FUN_00BC60D0)
+   *
+   * What it does:
+   * Allocates the next Lua metatable-factory object index and stores it in the
+   * recovered `CScrLuaMetatableFactory<CScriptObject*>` startup index lane.
+   */
+  int register_CScrLuaMetatableFactory_CScriptObject_Index();
 } // namespace moho

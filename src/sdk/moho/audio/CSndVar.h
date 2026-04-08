@@ -5,6 +5,11 @@
 
 #include "legacy/containers/String.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   /**
@@ -18,6 +23,8 @@ namespace moho
   class CSndVar
   {
   public:
+    inline static gpg::RType* sType = nullptr;
+
     /**
      * Address: 0x004E02B0 (FUN_004E02B0)
      *
@@ -50,6 +57,15 @@ namespace moho
     std::uint8_t mReserved03;       // +0x03
     msvc8::string mName;            // +0x04
   };
+
+  /**
+   * Address: 0x004DF390 (FUN_004DF390, func_NewCSndVar)
+   *
+   * What it does:
+   * Returns one interned `CSndVar` for the supplied variable name, creating a
+   * new descriptor on first use.
+   */
+  CSndVar* SND_FindOrCreateVariable(const msvc8::string& variableName);
 
   static_assert(offsetof(CSndVar, mState) == 0x00, "CSndVar::mState offset must be 0x00");
   static_assert(offsetof(CSndVar, mResolved) == 0x02, "CSndVar::mResolved offset must be 0x02");

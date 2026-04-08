@@ -62,4 +62,20 @@ namespace moho
     "CScriptObjectSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CScriptObjectSerializer) == 0x14, "CScriptObjectSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BC6080 (FUN_00BC6080, register_CScriptObjectSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callback lanes for `CScriptObject` and
+   * schedules intrusive helper cleanup at process exit.
+   */
+  void register_CScriptObjectSerializer();
+
+  /**
+   * What it does:
+   * Unlinks static serializer helper node from the intrusive helper list and
+   * restores self-links.
+   */
+  gpg::SerHelperBase* cleanup_CScriptObjectSerializer();
 } // namespace moho

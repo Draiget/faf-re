@@ -314,4 +314,40 @@ namespace moho
   static_assert(offsetof(CTaskStage, mActive) == 0x10, "CTaskStage::mActive offset must be 0x10");
   static_assert(sizeof(CTaskStageSerializer) == 0x14, "CTaskStageSerializer size must be 0x14");
   static_assert(sizeof(CTaskStageTypeInfo) == 0x64, "CTaskStageTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BC3020 (FUN_00BC3020, register_CTaskThreadTypeInfo)
+   *
+   * What it does:
+   * Materializes the startup `CTaskThreadTypeInfo` descriptor and registers
+   * process-exit teardown.
+   */
+  void register_CTaskThreadTypeInfo();
+
+  /**
+   * Address: 0x00BC3040 (FUN_00BC3040, register_CTaskThreadConstruct)
+   *
+   * What it does:
+   * Initializes the startup `CTaskThreadConstruct` helper and registers
+   * process-exit intrusive-link cleanup.
+   */
+  void register_CTaskThreadConstruct();
+
+  /**
+   * Address: 0x00BC30C0 (FUN_00BC30C0, register_CTaskStageTypeInfo)
+   *
+   * What it does:
+   * Materializes the startup `CTaskStageTypeInfo` descriptor and registers
+   * process-exit teardown.
+   */
+  void register_CTaskStageTypeInfo();
+
+  /**
+   * Address: 0x00BC30E0 (FUN_00BC30E0, register_CTaskStageSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callbacks for `CTaskStage` and registers
+   * process-exit intrusive-link cleanup.
+   */
+  void register_CTaskStageSerializer();
 } // namespace moho

@@ -1,5 +1,7 @@
 #include "moho/task/CTaskThread.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -16,6 +18,47 @@ namespace gpg
 
 namespace
 {
+  alignas(moho::CTaskThreadTypeInfo)
+    std::byte gCTaskThreadTypeInfoStorage[sizeof(moho::CTaskThreadTypeInfo)]{};
+  alignas(moho::CTaskStageTypeInfo)
+    std::byte gCTaskStageTypeInfoStorage[sizeof(moho::CTaskStageTypeInfo)]{};
+  bool gCTaskThreadTypeInfoConstructed = false;
+  bool gCTaskStageTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CTaskThreadTypeInfo& CTaskThreadTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CTaskThreadTypeInfo*>(gCTaskThreadTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::CTaskStageTypeInfo& CTaskStageTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CTaskStageTypeInfo*>(gCTaskStageTypeInfoStorage);
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper* const helper)
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(helper);
+  }
+
+  template <typename THelper>
+  void ResetHelperIntrusiveLinks(THelper* const helper)
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper->mNext = self;
+    helper->mPrev = self;
+  }
+
+  template <typename THelper>
+  void UnlinkHelperIntrusiveLinks(THelper* const helper)
+  {
+    if (helper->mNext != nullptr && helper->mPrev != nullptr) {
+      helper->mNext->mPrev = helper->mPrev;
+      helper->mPrev->mNext = helper->mNext;
+    }
+    ResetHelperIntrusiveLinks(helper);
+  }
+
   [[nodiscard]] gpg::RType* CachedCTaskThreadType()
   {
     gpg::RType* type = moho::CTaskThread::sType;
@@ -38,8 +81,7 @@ namespace
     moho::CTaskThreadConstruct* const constructHelper
   )
   {
-    constructHelper->mNext = nullptr;
-    constructHelper->mPrev = nullptr;
+    ResetHelperIntrusiveLinks(constructHelper);
     constructHelper->mSerConstructFunc =
       reinterpret_cast<gpg::RType::construct_func_t>(&moho::CTaskThreadConstruct::Construct);
     constructHelper->mDeleteFunc = &moho::CTaskThreadConstruct::Deconstruct;
@@ -113,15 +155,46 @@ namespace
     moho::CTaskThreadSerializer* const serializer
   )
   {
-    serializer->mNext = nullptr;
-    serializer->mPrev = nullptr;
+    ResetHelperIntrusiveLinks(serializer);
     serializer->mSerLoadFunc = &moho::CTaskThreadSerializer::Deserialize;
     serializer->mSerSaveFunc = &moho::CTaskThreadSerializer::Serialize;
     return serializer;
   }
 
+  [[nodiscard]] moho::CTaskStageSerializer* InitializeCTaskStageSerializerHelper(
+    moho::CTaskStageSerializer* const serializer
+  )
+  {
+    ResetHelperIntrusiveLinks(serializer);
+    serializer->mSerLoadFunc = nullptr;
+    serializer->mSerSaveFunc = nullptr;
+    return serializer;
+  }
+
+  [[nodiscard]] gpg::RType* InitializeCTaskThreadTypeInfoStorage()
+  {
+    if (!gCTaskThreadTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CTaskThreadTypeInfoSlot())) moho::CTaskThreadTypeInfo();
+      gpg::PreRegisterRType(typeid(moho::CTaskThread), &CTaskThreadTypeInfoSlot());
+      gCTaskThreadTypeInfoConstructed = true;
+    }
+
+    return &CTaskThreadTypeInfoSlot();
+  }
+
+  [[nodiscard]] gpg::RType* InitializeCTaskStageTypeInfoStorage()
+  {
+    if (!gCTaskStageTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CTaskStageTypeInfoSlot())) moho::CTaskStageTypeInfo();
+      gCTaskStageTypeInfoConstructed = true;
+    }
+
+    return &CTaskStageTypeInfoSlot();
+  }
+
   moho::CTaskThreadConstruct gCTaskThreadConstructHelper;
   moho::CTaskThreadSerializer gCTaskThreadSerializerHelper;
+  moho::CTaskStageSerializer gCTaskStageSerializerHelper;
 
   /**
    * Address: 0x00BC3080 (FUN_00BC3080, register_CTaskThreadSerializer)
@@ -139,13 +212,130 @@ namespace
   {
     CTaskThreadSerializerRegistration()
     {
-      InitializeCTaskThreadConstructHelper(&gCTaskThreadConstructHelper)->RegisterConstructFunction();
+      moho::register_CTaskThreadTypeInfo();
+      moho::register_CTaskThreadConstruct();
+      moho::register_CTaskStageTypeInfo();
+      moho::register_CTaskStageSerializer();
+
+      gCTaskThreadConstructHelper.RegisterConstructFunction();
       RegisterCTaskThreadSerializerBootstrap();
+      gCTaskStageSerializerHelper.RegisterSerializeFunctions();
     }
   };
 
   CTaskThreadSerializerRegistration gCTaskThreadSerializerRegistration;
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BEE340 (FUN_00BEE340, sub_BEE340)
+   *
+   * What it does:
+   * Executes process-exit teardown for startup `CTaskThreadTypeInfo` storage.
+   */
+  void cleanup_CTaskThreadTypeInfo()
+  {
+    if (!gCTaskThreadTypeInfoConstructed) {
+      return;
+    }
+
+    CTaskThreadTypeInfoSlot().~CTaskThreadTypeInfo();
+    gCTaskThreadTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BEE3A0 (FUN_00BEE3A0, sub_BEE3A0)
+   *
+   * What it does:
+   * Unlinks startup `CTaskThreadConstruct` helper lanes and resets them to a
+   * self-linked singleton state.
+   */
+  void cleanup_CTaskThreadConstruct()
+  {
+    UnlinkHelperIntrusiveLinks(&gCTaskThreadConstructHelper);
+  }
+
+  /**
+   * Address: 0x00BEE400 (FUN_00BEE400, ??1CTaskStageTypeInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Executes process-exit teardown for startup `CTaskStageTypeInfo` storage.
+   */
+  void cleanup_CTaskStageTypeInfo()
+  {
+    if (!gCTaskStageTypeInfoConstructed) {
+      return;
+    }
+
+    CTaskStageTypeInfoSlot().~CTaskStageTypeInfo();
+    gCTaskStageTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BEE460 (FUN_00BEE460, ??1CTaskStageSerializer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unlinks startup `CTaskStageSerializer` helper lanes and resets them to a
+   * self-linked singleton state.
+   */
+  void cleanup_CTaskStageSerializer()
+  {
+    UnlinkHelperIntrusiveLinks(&gCTaskStageSerializerHelper);
+  }
+
+  /**
+   * Address: 0x00BC3020 (FUN_00BC3020, register_CTaskThreadTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `CTaskThreadTypeInfo` storage and registers
+   * process-exit teardown.
+   */
+  void register_CTaskThreadTypeInfo()
+  {
+    (void)InitializeCTaskThreadTypeInfoStorage();
+    (void)std::atexit(&cleanup_CTaskThreadTypeInfo);
+  }
+
+  /**
+   * Address: 0x00BC3040 (FUN_00BC3040, register_CTaskThreadConstruct)
+   *
+   * What it does:
+   * Initializes startup `CTaskThreadConstruct` helper callback lanes and
+   * registers process-exit intrusive-link cleanup.
+   */
+  void register_CTaskThreadConstruct()
+  {
+    InitializeCTaskThreadConstructHelper(&gCTaskThreadConstructHelper);
+    (void)std::atexit(&cleanup_CTaskThreadConstruct);
+  }
+
+  /**
+   * Address: 0x00BC30C0 (FUN_00BC30C0, register_CTaskStageTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `CTaskStageTypeInfo` storage and registers
+   * process-exit teardown.
+   */
+  void register_CTaskStageTypeInfo()
+  {
+    (void)InitializeCTaskStageTypeInfoStorage();
+    (void)std::atexit(&cleanup_CTaskStageTypeInfo);
+  }
+
+  /**
+   * Address: 0x00BC30E0 (FUN_00BC30E0, register_CTaskStageSerializer)
+   *
+   * What it does:
+   * Initializes startup `CTaskStageSerializer` helper callback lanes and
+   * registers process-exit intrusive-link cleanup.
+   */
+  void register_CTaskStageSerializer()
+  {
+    InitializeCTaskStageSerializerHelper(&gCTaskStageSerializerHelper);
+    (void)std::atexit(&cleanup_CTaskStageSerializer);
+  }
+} // namespace moho
 
 /**
  * Address: 0x004094E0 (FUN_004094E0, Moho::CTaskThreadConstruct::Construct)

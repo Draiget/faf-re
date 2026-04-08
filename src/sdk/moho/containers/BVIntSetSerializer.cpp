@@ -1,5 +1,6 @@
 #include "moho/containers/BVIntSetSerializer.h"
 
+#include <cstdlib>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -11,8 +12,15 @@
 // query BVIntSet RTTI during static initialization.
 #pragma init_seg(lib)
 
+namespace moho
+{
+  void register_BVIntSetTypeInfo();
+  void register_BVIntSetSerializer();
+}
+
 namespace
 {
+  extern moho::BVIntSetTypeInfo gBVIntSetTypeInfo;
   extern moho::BVIntSetSerializer gBVIntSetSerializer;
 
   /**
@@ -161,6 +169,29 @@ namespace
     return node;
   }
 
+  /**
+   * Address: 0x00BEDE80 (FUN_00BEDE80, ??1BVIntSetTypeInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Process-exit cleanup for global `BVIntSetTypeInfo` dynamic field/base lanes.
+   */
+  void cleanup_BVIntSetTypeInfo()
+  {
+    gBVIntSetTypeInfo.fields_.clear();
+    gBVIntSetTypeInfo.bases_.clear();
+  }
+
+  /**
+   * Address: 0x00BEDEE0 (FUN_00BEDEE0, ??1BVIntSetSerializer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unlinks global BVIntSet serializer helper node from intrusive registration list.
+   */
+  void cleanup_BVIntSetSerializer()
+  {
+    (void)ResetGlobalBVIntSetSerializerNodeA();
+  }
+
   moho::BVIntSetTypeInfo gBVIntSetTypeInfo;
   moho::BVIntSetSerializer gBVIntSetSerializer;
 
@@ -168,6 +199,8 @@ namespace
   {
     BVIntSetReflectionRegistration()
     {
+      moho::register_BVIntSetTypeInfo();
+      moho::register_BVIntSetSerializer();
       InitializeBVIntSetSerializer()->RegisterSerializeFunctions();
     }
   };
@@ -177,6 +210,32 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC2CE0 (FUN_00BC2CE0, register_BVIntSetTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `BVIntSetTypeInfo` storage and registers process-exit
+   * teardown.
+   */
+  void register_BVIntSetTypeInfo()
+  {
+    (void)gBVIntSetTypeInfo;
+    (void)std::atexit(&cleanup_BVIntSetTypeInfo);
+  }
+
+  /**
+   * Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer)
+   *
+   * What it does:
+   * Materializes startup `BVIntSetSerializer` storage, installs serializer
+   * callback lanes, and registers process-exit teardown.
+   */
+  void register_BVIntSetSerializer()
+  {
+    InitializeBVIntSetSerializer();
+    (void)std::atexit(&cleanup_BVIntSetSerializer);
+  }
+
   /**
    * Address: 0x004015C0 (FUN_004015C0)
    *

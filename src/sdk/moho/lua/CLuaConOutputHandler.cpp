@@ -384,6 +384,22 @@ moho::CScrLuaInitForm* moho::func_RemoveConsoleOutputReciever_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00BC38F0 (FUN_00BC38F0, register_AddConsoleOutputReciever_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_AddConsoleOutputReciever_LuaFuncDef()
+{
+  return func_AddConsoleOutputReciever_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC3900 (FUN_00BC3900, register_RemoveConsoleOutputReciever_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_RemoveConsoleOutputReciever_LuaFuncDef()
+{
+  return func_RemoveConsoleOutputReciever_LuaFuncDef();
+}
+
+/**
  * Address: 0x00420910 (FUN_00420910, sub_420910)
  */
 LuaPlus::LuaObject

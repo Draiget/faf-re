@@ -125,6 +125,15 @@ namespace moho
      */
     void KillManipulatorsByBonePattern(const char* bonePattern);
 
+    /**
+     * Address: 0x0063ACA0 (FUN_0063ACA0, Moho::CAniActor::KillManipulator)
+     *
+     * What it does:
+     * Deletes the exact manipulator instance when that object is linked in this
+     * actor's precedence list.
+     */
+    void KillManipulator(IAniManipulator* manipulator);
+
   public:
     static gpg::RType* sType;
 

@@ -80,15 +80,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedVector4fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Vector4f));
-    }
-    return cached;
-  }
-
   gpg::RField* AddFieldWithDescription(
     gpg::RType* const typeInfo,
     const char* const fieldName,
@@ -211,8 +202,12 @@ namespace moho
     AddFieldWithDescription(typeInfo, "Thickness", CachedFloatType(), 0x30, "Thickness of the beam");
     AddFieldWithDescription(typeInfo, "LODCutoff", CachedFloatType(), 0x78, "cutoff distance");
     AddFieldWithDescription(typeInfo, "TextureName", CachedStringType(), 0x3C, "Filename of texture");
-    AddFieldWithDescription(typeInfo, "StartColor", CachedVector4fType(), 0x58, "RGBA start color of beam");
-    AddFieldWithDescription(typeInfo, "EndColor", CachedVector4fType(), 0x68, "RGBA end color of beam");
+    gpg::RField* const startColorField = typeInfo->AddFieldVector4f("StartColor", 0x58);
+    startColorField->v4 = 3;
+    startColorField->mDesc = "RGBA start color of beam";
+    gpg::RField* const endColorField = typeInfo->AddFieldVector4f("EndColor", 0x68);
+    endColorField->v4 = 3;
+    endColorField->mDesc = "RGBA end color of beam";
     AddFieldWithDescription(typeInfo, "UShift", CachedFloatType(), 0x34, "U Texture shift of beam texture");
     AddFieldWithDescription(typeInfo, "VShift", CachedFloatType(), 0x38, "V Texture shift of beam texture");
     AddFieldWithDescription(typeInfo, "RepeatRate", CachedFloatType(), 0x7C, "How often the texture repeats per ogrid");

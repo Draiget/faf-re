@@ -23,6 +23,16 @@ namespace moho
   LuaPlus::LuaObject SCR_ToLua<gpg::Rect2<float>>(LuaPlus::LuaState* state, const gpg::Rect2<float>& value);
 
   /**
+   * Address: 0x004D0990 (FUN_004D0990, Moho::SCR_ToLua<gpg::Rect2<int>>)
+   *
+   * What it does:
+   * Converts one `Rect2i` payload into a Lua hash table with keys
+   * `x0`,`y0`,`x1`,`y1`.
+   */
+  template <>
+  LuaPlus::LuaObject SCR_ToLua<gpg::Rect2<int>>(LuaPlus::LuaState* state, const gpg::Rect2<int>& value);
+
+  /**
    * Address: 0x004D0350 (FUN_004D0350, Moho::SCR_ToLua<Moho::SPointVector>)
    *
    * What it does:
@@ -33,9 +43,7 @@ namespace moho
   LuaPlus::LuaObject SCR_ToLua<SPointVector>(LuaPlus::LuaState* state, const SPointVector& value);
 
   /**
-   * Address: 0x100C1240 (FUN_100C1240)
-   *
-   * LuaPlus::LuaState*, Wm3::Quaternion<float> const&
+   * Address: 0x004CFB00 (FUN_004CFB00, Moho::SCR_ToLua<Wm3::Quaternion<float>>)
    *
    * What it does:
    * Converts quaternion value to Lua table payload and assigns
@@ -45,9 +53,7 @@ namespace moho
   LuaPlus::LuaObject SCR_ToLua<Wm3::Quaternion<float>>(LuaPlus::LuaState* state, const Wm3::Quaternion<float>& value);
 
   /**
-   * Address: 0x100C1410 (FUN_100C1410)
-   *
-   * LuaPlus::LuaState*, Wm3::Vector2<float> const&
+   * Address: 0x004CFCC0 (FUN_004CFCC0, Moho::SCR_ToLua<Wm3::Vector2<float>>)
    *
    * What it does:
    * Converts vec2 value to Lua table payload and assigns
@@ -57,9 +63,7 @@ namespace moho
   LuaPlus::LuaObject SCR_ToLua<Wm3::Vector2<float>>(LuaPlus::LuaState* state, const Wm3::Vector2<float>& value);
 
   /**
-   * Address: 0x100C16D0 (FUN_100C16D0)
-   *
-   * LuaPlus::LuaState*, Wm3::Vector3<float> const&
+   * Address: 0x004CFFC0 (FUN_004CFFC0, Moho::SCR_ToLua<Wm3::Vector3<float>>)
    *
    * What it does:
    * Converts vec3 value to Lua table payload and assigns

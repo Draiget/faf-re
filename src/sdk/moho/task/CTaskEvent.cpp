@@ -1,5 +1,7 @@
 #include "CTaskEvent.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -38,6 +40,85 @@ namespace
       cached = gpg::LookupRType(typeid(WeakPtr<CTaskThread>));
     }
     return cached;
+  }
+
+  alignas(moho::STaskEventLinkageTypeInfo)
+    std::byte gSTaskEventLinkageTypeInfoStorage[sizeof(moho::STaskEventLinkageTypeInfo)]{};
+  alignas(moho::STaskEventLinkageSerializer)
+    std::byte gSTaskEventLinkageSerializerStorage[sizeof(moho::STaskEventLinkageSerializer)]{};
+  alignas(moho::CTaskEventTypeInfo) std::byte gCTaskEventTypeInfoStorage[sizeof(moho::CTaskEventTypeInfo)]{};
+  bool gSTaskEventLinkageTypeInfoConstructed = false;
+  bool gSTaskEventLinkageSerializerConstructed = false;
+  bool gCTaskEventTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::STaskEventLinkageTypeInfo& STaskEventLinkageTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::STaskEventLinkageTypeInfo*>(gSTaskEventLinkageTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::STaskEventLinkageSerializer& STaskEventLinkageSerializerSlot()
+  {
+    return *reinterpret_cast<moho::STaskEventLinkageSerializer*>(gSTaskEventLinkageSerializerStorage);
+  }
+
+  [[nodiscard]] moho::CTaskEventTypeInfo& CTaskEventTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CTaskEventTypeInfo*>(gCTaskEventTypeInfoStorage);
+  }
+
+  template <typename THelper>
+  [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper* const helper)
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(helper);
+  }
+
+  template <typename THelper>
+  void ResetHelperIntrusiveLinks(THelper* const helper)
+  {
+    gpg::SerHelperBase* const self = HelperSelfNode(helper);
+    helper->mNext = self;
+    helper->mPrev = self;
+  }
+
+  template <typename THelper>
+  void UnlinkHelperIntrusiveLinks(THelper* const helper)
+  {
+    if (helper->mNext != nullptr && helper->mPrev != nullptr) {
+      helper->mNext->mPrev = helper->mPrev;
+      helper->mPrev->mNext = helper->mNext;
+    }
+
+    ResetHelperIntrusiveLinks(helper);
+  }
+
+  [[nodiscard]] moho::STaskEventLinkageSerializer* InitializeSTaskEventLinkageSerializerHelper(
+    moho::STaskEventLinkageSerializer* const serializer
+  )
+  {
+    ResetHelperIntrusiveLinks(serializer);
+    serializer->mSerLoadFunc = &moho::STaskEventLinkageSerializer::Deserialize;
+    serializer->mSerSaveFunc = &moho::STaskEventLinkageSerializer::Serialize;
+    return serializer;
+  }
+
+  [[nodiscard]] gpg::RType* InitializeSTaskEventLinkageTypeInfoStorage()
+  {
+    if (!gSTaskEventLinkageTypeInfoConstructed) {
+      ::new (static_cast<void*>(&STaskEventLinkageTypeInfoSlot())) moho::STaskEventLinkageTypeInfo();
+      gSTaskEventLinkageTypeInfoConstructed = true;
+    }
+
+    return &STaskEventLinkageTypeInfoSlot();
+  }
+
+  [[nodiscard]] gpg::RType* InitializeCTaskEventTypeInfoStorage()
+  {
+    if (!gCTaskEventTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CTaskEventTypeInfoSlot())) moho::CTaskEventTypeInfo();
+      gCTaskEventTypeInfoConstructed = true;
+    }
+
+    return &CTaskEventTypeInfoSlot();
   }
 
   /**
@@ -252,8 +333,7 @@ namespace
    */
   void RegisterCTaskEventSerializerBootstrap()
   {
-    gCTaskEventSerializer.mNext = nullptr;
-    gCTaskEventSerializer.mPrev = nullptr;
+    ResetHelperIntrusiveLinks(&gCTaskEventSerializer);
     gCTaskEventSerializer.mSerLoadFunc = &DeserializeCTaskEvent;
     gCTaskEventSerializer.mSerSaveFunc = &SerializeCTaskEvent;
     gCTaskEventSerializer.RegisterSerializeFunctions();
@@ -636,6 +716,15 @@ void CTaskEventSerializer::RegisterSerializeFunctions()
 }
 
 /**
+ * Address: 0x00406AD0 (FUN_00406AD0, Moho::CTaskEventTypeInfo::CTaskEventTypeInfo)
+ */
+CTaskEventTypeInfo::CTaskEventTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(CTaskEvent), this);
+}
+
+/**
  * Address: 0x00406B60 (FUN_00406B60, scalar deleting destructor thunk)
  */
 CTaskEventTypeInfo::~CTaskEventTypeInfo() = default;
@@ -657,3 +746,118 @@ void CTaskEventTypeInfo::Init()
   gpg::RType::Init();
   Finish();
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x00BEE0E0 (FUN_00BEE0E0, ??1STaskEventLinkageTypeInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Executes process-exit teardown for startup `STaskEventLinkageTypeInfo`
+   * storage.
+   */
+  void cleanup_STaskEventLinkageTypeInfo()
+  {
+    if (!gSTaskEventLinkageTypeInfoConstructed) {
+      return;
+    }
+
+    STaskEventLinkageTypeInfoSlot().~STaskEventLinkageTypeInfo();
+    gSTaskEventLinkageTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BEE140 (FUN_00BEE140, ??1STaskEventLinkageSerializer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unlinks startup `STaskEventLinkageSerializer` helper lanes and resets them
+   * to a self-linked singleton state.
+   */
+  void cleanup_STaskEventLinkageSerializer()
+  {
+    if (!gSTaskEventLinkageSerializerConstructed) {
+      return;
+    }
+
+    UnlinkHelperIntrusiveLinks(&STaskEventLinkageSerializerSlot());
+    STaskEventLinkageSerializerSlot().~STaskEventLinkageSerializer();
+    gSTaskEventLinkageSerializerConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BEE170 (FUN_00BEE170, ??1CTaskEventTypeInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Executes process-exit teardown for startup `CTaskEventTypeInfo` storage.
+   */
+  void cleanup_CTaskEventTypeInfo()
+  {
+    if (!gCTaskEventTypeInfoConstructed) {
+      return;
+    }
+
+    CTaskEventTypeInfoSlot().~CTaskEventTypeInfo();
+    gCTaskEventTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BC2ED0 (FUN_00BC2ED0, register_STaskEventLinkageTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `STaskEventLinkageTypeInfo` storage and registers
+   * process-exit teardown.
+   */
+  void register_STaskEventLinkageTypeInfo()
+  {
+    (void)InitializeSTaskEventLinkageTypeInfoStorage();
+    (void)std::atexit(&cleanup_STaskEventLinkageTypeInfo);
+  }
+
+  /**
+   * Address: 0x00BC2EF0 (FUN_00BC2EF0, register_STaskEventLinkageSerializer)
+   *
+   * What it does:
+   * Initializes startup `STaskEventLinkageSerializer` helper callback lanes and
+   * registers process-exit intrusive-link cleanup.
+   */
+  void register_STaskEventLinkageSerializer()
+  {
+    if (!gSTaskEventLinkageSerializerConstructed) {
+      ::new (static_cast<void*>(&STaskEventLinkageSerializerSlot())) STaskEventLinkageSerializer();
+      gSTaskEventLinkageSerializerConstructed = true;
+    }
+
+    InitializeSTaskEventLinkageSerializerHelper(&STaskEventLinkageSerializerSlot());
+    (void)std::atexit(&cleanup_STaskEventLinkageSerializer);
+  }
+
+  /**
+   * Address: 0x00BC2F30 (FUN_00BC2F30, register_CTaskEventTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `CTaskEventTypeInfo` storage and registers process-exit
+   * teardown.
+   */
+  void register_CTaskEventTypeInfo()
+  {
+    (void)InitializeCTaskEventTypeInfoStorage();
+    (void)std::atexit(&cleanup_CTaskEventTypeInfo);
+  }
+} // namespace moho
+
+namespace
+{
+  struct CTaskEventReflectionBootstrap
+  {
+    CTaskEventReflectionBootstrap()
+    {
+      moho::register_STaskEventLinkageTypeInfo();
+      moho::register_STaskEventLinkageSerializer();
+      moho::register_CTaskEventTypeInfo();
+      RegisterCTaskEventSerializerBootstrap();
+      RegisterWeakTaskEventLinkagePointerTypeBootstrap();
+    }
+  };
+
+  [[maybe_unused]] CTaskEventReflectionBootstrap gCTaskEventReflectionBootstrap;
+} // namespace

@@ -122,6 +122,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076D980 (FUN_0076D980, Moho::CIntelPosHandle::ChangeRadius)
+   *
+   * What it does:
+   * Rebuilds active grid coverage when the requested radius differs from the
+   * current one, preserving the existing world position.
+   */
+  void CIntelPosHandle::ChangeRadius(const std::int32_t newRadius)
+  {
+    if (Wm3::Vec3f::Compare(&mLastPos, &mLastPos) || newRadius != static_cast<std::int32_t>(mRadius)) {
+      SubViz();
+      mLastPos = mLastPos;
+      mRadius = static_cast<std::uint32_t>(newRadius);
+      AddViz();
+    }
+  }
+
+  /**
    * Address: 0x00770000 (FUN_00770000, Moho::CIntelPosHandle::MemberDeserialize)
    *
    * gpg::ReadArchive *

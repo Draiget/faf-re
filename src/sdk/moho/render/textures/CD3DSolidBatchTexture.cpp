@@ -17,7 +17,6 @@ namespace moho
     constexpr std::uint32_t kSolidTextureHeight = 2u;
     constexpr std::uint32_t kSolidTextureBorder = 1u;
 
-    boost::mutex sResourceLock;
     SolidTextureMap sSolidTextureMap;
 
     /**
@@ -292,6 +291,14 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x00BC4360 (FUN_00BC4360, register_sSolidTextureMap)
+   */
+  void register_sSolidTextureMap()
+  {
+    (void)InitializeSolidTextureMapStorage();
+  }
+
+  /**
    * Address: 0x00447720 (FUN_00447720)
    *
    * std::uint32_t rgba
@@ -411,3 +418,16 @@ namespace moho
     return outTexture;
   }
 } // namespace moho
+
+namespace
+{
+  struct SolidBatchTextureCacheBootstrap
+  {
+    SolidBatchTextureCacheBootstrap()
+    {
+      moho::register_sSolidTextureMap();
+    }
+  };
+
+  SolidBatchTextureCacheBootstrap gSolidBatchTextureCacheBootstrap;
+} // namespace

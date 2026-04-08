@@ -49,6 +49,14 @@ namespace gpg::gal
          */
         virtual HRESULT Unlock();
 
+        /**
+         * Address: 0x008F5CE0 (FUN_008F5CE0, gpg::gal::VertexBufferD3D9::GetD3D)
+         *
+         * What it does:
+         * Returns the retained D3D9 vertex-buffer handle and throws when unset.
+         */
+        void* GetD3D();
+
     public:
         VertexBufferContext context_{}; // +0x04
         void* d3dVertexBuffer_ = nullptr; // +0x18

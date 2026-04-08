@@ -115,6 +115,14 @@ namespace moho
 
     RES_RegisterPrefetchType("batch_textures", resourceType);
   }
+
+  /**
+   * Address: 0x00BC4440 (FUN_00BC4440, register_PrefetchType_batch_textures)
+   */
+  void register_PrefetchType_batch_textures()
+  {
+    register_SBatchTextureDataPrefetchType();
+  }
 } // namespace moho
 
 namespace
@@ -124,7 +132,7 @@ namespace
     SBatchTextureDataFactoryBootstrap()
     {
       moho::register_SBatchTextureDataFactory();
-      moho::register_SBatchTextureDataPrefetchType();
+      moho::register_PrefetchType_batch_textures();
     }
   };
 

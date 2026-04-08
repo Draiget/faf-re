@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,7 @@ namespace gpg::gal
 
 namespace LuaPlus
 {
+  class LuaObject;
   class LuaState;
 } // namespace LuaPlus
 
@@ -28,6 +30,8 @@ namespace moho
 {
   class CMovieManager;
   class CScrLuaInitForm;
+  class CScrLuaInitFormSet;
+  enum ESpecialFileType : std::int32_t;
 
   struct CfgAliasSet
   {
@@ -158,6 +162,40 @@ namespace moho
   [[nodiscard]] msvc8::string OPTIONS_GetString(gpg::StrArg key);
 
   /**
+   * Address: 0x008C6BF0 (FUN_008C6BF0)
+   * Mangled: ?OPTIONS_GetBool@Moho@@YA_NVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Reads one options value from `/lua/user/prefs.lua:GetOption` and returns it
+   * as a boolean lane.
+   */
+  [[nodiscard]] bool OPTIONS_GetBool(gpg::StrArg key);
+
+  /**
+   * Address: 0x008C6CF0 (FUN_008C6CF0)
+   * Mangled: ?OPTIONS_Apply@Moho@@YAXXZ
+   *
+   * What it does:
+   * Invokes `/lua/options/optionslogic.lua:Apply()` and keeps execution
+   * alive on Lua bridge failures.
+   */
+  void OPTIONS_Apply();
+
+  /**
+   * Address: 0x008C6DC0 (FUN_008C6DC0)
+   * Mangled: ?OPTIONS_SetCustomData@Moho@@YAXVStrArg@gpg@@ABVLuaObject@LuaPlus@@1@Z
+   *
+   * What it does:
+   * Invokes `/lua/options/optionslogic.lua:SetCustomData` for one option key
+   * using `(customData, defaultValue)` Lua object lanes.
+   */
+  void OPTIONS_SetCustomData(
+    gpg::StrArg key,
+    const LuaPlus::LuaObject& customData,
+    const LuaPlus::LuaObject& defaultValue
+  );
+
+  /**
    * Address: 0x008C6EC0 (FUN_008C6EC0)
    * Mangled: ?OPTIONS_CreateInitialProfileIfNeeded@Moho@@YAXVStrArg@gpg@@@Z
    *
@@ -235,6 +273,15 @@ namespace moho
    * Recreates the process-global movie manager singleton lane.
    */
   void SetupBasicMovieManager();
+
+  /**
+   * Address: 0x00874D30 (FUN_00874D30, `Moho::MOV_GetDuration`)
+   *
+   * What it does:
+   * Resolves one movie path through the mounted VFS, reads SFD header metadata,
+   * and returns movie duration in seconds (`0.0f` on missing/invalid data).
+   */
+  [[nodiscard]] float MOV_GetDuration(gpg::StrArg sourcePath);
 
   /**
    * Address: 0x008E6B60 (func_CreateDeviceD3D)
@@ -443,6 +490,24 @@ namespace moho
   [[nodiscard]] CScrLuaInitForm* func_HasCommandLineArg_LuaFuncDef();
 
   /**
+   * Address: 0x00BC3800 (FUN_00BC3800, register_GetCommandLineArg_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_GetCommandLineArg_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_GetCommandLineArg_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC3810 (FUN_00BC3810, register_HasCommandLineArg_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_HasCommandLineArg_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_HasCommandLineArg_LuaFuncDef();
+
+  /**
    * Address: 0x004D68C0 (FUN_004D68C0, cfunc_SHGetFolderPath)
    *
    * What it does:
@@ -470,6 +535,42 @@ namespace moho
   [[nodiscard]] CScrLuaInitForm* func_SHGetFolderPath_LuaFuncDef();
 
   /**
+   * Address: 0x00BC63D0 (FUN_00BC63D0, register_coreInitFormSet)
+   *
+   * What it does:
+   * Links the process-global core Lua init-form set at the head of
+   * `CScrLuaInitFormSet::sSets` and returns the previous head.
+   */
+  [[nodiscard]] CScrLuaInitFormSet* register_coreInitFormSet();
+
+  /**
+   * Address: 0x00BC63F0 (FUN_00BC63F0, register_userInitFormSet)
+   *
+   * What it does:
+   * Links the process-global user Lua init-form set at the head of
+   * `CScrLuaInitFormSet::sSets` and returns the previous head.
+   */
+  [[nodiscard]] CScrLuaInitFormSet* register_userInitFormSet();
+
+  /**
+   * Address: 0x00BC66E0 (FUN_00BC66E0, register_unsafeInitFormSet)
+   *
+   * What it does:
+   * Links the process-global unsafe Lua init-form set at the head of
+   * `CScrLuaInitFormSet::sSets` and returns the previous head.
+   */
+  [[nodiscard]] CScrLuaInitFormSet* register_unsafeInitFormSet();
+
+  /**
+   * Address: 0x00BC6700 (FUN_00BC6700, register_SHGetFolderPath_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_SHGetFolderPath_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_SHGetFolderPath_LuaFuncDef();
+
+  /**
    * Address: 0x00780A70 (FUN_00780A70, cfunc_GetTextureDimensions)
    *
    * What it does:
@@ -495,6 +596,254 @@ namespace moho
    * `GetTextureDimensions` in the user init set.
    */
   [[nodiscard]] CScrLuaInitForm* func_GetTextureDimensions_LuaFuncDef();
+
+  /**
+   * Address: 0x00874FA0 (FUN_00874FA0, cfunc_SetMovieVolume)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_SetMovieVolumeL`.
+   */
+  int cfunc_SetMovieVolume(lua_State* luaContext);
+
+  /**
+   * Address: 0x00874FC0 (FUN_00874FC0, func_SetMovieVolume_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `SetMovieVolume`.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_SetMovieVolume_LuaFuncDef();
+
+  /**
+   * Address: 0x00875020 (FUN_00875020, cfunc_SetMovieVolumeL)
+   *
+   * What it does:
+   * Reads one volume argument, validates numeric type, and applies movie-volume
+   * transform through process-global movie manager lane when present.
+   */
+  int cfunc_SetMovieVolumeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00875100 (FUN_00875100, cfunc_GetMovieVolume)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetMovieVolumeL`.
+   */
+  int cfunc_GetMovieVolume(lua_State* luaContext);
+
+  /**
+   * Address: 0x00875120 (FUN_00875120, func_GetMovieVolume_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `GetMovieVolume`.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetMovieVolume_LuaFuncDef();
+
+  /**
+   * Address: 0x00875180 (FUN_00875180, cfunc_GetMovieVolumeL)
+   *
+   * What it does:
+   * Validates zero-argument call shape and returns current movie-volume lane
+   * (fallback `1.0` when no movie manager exists).
+   */
+  int cfunc_GetMovieVolumeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008753A0 (FUN_008753A0, cfunc_GetMovieDuration)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetMovieDurationL`.
+   */
+  int cfunc_GetMovieDuration(lua_State* luaContext);
+
+  /**
+   * Address: 0x008753C0 (FUN_008753C0, func_GetMovieDuration_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `GetMovieDuration`
+   * in the core init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetMovieDuration_LuaFuncDef();
+
+  /**
+   * Address: 0x00875420 (FUN_00875420, cfunc_GetMovieDurationL)
+   *
+   * What it does:
+   * Reads one movie path argument, validates string type, and returns
+   * duration in seconds through `MOV_GetDuration`.
+   */
+  int cfunc_GetMovieDurationL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008C9490 (FUN_008C9490, cfunc_GetOptions)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetOptionsL`.
+   */
+  int cfunc_GetOptions(lua_State* luaContext);
+
+  /**
+   * Address: 0x008C9660 (FUN_008C9660, cfunc_GetAntiAliasingOptions)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetAntiAliasingOptionsL`.
+   */
+  int cfunc_GetAntiAliasingOptions(lua_State* luaContext);
+
+  /**
+   * Address: 0x008C9680 (FUN_008C9680, func_GetAntiAliasingOptions_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for
+   * `GetAntiAliasingOptions` in the user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetAntiAliasingOptions_LuaFuncDef();
+
+  /**
+   * Address: 0x008C96E0 (FUN_008C96E0, cfunc_GetAntiAliasingOptionsL)
+   *
+   * What it does:
+   * Builds and returns a Lua table of supported anti-aliasing modes for the
+   * primary render head.
+   */
+  int cfunc_GetAntiAliasingOptionsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008C94B0 (FUN_008C94B0, func_GetOptions_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `GetOptions` in the
+   * user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetOptions_LuaFuncDef();
+
+  /**
+   * Address: 0x008C9510 (FUN_008C9510, cfunc_GetOptionsL)
+   *
+   * What it does:
+   * Reads one options key string and returns the current user preference value
+   * as a Lua object.
+   */
+  int cfunc_GetOptionsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008C9850 (FUN_008C9850, cfunc_GetPreference)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_GetPreferenceL`.
+   */
+  int cfunc_GetPreference(lua_State* luaContext);
+
+  /**
+   * Address: 0x008C98D0 (FUN_008C98D0, cfunc_GetPreferenceL)
+   *
+   * What it does:
+   * Resolves one preference key and returns its Lua object value, with optional
+   * default object fallback from arg #2.
+   */
+  int cfunc_GetPreferenceL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008C9870 (FUN_008C9870, func_GetPreference_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `GetPreference`
+   * in the user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_GetPreference_LuaFuncDef();
+
+  /**
+   * Address: 0x008C9A50 (FUN_008C9A50, cfunc_SetPreference)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_SetPreferenceL`.
+   */
+  int cfunc_SetPreference(lua_State* luaContext);
+
+  /**
+   * Address: 0x008C9AD0 (FUN_008C9AD0, cfunc_SetPreferenceL)
+   *
+   * What it does:
+   * Writes one user preference object lane from `(key, value)` Lua args.
+   */
+  int cfunc_SetPreferenceL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008C9A70 (FUN_008C9A70, func_SetPreference_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `SetPreference`
+   * in the user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_SetPreference_LuaFuncDef();
+
+  /**
+   * Address: 0x008C9C30 (FUN_008C9C30, cfunc_SavePreferences)
+   *
+   * What it does:
+   * Validates zero-argument call shape and persists current user preferences.
+   */
+  int cfunc_SavePreferences(lua_State* luaContext);
+
+  /**
+   * Address: 0x008C9C70 (FUN_008C9C70, func_SavePreferences_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for `SavePreferences`
+   * in the user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_SavePreferences_LuaFuncDef();
+
+  /**
+   * Address: 0x008CAEA0 (FUN_008CAEA0, cfunc_DebugFacilitiesEnabled)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_DebugFacilitiesEnabledL`.
+   */
+  int cfunc_DebugFacilitiesEnabled(lua_State* luaContext);
+
+  /**
+   * Address: 0x008CAF20 (FUN_008CAF20, cfunc_DebugFacilitiesEnabledL)
+   *
+   * What it does:
+   * Validates zero-argument call shape and returns whether debug facilities
+   * are enabled.
+   */
+  int cfunc_DebugFacilitiesEnabledL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008CAEC0 (FUN_008CAEC0, func_DebugFacilitiesEnabled_LuaFuncDef)
+   *
+   * What it does:
+   * Returns/creates the global Lua binder definition for
+   * `DebugFacilitiesEnabled` in the user init set.
+   */
+  [[nodiscard]] CScrLuaInitForm* func_DebugFacilitiesEnabled_LuaFuncDef();
+
+  /**
+   * Address: 0x00BE8BF0 (FUN_00BE8BF0, register_SavePreferences_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_SavePreferences_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_SavePreferences_LuaFuncDef();
+
+  /**
+   * Address: 0x00BE8CE0 (FUN_00BE8CE0, j_func_DebugFacilitiesEnabled_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_DebugFacilitiesEnabled_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* j_func_DebugFacilitiesEnabled_LuaFuncDef();
 
   /**
    * Address: 0x00410760 (FUN_00410760)
@@ -712,12 +1061,71 @@ namespace moho
   [[nodiscard]] msvc8::string USER_GetSaveGameExt();
 
   /**
+   * Address: 0x008CA3A0 (FUN_008CA3A0)
+   *
+   * What it does:
+   * Returns `<USER_GetAppDocDir()> + "replays\\"`.
+   */
+  [[nodiscard]] msvc8::string USER_GetReplayDir();
+
+  /**
+   * Address: 0x008CA450 (FUN_008CA450)
+   *
+   * What it does:
+   * Returns `<APP preference prefix> + "Replay"`.
+   */
+  [[nodiscard]] msvc8::string USER_GetReplayExt();
+
+  /**
+   * Address: 0x008CA470 (FUN_008CA470)
+   *
+   * What it does:
+   * Returns `<APP preference prefix> + "CampaignSave"`.
+   */
+  [[nodiscard]] msvc8::string USER_GetCampaignSaveExt();
+
+  /**
+   * Address: 0x008CA490 (FUN_008CA490)
+   *
+   * What it does:
+   * Returns `<USER_GetAppDocDir()> + "screenshots\\"` and ensures the
+   * screenshot directory exists.
+   */
+  [[nodiscard]] msvc8::string USER_GetScreenshotDir();
+
+  /**
+   * Address: 0x008CA650 (FUN_008CA650, USER_GetSpecialFiles)
+   *
+   * ESpecialFileType, std::string &, std::string &,
+   * std::map<std::string,std::vector<std::string>> &
+   *
+   * What it does:
+   * Resolves special-file directory/extension lanes and groups matching
+   * profile-scoped filenames by profile name.
+   */
+  void USER_GetSpecialFiles(
+    ESpecialFileType specialFileType,
+    std::string& outDirectory,
+    std::string& outExtension,
+    std::map<std::string, std::vector<std::string>>& outFilesByProfile
+  );
+
+  /**
    * Address: 0x008CAE20 (FUN_008CAE20)
    *
    * What it does:
    * Returns startup preference toggle `debug.enable_debug_facilities`.
    */
   [[nodiscard]] bool USER_DebugFacilitiesEnabled();
+
+  /**
+   * Address: 0x008C91A0 (FUN_008C91A0, USER_SavePreferences)
+   *
+   * What it does:
+   * Serializes current user preferences to disk and atomically replaces
+   * the persisted prefs file with the newly written snapshot.
+   */
+  void USER_SavePreferences();
 
   /**
    * Address: 0x008CE220 (FUN_008CE220, func_FindMapScenario)

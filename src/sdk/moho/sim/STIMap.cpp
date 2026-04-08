@@ -24,12 +24,40 @@ namespace
 {
   constexpr std::size_t kTerrainTypeCount = moho::TerrainTypesVectorN::kInlineCount;
 
-  void DestroyTerrainTypeRange(LuaPlus::LuaObject* first, LuaPlus::LuaObject* last)
+  /**
+   * Address: 0x004C80D0 (FUN_004C80D0, sub_4C80D0)
+   *
+   * What it does:
+   * Destroys one half-open LuaObject range `[first, last)`.
+   */
+  void DestroyLuaObjectRange(LuaPlus::LuaObject* first, LuaPlus::LuaObject* last)
   {
     while (first != last) {
       first->~LuaObject();
       ++first;
     }
+  }
+
+  /**
+   * Address: 0x004C8120 (FUN_004C8120, func_LuaObjectRange)
+   *
+   * What it does:
+   * Copy-constructs LuaObjects from source range `[from, to)` into destination
+   * storage and returns the end pointer in destination range.
+   */
+  LuaPlus::LuaObject* CopyConstructLuaObjectRange(
+    const LuaPlus::LuaObject* from, LuaPlus::LuaObject* destination, const LuaPlus::LuaObject* to
+  )
+  {
+    while (from != to) {
+      if (destination != nullptr) {
+        ::new (static_cast<void*>(destination)) LuaPlus::LuaObject(*from);
+      }
+      ++from;
+      ++destination;
+    }
+
+    return destination;
   }
 
   /**
@@ -52,7 +80,7 @@ namespace
       newFinish = terrainVec.end();
     }
 
-    DestroyTerrainTypeRange(newFinish, terrainVec.end());
+    DestroyLuaObjectRange(newFinish, terrainVec.end());
     terrainVec.finish = newFinish;
   }
 
@@ -68,15 +96,15 @@ namespace
     std::size_t copied = 0u;
     try {
       for (; copied < currentSize; ++copied) {
-        ::new (static_cast<void*>(newBuffer + copied)) LuaPlus::LuaObject(terrainVec.begin()[copied]);
+        CopyConstructLuaObjectRange(terrainVec.begin() + copied, newBuffer + copied, terrainVec.begin() + copied + 1);
       }
     } catch (...) {
-      DestroyTerrainTypeRange(newBuffer, newBuffer + copied);
+      DestroyLuaObjectRange(newBuffer, newBuffer + copied);
       ::operator delete(newBuffer);
       throw;
     }
 
-    DestroyTerrainTypeRange(terrainVec.begin(), terrainVec.end());
+    DestroyLuaObjectRange(terrainVec.begin(), terrainVec.end());
     if (!terrainVec.UsingInlineStorage()) {
       ::operator delete(terrainVec.start);
     }
@@ -138,7 +166,7 @@ namespace
       return;
     }
 
-    DestroyTerrainTypeRange(terrainVec.begin(), terrainVec.end());
+    DestroyLuaObjectRange(terrainVec.begin(), terrainVec.end());
     if (!terrainVec.UsingInlineStorage()) {
       ::operator delete(terrainVec.start);
     }
@@ -2248,6 +2276,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x0080B9D0 (FUN_0080B9D0, Moho::CHeightField::GetTierMaxError)
+   *
+   * int tier, int x, int z
+   *
+   * What it does:
+   * Reads tier error word from `data2` for one tier-cell and scales it into
+   * world-space error units.
+   */
+  float CHeightField::GetTierMaxError(const std::int32_t tier, const std::int32_t x, const std::int32_t z) const
+  {
+    const CHeightFieldTier& grid = mGrids[static_cast<std::size_t>(tier - 1)];
+    const std::int32_t index = x + (z * grid.data2.width);
+    return static_cast<float>(static_cast<std::uint16_t>(grid.data2.data[index])) * 0.0078125f;
+  }
+
+  /**
    * Address: 0x00475DF0 (FUN_00475DF0)
    *
    * int x, int z, int tier
@@ -3244,6 +3288,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x0062CA60 (FUN_0062CA60, Moho::STIMap::IsWithin)
+   *
+   * What it does:
+   * Returns whether a circle at `position` with `border` radius fits either
+   * the whole terrain bounds or the playable-rect bounds.
+   */
+  bool STIMap::IsWithin(const Wm3::Vec3f& position, const float border, const bool wholeMap) const
+  {
+    const CHeightField* const field = mHeightField.get();
+
+    const float minX = position.x - border;
+    const float minZ = position.z - border;
+    const float maxX = position.x + border;
+    const float maxZ = position.z + border;
+
+    if (wholeMap) {
+      if (minX < 0.0f || minZ < 0.0f) {
+        return false;
+      }
+
+      const float mapMaxX = static_cast<float>(field->width - 1);
+      const float mapMaxZ = static_cast<float>(field->height - 1);
+      return maxX < mapMaxX && maxZ < mapMaxZ;
+    }
+
+    return static_cast<float>(mPlayableRect.x0) <= minX &&
+           static_cast<float>(mPlayableRect.z0) <= minZ &&
+           maxX <= static_cast<float>(mPlayableRect.x1) &&
+           maxZ <= static_cast<float>(mPlayableRect.z1);
+  }
+
+  /**
    * Address: 0x00577EC0 (FUN_00577EC0)
    *
    * unsigned int x, unsigned int z, unsigned char type
@@ -3716,6 +3792,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x00579300 (FUN_00579300, Moho::SFootprint::ToCellPos)
+   *
+   * What it does:
+   * Converts world-space center coordinates to footprint-origin grid cell.
+   */
+  SOCellPos SFootprint::ToCellPos(const Wm3::Vec3f& worldPos) const
+  {
+    SOCellPos cellPos{};
+    const float originX = worldPos.x - (static_cast<float>(mSizeX) * 0.5f);
+    const float originZ = worldPos.z - (static_cast<float>(mSizeZ) * 0.5f);
+    cellPos.x = static_cast<std::int16_t>(std::lrintf(originX));
+    cellPos.z = static_cast<std::int16_t>(std::lrintf(originZ));
+    return cellPos;
+  }
+
+  /**
    * Address: 0x00720AA0 (FUN_00720AA0, Moho::SFootprint::FitsAt)
    *
    * Moho::SCoordsVec2 const &, Moho::COGrid const &
@@ -3726,11 +3818,7 @@ namespace moho
    */
   EOccupancyCaps SFootprint::FitsAt(const SCoordsVec2& worldPos, const COGrid& grid) const
   {
-    const float originZ = worldPos.z - static_cast<float>(mSizeZ) * 0.5f;
-
-    SOCellPos cellPos{};
-    cellPos.x = static_cast<std::int16_t>(static_cast<int>(worldPos.x - static_cast<float>(mSizeX) * 0.5f));
-    cellPos.z = static_cast<std::int16_t>(static_cast<int>(originZ));
+    const SOCellPos cellPos = ToCellPos(Wm3::Vec3f{worldPos.x, 0.0f, worldPos.z});
     return OCCUPY_FootprintFits(grid, cellPos, *this, EOccupancyCaps::OC_ANY);
   }
 

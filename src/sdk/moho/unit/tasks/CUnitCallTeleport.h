@@ -16,6 +16,18 @@ namespace moho
   public:
     static gpg::RType* sType;
 
+    CUnitCallTeleport() = default;
+
+    /**
+     * Address: 0x00600E90 (FUN_00600E90, ??0CUnitCallTeleport@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes a teleport-call task using parent dispatch context, binds a
+     * weak target-unit link, clears runtime flags, and sets the teleport state
+     * bit on the owning unit.
+     */
+    CUnitCallTeleport(CCommandTask* parentTask, Unit* targetUnit);
+
     /**
      * Address: 0x00603CD0 (FUN_00603CD0)
      *
@@ -57,3 +69,15 @@ namespace moho
     "CUnitCallTeleport::mIsOccupying offset must be 0x39"
   );
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00603530 (FUN_00603530, gpg::RRef_CUnitCallTeleport)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitCallTeleport*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitCallTeleport(gpg::RRef* outRef, moho::CUnitCallTeleport* value);
+} // namespace gpg

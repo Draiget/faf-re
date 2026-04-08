@@ -126,10 +126,156 @@ namespace
   {
     (void)UnlinkHelperNode(gSSTIArmyVariableDataSerializer);
   }
+
+  /**
+   * Address: 0x00550F20 (FUN_00550F20, j_Moho::SSTIArmyVariableData::MemberDeserialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `SSTIArmyVariableData::SerializeLoadBody`.
+   */
+  [[maybe_unused]] void SSTIArmyVariableDataMemberDeserializeThunk(
+    moho::SSTIArmyVariableData* const data, gpg::ReadArchive* const archive
+  )
+  {
+    if (!data) {
+      return;
+    }
+
+    data->SerializeLoadBody(archive, nullptr);
+  }
+
+  /**
+   * Address: 0x00550F30 (FUN_00550F30, j_Moho::SSTIArmyVariableData::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `SSTIArmyVariableData::SerializeSaveBody`.
+   */
+  [[maybe_unused]] void SSTIArmyVariableDataMemberSerializeThunk(
+    const moho::SSTIArmyVariableData* const data, gpg::WriteArchive* const archive
+  )
+  {
+    if (!data) {
+      return;
+    }
+
+    data->SerializeSaveBody(archive, nullptr);
+  }
+
+  /**
+   * Address: 0x00550F80 (FUN_00550F80, j_Moho::SSTIArmyVariableData::MemberDeserialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `SSTIArmyVariableData::SerializeLoadBody`.
+   */
+  [[maybe_unused]] void SSTIArmyVariableDataMemberDeserializeThunkSecondary(
+    moho::SSTIArmyVariableData* const data, gpg::ReadArchive* const archive
+  )
+  {
+    if (!data) {
+      return;
+    }
+
+    data->SerializeLoadBody(archive, nullptr);
+  }
+
+  /**
+   * Address: 0x00550F90 (FUN_00550F90, j_Moho::SSTIArmyVariableData::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `SSTIArmyVariableData::SerializeSaveBody`.
+   */
+  [[maybe_unused]] void SSTIArmyVariableDataMemberSerializeThunkSecondary(
+    const moho::SSTIArmyVariableData* const data, gpg::WriteArchive* const archive
+  )
+  {
+    if (!data) {
+      return;
+    }
+
+    data->SerializeSaveBody(archive, nullptr);
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x006FD390 (FUN_006FD390, Moho::SSTIArmyVariableData::SSTIArmyVariableData)
+   *
+   * What it does:
+   * Seeds default runtime values for army variable state and constructs the
+   * textual/default category lanes expected by serializer/copy callers.
+   */
+  SSTIArmyVariableData::SSTIArmyVariableData()
+    : mIsResourceSharingEnabled(0u)
+    , mIsAlly(1u)
+    , mPlayerColorBgra(0u)
+    , mArmyColorBgra(0u)
+    , mArmyType("None")
+    , mFaction(0)
+    , mUseWholeMap(0u)
+    , mShowScore(1u)
+    , mIsOutOfGame(0u)
+    , mNoRushTimer(0)
+    , mNoRushRadius(100.0f)
+    , mHandicapValue(1.0f)
+    , mHandicapExtra(0.0f)
+  {
+    std::memset(&mEconomyTotals, 0, sizeof(mEconomyTotals));
+    mRuntimeWordVectorWithMeta.mMetaWord = 0u;
+    mCategoryFilterSet.ResetToEmpty(0u);
+    mArmyStart = Wm3::Vector2f(0.0f, 0.0f);
+    mNoRushOffset = Wm3::Vector2f(0.0f, 0.0f);
+  }
+
+  /**
+   * Address: 0x0055FF80 (FUN_0055FF80, Moho::SSTIArmyVariableData::SSTIArmyVariableData copy-ctor)
+   *
+   * What it does:
+   * Clones army-variable runtime payload lanes, including Set/category bitsets
+   * and legacy vector/string state, from one source object.
+   */
+  SSTIArmyVariableData::SSTIArmyVariableData(const SSTIArmyVariableData& other)
+    : mEconomyTotals(other.mEconomyTotals)
+    , mIsResourceSharingEnabled(other.mIsResourceSharingEnabled)
+    , mNeutrals(other.mNeutrals)
+    , mAllies(other.mAllies)
+    , mEnemies(other.mEnemies)
+    , mIsAlly(other.mIsAlly)
+    , mValidCommandSources(other.mValidCommandSources)
+    , mPlayerColorBgra(other.mPlayerColorBgra)
+    , mArmyColorBgra(other.mArmyColorBgra)
+    , mArmyType(other.mArmyType)
+    , mFaction(other.mFaction)
+    , mUseWholeMap(other.mUseWholeMap)
+    , mShowScore(other.mShowScore)
+    , mCategoryFilterSet(other.mCategoryFilterSet)
+    , mIsOutOfGame(other.mIsOutOfGame)
+    , mArmyStart(other.mArmyStart)
+    , mNoRushTimer(other.mNoRushTimer)
+    , mNoRushRadius(other.mNoRushRadius)
+    , mNoRushOffset(other.mNoRushOffset)
+    , mHandicapValue(other.mHandicapValue)
+    , mHandicapExtra(other.mHandicapExtra)
+  {
+    std::memcpy(mPad_0039_0040, other.mPad_0039_0040, sizeof(mPad_0039_0040));
+    std::memcpy(mPad_00A1_00A8, other.mPad_00A1_00A8, sizeof(mPad_00A1_00A8));
+    std::memcpy(mPad_00F1_00F4, other.mPad_00F1_00F4, sizeof(mPad_00F1_00F4));
+    std::memcpy(mRuntimePad_0109_0110, other.mRuntimePad_0109_0110, sizeof(mRuntimePad_0109_0110));
+    std::memcpy(mPad_0139_013C, other.mPad_0139_013C, sizeof(mPad_0139_013C));
+    std::memcpy(mPad_015C_0160, other.mPad_015C_0160, sizeof(mPad_015C_0160));
+
+    mRuntimeWordVectorWithMeta.CopyWordPayloadFrom(other.mRuntimeWordVectorWithMeta);
+    mRuntimeWordVectorWithMeta.mMetaWord = other.mRuntimeWordVectorWithMeta.mMetaWord;
+  }
+
+  /**
+   * Address: 0x0055FEA0 (FUN_0055FEA0, Moho::SSTIArmyVariableData::~SSTIArmyVariableData)
+   *
+   * What it does:
+   * Tears down set/vector/string member lanes for one army-variable payload.
+   */
+  SSTIArmyVariableData::~SSTIArmyVariableData() = default;
+
   /**
    * Address: 0x007011C0 (FUN_007011C0)
    */
@@ -256,7 +402,12 @@ namespace moho
   {
     auto* const data = reinterpret_cast<SSTIArmyVariableData*>(objectPtr);
     GPG_ASSERT(data != nullptr);
-    data->SerializeLoadBody(archive, ownerRef);
+    if (ownerRef != nullptr) {
+      data->SerializeLoadBody(archive, ownerRef);
+      return;
+    }
+
+    SSTIArmyVariableDataMemberDeserializeThunk(data, archive);
   }
 
   /**
@@ -274,7 +425,12 @@ namespace moho
   {
     const auto* const data = reinterpret_cast<const SSTIArmyVariableData*>(objectPtr);
     GPG_ASSERT(data != nullptr);
-    data->SerializeSaveBody(archive, ownerRef);
+    if (ownerRef != nullptr) {
+      data->SerializeSaveBody(archive, ownerRef);
+      return;
+    }
+
+    SSTIArmyVariableDataMemberSerializeThunk(data, archive);
   }
 
   /**

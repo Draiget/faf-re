@@ -338,6 +338,19 @@ namespace moho
   ENetProtocolType NET_ProtocolFromString(const char* str);
 
   /**
+   * Startup-owned protocol name vector backing protocol-list helper lanes.
+   */
+  extern msvc8::vector<msvc8::string> sProtocols;
+
+  /**
+   * Address: 0x00BC4690 (FUN_00BC4690, register_sProtocols)
+   *
+   * What it does:
+   * Registers process-exit cleanup for the startup-owned `sProtocols` storage.
+   */
+  void register_sProtocols();
+
+  /**
    * Address: 0x0047EC90 (FUN_0047EC90, NET_GetProtocolName)
    *
    * What it does:

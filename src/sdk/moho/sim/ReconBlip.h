@@ -22,10 +22,12 @@ namespace gpg
 namespace moho
 {
   class CAniPose;
+  class CArmyImpl;
   class RMeshBlueprint;
   class RScmResource;
   class Sim;
   class Unit;
+  enum EReconFlags : std::int32_t;
 
   /**
    * Per-army recon state block owned by `ReconBlip::mReconDat`.
@@ -54,6 +56,15 @@ namespace moho
     float mFractionComplete;                    // +0x2C
     std::uint8_t mMaybeDead;                    // +0x30
     std::uint8_t pad_31_33[0x03];               // +0x31
+
+    /**
+     * Address: 0x005C4F50 (FUN_005C4F50, Moho::SPerArmyReconInfo::~SPerArmyReconInfo)
+     *
+     * What it does:
+     * Releases shared recon snapshot lanes (`mPose`, `mPriorPose`, `mMesh`)
+     * in binary destructor order.
+     */
+    ~SPerArmyReconInfo();
 
     /**
      * Address: 0x005C8DE0 (FUN_005C8DE0, Moho::SPerArmyReconInfo::MemberDeserialize)
@@ -152,6 +163,15 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
+
+    /**
+     * Address: 0x005C6470 (FUN_005C6470, Moho::ReconBlip::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for `ReconBlip*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x005BED70 (FUN_005BED70, Moho::ReconBlip::ReconBlip)
@@ -212,6 +232,122 @@ namespace moho
      * Returns the source unit blueprint pointer stored on this blip.
      */
     [[nodiscard]] const RUnitBlueprint* GetBlueprint() const;
+
+    /**
+     * Address: 0x00579670 (FUN_00579670, Moho::ReconBlip::GetCreator)
+     *
+     * What it does:
+     * Returns the linked source-unit pointer from `mCreator` or null when this
+     * blip is detached.
+     */
+    [[nodiscard]] Unit* GetCreator() const noexcept;
+
+    /**
+     * Address: 0x005BDF00 (FUN_005BDF00, Moho::ReconBlip::GetFlags)
+     *
+     * What it does:
+     * Returns one army-local recon bitmask by direct army-index lane lookup.
+     */
+    [[nodiscard]] EReconFlags GetFlags(std::int32_t armyIndex) const;
+
+    /**
+     * Address: 0x005BDF10 (FUN_005BDF10, Moho::ReconBlip::GetFlags)
+     *
+     * What it does:
+     * Returns one army-local recon bitmask by owning army object.
+     */
+    [[nodiscard]] EReconFlags GetFlags(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDF30 (FUN_005BDF30, Moho::ReconBlip::IsKnownFake)
+     *
+     * What it does:
+     * Returns whether this blip is marked `RECON_KnownFake` for the queried
+     * army lane.
+     */
+    [[nodiscard]] bool IsKnownFake(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDF50 (FUN_005BDF50, Moho::ReconBlip::IsOnRadar)
+     *
+     * What it does:
+     * Returns whether this blip is currently radar-visible for the queried army
+     * lane.
+     */
+    [[nodiscard]] bool IsOnRadar(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDF70 (FUN_005BDF70, Moho::ReconBlip::IsOnSonar)
+     *
+     * What it does:
+     * Returns whether this blip is currently sonar-visible for the queried army
+     * lane.
+     */
+    [[nodiscard]] bool IsOnSonar(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDF90 (FUN_005BDF90, Moho::ReconBlip::IsOnOmni)
+     *
+     * What it does:
+     * Returns whether this blip is currently omni-visible for the queried army
+     * lane.
+     */
+    [[nodiscard]] bool IsOnOmni(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDFB0 (FUN_005BDFB0, Moho::ReconBlip::IsSeenEver)
+     *
+     * What it does:
+     * Returns whether this blip has ever been seen (`RECON_LOSEver`) by the
+     * queried army lane.
+     */
+    [[nodiscard]] bool IsSeenEver(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDFD0 (FUN_005BDFD0, Moho::ReconBlip::IsSeenNow)
+     *
+     * What it does:
+     * Returns whether this blip is currently seen (`RECON_LOSNow`) by the
+     * queried army lane.
+     */
+    [[nodiscard]] bool IsSeenNow(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BDFF0 (FUN_005BDFF0, Moho::ReconBlip::IsMaybeDead)
+     *
+     * What it does:
+     * Returns whether this blip is marked `RECON_MaybeDead` for the queried
+     * army lane.
+     */
+    [[nodiscard]] bool IsMaybeDead(CArmyImpl* army) const;
+
+    /**
+     * Address: 0x005BF5F0 (FUN_005BF5F0, Moho::ReconBlip::GetTargetPoint)
+     *
+     * What it does:
+     * Resolves one blip target point: source-unit target point plus jam offset
+     * when linked, otherwise root-bone position with blueprint collision-y
+     * offset lift.
+     */
+    [[nodiscard]] Wm3::Vec3f GetTargetPoint(std::int32_t targetPoint);
+
+    /**
+     * Address: 0x005BF4F0 (FUN_005BF4F0, Moho::ReconBlip::PickTargetPointAboveWater)
+     *
+     * What it does:
+     * Selects one above-water target-point lane by delegating to source unit
+     * when linked, otherwise by comparing blip elevation against water level.
+     */
+    bool PickTargetPointAboveWater(std::int32_t& outTargetPoint) const;
+
+    /**
+     * Address: 0x005BF570 (FUN_005BF570, Moho::ReconBlip::PickTargetPointBelowWater)
+     *
+     * What it does:
+     * Selects one below-water target-point lane by delegating to source unit
+     * when linked, otherwise by comparing blip elevation against water level.
+     */
+    bool PickTargetPointBelowWater(std::int32_t& outTargetPoint) const;
 
     /**
      * Address: 0x005BF810 (FUN_005BF810)

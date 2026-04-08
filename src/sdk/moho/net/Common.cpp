@@ -17,6 +17,29 @@
 #include "NetConVars.h"
 using namespace moho;
 
+namespace moho
+{
+  msvc8::vector<msvc8::string> sProtocols{};
+} // namespace moho
+
+namespace
+{
+  void cleanup_sProtocols() noexcept
+  {
+    moho::sProtocols = msvc8::vector<msvc8::string>{};
+  }
+
+  struct ProtocolRegistryBootstrap
+  {
+    ProtocolRegistryBootstrap()
+    {
+      moho::register_sProtocols();
+    }
+  };
+
+  [[maybe_unused]] ProtocolRegistryBootstrap gProtocolRegistryBootstrap;
+} // namespace
+
 /**
  * Address: 0x00485B60 (FUN_00485B60)
  *
@@ -1645,4 +1668,15 @@ ENetProtocolType moho::NET_ProtocolFromString(const char* str)
 
   const msvc8::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
   throw std::domain_error(msg.c_str());
+}
+
+/**
+ * Address: 0x00BC4690 (FUN_00BC4690, register_sProtocols)
+ *
+ * What it does:
+ * Registers process-exit cleanup for startup-owned protocol vector storage.
+ */
+void moho::register_sProtocols()
+{
+  (void)std::atexit(&cleanup_sProtocols);
 }

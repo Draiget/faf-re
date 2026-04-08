@@ -52,31 +52,35 @@ FileStream::IOError::IOError(const DWORD messageId)
  */
 FileStream::IOError::~IOError() noexcept = default;
 
+/**
+ * Address: 0x00957950 (FUN_00957950, gpg::GetWin32ErrorString)
+ *
+ * What it does:
+ * Resolves one Win32 system-message id to UTF-8 text via `FormatMessageW`.
+ * Falls back to `"Unknown error 0x%08x"` when lookup fails.
+ */
 std::string FileStream::IOError::BuildMessage(const DWORD messageId)
 {
-    LPSTR systemText = nullptr;
-    const DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    const DWORD length = FormatMessageA(
-        flags,
-        nullptr,
-        messageId,
-        0,
-        reinterpret_cast<LPSTR>(&systemText),
-        0,
-        nullptr);
+    LPWSTR systemText = nullptr;
+    const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER;
+    const int length = static_cast<int>(
+        ::FormatMessageW(
+            flags,
+            nullptr,
+            messageId,
+            0x400u,
+            reinterpret_cast<LPWSTR>(&systemText),
+            0,
+            nullptr));
 
-    if (length == 0 || systemText == nullptr) {
-        return "Win32 error " + std::to_string(messageId);
+    if (length <= 0 || systemText == nullptr) {
+        const msvc8::string unknownText = gpg::STR_Printf("Unknown error 0x%08x", messageId);
+        return std::string(unknownText.c_str());
     }
 
-    std::string text(systemText, length);
-    LocalFree(systemText);
-
-    while (!text.empty() && (text.back() == '\r' || text.back() == '\n')) {
-        text.pop_back();
-    }
-
-    return text;
+    const msvc8::string utf8Message = gpg::STR_WideToUtf8(systemText);
+    ::LocalFree(systemText);
+    return std::string(utf8Message.c_str());
 }
 
 /**

@@ -167,7 +167,7 @@ namespace
   bool IsPendingEventReady(const SDiskWatchEvent& event)
   {
     const std::uint64_t timestamp = GetEventTimestamp(event);
-    const std::uint64_t now = static_cast<std::uint64_t>(gpg::time::GetTime());
+    const std::uint64_t now = static_cast<std::uint64_t>(gpg::time::GetCycle());
     const std::uint64_t elapsedCycles = now >= timestamp ? now - timestamp : 0u;
     return gpg::time::CyclesToMilliseconds(static_cast<LONGLONG>(elapsedCycles)) >= kPendingEventDispatchDelayMs;
   }

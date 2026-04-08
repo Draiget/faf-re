@@ -1,5 +1,6 @@
 #include "WriteArchive.h"
 
+#include <cstdint>
 #include <cstdio>
 
 #include "String.h"
@@ -30,6 +31,8 @@ const char* SafeTypeName(const RType* const type)
     return type ? type->GetName() : "null";
 }
 
+constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
+
 class BinaryWriteArchive final : public gpg::WriteArchive
 {
 public:
@@ -43,20 +46,25 @@ public:
         WriteRaw(bytes, byteCount);
     }
 
-    void WriteString(msvc8::string* value) override
+    /**
+     * Address: 0x00905AC0 (FUN_00905AC0, BinaryWriteArchive::WriteString)
+     *
+     * What it does:
+     * Writes one length-prefixed string lane to the archive stream and throws
+     * `SerializationError("nowrite")` when either write fails.
+     */
+    void WriteString(msvc8::string* const value) override
     {
-        if (!value) {
-            const char terminator = '\0';
-            WriteRaw(&terminator, sizeof(terminator));
-            return;
+        std::FILE* const file = mFile.get();
+        const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
+
+        if (!file || std::fwrite(&byteCount, sizeof(byteCount), 1u, file) != 1u) {
+            ThrowSerializationError("nowrite");
         }
 
-        if (value->size() != 0) {
-            WriteRaw(value->data(), value->size());
+        if (byteCount != 0u && std::fwrite(value->raw_data_unsafe(), byteCount, 1u, file) != 1u) {
+            ThrowSerializationError("nowrite");
         }
-
-        const char terminator = '\0';
-        WriteRaw(&terminator, sizeof(terminator));
     }
 
     void WriteFloat(float value) override
@@ -119,9 +127,21 @@ public:
         WritePod(value);
     }
 
+    /**
+     * Address: 0x00905B60 (FUN_00905B60, BinaryWriteArchive::WriteToken)
+     *
+     * What it does:
+     * Writes one lexical archive marker byte (`}N0*{`) mapped from one
+     * runtime `ArchiveToken` ordinal lane and throws `SerializationError("nowrite")`
+     * when the marker write fails.
+     */
     void WriteMarker(int marker) override
     {
-        WritePod(marker);
+        std::FILE* const file = mFile.get();
+        const char markerByte = kArchiveTokenBytes[marker];
+        if (!file || std::fwrite(&markerByte, 1u, 1u, file) != 1u) {
+            ThrowSerializationError("nowrite");
+        }
     }
 
 private:
@@ -151,6 +171,20 @@ private:
     boost::shared_ptr<std::FILE> mFile;
 };
 } // namespace
+
+/**
+ * Address: 0x00953BE0 (FUN_00953BE0, ??0WriteArchive@gpg@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes write-archive map bookkeeping and refreshes global serializer
+ * helper registrations used by reflection save lanes.
+ */
+WriteArchive::WriteArchive()
+    : mRefCounts()
+    , mObjRefs()
+{
+    SerHelperBase::InitNewHelpers();
+}
 
 /**
  * Address: 0x00953C80 (FUN_00953C80)

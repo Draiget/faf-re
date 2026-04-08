@@ -367,3 +367,14 @@ moho::CScrLuaInitForm* moho::func_EnumColorNames_LuaFuncDef()
   );
   return &binder;
 }
+
+/**
+ * Address: 0x00BC5CD0 (FUN_00BC5CD0, register_EnumColorNames_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk forwarding to `func_EnumColorNames_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_EnumColorNames_LuaFuncDef()
+{
+  return func_EnumColorNames_LuaFuncDef();
+}

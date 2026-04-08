@@ -12,6 +12,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004C6E20 (FUN_004C6E20, Moho::CScriptObjectTypeInfo::CScriptObjectTypeInfo)
+     *
+     * What it does:
+     * Constructs runtime type info and preregisters reflected `CScriptObject`.
+     */
+    CScriptObjectTypeInfo();
+
+    /**
      * Address: 0x004C6EC0 (FUN_004C6EC0, Moho::CScriptObjectTypeInfo::dtr)
      *
      * What it does:
@@ -37,6 +45,15 @@ namespace moho
      */
     void Init() override;
   };
+
+  /**
+   * Address: 0x00BC6060 (FUN_00BC6060, register_CScriptObjectTypeInfo)
+   *
+   * What it does:
+   * Materializes the global CScriptObject reflection type-info singleton at
+   * startup.
+   */
+  void register_CScriptObjectTypeInfo();
 
   static_assert(sizeof(CScriptObjectTypeInfo) == 0x64, "CScriptObjectTypeInfo size must be 0x64");
 } // namespace moho

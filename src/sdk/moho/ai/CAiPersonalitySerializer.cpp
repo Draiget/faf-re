@@ -93,6 +93,40 @@ namespace
   alignas(CAiPersonalitySerializer) unsigned char gCAiPersonalitySerializerStorage[sizeof(CAiPersonalitySerializer)];
   bool gCAiPersonalitySerializerConstructed = false;
 
+  /**
+   * Address: 0x005B95F0 (FUN_005B95F0, j_Moho::CAiPersonality::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiPersonality::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiPersonalityMemberSerializeThunk(
+    moho::CAiPersonality* const personality, gpg::WriteArchive* const archive
+  )
+  {
+    if (!personality) {
+      return;
+    }
+
+    personality->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x005B9660 (FUN_005B9660, j_Moho::CAiPersonality::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiPersonality::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiPersonalityMemberSerializeThunkSecondary(
+    moho::CAiPersonality* const personality, gpg::WriteArchive* const archive
+  )
+  {
+    if (!personality) {
+      return;
+    }
+
+    personality->MemberSerialize(archive);
+  }
+
   [[nodiscard]] SValuePairTypeInfo* AcquireSValuePairTypeInfo()
   {
     if (!gSValuePairTypeInfoConstructed) {
@@ -330,10 +364,17 @@ void CAiPersonalitySerializer::Deserialize(gpg::ReadArchive* const archive, cons
 /**
  * Address: 0x005B6A90 (FUN_005B6A90, Moho::CAiPersonalitySerializer::Serialize)
  */
-void CAiPersonalitySerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+void CAiPersonalitySerializer::Serialize(
+  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+)
 {
   auto* const personality = reinterpret_cast<CAiPersonality*>(static_cast<std::uintptr_t>(objectPtr));
-  personality->MemberSerialize(archive);
+  if (ownerRef != nullptr) {
+    personality->MemberSerialize(archive);
+    return;
+  }
+
+  CAiPersonalityMemberSerializeThunk(personality, archive);
 }
 
 /**

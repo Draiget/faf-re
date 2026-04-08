@@ -60,6 +60,14 @@ namespace moho
     std::uint32_t mColor; // +0x20
   };
 
+  /**
+   * Address: 0x00BC4360 (FUN_00BC4360, register_sSolidTextureMap)
+   *
+   * What it does:
+   * Startup thunk that materializes the global solid-texture cache map storage.
+   */
+  void register_sSolidTextureMap();
+
   static_assert(offsetof(CD3DSolidBatchTexture, mColor) == 0x20, "CD3DSolidBatchTexture::mColor offset must be 0x20");
   static_assert(sizeof(CD3DSolidBatchTexture) == 0x24, "CD3DSolidBatchTexture size must be 0x24");
 } // namespace moho

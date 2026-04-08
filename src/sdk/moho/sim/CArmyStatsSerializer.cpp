@@ -27,7 +27,7 @@ namespace
   struct ArmyTriggerListRuntime
   {
     void* proxy;
-    moho::ArmyAuxListNode* head;
+    moho::ArmyTriggerNode* head;
     std::uint32_t size;
   };
   static_assert(sizeof(ArmyTriggerListRuntime) == 0x0C, "ArmyTriggerListRuntime size must be 0x0C");

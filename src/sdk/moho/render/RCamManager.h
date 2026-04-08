@@ -4,6 +4,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/render/camera/GeomCamera3.h"
 
 namespace moho
 {
@@ -12,6 +13,15 @@ namespace moho
   class RCamManager
   {
   public:
+    /**
+     * Address: 0x007AA930 (FUN_007AA930, ??1RCamManager@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Destroys owned runtime camera instances and releases camera pointer
+     * vector storage.
+     */
+    ~RCamManager();
+
     /**
      * Address: 0x007AABB0 (FUN_007AABB0, ?Frame@RCamManager@Moho@@QAEXMM@Z)
      *
@@ -30,6 +40,14 @@ namespace moho
      */
     [[nodiscard]] CameraImpl* GetCamera(gpg::StrArg name);
 
+    /**
+     * Address: 0x007AAB60 (FUN_007AAB60, ?GetAllCameras@RCamManager@Moho@@QAE?AV?$vector@PAVCameraImpl@Moho@@V?$allocator@PAVCameraImpl@Moho@@@std@@@std@@XZ)
+     *
+     * What it does:
+     * Returns a copy of the current camera pointer vector.
+     */
+    [[nodiscard]] msvc8::vector<CameraImpl*> GetAllCameras();
+
   public:
     msvc8::vector<CameraImpl*> mCams; // +0x00
   };
@@ -44,4 +62,20 @@ namespace moho
    * Lazily initializes and returns the process-global camera manager.
    */
   [[nodiscard]] RCamManager* CAM_GetManager();
+
+  /**
+   * Address: 0x007AAD20 (FUN_007AAD20, ?CAM_GetAllCameras@Moho@@YA?AV?$vector@VGeomCamera3@Moho@@V?$allocator@VGeomCamera3@Moho@@@std@@@std@@XZ)
+   *
+   * What it does:
+   * Copies all non-minimap camera views into one output camera-view vector.
+   */
+  [[nodiscard]] msvc8::vector<GeomCamera3> CAM_GetAllCameras();
+
+  /**
+   * Address: 0x007AADE0 (FUN_007AADE0, ?CAM_GetAllRCamCameras@Moho@@YA?AV?$vector@PAVCameraImpl@Moho@@V?$allocator@PAVCameraImpl@Moho@@@std@@@std@@XZ)
+   *
+   * What it does:
+   * Returns a copy of all runtime camera implementation pointers.
+   */
+  [[nodiscard]] msvc8::vector<CameraImpl*> CAM_GetAllRCamCameras();
 } // namespace moho

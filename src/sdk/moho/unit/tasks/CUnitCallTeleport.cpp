@@ -1,11 +1,25 @@
 #include "moho/unit/tasks/CUnitCallTeleport.h"
 
+#include <cstdint>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
+  constexpr std::uint64_t kUnitStateMaskTeleportPending = 0x0000000000000100ull;
+
+  [[nodiscard]] gpg::RType* CachedCUnitCallTeleportType()
+  {
+    gpg::RType* type = moho::CUnitCallTeleport::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CUnitCallTeleport));
+      moho::CUnitCallTeleport::sType = type;
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -24,6 +38,36 @@ namespace
     }
     return cached;
   }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
 } // namespace
 
 namespace moho
@@ -33,6 +77,22 @@ namespace moho
   int CUnitCallTeleport::Execute()
   {
     return -1;
+  }
+
+  /**
+   * Address: 0x00600E90 (FUN_00600E90, ??0CUnitCallTeleport@Moho@@QAE@@Z)
+   */
+  CUnitCallTeleport::CUnitCallTeleport(CCommandTask* const parentTask, Unit* const targetUnit)
+    : CCommandTask(parentTask)
+  {
+    mTargetTransportUnit.BindObjectUnlinked(targetUnit);
+    (void)mTargetTransportUnit.LinkIntoOwnerChainHeadUnlinked();
+    mCompletedSuccessfully = false;
+    mIsOccupying = false;
+
+    if (mUnit) {
+      mUnit->UnitStateMask |= kUnitStateMaskTeleportPending;
+    }
   }
 
   /**
@@ -84,3 +144,23 @@ namespace moho
     archive->WriteBool(task->mIsOccupying);
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00603530 (FUN_00603530, gpg::RRef_CUnitCallTeleport)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitCallTeleport*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitCallTeleport(gpg::RRef* const outRef, moho::CUnitCallTeleport* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    *outRef = MakeDerivedRef(value, CachedCUnitCallTeleportType());
+    return outRef;
+  }
+} // namespace gpg

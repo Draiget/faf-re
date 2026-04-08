@@ -25,10 +25,7 @@ namespace moho
   class RBroadcasterRType_EAiAttackerEvent final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "Broadcaster<EAiAttackerEvent>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
@@ -40,10 +37,7 @@ namespace moho
   class RListenerRType_EAiAttackerEvent final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "Listener<EAiAttackerEvent>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
@@ -59,6 +53,14 @@ namespace gpg
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x005DB9A0 (FUN_005DB9A0, gpg::RVectorType_UnitWeapon_P::GetLexical)
+     *
+     * What it does:
+     * Appends `size=<count>` suffix to the base lexical representation for
+     * one `vector<UnitWeapon*>` payload.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
@@ -71,6 +73,14 @@ namespace gpg
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x005DBB50 (FUN_005DBB50, gpg::RVectorType_CAcquireTargetTask_P::GetLexical)
+     *
+     * What it does:
+     * Appends `size=<count>` suffix to the base lexical representation for
+     * one `vector<CAcquireTargetTask*>` payload.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
@@ -86,6 +96,12 @@ namespace
   using ListenerAttackerType = moho::RListenerRType_EAiAttackerEvent;
   using UnitWeaponPtrVectorType = gpg::RVectorType_UnitWeaponPtr;
   using CAcquireTargetTaskPtrVectorType = gpg::RVectorType_CAcquireTargetTaskPtr;
+
+  struct CachedTypeName
+  {
+    msvc8::string value;
+    bool initialized = false;
+  };
 
   using UnitWeaponPtrVector = msvc8::vector<moho::UnitWeapon*>;
   using CAcquireTargetTaskPtrVector = msvc8::vector<moho::CAcquireTargetTask*>;
@@ -167,10 +183,46 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::RType* ResolveEAiAttackerEventType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::EAiAttackerEvent));
+      if (!cached) {
+        cached = gpg::REF_FindTypeNamed("EAiAttackerEvent");
+      }
+    }
+    return cached;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedBroadcasterEAiAttackerEventTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedListenerEAiAttackerEventTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedUnitWeaponPtrVectorTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedCAcquireTargetTaskPtrVectorTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
   template <class TVector>
   [[nodiscard]] msvc8::string MakeVectorLexical(const gpg::RType* const ownerType, const gpg::RRef& ref, const TVector* vec)
   {
-    const msvc8::string base = ownerType != nullptr ? ownerType->GetLexical(ref) : msvc8::string("vector");
+    const msvc8::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : msvc8::string("vector");
     const int size = vec ? static_cast<int>(vec->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
@@ -195,6 +247,34 @@ namespace
     gListenerAttackerTypeConstructed = false;
   }
 
+  void cleanup_RBroadcasterRType_EAiAttackerEvent_GetName()
+  {
+    CachedTypeName& cache = CachedBroadcasterEAiAttackerEventTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RListenerRType_EAiAttackerEvent_GetName()
+  {
+    CachedTypeName& cache = CachedListenerEAiAttackerEventTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RVectorType_UnitWeaponPtr_GetName()
+  {
+    CachedTypeName& cache = CachedUnitWeaponPtrVectorTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RVectorType_CAcquireTargetTaskPtr_GetName()
+  {
+    CachedTypeName& cache = CachedCAcquireTargetTaskPtrVectorTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
   void cleanup_RVectorType_UnitWeaponPtr()
   {
     if (!gUnitWeaponPtrVectorTypeConstructed) {
@@ -216,17 +296,73 @@ namespace
   }
 } // namespace
 
-const char* gpg::RVectorType_UnitWeaponPtr::GetName() const
+/**
+ * Address: 0x005DB790 (FUN_005DB790, Moho::RBroadcasterRType_EAiAttackerEvent::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name `Broadcaster<EAiAttackerEvent>`
+ * using the registered enum reflection type name.
+ */
+const char* moho::RBroadcasterRType_EAiAttackerEvent::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const gpg::RType* const elementType = ResolveUnitWeaponPtrType();
-    const char* const elementName = elementType ? elementType->GetName() : "UnitWeapon *";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "UnitWeapon *");
+  CachedTypeName& cache = CachedBroadcasterEAiAttackerEventTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    gpg::RType* const eventType = ResolveEAiAttackerEventType();
+    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiAttackerEvent";
+    cache.value = gpg::STR_Printf("Broadcaster<%s>", eventTypeName ? eventTypeName : "EAiAttackerEvent");
+    (void)std::atexit(&cleanup_RBroadcasterRType_EAiAttackerEvent_GetName);
   }
-  return sName.c_str();
+  return cache.value.c_str();
 }
 
+/**
+ * Address: 0x005DB850 (FUN_005DB850, Moho::RListenerRType_EAiAttackerEvent::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name `Listener<EAiAttackerEvent>`
+ * using the registered enum reflection type name.
+ */
+const char* moho::RListenerRType_EAiAttackerEvent::GetName() const
+{
+  CachedTypeName& cache = CachedListenerEAiAttackerEventTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    gpg::RType* const eventType = ResolveEAiAttackerEventType();
+    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiAttackerEvent";
+    cache.value = gpg::STR_Printf("Listener<%s>", eventTypeName ? eventTypeName : "EAiAttackerEvent");
+    (void)std::atexit(&cleanup_RListenerRType_EAiAttackerEvent_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005DB900 (FUN_005DB900, gpg::RVectorType_UnitWeapon_P::GetName)
+ *
+ * What it does:
+ * Lazily formats and caches the reflected type name for
+ * `msvc8::vector<moho::UnitWeapon*>`.
+ */
+const char* gpg::RVectorType_UnitWeaponPtr::GetName() const
+{
+  CachedTypeName& cache = CachedUnitWeaponPtrVectorTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    const gpg::RType* const elementType = ResolveUnitWeaponPtrType();
+    const char* const elementName = elementType ? elementType->GetName() : "UnitWeapon *";
+    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "UnitWeapon *");
+    (void)std::atexit(&cleanup_RVectorType_UnitWeaponPtr_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005DB9A0 (FUN_005DB9A0, gpg::RVectorType_UnitWeapon_P::GetLexical)
+ *
+ * What it does:
+ * Appends `size=<count>` suffix to the base lexical representation for one
+ * `vector<UnitWeapon*>` payload.
+ */
 msvc8::string gpg::RVectorType_UnitWeaponPtr::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const UnitWeaponPtrVector*>(ref.mObj));
@@ -275,17 +411,33 @@ void gpg::RVectorType_UnitWeaponPtr::SetCount(void* const obj, const int count) 
   storage->resize(static_cast<std::size_t>(count), nullptr);
 }
 
+/**
+ * Address: 0x005DBAB0 (FUN_005DBAB0, gpg::RVectorType_CAcquireTargetTask_P::GetName)
+ *
+ * What it does:
+ * Lazily formats and caches the reflected type name for
+ * `msvc8::vector<moho::CAcquireTargetTask*>`.
+ */
 const char* gpg::RVectorType_CAcquireTargetTaskPtr::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
+  CachedTypeName& cache = CachedCAcquireTargetTaskPtrVectorTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
     const gpg::RType* const elementType = ResolveCAcquireTargetTaskPtrType();
     const char* const elementName = elementType ? elementType->GetName() : "CAcquireTargetTask *";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "CAcquireTargetTask *");
+    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "CAcquireTargetTask *");
+    (void)std::atexit(&cleanup_RVectorType_CAcquireTargetTaskPtr_GetName);
   }
-  return sName.c_str();
+  return cache.value.c_str();
 }
 
+/**
+ * Address: 0x005DBB50 (FUN_005DBB50, gpg::RVectorType_CAcquireTargetTask_P::GetLexical)
+ *
+ * What it does:
+ * Appends `size=<count>` suffix to the base lexical representation for one
+ * `vector<CAcquireTargetTask*>` payload.
+ */
 msvc8::string gpg::RVectorType_CAcquireTargetTaskPtr::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const CAcquireTargetTaskPtrVector*>(ref.mObj));

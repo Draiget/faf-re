@@ -12,6 +12,7 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/console/CConCommand.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/ID3DIndexSheet.h"
 #include "moho/render/SParticleBuffer.h"
@@ -27,8 +28,20 @@ namespace moho
   extern ShaderVar& shaderVarParticleProjection;
   extern ShaderVar& shaderVarParticleWorldToProjection;
   extern ShaderVar& shaderVarParticleInverseViewMatrix;
+  extern ShaderVar& shaderVarParticleParticleSystemPosition;
   extern ShaderVar& shaderVarParticleTime;
+  extern ShaderVar& shaderVarParticleParticleSystemShape;
+  extern ShaderVar& shaderVarParticleParticleSpread;
+  extern ShaderVar& shaderVarParticleParticleSpeed;
+  extern ShaderVar& shaderVarParticleParticleSystemHeight;
+  extern ShaderVar& shaderVarParticleParticleSize;
+  extern ShaderVar& shaderVarParticleDragEnabled;
+  extern ShaderVar& shaderVarParticleDragCoeff;
+  extern ShaderVar& shaderVarParticleInvDragCoeff;
+  extern ShaderVar& shaderVarParticleInvDragCoeffSq;
   extern ShaderVar& shaderVarParticleBackgroundTexture;
+  extern ShaderVar& shaderVarParticleParticleTexture0;
+  extern ShaderVar& shaderVarParticleParticleTexture1;
   extern float efx_ParticleWaterSurface;
 } // namespace moho
 
@@ -73,8 +86,20 @@ namespace
   DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A82D8u);
   DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A83F8u);
   DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8638u);
-  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A85A0u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8368u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8560u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A84D0u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8290u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A85A8u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8518u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8488u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A83B0u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A86C8u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8320u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8718u);
   DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A85F0u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8680u);
+  DEFINE_PARTICLE_SHADER_VAR_SLOT(0x010A8760u);
 
 #undef DEFINE_PARTICLE_SHADER_VAR_SLOT
 
@@ -106,52 +131,228 @@ namespace
     moho::RegisterShaderVar(variableName, &AccessParticleShaderVarSlot<SlotAddress>(), "particle");
   }
 
-  void CleanupShaderVarParticleViewMatrix() noexcept
+  template <std::uintptr_t SlotAddress>
+  void CleanupParticleShaderVarRegistration() noexcept
   {
-    DestroyParticleShaderVarSlot<0x010A8440u>();
+    DestroyParticleShaderVarSlot<SlotAddress>();
   }
 
-  void CleanupShaderVarParticleProjection() noexcept
+  template <std::uintptr_t SlotAddress>
+  void RegisterParticleShaderVarWithAtexit(const char* const variableName)
   {
-    DestroyParticleShaderVarSlot<0x010A82D8u>();
+    RegisterParticleShaderVar<SlotAddress>(variableName);
+    (void)std::atexit(&CleanupParticleShaderVarRegistration<SlotAddress>);
   }
 
-  void CleanupShaderVarParticleWorldToProjection() noexcept
+  moho::TConVar<float> gTConVar_efx_ParticleWaterSurface(
+    "efx_ParticleWaterSurface",
+    "Particle water-surface control variable.",
+    &moho::efx_ParticleWaterSurface
+  );
+
+  void CleanupTConVar_efx_ParticleWaterSurface() noexcept
   {
-    DestroyParticleShaderVarSlot<0x010A83F8u>();
+    moho::TeardownConCommandRegistration(gTConVar_efx_ParticleWaterSurface);
   }
 
-  void CleanupShaderVarParticleInverseViewMatrix() noexcept
+  void CleanupSharedTrailQuadIndexSheetAtProcessExit() noexcept
   {
-    DestroyParticleShaderVarSlot<0x010A8638u>();
+    if (sSharedTrailQuadIndexSheet != nullptr) {
+      delete sSharedTrailQuadIndexSheet;
+    }
   }
 
-  void CleanupShaderVarParticleTime() noexcept
+  /**
+   * Address: 0x00BC5570 (FUN_00BC5570, register_TConVar_efx_ParticleWaterSurface)
+   *
+   * What it does:
+   * Registers startup convar for `efx_ParticleWaterSurface`.
+   */
+  void register_TConVar_efx_ParticleWaterSurface()
   {
-    DestroyParticleShaderVarSlot<0x010A85A0u>();
+    moho::RegisterConCommand(gTConVar_efx_ParticleWaterSurface);
+    (void)std::atexit(&CleanupTConVar_efx_ParticleWaterSurface);
   }
 
-  void CleanupShaderVarParticleBackgroundTexture() noexcept
+  /**
+   * Address: 0x00BC55B0 (FUN_00BC55B0, register_ShaderVarParticleWorldToProjection)
+   */
+  void register_ShaderVarParticleWorldToProjection()
   {
-    DestroyParticleShaderVarSlot<0x010A85F0u>();
+    RegisterParticleShaderVarWithAtexit<0x010A83F8u>("WorldToProjection");
+  }
+
+  /**
+   * Address: 0x00BC55D0 (FUN_00BC55D0, register_ShaderVarParticleViewMatrix)
+   */
+  void register_ShaderVarParticleViewMatrix()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8440u>("ViewMatrix");
+  }
+
+  /**
+   * Address: 0x00BC55F0 (FUN_00BC55F0, register_ShaderVarParticleInverseViewMatrix)
+   */
+  void register_ShaderVarParticleInverseViewMatrix()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8638u>("InverseViewMatrix");
+  }
+
+  /**
+   * Address: 0x00BC5610 (FUN_00BC5610, register_ShaderVarParticleProjection)
+   */
+  void register_ShaderVarParticleProjection()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A82D8u>("Projection");
+  }
+
+  /**
+   * Address: 0x00BC5630 (FUN_00BC5630, register_ShaderVarParticleParticleSystemPosition)
+   */
+  void register_ShaderVarParticleParticleSystemPosition()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8368u>("ParticleSystemPosition");
+  }
+
+  /**
+   * Address: 0x00BC5650 (FUN_00BC5650, register_ShaderVarParticleTime)
+   */
+  void register_ShaderVarParticleTime()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8560u>("time");
+  }
+
+  /**
+   * Address: 0x00BC5670 (FUN_00BC5670, register_ShaderVarParticleParticleSystemShape)
+   */
+  void register_ShaderVarParticleParticleSystemShape()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A84D0u>("ParticleSystemShape");
+  }
+
+  /**
+   * Address: 0x00BC5690 (FUN_00BC5690, register_ShaderVarParticleParticleSpread)
+   */
+  void register_ShaderVarParticleParticleSpread()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8290u>("ParticleSpread");
+  }
+
+  /**
+   * Address: 0x00BC56B0 (FUN_00BC56B0, register_ShaderVarParticleParticleSpeed)
+   */
+  void register_ShaderVarParticleParticleSpeed()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A85A8u>("ParticleSpeed");
+  }
+
+  /**
+   * Address: 0x00BC56D0 (FUN_00BC56D0, register_ShaderVarParticleParticleSystemHeight)
+   */
+  void register_ShaderVarParticleParticleSystemHeight()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8518u>("ParticleSystemHeight");
+  }
+
+  /**
+   * Address: 0x00BC56F0 (FUN_00BC56F0, register_ShaderVarParticleParticleSize)
+   */
+  void register_ShaderVarParticleParticleSize()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8488u>("ParticleSize");
+  }
+
+  /**
+   * Address: 0x00BC5710 (FUN_00BC5710, register_ShaderVarParticleDragEnabled)
+   */
+  void register_ShaderVarParticleDragEnabled()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A83B0u>("DragEnabled");
+  }
+
+  /**
+   * Address: 0x00BC5730 (FUN_00BC5730, register_ShaderVarParticleDragCoeff)
+   */
+  void register_ShaderVarParticleDragCoeff()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A86C8u>("DragCoeff");
+  }
+
+  /**
+   * Address: 0x00BC5750 (FUN_00BC5750, register_ShaderVarParticleInvDragCoeff)
+   */
+  void register_ShaderVarParticleInvDragCoeff()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8320u>("invDragCoeff");
+  }
+
+  /**
+   * Address: 0x00BC5770 (FUN_00BC5770, register_ShaderVarParticleInvDragCoeffSq)
+   */
+  void register_ShaderVarParticleInvDragCoeffSq()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8718u>("invDragCoeffSq");
+  }
+
+  /**
+   * Address: 0x00BC5790 (FUN_00BC5790, register_ShaderVarParticleBackgroundTexture)
+   */
+  void register_ShaderVarParticleBackgroundTexture()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A85F0u>("BackgroundTexture");
+  }
+
+  /**
+   * Address: 0x00BC57B0 (FUN_00BC57B0, register_ShaderVarParticleParticleTexture0)
+   */
+  void register_ShaderVarParticleParticleTexture0()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8680u>("ParticleTexture0");
+  }
+
+  /**
+   * Address: 0x00BC57D0 (FUN_00BC57D0, register_ShaderVarParticleParticleTexture1)
+   */
+  void register_ShaderVarParticleParticleTexture1()
+  {
+    RegisterParticleShaderVarWithAtexit<0x010A8760u>("ParticleTexture1");
+  }
+
+  /**
+   * Address: 0x00BC57F0 (FUN_00BC57F0, sub_BC57F0)
+   *
+   * What it does:
+   * Registers process-exit cleanup for the shared trail index-sheet lane.
+   */
+  int register_SharedTrailQuadIndexSheetCleanupAtExit()
+  {
+    return std::atexit(&CleanupSharedTrailQuadIndexSheetAtProcessExit);
   }
 
   struct ParticleShaderVarBootstrap
   {
     ParticleShaderVarBootstrap()
     {
-      RegisterParticleShaderVar<0x010A8440u>("ViewMatrix");
-      RegisterParticleShaderVar<0x010A82D8u>("Projection");
-      RegisterParticleShaderVar<0x010A83F8u>("WorldToProjection");
-      RegisterParticleShaderVar<0x010A8638u>("InverseViewMatrix");
-      RegisterParticleShaderVar<0x010A85A0u>("time");
-      RegisterParticleShaderVar<0x010A85F0u>("BackgroundTexture");
-      (void)std::atexit(CleanupShaderVarParticleViewMatrix);
-      (void)std::atexit(CleanupShaderVarParticleProjection);
-      (void)std::atexit(CleanupShaderVarParticleWorldToProjection);
-      (void)std::atexit(CleanupShaderVarParticleInverseViewMatrix);
-      (void)std::atexit(CleanupShaderVarParticleTime);
-      (void)std::atexit(CleanupShaderVarParticleBackgroundTexture);
+      register_TConVar_efx_ParticleWaterSurface();
+      register_ShaderVarParticleWorldToProjection();
+      register_ShaderVarParticleViewMatrix();
+      register_ShaderVarParticleInverseViewMatrix();
+      register_ShaderVarParticleProjection();
+      register_ShaderVarParticleParticleSystemPosition();
+      register_ShaderVarParticleTime();
+      register_ShaderVarParticleParticleSystemShape();
+      register_ShaderVarParticleParticleSpread();
+      register_ShaderVarParticleParticleSpeed();
+      register_ShaderVarParticleParticleSystemHeight();
+      register_ShaderVarParticleParticleSize();
+      register_ShaderVarParticleDragEnabled();
+      register_ShaderVarParticleDragCoeff();
+      register_ShaderVarParticleInvDragCoeff();
+      register_ShaderVarParticleInvDragCoeffSq();
+      register_ShaderVarParticleBackgroundTexture();
+      register_ShaderVarParticleParticleTexture0();
+      register_ShaderVarParticleParticleTexture1();
+      (void)register_SharedTrailQuadIndexSheetCleanupAtExit();
     }
   };
 
@@ -7922,8 +8123,21 @@ namespace moho
   ShaderVar& shaderVarParticleProjection = AccessParticleShaderVarSlot<0x010A82D8u>();
   ShaderVar& shaderVarParticleWorldToProjection = AccessParticleShaderVarSlot<0x010A83F8u>();
   ShaderVar& shaderVarParticleInverseViewMatrix = AccessParticleShaderVarSlot<0x010A8638u>();
-  ShaderVar& shaderVarParticleTime = AccessParticleShaderVarSlot<0x010A85A0u>();
+  ShaderVar& shaderVarParticleParticleSystemPosition = AccessParticleShaderVarSlot<0x010A8368u>();
+  ShaderVar& shaderVarParticleTime = AccessParticleShaderVarSlot<0x010A8560u>();
+  ShaderVar& shaderVarParticleParticleSystemShape = AccessParticleShaderVarSlot<0x010A84D0u>();
+  ShaderVar& shaderVarParticleParticleSpread = AccessParticleShaderVarSlot<0x010A8290u>();
+  ShaderVar& shaderVarParticleParticleSpeed = AccessParticleShaderVarSlot<0x010A85A8u>();
+  ShaderVar& shaderVarParticleParticleSystemHeight = AccessParticleShaderVarSlot<0x010A8518u>();
+  ShaderVar& shaderVarParticleParticleSize = AccessParticleShaderVarSlot<0x010A8488u>();
+  ShaderVar& shaderVarParticleDragEnabled = AccessParticleShaderVarSlot<0x010A83B0u>();
+  ShaderVar& shaderVarParticleDragCoeff = AccessParticleShaderVarSlot<0x010A86C8u>();
+  ShaderVar& shaderVarParticleInvDragCoeff = AccessParticleShaderVarSlot<0x010A8320u>();
+  ShaderVar& shaderVarParticleInvDragCoeffSq = AccessParticleShaderVarSlot<0x010A8718u>();
   ShaderVar& shaderVarParticleBackgroundTexture = AccessParticleShaderVarSlot<0x010A85F0u>();
+  ShaderVar& shaderVarParticleParticleTexture0 = AccessParticleShaderVarSlot<0x010A8680u>();
+  ShaderVar& shaderVarParticleParticleTexture1 = AccessParticleShaderVarSlot<0x010A8760u>();
+  float efx_ParticleWaterSurface = 0.0F;
 
   CWorldParticles sWorldParticles{};
 

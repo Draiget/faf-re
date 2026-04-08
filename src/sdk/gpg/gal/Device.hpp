@@ -10,6 +10,15 @@ namespace gpg::gal
   class DeviceContext;
 
   /**
+   * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
+   *
+   * What it does:
+   * Returns true when the OS foreground HWND matches any active GAL device
+   * head window/handle lane.
+   */
+  [[nodiscard]] bool WindowIsForeground();
+
+  /**
    * VFTABLE: 0x00D42224
    * COL:     0x00E5050C
    */

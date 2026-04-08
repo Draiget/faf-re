@@ -6,6 +6,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/misc/Listener.h"
 
@@ -16,10 +17,7 @@ namespace moho
   class RBroadcasterRType_EAiNavigatorEvent final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "Broadcaster<EAiNavigatorEvent>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
@@ -31,10 +29,7 @@ namespace moho
   class RListenerRType_EAiNavigatorEvent final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "Listener<EAiNavigatorEvent>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
@@ -48,6 +43,12 @@ namespace
 {
   using BroadcasterNavigatorType = moho::RBroadcasterRType_EAiNavigatorEvent;
   using ListenerNavigatorType = moho::RListenerRType_EAiNavigatorEvent;
+
+  struct CachedTypeName
+  {
+    msvc8::string value;
+    bool initialized = false;
+  };
 
   alignas(BroadcasterNavigatorType) unsigned char gBroadcasterNavigatorTypeStorage[sizeof(BroadcasterNavigatorType)];
   bool gBroadcasterNavigatorTypeConstructed = false;
@@ -95,6 +96,44 @@ namespace
     gListenerNavigatorTypeConstructed = false;
   }
 
+  [[nodiscard]] gpg::RType* ResolveEAiNavigatorEventType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::EAiNavigatorEvent));
+      if (!cached) {
+        cached = gpg::REF_FindTypeNamed("EAiNavigatorEvent");
+      }
+    }
+    return cached;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedBroadcasterEAiNavigatorEventTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedListenerEAiNavigatorEventTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  void cleanup_RBroadcasterRType_EAiNavigatorEvent_GetName()
+  {
+    CachedTypeName& cache = CachedBroadcasterEAiNavigatorEventTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RListenerRType_EAiNavigatorEvent_GetName()
+  {
+    CachedTypeName& cache = CachedListenerEAiNavigatorEventTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
   [[nodiscard]] gpg::RType* CachedBroadcasterEAiNavigatorEventType()
   {
     static gpg::RType* cached = nullptr;
@@ -104,6 +143,46 @@ namespace
     return cached;
   }
 } // namespace
+
+/**
+ * Address: 0x005A7000 (FUN_005A7000, Moho::RBroadcasterRType_EAiNavigatorEvent::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name `Broadcaster<EAiNavigatorEvent>`
+ * using the currently registered enum reflection type name.
+ */
+const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
+{
+  CachedTypeName& cache = CachedBroadcasterEAiNavigatorEventTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    gpg::RType* const eventType = ResolveEAiNavigatorEventType();
+    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiNavigatorEvent";
+    cache.value = gpg::STR_Printf("Broadcaster<%s>", eventTypeName ? eventTypeName : "EAiNavigatorEvent");
+    (void)std::atexit(&cleanup_RBroadcasterRType_EAiNavigatorEvent_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005A70C0 (FUN_005A70C0, Moho::RListenerRType_EAiNavigatorEvent::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name `Listener<EAiNavigatorEvent>`
+ * using the currently registered enum reflection type name.
+ */
+const char* moho::RListenerRType_EAiNavigatorEvent::GetName() const
+{
+  CachedTypeName& cache = CachedListenerEAiNavigatorEventTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    gpg::RType* const eventType = ResolveEAiNavigatorEventType();
+    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiNavigatorEvent";
+    cache.value = gpg::STR_Printf("Listener<%s>", eventTypeName ? eventTypeName : "EAiNavigatorEvent");
+    (void)std::atexit(&cleanup_RListenerRType_EAiNavigatorEvent_GetName);
+  }
+  return cache.value.c_str();
+}
 
 std::size_t SNavPath::Count() const noexcept
 {

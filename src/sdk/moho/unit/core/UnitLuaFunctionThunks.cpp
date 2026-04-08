@@ -578,7 +578,7 @@ namespace moho
    */
   void register_UnitRemoveBuildRestriction_LuaFuncDef()
   {
-    ForwardUnitLuaThunkVoid<&func_UnitRemoveBuildRestriction_LuaFuncDef>();
+    (void)ForwardUnitLuaThunk<&func_UnitRemoveBuildRestriction_LuaFuncDef>();
   }
 
   /**
@@ -594,7 +594,7 @@ namespace moho
    */
   void register_UnitAddCommandCap_LuaFuncDef()
   {
-    ForwardUnitLuaThunkVoid<&func_UnitAddCommandCap_LuaFuncDef>();
+    (void)ForwardUnitLuaThunk<&func_UnitAddCommandCap_LuaFuncDef>();
   }
 
   /**

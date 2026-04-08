@@ -2,6 +2,8 @@
 
 namespace moho
 {
+  class CSimConVarBase;
+
   /**
    * Address: 0x00BD3890 (FUN_00BD3890, register_SallyShears_ConAliasDef)
    *
@@ -69,6 +71,15 @@ namespace moho
    * Registers the `AddImpulse` console alias and installs startup cleanup.
    */
   void register_AddImpulse_ConAliasDef();
+
+  /**
+   * Address: 0x00BD3A80 (FUN_00BD3A80, register_AddImpulse_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `AddImpulse` sim command callback and installs startup
+   * cleanup.
+   */
+  void register_AddImpulse_SimConFuncDef();
 
   /**
    * Address: 0x00BCE6D0 (FUN_00BCE6D0, register_WeaponTerrainBlockageTest_ConAliasDef)
@@ -147,6 +158,9 @@ namespace moho
 
   /** Address: 0x00BFB5F0 (FUN_00BFB5F0, sub_BFB5F0) */
   void cleanup_AddImpulse_ConAlias();
+
+  /** Address: 0x00BFB640 (FUN_00BFB640, sub_BFB640) */
+  void cleanup_AddImpulse_SimConFunc();
 
   /**
    * Address: 0x00BFA720 (FUN_00BFA720, cleanup_NeedRefuelThresholdRatio_ConAlias)
@@ -237,6 +251,12 @@ namespace moho
    * Registers `AI_RunOpponentAI` sim convar and installs startup cleanup.
    */
   void register_AI_RunOpponentAI_SimConVarDef();
+
+  /**
+   * What it does:
+   * Returns the recovered `AI_RunOpponentAI` sim-convar definition object.
+   */
+  [[nodiscard]] CSimConVarBase* GetAI_RunOpponentAI_SimConVarDef();
 
   /**
    * Address: 0x00BCB0D0 (FUN_00BCB0D0, register_AI_DebugArmyIndex_ConAlias)
@@ -431,6 +451,40 @@ namespace moho
   void register_DebugAIStatesOn_SimConFunc();
 
   /**
+   * Address: 0x00BDC350 (FUN_00BDC350, register_TrackStats_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `TrackStats` console alias and installs startup cleanup.
+   */
+  void register_TrackStats_ConAliasDef();
+
+  /**
+   * Address: 0x00BDC380 (FUN_00BDC380, register_TrackStats_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `TrackStats` sim command callback and installs startup
+   * cleanup.
+   */
+  void register_TrackStats_SimConFuncDef();
+
+  /**
+   * Address: 0x00BDC3C0 (FUN_00BDC3C0, register_DumpUnits_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `DumpUnits` console alias and installs startup cleanup.
+   */
+  void register_DumpUnits_ConAliasDef();
+
+  /**
+   * Address: 0x00BDC3F0 (FUN_00BDC3F0, register_DumpUnits_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `DumpUnits` sim command callback and installs startup
+   * cleanup.
+   */
+  void register_DumpUnits_SimConFuncDef();
+
+  /**
    * Address: 0x00BD82A0 (FUN_00BD82A0, register_DebugSetProductionInActive_ConAliasDef)
    */
   void register_DebugSetProductionInActive_ConAliasDef();
@@ -501,6 +555,40 @@ namespace moho
 
   /** Address: 0x00BFE360 (FUN_00BFE360, sub_BFE360) */
   void cleanup_DebugAIStatesOn_SimConFunc();
+
+  /**
+   * Address: 0x00C01390 (FUN_00C01390, cleanup_TrackStats_ConAlias)
+   *
+   * What it does:
+   * Clears startup-owned `TrackStats` alias payload and unregisters command
+   * binding.
+   */
+  void cleanup_TrackStats_ConAlias();
+
+  /**
+   * Address: 0x00C013E0 (FUN_00C013E0, cleanup_TrackStats_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `TrackStats` sim-command callback object.
+   */
+  void cleanup_TrackStats_SimConFunc();
+
+  /**
+   * Address: 0x00C013F0 (FUN_00C013F0, cleanup_DumpUnits_ConAlias)
+   *
+   * What it does:
+   * Clears startup-owned `DumpUnits` alias payload and unregisters command
+   * binding.
+   */
+  void cleanup_DumpUnits_ConAlias();
+
+  /**
+   * Address: 0x00C01440 (FUN_00C01440, cleanup_DumpUnits_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `DumpUnits` sim-command callback object.
+   */
+  void cleanup_DumpUnits_SimConFunc();
 
   /** Address: 0x00BFE2B0 (FUN_00BFE2B0, sub_BFE2B0) */
   void cleanup_DebugSetProductionInActive_ConAlias();

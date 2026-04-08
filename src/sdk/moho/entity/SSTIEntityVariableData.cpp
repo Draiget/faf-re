@@ -3,15 +3,164 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <typeinfo>
 
+#include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/audio/CSndParams.h"
 #include "moho/entity/EntityId.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/RScmResource.h"
 
 namespace
 {
   constexpr std::uint32_t kAttachmentParentSentinel = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
   constexpr moho::EUserEntityVisibilityMode kDefaultVisibilityMode = moho::EUserEntityVisibilityMode::MapPlayableRect;
+
+  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
+  {
+    for (const char* const name : names) {
+      if (!name) {
+        continue;
+      }
+
+      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
+        return type;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveRScmResourceType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"RScmResource", "Moho::RScmResource"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(moho::RScmResource));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveRMeshBlueprintType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"RMeshBlueprint", "Moho::RMeshBlueprint"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(moho::RMeshBlueprint));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveVector3fType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(Wm3::Vec3f));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveVTransformType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::VTransform));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveEntIdType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"EntId", "Moho::EntId", "int", "signed int"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(int));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveAttachInfoVectorType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName(
+        {
+          "fastvector<SSTIEntityAttachInfo>",
+          "gpg::fastvector<Moho::SSTIEntityAttachInfo>",
+          "gpg::fastvector<SSTIEntityAttachInfo>",
+        }
+      );
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(moho::SSTIInlineUIntVector));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCSndParamsType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"CSndParams", "Moho::CSndParams"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(moho::CSndParams));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveVisibilityModeType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"EVisibilityMode", "Moho::EVisibilityMode"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(int));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveLayerType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"ELayer", "Moho::ELayer"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(int));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveEntityAttributesType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = ResolveTypeByAnyName({"EntityAttributes", "Moho::EntityAttributes"});
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(moho::SSTIIntelAttributes));
+      }
+    }
+    return sType;
+  }
+
+  template <typename TObject>
+  [[nodiscard]] gpg::RRef MakeObjectRef(TObject* const object, gpg::RType* const type)
+  {
+    gpg::RRef ref{};
+    ref.mObj = object;
+    ref.mType = type;
+    return ref;
+  }
 } // namespace
 
 namespace moho
@@ -161,6 +310,96 @@ namespace moho
     mUnderlayTexture = rhs.mUnderlayTexture;
     mIntelAttributes = rhs.mIntelAttributes;
     return *this;
+  }
+
+  /**
+   * Address: 0x00559E00 (FUN_00559E00, Moho::SSTIEntityVariableData::MemberSerialize)
+   */
+  void SSTIEntityVariableData::MemberSerialize(gpg::WriteArchive* const archive, const int version)
+  {
+    if (version < 2) {
+      throw gpg::SerializationError("Unsupported version.");
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const scmType = ResolveRScmResourceType();
+    GPG_ASSERT(scmType != nullptr);
+    gpg::WriteRawPointer(
+      archive,
+      MakeObjectRef(const_cast<RScmResource*>(mScmResource.get()), scmType),
+      gpg::TrackedPointerState::Shared,
+      ownerRef
+    );
+
+    gpg::RType* const meshType = ResolveRMeshBlueprintType();
+    GPG_ASSERT(meshType != nullptr);
+    gpg::WriteRawPointer(
+      archive,
+      MakeObjectRef(const_cast<RMeshBlueprint*>(mMeshBlueprint), meshType),
+      gpg::TrackedPointerState::Unowned,
+      ownerRef
+    );
+
+    gpg::RType* const vector3Type = ResolveVector3fType();
+    GPG_ASSERT(vector3Type != nullptr);
+    archive->Write(vector3Type, &mScale, ownerRef);
+    archive->WriteFloat(mHealth);
+    archive->WriteFloat(mMaxHealth);
+    archive->WriteBool(mIsBeingBuilt != 0u);
+    archive->WriteBool(mIsDead != 0u);
+    archive->WriteBool(mRequestRefreshUI != 0u);
+
+    gpg::RType* const transformType = ResolveVTransformType();
+    GPG_ASSERT(transformType != nullptr);
+    archive->Write(transformType, &mCurTransform, ownerRef);
+    archive->Write(transformType, &mLastTransform, ownerRef);
+    archive->WriteFloat(mCurImpactValue);
+    archive->WriteFloat(mFractionComplete);
+
+    gpg::RType* const entIdType = ResolveEntIdType();
+    GPG_ASSERT(entIdType != nullptr);
+    archive->Write(entIdType, &mAttachmentParentRef, ownerRef);
+
+    gpg::RType* const attachInfoType = ResolveAttachInfoVectorType();
+    GPG_ASSERT(attachInfoType != nullptr);
+    archive->Write(attachInfoType, &mAuxValueVector, ownerRef);
+
+    archive->WriteFloat(mScroll0U);
+    archive->WriteFloat(mScroll0V);
+    archive->WriteFloat(mScroll1U);
+    archive->WriteFloat(mScroll1V);
+
+    gpg::RType* const soundType = ResolveCSndParamsType();
+    GPG_ASSERT(soundType != nullptr);
+    gpg::WriteRawPointer(
+      archive,
+      MakeObjectRef(mAmbientSound, soundType),
+      gpg::TrackedPointerState::Unowned,
+      ownerRef
+    );
+    gpg::WriteRawPointer(
+      archive,
+      MakeObjectRef(mRumbleSound, soundType),
+      gpg::TrackedPointerState::Unowned,
+      ownerRef
+    );
+
+    archive->WriteBool(mVisibilityHidden != 0u);
+
+    gpg::RType* const visibilityModeType = ResolveVisibilityModeType();
+    GPG_ASSERT(visibilityModeType != nullptr);
+    archive->Write(visibilityModeType, &mVisibilityMode, ownerRef);
+
+    gpg::RType* const layerType = ResolveLayerType();
+    GPG_ASSERT(layerType != nullptr);
+    archive->Write(layerType, &mLayerMask, ownerRef);
+
+    archive->WriteBool(mUsingAltFootprint != 0u);
+
+    gpg::RType* const attributesType = ResolveEntityAttributesType();
+    GPG_ASSERT(attributesType != nullptr);
+    archive->Write(attributesType, &mIntelAttributes, ownerRef);
   }
 
   std::uint32_t SSTIEntityVariableData::GetVisibilityGridMask() const noexcept

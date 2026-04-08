@@ -4,21 +4,41 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
+#include <string>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiFormationInstance.h"
+#include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/CountedObject.h"
+#include "moho/misc/Stats.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/unit/CUnitCommandWeakPtrReflection.h"
+#include "moho/unit/core/UnitWeakPtrReflection.h"
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
+
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
 
 namespace
 {
@@ -42,6 +62,242 @@ namespace
   constexpr const char* kZKey = "Z";
   constexpr const char* kTargetIdKey = "TargetId";
   constexpr const char* kBlueprintIdKey = "BlueprintId";
+
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
+  {
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
+    }
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* ResolveCachedType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(TObject));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveBroadcasterCommandEventType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = register_Broadcaster_ECommandEvent_RType();
+      if (!sType) {
+        sType = gpg::LookupRType(typeid(BroadcasterEventTag<ECommandEvent>));
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveWeakPtrCUnitCommandVectorType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(msvc8::vector<WeakPtr<CUnitCommand>>));
+      if (!sType) {
+        sType = register_WeakPtr_CUnitCommand_VectorType_00();
+      }
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
+  {
+    gpg::RType* sType = WeakPtr<Unit>::sType;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(WeakPtr<Unit>));
+      if (!sType) {
+        sType = register_WeakPtr_Unit_Type_00();
+      }
+      WeakPtr<Unit>::sType = sType;
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveLuaObjectType()
+  {
+    gpg::RType* sType = LuaPlus::LuaObject::sType;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
+      LuaPlus::LuaObject::sType = sType;
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveEntityUnitSetType()
+  {
+    gpg::RType* sType = EntitySetTemplate<Unit>::sType;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(EntitySetTemplate<Unit>));
+      EntitySetTemplate<Unit>::sType = sType;
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveCountedPtrIFormationInstanceType()
+  {
+    gpg::RType* sType = CountedPtr<IFormationInstance>::sType;
+    if (!sType) {
+      register_IFormationInstanceCountedPtrReflection();
+      sType = gpg::LookupRType(typeid(CountedPtr<IFormationInstance>));
+      CountedPtr<IFormationInstance>::sType = sType;
+    }
+    return sType;
+  }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
+  {
+    gpg::RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uint8_t*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
+
+  [[nodiscard]] void* BroadcasterSubobjectPtr(CUnitCommand* const command) noexcept
+  {
+    if (!command) {
+      return nullptr;
+    }
+
+    // `Broadcaster<ECommandEvent>` is serialized from a secondary base slice
+    // at +0x34 in the original binary object layout.
+    return reinterpret_cast<void*>(reinterpret_cast<std::uint8_t*>(command) + 0x34u);
+  }
+
+  [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
+  {
+    if (!command) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<const void*>(reinterpret_cast<const std::uint8_t*>(command) + 0x34u);
+  }
+
+  void CopyUnitSetFromEntitySet(const EntitySetTemplate<Unit>& source, SCommandUnitSet& destination)
+  {
+    destination.mVec = gpg::core::FastVector<CScriptObject*>{};
+    for (Unit* const* it = source.begin(); it != source.end(); ++it) {
+      if (!*it) {
+        continue;
+      }
+      (void)destination.InsertUnitSorted(*it);
+    }
+  }
+
+  void BuildEntitySetFromCommandUnitSet(const SCommandUnitSet& source, EntitySetTemplate<Unit>& destination)
+  {
+    destination.Clear();
+    for (CScriptObject* const entry : source.mVec) {
+      if (!SCommandUnitSet::IsUsableEntry(entry)) {
+        continue;
+      }
+
+      const Unit* const unit = SCommandUnitSet::UnitFromEntry(entry);
+      if (!unit) {
+        continue;
+      }
+
+      (void)destination.Add(const_cast<Unit*>(unit));
+    }
+  }
+
+  /**
+   * Address: 0x006E7BD0 (FUN_006E7BD0, struct_CommandIssueDataHelper::cpy)
+   *
+   * What it does:
+   * Copies one published-command descriptor lane (`SSTICommandConstantData`)
+   * including legacy string payload.
+   */
+  void CopyPublishedCommandDescriptor(
+    SSTICommandConstantData& destination,
+    const SSTICommandConstantData& source
+  )
+  {
+    destination.cmd = source.cmd;
+    destination.unk0 = source.unk0;
+    destination.origin = source.origin;
+    destination.unk1 = source.unk1;
+    destination.blueprint = source.blueprint;
+    destination.unk2 = source.unk2;
+  }
+
+  /**
+   * Address: 0x006E9360 (FUN_006E9360)
+   *
+   * What it does:
+   * Appends one command descriptor record into sync publication output.
+   */
+  void AppendPublishedCommandDescriptor(
+    msvc8::vector<SSTICommandConstantData>& descriptors,
+    const SSTICommandConstantData& descriptor
+  )
+  {
+    descriptors.push_back(descriptor);
+  }
+
+  /**
+   * Address: 0x006E7C50 (FUN_006E7C50)
+   *
+   * What it does:
+   * Builds one published-command packet from command id and variable payload.
+   */
+  [[nodiscard]] SSyncPublishedCommandPacket BuildPublishedCommandPacket(
+    const CmdId commandId,
+    const SSTICommandVariableData& variableData
+  )
+  {
+    SSyncPublishedCommandPacket packet{};
+    packet.commandId = commandId;
+    packet.variableData = variableData;
+    return packet;
+  }
+
+  /**
+   * Address: 0x006E93F0 (FUN_006E93F0)
+   *
+   * What it does:
+   * Appends one published-command packet into sync publication output.
+   */
+  void AppendPublishedCommandPacket(
+    msvc8::vector<SSyncPublishedCommandPacket>& packets,
+    const SSyncPublishedCommandPacket& packet
+  )
+  {
+    packets.push_back(packet);
+  }
 
   template <typename TValue>
   void SetCommandQueueField(LuaPlus::LuaObject& row, const char* key, const TValue& value);
@@ -143,6 +399,27 @@ namespace
   }
 
 } // namespace
+
+/**
+ * Address: 0x006EA340 (FUN_006EA340, Moho::InstanceCounter<Moho::CUnitCommand>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for CUnitCommand
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CUnitCommand>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CUnitCommand).name());
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
 
 CScriptObject* SCommandUnitSet::EntryFromUnit(Unit* const unit) noexcept
 {
@@ -253,6 +530,52 @@ bool SCommandUnitSet::RemoveUnitSorted(Unit* const unit)
 }
 
 /**
+ * Address: 0x006E7FF0 (FUN_006E7FF0, ??0CUnitCommand@Moho@@AAE@XZ)
+ *
+ * What it does:
+ * Default-initializes one command instance used by serializer construct flow.
+ */
+CUnitCommand::CUnitCommand()
+  : unk0(nullptr)
+  , mSim(nullptr)
+  , mConstDat{}
+  , mVarDat{}
+  , unk1(nullptr)
+  , mUnitSet{}
+  , mFormationInstance(nullptr)
+  , mTarget{}
+  , mInstanceSerial(0)
+  , mHasPublishedCommandEvent(false)
+  , mNeedsUpdate(true)
+  , mUnknownFlag142(false)
+  , mUnknownFlag143(false)
+  , mCoordinatingOrders{}
+  , mUnknownFlag154(false)
+  , mUnit()
+  , mArgs()
+  , mUnknownTailInt(0)
+{
+  mPrev = this;
+  mNext = this;
+
+  mConstDat.cmd = -1;
+  mConstDat.unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(0xFFFFFFFFu));
+  mConstDat.origin = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
+  mConstDat.unk1 = 0.0f;
+  mConstDat.blueprint = nullptr;
+  mConstDat.unk2 = msvc8::string{};
+
+  mVarDat = SSTICommandVariableData{};
+  mUnitSet.mVec = gpg::core::FastVector<CScriptObject*>{};
+
+  mTarget.targetType = EAiTargetType::AITARGET_None;
+  mTarget.targetEntity.ClearLinkState();
+  mTarget.position = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+  mTarget.targetPoint = -1;
+  mTarget.targetIsMobile = false;
+}
+
+/**
  * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
  *
  * What it does:
@@ -327,12 +650,12 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
       continue;
     }
 
-    peer->LinkCoordinatingOrder(this);
-    LinkCoordinatingOrder(peer);
+    peer->CoordinateWith(this);
+    CoordinateWith(peer);
   }
 
-  coordinatingCommand->LinkCoordinatingOrder(this);
-  LinkCoordinatingOrder(coordinatingCommand);
+  coordinatingCommand->CoordinateWith(this);
+  CoordinateWith(coordinatingCommand);
 }
 
 /**
@@ -344,6 +667,174 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
 msvc8::vector<WeakPtr<CUnitCommand>> CUnitCommand::GetCoordinatingOrdersSnapshot() const
 {
   return mCoordinatingOrders;
+}
+
+/**
+ * Address: 0x006E91C0 (FUN_006E91C0, Moho::CUnitCommand::MemberConstruct)
+ *
+ * What it does:
+ * Allocates one command object, runs default constructor lanes, and publishes
+ * the result as an unowned construct payload.
+ */
+void CUnitCommand::MemberConstruct(gpg::SerConstructResult* const result)
+{
+  if (!result) {
+    return;
+  }
+
+  CUnitCommand* const command = new (std::nothrow) CUnitCommand();
+  gpg::RRef objectRef{};
+  objectRef.mObj = command;
+  objectRef.mType = CUnitCommand::StaticGetClass();
+  result->SetUnowned(objectRef, 0u);
+}
+
+/**
+ * Address: 0x006ECB80 (FUN_006ECB80, Moho::CUnitCommand::MemberDeserialize)
+ *
+ * What it does:
+ * Loads reflected base/object lanes and command payload fields, then maps the
+ * serialized unit-set lane into command-runtime unit entries.
+ */
+void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitCommand* const command, const int version)
+{
+  if (!archive || !command) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+
+  if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
+    archive->Read(scriptType, command, ownerRef);
+  }
+
+  if (gpg::RType* const broadcasterType = ResolveBroadcasterCommandEventType()) {
+    archive->Read(broadcasterType, BroadcasterSubobjectPtr(command), ownerRef);
+  }
+
+  (void)archive->ReadPointer_Sim(&command->mSim, &ownerRef);
+
+  if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
+    archive->Read(constDataType, &command->mConstDat, ownerRef);
+  }
+
+  if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
+    archive->Read(variableDataType, &command->mVarDat, ownerRef);
+  }
+
+  EntitySetTemplate<Unit> loadedUnitSet{};
+  if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
+    archive->Read(unitSetType, &loadedUnitSet, ownerRef);
+    CopyUnitSetFromEntitySet(loadedUnitSet, command->mUnitSet);
+  }
+
+  if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
+    CountedPtr<IFormationInstance> formation{};
+    archive->Read(formationType, &formation, ownerRef);
+    command->mFormationInstance = static_cast<CAiFormationInstance*>(formation.tex);
+  }
+
+  if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
+    archive->Read(targetType, &command->mTarget, ownerRef);
+  }
+
+  std::uint32_t instanceSerial = 0u;
+  archive->ReadUInt(&instanceSerial);
+  command->mInstanceSerial = static_cast<CmdId>(instanceSerial);
+
+  archive->ReadBool(&command->mUnknownFlag142);
+
+  if (gpg::RType* const coordinatingOrdersType = ResolveWeakPtrCUnitCommandVectorType()) {
+    archive->Read(coordinatingOrdersType, &command->mCoordinatingOrders, ownerRef);
+  }
+
+  archive->ReadBool(&command->mUnknownFlag154);
+
+  if (version >= 1) {
+    if (gpg::RType* const weakUnitType = ResolveWeakPtrUnitType()) {
+      archive->Read(weakUnitType, &command->mUnit, ownerRef);
+    }
+  }
+
+  if (version >= 2) {
+    if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
+      archive->Read(luaObjectType, &command->mArgs, ownerRef);
+    }
+  }
+}
+
+/**
+ * Address: 0x006ECE20 (FUN_006ECE20, Moho::CUnitCommand::MemberSerialize)
+ *
+ * What it does:
+ * Saves reflected base/object lanes and command payload fields, serializing
+ * the command-unit set through legacy `EntitySetTemplate<Unit>` RTTI lanes.
+ */
+void CUnitCommand::MemberSerialize(CUnitCommand* const command, gpg::WriteArchive* const archive, const int version)
+{
+  if (!archive || !command) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+
+  if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
+    archive->Write(scriptType, command, ownerRef);
+  }
+
+  if (gpg::RType* const broadcasterType = ResolveBroadcasterCommandEventType()) {
+    archive->Write(broadcasterType, BroadcasterSubobjectPtr(command), ownerRef);
+  }
+
+  if (gpg::RType* const simType = ResolveCachedType<Sim>()) {
+    const gpg::RRef simRef = MakeDerivedRef(command->mSim, simType);
+    gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
+
+  if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
+    archive->Write(constDataType, &command->mConstDat, ownerRef);
+  }
+
+  if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
+    archive->Write(variableDataType, &command->mVarDat, ownerRef);
+  }
+
+  EntitySetTemplate<Unit> serializedUnitSet{};
+  BuildEntitySetFromCommandUnitSet(command->mUnitSet, serializedUnitSet);
+  if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
+    archive->Write(unitSetType, &serializedUnitSet, ownerRef);
+  }
+
+  CountedPtr<IFormationInstance> formation{};
+  formation.tex = static_cast<IFormationInstance*>(command->mFormationInstance);
+  if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
+    archive->Write(formationType, &formation, ownerRef);
+  }
+
+  if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
+    archive->Write(targetType, &command->mTarget, ownerRef);
+  }
+
+  archive->WriteUInt(static_cast<unsigned int>(command->mInstanceSerial));
+  archive->WriteBool(command->mUnknownFlag142);
+
+  if (gpg::RType* const coordinatingOrdersType = ResolveWeakPtrCUnitCommandVectorType()) {
+    archive->Write(coordinatingOrdersType, &command->mCoordinatingOrders, ownerRef);
+  }
+
+  archive->WriteBool(command->mUnknownFlag154);
+
+  if (version >= 1) {
+    if (gpg::RType* const weakUnitType = ResolveWeakPtrUnitType()) {
+      archive->Write(weakUnitType, &command->mUnit, ownerRef);
+    }
+  }
+
+  if (version >= 2) {
+    if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
+      archive->Write(luaObjectType, &command->mArgs, ownerRef);
+    }
+  }
 }
 
 /**
@@ -481,6 +972,27 @@ void CUnitCommand::RefreshBlipState()
 }
 
 /**
+ * Address: 0x006E8140 (FUN_006E8140, Moho::CUnitCommand::dtr)
+ *
+ * What it does:
+ * Executes `CUnitCommand` teardown and conditionally frees storage when
+ * `deleteFlag & 1` is set.
+ */
+CScriptObject* CUnitCommand::DestroyWithDeleteFlag(CScriptObject* const object, const std::uint8_t deleteFlag)
+{
+  auto* const command = reinterpret_cast<CUnitCommand*>(object);
+  if (!command) {
+    return object;
+  }
+
+  command->DestroyInternal();
+  if ((deleteFlag & 1u) != 0u) {
+    ::operator delete(command);
+  }
+  return object;
+}
+
+/**
  * Address: 0x006E8500 (FUN_006E8500)
  *
  * What it does:
@@ -546,6 +1058,9 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
       }
       mHasPublishedCommandEvent = false;
     }
+
+    // Empty live-unit set follows the binary delete-slot path from 0x006E8E39.
+    DestroyInternal();
     return;
   }
 
@@ -573,10 +1088,18 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
     return;
   }
 
-  // 0x006E7BD0/0x006E9360/0x006E7C50/0x006E93F0 event blob helpers remain
-  // in the unresolved event-dispatch chain; keep publish state transitions exact.
   if (!mHasPublishedCommandEvent) {
+    if (syncData) {
+      SSTICommandConstantData descriptor{};
+      CopyPublishedCommandDescriptor(descriptor, mConstDat);
+      AppendPublishedCommandDescriptor(syncData->mPublishedCommandDescriptors, descriptor);
+    }
     mHasPublishedCommandEvent = true;
+  }
+
+  if (syncData) {
+    const SSyncPublishedCommandPacket packet = BuildPublishedCommandPacket(mConstDat.cmd, mVarDat);
+    AppendPublishedCommandPacket(syncData->mPublishedCommandPackets, packet);
   }
 }
 
@@ -584,9 +1107,10 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
  * Address: 0x006E9000 (FUN_006E9000)
  *
  * What it does:
- * Links compatible commands into each other's coordinating-order vector.
+ * Adds a one-way coordinating-order link from this command to `other` when
+ * command types are compatible.
  */
-void CUnitCommand::LinkCoordinatingOrder(CUnitCommand* const other)
+void CUnitCommand::CoordinateWith(CUnitCommand* const other)
 {
   if (!other) {
     return;

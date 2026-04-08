@@ -13,6 +13,25 @@ namespace gpg::gal
     class EffectMacro
     {
     public:
+        EffectMacro() = default;
+
+        /**
+         * Address: 0x008FA9A0 (FUN_008FA9A0)
+         *
+         * What it does:
+         * Copy-constructs one effect-macro entry by assigning both key/value
+         * text lanes from source.
+         */
+        EffectMacro(const EffectMacro& other);
+
+        /**
+         * Address: 0x0093F8B0 (FUN_0093F8B0)
+         *
+         * What it does:
+         * Constructs one effect-macro entry from raw C-string key/value pairs.
+         */
+        EffectMacro(const char* keyText, const char* valueText);
+
         /**
          * Address: 0x008FAA20 (FUN_008FAA20)
          *

@@ -40,6 +40,122 @@ namespace Wm3
   ) noexcept;
 
   /**
+   * Address: 0x00A458C0 (FUN_00A458C0, Wm3::DistVector3Box3f::StaticGet)
+   *
+   * float, Wm3::Vector3<float> const&, Wm3::Box3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3f::StaticGet(Wm3::DistVector3Box3f *this, float fT, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns point-to-box distance.
+   */
+  float DistVector3Box3fStaticGet(
+    float t,
+    const Vector3<float>& vector,
+    const Box3<float>& box,
+    const Vector3<float>& vectorVelocity,
+    const Vector3<float>& boxVelocity,
+    Vector3<float>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A45A60 (FUN_00A45A60, Wm3::DistVector3Box3f::StaticGetSquared)
+   *
+   * float, Wm3::Vector3<float> const&, Wm3::Box3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3f::StaticGetSquared(Wm3::DistVector3Box3f *this, float fT, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns squared point-to-box distance.
+   */
+  float DistVector3Box3fStaticGetSquared(
+    float t,
+    const Vector3<float>& vector,
+    const Box3<float>& box,
+    const Vector3<float>& vectorVelocity,
+    const Vector3<float>& boxVelocity,
+    Vector3<float>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A460D0 (FUN_00A460D0, Wm3::DistVector3Box3d::GetSquared)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Box3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::GetSquared(Wm3::DistVector3Box3d *this);
+   *
+   * What it does:
+   * Computes squared distance from a point to an oriented double-precision box and optionally writes closest point.
+   */
+  double DistVector3Box3dGetSquared(
+    const Vector3<double>& vector, const Box3<double>& box, Vector3<double>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A45800 (FUN_00A45800, Wm3::DistVector3Box3d::Get)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Box3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::Get(Wm3::DistVector3Box3d *this);
+   *
+   * What it does:
+   * Returns distance from a point to an oriented double-precision box.
+   */
+  double DistVector3Box3dGet(
+    const Vector3<double>& vector, const Box3<double>& box, Vector3<double>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A45E90 (FUN_00A45E90, Wm3::DistVector3Box3d::StaticGet)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Box3<double> const&, Wm3::Vector3<double> const&, Wm3::Vector3<double>
+   * const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::StaticGet(Wm3::DistVector3Box3d *this, double t, Wm3::Vector3d
+   * *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns point-to-box distance.
+   */
+  double DistVector3Box3dStaticGet(
+    double t,
+    const Vector3<double>& vector,
+    const Box3<double>& box,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& boxVelocity,
+    Vector3<double>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A45FB0 (FUN_00A45FB0, Wm3::DistVector3Box3d::StaticGetSquared)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Box3<double> const&, Wm3::Vector3<double> const&, Wm3::Vector3<double>
+   * const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::StaticGetSquared(Wm3::DistVector3Box3d *this, double t, Wm3::Vector3d
+   * *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns squared point-to-box distance.
+   */
+  double DistVector3Box3dStaticGetSquared(
+    double t,
+    const Vector3<double>& vector,
+    const Box3<double>& box,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& boxVelocity,
+    Vector3<double>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
    * Address: 0x00A484F0 (FUN_00A484F0, Wm3::DistVector3Segment3f::GetSquared)
    *
    * Wm3::Vector3<float> const&, Wm3::Segment3<float> const&
@@ -112,6 +228,164 @@ namespace Wm3
     const Vector3<float>& vectorVelocity,
     const Vector3<float>& segmentVelocity,
     Vector3<float>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A48910 (FUN_00A48910, Wm3::DistVector3Segment3d::GetSquared)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::GetSquared(Wm3::DistVector3Segment3d *this);
+   *
+   * What it does:
+   * Computes squared distance from a point to a segment and optionally writes closest point on segment.
+   */
+  double DistVector3Segment3dGetSquared(
+    const Vector3<double>& vector, const Segment3<double>& segment, Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A48100 (FUN_00A48100, Wm3::DistVector3Segment3d::Get)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::Get(Wm3::DistVector3Segment3d *this);
+   *
+   * What it does:
+   * Returns distance from a point to a segment.
+   */
+  double DistVector3Segment3dGet(
+    const Vector3<double>& vector, const Segment3<double>& segment, Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A486B0 (FUN_00A486B0, Wm3::DistVector3Segment3d::StaticGet)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::StaticGet(Wm3::DistVector3Segment3d *this, double t, Wm3::Vector3d
+   * *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/segment forward by time `t` using the provided velocities, then returns point-to-segment distance.
+   */
+  double DistVector3Segment3dStaticGet(
+    double t,
+    const Vector3<double>& vector,
+    const Segment3<double>& segment,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A487E0 (FUN_00A487E0, Wm3::DistVector3Segment3d::StaticGetSquared)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::StaticGetSquared(Wm3::DistVector3Segment3d *this, double t,
+   * Wm3::Vector3d *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/segment forward by time `t` using the provided velocities, then returns squared point-to-segment
+   * distance.
+   */
+  double DistVector3Segment3dStaticGetSquared(
+    double t,
+    const Vector3<double>& vector,
+    const Segment3<double>& segment,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A81330 (FUN_00A81330, Wm3::DistLine3Segment3d::GetSquared)
+   *
+   * Wm3::Line3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * long double __thiscall Wm3::DistLine3Segment3d::GetSquared(Wm3::DistLine3Segment3d *this);
+   *
+   * What it does:
+   * Computes squared distance between an infinite line and a bounded segment,
+   * and optionally emits closest points on both primitives.
+   */
+  double DistLine3Segment3dGetSquared(
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    Vector3<double>* closestPointOnLine = nullptr,
+    Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A809C0 (FUN_00A809C0, Wm3::DistLine3Segment3d::Get)
+   *
+   * Wm3::Line3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistLine3Segment3d::Get(Wm3::DistLine3Segment3d *this);
+   *
+   * What it does:
+   * Returns distance between an infinite line and a bounded segment.
+   */
+  double DistLine3Segment3dGet(
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    Vector3<double>* closestPointOnLine = nullptr,
+    Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A810B0 (FUN_00A810B0, Wm3::DistLine3Segment3d::StaticGet)
+   *
+   * double, Wm3::Line3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistLine3Segment3d::StaticGet(Wm3::DistLine3Segment3d *this, double t,
+   * Wm3::Vector3d *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves line and segment origins by time `t` and returns line-to-segment distance.
+   */
+  double DistLine3Segment3dStaticGet(
+    double t,
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    const Vector3<double>& lineVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* closestPointOnLine = nullptr,
+    Vector3<double>* closestPointOnSegment = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A811F0 (FUN_00A811F0, Wm3::DistLine3Segment3d::StaticGetSquared)
+   *
+   * double, Wm3::Line3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistLine3Segment3d::StaticGetSquared(Wm3::DistLine3Segment3d *this, double t,
+   * Wm3::Vector3d *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves line and segment origins by time `t` and returns squared line-to-segment distance.
+   */
+  double DistLine3Segment3dStaticGetSquared(
+    double t,
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    const Vector3<double>& lineVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* closestPointOnLine = nullptr,
+    Vector3<double>* closestPointOnSegment = nullptr
   ) noexcept;
 
   /**

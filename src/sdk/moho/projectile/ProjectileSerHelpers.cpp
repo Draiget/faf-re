@@ -221,6 +221,8 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069EC80 (FUN_0069EC80, gpg::SerSaveLoadHelper_Projectile::Init)
+   *
    * What it does:
    * Binds load/save callbacks into reflected RTTI for `Projectile`.
    */
@@ -232,8 +234,8 @@ namespace moho
       Projectile::sType = type;
     }
 
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
     type->serSaveFunc_ = mSerialize;
   }

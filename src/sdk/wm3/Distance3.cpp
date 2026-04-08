@@ -730,6 +730,196 @@ namespace Wm3
   }
 
   /**
+   * Address: 0x00A458C0 (FUN_00A458C0, Wm3::DistVector3Box3f::StaticGet)
+   *
+   * float, Wm3::Vector3<float> const&, Wm3::Box3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3f::StaticGet(Wm3::DistVector3Box3f *this, float fT, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns point-to-box distance.
+   */
+  float DistVector3Box3fStaticGet(
+    const float t,
+    const Vector3<float>& vector,
+    const Box3<float>& box,
+    const Vector3<float>& vectorVelocity,
+    const Vector3<float>& boxVelocity,
+    Vector3<float>* const closestPointOnBox
+  ) noexcept
+  {
+    const Vector3<float> movedVector = Vector3<float>::Add(vector, Vector3<float>::Scale(vectorVelocity, t));
+
+    Box3<float> movedBox = box;
+    movedBox.Center[0] = box.Center[0] + boxVelocity.x * t;
+    movedBox.Center[1] = box.Center[1] + boxVelocity.y * t;
+    movedBox.Center[2] = box.Center[2] + boxVelocity.z * t;
+
+    return DistVector3Box3fGet(movedVector, movedBox, closestPointOnBox);
+  }
+
+  /**
+   * Address: 0x00A45A60 (FUN_00A45A60, Wm3::DistVector3Box3f::StaticGetSquared)
+   *
+   * float, Wm3::Vector3<float> const&, Wm3::Box3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3f::StaticGetSquared(Wm3::DistVector3Box3f *this, float fT, Wm3::Vector3f
+   * *rkVelocity0, Wm3::Vector3f *rkVelocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns squared point-to-box distance.
+   */
+  float DistVector3Box3fStaticGetSquared(
+    const float t,
+    const Vector3<float>& vector,
+    const Box3<float>& box,
+    const Vector3<float>& vectorVelocity,
+    const Vector3<float>& boxVelocity,
+    Vector3<float>* const closestPointOnBox
+  ) noexcept
+  {
+    const Vector3<float> movedVector = Vector3<float>::Add(vector, Vector3<float>::Scale(vectorVelocity, t));
+
+    Box3<float> movedBox = box;
+    movedBox.Center[0] = box.Center[0] + boxVelocity.x * t;
+    movedBox.Center[1] = box.Center[1] + boxVelocity.y * t;
+    movedBox.Center[2] = box.Center[2] + boxVelocity.z * t;
+
+    return DistVector3Box3fGetSquared(movedVector, movedBox, closestPointOnBox);
+  }
+
+  /**
+   * Address: 0x00A460D0 (FUN_00A460D0, Wm3::DistVector3Box3d::GetSquared)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Box3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::GetSquared(Wm3::DistVector3Box3d *this);
+   *
+   * What it does:
+   * Computes squared distance from a point to an oriented box and optionally writes the closest point.
+   */
+  double DistVector3Box3dGetSquared(
+    const Vector3<double>& vector, const Box3<double>& box, Vector3<double>* const closestPointOnBox
+  ) noexcept
+  {
+    const Vector3<double> center{box.Center[0], box.Center[1], box.Center[2]};
+    const Vector3<double> diff = Vector3<double>::Sub(vector, center);
+
+    Vector3<double> closest = center;
+    double squaredDistance = 0.0;
+
+    for (int i = 0; i < 3; ++i) {
+      const Vector3<double> axis{box.Axis[i][0], box.Axis[i][1], box.Axis[i][2]};
+      const double projected = Vector3<double>::Dot(diff, axis);
+
+      double clamped = projected;
+      if (projected < -box.Extent[i]) {
+        const double delta = projected + box.Extent[i];
+        squaredDistance += delta * delta;
+        clamped = -box.Extent[i];
+      } else if (projected > box.Extent[i]) {
+        const double delta = projected - box.Extent[i];
+        squaredDistance += delta * delta;
+        clamped = box.Extent[i];
+      }
+
+      closest = Vector3<double>::Add(closest, Vector3<double>::Scale(axis, clamped));
+    }
+
+    if (closestPointOnBox) {
+      *closestPointOnBox = closest;
+    }
+    return squaredDistance;
+  }
+
+  /**
+   * Address: 0x00A45800 (FUN_00A45800, Wm3::DistVector3Box3d::Get)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Box3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::Get(Wm3::DistVector3Box3d *this);
+   *
+   * What it does:
+   * Returns distance from a point to an oriented box.
+   */
+  double DistVector3Box3dGet(
+    const Vector3<double>& vector, const Box3<double>& box, Vector3<double>* const closestPointOnBox
+  ) noexcept
+  {
+    using std::sqrt;
+    return sqrt(DistVector3Box3dGetSquared(vector, box, closestPointOnBox));
+  }
+
+  /**
+   * Address: 0x00A45E90 (FUN_00A45E90, Wm3::DistVector3Box3d::StaticGet)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Box3<double> const&, Wm3::Vector3<double> const&, Wm3::Vector3<double>
+   * const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::StaticGet(Wm3::DistVector3Box3d *this, double t, Wm3::Vector3d
+   * *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns point-to-box distance.
+   */
+  double DistVector3Box3dStaticGet(
+    const double t,
+    const Vector3<double>& vector,
+    const Box3<double>& box,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& boxVelocity,
+    Vector3<double>* const closestPointOnBox
+  ) noexcept
+  {
+    const Vector3<double> movedVector = Vector3<double>::Add(vector, Vector3<double>::Scale(vectorVelocity, t));
+
+    Box3<double> movedBox = box;
+    movedBox.Center[0] = box.Center[0] + boxVelocity.x * t;
+    movedBox.Center[1] = box.Center[1] + boxVelocity.y * t;
+    movedBox.Center[2] = box.Center[2] + boxVelocity.z * t;
+
+    return DistVector3Box3dGet(movedVector, movedBox, closestPointOnBox);
+  }
+
+  /**
+   * Address: 0x00A45FB0 (FUN_00A45FB0, Wm3::DistVector3Box3d::StaticGetSquared)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Box3<double> const&, Wm3::Vector3<double> const&, Wm3::Vector3<double>
+   * const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Box3d::StaticGetSquared(Wm3::DistVector3Box3d *this, double t, Wm3::Vector3d
+   * *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` using the provided velocities, then returns squared point-to-box distance.
+   */
+  double DistVector3Box3dStaticGetSquared(
+    const double t,
+    const Vector3<double>& vector,
+    const Box3<double>& box,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& boxVelocity,
+    Vector3<double>* const closestPointOnBox
+  ) noexcept
+  {
+    const Vector3<double> movedVector = Vector3<double>::Add(vector, Vector3<double>::Scale(vectorVelocity, t));
+
+    Box3<double> movedBox = box;
+    movedBox.Center[0] = box.Center[0] + boxVelocity.x * t;
+    movedBox.Center[1] = box.Center[1] + boxVelocity.y * t;
+    movedBox.Center[2] = box.Center[2] + boxVelocity.z * t;
+
+    return DistVector3Box3dGetSquared(movedVector, movedBox, closestPointOnBox);
+  }
+
+  /**
    * Address: 0x00A484F0 (FUN_00A484F0, Wm3::DistVector3Segment3f::GetSquared)
    *
    * Wm3::Vector3<float> const&, Wm3::Segment3<float> const&
@@ -839,6 +1029,275 @@ namespace Wm3
     movedSegment.Origin = Vector3<float>::Add(segment.Origin, Vector3<float>::Scale(segmentVelocity, t));
 
     return DistVector3Segment3fGetSquared(movedVector, movedSegment, closestPointOnSegment);
+  }
+
+  /**
+   * Address: 0x00A48910 (FUN_00A48910, Wm3::DistVector3Segment3d::GetSquared)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::GetSquared(Wm3::DistVector3Segment3d *this);
+   *
+   * What it does:
+   * Computes squared distance from a point to a segment and writes the closest point.
+   */
+  double DistVector3Segment3dGetSquared(
+    const Vector3<double>& vector, const Segment3<double>& segment, Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    const Vector3<double> diff = Vector3<double>::Sub(vector, segment.Origin);
+    double t = Vector3<double>::Dot(segment.Direction, diff);
+
+    if (t < -segment.Extent) {
+      t = -segment.Extent;
+    } else if (t > segment.Extent) {
+      t = segment.Extent;
+    }
+
+    const Vector3<double> closest = Vector3<double>::Add(segment.Origin, Vector3<double>::Scale(segment.Direction, t));
+    const Vector3<double> delta = Vector3<double>::Sub(closest, vector);
+
+    if (closestPointOnSegment) {
+      *closestPointOnSegment = closest;
+    }
+    return Vector3<double>::Dot(delta, delta);
+  }
+
+  /**
+   * Address: 0x00A48100 (FUN_00A48100, Wm3::DistVector3Segment3d::Get)
+   *
+   * Wm3::Vector3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::Get(Wm3::DistVector3Segment3d *this);
+   *
+   * What it does:
+   * Returns distance from a point to a segment.
+   */
+  double DistVector3Segment3dGet(
+    const Vector3<double>& vector, const Segment3<double>& segment, Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    using std::sqrt;
+    return sqrt(DistVector3Segment3dGetSquared(vector, segment, closestPointOnSegment));
+  }
+
+  /**
+   * Address: 0x00A486B0 (FUN_00A486B0, Wm3::DistVector3Segment3d::StaticGet)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::StaticGet(Wm3::DistVector3Segment3d *this, double t, Wm3::Vector3d
+   * *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/segment forward by time `t` using the provided velocities, then returns point-to-segment distance.
+   */
+  double DistVector3Segment3dStaticGet(
+    const double t,
+    const Vector3<double>& vector,
+    const Segment3<double>& segment,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    const Vector3<double> movedVector = Vector3<double>::Add(vector, Vector3<double>::Scale(vectorVelocity, t));
+
+    Segment3<double> movedSegment = segment;
+    movedSegment.Origin = Vector3<double>::Add(segment.Origin, Vector3<double>::Scale(segmentVelocity, t));
+
+    return DistVector3Segment3dGet(movedVector, movedSegment, closestPointOnSegment);
+  }
+
+  /**
+   * Address: 0x00A487E0 (FUN_00A487E0, Wm3::DistVector3Segment3d::StaticGetSquared)
+   *
+   * double, Wm3::Vector3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector3Segment3d::StaticGetSquared(Wm3::DistVector3Segment3d *this, double t,
+   * Wm3::Vector3d *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves point/segment forward by time `t` using the provided velocities, then returns squared point-to-segment
+   * distance.
+   */
+  double DistVector3Segment3dStaticGetSquared(
+    const double t,
+    const Vector3<double>& vector,
+    const Segment3<double>& segment,
+    const Vector3<double>& vectorVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    const Vector3<double> movedVector = Vector3<double>::Add(vector, Vector3<double>::Scale(vectorVelocity, t));
+
+    Segment3<double> movedSegment = segment;
+    movedSegment.Origin = Vector3<double>::Add(segment.Origin, Vector3<double>::Scale(segmentVelocity, t));
+
+    return DistVector3Segment3dGetSquared(movedVector, movedSegment, closestPointOnSegment);
+  }
+
+  /**
+   * Address: 0x00A81330 (FUN_00A81330, Wm3::DistLine3Segment3d::GetSquared)
+   *
+   * Wm3::Line3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * long double __thiscall Wm3::DistLine3Segment3d::GetSquared(Wm3::DistLine3Segment3d *this);
+   *
+   * What it does:
+   * Computes squared distance between an infinite line and a bounded segment,
+   * and writes closest points on both primitives.
+   */
+  double DistLine3Segment3dGetSquared(
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    Vector3<double>* const closestPointOnLine,
+    Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    const Vector3<double> diff = Vector3<double>::Sub(line.Origin, segment.Origin);
+    const double a01 = -Vector3<double>::Dot(line.Direction, segment.Direction);
+    const double b0 = Vector3<double>::Dot(diff, line.Direction);
+    const double c = Vector3<double>::Dot(diff, diff);
+    const double det = std::fabs(1.0 - a01 * a01);
+
+    double lineParam = 0.0;
+    double segmentParam = 0.0;
+    double sqrDist = 0.0;
+
+    if (det < 0.00000001) {
+      lineParam = -b0;
+      segmentParam = 0.0;
+      sqrDist = b0 * lineParam + c;
+    } else {
+      const double b1 = -Vector3<double>::Dot(diff, segment.Direction);
+      const double segmentNumerator = a01 * b0 - b1;
+      const double extDet = segment.Extent * det;
+
+      if (segmentNumerator < -extDet) {
+        segmentParam = -segment.Extent;
+        lineParam = -(a01 * segmentParam + b0);
+        sqrDist = -lineParam * lineParam + segmentParam * (segmentParam + 2.0 * b1) + c;
+      } else if (segmentNumerator > extDet) {
+        segmentParam = segment.Extent;
+        lineParam = -(a01 * segmentParam + b0);
+        sqrDist = -lineParam * lineParam + segmentParam * (segmentParam + 2.0 * b1) + c;
+      } else {
+        const double invDet = 1.0 / det;
+        lineParam = (a01 * b1 - b0) * invDet;
+        segmentParam = segmentNumerator * invDet;
+        sqrDist = lineParam * (lineParam + a01 * segmentParam + 2.0 * b0) +
+          segmentParam * (a01 * lineParam + segmentParam + 2.0 * b1) + c;
+      }
+    }
+
+    const Vector3<double> closestLinePoint =
+      Vector3<double>::Add(line.Origin, Vector3<double>::Scale(line.Direction, lineParam));
+    const Vector3<double> closestSegmentPoint =
+      Vector3<double>::Add(segment.Origin, Vector3<double>::Scale(segment.Direction, segmentParam));
+
+    if (closestPointOnLine) {
+      *closestPointOnLine = closestLinePoint;
+    }
+    if (closestPointOnSegment) {
+      *closestPointOnSegment = closestSegmentPoint;
+    }
+
+    return std::fabs(sqrDist);
+  }
+
+  /**
+   * Address: 0x00A809C0 (FUN_00A809C0, Wm3::DistLine3Segment3d::Get)
+   *
+   * Wm3::Line3<double> const&, Wm3::Segment3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistLine3Segment3d::Get(Wm3::DistLine3Segment3d *this);
+   *
+   * What it does:
+   * Returns distance between an infinite line and a bounded segment.
+   */
+  double DistLine3Segment3dGet(
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    Vector3<double>* const closestPointOnLine,
+    Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    using std::sqrt;
+    return sqrt(DistLine3Segment3dGetSquared(line, segment, closestPointOnLine, closestPointOnSegment));
+  }
+
+  /**
+   * Address: 0x00A810B0 (FUN_00A810B0, Wm3::DistLine3Segment3d::StaticGet)
+   *
+   * double, Wm3::Line3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistLine3Segment3d::StaticGet(Wm3::DistLine3Segment3d *this, double t,
+   * Wm3::Vector3d *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves line and segment origins by time `t` and returns line-to-segment distance.
+   */
+  double DistLine3Segment3dStaticGet(
+    const double t,
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    const Vector3<double>& lineVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* const closestPointOnLine,
+    Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    Line3<double> movedLine = line;
+    movedLine.Origin = Vector3<double>::Add(line.Origin, Vector3<double>::Scale(lineVelocity, t));
+
+    Segment3<double> movedSegment = segment;
+    movedSegment.Origin = Vector3<double>::Add(segment.Origin, Vector3<double>::Scale(segmentVelocity, t));
+
+    return DistLine3Segment3dGet(movedLine, movedSegment, closestPointOnLine, closestPointOnSegment);
+  }
+
+  /**
+   * Address: 0x00A811F0 (FUN_00A811F0, Wm3::DistLine3Segment3d::StaticGetSquared)
+   *
+   * double, Wm3::Line3<double> const&, Wm3::Segment3<double> const&, Wm3::Vector3<double> const&,
+   * Wm3::Vector3<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistLine3Segment3d::StaticGetSquared(Wm3::DistLine3Segment3d *this, double t,
+   * Wm3::Vector3d *velocity0, Wm3::Vector3d *velocity1);
+   *
+   * What it does:
+   * Moves line and segment origins by time `t` and returns squared line-to-segment distance.
+   */
+  double DistLine3Segment3dStaticGetSquared(
+    const double t,
+    const Line3<double>& line,
+    const Segment3<double>& segment,
+    const Vector3<double>& lineVelocity,
+    const Vector3<double>& segmentVelocity,
+    Vector3<double>* const closestPointOnLine,
+    Vector3<double>* const closestPointOnSegment
+  ) noexcept
+  {
+    Line3<double> movedLine = line;
+    movedLine.Origin = Vector3<double>::Add(line.Origin, Vector3<double>::Scale(lineVelocity, t));
+
+    Segment3<double> movedSegment = segment;
+    movedSegment.Origin = Vector3<double>::Add(segment.Origin, Vector3<double>::Scale(segmentVelocity, t));
+
+    return DistLine3Segment3dGetSquared(movedLine, movedSegment, closestPointOnLine, closestPointOnSegment);
   }
 
   /**

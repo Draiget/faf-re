@@ -33,6 +33,16 @@ namespace moho
    */
   class Projectile : public Entity
   {
+  private:
+    /**
+     * Address: 0x0069AC30 (FUN_0069AC30, Moho::Projectile::Projectile)
+     *
+     * What it does:
+     * Constructs one archive-owned projectile shell from simulation owner
+     * context and writes default runtime lanes.
+     */
+    explicit Projectile(Sim* sim);
+
   public:
     inline static gpg::RType* sType = nullptr;
 
@@ -73,7 +83,8 @@ namespace moho
   public:
     std::uint8_t mUnknown0270[0x1C];   // +0x270
     Wm3::Vector3f mLocalAngularVelocity; // +0x28C
-    std::uint8_t mUnknown0298[0x30];   // +0x298
+    Wm3::Vector3f mScaleVelocity;      // +0x298
+    std::uint8_t mUnknown02A4[0x24];   // +0x2A4
     float mDamage;                   // +0x2C8
     float mDamageRadius;             // +0x2CC
     msvc8::string mDamageTypeName;   // +0x2D0
@@ -82,6 +93,7 @@ namespace moho
   };
 
   static_assert(offsetof(Projectile, mLocalAngularVelocity) == 0x28C, "Projectile::mLocalAngularVelocity offset must be 0x28C");
+  static_assert(offsetof(Projectile, mScaleVelocity) == 0x298, "Projectile::mScaleVelocity offset must be 0x298");
   static_assert(offsetof(Projectile, mDamage) == 0x2C8, "Projectile::mDamage offset must be 0x2C8");
   static_assert(offsetof(Projectile, mDamageRadius) == 0x2CC, "Projectile::mDamageRadius offset must be 0x2CC");
   static_assert(offsetof(Projectile, mDamageTypeName) == 0x2D0, "Projectile::mDamageTypeName offset must be 0x2D0");

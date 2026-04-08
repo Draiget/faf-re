@@ -1,5 +1,3 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
 #include <cstddef>
@@ -38,20 +36,45 @@ namespace moho
        * Mangled: ??0struct1@VisionDB@Moho@@QAE@@Z
        *
        * What it does:
-       * Stores owner/tree links, two flag bytes, and two 3-float bounds vectors.
+       * Stores owner/tree links, visibility flags, and previous/current 2D circles.
        */
+      struct EntryCircle
+      {
+        float x{0.0f};      // +0x00
+        float y{0.0f};      // +0x04
+        float radius{0.0f}; // +0x08
+      };
+      MOHO_VISIONDB_X86_ASSERT(sizeof(EntryCircle) == 0x0C, "VisionDB::Pool::EntryCircle size must be 0x0C");
+
       struct PooledNode
       {
-        void* ownerOrChain{nullptr};      // +0x00
-        PooledNode* firstChild{nullptr};  // +0x04
-        PooledNode* nextSibling{nullptr}; // +0x08
-        std::uint8_t typeFlag{0};         // +0x0C
-        std::uint8_t markFlag{0};         // +0x0D
-        std::uint16_t pad0E{0};           // +0x0E
-        float minBounds[3]{};             // +0x10
-        float maxBounds[3]{};             // +0x1C
+        void* mParent{nullptr};      // +0x00
+        PooledNode* mContained{nullptr}; // +0x04
+        PooledNode* mNext{nullptr};      // +0x08
+        std::uint8_t mIsReal{0};         // +0x0C
+        std::uint8_t mVis{0};            // +0x0D
+        std::uint16_t mPad0E{0};         // +0x0E
+        EntryCircle mPrevCircle{};       // +0x10
+        EntryCircle mCurCircle{};        // +0x1C
       };
       MOHO_VISIONDB_X86_ASSERT(sizeof(PooledNode) == 0x28, "VisionDB::Pool::PooledNode size must be 0x28");
+      MOHO_VISIONDB_X86_ASSERT(offsetof(PooledNode, mParent) == 0x00, "VisionDB::Pool::PooledNode::mParent offset must be 0x00");
+      MOHO_VISIONDB_X86_ASSERT(
+        offsetof(PooledNode, mContained) == 0x04, "VisionDB::Pool::PooledNode::mContained offset must be 0x04"
+      );
+      MOHO_VISIONDB_X86_ASSERT(offsetof(PooledNode, mNext) == 0x08, "VisionDB::Pool::PooledNode::mNext offset must be 0x08");
+      MOHO_VISIONDB_X86_ASSERT(
+        offsetof(PooledNode, mIsReal) == 0x0C, "VisionDB::Pool::PooledNode::mIsReal offset must be 0x0C"
+      );
+      MOHO_VISIONDB_X86_ASSERT(offsetof(PooledNode, mVis) == 0x0D, "VisionDB::Pool::PooledNode::mVis offset must be 0x0D");
+      MOHO_VISIONDB_X86_ASSERT(
+        offsetof(PooledNode, mPrevCircle) == 0x10, "VisionDB::Pool::PooledNode::mPrevCircle offset must be 0x10"
+      );
+      MOHO_VISIONDB_X86_ASSERT(
+        offsetof(PooledNode, mCurCircle) == 0x1C, "VisionDB::Pool::PooledNode::mCurCircle offset must be 0x1C"
+      );
+
+      using Entry = PooledNode;
 
       /**
        * Circular-list node that points to a pooled-node block base.
@@ -101,20 +124,37 @@ namespace moho
        */
       void Clear();
 
+      /**
+       * Address: 0x0081AA00 (FUN_0081AA00)
+       *
+       * What it does:
+       * Obtains one entry from the reusable pool, allocating and seeding a 500-entry
+       * block when the free-list is empty.
+       */
+      [[nodiscard]] Entry* NewEntry(const EntryCircle& previousCircle, const EntryCircle& currentCircle, bool isReal);
+
     private:
       static void FreeZoneBlocks(ZoneBlockEntry* head);
 
-    private:
+    public:
       friend class Handle;
 
-      std::uint32_t zoneListState_;             // +0x04 (list bookkeeping, semantics unresolved)
-      ZoneBlockEntry* zoneBlocksHead_{nullptr}; // +0x08
-      std::uint32_t zoneBlockCount_{0};         // +0x0C
-      std::uint32_t freeListState_;             // +0x10 (list bookkeeping, semantics unresolved)
-      FreeNodeEntry* freeNodeHead_{nullptr};    // +0x14
-      std::uint32_t freeNodeCount_{0};          // +0x18
+      std::uint32_t mEntriesListState{0};       // +0x04 (legacy std::list proxy lane)
+      ZoneBlockEntry* mEntriesHead{nullptr};    // +0x08
+      std::uint32_t mEntriesSize{0};            // +0x0C
+      std::uint32_t mEntryPoolListState{0};     // +0x10 (legacy std::list proxy lane)
+      FreeNodeEntry* mEntryPoolHead{nullptr};   // +0x14
+      std::uint32_t mEntryPoolSize{0};          // +0x18
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Pool) == 0x1C, "VisionDB::Pool size must be 0x1C");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mEntriesHead) == 0x08, "VisionDB::Pool::mEntriesHead offset must be 0x08");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mEntriesSize) == 0x0C, "VisionDB::Pool::mEntriesSize offset must be 0x0C");
+    MOHO_VISIONDB_X86_ASSERT(
+      offsetof(Pool, mEntryPoolHead) == 0x14, "VisionDB::Pool::mEntryPoolHead offset must be 0x14"
+    );
+    MOHO_VISIONDB_X86_ASSERT(
+      offsetof(Pool, mEntryPoolSize) == 0x18, "VisionDB::Pool::mEntryPoolSize offset must be 0x18"
+    );
 
     /**
      * VFTABLE: 0x00E422BC
@@ -145,8 +185,8 @@ namespace moho
     private:
       struct OwnerChainView
       {
-        void* ownerCookie;          // +0x00
-        Pool::PooledNode* rootNode; // +0x04
+        void* mOwnerCookie;     // +0x00
+        Pool::PooledNode* mRoot; // +0x04
       };
       MOHO_VISIONDB_X86_ASSERT(sizeof(OwnerChainView) == 0x08, "VisionDB::Handle::OwnerChainView size must be 0x08");
 
@@ -175,11 +215,13 @@ namespace moho
        */
       static void ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* node);
 
-    private:
-      std::uintptr_t ownerPtr_{0};      // +0x04
-      std::uintptr_t pooledNodePtr_{0}; // +0x08
+    public:
+      std::uintptr_t mDB{0};   // +0x04
+      std::uintptr_t mNode{0}; // +0x08
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Handle) == 0x0C, "VisionDB::Handle size must be 0x0C");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mDB) == 0x04, "VisionDB::Handle::mDB offset must be 0x04");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mNode) == 0x08, "VisionDB::Handle::mNode offset must be 0x08");
 
     VisionDB();
 

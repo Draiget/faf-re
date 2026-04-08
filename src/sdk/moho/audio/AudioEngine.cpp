@@ -5,11 +5,18 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <limits>
+#include <string>
+#include <vector>
+#include <windows.h>
 
 #include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
+#include "moho/audio/XAudioError.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/camera/VTransform.h"
@@ -19,12 +26,57 @@ moho::SoundConfiguration* moho::sSoundConfiguration = nullptr;
 namespace moho
 {
   const char* func_SoundErrorCodeToMsg(int errorCode);
+  int register_SoundConfigurationCleanupAtExit();
+}
+
+namespace
+{
+  /**
+   * Address: 0x00BF0DB0 (FUN_00BF0DB0, sub_BF0DB0)
+   *
+   * What it does:
+   * Deletes the process-global sound-configuration singleton when present.
+   */
+  void cleanup_SoundConfigurationSingleton()
+  {
+    if (moho::sSoundConfiguration == nullptr) {
+      return;
+    }
+
+    delete moho::sSoundConfiguration;
+    moho::sSoundConfiguration = nullptr;
+  }
+}
+
+/**
+ * Address: 0x00BC67C0 (FUN_00BC67C0, sub_BC67C0)
+ *
+ * What it does:
+ * Registers process-exit cleanup for the global sound configuration singleton.
+ */
+int moho::register_SoundConfigurationCleanupAtExit()
+{
+  return std::atexit(&cleanup_SoundConfigurationSingleton);
+}
+
+namespace
+{
+  struct AudioStartupCleanupRegistrations
+  {
+    AudioStartupCleanupRegistrations()
+    {
+      (void)moho::register_SoundConfigurationCleanupAtExit();
+    }
+  };
+
+  [[maybe_unused]] AudioStartupCleanupRegistrations gAudioStartupCleanupRegistrations;
 }
 
 namespace
 {
   constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
   constexpr std::uint16_t kInvalidCategoryId = 0xFFFFu;
+  constexpr std::uint16_t kInvalidVariableId = 0xFFFFu;
   constexpr float kDefaultCategoryVolume = 1.0f;
   constexpr const char* kGlobalCategoryName = "Global";
   bool gSuppressXact3dApplyFailureWarning = true;
@@ -67,16 +119,22 @@ namespace
   };
   static_assert(sizeof(AudioCategoryVolumeNode) == 0x18, "AudioCategoryVolumeNode size must be 0x18");
 
-  struct AudioMap1HeadNode
+  struct AudioMap1CategoryNode
   {
-    AudioMap1HeadNode* mLeft;   // +0x00
-    AudioMap1HeadNode* mParent; // +0x04
-    AudioMap1HeadNode* mRight;  // +0x08
-    std::uint8_t mReserved0C[0x1D];
-    std::uint8_t mIsNil; // +0x29
-    std::uint8_t mPad2A[2];
+    AudioMap1CategoryNode* mLeft;   // +0x00
+    AudioMap1CategoryNode* mParent; // +0x04
+    AudioMap1CategoryNode* mRight;  // +0x08
+    msvc8::string mCategoryName;    // +0x0C
+    std::uint8_t mColor;            // +0x28
+    std::uint8_t mIsNil;            // +0x29
+    std::uint8_t mPad2A[2];         // +0x2A
   };
-  static_assert(sizeof(AudioMap1HeadNode) == 0x2C, "AudioMap1HeadNode size must be 0x2C");
+  static_assert(sizeof(AudioMap1CategoryNode) == 0x2C, "AudioMap1CategoryNode size must be 0x2C");
+  static_assert(
+    offsetof(AudioMap1CategoryNode, mCategoryName) == 0x0C, "AudioMap1CategoryNode::mCategoryName offset must be 0x0C"
+  );
+  static_assert(offsetof(AudioMap1CategoryNode, mColor) == 0x28, "AudioMap1CategoryNode::mColor offset must be 0x28");
+  static_assert(offsetof(AudioMap1CategoryNode, mIsNil) == 0x29, "AudioMap1CategoryNode::mIsNil offset must be 0x29");
 
   [[nodiscard]] bool IsCategoryArgValid(const gpg::StrArg category)
   {
@@ -285,20 +343,204 @@ namespace
     return true;
   }
 
+  [[nodiscard]] AudioMap1CategoryNode* AsMap1Head(const moho::AudioMapStorage& map)
+  {
+    return static_cast<AudioMap1CategoryNode*>(map.mHead);
+  }
+
+  [[nodiscard]] AudioMap1CategoryNode*
+  FindMap1CategoryNode(const moho::AudioMapStorage& map, const char* const categoryName)
+  {
+    const AudioMap1CategoryNode* const head = AsMap1Head(map);
+    if (head == nullptr || categoryName == nullptr) {
+      return nullptr;
+    }
+
+    AudioMap1CategoryNode* node = head->mParent;
+    while (node != nullptr && node != head && node->mIsNil == 0u) {
+      const int compare = std::strcmp(categoryName, node->mCategoryName.c_str());
+      if (compare < 0) {
+        node = node->mLeft;
+      } else if (compare > 0) {
+        node = node->mRight;
+      } else {
+        return node;
+      }
+    }
+
+    return nullptr;
+  }
+
+  void DestroyMap1Subtree(AudioMap1CategoryNode* node, const AudioMap1CategoryNode* const head)
+  {
+    if (node == nullptr || node == head || node->mIsNil != 0u) {
+      return;
+    }
+
+    DestroyMap1Subtree(node->mLeft, head);
+    DestroyMap1Subtree(node->mRight, head);
+    node->mCategoryName.tidy(true);
+    delete node;
+  }
+
+  void RefreshMap1Bounds(AudioMap1CategoryNode* const head)
+  {
+    if (head == nullptr) {
+      return;
+    }
+
+    AudioMap1CategoryNode* root = head->mParent;
+    if (root == nullptr || root == head || root->mIsNil != 0u) {
+      head->mParent = head;
+      head->mLeft = head;
+      head->mRight = head;
+      return;
+    }
+
+    AudioMap1CategoryNode* leftMost = root;
+    while (leftMost->mLeft != nullptr && leftMost->mLeft != head && leftMost->mLeft->mIsNil == 0u) {
+      leftMost = leftMost->mLeft;
+    }
+
+    AudioMap1CategoryNode* rightMost = root;
+    while (rightMost->mRight != nullptr && rightMost->mRight != head && rightMost->mRight->mIsNil == 0u) {
+      rightMost = rightMost->mRight;
+    }
+
+    head->mLeft = leftMost;
+    head->mRight = rightMost;
+  }
+
   void InitMap1Head(moho::AudioMapStorage& map)
   {
     map.mAllocatorCookie = nullptr;
     map.mSize = 0;
 
-    auto* const head = new AudioMap1HeadNode{};
+    auto* const head = new AudioMap1CategoryNode{};
     head->mLeft = head;
     head->mParent = head;
     head->mRight = head;
-    std::memset(head->mReserved0C, 0, sizeof(head->mReserved0C));
+    head->mCategoryName.clear();
+    head->mColor = 1;
     head->mIsNil = 1;
     head->mPad2A[0] = 0;
     head->mPad2A[1] = 0;
     map.mHead = head;
+  }
+
+  void ResetMap1(moho::AudioMapStorage& map)
+  {
+    AudioMap1CategoryNode* const head = AsMap1Head(map);
+    if (head == nullptr) {
+      map.mSize = 0;
+      return;
+    }
+
+    DestroyMap1Subtree(head->mParent, head);
+    head->mCategoryName.tidy(true);
+    delete head;
+    map.mHead = nullptr;
+    map.mSize = 0;
+  }
+
+  [[nodiscard]] bool InsertPausedCategoryName(moho::AudioMapStorage& map, const char* const categoryName)
+  {
+    if (categoryName == nullptr || *categoryName == '\0') {
+      return false;
+    }
+
+    AudioMap1CategoryNode* head = AsMap1Head(map);
+    if (head == nullptr) {
+      InitMap1Head(map);
+      head = AsMap1Head(map);
+    }
+
+    AudioMap1CategoryNode* parent = head;
+    AudioMap1CategoryNode* node = head->mParent;
+    bool goLeft = true;
+
+    while (node != nullptr && node != head && node->mIsNil == 0u) {
+      parent = node;
+
+      const int compare = std::strcmp(categoryName, node->mCategoryName.c_str());
+      if (compare < 0) {
+        goLeft = true;
+        node = node->mLeft;
+      } else if (compare > 0) {
+        goLeft = false;
+        node = node->mRight;
+      } else {
+        return false;
+      }
+    }
+
+    auto* const inserted = new AudioMap1CategoryNode{};
+    inserted->mLeft = head;
+    inserted->mRight = head;
+    inserted->mParent = (parent == head) ? head : parent;
+    inserted->mCategoryName.assign_owned(categoryName);
+    inserted->mColor = 0;
+    inserted->mIsNil = 0;
+    inserted->mPad2A[0] = 0;
+    inserted->mPad2A[1] = 0;
+
+    if (parent == head) {
+      head->mParent = inserted;
+    } else if (goLeft) {
+      parent->mLeft = inserted;
+    } else {
+      parent->mRight = inserted;
+    }
+
+    ++map.mSize;
+    RefreshMap1Bounds(head);
+    return true;
+  }
+
+  void CollectRetainedPausedCategoryNames(
+    const AudioMap1CategoryNode* node,
+    const AudioMap1CategoryNode* const head,
+    const char* const categoryToRemove,
+    std::vector<std::string>& retainedNames
+  )
+  {
+    if (node == nullptr || node == head || node->mIsNil != 0u) {
+      return;
+    }
+
+    CollectRetainedPausedCategoryNames(node->mLeft, head, categoryToRemove, retainedNames);
+    if (std::strcmp(node->mCategoryName.c_str(), categoryToRemove) != 0) {
+      retainedNames.emplace_back(node->mCategoryName.c_str());
+    }
+    CollectRetainedPausedCategoryNames(node->mRight, head, categoryToRemove, retainedNames);
+  }
+
+  [[nodiscard]] bool ErasePausedCategoryName(moho::AudioMapStorage& map, const char* const categoryName)
+  {
+    if (categoryName == nullptr || *categoryName == '\0') {
+      return false;
+    }
+
+    AudioMap1CategoryNode* const head = AsMap1Head(map);
+    if (head == nullptr || FindMap1CategoryNode(map, categoryName) == nullptr) {
+      return false;
+    }
+
+    std::vector<std::string> retainedNames;
+    retainedNames.reserve(map.mSize > 0u ? map.mSize - 1u : 0u);
+    CollectRetainedPausedCategoryNames(head->mParent, head, categoryName, retainedNames);
+
+    DestroyMap1Subtree(head->mParent, head);
+    head->mParent = head;
+    head->mLeft = head;
+    head->mRight = head;
+    map.mSize = 0;
+
+    for (const std::string& retainedName : retainedNames) {
+      (void)InsertPausedCategoryName(map, retainedName.c_str());
+    }
+
+    return true;
   }
 
   [[nodiscard]] moho::SoundConfiguration* EnsureSoundConfigurationForCreate()
@@ -314,6 +556,7 @@ namespace
     configuration->mEngines.mCapacity = nullptr;
     configuration->mNoSound = 1u;
     configuration->mSpeakerConfiguration = 0x03u;
+    configuration->mAudioRuntimeModule = nullptr;
     configuration->mLookAheadTimeMs = 250u;
     configuration->mGlobalSettingsStart = nullptr;
     configuration->mGlobalSettingsLength = 0u;
@@ -347,9 +590,30 @@ namespace
     engines.mCapacity = newStorage + targetCapacity;
   }
 
-  void RegisterEngineRef(moho::SoundConfiguration& configuration, moho::AudioEngine* const engine)
+  [[nodiscard]] const boost::SharedPtrLayoutView<moho::AudioEngine>&
+  AsSharedLayout(const boost::shared_ptr<moho::AudioEngine>& value)
   {
-    if (engine == nullptr) {
+    return *reinterpret_cast<const boost::SharedPtrLayoutView<moho::AudioEngine>*>(&value);
+  }
+
+  [[nodiscard]] boost::shared_ptr<moho::AudioEngine> CopyEngineRefShared(const moho::AudioEngineRef& ref)
+  {
+    boost::shared_ptr<moho::AudioEngine> result;
+    auto& view = *reinterpret_cast<boost::SharedPtrLayoutView<moho::AudioEngine>*>(&result);
+    view.px = ref.mEngine;
+    view.pi = static_cast<boost::detail::sp_counted_base*>(ref.mControl);
+    if (view.pi != nullptr) {
+      view.pi->add_ref_copy();
+    }
+    return result;
+  }
+
+  void RegisterEngineRef(
+    moho::SoundConfiguration& configuration, const boost::shared_ptr<moho::AudioEngine>& engineRef
+  )
+  {
+    const auto& engineLayout = AsSharedLayout(engineRef);
+    if (engineLayout.px == nullptr) {
       return;
     }
 
@@ -358,8 +622,11 @@ namespace
       engines.mStart == nullptr || engines.mFinish == nullptr ? 0u : static_cast<std::size_t>(engines.mFinish - engines.mStart);
     ReserveEngineRefCapacity(engines, currentCount + 1u);
 
-    engines.mFinish->mEngine = engine;
-    engines.mFinish->mControl = nullptr;
+    engines.mFinish->mEngine = engineLayout.px;
+    engines.mFinish->mControl = engineLayout.pi;
+    if (engineLayout.pi != nullptr) {
+      engineLayout.pi->add_ref_copy();
+    }
     ++engines.mFinish;
   }
 
@@ -436,6 +703,13 @@ namespace
     return QuaternionFromBasis(right, up, forward);
   }
 
+  /**
+   * Address: 0x004D82A0 (FUN_004D82A0, func_ApplySettingsToCue)
+   *
+   * What it does:
+   * Applies one X3DAudio matrix and per-cue runtime variables (`Distance`,
+   * `DopplerPitchScalar`, `OrientationAngle`) to the target cue.
+   */
   int ApplySettingsToCue(const moho::Audio3DDspSettings* settings, moho::IXACTCue* cue)
   {
     if (settings == nullptr || cue == nullptr) {
@@ -467,6 +741,7 @@ namespace
 
 namespace moho
 {
+  int func_CreateXACTinstance(std::uint32_t mode, void** outEngine);
   int func_AudioInitialize(IXACTEngine* engine, void* audioHandle);
   void func_RetreiveXACTCOMInterface(AudioEngineImpl* impl);
   void func_LoadSoundPath(AudioEngineImpl* impl, gpg::StrArg voicePath);
@@ -485,6 +760,35 @@ namespace moho
     Audio3DDspSettings* settings,
     const void* audioHandle
   );
+
+  /**
+   * Address: 0x004D8970 (FUN_004D8970, func_RetreiveXACTCOMInterface)
+   *
+   * What it does:
+   * Chooses XACT creation mode from `/xactdebug` + audition settings, creates
+   * the engine COM instance, and throws `XAudioError` on failure.
+   */
+  void func_RetreiveXACTCOMInterface(AudioEngineImpl* const impl)
+  {
+    if (impl == nullptr) {
+      return;
+    }
+
+    std::uint32_t mode = 0u;
+    if (CFG_GetArgOption("/xactdebug", 0, nullptr)) {
+      mode = 2u;
+    } else if (sSoundConfiguration != nullptr && sSoundConfiguration->mAudition != 0u) {
+      mode = 1u;
+    }
+
+    const int errorCode = func_CreateXACTinstance(mode, reinterpret_cast<void**>(&impl->mInstance));
+    if (errorCode < 0) {
+      const char* const errorMessage = func_SoundErrorCodeToMsg(errorCode);
+      const msvc8::string fullMessage =
+        gpg::STR_Printf("SND: Error retrieving XACT COM interface. %s", errorMessage ? errorMessage : "Unknown XACT Error");
+      throw XAudioError(fullMessage.c_str());
+    }
+  }
 
   /**
    * Address: 0x004D8A50 (FUN_004D8A50, func_SoundErrorCodeToMsg)
@@ -643,6 +947,55 @@ namespace moho
     }
   } // namespace
 
+  /**
+   * Address: 0x004D9250 (FUN_004D9250, ??1struct_SoundConfig@@QAE@@Z)
+   * Mangled: ??1struct_SoundConfig@@QAE@@Z
+   *
+   * What it does:
+   * Clears all active `AudioEngineImpl` lanes, unloads optional audio runtime
+   * module state, and releases retained shared engine references.
+   */
+  SoundConfiguration::~SoundConfiguration()
+  {
+    if (mEngines.mStart != nullptr && mEngines.mFinish != nullptr) {
+      for (AudioEngineRef* entry = mEngines.mStart; entry != mEngines.mFinish; ++entry) {
+        AudioEngine* const engine = entry->mEngine;
+        if (engine == nullptr) {
+          continue;
+        }
+
+        AudioEngineImpl* const impl = engine->mImpl;
+        engine->mImpl = nullptr;
+        if (impl != nullptr) {
+          impl->~AudioEngineImpl();
+          operator delete(impl);
+        }
+      }
+    }
+
+    if (mAudioRuntimeModule != nullptr) {
+      (void)::FreeLibrary(static_cast<HMODULE>(mAudioRuntimeModule));
+      mAudioRuntimeModule = nullptr;
+    }
+
+    if (mEngines.mStart != nullptr) {
+      for (AudioEngineRef* entry = mEngines.mStart; entry != mEngines.mFinish; ++entry) {
+        auto* const control = static_cast<boost::detail::sp_counted_base*>(entry->mControl);
+        if (control != nullptr) {
+          control->release();
+        }
+        entry->mEngine = nullptr;
+        entry->mControl = nullptr;
+      }
+      operator delete[](mEngines.mStart);
+    }
+
+    mEngines.mAllocatorCookie = nullptr;
+    mEngines.mStart = nullptr;
+    mEngines.mFinish = nullptr;
+    mEngines.mCapacity = nullptr;
+  }
+
   std::uint32_t SoundConfiguration::EngineCount() const
   {
     if (mEngines.mStart == nullptr || mEngines.mFinish == nullptr) {
@@ -715,6 +1068,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x004D8EE0 (FUN_004D8EE0, ?SND_Shutdown@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Clears and destroys the process-global sound configuration singleton.
+   */
+  void SND_Shutdown()
+  {
+    SoundConfiguration* const configuration = sSoundConfiguration;
+    sSoundConfiguration = nullptr;
+    if (configuration == nullptr) {
+      return;
+    }
+
+    configuration->~SoundConfiguration();
+    ::operator delete(configuration);
+  }
+
+  /**
+   * Address: 0x004D8F10 (FUN_004D8F10, ?SND_Enabled@Moho@@YA_NXZ)
+   *
+   * What it does:
+   * Reports whether at least one audio engine is loaded and no-sound mode is
+   * disabled.
+   */
+  bool SND_Enabled()
+  {
+    const SoundConfiguration* const configuration = sSoundConfiguration;
+    const AudioEngineRef* const begin = configuration->mEngines.mStart;
+    return begin != nullptr && configuration->mEngines.mFinish != begin && configuration->mNoSound == 0u;
+  }
+
+  /**
    * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)
    *
    * What it does:
@@ -765,6 +1150,130 @@ namespace moho
       impl->mEngine->SetVolume(kGlobalCategoryName, volume);
       configuration = sSoundConfiguration;
     }
+  }
+
+  /**
+   * Address: 0x004D9040 (FUN_004D9040, ?SND_GetGlobalVarIndex@Moho@@...)
+   *
+   * gpg::StrArg variableName, std::uint16_t* outVarIndex
+   *
+   * What it does:
+   * Resolves one global XACT variable index from the active primary engine.
+   */
+  bool SND_GetGlobalVarIndex(const gpg::StrArg variableName, std::uint16_t* const outVarIndex)
+  {
+    if (outVarIndex == nullptr) {
+      return false;
+    }
+
+    const SoundConfiguration* const configuration = sSoundConfiguration;
+    if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
+        configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
+      return false;
+    }
+
+    AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
+    if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
+      return false;
+    }
+
+    const std::uint16_t variableId = engine->mImpl->mInstance->GetGlobalVariableIndex(variableName);
+    *outVarIndex = variableId;
+    return variableId != kInvalidVariableId;
+  }
+
+  /**
+   * Address: 0x004D9090 (FUN_004D9090, ?SND_GetGlobalFloat@Moho@@...)
+   *
+   * std::uint16_t varIndex
+   *
+   * What it does:
+   * Reads one global XACT variable value from the active primary engine.
+   */
+  float SND_GetGlobalFloat(const std::uint16_t varIndex)
+  {
+    const SoundConfiguration* const configuration = sSoundConfiguration;
+    if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
+        configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
+    if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    float value = std::numeric_limits<float>::quiet_NaN();
+    if (engine->mImpl->mInstance->GetGlobalVariable(varIndex, &value) < 0) {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
+    return value;
+  }
+
+  /**
+   * Address: 0x004D90E0 (FUN_004D90E0, ?SND_SetGlobalFloat@Moho@@...)
+   *
+   * std::uint16_t varIndex, float value
+   *
+   * What it does:
+   * Writes one global XACT variable value on the active primary engine.
+   */
+  void SND_SetGlobalFloat(const std::uint16_t varIndex, const float value)
+  {
+    const SoundConfiguration* const configuration = sSoundConfiguration;
+    if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
+        configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u) {
+      return;
+    }
+
+    AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
+    if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
+      return;
+    }
+
+    if (engine->mImpl->mInstance->SetGlobalVariable(varIndex, value) < 0) {
+      gpg::Warnf("SND: Error setting global variable [index:%i]", varIndex);
+    }
+  }
+
+  /**
+   * Address: 0x004D9140 (FUN_004D9140, ?SND_FindEngine@Moho@@...)
+   *
+   * gpg::StrArg
+   *
+   * What it does:
+   * Finds one loaded `AudioEngine` that owns a bank matching the supplied
+   * bank name.
+   */
+  boost::shared_ptr<AudioEngine> SND_FindEngine(const gpg::StrArg bankName)
+  {
+    SoundConfiguration* const configuration = sSoundConfiguration;
+    if (configuration == nullptr || bankName == nullptr || configuration->mEngines.mStart == nullptr ||
+        configuration->mEngines.mFinish == nullptr) {
+      return {};
+    }
+
+    const std::size_t engineCount = static_cast<std::size_t>(configuration->mEngines.mFinish - configuration->mEngines.mStart);
+    for (std::size_t engineIndex = 0; engineIndex < engineCount; ++engineIndex) {
+      const AudioEngineRef& engineRef = configuration->mEngines.mStart[engineIndex];
+      AudioEngine* const engine = engineRef.mEngine;
+      if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mBanks.mStart == nullptr ||
+          engine->mImpl->mBanks.mFinish == nullptr) {
+        continue;
+      }
+
+      const std::size_t bankCount =
+        static_cast<std::size_t>(engine->mImpl->mBanks.mFinish - engine->mImpl->mBanks.mStart);
+      for (std::size_t bankIndex = 0; bankIndex < bankCount; ++bankIndex) {
+        auto* const loader = static_cast<AudioSoundBankLoader*>(engine->mImpl->mBanks.mStart[bankIndex]);
+        if (loader == nullptr || ::_stricmp(bankName, loader->mName.c_str()) != 0) {
+          continue;
+        }
+        return CopyEngineRefShared(engineRef);
+      }
+    }
+
+    return {};
   }
 
   /**
@@ -852,7 +1361,7 @@ namespace moho
 
     boost::shared_ptr<AudioEngine> result(createdEngine);
     if (configuration != nullptr && createdEngine != nullptr) {
-      RegisterEngineRef(*configuration, createdEngine);
+      RegisterEngineRef(*configuration, result);
     }
 
     return result;
@@ -1019,9 +1528,7 @@ namespace moho
     mBanks.mFinish = nullptr;
     mBanks.mEnd = nullptr;
 
-    delete static_cast<AudioMap1HeadNode*>(mMap1.mHead);
-    mMap1.mHead = nullptr;
-    mMap1.mSize = 0;
+    ResetMap1(mMap1);
 
     ResetCategoryMap(mMap2);
     mMap2.mHead = nullptr;
@@ -1074,6 +1581,99 @@ namespace moho
       func_SoundErrorCodeToMsg(result)
     );
     return result;
+  }
+
+  /**
+   * Address: 0x004D9BD0 (FUN_004D9BD0)
+   *
+   * gpg::StrArg bankName, std::uint16_t* outBankId
+   *
+   * What it does:
+   * Finds one loaded sound-bank index by case-insensitive bank name.
+   */
+  bool AudioEngine::GetBankIndex(const gpg::StrArg bankName, std::uint16_t* const outBankId)
+  {
+    if (bankName == nullptr || outBankId == nullptr || mImpl == nullptr || mImpl->mBanks.mStart == nullptr ||
+        mImpl->mBanks.mFinish == nullptr) {
+      return false;
+    }
+
+    const std::size_t bankCount = static_cast<std::size_t>(mImpl->mBanks.mFinish - mImpl->mBanks.mStart);
+    for (std::size_t bankIndex = 0; bankIndex < bankCount; ++bankIndex) {
+      auto* const loader = static_cast<AudioSoundBankLoader*>(mImpl->mBanks.mStart[bankIndex]);
+      if (loader == nullptr || ::_stricmp(loader->mName.c_str(), bankName) != 0) {
+        continue;
+      }
+
+      *outBankId = static_cast<std::uint16_t>(bankIndex);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Address: 0x004D9C40 (FUN_004D9C40)
+   *
+   * gpg::StrArg cueName, std::uint16_t bankId, std::uint16_t* outCueId
+   *
+   * What it does:
+   * Resolves one cue index from one loaded sound bank.
+   */
+  bool AudioEngine::GetCueIndex(const gpg::StrArg cueName, const std::uint16_t bankId, std::uint16_t* const outCueId)
+  {
+    if (cueName == nullptr || outCueId == nullptr || mImpl == nullptr || mImpl->mBanks.mStart == nullptr ||
+        mImpl->mBanks.mFinish == nullptr) {
+      return false;
+    }
+
+    const std::size_t bankCount = static_cast<std::size_t>(mImpl->mBanks.mFinish - mImpl->mBanks.mStart);
+    if (static_cast<std::size_t>(bankId) >= bankCount) {
+      return false;
+    }
+
+    auto* const loader = static_cast<AudioSoundBankLoader*>(mImpl->mBanks.mStart[bankId]);
+    if (loader == nullptr || loader->mBank == nullptr) {
+      return false;
+    }
+
+    const std::uint16_t cueId = loader->mBank->GetCueIndex(cueName);
+    *outCueId = cueId;
+    return cueId != 0xFFFFu;
+  }
+
+  /**
+   * Address: 0x004D9C90 (FUN_004D9C90, ?SetPaused@AudioEngine@Moho@@QAEXVStrArg@gpg@@_N@Z)
+   *
+   * gpg::StrArg category, bool paused
+   *
+   * What it does:
+   * Pauses or unpauses one named sound category and updates the paused
+   * category tracking map on success.
+   */
+  void AudioEngine::SetPaused(const gpg::StrArg category, const bool paused)
+  {
+    if (mImpl == nullptr || mImpl->mInstance == nullptr || !IsCategoryArgValid(category)) {
+      return;
+    }
+
+    const std::uint16_t categoryId = mImpl->mInstance->GetCategory(category);
+    if (categoryId == kInvalidCategoryId) {
+      gpg::Warnf("SND: SetPaused - Invalid Category [%s]", category);
+      return;
+    }
+
+    const int result = mImpl->mInstance->Pause(categoryId, paused ? 1 : 0);
+    if (result < 0) {
+      gpg::Warnf("SND: Error pausing category %s\n%s", category, func_SoundErrorCodeToMsg(result));
+      return;
+    }
+
+    if (paused) {
+      (void)InsertPausedCategoryName(mImpl->mMap1, category);
+    } else {
+      (void)ErasePausedCategoryName(mImpl->mMap1, category);
+    }
   }
 
   /**

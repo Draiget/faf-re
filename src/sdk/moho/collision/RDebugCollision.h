@@ -62,6 +62,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0064C2B0 (FUN_0064C2B0, Moho::RDebugCollisionTypeInfo::RDebugCollisionTypeInfo)
+     *
+     * What it does:
+     * Initializes debug-overlay class RTTI lanes and preregisters
+     * `RDebugCollision` reflection ownership.
+     */
+    RDebugCollisionTypeInfo();
+
+    /**
      * Address: 0x0064C3A0 (FUN_0064C3A0, scalar deleting destructor thunk)
      * Slot: 2
      */

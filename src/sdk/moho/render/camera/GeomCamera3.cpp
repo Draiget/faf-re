@@ -358,6 +358,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
+   *
+   * What it does:
+   * Releases heap-backed frustum-plane lanes and restores both solids to inline
+   * storage prior to member dtors.
+   */
+  GeomCamera3::~GeomCamera3()
+  {
+    solid2.planes_.ResetStorageToInline();
+    solid1.planes_.ResetStorageToInline();
+  }
+
+  /**
    * Address: 0x004700A0 (FUN_004700A0, Moho::GeomCamera3::Init)
    *
    * Moho::VTransform const&, Moho::VMatrix4 const&

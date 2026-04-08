@@ -7,6 +7,12 @@
 #include "moho/ai/IAiSteering.h"
 #include "moho/task/CTask.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class CUnitMotion;
@@ -150,6 +156,22 @@ namespace moho
      * Address: 0x005D3740 (FUN_005D3740, Moho::CAiSteeringImpl::CheckCollisions)
      */
     void CheckCollisions();
+
+    /**
+     * Address: 0x005D48E0 (FUN_005D48E0, Moho::CAiSteeringImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Loads steering runtime fields from one archive lane in serializer order.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005D4B50 (FUN_005D4B50, Moho::CAiSteeringImpl::MemberSerialize)
+     *
+     * What it does:
+     * Saves steering runtime fields to one archive lane in serializer order.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x005D2480 (FUN_005D2480, func_TrySnapPosToWaypoint)

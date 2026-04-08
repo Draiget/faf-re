@@ -6,6 +6,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/Listener.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/task/CCommandTask.h"
@@ -13,6 +14,7 @@
 
 namespace moho
 {
+  class CScrLuaInitForm;
   class CUnitCommand;
 
   /**
@@ -103,6 +105,85 @@ namespace moho
     msvc8::string mTaskScriptPath;     // +0x9C
   };
 
+  /**
+   * VFTABLE: 0x00E20C00
+   * COL: 0x00E7A0D0
+   */
+  template <>
+  class CScrLuaMetatableFactory<CUnitScriptTask> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    /**
+     * Address: 0x00623B50 (FUN_00623B50, ?Create@?$CScrLuaMetatableFactory@VCUnitScriptTask@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     *
+     * What it does:
+     * Builds the metatable object used for `CUnitScriptTask` Lua userdata.
+     */
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CUnitScriptTask>) == 0x8,
+    "CScrLuaMetatableFactory<CUnitScriptTask> size must be 0x8"
+  );
+
+  /**
+   * Address: 0x006233C0 (FUN_006233C0, cfunc_CUnitScriptTaskGetUnit)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CUnitScriptTaskGetUnitL`.
+   */
+  int cfunc_CUnitScriptTaskGetUnit(lua_State* luaContext);
+
+  /**
+   * Address: 0x006233E0 (FUN_006233E0, func_CUnitScriptTaskGetUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CUnitScriptTask:GetUnit()` Lua binder.
+   */
+  CScrLuaInitForm* func_CUnitScriptTaskGetUnit_LuaFuncDef();
+
+  /**
+   * Address: 0x00623440 (FUN_00623440, cfunc_CUnitScriptTaskGetUnitL)
+   *
+   * What it does:
+   * Resolves one `CUnitScriptTask` and pushes owner-unit Lua userdata.
+   */
+  int cfunc_CUnitScriptTaskGetUnitL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x006234F0 (FUN_006234F0, cfunc_CUnitScriptTaskSetAIResult)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CUnitScriptTaskSetAIResultL`.
+   */
+  int cfunc_CUnitScriptTaskSetAIResult(lua_State* luaContext);
+
+  /**
+   * Address: 0x00623510 (FUN_00623510, func_CUnitScriptTaskSetAIResult_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CUnitScriptTask:SetAIResult(result)` Lua binder.
+   */
+  CScrLuaInitForm* func_CUnitScriptTaskSetAIResult_LuaFuncDef();
+
+  /**
+   * Address: 0x00623570 (FUN_00623570, cfunc_CUnitScriptTaskSetAIResultL)
+   *
+   * What it does:
+   * Resolves one `CUnitScriptTask` and writes one integer AI-result lane.
+   */
+  int cfunc_CUnitScriptTaskSetAIResultL(LuaPlus::LuaState* state);
+
   static_assert(sizeof(CUnitScriptTask) == 0xB8, "CUnitScriptTask size must be 0xB8");
   static_assert(
     offsetof(CUnitScriptTask, mSourceCommand) == 0x70, "CUnitScriptTask::mSourceCommand offset must be 0x70"
@@ -113,3 +194,15 @@ namespace moho
     offsetof(CUnitScriptTask, mTaskScriptPath) == 0x9C, "CUnitScriptTask::mTaskScriptPath offset must be 0x9C"
   );
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x006242A0 (FUN_006242A0, gpg::RRef_CUnitScriptTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitScriptTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitScriptTask(gpg::RRef* outRef, moho::CUnitScriptTask* value);
+} // namespace gpg

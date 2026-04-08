@@ -1099,6 +1099,7 @@ bool CScApp::CreateDevice()
   moho::SetupShadowQualitySettings();
   moho::SetupAntiAliasingSettings();
   moho::SetupBasicMovieManager();
+  moho::OPTIONS_Apply();
 
   gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
   (void)device->GetDeviceContext();

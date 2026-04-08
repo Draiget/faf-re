@@ -6,6 +6,8 @@
 
 namespace gpg
 {
+  class ReadArchive;
+  class SerConstructResult;
   struct SerHelperBase;
 }
 
@@ -18,6 +20,16 @@ namespace moho
   class CAniResourceSkelConstruct
   {
   public:
+    /**
+     * Address: 0x005388C0 (FUN_005388C0, Moho::CAniResourceSkelConstruct::Construct)
+     *
+     * What it does:
+     * Reads one model path from archive, resolves/loads the referenced SCM
+     * resource, acquires its shared skeleton payload, and forwards it into the
+     * construct result as shared `CAniSkel` content.
+     */
+    static void Construct(gpg::ReadArchive* archive, int objectStorage, int version, gpg::SerConstructResult* result);
+
     /**
      * Address: 0x00539580 (FUN_00539580, gpg::SerConstructHelper_CAniResourceSkel::Init)
      *

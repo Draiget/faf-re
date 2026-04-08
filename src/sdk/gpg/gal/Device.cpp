@@ -3,6 +3,8 @@
 #include "Error.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 
+#include <Windows.h>
+
 namespace gpg::gal
 {
     namespace
@@ -82,10 +84,7 @@ namespace gpg::gal
     }
 
     /**
-     * Address family:
-     * - used by 0x0042EA00 (FUN_0042EA00)
-     * - used by 0x0042EA30 (FUN_0042EA30)
-     * - used by 0x0042EAE0 (FUN_0042EAE0)
+     * Address: 0x008E6720 (FUN_008E6720, gpg::gal::Device::IsReady)
      *
      * What it does:
      * Returns true when the global active device singleton is available.
@@ -136,6 +135,41 @@ namespace gpg::gal
 
         auto* const device = static_cast<DeviceD3D9*>(GetInstance());
         device->InitCursor();
+    }
+
+    /**
+     * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
+     *
+     * What it does:
+     * Returns true when the foreground HWND matches any configured head window
+     * handle in the active device context.
+     */
+    bool WindowIsForeground()
+    {
+        const HWND foregroundWindow = ::GetForegroundWindow();
+        Device* const instance = Device::GetInstance();
+        if (instance == nullptr)
+        {
+            return false;
+        }
+
+        DeviceContext* const context = instance->GetDeviceContext();
+        const int headCount = context->GetHeadCount();
+        if (headCount <= 0)
+        {
+            return false;
+        }
+
+        for (int headIndex = 0; headIndex < headCount; ++headIndex)
+        {
+            const Head& head = context->GetHead(static_cast<std::uint32_t>(headIndex));
+            if (foregroundWindow == head.mWindow || foregroundWindow == head.mHandle)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

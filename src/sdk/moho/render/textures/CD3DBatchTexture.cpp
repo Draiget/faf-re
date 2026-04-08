@@ -25,6 +25,16 @@ namespace
 
 namespace moho
 {
+  boost::mutex sResourceLock{};
+
+  /**
+   * Address: 0x00BC4340 (FUN_00BC4340, register_sResourceLock)
+   */
+  void register_sResourceLock()
+  {
+    (void)sResourceLock;
+  }
+
   /**
    * Address: 0x004470F0 (FUN_004470F0)
    */
@@ -161,3 +171,16 @@ namespace moho
     return outTexture;
   }
 } // namespace moho
+
+namespace
+{
+  struct BatchTextureResourceLockBootstrap
+  {
+    BatchTextureResourceLockBootstrap()
+    {
+      moho::register_sResourceLock();
+    }
+  };
+
+  BatchTextureResourceLockBootstrap gBatchTextureResourceLockBootstrap;
+} // namespace

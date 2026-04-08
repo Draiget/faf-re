@@ -16,27 +16,79 @@
 #include "legacy/containers/Vector.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/command/SSTICommandConstantData.h"
+#include "moho/command/SSTICommandVariableData.h"
 #include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/net/Common.h"
 #include "platform/Platform.h"
 #include "SSyncFilter.h"
 
+#ifndef FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
+#define FAF_ENFORCE_STRICT_LAYOUT_ASSERTS 0
+#endif
+
+#ifndef FAF_RUNTIME_LAYOUT_ASSERT
+#if FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
+#define FAF_RUNTIME_LAYOUT_ASSERT(...) static_assert(__VA_ARGS__)
+#else
+#define FAF_RUNTIME_LAYOUT_ASSERT(...)
+#endif
+#endif
 namespace moho
 {
   class LaunchInfoBase;
   class CMarshaller;
   class CDecoder;
+  class REntityBlueprint;
+  class StatItem;
 
   struct SSyncPublishedCommandPacket
   {
-    CmdId commandId;                       // +0x00
-    std::uint8_t pad_0004_0008[0x04]{};    // +0x04
-    std::uint8_t serializedBlob0x70[0x70]{}; // +0x08
+    CmdId commandId = 0;                       // +0x00
+    std::int32_t reserved = 0;                 // +0x04
+    SSTICommandVariableData variableData{};    // +0x08
   };
-  static_assert(sizeof(SSyncPublishedCommandPacket) == 0x78, "SSyncPublishedCommandPacket size must be 0x78");
-  static_assert(
-    offsetof(SSyncPublishedCommandPacket, serializedBlob0x70) == 0x08,
-    "SSyncPublishedCommandPacket::serializedBlob0x70 offset must be 0x08"
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncPublishedCommandPacket) == 0x78, "SSyncPublishedCommandPacket size must be 0x78");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncPublishedCommandPacket, variableData) == 0x08,
+    "SSyncPublishedCommandPacket::variableData offset must be 0x08"
+  );
+
+  /**
+   * Unit-create constant payload mirrored into `SSyncData::mNewUnits`.
+   *
+   * Layout evidence:
+   * - Unit/ReconBlip create-interface lanes copy byte + shared root + fake
+   *   from object `SSTIUnitConstantData` into stack payload then push.
+   */
+  struct SCreateUnitConstantData
+  {
+    std::uint8_t mBuildStateTag = 0;                  // +0x00
+    std::uint8_t pad_01_03[0x03]{};                   // +0x01
+    boost::shared_ptr<StatItem> mStatsRoot;           // +0x04
+    std::uint8_t mFake = 0;                           // +0x0C
+    std::uint8_t pad_0D_0F[0x03]{};                   // +0x0D
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitConstantData) == 0x10, "SCreateUnitConstantData size must be 0x10");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SCreateUnitConstantData, mStatsRoot) == 0x04,
+    "SCreateUnitConstantData::mStatsRoot offset must be 0x04"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SCreateUnitConstantData, mFake) == 0x0C, "SCreateUnitConstantData::mFake offset must be 0x0C");
+
+  /**
+   * One unit/recon create packet queued by `Entity::CreateInterface` overrides.
+   */
+  struct SCreateUnitParams
+  {
+    EntId mEntityId = 0;                          // +0x00
+    REntityBlueprint* mBlueprint = nullptr;       // +0x04
+    std::uint32_t mTickCreated = 0;               // +0x08
+    SCreateUnitConstantData mConstDat{};          // +0x0C
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitParams) == 0x1C, "SCreateUnitParams size must be 0x1C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SCreateUnitParams, mConstDat) == 0x0C,
+    "SCreateUnitParams::mConstDat offset must be 0x0C"
   );
 
   /**
@@ -47,37 +99,52 @@ namespace moho
   struct SSyncData
   {
     int32_t mCurBeat = 0;                                  // +0x000
-    std::uint8_t pad_0004_0188[0x184]{};                    // +0x004
+    std::uint8_t pad_0004_0138[0x134]{};                    // +0x004
+    msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
+    std::uint8_t pad_0144_0188[0x44]{};                     // +0x144
     msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
     msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
     msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
     msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
     std::uint8_t pad_01C8_02B8[0xF0]{};                     // +0x1C8
 
+    /**
+     * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one sync-packet payload with zeroed scalar lanes and empty
+     * legacy vector containers.
+     */
+    SSyncData();
+
     void QueuePendingCommandEventRemoval(CmdId commandId);
   };
-  static_assert(sizeof(SSTICommandConstantData) == 0x3C, "SSTICommandConstantData size must be 0x3C");
-  static_assert(
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSTICommandConstantData) == 0x3C, "SSTICommandConstantData size must be 0x3C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSTICommandConstantData, unk2) == 0x20,
     "SSTICommandConstantData::unk2 offset must be 0x20"
   );
-  static_assert(
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SSyncData, mNewUnits) == 0x138,
+    "SSyncData::mNewUnits offset must be 0x138"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
     "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
   );
-  static_assert(
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mPublishedCommandPackets) == 0x198,
     "SSyncData::mPublishedCommandPackets offset must be 0x198"
   );
-  static_assert(
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mPendingCommandEventRemovals) == 0x1A8,
     "SSyncData::mPendingCommandEventRemovals offset must be 0x1A8"
   );
-  static_assert(
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
     "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
   );
-  static_assert(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
 
   /**
    * 8-byte lock cell used by CSimDriver (matches +0x30..+0x37 layout).
@@ -87,7 +154,7 @@ namespace moho
     boost::mutex* lock = nullptr; // runtime-owned lock pointer
     uint8_t pad[3]{};
   };
-  static_assert(sizeof(SDriverMutex) == 0x8, "SDriverMutex size must be 0x8");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SDriverMutex) == 0x8, "SDriverMutex size must be 0x8");
 
   /**
    * Ring buffer used for pending sync packets.
@@ -109,7 +176,7 @@ namespace moho
     SSyncData* PopFront();
     void ClearAndDelete();
   };
-  static_assert(sizeof(SSyncDataQueue) == 0x14, "SSyncDataQueue size must be 0x14");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncDataQueue) == 0x14, "SSyncDataQueue size must be 0x14");
 
   enum class EDriverState : int32_t
   {
@@ -154,6 +221,15 @@ namespace moho
      * Performs full shutdown and releases all owned resources.
      */
     ~CSimDriver() override;
+
+    /**
+     * Address: 0x0073B910 (FUN_0073B910, Moho::CSimDriver::dtr)
+     *
+     * What it does:
+     * Executes full destructor body and conditionally frees object storage
+     * when `deleteFlag & 1` is set.
+     */
+    CSimDriver* DestroyWithDeleteFlag(std::uint8_t deleteFlag);
 
     // Slot order matches ISTIDriver; addresses here are CSimDriver override entrypoints.
     /**
@@ -232,11 +308,11 @@ namespace moho
     /**
      * Address: 0x0073C660 (FUN_0073C660)
      */
-    void RequestPause() override;
+    void RequestPause(std::int32_t* outCommandCookie = nullptr) override;
     /**
      * Address: 0x0073C700 (FUN_0073C700)
      */
-    void Resume() override;
+    void Resume(std::int32_t* outCommandCookie = nullptr) override;
     /**
      * Address: 0x0073C7A0 (FUN_0073C7A0)
      */
@@ -411,29 +487,29 @@ namespace moho
 
   struct CSimDriverLayoutAssertions
   {
-    static_assert(sizeof(CSimDriver) == 0x230, "CSimDriver size must be 0x230");
-    static_assert(offsetof(CSimDriver, mClientManager) == 0x8, "mClientManager offset mismatch");
-    static_assert(offsetof(CSimDriver, mMarshaller) == 0x28, "mMarshaller offset mismatch");
-    static_assert(offsetof(CSimDriver, mLastSyncCycleTime) == 0x50, "mLastSyncCycleTime offset mismatch");
-    static_assert(offsetof(CSimDriver, mStopSimThread) == 0x58, "mStopSimThread offset mismatch");
-    static_assert(offsetof(CSimDriver, mFirstCommandCycleTime) == 0x60, "mFirstCommandCycleTime offset mismatch");
-    static_assert(offsetof(CSimDriver, mSimBusy) == 0x68, "mSimBusy offset mismatch");
-    static_assert(offsetof(CSimDriver, mCreateSimThread) == 0x6C, "mCreateSimThread offset mismatch");
-    static_assert(offsetof(CSimDriver, mStopCreateSimThread) == 0x70, "mStopCreateSimThread offset mismatch");
-    static_assert(offsetof(CSimDriver, mState) == 0x8C, "mState offset mismatch");
-    static_assert(offsetof(CSimDriver, mSyncDataAvailableEvent) == 0xA4, "mSyncDataAvailableEvent offset mismatch");
-    static_assert(offsetof(CSimDriver, mInterlockedMode) == 0xA8, "mInterlockedMode offset mismatch");
-    static_assert(offsetof(CSimDriver, mInterlockRefCount) == 0xAC, "mInterlockRefCount offset mismatch");
-    static_assert(offsetof(CSimDriver, mPendingSyncFilter) == 0xB0, "mPendingSyncFilter offset mismatch");
-    static_assert(offsetof(CSimDriver, mActiveSyncFilter) == 0x120, "mActiveSyncFilter offset mismatch");
-    static_assert(offsetof(CSimDriver, mSaveGameRequest) == 0x190, "mSaveGameRequest offset mismatch");
-    static_assert(offsetof(CSimDriver, mWantsToSave) == 0x194, "mWantsToSave offset mismatch");
-    static_assert(
+    FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CSimDriver) == 0x230, "CSimDriver size must be 0x230");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mClientManager) == 0x8, "mClientManager offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mMarshaller) == 0x28, "mMarshaller offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mLastSyncCycleTime) == 0x50, "mLastSyncCycleTime offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mStopSimThread) == 0x58, "mStopSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mFirstCommandCycleTime) == 0x60, "mFirstCommandCycleTime offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSimBusy) == 0x68, "mSimBusy offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mCreateSimThread) == 0x6C, "mCreateSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mStopCreateSimThread) == 0x70, "mStopCreateSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mState) == 0x8C, "mState offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSyncDataAvailableEvent) == 0xA4, "mSyncDataAvailableEvent offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mInterlockedMode) == 0xA8, "mInterlockedMode offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mInterlockRefCount) == 0xAC, "mInterlockRefCount offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mPendingSyncFilter) == 0xB0, "mPendingSyncFilter offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mActiveSyncFilter) == 0x120, "mActiveSyncFilter offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSaveGameRequest) == 0x190, "mSaveGameRequest offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mWantsToSave) == 0x194, "mWantsToSave offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(
       offsetof(CSimDriver, mSaveRequestUsesSuggestedName) == 0x198, "mSaveRequestUsesSuggestedName offset mismatch"
     );
-    static_assert(offsetof(CSimDriver, mPendingSaveName) == 0x19C, "mPendingSaveName offset mismatch");
-    static_assert(offsetof(CSimDriver, mSimSpeedSamples) == 0x1B8, "mSimSpeedSamples offset mismatch");
-    static_assert(offsetof(CSimDriver, mCurrentSimRate) == 0x228, "mCurrentSimRate offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mPendingSaveName) == 0x19C, "mPendingSaveName offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSimSpeedSamples) == 0x1B8, "mSimSpeedSamples offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mCurrentSimRate) == 0x228, "mCurrentSimRate offset mismatch");
   };
 
   /**

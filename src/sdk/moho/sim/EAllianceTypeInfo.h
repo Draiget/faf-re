@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
@@ -59,4 +60,83 @@ namespace moho
   };
 
   static_assert(sizeof(EAllianceTypeInfo) == 0x78, "EAllianceTypeInfo size must be 0x78");
+
+  class EAlliancePrimitiveSerializer
+  {
+  public:
+    /**
+     * Address: 0x0050A920 (FUN_0050A920, PrimitiveSerHelper<EAlliance>::Deserialize)
+     *
+     * What it does:
+     * Deserializes one `EAlliance` lane from archive storage.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0050A940 (FUN_0050A940, PrimitiveSerHelper<EAlliance>::Serialize)
+     *
+     * What it does:
+     * Serializes one `EAlliance` lane into archive storage.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0050A630 (FUN_0050A630, gpg::PrimitiveSerHelper<Moho::EAlliance,int>::Init)
+     *
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected `EAlliance`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mDeserialize;
+    gpg::RType::save_func_t mSerialize;
+  };
+
+  static_assert(
+    offsetof(EAlliancePrimitiveSerializer, mHelperNext) == 0x04,
+    "EAlliancePrimitiveSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(EAlliancePrimitiveSerializer, mHelperPrev) == 0x08,
+    "EAlliancePrimitiveSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(EAlliancePrimitiveSerializer, mDeserialize) == 0x0C,
+    "EAlliancePrimitiveSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EAlliancePrimitiveSerializer, mSerialize) == 0x10,
+    "EAlliancePrimitiveSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(EAlliancePrimitiveSerializer) == 0x14, "EAlliancePrimitiveSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00509D60 (FUN_00509D60, preregister_EAllianceTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup-owned RTTI descriptor storage for
+   * `EAlliance`.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EAllianceTypeInfo();
+
+  /**
+   * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
+   *
+   * What it does:
+   * Runs `EAlliance` typeinfo preregistration and installs process-exit
+   * cleanup.
+   */
+  int register_EAllianceTypeInfo();
+
+  /**
+   * Address: 0x00BC7A30 (FUN_00BC7A30, register_EAlliancePrimitiveSerializer)
+   *
+   * What it does:
+   * Initializes startup primitive serializer helper links/callbacks for
+   * `EAlliance` and installs process-exit cleanup.
+   */
+  int register_EAlliancePrimitiveSerializer();
 } // namespace moho

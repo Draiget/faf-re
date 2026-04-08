@@ -1,10 +1,48 @@
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
+
+#include <cstring>
+
+#include "lua/LuaTableIterator.h"
 #include "moho/console/CConAlias.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/SCR_Color.h"
+#include "moho/misc/XDataError.h"
+#include "moho/resource/RResId.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimConFunc.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
+#include "moho/ui/UiRuntimeTypes.h"
+#include "moho/unit/core/SUnitConstructionParams.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
+  constexpr const char* kGlobalLuaClassName = "<global>";
+  constexpr const char* kCreateInitialArmyUnitName = "CreateInitialArmyUnit";
+  constexpr const char* kCreateInitialArmyUnitHelpText = "CreateInitialArmyUnit(armyName, initialUnitName";
+  constexpr const char* kSetArmyColorIndexName = "SetArmyColorIndex";
+  constexpr const char* kSetArmyColorIndexHelpText = "SetArmyColorIndex(army,index)";
+  constexpr const char* kAddBuildRestrictionName = "AddBuildRestriction";
+  constexpr const char* kAddBuildRestrictionHelpText =
+    "AddBuildRestriction(army,category) - Add a category to the restricted list";
+  constexpr const char* kRemoveBuildRestrictionName = "RemoveBuildRestriction";
+  constexpr const char* kRemoveBuildRestrictionHelpText =
+    "RemoveBuildRestriction(army,category) - Remove a category from the restricted list";
+  constexpr const char* kGameColorsScriptPath = "/lua/gameColors.lua";
+  constexpr const char* kGameColorsTableName = "GameColors";
+  constexpr const char* kPlayerColorsTableName = "PlayerColors";
+  constexpr const char* kArmyColorsTableName = "ArmyColors";
+  constexpr const char* kCivilianArmyColorFieldName = "CivilianArmyColor";
+  constexpr const char* kUnidentifiedColorFieldName = "UnidentifiedColor";
+
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
   [[nodiscard]] moho::CConAlias& ConAlias_SetArmyColor()
   {
     static moho::CConAlias sAlias;
@@ -17,6 +55,111 @@ namespace
     return sCommand;
   }
 
+  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
+  {
+    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
+  }
+
+  /**
+   * Address: 0x00506850 (FUN_00506850, Moho::GetColorLuaState)
+   *
+   * What it does:
+   * Returns process-static Lua state used for game-color table loading.
+   */
+  [[nodiscard]] LuaPlus::LuaState* GetColorLuaState()
+  {
+    static LuaPlus::LuaState sColorLuaState(LuaPlus::LuaState::LIB_OSIO);
+    return &sColorLuaState;
+  }
+
+  /**
+   * Address: 0x00506760 (FUN_00506760, ?GetColors@Moho@@YA?AVLuaObject@LuaPlus@@AAVLuaState@3@@Z)
+   *
+   * What it does:
+   * Lazily creates and loads the static `sGameColorsObj` table by executing
+   * `/lua/gameColors.lua`; throws `XDataError` when script load fails.
+   */
+  [[nodiscard]] LuaPlus::LuaObject* GetColors()
+  {
+    static LuaPlus::LuaObject sGameColorsObject;
+    static bool sLoadOnce = true;
+
+    if (sLoadOnce) {
+      LuaPlus::LuaState* const colorState = GetColorLuaState();
+      sGameColorsObject.AssignNewTable(colorState, 0, 0);
+      if (!moho::SCR_LuaDoScript(colorState, kGameColorsScriptPath, &sGameColorsObject)) {
+        throw moho::XDataError("Error reading gameColors");
+      }
+      sLoadOnce = false;
+    }
+
+    return &sGameColorsObject;
+  }
+
+  [[nodiscard]] std::uint32_t ResolvePlayerColorByIndex(LuaPlus::LuaState* const state, const int colorIndex)
+  {
+    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+
+    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
+    const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
+    const LuaPlus::LuaObject colorObject = playerColors.GetByIndex(colorIndex + 1);
+    return moho::SCR_DecodeColor(state, colorObject);
+  }
+
+  [[nodiscard]] std::uint32_t ResolveArmyColorByIndex(LuaPlus::LuaState* const state, const int colorIndex)
+  {
+    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+
+    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
+    const LuaPlus::LuaObject armyColors = gameColors[kArmyColorsTableName];
+    const LuaPlus::LuaObject colorObject = armyColors.GetByIndex(colorIndex + 1);
+    return moho::SCR_DecodeColor(state, colorObject);
+  }
+
+  [[nodiscard]] std::uint32_t ResolveGameColorField(LuaPlus::LuaState* const state, const char* const fieldName)
+  {
+    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+
+    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
+    const LuaPlus::LuaObject colorObject = gameColors[fieldName];
+    return moho::SCR_DecodeColor(state, colorObject);
+  }
+
+  [[nodiscard]] msvc8::string ResolvePlayerColorNameByIndex(LuaPlus::LuaState* const state, const int colorIndex)
+  {
+    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+
+    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
+    const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
+    const LuaPlus::LuaObject colorObject = playerColors.GetByIndex(colorIndex + 1);
+    return msvc8::string(colorObject.GetString());
+  }
+
+  [[nodiscard]] std::uint32_t ResolvePlayerColorCount(LuaPlus::LuaState* const state)
+  {
+    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+
+    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
+    const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
+    return static_cast<std::uint32_t>(playerColors.GetCount());
+  }
+
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardArmyLuaRegistrationThunk() noexcept
   {
@@ -26,6 +169,415 @@ namespace
 
 namespace moho
 {
+  int cfunc_CreateInitialArmyUnit(lua_State* luaContext);
+  int cfunc_SetArmyColorIndex(lua_State* luaContext);
+  int cfunc_AddBuildRestriction(lua_State* luaContext);
+  int cfunc_RemoveBuildRestriction(lua_State* luaContext);
+  int cfunc_CreateInitialArmyUnitL(LuaPlus::LuaState* state);
+  int cfunc_SetArmyColorIndexL(LuaPlus::LuaState* state);
+  int cfunc_AddBuildRestrictionL(LuaPlus::LuaState* state);
+  int cfunc_RemoveBuildRestrictionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005068B0 (FUN_005068B0, ?GetPlayerColor@Moho@@YAIH@Z)
+   *
+   * int idx
+   *
+   * What it does:
+   * Resolves one configured player color entry by index and decodes it into
+   * packed ARGB.
+   */
+  std::uint32_t GetPlayerColor(const int idx)
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+    return ResolvePlayerColorByIndex(colorState, idx);
+  }
+
+  /**
+   * Address: 0x00506970 (FUN_00506970, ?GetArmyColor@Moho@@YAIH@Z)
+   *
+   * int idx
+   *
+   * What it does:
+   * Resolves one configured army color entry by index and decodes it into
+   * packed ARGB.
+   */
+  std::uint32_t GetArmyColor(const int idx)
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+    return ResolveArmyColorByIndex(colorState, idx);
+  }
+
+  /**
+   * Address: 0x00506A30 (FUN_00506A30, ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
+   *
+   * int idx
+   *
+   * What it does:
+   * Returns one player-color token string from the game color table.
+   */
+  msvc8::string GetPlayerColorName(const int idx)
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+    return ResolvePlayerColorNameByIndex(colorState, idx);
+  }
+
+  /**
+   * Address: 0x00506B20 (FUN_00506B20, ?GetPlayerColorCount@Moho@@YAIXZ)
+   *
+   * What it does:
+   * Returns the number of configured player colors.
+   */
+  std::uint32_t GetPlayerColorCount()
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+    return ResolvePlayerColorCount(colorState);
+  }
+
+  /**
+   * Address: 0x00506BB0 (FUN_00506BB0, ?GetCivilianArmyColor@Moho@@YAIXZ)
+   *
+   * What it does:
+   * Decodes the configured civilian army color token into packed ARGB.
+   */
+  std::uint32_t GetCivilianArmyColor()
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+    return ResolveGameColorField(colorState, kCivilianArmyColorFieldName);
+  }
+
+  /**
+   * Address: 0x00506C40 (FUN_00506C40, ?GetUnidentifiedColor@Moho@@YAIXZ)
+   *
+   * What it does:
+   * Decodes the configured unidentified color token into packed ARGB.
+   */
+  std::uint32_t GetUnidentifiedColor()
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+    return ResolveGameColorField(colorState, kUnidentifiedColorFieldName);
+  }
+
+  /**
+   * Address: 0x00506CD0 (FUN_00506CD0, func_GetColorIndex)
+   *
+   * int packedColor
+   *
+   * What it does:
+   * Scans the configured army-color table and returns the first index whose
+   * decoded color matches `packedColor`; defaults to `3` when not found.
+   */
+  int func_GetColorIndex(const int packedColor)
+  {
+    LuaPlus::LuaState* const colorState = GetColorLuaState();
+
+    LuaPlus::LuaObject* const gameColorsRoot = GetColors();
+
+    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
+    const LuaPlus::LuaObject armyColors = gameColors[kArmyColorsTableName];
+    LuaPlus::LuaTableIterator iter(armyColors, 1);
+
+    int colorIndex = 0;
+    while (iter.IsValid()) {
+      const int decodedColor = static_cast<int>(moho::SCR_DecodeColor(colorState, iter.GetValue()));
+      if (packedColor == decodedColor) {
+        return colorIndex;
+      }
+
+      iter.Next();
+      ++colorIndex;
+    }
+
+    return 3;
+  }
+
+  /**
+   * Address: 0x007092E0 (FUN_007092E0, func_CreateInitialArmyUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `CreateInitialArmyUnit`.
+   */
+  CScrLuaInitForm* func_CreateInitialArmyUnit_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kCreateInitialArmyUnitName,
+      &cfunc_CreateInitialArmyUnit,
+      nullptr,
+      kGlobalLuaClassName,
+      kCreateInitialArmyUnitHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00709E70 (FUN_00709E70, func_SetArmyColorIndex_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SetArmyColorIndex`.
+   */
+  CScrLuaInitForm* func_SetArmyColorIndex_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kSetArmyColorIndexName,
+      &cfunc_SetArmyColorIndex,
+      nullptr,
+      kGlobalLuaClassName,
+      kSetArmyColorIndexHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0070A700 (FUN_0070A700, func_AddBuildRestriction_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `AddBuildRestriction`.
+   */
+  CScrLuaInitForm* func_AddBuildRestriction_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kAddBuildRestrictionName,
+      &cfunc_AddBuildRestriction,
+      nullptr,
+      kGlobalLuaClassName,
+      kAddBuildRestrictionHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0070A820 (FUN_0070A820, func_RemoveBuildRestriction_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `RemoveBuildRestriction`.
+   */
+  CScrLuaInitForm* func_RemoveBuildRestriction_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kRemoveBuildRestrictionName,
+      &cfunc_RemoveBuildRestriction,
+      nullptr,
+      kGlobalLuaClassName,
+      kRemoveBuildRestrictionHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x007092C0 (FUN_007092C0, cfunc_CreateInitialArmyUnit)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CreateInitialArmyUnitL`.
+   */
+  int cfunc_CreateInitialArmyUnit(lua_State* const luaContext)
+  {
+    return cfunc_CreateInitialArmyUnitL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00709E50 (FUN_00709E50, cfunc_SetArmyColorIndex)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyColorIndexL`.
+   */
+  int cfunc_SetArmyColorIndex(lua_State* const luaContext)
+  {
+    return cfunc_SetArmyColorIndexL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00709ED0 (FUN_00709ED0, cfunc_SetArmyColorIndexL)
+   *
+   * What it does:
+   * Reads `(army, colorIndex)`, resolves one configured player color by index,
+   * and writes both army color lanes.
+   */
+  int cfunc_SetArmyColorIndexL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetArmyColorIndexHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+    CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+    LuaPlus::LuaStackObject colorIndexArg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      colorIndexArg.TypeError("integer");
+    }
+
+    const int colorIndex = static_cast<int>(lua_tonumber(rawState, 2));
+    const std::uint32_t packedColor = GetPlayerColor(colorIndex);
+    army->PlayerColorBgra = packedColor;
+    army->ArmyColorBgra = packedColor;
+    return 0;
+  }
+
+  /**
+   * Address: 0x0070A6E0 (FUN_0070A6E0, cfunc_AddBuildRestriction)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_AddBuildRestrictionL`.
+   */
+  int cfunc_AddBuildRestriction(lua_State* const luaContext)
+  {
+    return cfunc_AddBuildRestrictionL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0070A800 (FUN_0070A800, cfunc_RemoveBuildRestriction)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_RemoveBuildRestrictionL`.
+   */
+  int cfunc_RemoveBuildRestriction(lua_State* const luaContext)
+  {
+    return cfunc_RemoveBuildRestrictionL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00709340 (FUN_00709340, cfunc_CreateInitialArmyUnitL)
+   *
+   * What it does:
+   * Reads `(army, initialUnitName)`, resolves one unit blueprint from rules,
+   * and creates one initial unit at that army start position.
+   */
+  int cfunc_CreateInitialArmyUnitL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCreateInitialArmyUnitHelpText, 2, argumentCount);
+    }
+
+    Sim* const sim = lua_getglobaluserdata(rawState);
+
+    const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+    CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+    LuaPlus::LuaStackObject initialUnitArg(state, 2);
+    const char* initialUnitName = lua_tostring(rawState, 2);
+    if (!initialUnitName) {
+      initialUnitArg.TypeError("string");
+      initialUnitName = "";
+    }
+
+    RResId blueprintId{};
+    blueprintId.name.assign_owned(initialUnitName);
+
+    RUnitBlueprint* blueprint = nullptr;
+    if (sim && sim->mRules) {
+      blueprint = sim->mRules->GetUnitBlueprint(blueprintId);
+    }
+    if (!blueprint) {
+      LuaPlus::LuaState::Error(state, "Unknown initial unit: %s", blueprintId.name.c_str());
+    }
+
+    Wm3::Vector2f startPosition{};
+    army->GetArmyStartPos(startPosition);
+
+    SUnitConstructionParams constructionParams{};
+    constructionParams.mArmy = army;
+    constructionParams.mBlueprint = blueprint;
+    constructionParams.mTransform.orient_.x = 1.0f;
+    constructionParams.mTransform.orient_.y = 0.0f;
+    constructionParams.mTransform.orient_.z = 0.0f;
+    constructionParams.mTransform.orient_.w = 0.0f;
+    constructionParams.mTransform.pos_.x = startPosition.x;
+    constructionParams.mTransform.pos_.y = 0.0f;
+    constructionParams.mTransform.pos_.z = startPosition.y;
+    constructionParams.mUseLayerOverride = 1;
+    constructionParams.mFixElevation = 0;
+    constructionParams.mLayer = 0;
+    constructionParams.mLinkSourceUnit = nullptr;
+    constructionParams.mComplete = 1;
+
+    Unit* const unit = sim ? sim->CreateUnitForScript(constructionParams, true) : nullptr;
+    if (!unit) {
+      LuaPlus::LuaState::Error(state, "SetArmyStart() failed");
+    }
+
+    unit->mLuaObj.PushStack(state);
+    return 1;
+  }
+
+  /**
+   * Address: 0x0070A760 (FUN_0070A760, cfunc_AddBuildRestrictionL)
+   *
+   * What it does:
+   * Reads `(army, categorySet)` and applies one build restriction to that army.
+   */
+  int cfunc_AddBuildRestrictionL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kAddBuildRestrictionHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+    CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+    const LuaPlus::LuaObject restrictionObject(LuaPlus::LuaStackObject(state, 2));
+    void* const restriction = static_cast<void*>(func_GetCObj_EntityCategory(restrictionObject));
+    army->AddBuildRestriction(restriction);
+    return 0;
+  }
+
+  /**
+   * Address: 0x0070A880 (FUN_0070A880, cfunc_RemoveBuildRestrictionL)
+   *
+   * What it does:
+   * Reads `(army, categorySet)` and removes one build restriction from that
+   * army.
+   */
+  int cfunc_RemoveBuildRestrictionL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected %d args, but got %d",
+        kRemoveBuildRestrictionHelpText,
+        2,
+        argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+    CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+    const LuaPlus::LuaObject restrictionObject(LuaPlus::LuaStackObject(state, 2));
+    void* const restriction = static_cast<void*>(func_GetCObj_EntityCategory(restrictionObject));
+    army->RemoveBuildRestriction(restriction);
+    return 0;
+  }
+
   /**
    * Address: 0x00BD9D00 (FUN_00BD9D00, j_func_ListArmies_LuaFuncDef)
    *

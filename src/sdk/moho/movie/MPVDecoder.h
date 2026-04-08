@@ -33,6 +33,16 @@ namespace moho::movie
 
   static_assert(sizeof(MPVSjChunk) == 0x08, "MPVSjChunk size must be 0x08");
 
+  struct MPVFrameDecodeSession
+  {
+    std::int32_t decodeControlWords[9]; // +0x00
+    int pictureAttributesAddress;       // +0x24
+    int recoverEventDelta;              // +0x28
+    int recoverConditionDelta;          // +0x2C
+  };
+
+  static_assert(sizeof(MPVFrameDecodeSession) == 0x30, "MPVFrameDecodeSession size must be 0x30");
+
   struct MPVBlockWriteTarget
   {
     std::uint8_t* pixels; // +0x00
@@ -587,3 +597,583 @@ namespace moho::movie
    */
   int MPVDEC_DecBpicMb(MPVDecoderScanContext* context, MPVSjStream* stream);
 } // namespace moho::movie
+
+extern "C"
+{
+  /**
+   * Address: 0x00AE79E0 (FUN_00AE79E0, _mpvlib_ChkFatal)
+   *
+   * What it does:
+   * Validates MPV runtime prerequisites (VLC-table sizing and decoder version)
+   * and maps failures to MPV error codes.
+   */
+  int mpvlib_ChkFatal();
+
+  /**
+   * Address: 0x00AE7A30 (FUN_00AE7A30, _mpvlib_ChkCacheMode)
+   *
+   * What it does:
+   * Cache-mode compatibility hook (no-op in the PC build).
+   */
+  void mpvlib_ChkCacheMode();
+
+  /**
+   * Address: 0x00AE7A40 (FUN_00AE7A40, _MPVLIB_ConvWorkAddr)
+   *
+   * What it does:
+   * Converts caller-provided work memory address into runtime work-space
+   * address form (identity on PC build).
+   */
+  int MPVLIB_ConvWorkAddr(int workAddress);
+
+  /**
+   * Address: 0x00AE7A50 (FUN_00AE7A50)
+   *
+   * What it does:
+   * Applies optional work-address tag lane A when the corresponding runtime
+   * flag is enabled.
+   */
+  int MPVLIB_ConvAddrPrimary(int address);
+
+  /**
+   * Address: 0x00AE7A70 (FUN_00AE7A70)
+   *
+   * What it does:
+   * Applies optional work-address tag lane B when the corresponding runtime
+   * flag is enabled.
+   */
+  int MPVLIB_ConvAddrSecondary(int address);
+
+  /**
+   * Address: 0x00AE7A90 (FUN_00AE7A90)
+   *
+   * What it does:
+   * Normalizes an address into the high-bit tagged address domain used by MPV
+   * runtime lanes.
+   */
+  std::uint32_t MPVLIB_ConvAddrWindow8(int address);
+
+  /**
+   * Address: 0x00AE7AA0 (FUN_00AE7AA0, _mpvlib_InitClip)
+   *
+   * What it does:
+   * Initializes clip-table defaults and optionally mirrors them into caller
+   * work memory.
+   */
+  std::int32_t* mpvlib_InitClip(std::int32_t* clipTableStorage);
+
+  /**
+   * Address: 0x00AE7AD0 (FUN_00AE7AD0, _mpvlib_InitClip0255)
+   *
+   * What it does:
+   * Builds the canonical signed clip table [-384..639] with central
+   * 0..255 identity lane.
+   */
+  int mpvlib_InitClip0255();
+
+  /**
+   * Address: 0x00AE7B10 (FUN_00AE7B10, _mpvlib_InitObjTbl)
+   *
+   * What it does:
+   * Marks each allocated MPV work object slot as active in the object table.
+   */
+  void mpvlib_InitObjTbl();
+
+  /**
+   * Address: 0x00AE7B40 (FUN_00AE7B40, _mpvlib_InitDct)
+   *
+   * What it does:
+   * Initializes DCT runtime kernels and scale tables in caller work memory.
+   */
+  int mpvlib_InitDct(int runtimeWorkBase);
+
+  /**
+   * Address: 0x00AE7B60 (FUN_00AE7B60, _mpvlib_InitWork)
+   *
+   * What it does:
+   * Clears/aligned MPV work arena, seeds conceal workspace, and stores active
+   * runtime lane pointers into global MPV work state.
+   */
+  std::int32_t* mpvlib_InitWork(int objectCount, int workMemoryBaseAddress);
+
+  /**
+   * Address: 0x00AE7BE0 (FUN_00AE7BE0, _MPV_Finish)
+   *
+   * What it does:
+   * Finalizes MPV decode/conceal subsystems using active global work state.
+   */
+  int MPV_Finish();
+
+  /**
+   * Address: 0x00AE7C00 (FUN_00AE7C00, _MPV_Create)
+   *
+   * What it does:
+   * Allocates one free MPV handle slot, initializes it, and creates the paired
+   * MPVM2V runtime object.
+   */
+  int MPV_Create();
+
+  /**
+   * Address: 0x00AE7C40 (FUN_00AE7C40, _mpvlib_SearchFreeHn)
+   *
+   * What it does:
+   * Scans the MPV handle table for a free slot marker and returns its address.
+   */
+  int mpvlib_SearchFreeHn();
+
+  /**
+   * Address: 0x00AE7C70 (FUN_00AE7C70, _mpvlib_InitHn)
+   *
+   * What it does:
+   * Performs full per-handle initialization: object lanes, error state,
+   * picture attributes, callback defaults, and stream hooks.
+   */
+  int mpvlib_InitHn(int handleAddress);
+
+  /**
+   * Address: 0x00AE7D60 (FUN_00AE7D60, _mpvlib_InitObj)
+   *
+   * What it does:
+   * Binds VLC/clip/transform and internal scratch lanes for one MPV handle.
+   */
+  int mpvlib_InitObj(int handleAddress);
+
+  /**
+   * Address: 0x00AE7E70 (FUN_00AE7E70, _mpvlib_InitPicAtr)
+   *
+   * What it does:
+   * Resets picture-attribute defaults used by MPEG picture decode paths.
+   */
+  int mpvlib_InitPicAtr(int pictureAttributesAddress);
+
+  /**
+   * Address: 0x00AE7F10 (FUN_00AE7F10, _mpvlib_InitDctPa)
+   *
+   * What it does:
+   * Initializes per-handle DCT plane state and binds DCT count/scratch lanes.
+   */
+  int mpvlib_InitDctPa(int handleAddress);
+
+  /**
+   * Address: 0x00AE7F40 (FUN_00AE7F40, _MPV_GetDctCnt)
+   *
+   * What it does:
+   * Reads two per-handle DCT counters into caller outputs.
+   */
+  int MPV_GetDctCnt(int handleAddress, int* outPrimaryCount, int* outSecondaryCount);
+
+  /**
+   * Address: 0x00AE7F60 (FUN_00AE7F60, _MPV_Destroy)
+   *
+   * What it does:
+   * Validates and destroys one MPV handle lane, then marks it free.
+   */
+  int MPV_Destroy(int handleAddress);
+
+  /**
+   * Address: 0x00AE7FB0 (FUN_00AE7FB0, nullsub_48)
+   *
+   * What it does:
+   * No-op range initializer hook retained for binary parity.
+   */
+  void mpvlib_NoOpInitializeRange(void* stateBaseAddress, int stateSizeBytes);
+
+  /**
+   * Address: 0x00AE7FC0 (FUN_00AE7FC0, _MPVCONCEAL_Finish)
+   *
+   * What it does:
+   * No-op conceal teardown hook retained for binary parity.
+   */
+  int MPVCONCEAL_Finish(int concealStateBaseAddress, int concealStateSizeBytes);
+
+  /**
+   * Address: 0x00AE7FD0 (FUN_00AE7FD0, nullsub_26)
+   *
+   * What it does:
+   * Default no-op condition callback used when condition slot 8 is null.
+   */
+  int mpvlib_DefaultConditionNoOp();
+
+  /**
+   * Address: 0x00AE7FE0 (FUN_00AE7FE0, _MPV_SetCond)
+   *
+   * What it does:
+   * Sets one runtime condition callback either globally or per handle.
+   */
+  int MPV_SetCond(int handleAddress, int conditionIndex, int (*conditionCallback)());
+
+  /**
+   * Address: 0x00AE8060 (FUN_00AE8060, _mpvlib_SetCondAll)
+   *
+   * What it does:
+   * Broadcasts one condition callback to all active MPV handle lanes.
+   */
+  int mpvlib_SetCondAll(int conditionIndex, int callbackAddress);
+
+  /**
+   * Address: 0x00AE80A0 (FUN_00AE80A0, _MPV_GetCond)
+   *
+   * What it does:
+   * Gets one runtime condition callback from either global state or a handle.
+   */
+  int MPV_GetCond(int handleAddress, int conditionIndex, int* outCallbackAddress);
+
+  /**
+   * Address: 0x00AE8100 (FUN_00AE8100, _MPVLIB_CheckHn)
+   *
+   * What it does:
+   * Validates that a handle exists and is currently allocated.
+   */
+  int MPVLIB_CheckHn(int handleAddress);
+
+  /**
+   * Address: 0x00AE8120 (FUN_00AE8120, _MPVHDEC_Init)
+   *
+   * What it does:
+   * Initializes macroblock decode dispatch tables for normal and thumbnail
+   * decode lanes.
+   */
+  void MPVHDEC_Init();
+
+  /**
+   * Address: 0x00AE8270 (FUN_00AE8270, _MPV_SetUsrSj)
+   *
+   * What it does:
+   * Sets one user SJ stream slot (object/callback/context) for a handle.
+   */
+  std::int32_t* MPV_SetUsrSj(
+    int handleAddress, int streamIndex, int streamObjectAddress, int streamCallbackAddress, int streamContextAddress
+  );
+
+  /**
+   * Address: 0x00AE82A0 (FUN_00AE82A0, _MPV_SetPicUsrBuf)
+   *
+   * What it does:
+   * Sets per-handle picture-user buffer/context and clears picture decode-state
+   * latch.
+   */
+  std::int32_t* MPV_SetPicUsrBuf(int handleAddress, int userBufferAddress, int userContextAddress);
+
+  /**
+   * Address: 0x00AE82D0 (FUN_00AE82D0, _MPV_GetPicUsr)
+   *
+   * What it does:
+   * Reads per-handle picture-user buffer/decode-state fields.
+   */
+  int* MPV_GetPicUsr(int handleAddress, int* outUserBufferAddress, int* outDecodeState);
+
+  /**
+   * Address: 0x00AE8300 (FUN_00AE8300, _MPV_DecodePicAtrSj)
+   *
+   * What it does:
+   * Decodes picture attributes from an SJ stream using delimiter recovery
+   * semantics.
+   */
+  int MPV_DecodePicAtrSj(int handleAddress, moho::movie::MPVSjStream* stream);
+
+  /**
+   * Address: 0x00AE84C0 (FUN_00AE84C0, _mpvhdec_GetCurDelim)
+   *
+   * What it does:
+   * Reads current stream delimiter type from the active SJ chunk.
+   */
+  int mpvhdec_GetCurDelim(moho::movie::MPVSjStream* stream);
+
+  /**
+   * Address: 0x00AE8510 (FUN_00AE8510, _MPV_DecodePicAtr)
+   *
+   * What it does:
+   * Decodes picture attributes from a raw buffer range through SJ memory
+   * wrapper stream.
+   */
+  int MPV_DecodePicAtr(int handleAddress, const int* pictureDataRange, int* outConsumedBytes);
+
+  /**
+   * Address: 0x00AEAB20 (FUN_00AEAB20, _MPV_DecodeFrmSj)
+   *
+   * What it does:
+   * Decodes one frame from an SJ stream, refreshes exported picture attributes,
+   * and reports recovery-counter deltas.
+   */
+  int MPV_DecodeFrmSj(int handleAddress, moho::movie::MPVSjStream* stream, moho::movie::MPVFrameDecodeSession* frameSession);
+
+  /**
+   * Address: 0x00AE8570 (FUN_00AE8570, _mpvhdec_GetCodec)
+   *
+   * What it does:
+   * Classifies codec lane for current chunk and caches result in handle state.
+   */
+  int mpvhdec_GetCodec(int handleAddress, moho::movie::MPVSjChunk* chunk);
+
+  /**
+   * Address: 0x00AE94C0 (FUN_00AE94C0, _mpvhdec_AnalyUd)
+   *
+   * What it does:
+   * Scans user-data payload, forwards captured bytes to configured user lanes,
+   * and applies sequence user-data directives when needed.
+   */
+  int mpvhdec_AnalyUd(std::int32_t* handleWords, std::uint8_t* userDataStart, int chunkSize);
+
+  /**
+   * Address: 0x00AE9650 (FUN_00AE9650, _mpvhdec_DecSeqUdsc)
+   *
+   * What it does:
+   * Parses sequence user-data directives (`IDCPREC`, `STCCODE`) and updates
+   * decoder kernel/table lane bindings.
+   */
+  int mpvhdec_DecSeqUdsc(std::int32_t* handleWords, const std::uint8_t* userDataStart, int consumedByteCount);
+
+  /**
+   * Address: 0x00AE9A10 (FUN_00AE9A10, _MPVHDEC_RecoverSj)
+   *
+   * What it does:
+   * Advances/realigns SJ stream to matching delimiter mask with recovery
+   * counters.
+   */
+  int MPVHDEC_RecoverSj(int handleAddress, int expectedDelimiterMask, moho::movie::MPVSjStream* stream);
+
+  /**
+   * Address: 0x00AE9AB0 (FUN_00AE9AB0, _MPV_MoveChunk)
+   *
+   * What it does:
+   * Moves one stream chunk between lanes and returns moved byte count.
+   */
+  int MPV_MoveChunk(moho::movie::MPVSjStream* stream, int lane, int byteCount);
+
+  /**
+   * Address: 0x00AE9F10 (FUN_00AE9F10, _MPV_CheckDelim)
+   *
+   * What it does:
+   * Classifies one 4-byte start-code word into MPV delimiter categories.
+   */
+  int MPV_CheckDelim(const std::uint8_t* bitstreamCursor);
+
+  /**
+   * Address: 0x00AE9FB0 (FUN_00AE9FB0, _MPV_BsearchDelim)
+   *
+   * What it does:
+   * Scans backward from one-past-end cursor for a delimiter matching mask.
+   */
+  std::uint8_t* MPV_BsearchDelim(std::uint8_t* bitstreamCursor, unsigned int scanLengthBytes, int delimiterMask);
+
+  /**
+   * Address: 0x00AEA040 (FUN_00AEA040, _MPV_SearchDelim)
+   *
+   * What it does:
+   * Scans forward across a byte range and returns first matching delimiter.
+   */
+  std::uint8_t* MPV_SearchDelim(const std::uint8_t* bitstreamCursor, int scanLengthBytes, int delimiterMask);
+
+  /**
+   * Address: 0x00AF63A0 (FUN_00AF63A0, _MPVVLC_Init)
+   *
+   * What it does:
+   * Initializes all static MPV VLC tables and optionally builds runtime VLC
+   * state for a provided setup context.
+   */
+  int MPVVLC_Init(int vlcContextBase);
+
+  /**
+   * Address: 0x00AF63E0 (FUN_00AF63E0, _mpvvlc_InitMbai)
+   *
+   * What it does:
+   * Initializes I/P/B-picture MBAI seed tables.
+   */
+  std::uint16_t* mpvvlc_InitMbai();
+
+  /**
+   * Address: 0x00AF63F0 (FUN_00AF63F0, _mpvvlc_InitMbaiIpic)
+   *
+   * What it does:
+   * Seeds I-picture MBAI VLC tables (`mpvvlt_mbai_i_0` and
+   * `mpvvlt_mbai_i_1`).
+   */
+  int mpvvlc_InitMbaiIpic();
+
+  /**
+   * Address: 0x00AF6630 (FUN_00AF6630, _mpvvlc_InitMbaiPpic)
+   *
+   * What it does:
+   * Seeds P-picture MBAI VLC tables (`mpvvlt_mbai_p_0` and
+   * `mpvvlt_mbai_p_1`).
+   */
+  std::uint16_t* mpvvlc_InitMbaiPpic();
+
+  /**
+   * Address: 0x00AF68D0 (FUN_00AF68D0, _mpvvlc_InitMbaiBpic)
+   *
+   * What it does:
+   * Seeds B-picture MBAI VLC tables (`mpvvlt_mbai_b_0` and
+   * `mpvvlt_mbai_b_1`).
+   */
+  std::uint16_t* mpvvlc_InitMbaiBpic();
+
+  /**
+   * Address: 0x00AF6B80 (FUN_00AF6B80, _mpvvlc_InitMbType)
+   *
+   * What it does:
+   * Initializes both P-picture and B-picture MB-type VLC seed tables.
+   */
+  int mpvvlc_InitMbType();
+
+  /**
+   * Address: 0x00AF6B90 (FUN_00AF6B90, _mpvvlc_InitMbTypePpic)
+   *
+   * What it does:
+   * Seeds the static P-picture MB-type VLC table.
+   */
+  int mpvvlc_InitMbTypePpic();
+
+  /**
+   * Address: 0x00AF6C00 (FUN_00AF6C00, _mpvvlc_InitMbTypeBpic)
+   *
+   * What it does:
+   * Seeds the static B-picture MB-type VLC table.
+   */
+  int mpvvlc_InitMbTypeBpic();
+
+  /**
+   * Address: 0x00AF6CC0 (FUN_00AF6CC0, _mpvvlc_InitMotion)
+   *
+   * What it does:
+   * Seeds motion-vector VLC tables (`mpvvlt_motion_0` and
+   * `mpvvlt_motion_1`).
+   */
+  int mpvvlc_InitMotion();
+
+  /**
+   * Address: 0x00AF6E30 (FUN_00AF6E30, _mpvvlc_InitCbp)
+   *
+   * What it does:
+   * Initializes the complete CBP VLC table by chaining two seed segments.
+   */
+  std::uint32_t* mpvvlc_InitCbp();
+
+  /**
+   * Address: 0x00AF6E50 (FUN_00AF6E50, _mpvvlc_InitCbpSub1)
+   *
+   * What it does:
+   * Seeds the first contiguous CBP VLC segment and returns the next write
+   * cursor.
+   */
+  std::uint32_t* mpvvlc_InitCbpSub1(std::uint32_t* cbpTable);
+
+  /**
+   * Address: 0x00AF6F90 (FUN_00AF6F90, _mpvvlc_InitCbpSub2)
+   *
+   * What it does:
+   * Seeds trailing CBP VLC segments and returns the final write cursor.
+   */
+  std::uint32_t* mpvvlc_InitCbpSub2(std::uint32_t* cbpCursor);
+
+  /**
+   * Address: 0x00AF7190 (FUN_00AF7190, _mpvvlc_InitDcSiz)
+   *
+   * What it does:
+   * Initializes primary and secondary Y/C DC-size VLC seed tables.
+   */
+  int mpvvlc_InitDcSiz();
+
+  /**
+   * Address: 0x00AF71B0 (FUN_00AF71B0, _mpvvlc_InitDcSizY)
+   *
+   * What it does:
+   * Seeds primary Y DC-size VLC table entries.
+   */
+  int mpvvlc_InitDcSizY();
+
+  /**
+   * Address: 0x00AF7260 (FUN_00AF7260, _mpvvlc_InitDcSizC)
+   *
+   * What it does:
+   * Seeds primary C DC-size VLC table entries.
+   */
+  int mpvvlc_InitDcSizC();
+
+  /**
+   * Address: 0x00AF72F0 (FUN_00AF72F0, _mpvvlc2_InitDcSizY)
+   *
+   * What it does:
+   * Seeds secondary Y DC-size VLC table entries.
+   */
+  int mpvvlc2_InitDcSizY();
+
+  /**
+   * Address: 0x00AF73B0 (FUN_00AF73B0, _mpvvlc2_InitDcSizC)
+   *
+   * What it does:
+   * Seeds secondary C DC-size VLC table entries.
+   */
+  int mpvvlc2_InitDcSizC();
+
+  /**
+   * Address: 0x00AF7470 (FUN_00AF7470, _mpvvlc_InitRunLevel)
+   *
+   * What it does:
+   * Thin run-level init thunk that forwards into the concrete 8-bit table
+   * initializer.
+   */
+  int mpvvlc_InitRunLevel();
+
+  /**
+   * Address: 0x00AF7480 (FUN_00AF7480, _mpvvlc_InitIntRunLevel)
+   *
+   * What it does:
+   * Seeds the 8-bit run-level VLC table with fixed entries and compact value
+   * runs used by MPV decode setup.
+   */
+  int mpvvlc_InitIntRunLevel();
+
+  /**
+   * Address: 0x00AF7620 (FUN_00AF7620, _mpvvlc_SetDflPtr)
+   *
+   * What it does:
+   * Rebinds active VLC pointer lanes to their default static table roots.
+   */
+  void mpvvlc_SetDflPtr();
+
+  /**
+   * Address: 0x00AF7730 (FUN_00AF7730, _mpvvlc_SetVlcRunLevel)
+   *
+   * What it does:
+   * Carves run-level VLC lanes inside the runtime setup arena and copies
+   * static defaults into each lane.
+   */
+  int mpvvlc_SetVlcRunLevel(int runLevelStateBase);
+
+  /**
+   * Address: 0x00AF77E0 (FUN_00AF77E0, _mpvvlc_SetVlcDcSiz)
+   *
+   * What it does:
+   * Allocates Y/C DC-size VLC lanes in the setup arena and copies their
+   * default decode tables.
+   */
+  int mpvvlc_SetVlcDcSiz(int runLevelState);
+
+  /**
+   * Address: 0x00AF7820 (FUN_00AF7820, _mpvvlc_SetVlcMotion)
+   *
+   * What it does:
+   * Writes motion-vector VLC tables into the setup arena and returns the next
+   * free cursor for downstream setup lanes.
+   */
+  int mpvvlc_SetVlcMotion(int runLevelState);
+
+  /**
+   * Address: 0x00AF7860 (FUN_00AF7860, _mpvvlc_SetVlcMbType)
+   *
+   * What it does:
+   * Allocates and seeds P/B macroblock-type VLC tables, returning the
+   * remaining setup cursor after both tables are copied.
+   */
+  int mpvvlc_SetVlcMbType(int runLevelState);
+
+  /**
+   * Address: 0x00AF7700 (FUN_00AF7700, _mpvvlc_SetupVlc)
+   *
+   * What it does:
+   * Builds VLC runtime state by chaining run-level, DC-size, motion, and
+   * macroblock-type setup lanes.
+   */
+  int mpvvlc_SetupVlc(int vlcContextBase);
+}

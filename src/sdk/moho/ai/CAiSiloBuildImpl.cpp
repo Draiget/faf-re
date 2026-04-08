@@ -679,8 +679,8 @@ void CAiSiloBuildImpl::SiloStopBuild()
   mUnit->NeedSyncGameData = true;
 
   if (mState == SBS_Prepare || mState == SBS_Active) {
-    mUnit->EconomyEventRequestedEnergyRate = 0.0f;
-    mUnit->EconomyEventRequestedMassRate = 0.0f;
+    mUnit->SharedEconomyRateEnergy = 0.0f;
+    mUnit->SharedEconomyRateMass = 0.0f;
   }
 
   mUnit->UnitStateMask &= ~kSiloBuildingStateMask;
@@ -756,8 +756,8 @@ void CAiSiloBuildImpl::SiloTick()
     ReplaceEconomyRequestPointer(mRequest, CreateEconomyRequest(mSegmentCost, economy));
 
     mState = SBS_Active;
-    mUnit->EconomyEventRequestedEnergyRate = mSegmentCost.energy;
-    mUnit->EconomyEventRequestedMassRate = mSegmentCost.mass;
+    mUnit->SharedEconomyRateEnergy = mSegmentCost.energy;
+    mUnit->SharedEconomyRateMass = mSegmentCost.mass;
     mUnit->UnitStateMask |= kSiloBuildingStateMask;
     DispatchWeaponCallback(mUnit, "OnSiloBuildStart", queuedWeapon);
     return;
@@ -766,8 +766,8 @@ void CAiSiloBuildImpl::SiloTick()
   case SBS_Active:
     if (mRequest && mRequest->mGranted.energy >= mSegmentCost.energy && mRequest->mGranted.mass >= mSegmentCost.mass) {
       const SEconValue granted = TakeGrantedResourcesAndReset(mRequest);
-      mUnit->EconomyEventRequestedEnergyRate = mSegmentCost.energy;
-      mUnit->EconomyEventRequestedMassRate = mSegmentCost.mass;
+      mUnit->SharedEconomyRateEnergy = mSegmentCost.energy;
+      mUnit->SharedEconomyRateMass = mSegmentCost.mass;
       mUnit->mBeatResourceAccumulators.resourcesSpentEnergy += granted.energy;
       mUnit->mBeatResourceAccumulators.resourcesSpentMass += granted.mass;
       mUnit->WorkProgress = static_cast<float>(mCurSegments++) / mSegments;
@@ -780,8 +780,8 @@ void CAiSiloBuildImpl::SiloTick()
 
   case SBS_Finish:
   {
-    mUnit->EconomyEventRequestedEnergyRate = 0.0f;
-    mUnit->EconomyEventRequestedMassRate = 0.0f;
+    mUnit->SharedEconomyRateEnergy = 0.0f;
+    mUnit->SharedEconomyRateMass = 0.0f;
     mUnit->UnitStateMask &= ~kSiloBuildingStateMask;
     mUnit->WorkProgress = 0.0f;
 

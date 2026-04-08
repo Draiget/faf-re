@@ -6,6 +6,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/String.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/misc/Stats.h"
 
@@ -16,10 +17,7 @@ namespace
   class Rect2iListTypeInfo final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "std::list<gpg::Rect2<int>>";
-    }
+    [[nodiscard]] const char* GetName() const override;
   };
 
   static_assert(sizeof(Rect2iListTypeInfo) == 0x64, "Rect2iListTypeInfo size must be 0x64");
@@ -29,6 +27,8 @@ namespace
 
   alignas(Rect2iListTypeInfo) unsigned char gRect2iListTypeInfoStorage[sizeof(Rect2iListTypeInfo)] = {};
   bool gRect2iListTypeInfoConstructed = false;
+  msvc8::string gRect2iListTypeName;
+  bool gRect2iListTypeNameCleanupRegistered = false;
 
   template <std::uintptr_t SlotAddress>
   struct StartupEngineStatsSlot
@@ -60,6 +60,16 @@ namespace
     }
 
     return reinterpret_cast<Rect2iListTypeInfo*>(gRect2iListTypeInfoStorage);
+  }
+
+  [[nodiscard]] gpg::RType* CachedRect2iType()
+  {
+    gpg::RType* type = gpg::Rect2i::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(gpg::Rect2i));
+      gpg::Rect2i::sType = type;
+    }
+    return type;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiPathFinderType()
@@ -127,6 +137,33 @@ namespace
     if (pathFinder) {
       pathFinder->~CAiPathFinder();
     }
+  }
+
+  void cleanup_Rect2iListTypeName()
+  {
+    gRect2iListTypeName.clear();
+    gRect2iListTypeNameCleanupRegistered = false;
+  }
+
+  /**
+   * Address: 0x005AAFA0 (FUN_005AAFA0, gpg::RListType_Rect2i::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `list<Rect2i>` type name.
+   */
+  const char* Rect2iListTypeInfo::GetName() const
+  {
+    if (gRect2iListTypeName.empty()) {
+      const gpg::RType* const elementType = CachedRect2iType();
+      const char* const elementName = elementType ? elementType->GetName() : "Rect2i";
+      gRect2iListTypeName = gpg::STR_Printf("list<%s>", elementName ? elementName : "Rect2i");
+      if (!gRect2iListTypeNameCleanupRegistered) {
+        gRect2iListTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_Rect2iListTypeName);
+      }
+    }
+
+    return gRect2iListTypeName.c_str();
   }
 
   void AddBaseByTypeInfo(gpg::RType* typeInfo, const std::type_info& baseTypeInfo, const std::int32_t baseOffset)
@@ -232,6 +269,9 @@ CAiPathFinderTypeInfo::~CAiPathFinderTypeInfo() = default;
 
 /**
  * Address: 0x005AAB50 (FUN_005AAB50, ?GetName@CAiPathFinderTypeInfo@Moho@@UBEPBDXZ)
+ *
+ * What it does:
+ * Returns the reflected `CAiPathFinder` type name.
  */
 const char* CAiPathFinderTypeInfo::GetName() const
 {

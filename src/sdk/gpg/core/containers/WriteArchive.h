@@ -22,6 +22,15 @@ namespace gpg
     class WriteArchive
     {
     public:
+        /**
+         * Address: 0x00953BE0 (FUN_00953BE0, ??0WriteArchive@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Initializes archive reflection/type bookkeeping maps and refreshes
+         * global serializer helper registrations for write flows.
+         */
+        WriteArchive();
+
         struct TrackedPointerRecord
         {
             RType* type = nullptr;

@@ -1,28 +1,38 @@
 #include "Timer.h"
 using namespace gpg;
 
-LARGE_INTEGER PerformanceFrequency; // 0x00F8ED58
-float TimerCycleToSeconds; // 0x00F8ED60
-LONGLONG gpgTime; // 0x00F8ED68
+LARGE_INTEGER sPerformanceFrequency; // 0x00F8ED58
+float sTimerCycleToSeconds; // 0x00F8ED60
+volatile LONGLONG cycle; // 0x00F8ED68
 time::Timer systemTimer; // 0x00F8ED78, first set at 0x00BEAB90
 
 // inline
-inline void initPerformanceCounters() {
-    if (!PerformanceFrequency.QuadPart) {
-        QueryPerformanceCounter(&PerformanceFrequency);
-        TimerCycleToSeconds = 1.0f / PerformanceFrequency.QuadPart;
+inline void EnsurePerformanceFrequencyInitialized() {
+    if (!sPerformanceFrequency.QuadPart) {
+        QueryPerformanceFrequency(&sPerformanceFrequency);
+        sTimerCycleToSeconds = 1.0f / static_cast<float>(sPerformanceFrequency.QuadPart);
     }
 }
 
-// 0x009556F0 or 0x009556D0
+/**
+ * Address: 0x009556D0 (FUN_009556D0, gpg::time::Timer::Timer)
+ *
+ * What it does:
+ * Captures the current monotonic cycle counter as the timer baseline.
+ */
 time::Timer::Timer() :
-    mTime{ GetTime() }
+    mTime{ GetCycle() }
 {
 }
 
-// 0x009556D0 or 0x009556F0
+/**
+ * Address: 0x009556F0 (FUN_009556F0, gpg::time::Timer::Reset)
+ *
+ * What it does:
+ * Replaces the timer baseline with the current monotonic cycle counter.
+ */
 void time::Timer::Reset() {
-    this->mTime = GetTime();
+    this->mTime = GetCycle();
 }
 
 /**
@@ -32,7 +42,7 @@ void time::Timer::Reset() {
  * Returns elapsed cycle count since last stored timestamp and updates the timer baseline.
  */
 LONGLONG time::Timer::ElapsedCyclesAndReset() {
-	const LONGLONG curTime = GetTime();
+	const LONGLONG curTime = GetCycle();
 	const LONGLONG diff = curTime - this->mTime;
     this->mTime = curTime;
     return diff;
@@ -45,7 +55,7 @@ LONGLONG time::Timer::ElapsedCyclesAndReset() {
  * Returns elapsed cycle count since the timer baseline without mutating state.
  */
 LONGLONG time::Timer::ElapsedCycles() const {
-    return GetTime() - this->mTime;
+    return GetCycle() - this->mTime;
 }
 
 /**
@@ -78,39 +88,65 @@ float time::Timer::ElapsedMilliseconds() const {
     return CyclesToMilliseconds(this->ElapsedCycles());
 }
 
-// 0x00955400
-LONGLONG time::GetTime() {
+/**
+ * Address: 0x00955400 (FUN_00955400, gpg::time::GetCycle)
+ *
+ * What it does:
+ * Returns a monotonic process cycle value derived from
+ * `QueryPerformanceCounter`, clamped to never move backward.
+ */
+LONGLONG time::GetCycle() {
     LARGE_INTEGER PerformanceCount;
     QueryPerformanceCounter(&PerformanceCount);
-    LONGLONG newVal = PerformanceCount.QuadPart;
-    LONGLONG ex, cur;
-    do {
-        cur = gpgTime;
-        if (newVal < cur) {
-            newVal = gpgTime + 1;
+    while (true) {
+        const LONGLONG current = cycle;
+        LONGLONG next = PerformanceCount.QuadPart;
+        if (next < current) {
+            next = current + 1;
+            PerformanceCount.QuadPart = next;
         }
-        ex = InterlockedCompareExchange64(&gpgTime, newVal, gpgTime);
-    } while (ex != cur);
-    return newVal;
+
+        const LONGLONG observed = InterlockedCompareExchange64(&cycle, next, current);
+        if (observed == current) {
+            return PerformanceCount.QuadPart;
+        }
+    }
 }
 
-// 0x00955520
+/**
+ * Address: 0x00955520 (FUN_00955520, gpg::time::CyclesToMicroseconds)
+ *
+ * What it does:
+ * Converts performance-counter cycles to microseconds using cached frequency.
+ */
 LONGLONG time::CyclesToMicroseconds(const LONGLONG cycles) {
-    initPerformanceCounters();
-    const LONGLONG freq = PerformanceFrequency.QuadPart;
-    return 1000000 * (cycles % freq + (cycles >> 32) / freq);
+    EnsurePerformanceFrequencyInitialized();
+    const LONGLONG freq = sPerformanceFrequency.QuadPart;
+    const LONGLONG seconds = cycles / freq;
+    const LONGLONG remainder = cycles % freq;
+    return (seconds * 1000000LL) + ((remainder * 1000000LL) / freq);
 }
 
-// 0x009554E0
+/**
+ * Address: 0x009554E0 (FUN_009554E0, gpg::time::CyclesToMilliseconds)
+ *
+ * What it does:
+ * Converts performance-counter cycles to milliseconds.
+ */
 float time::CyclesToMilliseconds(const LONGLONG cycles) {
-    initPerformanceCounters();
-    return cycles * TimerCycleToSeconds * 1000.0;
+    EnsurePerformanceFrequencyInitialized();
+    return static_cast<float>(cycles) * sTimerCycleToSeconds * 1000.0f;
 }
 
-// 0x009554A0
+/**
+ * Address: 0x009554A0 (FUN_009554A0, gpg::time::CyclesToSeconds)
+ *
+ * What it does:
+ * Converts performance-counter cycles to seconds.
+ */
 float time::CyclesToSeconds(const LONGLONG cycles) {
-    initPerformanceCounters();
-    return cycles * TimerCycleToSeconds;
+    EnsurePerformanceFrequencyInitialized();
+    return static_cast<float>(cycles) * sTimerCycleToSeconds;
 }
 
 /**
@@ -128,21 +164,39 @@ time::Timer const& time::GetSystemTimer() {
     return systemTimer;
 }
 
-// 0x00955630
+/**
+ * Address: 0x00955630 (FUN_00955630, gpg::time::MicrosecondsToCycles)
+ *
+ * What it does:
+ * Converts microseconds to performance-counter cycles using decomposed
+ * quotient/remainder arithmetic to preserve 64-bit precision.
+ */
 LONGLONG time::MicrosecondsToCycles(const LONGLONG micro) {
-    initPerformanceCounters();
-    const LONGLONG freq = PerformanceFrequency.QuadPart;
-    return freq * (micro % 1000000 + (micro >> 32) / 1000000);
+    EnsurePerformanceFrequencyInitialized();
+    const LONGLONG freq = sPerformanceFrequency.QuadPart;
+    const LONGLONG seconds = micro / 1000000LL;
+    const LONGLONG remainder = micro % 1000000LL;
+    return (seconds * freq) + ((remainder * freq) / 1000000LL);
 }
 
-// 0x009555F0
+/**
+ * Address: 0x009555F0 (FUN_009555F0, gpg::time::MillisecondsToCycles)
+ *
+ * What it does:
+ * Converts milliseconds to performance-counter cycles.
+ */
 LONGLONG time::MillisecondsToCycles(const float milli) {
-    initPerformanceCounters();
-    return static_cast<LONGLONG>(PerformanceFrequency.QuadPart * milli * 0.001);
+    EnsurePerformanceFrequencyInitialized();
+    return static_cast<LONGLONG>(sPerformanceFrequency.QuadPart * milli * 0.001);
 }
 
-// 0x009555B0
+/**
+ * Address: 0x009555B0 (FUN_009555B0, gpg::time::SecondsToCycles)
+ *
+ * What it does:
+ * Converts seconds to performance-counter cycles.
+ */
 LONGLONG time::SecondsToCycles(const float sec) {
-    initPerformanceCounters();
-    return (LONGLONG)(PerformanceFrequency.QuadPart * sec);
+    EnsurePerformanceFrequencyInitialized();
+    return static_cast<LONGLONG>(sPerformanceFrequency.QuadPart * sec);
 }

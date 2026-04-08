@@ -1,5 +1,7 @@
 #include "moho/render/textures/DeviceExitListener.h"
 
+#include <cstdlib>
+
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 
@@ -43,9 +45,26 @@ namespace moho
       return link;
     }
 
+    void DestroyDeviceExitListenerAtProcessExit()
+    {
+      DeviceExitListener* const previousListener = moho::sDeviceExitListener;
+      moho::sDeviceExitListener = nullptr;
+      if (previousListener != nullptr) {
+        previousListener->~DeviceExitListener();
+      }
+    }
+
   } // namespace
 
   DeviceExitListener* sDeviceExitListener = nullptr;
+
+  /**
+   * Address: 0x00BC43F0 (FUN_00BC43F0, register_sDeviceExitListener)
+   */
+  void register_sDeviceExitListener()
+  {
+    (void)std::atexit(&DestroyDeviceExitListenerAtProcessExit);
+  }
 
   /**
    * Address: 0x004472B0 (FUN_004472B0, Moho::DeviceExitListener::DeviceExitListener)
@@ -116,3 +135,16 @@ namespace moho
     }
   }
 } // namespace moho
+
+namespace
+{
+  struct DeviceExitListenerBootstrap
+  {
+    DeviceExitListenerBootstrap()
+    {
+      moho::register_sDeviceExitListener();
+    }
+  };
+
+  DeviceExitListenerBootstrap gDeviceExitListenerBootstrap;
+} // namespace

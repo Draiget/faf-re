@@ -1,7 +1,20 @@
 #include "moho/sim/EImpactTypeTypeInfo.h"
 
+#include <cstdlib>
+#include <cstdint>
+#include <new>
+#include <typeinfo>
+
 namespace
 {
+  alignas(moho::EImpactTypeTypeInfo) unsigned char gEImpactTypeTypeInfoStorage[sizeof(moho::EImpactTypeTypeInfo)]{};
+  bool gEImpactTypeTypeInfoConstructed = false;
+  bool gEImpactTypeTypeInfoPreregistered = false;
+
+  alignas(moho::EImpactTypePrimitiveSerializer)
+    unsigned char gEImpactTypePrimitiveSerializerStorage[sizeof(moho::EImpactTypePrimitiveSerializer)]{};
+  bool gEImpactTypePrimitiveSerializerConstructed = false;
+
   /**
    * Address: 0x00509F80 (FUN_00509F80, REnumType dtor thunk for EImpactType block)
    */
@@ -11,10 +24,114 @@ namespace
       typeInfo->gpg::REnumType::~REnumType();
     }
   }
+
+  [[nodiscard]] moho::EImpactTypePrimitiveSerializer* AcquireEImpactTypePrimitiveSerializer()
+  {
+    if (!gEImpactTypePrimitiveSerializerConstructed) {
+      new (gEImpactTypePrimitiveSerializerStorage) moho::EImpactTypePrimitiveSerializer();
+      gEImpactTypePrimitiveSerializerConstructed = true;
+    }
+
+    return reinterpret_cast<moho::EImpactTypePrimitiveSerializer*>(gEImpactTypePrimitiveSerializerStorage);
+  }
+
+  [[nodiscard]] moho::EImpactTypeTypeInfo* AcquireEImpactTypeTypeInfo()
+  {
+    if (!gEImpactTypeTypeInfoConstructed) {
+      new (gEImpactTypeTypeInfoStorage) moho::EImpactTypeTypeInfo();
+      gEImpactTypeTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::EImpactTypeTypeInfo*>(gEImpactTypeTypeInfoStorage);
+  }
+
+  [[nodiscard]] gpg::RType* ResolveEImpactType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::EImpactType));
+    }
+    return cached;
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  template <typename TSerializer>
+  void InitializeSerializerNode(TSerializer& serializer) noexcept
+  {
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+  }
+
+  template <typename TSerializer>
+  void UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperNext = self;
+    serializer.mHelperPrev = self;
+  }
+
+  /**
+   * Address: 0x00509ED0 (FUN_00509ED0, preregister_EImpactTypeTypeInfo)
+   */
+  [[nodiscard]] gpg::REnumType* ConstructEImpactTypeTypeInfoInternal()
+  {
+    auto* const typeInfo = AcquireEImpactTypeTypeInfo();
+    if (!gEImpactTypeTypeInfoPreregistered) {
+      gpg::PreRegisterRType(typeid(moho::EImpactType), typeInfo);
+      gEImpactTypeTypeInfoPreregistered = true;
+    }
+
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x00BF1F60 (FUN_00BF1F60, cleanup_EImpactTypePrimitiveSerializer)
+   */
+  void cleanup_EImpactTypePrimitiveSerializer()
+  {
+    if (!gEImpactTypePrimitiveSerializerConstructed) {
+      return;
+    }
+
+    UnlinkSerializerNode(*AcquireEImpactTypePrimitiveSerializer());
+  }
+
+  /**
+   * Address: 0x00BF1F50 (FUN_00BF1F50, cleanup_EImpactTypeTypeInfo)
+   */
+  void cleanup_EImpactTypeTypeInfo()
+  {
+    if (!gEImpactTypeTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireEImpactTypeTypeInfo()->~EImpactTypeTypeInfo();
+    gEImpactTypeTypeInfoConstructed = false;
+    gEImpactTypeTypeInfoPreregistered = false;
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00509ED0 (FUN_00509ED0, preregister_EImpactTypeTypeInfo)
+   */
+  gpg::REnumType* preregister_EImpactTypeTypeInfo()
+  {
+    return ConstructEImpactTypeTypeInfoInternal();
+  }
+
   /**
    * Address: 0x0067B320 (FUN_0067B320, Moho::ENT_GetImpactTypeString)
    */
@@ -94,4 +211,89 @@ namespace moho
     AddEnum(StripPrefix("IMPACT_UnitAir"), static_cast<std::int32_t>(IMPACT_UnitAir));
     AddEnum(StripPrefix("IMPACT_UnitUnderwater"), static_cast<std::int32_t>(IMPACT_UnitUnderwater));
   }
+
+  /**
+   * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
+   */
+  int register_EImpactTypeTypeInfo()
+  {
+    (void)preregister_EImpactTypeTypeInfo();
+    return std::atexit(&cleanup_EImpactTypeTypeInfo);
+  }
+
+  /**
+   * Address: 0x0050A990 (FUN_0050A990, PrimitiveSerHelper<EImpactType>::Deserialize)
+   */
+  void EImpactTypePrimitiveSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    int value = 0;
+    archive->ReadInt(&value);
+    *reinterpret_cast<EImpactType*>(static_cast<std::uintptr_t>(objectPtr)) = static_cast<EImpactType>(value);
+  }
+
+  /**
+   * Address: 0x0050A9B0 (FUN_0050A9B0, PrimitiveSerHelper<EImpactType>::Serialize)
+   */
+  void EImpactTypePrimitiveSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef*
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    const auto value = *reinterpret_cast<const EImpactType*>(static_cast<std::uintptr_t>(objectPtr));
+    archive->WriteInt(static_cast<int>(value));
+  }
+
+  /**
+   * Address: 0x0050A6D0 (FUN_0050A6D0, gpg::PrimitiveSerHelper<Moho::EImpactType,int>::Init)
+   */
+  void EImpactTypePrimitiveSerializer::RegisterSerializeFunctions()
+  {
+    gpg::RType* const type = ResolveEImpactType();
+    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
+    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    type->serLoadFunc_ = mDeserialize;
+    type->serSaveFunc_ = mSerialize;
+  }
+
+  /**
+   * Address: 0x00BC7A90 (FUN_00BC7A90, register_EImpactTypePrimitiveSerializer)
+   */
+  int register_EImpactTypePrimitiveSerializer()
+  {
+    auto* const serializer = AcquireEImpactTypePrimitiveSerializer();
+    InitializeSerializerNode(*serializer);
+    serializer->mDeserialize = &EImpactTypePrimitiveSerializer::Deserialize;
+    serializer->mSerialize = &EImpactTypePrimitiveSerializer::Serialize;
+
+    return std::atexit(&cleanup_EImpactTypePrimitiveSerializer);
+  }
 } // namespace moho
+
+namespace
+{
+  struct EImpactTypeTypeInfoBootstrap
+  {
+    EImpactTypeTypeInfoBootstrap()
+    {
+      (void)moho::register_EImpactTypeTypeInfo();
+      (void)moho::register_EImpactTypePrimitiveSerializer();
+    }
+  };
+
+  [[maybe_unused]] EImpactTypeTypeInfoBootstrap gEImpactTypeTypeInfoBootstrap;
+} // namespace

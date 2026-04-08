@@ -34,4 +34,13 @@ namespace moho
   static_assert(offsetof(IdPoolSerializer, mLoadCallback) == 0x0C, "IdPoolSerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(IdPoolSerializer, mSaveCallback) == 0x10, "IdPoolSerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(IdPoolSerializer) == 0x14, "IdPoolSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BC2DA0 (FUN_00BC2DA0, register_IdPoolSerializer)
+   *
+   * What it does:
+   * Materializes startup `IdPoolSerializer` storage, installs serializer
+   * callback lanes, and registers process-exit teardown.
+   */
+  void register_IdPoolSerializer();
 } // namespace moho

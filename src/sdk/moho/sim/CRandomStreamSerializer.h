@@ -46,4 +46,22 @@ namespace moho
     "CRandomStreamSerializer::mSaveCallback offset must be 0x10"
   );
   static_assert(sizeof(CRandomStreamSerializer) == 0x14, "CRandomStreamSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BC3360 (FUN_00BC3360, register_CRandomStreamTypeInfo)
+   *
+   * What it does:
+   * Startup thunk that materializes CRandomStream type-info storage and
+   * registers its process-exit destructor.
+   */
+  void register_CRandomStreamTypeInfo();
+
+  /**
+   * Address: 0x00BC3380 (FUN_00BC3380, register_CRandomStreamSerializer)
+   *
+   * What it does:
+   * Startup thunk that initializes CRandomStream serializer helper lanes and
+   * registers process-exit teardown.
+   */
+  void register_CRandomStreamSerializer();
 } // namespace moho

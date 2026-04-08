@@ -2,11 +2,13 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
 #include "moho/sim/IArmy.h"
 #include "moho/sim/IArmyTypeInfo.h"
+#include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 
@@ -153,6 +155,56 @@ namespace moho
 
     gpg::RRef variableOwnerRef{};
     archive->Write(variableType, &view->mVariableData, variableOwnerRef);
+  }
+
+  /**
+   * Address: 0x00579430 (FUN_00579430, Moho::IArmy::GetAllianceWith)
+   *
+   * What it does:
+   * Resolves alliance relation against `other` using the neutral/ally/enemy
+   * relation bitsets, defaulting to neutral.
+   */
+  EAlliance IArmy::GetAllianceWith(const IArmy* const other) const
+  {
+    if (!other) {
+      return ALLIANCE_Neutral;
+    }
+
+    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
+    const auto* const otherView = reinterpret_cast<const IArmySerializedView*>(other);
+
+    if (view->mConstantData.mArmyIndex == otherView->mConstantData.mArmyIndex) {
+      return ALLIANCE_Ally;
+    }
+
+    const std::uint32_t otherArmyIndex = static_cast<std::uint32_t>(otherView->mConstantData.mArmyIndex);
+    if (view->mVariableData.mNeutrals.Contains(otherArmyIndex)) {
+      return ALLIANCE_Neutral;
+    }
+    if (view->mVariableData.mAllies.Contains(otherArmyIndex)) {
+      return ALLIANCE_Ally;
+    }
+    if (view->mVariableData.mEnemies.Contains(otherArmyIndex)) {
+      return ALLIANCE_Enemy;
+    }
+
+    return ALLIANCE_Neutral;
+  }
+
+  /**
+   * Address: 0x005D5540 (FUN_005D5540, Moho::IArmy::IsEnemy)
+   *
+   * What it does:
+   * Returns whether `armyIndex` is present in the enemy relation bitset.
+   */
+  bool IArmy::IsEnemy(const std::uint32_t armyIndex) const
+  {
+    if (armyIndex == std::numeric_limits<std::uint32_t>::max()) {
+      return false;
+    }
+
+    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
+    return view->mVariableData.mEnemies.Contains(armyIndex);
   }
 
   /**

@@ -40,6 +40,25 @@ namespace gpg
 
 using namespace moho;
 
+/**
+ * Address: 0x005E43A0 (FUN_005E43A0, Moho::STransportPickUpInfo::STransportPickUpInfo)
+ *
+ * What it does:
+ * Initializes fallback position/orientation lanes and resets pickup-unit set
+ * storage to an empty inline-backed state.
+ */
+STransportPickUpInfo::STransportPickUpInfo()
+  : mFallbackPos{0.0f, 0.0f}
+  , mOri(0.0f, 0.0f, 0.0f, 0.0f)
+  , mPos(0.0f, 0.0f, 0.0f)
+  , mReserved24(0)
+  , mUnits()
+  , mHasSpace(0)
+{
+  mUnits.ListResetLinks();
+  mUnits.Clear();
+}
+
 bool STransportPickUpInfo::HasUnit(const Unit* const unit) const noexcept
 {
   return mUnits.ContainsUnit(unit);
@@ -412,6 +431,29 @@ CAiTransportImpl::CAiTransportImpl(Unit* const unit)
 }
 
 /**
+ * Address: 0x005E5C10 (FUN_005E5C10, core dtor)
+ *
+ * What it does:
+ * Releases runtime waiting-formation state and destroys any still-live units
+ * currently tracked in transport storage before normal member/base teardown.
+ */
+CAiTransportImpl::~CAiTransportImpl()
+{
+  TransportClearWaitingFormation();
+
+  Entity* const* it = mStoredUnits.mVec.begin();
+  Entity* const* const end = mStoredUnits.mVec.end();
+  for (; it != end; ++it) {
+    Unit* const storedUnit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+    if (!storedUnit || storedUnit->IsDead()) {
+      continue;
+    }
+
+    static_cast<Entity*>(storedUnit)->Destroy();
+  }
+}
+
+/**
  * Address: 0x005E8500 (FUN_005E8500, Moho::CAiTransportImpl::MemberConstruct)
  *
  * What it does:
@@ -601,7 +643,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
       continue;
     }
 
-    (void)out.Add(static_cast<Entity*>(attachedUnit));
+    (void)out.Add(attachedUnit);
   }
 
   return out;
@@ -612,8 +654,8 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
  */
 void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& units, const SCoordsVec2 fallbackPos)
 {
-  for (Entity* const* it = units.begin(); it != units.end(); ++it) {
-    Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+  for (Unit* const* it = units.begin(); it != units.end(); ++it) {
+    Unit* const unit = *it;
     if (unit) {
       TransportRemovePickupUnit(unit, false);
     }
@@ -1394,15 +1436,15 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
     }
 
     if (TransportIsStoredUnit(unit)) {
-      (void)storedToDestroy.Add(static_cast<Entity*>(unit));
+      (void)storedToDestroy.Add(unit);
     } else {
-      (void)detached.Add(static_cast<Entity*>(unit));
+      (void)detached.Add(unit);
     }
   }
 
   CRandomStream* const random = sim ? sim->mRngState : nullptr;
-  for (Entity* const* it = detached.mVec.begin(); it != detached.mVec.end(); ++it) {
-    Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+  for (Unit* const* it = detached.mVec.begin(); it != detached.mVec.end(); ++it) {
+    Unit* const unit = *it;
     if (!unit) {
       continue;
     }
@@ -1425,8 +1467,8 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
     (void)TransportDetachUnit(unit);
   }
 
-  for (Entity* const* it = storedToDestroy.mVec.begin(); it != storedToDestroy.mVec.end(); ++it) {
-    Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+  for (Unit* const* it = storedToDestroy.mVec.begin(); it != storedToDestroy.mVec.end(); ++it) {
+    Unit* const unit = *it;
     if (!unit) {
       continue;
     }

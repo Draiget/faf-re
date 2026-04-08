@@ -18,6 +18,7 @@ namespace
     constexpr const char* kSeekOutputReadOnly = "can't seek the output position on a read-only MemBufferStream.";
     constexpr const char* kSeekPastEndReadOnly = "Can't seek past the end of a read-only MemBufferStream.";
     constexpr const char* kWriteReadOnly = "Can't write to a read-only MemBufferStream.";
+    constexpr const char* kGetBufferReadOnly = "Can't return a mutable buffer from an immutable stream.";
     constexpr const char* kUngetBeyondStart = "Attempt to UnGetByte() beyond the start of the buffer.";
     constexpr const char* kSeekBufferTooLarge = "invalid position for MemBufferStream::Seek() -- buffer too large";
 
@@ -244,6 +245,22 @@ bool MemBufferStream::VirtAtEnd()
 void MemBufferStream::VirtFlush()
 {
     SyncReadEndWithWriteHead();
+}
+
+/**
+ * Address: 0x004CCCD0 (FUN_004CCCD0, gpg::MemBufferStream::GetBuffer)
+ *
+ * What it does:
+ * Returns one mutable buffer view for writable streams and throws on
+ * immutable stream instances.
+ */
+MemBuffer<char> MemBufferStream::GetBuffer() const
+{
+    if (mInput.begin() == nullptr) {
+        throw std::runtime_error(kGetBufferReadOnly);
+    }
+
+    return mInput;
 }
 
 /**

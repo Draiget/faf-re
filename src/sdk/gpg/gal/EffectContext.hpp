@@ -40,10 +40,12 @@ namespace gpg::gal
         );
 
         /**
-         * Address: 0x008FE8B0 (FUN_008FE8B0)
+         * Address: 0x0093F950 (FUN_0093F950, gpg::gal::EffectContext::~EffectContext)
+         * Address: 0x008FE8B0 (FUN_008FE8B0, scalar deleting destructor thunk owner)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk for effect-context interface instances.
+         * Releases effect-context macro/source lanes and services deleting
+         * destructor thunk ownership.
          */
         virtual ~EffectContext();
     };

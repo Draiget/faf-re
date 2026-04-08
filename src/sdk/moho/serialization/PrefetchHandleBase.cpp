@@ -1,5 +1,6 @@
 #include "moho/serialization/PrefetchHandleBase.h"
 
+#include <cstdlib>
 #include <map>
 #include <new>
 #include <string>
@@ -244,6 +245,17 @@ namespace
   moho::PrefetchHandleBaseTypeInfo gPrefetchHandleBaseTypeInfo;
   moho::PrefetchHandleBaseSerializer gPrefetchHandleBaseSerializer;
 
+  void CleanupPrefetchHandleBaseTypeInfoAtExit() noexcept
+  {
+    gPrefetchHandleBaseTypeInfo.fields_ = msvc8::vector<gpg::RField>{};
+    gPrefetchHandleBaseTypeInfo.bases_ = msvc8::vector<gpg::RField>{};
+  }
+
+  void CleanupPrefetchHandleBaseSerializerAtExit()
+  {
+    (void)moho::ResetPrefetchHandleBaseSerializerLinksVariant1();
+  }
+
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(moho::PrefetchHandleBaseSerializer& serializer) noexcept
   {
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
@@ -265,12 +277,8 @@ namespace
   void EnsurePrefetchHandleBaseRegistered()
   {
     static const bool kRegistered = []() {
-      gpg::PreRegisterRType(typeid(moho::PrefetchHandleBase), &gPrefetchHandleBaseTypeInfo);
-      gPrefetchHandleBaseSerializer.mHelperNext = nullptr;
-      gPrefetchHandleBaseSerializer.mHelperPrev = nullptr;
-      gPrefetchHandleBaseSerializer.mLoadCallback = &moho::PrefetchHandleBaseSerializer::Deserialize;
-      gPrefetchHandleBaseSerializer.mSaveCallback = &moho::PrefetchHandleBaseSerializer::Serialize;
-      gPrefetchHandleBaseSerializer.RegisterSerializeFunctions();
+      moho::register_PrefetchHandleBaseTypeInfo();
+      moho::register_PrefetchHandleBaseSerializer();
       return true;
     }();
 
@@ -283,6 +291,43 @@ namespace moho
   void EnsurePrefetchSetTypeRegistration()
   {
     (void)EnsurePrefetchSetTypeRegistered();
+  }
+
+  /**
+   * Address: 0x00BC5BC0 (FUN_00BC5BC0, register_PrefetchHandleBaseTypeInfo)
+   *
+   * What it does:
+   * Materializes prefetch-handle type-info startup registration.
+   */
+  void register_PrefetchHandleBaseTypeInfo()
+  {
+    gpg::PreRegisterRType(typeid(PrefetchHandleBase), &gPrefetchHandleBaseTypeInfo);
+    static const bool kAtexitRegistered = []() {
+      (void)std::atexit(&CleanupPrefetchHandleBaseTypeInfoAtExit);
+      return true;
+    }();
+    (void)kAtexitRegistered;
+  }
+
+  /**
+   * Address: 0x00BC5BE0 (FUN_00BC5BE0, register_PrefetchHandleBaseSerializer)
+   *
+   * What it does:
+   * Materializes prefetch-handle serializer startup registration.
+   */
+  void register_PrefetchHandleBaseSerializer()
+  {
+    gPrefetchHandleBaseSerializer.mHelperNext = nullptr;
+    gPrefetchHandleBaseSerializer.mHelperPrev = nullptr;
+    (void)ResetSerializerLinks(gPrefetchHandleBaseSerializer);
+    gPrefetchHandleBaseSerializer.mLoadCallback = &PrefetchHandleBaseSerializer::Deserialize;
+    gPrefetchHandleBaseSerializer.mSaveCallback = &PrefetchHandleBaseSerializer::Serialize;
+    gPrefetchHandleBaseSerializer.RegisterSerializeFunctions();
+    static const bool kAtexitRegistered = []() {
+      (void)std::atexit(&CleanupPrefetchHandleBaseSerializerAtExit);
+      return true;
+    }();
+    (void)kAtexitRegistered;
   }
 
   /**

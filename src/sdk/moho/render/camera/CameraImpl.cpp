@@ -1,18 +1,261 @@
 #include "moho/render/camera/CameraImpl.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
+#include "moho/lua/SCR_ToLua.h"
 #include "moho/script/CScriptEvent.h"
+
+namespace moho
+{
+  class CHeightField
+  {
+  public:
+    std::uint16_t* data;
+    std::int32_t width;
+    std::int32_t height;
+
+    [[nodiscard]] float GetElevation(float x, float z) const;
+  };
+
+  class STIMap
+  {
+  public:
+    [[nodiscard]] CHeightField* GetHeightField() const noexcept;
+    [[nodiscard]] bool IsWaterEnabled() const noexcept;
+    [[nodiscard]] float GetWaterElevation() const noexcept;
+  };
+
+  extern float cam_NearZoom;
+  extern float cam_FarFOV;
+  extern float cam_FarPitch;
+  int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplReset(lua_State* luaContext);
+  int cfunc_CameraImplResetL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplTrackEntities(lua_State* luaContext);
+  int cfunc_CameraImplTargetEntities(lua_State* luaContext);
+  int cfunc_CameraImplNoseCam(lua_State* luaContext);
+  int cfunc_CameraImplHoldRotation(lua_State* luaContext);
+  int cfunc_CameraImplHoldRotationL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplRevertRotation(lua_State* luaContext);
+  int cfunc_CameraImplRevertRotationL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplGetZoom(lua_State* luaContext);
+  int cfunc_CameraImplGetFocusPosition(lua_State* luaContext);
+  int cfunc_CameraImplGetFocusPositionL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplSaveSettings(lua_State* luaContext);
+  int cfunc_CameraImplRestoreSettings(lua_State* luaContext);
+  int cfunc_CameraImplUseGameClock(lua_State* luaContext);
+  int cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplUseSystemClock(lua_State* luaContext);
+  int cfunc_CameraImplUseSystemClockL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplEnableEaseInOut(lua_State* luaContext);
+  int cfunc_CameraImplEnableEaseInOutL(LuaPlus::LuaState* state);
+  int cfunc_CameraImplDisableEaseInOut(lua_State* luaContext);
+  int cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* state);
+}
 
 namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+  constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kCameraImplLuaClassName = "CameraImpl";
+  constexpr const char* kCameraImplResetName = "Reset";
+  constexpr const char* kCameraImplResetHelpText = "Camera:Reset()";
+  constexpr const char* kCameraImplSnapToName = "SnapTo";
+  constexpr const char* kCameraImplSnapToHelpText = "Camera:SnapTo(position, orientationHPR, zoom)";
+  constexpr const char* kCameraImplTrackEntitiesName = "TrackEntities";
+  constexpr const char* kCameraImplTrackEntitiesHelpText = "Camera:TrackEntities(ents,zoom,seconds)";
+  constexpr const char* kCameraImplTargetEntitiesName = "TargetEntities";
+  constexpr const char* kCameraImplTargetEntitiesHelpText = "Camera:TargetEntities(ents,zoom,seconds)";
+  constexpr const char* kCameraImplNoseCamName = "NoseCam";
+  constexpr const char* kCameraImplNoseCamHelpText = "Camera:NoseCam(ent,pitchAdjust,zoom,seconds,transition)";
+  constexpr const char* kCameraImplHoldRotationName = "HoldRotation";
+  constexpr const char* kCameraImplHoldRotationHelpText = "Camera:HoldRotation()";
+  constexpr const char* kCameraImplRevertRotationName = "RevertRotation";
+  constexpr const char* kCameraImplRevertRotationHelpText = "Camera:RevertRotation()";
   constexpr const char* kCameraImplMoveToName = "MoveTo";
   constexpr const char* kCameraImplMoveToHelpText = "Camera:MoveTo(position, orientationHPR, zoom, seconds)";
+  constexpr const char* kCameraImplMoveToRegionName = "MoveToRegion";
+  constexpr const char* kCameraImplMoveToRegionHelpText = "Camera:MoveTo(region[,seconds])";
+  constexpr const char* kCameraImplGetZoomName = "GetZoom";
+  constexpr const char* kCameraImplGetZoomHelpText = "Camera:GetZoom()";
+  constexpr const char* kCameraImplGetFocusPositionName = "GetFocusPosition";
+  constexpr const char* kCameraImplGetFocusPositionHelpText = "Camera:GetFocusPosition()";
+  constexpr const char* kCameraImplSaveSettingsName = "SaveSettings";
+  constexpr const char* kCameraImplSaveSettingsHelpText = "Camera:SaveSettings()";
+  constexpr const char* kCameraImplRestoreSettingsName = "RestoreSettings";
+  constexpr const char* kCameraImplRestoreSettingsHelpText = "Camera:RestoreSettings(settings)";
+  constexpr const char* kCameraImplGetMinZoomName = "GetMinZoom";
+  constexpr const char* kCameraImplGetMinZoomHelpText = "Camera:GetMinZoom()";
+  constexpr const char* kCameraImplGetTargetZoomName = "GetTargetZoom";
+  constexpr const char* kCameraImplGetTargetZoomHelpText = "Camera:GetTargetZoom()";
+  constexpr const char* kCameraImplGetMaxZoomName = "GetMaxZoom";
+  constexpr const char* kCameraImplGetMaxZoomHelpText = "Camera:GetMaxZoom()";
+  constexpr const char* kCameraImplSetZoomHelpText = "Camera:SetZoom(zoom,seconds)";
+  constexpr const char* kCameraImplSetTargetZoomName = "SetTargetZoom";
+  constexpr const char* kCameraImplSetTargetZoomHelpText = "Camera:SetTargetZoom(zoom)";
+  constexpr const char* kCameraImplSetMaxZoomMultName = "SetMaxZoomMult";
+  constexpr const char* kCameraImplSetMaxZoomMultHelpText =
+    "Camera:SetMaxZoomMult() - set zoom scale to allow zooming past or before the point where map fills control";
+  constexpr const char* kCameraImplUseGameClockName = "UseGameClock";
+  constexpr const char* kCameraImplUseGameClockHelpText = "Camera:UseGameClock()";
+  constexpr const char* kCameraImplUseSystemClockName = "UseSystemClock";
+  constexpr const char* kCameraImplUseSystemClockHelpText = "Camera:UseSystemClock()";
+  constexpr const char* kCameraImplEnableEaseInOutName = "EnableEaseInOut";
+  constexpr const char* kCameraImplEnableEaseInOutHelpText = "Camera:EnableEaseInOut()";
+  constexpr const char* kCameraImplDisableEaseInOutName = "DisableEaseInOut";
+  constexpr const char* kCameraImplDisableEaseInOutHelpText = "Camera:DisableEaseInOut()";
+  constexpr const char* kCameraImplSetAccModeName = "SetAccMode";
+  constexpr const char* kCameraImplSetAccModeHelpText = "Camera:SetAccMode(accTypeName)";
+  constexpr const char* kCameraImplSpinName = "Spin";
+  constexpr const char* kCameraImplSpinHelpText = "Camera:Spin(headingRate[,zoomRate])";
+  constexpr float kDegreesToRadians = 0.017453292f;
+  constexpr float kPi = 3.1415927f;
+  constexpr std::int32_t kCameraTargetTypeLocation = 0;
+  constexpr std::int32_t kCameraTargetTypeEntity = 2;
+  constexpr std::int32_t kCameraTargetTypeHermite = 4;
+  constexpr std::int32_t kCameraTimeSourceSystem = 0;
+  constexpr std::int32_t kCameraTimeSourceGame = 1;
+  constexpr std::int32_t kCameraAccTypeLinear = 0;
+  constexpr std::int32_t kCameraAccTypeFastInSlowOut = 1;
+  constexpr std::int32_t kCameraAccTypeSlowInOut = 2;
+  constexpr const char* kCameraAccTypeLinearName = "Linear";
+  constexpr const char* kCameraAccTypeFastInSlowOutName = "FastInSlowOut";
+  constexpr const char* kCameraAccTypeSlowInOutName = "SlowInOut";
+
+  struct CameraImplRuntimeView
+  {
+    std::uint8_t mUnknown000To04F[0x50]{};
+    msvc8::string mName{};                        // +0x050
+    moho::STIMap* mTerrainMap = nullptr;          // +0x06C
+    std::uint8_t mUnknown070To33C[0x2CD]{};       // +0x070
+    std::uint8_t mIsRotated = 0;                  // +0x33D
+    std::uint8_t mRevertRotation = 0;             // +0x33E
+    std::uint8_t mUnknown33FTo33F[0x01]{};        // +0x33F
+    float mFarFov = 0.0f;                         // +0x340
+    float mHeading = 0.0f;                        // +0x344
+    float mUnknown348 = 0.0f;                     // +0x348
+    float mFarPitch = 0.0f;                       // +0x34C
+    float mHeadingZoom = 0.0f;                    // +0x350
+    float mTargetZoom = 0.0f;                     // +0x354
+    float mNearZoom = 0.0f;                       // +0x358
+    std::uint8_t mUnknown35CTo35F[0x04]{};        // +0x35C
+    Wm3::Vec3f mOffset{};                         // +0x360
+    std::uint8_t mUnknown36CTo373[0x08]{};        // +0x36C
+    float mHeadingRate = 0.0f;                    // +0x374
+    float mZoomRate = 0.0f;                       // +0x378
+    std::int32_t mTargetType = 0;                 // +0x37C
+    Wm3::Vec3f mTargetLocation{};                 // +0x380
+    std::uint8_t mUnknown38CTo3B3[0x28]{};        // +0x38C
+    float mTargetTimeLeft = 0.0f;                 // +0x3B4
+    std::uint8_t mTargetTime = 0;                 // +0x3B8
+    std::uint8_t mUnknown3B9To3BB[0x03]{};        // +0x3B9
+    std::int32_t mTimeSource = 0;                 // +0x3BC
+    std::uint8_t mUnknown3C0To3CB[0x0C]{};        // +0x3C0
+    std::uint8_t mEnableEaseInOut = 0;            // +0x3CC
+    std::uint8_t mUnknown3CDTo3CF[0x03]{};        // +0x3CD
+    float mUnknown3D0 = 0.0f;                     // +0x3D0
+    std::uint8_t mUnknown3D4To44F[0x7C]{};        // +0x3D4
+    std::int32_t mAccType = 0;                    // +0x450
+  };
+
+  static_assert(
+    offsetof(CameraImplRuntimeView, mIsRotated) == 0x33D,
+    "CameraImplRuntimeView::mIsRotated offset must be 0x33D"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mRevertRotation) == 0x33E,
+    "CameraImplRuntimeView::mRevertRotation offset must be 0x33E"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mFarFov) == 0x340,
+    "CameraImplRuntimeView::mFarFov offset must be 0x340"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTerrainMap) == 0x06C,
+    "CameraImplRuntimeView::mTerrainMap offset must be 0x06C"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mHeading) == 0x344,
+    "CameraImplRuntimeView::mHeading offset must be 0x344"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mFarPitch) == 0x34C,
+    "CameraImplRuntimeView::mFarPitch offset must be 0x34C"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTargetZoom) == 0x354,
+    "CameraImplRuntimeView::mTargetZoom offset must be 0x354"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mNearZoom) == 0x358,
+    "CameraImplRuntimeView::mNearZoom offset must be 0x358"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mOffset) == 0x360,
+    "CameraImplRuntimeView::mOffset offset must be 0x360"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mHeadingRate) == 0x374,
+    "CameraImplRuntimeView::mHeadingRate offset must be 0x374"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mZoomRate) == 0x378,
+    "CameraImplRuntimeView::mZoomRate offset must be 0x378"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTargetType) == 0x37C,
+    "CameraImplRuntimeView::mTargetType offset must be 0x37C"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTargetLocation) == 0x380,
+    "CameraImplRuntimeView::mTargetLocation offset must be 0x380"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTargetTimeLeft) == 0x3B4,
+    "CameraImplRuntimeView::mTargetTimeLeft offset must be 0x3B4"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTargetTime) == 0x3B8,
+    "CameraImplRuntimeView::mTargetTime offset must be 0x3B8"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTimeSource) == 0x3BC,
+    "CameraImplRuntimeView::mTimeSource offset must be 0x3BC"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mEnableEaseInOut) == 0x3CC,
+    "CameraImplRuntimeView::mEnableEaseInOut offset must be 0x3CC"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mAccType) == 0x450,
+    "CameraImplRuntimeView::mAccType offset must be 0x450"
+  );
+
+  [[nodiscard]] CameraImplRuntimeView* AsRuntimeView(moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<CameraImplRuntimeView*>(camera);
+  }
+
+  struct CameraImplZoomLimitView
+  {
+    std::uint8_t mUnknown000To84F[0x850]{};
+    float mMaxZoomMult = 0.0f; // +0x850
+  };
+
+  static_assert(
+    offsetof(CameraImplZoomLimitView, mMaxZoomMult) == 0x850,
+    "CameraImplZoomLimitView::mMaxZoomMult offset must be 0x850"
+  );
+
+  [[nodiscard]] CameraImplZoomLimitView* AsZoomLimitView(moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<CameraImplZoomLimitView*>(camera);
+  }
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
@@ -57,6 +300,186 @@ namespace moho
 } // namespace moho
 
 /**
+ * Address: 0x007A6E70 (FUN_007A6E70)
+ * Mangled: ?CameraSetAccType@CameraImpl@Moho@@QAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+ *
+ * What it does:
+ * Applies one camera acceleration mode token to runtime lane `mAccType`.
+ */
+void moho::CameraImpl::CameraSetAccType(const msvc8::string& accType)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (_stricmp(accType.c_str(), kCameraAccTypeLinearName) == 0) {
+    runtime->mAccType = kCameraAccTypeLinear;
+    return;
+  }
+
+  if (_stricmp(accType.c_str(), kCameraAccTypeFastInSlowOutName) == 0) {
+    runtime->mAccType = kCameraAccTypeFastInSlowOut;
+    return;
+  }
+
+  if (_stricmp(accType.c_str(), kCameraAccTypeSlowInOutName) == 0) {
+    runtime->mAccType = kCameraAccTypeSlowInOut;
+  }
+}
+
+/**
+ * Address: 0x007A6DE0 (FUN_007A6DE0, Moho::CameraImpl::CameraHoldRotation)
+ * Mangled: ?CameraHoldRotation@CameraImpl@Moho@@QAEXXZ
+ *
+ * What it does:
+ * Arms camera rotation hold mode and clears any pending revert flag.
+ */
+void moho::CameraImpl::CameraHoldRotation()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  runtime->mIsRotated = 1u;
+  runtime->mRevertRotation = 0u;
+}
+
+/**
+ * Address: 0x007A6E40 (FUN_007A6E40, Moho::CameraImpl::CameraRevertRotation)
+ * Mangled: ?CameraRevertRotation@CameraImpl@Moho@@UAEXXZ
+ *
+ * What it does:
+ * Schedules a rotation revert when the camera is currently in rotated mode.
+ */
+void moho::CameraImpl::CameraRevertRotation()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mIsRotated == 0u) {
+    return;
+  }
+
+  runtime->mRevertRotation = 1u;
+  if (runtime->mTargetType != kCameraTargetTypeEntity) {
+    runtime->mTargetType = kCameraTargetTypeLocation;
+  }
+}
+
+/**
+ * Address: 0x007A80A0 (FUN_007A80A0, Moho::CameraImpl::CameraReset)
+ * Mangled: ?CameraReset@CameraImpl@Moho@@UAEXXZ
+ *
+ * What it does:
+ * Resets runtime camera orientation/target lanes to map-centered defaults.
+ */
+void moho::CameraImpl::CameraReset()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  runtime->mFarFov = cam_FarFOV * kDegreesToRadians;
+  runtime->mHeading = kPi;
+  runtime->mIsRotated = 0u;
+  runtime->mFarPitch = cam_FarPitch * kDegreesToRadians;
+  runtime->mUnknown348 = 0.0f;
+  runtime->mUnknown3D0 = 0.0f;
+  runtime->mHeadingZoom = runtime->mFarPitch;
+  runtime->mEnableEaseInOut = 1u;
+
+  runtime->mTargetLocation = {};
+  if (const STIMap* const terrainMap = runtime->mTerrainMap; terrainMap != nullptr) {
+    if (const CHeightField* const heightField = terrainMap->GetHeightField(); heightField != nullptr) {
+      runtime->mTargetLocation.x = static_cast<float>(heightField->width - 1) * 0.5f;
+      runtime->mTargetLocation.z = static_cast<float>(heightField->height - 1) * 0.5f;
+      float targetElevation = heightField->GetElevation(runtime->mTargetLocation.x, runtime->mTargetLocation.z);
+      if (terrainMap->IsWaterEnabled()) {
+        const float waterElevation = terrainMap->GetWaterElevation();
+        if (waterElevation > targetElevation) {
+          targetElevation = waterElevation;
+        }
+      }
+      runtime->mTargetLocation.y = targetElevation;
+    }
+  }
+
+  runtime->mNearZoom = GetMaxZoom();
+  runtime->mHeadingRate = 0.0f;
+  runtime->mZoomRate = 0.0f;
+  runtime->mTargetType = kCameraTargetTypeLocation;
+  runtime->mTargetTime = 0u;
+  runtime->mTargetTimeLeft = 0.0f;
+  runtime->mOffset = runtime->mTargetLocation;
+  runtime->mTargetZoom = runtime->mNearZoom;
+}
+
+/**
+ * Address: 0x007A73C0 (FUN_007A73C0)
+ *
+ * What it does:
+ * Updates one runtime multiplier lane used by max-zoom gating.
+ */
+void moho::CameraImpl::SetMaxZoomMult(const float maxZoomMult)
+{
+  AsZoomLimitView(this)->mMaxZoomMult = maxZoomMult;
+}
+
+/**
+ * Address: 0x007AB4E0 (FUN_007AB4E0, cfunc_CameraImplSnapTo)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplSnapToL`.
+ */
+int moho::cfunc_CameraImplSnapTo(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSnapToL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AB500 (FUN_007AB500, func_CameraImplSnapTo_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:SnapTo`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSnapTo_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplSnapToName,
+    &moho::cfunc_CameraImplSnapTo,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSnapToHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AB560 (FUN_007AB560, cfunc_CameraImplSnapToL)
+ *
+ * What it does:
+ * Validates `Camera:SnapTo(position, orientationHPR, zoom)`, resolves Lua
+ * camera/vector payloads, and applies an immediate manual camera target.
+ */
+int moho::cfunc_CameraImplSnapToL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSnapToHelpText, 4, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaObject positionObject(LuaPlus::LuaStackObject(state, 2));
+  const Wm3::Vec3f targetPosition = SCR_FromLuaCopy<Wm3::Vec3f>(positionObject);
+
+  const LuaPlus::LuaObject orientationObject(LuaPlus::LuaStackObject(state, 3));
+  const Wm3::Vec3f orientationHpr = SCR_FromLuaCopy<Wm3::Vec3f>(orientationObject);
+
+  const LuaPlus::LuaStackObject zoomArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    zoomArg.TypeError("number");
+  }
+  const float targetZoom = static_cast<float>(lua_tonumber(rawState, 4));
+
+  camera->TargetManual(targetPosition, orientationHpr.x, orientationHpr.y, targetZoom, 0.0f);
+  return 0;
+}
+
+/**
  * Address: 0x007AB6E0 (FUN_007AB6E0, cfunc_CameraImplMoveTo)
  *
  * What it does:
@@ -65,6 +488,37 @@ namespace moho
 int moho::cfunc_CameraImplMoveTo(lua_State* const luaContext)
 {
   return cfunc_CameraImplMoveToL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AB1B0 (FUN_007AB1B0, cfunc_CameraImplMoveToRegion)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplMoveToRegionL`.
+ */
+int moho::cfunc_CameraImplMoveToRegion(lua_State* const luaContext)
+{
+  return cfunc_CameraImplMoveToRegionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AB1D0 (FUN_007AB1D0, func_CameraImplMoveToRegion_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:MoveToRegion`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplMoveToRegion_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplMoveToRegionName,
+    &moho::cfunc_CameraImplMoveToRegion,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplMoveToRegionHelpText
+  );
+  return &binder;
 }
 
 /**
@@ -108,6 +562,130 @@ int moho::cfunc_CameraImplMoveToL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x007AC760 (FUN_007AC760, cfunc_CameraImplSetZoom)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplSetZoomL`.
+ */
+int moho::cfunc_CameraImplSetZoom(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSetZoomL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AC780 (FUN_007AC780, func_CameraImplSetZoom_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:SetZoom`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSetZoom_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetZoom",
+    &moho::cfunc_CameraImplSetZoom,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSetZoomHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AC7E0 (FUN_007AC7E0, cfunc_CameraImplSetZoomL)
+ *
+ * What it does:
+ * Validates `Camera:SetZoom(zoom,seconds)`, keeps current target position and
+ * heading/pitch lanes, and dispatches manual camera targeting with new zoom
+ * and transition seconds.
+ */
+int moho::cfunc_CameraImplSetZoomL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetZoomHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject secondsArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    secondsArg.TypeError("number");
+  }
+  const float transitionSeconds = static_cast<float>(lua_tonumber(rawState, 3));
+
+  const LuaPlus::LuaStackObject zoomArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    zoomArg.TypeError("number");
+  }
+  const float targetZoom = static_cast<float>(lua_tonumber(rawState, 2));
+
+  CameraImplRuntimeView* const runtime = AsRuntimeView(camera);
+  camera->TargetManual(runtime->mTargetLocation, runtime->mHeading, runtime->mFarPitch, targetZoom, transitionSeconds);
+  return 0;
+}
+
+/**
+ * Address: 0x007AC930 (FUN_007AC930, cfunc_CameraImplSetTargetZoom)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplSetTargetZoomL`.
+ */
+int moho::cfunc_CameraImplSetTargetZoom(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSetTargetZoomL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AC950 (FUN_007AC950, func_CameraImplSetTargetZoom_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:SetTargetZoom`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSetTargetZoom_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplSetTargetZoomName,
+    &moho::cfunc_CameraImplSetTargetZoom,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSetTargetZoomHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AC9B0 (FUN_007AC9B0, cfunc_CameraImplSetTargetZoomL)
+ *
+ * What it does:
+ * Validates `Camera:SetTargetZoom(zoom)` and updates one runtime near-zoom
+ * lane directly from Lua.
+ */
+int moho::cfunc_CameraImplSetTargetZoomL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetTargetZoomHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject targetZoomArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    targetZoomArg.TypeError("number");
+  }
+
+  AsRuntimeView(camera)->mNearZoom = static_cast<float>(lua_tonumber(rawState, 2));
+  return 0;
+}
+
+/**
  * Address: 0x007AB700 (FUN_007AB700, func_CameraImplMoveTo_LuaFuncDef)
  *
  * What it does:
@@ -122,6 +700,884 @@ moho::CScrLuaInitForm* moho::func_CameraImplMoveTo_LuaFuncDef()
     &CScrLuaMetatableFactory<CameraImpl>::Instance(),
     kCameraImplLuaClassName,
     kCameraImplMoveToHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD650 (FUN_007AD650, cfunc_CameraImplGetMinZoom)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplGetMinZoomL`.
+ */
+int moho::cfunc_CameraImplGetMinZoom(lua_State* const luaContext)
+{
+  return cfunc_CameraImplGetMinZoomL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AD670 (FUN_007AD670, func_CameraImplGetMinZoom_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:GetMinZoom`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplGetMinZoom_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplGetMinZoomName,
+    &moho::cfunc_CameraImplGetMinZoom,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplGetMinZoomHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD6D0 (FUN_007AD6D0, cfunc_CameraImplGetMinZoomL)
+ *
+ * What it does:
+ * Validates `Camera:GetMinZoom()`, pushes the global near-zoom value, and
+ * returns one Lua result.
+ */
+int moho::cfunc_CameraImplGetMinZoomL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetMinZoomHelpText, 1, argumentCount);
+  }
+
+  lua_pushnumber(rawState, cam_NearZoom);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x007AD720 (FUN_007AD720, cfunc_CameraImplSetMaxZoomMult)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplSetMaxZoomMultL`.
+ */
+int moho::cfunc_CameraImplSetMaxZoomMult(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSetMaxZoomMultL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AD740 (FUN_007AD740, func_CameraImplSetMaxZoomMult_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:SetMaxZoomMult`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSetMaxZoomMult_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplSetMaxZoomMultName,
+    &moho::cfunc_CameraImplSetMaxZoomMult,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSetMaxZoomMultHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD7A0 (FUN_007AD7A0, cfunc_CameraImplSetMaxZoomMultL)
+ *
+ * What it does:
+ * Validates `Camera:SetMaxZoomMult(mult)` and applies one max-zoom multiplier
+ * through the camera virtual lane.
+ */
+int moho::cfunc_CameraImplSetMaxZoomMultL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetMaxZoomMultHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject maxZoomMultArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    maxZoomMultArg.TypeError("number");
+  }
+
+  camera->SetMaxZoomMult(static_cast<float>(lua_tonumber(rawState, 2)));
+  return 0;
+}
+
+/**
+ * Address: 0x007ACAA0 (FUN_007ACAA0, cfunc_CameraImplSetAccMode)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplSetAccModeL`.
+ */
+int moho::cfunc_CameraImplSetAccMode(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSetAccModeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ACB20 (FUN_007ACB20, cfunc_CameraImplSetAccModeL)
+ *
+ * What it does:
+ * Validates `Camera:SetAccMode(accTypeName)`, resolves typed camera payload
+ * and one string acceleration token from Lua, then dispatches
+ * `CameraImpl::CameraSetAccType`.
+ */
+int moho::cfunc_CameraImplSetAccModeL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSetAccModeHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject modeObject(state, 2);
+  const char* const modeText = lua_tostring(state->m_state, 2);
+  if (modeText == nullptr) {
+    modeObject.TypeError("string");
+  }
+
+  msvc8::string accTypeName{};
+  accTypeName.assign_owned(modeText != nullptr ? modeText : "");
+  camera->CameraSetAccType(accTypeName);
+  return 0;
+}
+
+/**
+ * Address: 0x007ACAC0 (FUN_007ACAC0, func_CameraImplSetAccMode_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:SetAccMode`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSetAccMode_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplSetAccModeName,
+    &moho::cfunc_CameraImplSetAccMode,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSetAccModeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD890 (FUN_007AD890, cfunc_CameraImplSpin)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplSpinL`.
+ */
+int moho::cfunc_CameraImplSpin(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSpinL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AD910 (FUN_007AD910, cfunc_CameraImplSpinL)
+ *
+ * What it does:
+ * Reads heading plus optional zoom spin rates from Lua and updates camera spin
+ * control lanes.
+ */
+int moho::cfunc_CameraImplSpinL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedBetweenArgsWarning, kCameraImplSpinHelpText, 2, 3, argumentCount);
+  }
+
+  lua_settop(state->m_state, 3);
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  float zoomRate = 0.0f;
+  if (lua_type(state->m_state, 3) != LUA_TNIL) {
+    const LuaPlus::LuaStackObject zoomRateArg(state, 3);
+    if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+      zoomRateArg.TypeError("number");
+    }
+    zoomRate = static_cast<float>(lua_tonumber(state->m_state, 3));
+  }
+
+  const LuaPlus::LuaStackObject headingRateArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    headingRateArg.TypeError("number");
+  }
+
+  CameraImplRuntimeView* const runtime = AsRuntimeView(camera);
+  runtime->mHeadingRate = static_cast<float>(lua_tonumber(state->m_state, 2));
+  runtime->mZoomRate = zoomRate;
+  runtime->mIsRotated = true;
+  runtime->mTargetType = kCameraTargetTypeHermite;
+  return 0;
+}
+
+/**
+ * Address: 0x007AD8B0 (FUN_007AD8B0, func_CameraImplSpin_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:Spin`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSpin_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplSpinName,
+    &moho::cfunc_CameraImplSpin,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSpinHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AB930 (FUN_007AB930, cfunc_CameraImplReset)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplResetL`.
+ */
+int moho::cfunc_CameraImplReset(lua_State* const luaContext)
+{
+  return cfunc_CameraImplResetL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AB9B0 (FUN_007AB9B0, cfunc_CameraImplResetL)
+ *
+ * What it does:
+ * Validates `Camera:Reset()`, resolves one camera payload, and invokes
+ * `CameraImpl::CameraReset`.
+ */
+int moho::cfunc_CameraImplResetL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplResetHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  camera->CameraReset();
+  return 0;
+}
+
+/**
+ * Address: 0x007AB950 (FUN_007AB950, func_CameraImplReset_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:Reset`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplReset_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplResetName,
+    &moho::cfunc_CameraImplReset,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplResetHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ABA80 (FUN_007ABA80, func_CameraImplTrackEntities_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:TrackEntities`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplTrackEntities_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplTrackEntitiesName,
+    &moho::cfunc_CameraImplTrackEntities,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplTrackEntitiesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ABE60 (FUN_007ABE60, func_CameraImplTargetEntities_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:TargetEntities`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplTargetEntities_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplTargetEntitiesName,
+    &moho::cfunc_CameraImplTargetEntities,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplTargetEntitiesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AC1E0 (FUN_007AC1E0, func_CameraImplNoseCam_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:NoseCam`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplNoseCam_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplNoseCamName,
+    &moho::cfunc_CameraImplNoseCam,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplNoseCamHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AC500 (FUN_007AC500, cfunc_CameraImplHoldRotation)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplHoldRotationL`.
+ */
+int moho::cfunc_CameraImplHoldRotation(lua_State* const luaContext)
+{
+  return cfunc_CameraImplHoldRotationL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AC580 (FUN_007AC580, cfunc_CameraImplHoldRotationL)
+ *
+ * What it does:
+ * Validates `Camera:HoldRotation()`, resolves one camera payload, and applies
+ * hold-rotation runtime flags.
+ */
+int moho::cfunc_CameraImplHoldRotationL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplHoldRotationHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  camera->CameraHoldRotation();
+  return 0;
+}
+
+/**
+ * Address: 0x007AC520 (FUN_007AC520, func_CameraImplHoldRotation_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:HoldRotation`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplHoldRotation_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplHoldRotationName,
+    &moho::cfunc_CameraImplHoldRotation,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplHoldRotationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AC630 (FUN_007AC630, cfunc_CameraImplRevertRotation)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplRevertRotationL`.
+ */
+int moho::cfunc_CameraImplRevertRotation(lua_State* const luaContext)
+{
+  return cfunc_CameraImplRevertRotationL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AC6B0 (FUN_007AC6B0, cfunc_CameraImplRevertRotationL)
+ *
+ * What it does:
+ * Validates `Camera:RevertRotation()`, resolves one camera payload, and
+ * invokes `CameraImpl::CameraRevertRotation`.
+ */
+int moho::cfunc_CameraImplRevertRotationL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplRevertRotationHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  camera->CameraRevertRotation();
+  return 0;
+}
+
+/**
+ * Address: 0x007AC650 (FUN_007AC650, func_CameraImplRevertRotation_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:RevertRotation`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplRevertRotation_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplRevertRotationName,
+    &moho::cfunc_CameraImplRevertRotation,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplRevertRotationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ACC60 (FUN_007ACC60, func_CameraImplGetZoom_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:GetZoom`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplGetZoom_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplGetZoomName,
+    &moho::cfunc_CameraImplGetZoom,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplGetZoomHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ACD80 (FUN_007ACD80, cfunc_CameraImplGetFocusPosition)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplGetFocusPositionL`.
+ */
+int moho::cfunc_CameraImplGetFocusPosition(lua_State* const luaContext)
+{
+  return cfunc_CameraImplGetFocusPositionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ACE00 (FUN_007ACE00, cfunc_CameraImplGetFocusPositionL)
+ *
+ * What it does:
+ * Resolves one camera object and pushes its focus-position vector payload.
+ */
+int moho::cfunc_CameraImplGetFocusPositionL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetFocusPositionHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  LuaPlus::LuaObject focusPositionObject = SCR_ToLua<Wm3::Vector3<float>>(state, camera->CameraGetOffset());
+  focusPositionObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x007ACDA0 (FUN_007ACDA0, func_CameraImplGetFocusPosition_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:GetFocusPosition`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplGetFocusPosition_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplGetFocusPositionName,
+    &moho::cfunc_CameraImplGetFocusPosition,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplGetFocusPositionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ACF00 (FUN_007ACF00, func_CameraImplSaveSettings_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:SaveSettings`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplSaveSettings_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplSaveSettingsName,
+    &moho::cfunc_CameraImplSaveSettings,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplSaveSettingsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD0F0 (FUN_007AD0F0, func_CameraImplRestoreSettings_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:RestoreSettings`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplRestoreSettings_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplRestoreSettingsName,
+    &moho::cfunc_CameraImplRestoreSettings,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplRestoreSettingsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD3D0 (FUN_007AD3D0, cfunc_CameraImplGetTargetZoom)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplGetTargetZoomL`.
+ */
+int moho::cfunc_CameraImplGetTargetZoom(lua_State* const luaContext)
+{
+  return cfunc_CameraImplGetTargetZoomL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AD3F0 (FUN_007AD3F0, func_CameraImplGetTargetZoom_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:GetTargetZoom`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplGetTargetZoom_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplGetTargetZoomName,
+    &moho::cfunc_CameraImplGetTargetZoom,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplGetTargetZoomHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD450 (FUN_007AD450, cfunc_CameraImplGetTargetZoomL)
+ *
+ * What it does:
+ * Validates `Camera:GetTargetZoom()`, resolves typed camera payload, pushes
+ * current near-zoom lane, and returns one Lua result.
+ */
+int moho::cfunc_CameraImplGetTargetZoomL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetTargetZoomHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  lua_pushnumber(rawState, AsRuntimeView(camera)->mNearZoom);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x007AD510 (FUN_007AD510, cfunc_CameraImplGetMaxZoom)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplGetMaxZoomL`.
+ */
+int moho::cfunc_CameraImplGetMaxZoom(lua_State* const luaContext)
+{
+  return cfunc_CameraImplGetMaxZoomL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AD530 (FUN_007AD530, func_CameraImplGetMaxZoom_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:GetMaxZoom`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplGetMaxZoom_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplGetMaxZoomName,
+    &moho::cfunc_CameraImplGetMaxZoom,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplGetMaxZoomHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AD590 (FUN_007AD590, cfunc_CameraImplGetMaxZoomL)
+ *
+ * What it does:
+ * Validates `Camera:GetMaxZoom()`, resolves typed camera payload, queries
+ * runtime max zoom through virtual lane, and returns one Lua result.
+ */
+int moho::cfunc_CameraImplGetMaxZoomL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetMaxZoomHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  lua_pushnumber(rawState, camera->GetMaxZoom());
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x007ADA90 (FUN_007ADA90, cfunc_CameraImplUseGameClock)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplUseGameClockL`.
+ */
+int moho::cfunc_CameraImplUseGameClock(lua_State* const luaContext)
+{
+  return cfunc_CameraImplUseGameClockL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ADB10 (FUN_007ADB10, cfunc_CameraImplUseGameClockL)
+ *
+ * What it does:
+ * Validates `Camera:UseGameClock()`, resolves one camera payload, and switches
+ * camera timing to game-clock mode.
+ */
+int moho::cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplUseGameClockHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  AsRuntimeView(camera)->mTimeSource = kCameraTimeSourceGame;
+  return 0;
+}
+
+/**
+ * Address: 0x007ADAB0 (FUN_007ADAB0, func_CameraImplUseGameClock_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:UseGameClock`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplUseGameClock_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplUseGameClockName,
+    &moho::cfunc_CameraImplUseGameClock,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplUseGameClockHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ADBC0 (FUN_007ADBC0, cfunc_CameraImplUseSystemClock)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplUseSystemClockL`.
+ */
+int moho::cfunc_CameraImplUseSystemClock(lua_State* const luaContext)
+{
+  return cfunc_CameraImplUseSystemClockL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ADC40 (FUN_007ADC40, cfunc_CameraImplUseSystemClockL)
+ *
+ * What it does:
+ * Validates `Camera:UseSystemClock()`, resolves one camera payload, and
+ * switches camera timing to system-clock mode.
+ */
+int moho::cfunc_CameraImplUseSystemClockL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplUseSystemClockHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  AsRuntimeView(camera)->mTimeSource = kCameraTimeSourceSystem;
+  return 0;
+}
+
+/**
+ * Address: 0x007ADBE0 (FUN_007ADBE0, func_CameraImplUseSystemClock_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:UseSystemClock`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplUseSystemClock_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplUseSystemClockName,
+    &moho::cfunc_CameraImplUseSystemClock,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplUseSystemClockHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ADCF0 (FUN_007ADCF0, cfunc_CameraImplEnableEaseInOut)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplEnableEaseInOutL`.
+ */
+int moho::cfunc_CameraImplEnableEaseInOut(lua_State* const luaContext)
+{
+  return cfunc_CameraImplEnableEaseInOutL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ADD70 (FUN_007ADD70, cfunc_CameraImplEnableEaseInOutL)
+ *
+ * What it does:
+ * Validates `Camera:EnableEaseInOut()`, resolves one camera payload, and
+ * enables ease-in/out targeting behavior.
+ */
+int moho::cfunc_CameraImplEnableEaseInOutL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplEnableEaseInOutHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  AsRuntimeView(camera)->mEnableEaseInOut = 1u;
+  return 0;
+}
+
+/**
+ * Address: 0x007ADD10 (FUN_007ADD10, func_CameraImplEnableEaseInOut_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:EnableEaseInOut`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplEnableEaseInOut_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplEnableEaseInOutName,
+    &moho::cfunc_CameraImplEnableEaseInOut,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplEnableEaseInOutHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007ADE20 (FUN_007ADE20, cfunc_CameraImplDisableEaseInOut)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplDisableEaseInOutL`.
+ */
+int moho::cfunc_CameraImplDisableEaseInOut(lua_State* const luaContext)
+{
+  return cfunc_CameraImplDisableEaseInOutL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ADEA0 (FUN_007ADEA0, cfunc_CameraImplDisableEaseInOutL)
+ *
+ * What it does:
+ * Validates `Camera:DisableEaseInOut()`, resolves one camera payload, and
+ * disables ease-in/out targeting behavior.
+ */
+int moho::cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplDisableEaseInOutHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  AsRuntimeView(camera)->mEnableEaseInOut = 0u;
+  return 0;
+}
+
+/**
+ * Address: 0x007ADE40 (FUN_007ADE40, func_CameraImplDisableEaseInOut_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes Lua binder metadata for `CameraImpl:DisableEaseInOut`.
+ */
+moho::CScrLuaInitForm* moho::func_CameraImplDisableEaseInOut_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kCameraImplDisableEaseInOutName,
+    &moho::cfunc_CameraImplDisableEaseInOut,
+    &CScrLuaMetatableFactory<CameraImpl>::Instance(),
+    kCameraImplLuaClassName,
+    kCameraImplDisableEaseInOutHelpText
   );
   return &binder;
 }

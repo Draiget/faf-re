@@ -6,11 +6,12 @@
 #include <cstring>
 #include <ios>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Global.h"
 
 using namespace gpg;
 
@@ -20,9 +21,225 @@ constexpr std::size_t kInitialContextCapacity = 4;
 constexpr std::size_t kPipeChunkSize = 0x1000;
 constexpr std::size_t kDebugOutputPayloadSize = 0x100;
 
-std::mutex gHistoryMutex;
-int gHistoryCapacity = 0;
-msvc8::vector<msvc8::string> gHistoryEntries;
+class HistoryLogTarget final : public gpg::LogTarget
+{
+public:
+    enum class EntryKind : std::int32_t
+    {
+        Message = 0,
+        Context = 1,
+    };
+
+    struct Entry
+    {
+        EntryKind kind = EntryKind::Message;
+        gpg::LogSeverity severity = gpg::LogSeverity::Info;
+        msvc8::string text{};
+        std::int32_t contextDepth = 0;
+    };
+
+    /**
+     * Address: 0x008E48E0 (FUN_008E48E0, HistoryLogTarget::HistoryLogTarget)
+     *
+     * What it does:
+     * Constructs one history log target, auto-registers it, and seeds the
+     * retained-message cap.
+     */
+    explicit HistoryLogTarget(const std::int32_t maxMessages)
+        : gpg::LogTarget(true),
+          mMaxMessages(maxMessages)
+    {
+    }
+
+    /**
+     * Address: 0x008E49D0 (FUN_008E49D0, HistoryLogTarget::Enable)
+     *
+     * What it does:
+     * Updates the retained-message cap and trims retained entries to fit.
+     */
+    void Enable(const std::int32_t maxMessages)
+    {
+        boost::recursive_mutex::scoped_lock lock(mLock);
+        mMaxMessages = maxMessages;
+        TrimLocked();
+    }
+
+    /**
+     * Address: 0x008E4B30 (FUN_008E4B30, HistoryLogTarget::OnMessage)
+     *
+     * What it does:
+     * Appends replay-context entries plus one message entry into retained
+     * history, then enforces the retained-message cap.
+     */
+    void OnMessage(
+        const gpg::LogSeverity level,
+        const msvc8::string& message,
+        const msvc8::vector<msvc8::string>& context,
+        const int previousDepth
+    ) override
+    {
+        boost::recursive_mutex::scoped_lock lock(mLock);
+
+        int startDepth = previousDepth;
+        if (startDepth < 0) {
+            startDepth = 0;
+        }
+
+        const int contextCount = static_cast<int>(context.size());
+        if (startDepth < contextCount) {
+            for (int depth = startDepth; depth < contextCount; ++depth) {
+                Entry replayEntry{};
+                replayEntry.kind = EntryKind::Context;
+                replayEntry.severity = level;
+                replayEntry.text = context[static_cast<std::size_t>(depth)];
+                replayEntry.contextDepth = depth;
+                mEntries.push_back(replayEntry);
+            }
+        }
+
+        Entry messageEntry{};
+        messageEntry.kind = EntryKind::Message;
+        messageEntry.severity = level;
+        messageEntry.text = message;
+        messageEntry.contextDepth = contextCount;
+        mEntries.push_back(messageEntry);
+        ++mMessageCount;
+
+        TrimLocked();
+    }
+
+    /**
+     * Address: 0x008E4CF0 (FUN_008E4CF0, HistoryLogTarget::ReplayTo)
+     *
+     * What it does:
+     * Replays retained history entries into a target, preserving context-depth
+     * transitions, then trims retained entries after replay unlock.
+     */
+    void ReplayTo(gpg::LogTarget& target)
+    {
+        msvc8::vector<Entry> snapshot{};
+        {
+            boost::recursive_mutex::scoped_lock lock(mLock);
+            if (mEntries.empty()) {
+                return;
+            }
+
+            ++mReplayDepth;
+            snapshot = mEntries;
+        }
+
+        msvc8::vector<msvc8::string> context{};
+        int previousDepth = 0;
+        for (const Entry& entry : snapshot) {
+            const int retainedDepth = entry.contextDepth;
+            if (retainedDepth < 0) {
+                continue;
+            }
+            const int currentDepth = static_cast<int>(context.size());
+            if (retainedDepth < currentDepth) {
+                previousDepth = retainedDepth;
+                context.erase(
+                    context.begin() + static_cast<std::size_t>(retainedDepth),
+                    context.end()
+                );
+            }
+
+            if (retainedDepth != static_cast<int>(context.size())) {
+                continue;
+            }
+
+            if (entry.kind == EntryKind::Context) {
+                context.push_back(entry.text);
+                continue;
+            }
+
+            target.OnMessage(entry.severity, entry.text, context, previousDepth);
+            previousDepth = retainedDepth;
+        }
+
+        {
+            boost::recursive_mutex::scoped_lock lock(mLock);
+            if (mReplayDepth > 0) {
+                --mReplayDepth;
+            }
+            TrimLocked();
+        }
+    }
+
+private:
+    /**
+     * Address: 0x008E4770 (FUN_008E4770, HistoryLogTarget::TrimLocked)
+     *
+     * What it does:
+     * Removes oldest retained message entries (and stale context lanes) until
+     * retained message count is within the configured cap.
+     */
+    void TrimLocked()
+    {
+        if (mReplayDepth != 0) {
+            return;
+        }
+
+        if (mMaxMessages < 0 || mMessageCount <= mMaxMessages) {
+            return;
+        }
+
+        while (mMessageCount > mMaxMessages && !mEntries.empty()) {
+            bool removedMessage = false;
+            int currentDepth = 0;
+
+            for (std::size_t index = 0; index < mEntries.size();) {
+                const int entryDepth = mEntries[index].contextDepth;
+                if (entryDepth < 0) {
+                    mEntries.erase(mEntries.begin() + index);
+                    continue;
+                }
+                if (entryDepth < currentDepth) {
+                    if (index == 0) {
+                        currentDepth = entryDepth;
+                    } else {
+                        --index;
+                        mEntries.erase(mEntries.begin() + index);
+                        --currentDepth;
+                    }
+                    continue;
+                }
+
+                currentDepth = entryDepth;
+
+                if (mEntries[index].kind == EntryKind::Context) {
+                    ++currentDepth;
+                    ++index;
+                    continue;
+                }
+
+                mEntries.erase(mEntries.begin() + index);
+                --mMessageCount;
+                removedMessage = true;
+                break;
+            }
+
+            if (!removedMessage) {
+                break;
+            }
+        }
+    }
+
+    boost::recursive_mutex mLock{};
+    msvc8::vector<Entry> mEntries{};
+    std::int32_t mMaxMessages = 0;
+    std::int32_t mMessageCount = 0;
+    std::int32_t mReplayDepth = 0;
+};
+
+HistoryLogTarget* gLogHistoryTarget = nullptr;
+std::once_flag gLogHistoryAtexitOnce;
+
+void DestroyLogHistoryTarget()
+{
+    delete gLogHistoryTarget;
+    gLogHistoryTarget = nullptr;
+}
 
 void EnsureThreadContextCapacity(gpg::ThreadState* const tls, const std::size_t wantedCount)
 {
@@ -117,19 +334,6 @@ void WriteIndent(std::ostream& stream, const int count)
         stream.put(' ');
     }
 }
-
-void AppendHistoryEntry(const msvc8::string& message)
-{
-    std::lock_guard<std::mutex> lock(gHistoryMutex);
-    if (gHistoryCapacity <= 0) {
-        return;
-    }
-
-    while (gHistoryEntries.size() >= static_cast<std::size_t>(gHistoryCapacity)) {
-        gHistoryEntries.erase(gHistoryEntries.begin());
-    }
-    gHistoryEntries.push_back(message);
-}
 } // namespace
 
 /**
@@ -148,60 +352,112 @@ LogTarget::LogTarget(const bool autoRegister)
 }
 
 /**
+ * Address: 0x00937E80 (FUN_00937E80, gpg::LogTarget::~LogTarget)
  * Address: 0x00937ED0 (FUN_00937ED0)
  * Demangled: gpg::LogTarget deleting dtor thunk
  *
  * What it does:
- * Unregisters the target from global logging dispatch if currently attached.
+ * Removes this target from global logging dispatch when attached,
+ * covering both complete-destructor and deleting-thunk lanes.
  */
 LogTarget::~LogTarget()
 {
     Detach();
 }
 
-void LogTarget::Attach()
+/**
+ * Address: 0x00936770 (FUN_00936770, struct_LogContext::~struct_LogContext)
+ *
+ * What it does:
+ * Detaches and destroys all registered target nodes, clears current-thread TSS
+ * state, and restores the intrusive ring sentinel links.
+ */
+LogContext::~LogContext()
 {
-    if (mNode) {
-        return;
+    rw.lock();
+    while (head.next != &head) {
+        LogTargetNode* const node = head.next;
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+        node->next = node;
+        node->prev = node;
+
+        if (node->obj != nullptr) {
+            node->obj->mNode = nullptr;
+        }
+
+        delete node;
     }
+    head.next = &head;
+    head.prev = &head;
+    rw.unlock();
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (!g_LogCtx) {
-        return;
+    if (tss.get() != nullptr) {
+        tss.reset(nullptr);
     }
-
-    auto* const node = new LogTargetNode{};
-    node->obj = this;
-    node->flushOnce = 1;
-
-    g_LogCtx->rw.lock();
-    node->prev = g_LogCtx->head.prev;
-    node->next = &g_LogCtx->head;
-    g_LogCtx->head.prev->next = node;
-    g_LogCtx->head.prev = node;
-    mNode = node;
-    g_LogCtx->rw.unlock();
+    lastTls = nullptr;
 }
 
-void LogTarget::Detach()
+/**
+ * Address: 0x009364A0 (FUN_009364A0, struct_LogContext::AddTarget)
+ *
+ * What it does:
+ * Asserts detached target state, allocates one intrusive target node,
+ * and appends it into the global log-target ring.
+ */
+void LogContext::AddTarget(LogTarget* const target)
 {
-    LogTargetNode* const node = mNode;
-    if (!node) {
+    if (target == nullptr) {
         return;
     }
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (!g_LogCtx) {
-        mNode = nullptr;
+    if (target->mNode != nullptr) {
+        HandleAssertFailure(
+            "!target->mImpl",
+            286,
+            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp"
+        );
         return;
     }
 
-    g_LogCtx->rw.lock();
+    rw.lock();
+    auto* const node = new LogTargetNode{};
+    node->obj = target;
+    node->flushOnce = 1;
+    node->busy = 0;
+    node->pendingRemove = 0;
+    node->prev = head.prev;
+    node->next = &head;
+    head.prev->next = node;
+    head.prev = node;
+    target->mNode = node;
+    rw.unlock();
+}
+
+/**
+ * Address: 0x00936570 (FUN_00936570, struct_LogContext::RemoveTarget)
+ *
+ * What it does:
+ * Detaches one target node from the global log-target ring, or marks
+ * pending removal when dispatch is currently inside that target.
+ */
+void LogContext::RemoveTarget(LogTarget* const target)
+{
+    if (target == nullptr) {
+        return;
+    }
+
+    rw.lock();
+    LogTargetNode* const node = target->mNode;
+    if (node == nullptr) {
+        rw.unlock();
+        return;
+    }
+
     if (node->busy) {
         node->pendingRemove = 1;
-        node->obj = nullptr;
-        mNode = nullptr;
-        g_LogCtx->rw.unlock();
+        target->mNode = nullptr;
+        rw.unlock();
         return;
     }
 
@@ -210,8 +466,57 @@ void LogTarget::Detach()
     node->prev = node;
     node->next = node;
     delete node;
-    mNode = nullptr;
-    g_LogCtx->rw.unlock();
+    target->mNode = nullptr;
+    rw.unlock();
+}
+
+/**
+ * Address: 0x00937DB0 (FUN_00937DB0, gpg::LogTarget::Install)
+ *
+ * What it does:
+ * Validates detached state, initializes global logging singleton,
+ * and registers this target in the global target ring.
+ */
+void LogTarget::Attach()
+{
+    if (mNode != nullptr) {
+        HandleAssertFailure(
+            "!mImpl",
+            413,
+            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp"
+        );
+        return;
+    }
+
+    std::call_once(g_LogOnce, &InitLogSingleton);
+    if (g_LogCtx != nullptr) {
+        g_LogCtx->AddTarget(this);
+    }
+}
+
+/**
+ * Address: 0x00937E00 (FUN_00937E00, gpg::LogTarget::Uninstall)
+ *
+ * What it does:
+ * Removes this target from the global target ring when currently attached.
+ */
+void LogTarget::Detach()
+{
+    if (mNode == nullptr) {
+        return;
+    }
+
+    std::call_once(g_LogOnce, &InitLogSingleton);
+    if (!g_LogCtx) {
+        HandleAssertFailure(
+            "state",
+            425,
+            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp"
+        );
+        return;
+    }
+
+    g_LogCtx->RemoveTarget(this);
 }
 
 void LogTarget::OnLog(
@@ -720,12 +1025,20 @@ int DebugOutputStreambuf::sync()
     return 0;
 }
 
-void LogContext::Dispatch(const int level, const msvc8::string& msg)
+/**
+ * Address: 0x00937640 (FUN_00937640, gpg::LogContext::push)
+ *
+ * What it does:
+ * Clones current thread logging context labels, computes the previously
+ * emitted depth for this thread lane, then calls every attached target while
+ * processing deferred removals safely after callback return.
+ */
+void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
 {
-    rw.lock_shared();
+    rw.lock();
 
     ThreadState* const tls = tss.get();
-    std::vector<msvc8::string> snapshot;
+    msvc8::vector<msvc8::string> snapshot;
     int prevDepth = 0;
 
     if (tls) {
@@ -734,7 +1047,7 @@ void LogContext::Dispatch(const int level, const msvc8::string& msg)
 
         snapshot.reserve(count);
         for (std::size_t i = 0; i < count; ++i) {
-            snapshot.emplace_back(tls->begin[i]->text);
+            snapshot.push_back(tls->begin[i]->text);
         }
 
         prevDepth = static_cast<int>(tls->depthCache);
@@ -759,12 +1072,7 @@ void LogContext::Dispatch(const int level, const msvc8::string& msg)
         current->flushOnce = 0;
 
         if (current->obj) {
-            current->obj->OnLog(
-                level,
-                msg,
-                std::span<const msvc8::string>(snapshot.data(), snapshot.size()),
-                sendPrev
-            );
+            current->obj->OnMessage(level, msg, snapshot, sendPrev);
         }
 
         current->busy = 0;
@@ -777,7 +1085,7 @@ void LogContext::Dispatch(const int level, const msvc8::string& msg)
         }
     }
 
-    rw.unlock_shared();
+    rw.unlock();
 }
 
 ScopedLogContext::ScopedLogContext(const msvc8::string& text)
@@ -821,7 +1129,7 @@ void gpg::LogMessage(const LogSeverity level, const msvc8::string& message)
 {
     std::call_once(g_LogOnce, &InitLogSingleton);
     if (g_LogCtx) {
-        g_LogCtx->Dispatch(static_cast<int>(level), message);
+        g_LogCtx->Dispatch(level, message);
     }
 }
 
@@ -838,11 +1146,9 @@ void gpg::Logf(const char* fmt, ...)
     const msvc8::string msg = STR_Va(fmt, va);
     va_end(va);
 
-    AppendHistoryEntry(msg);
-
     std::call_once(g_LogOnce, &InitLogSingleton);
     if (g_LogCtx) {
-        g_LogCtx->Dispatch(kInfo, msg);
+        g_LogCtx->Dispatch(LogSeverity::Info, msg);
     }
 }
 
@@ -859,11 +1165,9 @@ void gpg::Warnf(const char* fmt, ...)
     const msvc8::string msg = STR_Va(fmt, va);
     va_end(va);
 
-    AppendHistoryEntry(msg);
-
     std::call_once(g_LogOnce, &InitLogSingleton);
     if (g_LogCtx) {
-        g_LogCtx->Dispatch(kWarn, msg);
+        g_LogCtx->Dispatch(LogSeverity::Warn, msg);
     }
 }
 
@@ -880,11 +1184,9 @@ void gpg::Debugf(const char* fmt, ...)
     const msvc8::string msg = STR_Va(fmt, va);
     va_end(va);
 
-    AppendHistoryEntry(msg);
-
     std::call_once(g_LogOnce, &InitLogSingleton);
     if (g_LogCtx) {
-        g_LogCtx->Dispatch(kDebug, msg);
+        g_LogCtx->Dispatch(LogSeverity::Debug, msg);
     }
 }
 
@@ -896,31 +1198,48 @@ void gpg::Debugf(const char* fmt, ...)
  */
 void gpg::EnableLogHistory(const int maxEntries)
 {
-    std::lock_guard<std::mutex> lock(gHistoryMutex);
-    gHistoryCapacity = (maxEntries > 0) ? maxEntries : 0;
-
-    if (gHistoryCapacity == 0) {
-        gHistoryEntries.clear();
+    if (gLogHistoryTarget != nullptr) {
+        gLogHistoryTarget->Enable(maxEntries);
         return;
     }
 
-    while (gHistoryEntries.size() > static_cast<std::size_t>(gHistoryCapacity)) {
-        gHistoryEntries.erase(gHistoryEntries.begin());
-    }
+    gLogHistoryTarget = new HistoryLogTarget(maxEntries);
+    std::call_once(gLogHistoryAtexitOnce, [] {
+        std::atexit(DestroyLogHistoryTarget);
+    });
 }
 
-msvc8::string gpg::GetRecentLogLines()
+/**
+ * Address: 0x008E4F20 (FUN_008E4F20, gpg::ReplayLogHistory)
+ *
+ * What it does:
+ * Replays retained log-history entries into one caller-supplied log target.
+ */
+bool gpg::ReplayLogHistory(LogTarget* const target)
 {
-    std::lock_guard<std::mutex> lock(gHistoryMutex);
-
-    std::string merged;
-    for (const msvc8::string& line : gHistoryEntries) {
-        merged.append(line.c_str());
-        merged.push_back('\n');
+    if (target == nullptr || gLogHistoryTarget == nullptr) {
+        return false;
     }
 
+    gLogHistoryTarget->ReplayTo(*target);
+    return true;
+}
+
+/**
+ * Address: 0x008E4AD0 + 0x008E4CF0 + 0x008E4F20 path
+ *
+ * What it does:
+ * Builds one newline-delimited UTF-8 text snapshot by replaying retained
+ * history entries through a stream log target.
+ */
+msvc8::string gpg::GetRecentLogLines()
+{
+    std::ostringstream stream{};
+    StreamLogTarget sink(stream, 0u);
+    (void)ReplayLogHistory(&sink);
+
     msvc8::string result;
-    result.assign_owned(merged);
+    result.assign_owned(stream.str());
     return result;
 }
 

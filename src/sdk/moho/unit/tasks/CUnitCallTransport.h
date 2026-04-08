@@ -27,6 +27,25 @@ namespace moho
     CUnitCallTransport();
 
     /**
+     * Address: 0x005FF6D0 (FUN_005FF6D0, Moho::CUnitCallTransport::CUnitCallTransport)
+     *
+     * What it does:
+     * Initializes one transport-call task bound to `parentTask`, stores the
+     * requested transport weak pointer, snapshots source/destination transform
+     * lanes from transport position, and sets call-transport state flags.
+     */
+    CUnitCallTransport(CCommandTask* parentTask, Unit* transportUnit);
+
+    /**
+     * Address: 0x005FF7F0 (FUN_005FF7F0, Moho::CUnitCallTransport::~CUnitCallTransport)
+     *
+     * What it does:
+     * Tears down transport-call state, clears owner-unit transport flags,
+     * finalizes dispatch result, and unlinks the target transport weak pointer.
+     */
+    ~CUnitCallTransport() override;
+
+    /**
      * Address: 0x00603890 (FUN_00603890)
      *
      * What it does:
@@ -78,4 +97,26 @@ namespace moho
     offsetof(CUnitCallTransport, mArrivalTickOrSequence) == 0x78,
     "CUnitCallTransport::mArrivalTickOrSequence offset must be 0x78"
   );
+
+  /**
+   * Address: 0x005FFBB0 (FUN_005FFBB0, Moho::NewCallTransportCommand)
+   *
+   * What it does:
+   * Validates one candidate transport unit and allocates a
+   * `CUnitCallTransport` task for `parentTask`; emits a warning when the
+   * candidate cannot serve as transport.
+   */
+  void NewCallTransportCommand(CCommandTask* parentTask, Unit* transportUnit);
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x006031D0 (FUN_006031D0, gpg::RRef_CUnitCallTransport)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitCallTransport*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitCallTransport(gpg::RRef* outRef, moho::CUnitCallTransport* value);
+} // namespace gpg

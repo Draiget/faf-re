@@ -42,6 +42,22 @@ namespace moho
      * Registers `RUnitBlueprintGeneral` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005252A0 (FUN_005252A0, gpg::RType::AddField_ERuleBPUnitCommandCaps_0x0CommandCaps)
+     *
+     * What it does:
+     * Appends the `CommandCaps` reflected field entry (`+0x00`).
+     */
+    static gpg::RField* AddFieldCommandCaps(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00525320 (FUN_00525320, gpg::RType::AddField_ERuleBPUnitToggleCaps_0x4ToggleCaps)
+     *
+     * What it does:
+     * Appends the `ToggleCaps` reflected field entry (`+0x04`).
+     */
+    static gpg::RField* AddFieldToggleCaps(gpg::RType* typeInfo);
   };
 
   class RUnitBlueprintDisplayTypeInfo : public gpg::RType
@@ -122,6 +138,38 @@ namespace moho
      * Registers `RUnitBlueprintPhysics` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00525420 (FUN_00525420, gpg::RType::AddField_ELayer_0x7CBuildOnLayerCaps)
+     *
+     * What it does:
+     * Appends the `BuildOnLayerCaps` reflected field entry (`+0x7C`).
+     */
+    static gpg::RField* AddFieldBuildOnLayerCaps(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005253A0 (FUN_005253A0, gpg::RType::AddField_ERuleBPUnitMovementType)
+     *
+     * What it does:
+     * Appends an `ERuleBPUnitMovementType` reflected field entry.
+     */
+    static gpg::RField* AddFieldMovementType(gpg::RType* typeInfo, const char* fieldName, int offset);
+
+    /**
+     * Address: 0x005254A0 (FUN_005254A0, gpg::RType::AddField_ERuleBPUnitBuildRestriction_0x80BuildRestriction)
+     *
+     * What it does:
+     * Appends the `BuildRestriction` reflected field entry (`+0x80`).
+     */
+    static gpg::RField* AddFieldBuildRestriction(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00525520 (FUN_00525520, gpg::RType::AddField_vector_float)
+     *
+     * What it does:
+     * Appends a `vector<float>` reflected field entry.
+     */
+    static gpg::RField* AddFieldVectorFloat(gpg::RType* typeInfo, const char* fieldName, int offset);
   };
 
   class RUnitBlueprintAirTypeInfo : public gpg::RType
@@ -282,6 +330,14 @@ namespace moho
      * Registers `RUnitBlueprintDefense` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005255A0 (FUN_005255A0, gpg::RType::AddField_RUnitBlueprintDefenseShield_0x38Shield)
+     *
+     * What it does:
+     * Appends the `Shield` reflected field entry (`+0x38`).
+     */
+    static gpg::RField* AddFieldShield(gpg::RType* typeInfo);
   };
 
   class RUnitBlueprintIntelTypeInfo : public gpg::RType
@@ -322,6 +378,14 @@ namespace moho
      * Registers `RUnitBlueprintIntel` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00525620 (FUN_00525620, gpg::RType::AddFieldSMinMaxUint)
+     *
+     * What it does:
+     * Appends an `SMinMax<uint32_t>` reflected field entry.
+     */
+    static gpg::RField* AddFieldSMinMaxUInt(gpg::RType* typeInfo, const char* fieldName, int offset);
   };
 
   class RUnitBlueprintEconomyTypeInfo : public gpg::RType
@@ -402,6 +466,30 @@ namespace moho
      * Registers `RUnitBlueprintWeapon` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005256A0 (FUN_005256A0, gpg::RType::AddField_UnitWeaponRangeCategory_0x40RangeCategory)
+     *
+     * What it does:
+     * Appends the `RangeCategory` reflected field entry (`+0x40`).
+     */
+    static gpg::RField* AddFieldRangeCategory(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00525720 (FUN_00525720, gpg::RType::AddField_ERuleBPUnitWeaponBallisticArc_0xE4BallisticArc)
+     *
+     * What it does:
+     * Appends the `BallisticArc` reflected field entry (`+0xE4`).
+     */
+    static gpg::RField* AddFieldBallisticArc(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005257A0 (FUN_005257A0, gpg::RType::AddField_ERuleBPUnitWeaponTargetType_0x130TargetType)
+     *
+     * What it does:
+     * Appends the `TargetType` reflected field entry (`+0x130`).
+     */
+    static gpg::RField* AddFieldTargetType(gpg::RType* typeInfo);
   };
 
   /**

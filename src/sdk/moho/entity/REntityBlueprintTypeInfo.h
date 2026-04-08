@@ -4,6 +4,8 @@
 
 namespace moho
 {
+  struct REntityBlueprint;
+
   /**
    * VFTABLE: 0x00E0F610
    * COL: 0x00E68674
@@ -58,6 +60,14 @@ namespace moho
      * Registers `REntityBlueprint` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005132B0 (FUN_005132B0, gpg::RType::AddField_ECollisionShape_0xA8CollisionShape)
+     *
+     * What it does:
+     * Appends the `CollisionShape` reflected field entry (`+0xA8`).
+     */
+    static gpg::RField* AddFieldCollisionShape(gpg::RType* typeInfo);
   };
 
   /**
@@ -68,6 +78,35 @@ namespace moho
    */
   void register_REntityBlueprintTypeInfo();
 
+  /**
+   * Address: 0x00BC8340 (FUN_00BC8340, register_EFootprintFlagsTypeInfo)
+   *
+   * What it does:
+   * Materializes and startup-registers the reflected `EFootprintFlags` enum
+   * descriptor, then installs its exit-time cleanup.
+   */
+  int register_EFootprintFlagsTypeInfo();
+
+  /**
+   * Address: 0x00BC82B0 (FUN_00BC82B0, register_RStringVectorTypeInfo)
+   *
+   * What it does:
+   * Materializes and startup-registers the reflected `vector<string>`
+   * descriptor, then installs its exit-time cleanup.
+   */
+  int register_RStringVectorTypeInfo();
+
   static_assert(sizeof(REntityBlueprintTypeInfo) == 0x64, "REntityBlueprintTypeInfo size must be 0x64");
 } // namespace moho
 
+namespace gpg
+{
+  /**
+   * Address: 0x00555040 (FUN_00555040, gpg::RRef_REntityBlueprint)
+   *
+   * What it does:
+   * Builds a typed reflection reference for `REntityBlueprint*`, upgrading to
+   * the dynamic derived type and applying base-offset adjustment when needed.
+   */
+  gpg::RRef* RRef_REntityBlueprint(gpg::RRef* outRef, moho::REntityBlueprint* value);
+} // namespace gpg

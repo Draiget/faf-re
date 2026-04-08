@@ -18,6 +18,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x006003F0 (FUN_006003F0, ??1CUnitCallLandTransport@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Tears down transport-call state, clears owner-unit transport flags,
+     * finalizes dispatch result, and unlinks the target transport weak pointer.
+     */
+    ~CUnitCallLandTransport() override;
+
+    /**
      * Address: 0x00600250 (FUN_00600250)
      *
      * What it does:
@@ -25,6 +34,16 @@ namespace moho
      * transforms and cleared weak-pointer/flag lanes.
      */
     CUnitCallLandTransport();
+
+    /**
+     * Address: 0x006002D0 (FUN_006002D0, Moho::CUnitCallLandTransport::CUnitCallLandTransport)
+     *
+     * What it does:
+     * Initializes one parent-linked land-transport task, binds target
+     * transport weak pointer, snapshots source/destination transforms, and
+     * sets owner-unit transport-pending state.
+     */
+    CUnitCallLandTransport(CCommandTask* parentTask, Unit* transportUnit);
 
     /**
      * Address: 0x00603AB0 (FUN_00603AB0)
@@ -82,3 +101,15 @@ namespace moho
     "CUnitCallLandTransport::mIsOccupying offset must be 0x75"
   );
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00603380 (FUN_00603380, gpg::RRef_CUnitCallLandTransport)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitCallLandTransport*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitCallLandTransport(gpg::RRef* outRef, moho::CUnitCallLandTransport* value);
+} // namespace gpg

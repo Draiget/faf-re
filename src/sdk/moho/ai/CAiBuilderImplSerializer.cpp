@@ -15,6 +15,40 @@ namespace
   unsigned char gCAiBuilderImplSerializerStorage[sizeof(CAiBuilderImplSerializer)] = {};
   bool gCAiBuilderImplSerializerConstructed = false;
 
+  /**
+   * Address: 0x005A1CF0 (FUN_005A1CF0, j_Moho::CAiBuilderImpl::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiBuilderImpl::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiBuilderImplMemberSerializeThunk(
+    const moho::CAiBuilderImpl* const builder, gpg::WriteArchive* const archive
+  )
+  {
+    if (!builder) {
+      return;
+    }
+
+    builder->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x005A21F0 (FUN_005A21F0, j_Moho::CAiBuilderImpl::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiBuilderImpl::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiBuilderImplMemberSerializeThunkSecondary(
+    const moho::CAiBuilderImpl* const builder, gpg::WriteArchive* const archive
+  )
+  {
+    if (!builder) {
+      return;
+    }
+
+    builder->MemberSerialize(archive);
+  }
+
   [[nodiscard]] CAiBuilderImplSerializer* AcquireCAiBuilderImplSerializer()
   {
     if (!gCAiBuilderImplSerializerConstructed) {
@@ -110,7 +144,7 @@ void CAiBuilderImplSerializer::Serialize(
   gpg::WriteArchive* const archive,
   const int objectPtr,
   const int,
-  gpg::RRef* const
+  gpg::RRef* const ownerRef
 )
 {
   const auto* const builder = reinterpret_cast<const CAiBuilderImpl*>(static_cast<std::uintptr_t>(objectPtr));
@@ -118,7 +152,12 @@ void CAiBuilderImplSerializer::Serialize(
     return;
   }
 
-  builder->MemberSerialize(archive);
+  if (ownerRef != nullptr) {
+    builder->MemberSerialize(archive);
+    return;
+  }
+
+  CAiBuilderImplMemberSerializeThunk(builder, archive);
 }
 
 /**

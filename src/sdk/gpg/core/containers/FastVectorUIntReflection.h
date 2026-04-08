@@ -72,5 +72,14 @@ namespace gpg
 
   static_assert(sizeof(RFastVectorType<unsigned int>) == 0x68, "RFastVectorType<unsigned int> size must be 0x68");
 
+  /**
+   * Address: 0x00BC2D40 (FUN_00BC2D40, register_RFastVectorType_uint)
+   *
+   * What it does:
+   * Materializes startup reflection storage for `fastvector<unsigned int>` and
+   * registers process-exit teardown.
+   */
+  void register_RFastVectorType_uint();
+
   [[nodiscard]] RType* ResolveFastVectorUIntType();
 } // namespace gpg

@@ -2,6 +2,43 @@
 
 #include "moho/unit/CUnitMotion.h"
 
+namespace
+{
+  /**
+   * Address: 0x006BACB0 (FUN_006BACB0, j_Moho::CUnitMotion::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CUnitMotion::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitMotionMemberSerializeThunk(
+    moho::CUnitMotion* const motion, gpg::WriteArchive* const archive
+  )
+  {
+    if (archive == nullptr || motion == nullptr) {
+      return;
+    }
+
+    moho::CUnitMotion::MemberSerialize(motion, archive);
+  }
+
+  /**
+   * Address: 0x006BACD0 (FUN_006BACD0, j_Moho::CUnitMotion::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CUnitMotion::MemberSerialize`.
+   */
+  [[maybe_unused]] void CUnitMotionMemberSerializeThunkSecondary(
+    moho::CUnitMotion* const motion, gpg::WriteArchive* const archive
+  )
+  {
+    if (archive == nullptr || motion == nullptr) {
+      return;
+    }
+
+    moho::CUnitMotion::MemberSerialize(motion, archive);
+  }
+} // namespace
+
 namespace moho
 {
   /**
@@ -20,14 +57,21 @@ namespace moho
   /**
    * Address: 0x006BA2F0 (FUN_006BA2F0, Moho::CUnitMotionSerializer::Serialize)
    */
-  void CUnitMotionSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  void CUnitMotionSerializer::Serialize(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+  )
   {
     auto* const motion = reinterpret_cast<CUnitMotion*>(objectPtr);
     if (archive == nullptr || motion == nullptr) {
       return;
     }
 
-    CUnitMotion::MemberSerialize(motion, archive);
+    if (ownerRef != nullptr) {
+      CUnitMotion::MemberSerialize(motion, archive);
+      return;
+    }
+
+    CUnitMotionMemberSerializeThunk(motion, archive);
   }
 
   /**

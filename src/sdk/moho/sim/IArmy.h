@@ -28,6 +28,7 @@ namespace moho
   class CArmyImpl;
   class UserArmy;
   class Unit;
+  enum EAlliance : std::int32_t;
   struct ArmyPool;
 
   class IArmy
@@ -53,6 +54,23 @@ namespace moho
      * `SSTIArmyVariableData` (+0x80) lanes of the IArmy payload.
      */
     void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00579430 (FUN_00579430, Moho::IArmy::GetAllianceWith)
+     *
+     * What it does:
+     * Resolves alliance relation against `other` using the neutral/ally/enemy
+     * relation bitsets, defaulting to neutral.
+     */
+    [[nodiscard]] EAlliance GetAllianceWith(const IArmy* other) const;
+
+    /**
+     * Address: 0x005D5540 (FUN_005D5540, Moho::IArmy::IsEnemy)
+     *
+     * What it does:
+     * Returns whether `armyIndex` is present in the enemy relation bitset.
+     */
+    [[nodiscard]] bool IsEnemy(std::uint32_t armyIndex) const;
 
     /**
      * Binary evidence summary:
@@ -160,7 +178,7 @@ namespace moho
     // Address: 0x006FDED0 (FUN_006FDED0)
     virtual bool UseWholeMap() = 0;
     // Address: 0x006FE1B0 (FUN_006FE1B0)
-    virtual void AddBuildRestriction() = 0;
+    virtual void AddBuildRestriction(void* restriction) = 0;
     // Address: 0x006FE220 (FUN_006FE220)
     virtual void RemoveBuildRestriction(void* restriction) = 0;
     // Address: 0x006FE290 (FUN_006FE290)

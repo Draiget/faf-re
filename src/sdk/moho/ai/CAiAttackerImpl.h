@@ -4,6 +4,7 @@
 
 #include "moho/lua/CScrLuaBinderFwd.h"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace LuaPlus
@@ -12,10 +13,28 @@ namespace LuaPlus
   class LuaState;
 } // namespace LuaPlus
 
+namespace gpg::core
+{
+  template <class T, std::size_t N>
+  class FastVectorN;
+}
+
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
+  struct SWeakRefSlot;
   struct WeaponExtraRefSubobject;
+  class CAiTarget;
+  class CollisionBeamEntity;
   class CScrLuaInitForm;
+  class Entity;
+  class Unit;
+  class UnitWeapon;
 
   /**
    * VFTABLE: 0x00E1E9CC
@@ -43,14 +62,14 @@ namespace moho
      * Slot: 2
      * Demangled: Moho::CAiAttackerImpl::GetUnit
      */
-    virtual void GetUnit() = 0;
+    virtual Unit* GetUnit() = 0;
 
     /**
      * Address: 0x005D6D80
      * Slot: 3
      * Demangled: Moho::CAiAttackerImpl::WeaponsBusy
      */
-    virtual void WeaponsBusy() = 0;
+    virtual bool WeaponsBusy() = 0;
 
     /**
      * Address: 0x005D5D80
@@ -85,14 +104,14 @@ namespace moho
      * Slot: 8
      * Demangled: Moho::CAiAttackerImpl::SetDesiredTarget
      */
-    virtual void SetDesiredTarget() = 0;
+    virtual void SetDesiredTarget(CAiTarget* target) = 0;
 
     /**
      * Address: 0x005D5D70
      * Slot: 9
      * Demangled: Moho::CAiAttackerImpl::GetDesiredTarget
      */
-    virtual void GetDesiredTarget() = 0;
+    virtual CAiTarget* GetDesiredTarget() = 0;
 
     /**
      * Address: 0x005D7570
@@ -106,7 +125,7 @@ namespace moho
      * Slot: 11
      * Demangled: Moho::CAiAttackerImpl::CanAttackTarget
      */
-    virtual void CanAttackTarget() = 0;
+    virtual bool CanAttackTarget(CAiTarget* target) = 0;
 
     /**
      * Address: 0x005D6F40
@@ -120,28 +139,34 @@ namespace moho
      * Slot: 13
      * Demangled: Moho::CAiAttackerImpl::FindBestEnemy
      */
-    virtual void FindBestEnemy() = 0;
+    virtual Entity*
+    FindBestEnemy(
+      UnitWeapon* weapon,
+      gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange,
+      float maxRange,
+      bool ignoreTargetExemption
+    ) = 0;
 
     /**
      * Address: 0x005D6DC0
      * Slot: 14
      * Demangled: Moho::CAiAttackerImpl::GetTargetWeapon
      */
-    virtual void GetTargetWeapon() = 0;
+    virtual UnitWeapon* GetTargetWeapon(CAiTarget* target) = 0;
 
     /**
      * Address: 0x005D6E30
      * Slot: 15
      * Demangled: Moho::CAiAttackerImpl::GetPrimaryWeapon
      */
-    virtual void GetPrimaryWeapon() = 0;
+    virtual UnitWeapon* GetPrimaryWeapon() = 0;
 
     /**
      * Address: 0x005D6E80
      * Slot: 16
      * Demangled: Moho::CAiAttackerImpl::GetMaxWeaponRange
      */
-    virtual void GetMaxWeaponRange() = 0;
+    virtual float GetMaxWeaponRange() = 0;
 
     /**
      * Address: 0x005D7190
@@ -176,21 +201,21 @@ namespace moho
      * Slot: 21
      * Demangled: Moho::CAiAttackerImpl::IsTooClose
      */
-    virtual void IsTooClose() = 0;
+    virtual bool IsTooClose(CAiTarget* target) = 0;
 
     /**
      * Address: 0x005D7340
      * Slot: 22
      * Demangled: Moho::CAiAttackerImpl::IsTargetExempt
      */
-    virtual void IsTargetExempt() = 0;
+    virtual bool IsTargetExempt(Entity* target) = 0;
 
     /**
      * Address: 0x005D72B0
      * Slot: 23
      * Demangled: Moho::CAiAttackerImpl::HasSlavedTarget
      */
-    virtual void HasSlavedTarget() = 0;
+    virtual CAiTarget* HasSlavedTarget(UnitWeapon** outWeapon) = 0;
 
     /**
      * Address: 0x005D5DB0
@@ -211,23 +236,66 @@ namespace moho
      * Slot: 26
      * Demangled: Moho::CAiAttackerImpl::TransmitBeamImpactEvent
      */
-    virtual void TransmitBeamImpactEvent() = 0;
+    virtual void TransmitBeamImpactEvent(const LuaPlus::LuaObject* launcherWeaponLuaObject, CollisionBeamEntity* beam) = 0;
 
     /**
      * Address: 0x005D8650
      * Slot: 27
      * Demangled: Moho::CAiAttackerImpl::ForceEngage
      */
-    virtual void ForceEngage() = 0;
+    virtual void ForceEngage(Entity* target) = 0;
 
     /**
      * Address: 0x005D5DC0
      * Slot: 28
      * Demangled: Moho::CAiAttackerImpl::PushStack
      */
-    virtual void PushStack() = 0;
+    virtual void PushStack(LuaPlus::LuaState* luaState) = 0;
 
   public:
+    /**
+     * Address: 0x005D56F0 (FUN_005D56F0, CAiAttackerImpl::Stop)
+     *
+     * What it does:
+     * Applies a null/clear desired-target payload to the attacker and unlinks
+     * the temporary weak-target node from owner chain state.
+     */
+    void Stop();
+
+    /**
+     * Address: 0x005E13B0 (FUN_005E13B0, Moho::CAiAttackerImpl::MemberDeserialize)
+     *
+     * What it does:
+     * Loads the serialized attacker state lanes and repopulates owned pointer
+     * vectors.
+     */
+    static void MemberDeserialize(CAiAttackerImpl* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005E1520 (FUN_005E1520, Moho::CAiAttackerImpl::MemberSerialize)
+     *
+     * What it does:
+     * Saves attacker base, pointer-vector, stage/thread, desired-target, and
+     * reporting-state lanes.
+     */
+    static void MemberSerialize(const CAiAttackerImpl* object, gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x005D85B0 (FUN_005D85B0, Moho::CAiAttackerImpl::DeserializePointerVectors)
+     *
+     * What it does:
+     * Loads owned `UnitWeapon*` and `CAcquireTargetTask*` pointer vectors.
+     */
+    static void DeserializePointerVectors(gpg::ReadArchive* archive, CAiAttackerImpl* object);
+
+    /**
+     * Address: 0x005D84E0 (FUN_005D84E0, Moho::CAiAttackerImpl::SerializePointerVectors)
+     *
+     * What it does:
+     * Saves owned `UnitWeapon*` and `CAcquireTargetTask*` pointer vectors.
+     */
+    static void SerializePointerVectors(gpg::WriteArchive* archive, const CAiAttackerImpl* object);
+
     struct WeaponExtraData
     {
       std::int32_t key;
@@ -246,22 +314,70 @@ namespace moho
   };
 
   // Underlying Lua function-definition publishers referenced by this thunk pack.
+  /**
+   * Address: 0x005D9950 (FUN_005D9950, func_CAiAttackerImplGetUnit_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplGetUnit_LuaFuncDef();
+  /**
+   * Address: 0x005D9A90 (FUN_005D9A90, func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef();
+  /**
+   * Address: 0x005D9BD0 (FUN_005D9BD0, func_CAiAttackerImplGetWeaponCount_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplGetWeaponCount_LuaFuncDef();
+  /**
+   * Address: 0x005D9D20 (FUN_005D9D20, func_CAiAttackerImplSetDesiredTarget_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplSetDesiredTarget_LuaFuncDef();
+  /**
+   * Address: 0x005D9EC0 (FUN_005D9EC0, func_CAiAttackerImplGetDesiredTarget_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplGetDesiredTarget_LuaFuncDef();
+  /**
+   * Address: 0x005DA020 (FUN_005DA020, func_CAiAttackerImplStop_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplStop_LuaFuncDef();
+  /**
+   * Address: 0x005DA150 (FUN_005DA150, func_CAiAttackerImplCanAttackTarget_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplCanAttackTarget_LuaFuncDef();
+  /**
+   * Address: 0x005DA300 (FUN_005DA300, func_CAiAttackerImplFindBestEnemy_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplFindBestEnemy_LuaFuncDef();
+  /**
+   * Address: 0x005DA4B0 (FUN_005DA4B0, func_CAiAttackerImplGetTargetWeapon_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplGetTargetWeapon_LuaFuncDef();
+  /**
+   * Address: 0x005DA670 (FUN_005DA670, func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef();
+  /**
+   * Address: 0x005DA7C0 (FUN_005DA7C0, func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef();
   CScrLuaInitForm* func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef();
+  /**
+   * Address: 0x005DAD00 (FUN_005DAD00, func_CAiAttackerImplIsTooClose_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplIsTooClose_LuaFuncDef();
+  /**
+   * Address: 0x005DAEB0 (FUN_005DAEB0, func_CAiAttackerImplIsTargetExempt_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplIsTargetExempt_LuaFuncDef();
+  /**
+   * Address: 0x005DB030 (FUN_005DB030, func_CAiAttackerImplHasSlavedTarget_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplHasSlavedTarget_LuaFuncDef();
+  /**
+   * Address: 0x005DB1C0 (FUN_005DB1C0, func_CAiAttackerImplResetReportingState_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplResetReportingState_LuaFuncDef();
+  /**
+   * Address: 0x005DB2F0 (FUN_005DB2F0, func_CAiAttackerImplForceEngage_LuaFuncDef)
+   */
   CScrLuaInitForm* func_CAiAttackerImplForceEngage_LuaFuncDef();
 
   /**

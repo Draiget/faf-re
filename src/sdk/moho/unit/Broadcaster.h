@@ -14,7 +14,19 @@ namespace moho
   enum ECommandEvent : int;
   enum EUnitCommandQueueStatus : int;
 
-  class Broadcaster : public TDatList<Broadcaster, void> {};
+  class Broadcaster : public TDatList<Broadcaster, void>
+  {
+  public:
+    /**
+     * Address: 0x006F8070 (FUN_006F8070,
+     * ?BroadcastEvent@?$Broadcaster@W4EUnitCommandQueueStatus@Moho@@@Moho@@IAEXW4EUnitCommandQueueStatus@2@@Z)
+     *
+     * What it does:
+     * Broadcasts one queue-status event to all linked listeners while
+     * preserving iteration safety when listeners relink/unlink during callback.
+     */
+    void BroadcastEvent(EUnitCommandQueueStatus event);
+  };
 
   static_assert(offsetof(Broadcaster, mPrev) == 0x00, "Broadcaster::mPrev offset must be 0x00");
   static_assert(offsetof(Broadcaster, mNext) == 0x04, "Broadcaster::mNext offset must be 0x04");

@@ -582,7 +582,7 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 (FUN_00694380, gpg::RFastVectorType_Entity_P::GetName)
+   * Address: 0x00693C00 (FUN_00693C00, gpg::RFastVectorType_EntityP::GetName)
    */
   const char* RFastVectorType<moho::Entity*>::GetName() const
   {

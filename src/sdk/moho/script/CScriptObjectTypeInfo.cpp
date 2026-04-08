@@ -6,6 +6,12 @@
 
 namespace
 {
+  [[nodiscard]] moho::CScriptObjectTypeInfo& ScriptObjectTypeInfoSingleton()
+  {
+    static moho::CScriptObjectTypeInfo sTypeInfo{};
+    return sTypeInfo;
+  }
+
   /**
    * Address: 0x004C8150 (FUN_004C8150, Moho::CScriptObjectTypeInfo::AddBase_RObject)
    *
@@ -27,10 +33,29 @@ namespace
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
+
+  struct CScriptObjectTypeInfoBootstrap
+  {
+    CScriptObjectTypeInfoBootstrap()
+    {
+      moho::register_CScriptObjectTypeInfo();
+    }
+  };
+
+  CScriptObjectTypeInfoBootstrap gCScriptObjectTypeInfoBootstrap{};
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x004C6E20 (FUN_004C6E20, Moho::CScriptObjectTypeInfo::CScriptObjectTypeInfo)
+   */
+  CScriptObjectTypeInfo::CScriptObjectTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CScriptObject), this);
+  }
+
   /**
    * Address: 0x004C6EC0 (FUN_004C6EC0, Moho::CScriptObjectTypeInfo::dtr)
    */
@@ -59,5 +84,13 @@ namespace moho
     AddBase_RObject(this);
     gpg::RType::Init();
     Finish();
+  }
+
+  /**
+   * Address: 0x00BC6060 (FUN_00BC6060, register_CScriptObjectTypeInfo)
+   */
+  void register_CScriptObjectTypeInfo()
+  {
+    (void)ScriptObjectTypeInfoSingleton();
   }
 } // namespace moho

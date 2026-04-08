@@ -1,5 +1,6 @@
 #include "moho/serialization/CPrefetchSet.h"
 
+#include <cstring>
 #include <new>
 #include <typeinfo>
 
@@ -14,11 +15,30 @@ namespace
   constexpr const char* kPrefetchSetUpdateHelpText =
     "CPrefetchSet:Update({d3d_textures=..., batch_textures=..., models=..., anims=...})";
   constexpr const char* kPrefetchSetResetHelpText = "CPrefetchSet:Reset()";
+  moho::CScrLuaInitForm* gRecoveredCoreLuaInitFormPrev_CPrefetchSetStartup = nullptr;
+  moho::CScrLuaInitForm* gRecoveredCoreLuaInitFormAnchor_CPrefetchSetStartup = nullptr;
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
     static moho::CScrLuaInitFormSet sSet("core");
     return sSet;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
+  {
+    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
+  template <moho::CScrLuaInitForm* (*Target)()>
+  [[nodiscard]] moho::CScrLuaInitForm* ForwardPrefetchSetLuaRegistrationThunk() noexcept
+  {
+    return Target();
   }
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
@@ -267,6 +287,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC59D0 (FUN_00BC59D0, register_CreatePrefetchSet_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards `register_CreatePrefetchSet_LuaFuncDef` to
+   * `func_CreatePrefetchSet_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CreatePrefetchSet_LuaFuncDef()
+  {
+    return ForwardPrefetchSetLuaRegistrationThunk<&func_CreatePrefetchSet_LuaFuncDef>();
+  }
+
+  /**
    * Address: 0x004A5810 (FUN_004A5810, cfunc_CPrefetchSetUpdate)
    */
   int cfunc_CPrefetchSetUpdate(lua_State* const luaContext)
@@ -314,6 +346,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC5A00 (FUN_00BC5A00, register_CPrefetchSetUpdate_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards `register_CPrefetchSetUpdate_LuaFuncDef` to
+   * `func_CPrefetchSetUpdate_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CPrefetchSetUpdate_LuaFuncDef()
+  {
+    return ForwardPrefetchSetLuaRegistrationThunk<&func_CPrefetchSetUpdate_LuaFuncDef>();
+  }
+
+  /**
    * Address: 0x004A5950 (FUN_004A5950, cfunc_CPrefetchSetReset)
    */
   int cfunc_CPrefetchSetReset(lua_State* const luaContext)
@@ -358,4 +402,67 @@ namespace moho
     );
     return &binder;
   }
+
+  /**
+   * Address: 0x00BC5A10 (FUN_00BC5A10, register_CPrefetchSetReset_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards `register_CPrefetchSetReset_LuaFuncDef` to
+   * `func_CPrefetchSetReset_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CPrefetchSetReset_LuaFuncDef()
+  {
+    return ForwardPrefetchSetLuaRegistrationThunk<&func_CPrefetchSetReset_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BC5A40 (FUN_00BC5A40, sub_BC5A40)
+   *
+   * What it does:
+   * Allocates one Lua metatable-factory index and stores it in
+   * `CScrLuaMetatableFactory<CPrefetchSet>::sInstance`.
+   */
+  int register_CScrLuaMetatableFactory_CPrefetchSet_Index()
+  {
+    const int index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
+    CScrLuaMetatableFactory<CPrefetchSet>::Instance().SetFactoryObjectIndexForRecovery(index);
+    return index;
+  }
+
+  /**
+   * Address: 0x00BC59E0 (FUN_00BC59E0, sub_BC59E0)
+   *
+   * What it does:
+   * Saves current `core` Lua-init form chain head and relinks it to the
+   * recovered CPrefetchSet startup anchor lane.
+   */
+  CScrLuaInitForm* register_core_CoreInits_mForms_CPrefetchSetAnchor()
+  {
+    CScrLuaInitFormSet* coreSet = FindLuaInitFormSetByName("core");
+    if (coreSet == nullptr) {
+      coreSet = &CoreLuaInitSet();
+    }
+
+    CScrLuaInitForm* const result = coreSet->mForms;
+    gRecoveredCoreLuaInitFormPrev_CPrefetchSetStartup = result;
+    coreSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gRecoveredCoreLuaInitFormAnchor_CPrefetchSetStartup);
+    return result;
+  }
 } // namespace moho
+
+namespace
+{
+  struct CPrefetchSetLuaStartupBootstrap
+  {
+    CPrefetchSetLuaStartupBootstrap()
+    {
+      (void)moho::register_core_CoreInits_mForms_CPrefetchSetAnchor();
+      (void)moho::register_CScrLuaMetatableFactory_CPrefetchSet_Index();
+      (void)moho::register_CreatePrefetchSet_LuaFuncDef();
+      (void)moho::register_CPrefetchSetUpdate_LuaFuncDef();
+      (void)moho::register_CPrefetchSetReset_LuaFuncDef();
+    }
+  };
+
+  [[maybe_unused]] CPrefetchSetLuaStartupBootstrap gCPrefetchSetLuaStartupBootstrap;
+} // namespace

@@ -42,4 +42,13 @@ namespace moho
   };
 
   static_assert(sizeof(BVIntSetTypeInfo) == 0x64, "BVIntSetTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BC2CE0 (FUN_00BC2CE0, register_BVIntSetTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `BVIntSetTypeInfo` storage and registers process-exit
+   * teardown.
+   */
+  void register_BVIntSetTypeInfo();
 } // namespace moho

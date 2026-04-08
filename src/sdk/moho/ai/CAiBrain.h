@@ -25,6 +25,7 @@ namespace moho
   class CAiPersonality;
   class CScrLuaInitForm;
   class CTaskStage;
+  struct SEntitySetTemplateUnit;
   class Sim;
   class Unit;
 
@@ -108,6 +109,15 @@ namespace moho
     explicit CAiBrain(CArmyImpl* army);
 
     /**
+     * Address: 0x0057A440 (FUN_0057A440, Moho::CAiBrain::Initialize)
+     *
+     * What it does:
+     * Resolves this army's plan string (or `"None"`), then dispatches either
+     * `OnCreateHuman` or `OnCreateAI` on the brain script object.
+     */
+    void Initialize();
+
+    /**
      * Address: 0x00579590 (FUN_00579590, ?GetClass@CAiBrain@Moho@@UBEPAVRType@gpg@@XZ)
      *
      * VFTable SLOT: 0
@@ -121,6 +131,24 @@ namespace moho
      * VFTable SLOT: 1
      */
     gpg::RRef GetDerivedObjectRef() override;
+
+    /**
+     * Address: 0x00583CB0 (FUN_00583CB0, Moho::CAiBrain::MemberDeserialize)
+     *
+     * What it does:
+     * Loads CAiBrain runtime lanes from archive storage, replacing owned
+     * personality/task-stage pointers with freshly deserialized instances.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00583ED0 (FUN_00583ED0, Moho::CAiBrain::MemberSerialize)
+     *
+     * What it does:
+     * Saves CAiBrain runtime lanes to archive storage, preserving original
+     * tracked-pointer ownership states for each pointer field.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x00579F30 (FUN_00579F30, scalar deleting thunk)
@@ -140,12 +168,34 @@ namespace moho
     static bool CanBuildUnit(const char* blueprintId, CAiBrain* brain, Unit* builder);
 
     /**
+     * Address: 0x0057B1E0 (FUN_0057B1E0, Moho::CAiBrain::BuildUnit)
+     *
+     * What it does:
+     * Resolves one buildable blueprint id and issues `UNITCOMMAND_BuildFactory`
+     * commands for `builder` `count` times.
+     */
+    static bool BuildUnit(const char* blueprintId, CAiBrain* brain, Unit* builder, int count);
+
+    /**
      * Address: 0x0057BAA0 (FUN_0057BAA0, Moho::CAiBrain::DrawDebug)
      *
      * What it does:
      * Draws AI debug grid lines and per-attack-vector direction markers.
      */
     static CAiBrain* DrawDebug(CAiBrain* brain);
+
+    /**
+     * Address: 0x0057AEC0 (FUN_0057AEC0, Moho::CAiBrain::GetAvailableFactories)
+     *
+     * What it does:
+     * Scans this brain's non-mobile factory units and appends currently
+     * available entries to `outSet`, optionally filtering by XZ range.
+     */
+    SEntitySetTemplateUnit* GetAvailableFactories(
+      SEntitySetTemplateUnit* outSet,
+      const Wm3::Vector3f* referencePosition,
+      float maxDistance
+    );
 
   public:
     static gpg::RType* sType;
@@ -420,6 +470,696 @@ using CAiBrainIsAnyEngineerBuilding_LuaFuncDef = ::moho::CScrLuaBinder;
 namespace moho
 {
   /**
+   * Address: 0x00585EF0 (FUN_00585EF0, cfunc_CAiBrainIsOpponentAIRunning)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainIsOpponentAIRunningL`.
+   */
+  int cfunc_CAiBrainIsOpponentAIRunning(lua_State* luaContext);
+
+  /**
+   * Address: 0x00585F10 (FUN_00585F10, func_CAiBrainIsOpponentAIRunning_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:IsOpponentAIRunning()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainIsOpponentAIRunning_LuaFuncDef();
+
+  /**
+   * Address: 0x00585F70 (FUN_00585F70, cfunc_CAiBrainIsOpponentAIRunningL)
+   *
+   * What it does:
+   * Returns whether opponent AI should run for one brain, honoring `/noai`
+   * override and sim-convar state.
+   */
+  int cfunc_CAiBrainIsOpponentAIRunningL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00586070 (FUN_00586070, cfunc_CAiBrainGetArmyIndex)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetArmyIndexL`.
+   */
+  int cfunc_CAiBrainGetArmyIndex(lua_State* luaContext);
+
+  /**
+   * Address: 0x00586090 (FUN_00586090, func_CAiBrainGetArmyIndex_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetArmyIndex()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetArmyIndex_LuaFuncDef();
+
+  /**
+   * Address: 0x005860F0 (FUN_005860F0, cfunc_CAiBrainGetArmyIndexL)
+   *
+   * What it does:
+   * Returns one-based army index for the brain's owning army.
+   */
+  int cfunc_CAiBrainGetArmyIndexL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005861C0 (FUN_005861C0, cfunc_CAiBrainGetFactionIndex)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetFactionIndexL`.
+   */
+  int cfunc_CAiBrainGetFactionIndex(lua_State* luaContext);
+
+  /**
+   * Address: 0x005861E0 (FUN_005861E0, func_CAiBrainGetFactionIndex_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetFactionIndex()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetFactionIndex_LuaFuncDef();
+
+  /**
+   * Address: 0x00586240 (FUN_00586240, cfunc_CAiBrainGetFactionIndexL)
+   *
+   * What it does:
+   * Returns one-based faction index for the brain's owning army.
+   */
+  int cfunc_CAiBrainGetFactionIndexL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00586310 (FUN_00586310, cfunc_CAiBrainSetCurrentPlan)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainSetCurrentPlanL`.
+   */
+  int cfunc_CAiBrainSetCurrentPlan(lua_State* luaContext);
+
+  /**
+   * Address: 0x00586330 (FUN_00586330, func_CAiBrainSetCurrentPlan_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetCurrentPlan(planName)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetCurrentPlan_LuaFuncDef();
+
+  /**
+   * Address: 0x00586390 (FUN_00586390, cfunc_CAiBrainSetCurrentPlanL)
+   *
+   * What it does:
+   * Updates the brain current-plan string from Lua arg #2 when it is a string.
+   */
+  int cfunc_CAiBrainSetCurrentPlanL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005864A0 (FUN_005864A0, cfunc_CAiBrainGetPersonality)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetPersonalityL`.
+   */
+  int cfunc_CAiBrainGetPersonality(lua_State* luaContext);
+
+  /**
+   * Address: 0x005864C0 (FUN_005864C0, func_CAiBrainGetPersonality_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetPersonality()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetPersonality_LuaFuncDef();
+
+  /**
+   * Address: 0x00586520 (FUN_00586520, cfunc_CAiBrainGetPersonalityL)
+   *
+   * What it does:
+   * Returns personality Lua object for this brain, or `nil` when unavailable.
+   */
+  int cfunc_CAiBrainGetPersonalityL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005865F0 (FUN_005865F0, cfunc_CAiBrainSetCurrentEnemy)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainSetCurrentEnemyL`.
+   */
+  int cfunc_CAiBrainSetCurrentEnemy(lua_State* luaContext);
+
+  /**
+   * Address: 0x00586610 (FUN_00586610, func_CAiBrainSetCurrentEnemy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetCurrentEnemy(enemyBrain)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetCurrentEnemy_LuaFuncDef();
+
+  /**
+   * Address: 0x00586670 (FUN_00586670, cfunc_CAiBrainSetCurrentEnemyL)
+   *
+   * What it does:
+   * Stores enemy army pointer from Lua arg #2 brain (or clears it on nil/invalid).
+   */
+  int cfunc_CAiBrainSetCurrentEnemyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00586770 (FUN_00586770, cfunc_CAiBrainGetCurrentEnemy)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetCurrentEnemyL`.
+   */
+  int cfunc_CAiBrainGetCurrentEnemy(lua_State* luaContext);
+
+  /**
+   * Address: 0x00586790 (FUN_00586790, func_CAiBrainGetCurrentEnemy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetCurrentEnemy()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetCurrentEnemy_LuaFuncDef();
+
+  /**
+   * Address: 0x005867F0 (FUN_005867F0, cfunc_CAiBrainGetCurrentEnemyL)
+   *
+   * What it does:
+   * Returns current enemy brain Lua object for this brain, or `nil` when none.
+   */
+  int cfunc_CAiBrainGetCurrentEnemyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005868D0 (FUN_005868D0, cfunc_CAiBrainGetUnitBlueprint)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetUnitBlueprintL`.
+   */
+  int cfunc_CAiBrainGetUnitBlueprint(lua_State* luaContext);
+
+  /**
+   * Address: 0x005868F0 (FUN_005868F0, func_CAiBrainGetUnitBlueprint_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetUnitBlueprint(bpName)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetUnitBlueprint_LuaFuncDef();
+
+  /**
+   * Address: 0x00586950 (FUN_00586950, cfunc_CAiBrainGetUnitBlueprintL)
+   *
+   * What it does:
+   * Resolves one unit blueprint id string for the given AI brain and returns
+   * the corresponding Lua blueprint table/object, or `nil` when missing.
+   */
+  int cfunc_CAiBrainGetUnitBlueprintL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00586AD0 (FUN_00586AD0, cfunc_CAiBrainGetArmyStat)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetArmyStatL`.
+   */
+  int cfunc_CAiBrainGetArmyStat(lua_State* luaContext);
+
+  /**
+   * Address: 0x00586AF0 (FUN_00586AF0, func_CAiBrainGetArmyStat_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetArmyStat(statName, defaultValue)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetArmyStat_LuaFuncDef();
+
+  /**
+   * Address: 0x00586B50 (FUN_00586B50, cfunc_CAiBrainGetArmyStatL)
+   *
+   * What it does:
+   * Resolves one army stat by path and returns its Lua table representation.
+   */
+  int cfunc_CAiBrainGetArmyStatL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00586DA0 (FUN_00586DA0, cfunc_CAiBrainSetArmyStat)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainSetArmyStatL`.
+   */
+  int cfunc_CAiBrainSetArmyStat(lua_State* luaContext);
+
+  /**
+   * Address: 0x00586DC0 (FUN_00586DC0, func_CAiBrainSetArmyStat_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetArmyStat(statName, value)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetArmyStat_LuaFuncDef();
+
+  /**
+   * Address: 0x00586E20 (FUN_00586E20, cfunc_CAiBrainSetArmyStatL)
+   *
+   * What it does:
+   * Writes one army stat lane from Lua number input.
+   */
+  int cfunc_CAiBrainSetArmyStatL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00587020 (FUN_00587020, cfunc_CAiBrainAddArmyStat)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainAddArmyStatL`.
+   */
+  int cfunc_CAiBrainAddArmyStat(lua_State* luaContext);
+
+  /**
+   * Address: 0x00587040 (FUN_00587040, func_CAiBrainAddArmyStat_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:AddArmyStat(statName, value)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainAddArmyStat_LuaFuncDef();
+
+  /**
+   * Address: 0x005870A0 (FUN_005870A0, cfunc_CAiBrainAddArmyStatL)
+   *
+   * What it does:
+   * Adds one Lua numeric delta into one army stat lane.
+   */
+  int cfunc_CAiBrainAddArmyStatL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005872A0 (FUN_005872A0, cfunc_CAiBrainSetGreaterOf)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainSetGreaterOfL`.
+   */
+  int cfunc_CAiBrainSetGreaterOf(lua_State* luaContext);
+
+  /**
+   * Address: 0x005872C0 (FUN_005872C0, func_CAiBrainSetGreaterOf_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetGreaterOf(statName, value)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetGreaterOf_LuaFuncDef();
+
+  /**
+   * Address: 0x00587320 (FUN_00587320, cfunc_CAiBrainSetGreaterOfL)
+   *
+   * What it does:
+   * Updates one army stat only when the incoming value is greater than the
+   * stored stat lane.
+   */
+  int cfunc_CAiBrainSetGreaterOfL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00587520 (FUN_00587520, cfunc_CAiBrainGetBlueprintStat)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetBlueprintStatL`.
+   */
+  int cfunc_CAiBrainGetBlueprintStat(lua_State* luaContext);
+
+  /**
+   * Address: 0x00587540 (FUN_00587540, func_CAiBrainGetBlueprintStat_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetBlueprintStat(statName, category)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetBlueprintStat_LuaFuncDef();
+
+  /**
+   * Address: 0x005875A0 (FUN_005875A0, cfunc_CAiBrainGetBlueprintStatL)
+   *
+   * What it does:
+   * Returns one blueprint-filtered aggregate value for the selected stat path.
+   */
+  int cfunc_CAiBrainGetBlueprintStatL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005876E0 (FUN_005876E0, cfunc_CAiBrainGetCurrentUnits)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetCurrentUnitsL`.
+   */
+  int cfunc_CAiBrainGetCurrentUnits(lua_State* luaContext);
+
+  /**
+   * Address: 0x00587700 (FUN_00587700, func_CAiBrainGetCurrentUnits_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetCurrentUnits(category)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetCurrentUnits_LuaFuncDef();
+
+  /**
+   * Address: 0x00587760 (FUN_00587760, cfunc_CAiBrainGetCurrentUnitsL)
+   *
+   * What it does:
+   * Returns the active-unit count for one category set, truncated to integer.
+   */
+  int cfunc_CAiBrainGetCurrentUnitsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00587B80 (FUN_00587B80, cfunc_CAiBrainSetArmyStatsTrigger)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainSetArmyStatsTriggerL`.
+   */
+  int cfunc_CAiBrainSetArmyStatsTrigger(lua_State* luaContext);
+
+  /**
+   * Address: 0x00587BA0 (FUN_00587BA0, func_CAiBrainSetArmyStatsTrigger_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetArmyStatsTrigger(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetArmyStatsTrigger_LuaFuncDef();
+
+  /**
+   * Address: 0x00587C00 (FUN_00587C00, cfunc_CAiBrainSetArmyStatsTriggerL)
+   *
+   * What it does:
+   * Adds one army-stat trigger condition with optional category filtering.
+   */
+  int cfunc_CAiBrainSetArmyStatsTriggerL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00587FA0 (FUN_00587FA0, cfunc_CAiBrainRemoveArmyStatsTrigger)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainRemoveArmyStatsTriggerL`.
+   */
+  int cfunc_CAiBrainRemoveArmyStatsTrigger(lua_State* luaContext);
+
+  /**
+   * Address: 0x00587FC0 (FUN_00587FC0, func_CAiBrainRemoveArmyStatsTrigger_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:RemoveArmyStatsTrigger(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainRemoveArmyStatsTrigger_LuaFuncDef();
+
+  /**
+   * Address: 0x00588020 (FUN_00588020, cfunc_CAiBrainRemoveArmyStatsTriggerL)
+   *
+   * What it does:
+   * Removes one named trigger from the owning army stats trigger list.
+   */
+  int cfunc_CAiBrainRemoveArmyStatsTriggerL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00587870 (FUN_00587870, cfunc_CAiBrainGetListOfUnits)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetListOfUnitsL`.
+   */
+  int cfunc_CAiBrainGetListOfUnits(lua_State* luaContext);
+
+  /**
+   * Address: 0x00587890 (FUN_00587890, func_CAiBrainGetListOfUnits_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetListOfUnits(entityCategory, needToBeIdle, requireBuilt)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetListOfUnits_LuaFuncDef();
+
+  /**
+   * Address: 0x005878F0 (FUN_005878F0, cfunc_CAiBrainGetListOfUnitsL)
+   *
+   * What it does:
+   * Builds and returns a Lua array of army units matching category + optional
+   * idle/build filters.
+   */
+  int cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00588850 (FUN_00588850, cfunc_CAiBrainSetResourceSharing)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainSetResourceSharingL`.
+   */
+  int cfunc_CAiBrainSetResourceSharing(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588870 (FUN_00588870, func_CAiBrainSetResourceSharing_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetResourceSharing(bool)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetResourceSharing_LuaFuncDef();
+
+  /**
+   * Address: 0x005888D0 (FUN_005888D0, cfunc_CAiBrainSetResourceSharingL)
+   *
+   * What it does:
+   * Sets per-army economy resource-sharing enable flag from Lua arg #2.
+   */
+  int cfunc_CAiBrainSetResourceSharingL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00589720 (FUN_00589720, cfunc_CAiBrainGetArmyStartPos)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetArmyStartPosL`.
+   */
+  int cfunc_CAiBrainGetArmyStartPos(lua_State* luaContext);
+
+  /**
+   * Address: 0x00589740 (FUN_00589740, func_CAiBrainGetArmyStartPos_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetArmyStartPos()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetArmyStartPos_LuaFuncDef();
+
+  /**
+   * Address: 0x005897A0 (FUN_005897A0, cfunc_CAiBrainGetArmyStartPosL)
+   *
+   * What it does:
+   * Returns army start position as two Lua numbers: `x`, `y`.
+   */
+  int cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058ED60 (FUN_0058ED60, cfunc_CAiBrainGetAttackVectors)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetAttackVectorsL`.
+   */
+  int cfunc_CAiBrainGetAttackVectors(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058ED80 (FUN_0058ED80, func_CAiBrainGetAttackVectors_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetAttackVectors()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetAttackVectors_LuaFuncDef();
+
+  /**
+   * Address: 0x0058EDE0 (FUN_0058EDE0, cfunc_CAiBrainGetAttackVectorsL)
+   *
+   * What it does:
+   * Returns the brain's current attack vectors as a Lua table of
+   * `SPointVector` objects, or `nil` when none are available.
+   */
+  int cfunc_CAiBrainGetAttackVectorsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058F390 (FUN_0058F390, func_CAiBrainGetEconomyStored_LuaFuncDef)
+   * Alias export: 0x0058F3A0 (FUN_0058F3A0)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetEconomyStored()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetEconomyStored_LuaFuncDef();
+
+  /**
+   * Address: 0x0058F370 (FUN_0058F370, cfunc_CAiBrainGetEconomyStored)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyStoredL`.
+   */
+  int cfunc_CAiBrainGetEconomyStored(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058F3F0 (FUN_0058F3F0, cfunc_CAiBrainGetEconomyStoredL)
+   *
+   * What it does:
+   * Returns stored economy amount for one requested resource lane.
+   */
+  int cfunc_CAiBrainGetEconomyStoredL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058F750 (FUN_0058F750, func_CAiBrainGetEconomyIncome_LuaFuncDef)
+   * Alias export: 0x0058F760 (FUN_0058F760)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetEconomyIncome()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetEconomyIncome_LuaFuncDef();
+
+  /**
+   * Address: 0x0058F730 (FUN_0058F730, cfunc_CAiBrainGetEconomyIncome)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyIncomeL`.
+   */
+  int cfunc_CAiBrainGetEconomyIncome(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058F7B0 (FUN_0058F7B0, cfunc_CAiBrainGetEconomyIncomeL)
+   *
+   * What it does:
+   * Returns economy income amount for one requested resource lane.
+   */
+  int cfunc_CAiBrainGetEconomyIncomeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058F910 (FUN_0058F910, func_CAiBrainGetEconomyUsage_LuaFuncDef)
+   * Alias export: 0x0058F920 (FUN_0058F920)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetEconomyUsage()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetEconomyUsage_LuaFuncDef();
+
+  /**
+   * Address: 0x0058F8F0 (FUN_0058F8F0, cfunc_CAiBrainGetEconomyUsage)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyUsageL`.
+   */
+  int cfunc_CAiBrainGetEconomyUsage(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058F970 (FUN_0058F970, cfunc_CAiBrainGetEconomyUsageL)
+   *
+   * What it does:
+   * Returns last-actual usage amount for one requested resource lane.
+   */
+  int cfunc_CAiBrainGetEconomyUsageL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058FAD0 (FUN_0058FAD0, func_CAiBrainGetEconomyRequested_LuaFuncDef)
+   * Alias export: 0x0058FAE0 (FUN_0058FAE0)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetEconomyRequested()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetEconomyRequested_LuaFuncDef();
+
+  /**
+   * Address: 0x0058FAB0 (FUN_0058FAB0, cfunc_CAiBrainGetEconomyRequested)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyRequestedL`.
+   */
+  int cfunc_CAiBrainGetEconomyRequested(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058FB30 (FUN_0058FB30, cfunc_CAiBrainGetEconomyRequestedL)
+   *
+   * What it does:
+   * Returns last-requested amount for one requested resource lane.
+   */
+  int cfunc_CAiBrainGetEconomyRequestedL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058FC90 (FUN_0058FC90, func_CAiBrainGetEconomyTrend_LuaFuncDef)
+   * Alias export: 0x0058FCA0 (FUN_0058FCA0)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetEconomyTrend()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetEconomyTrend_LuaFuncDef();
+
+  /**
+   * Address: 0x0058FC70 (FUN_0058FC70, cfunc_CAiBrainGetEconomyTrend)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyTrendL`.
+   */
+  int cfunc_CAiBrainGetEconomyTrend(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058FCF0 (FUN_0058FCF0, cfunc_CAiBrainGetEconomyTrendL)
+   *
+   * What it does:
+   * Returns `(income - lastActualUse)` for one requested resource lane.
+   */
+  int cfunc_CAiBrainGetEconomyTrendL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058F530 (FUN_0058F530, cfunc_CAiBrainGetEconomyStoredRatio)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetEconomyStoredRatioL`.
+  */
+  int cfunc_CAiBrainGetEconomyStoredRatio(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058F550 (FUN_0058F550, func_CAiBrainGetEconomyStoredRatio_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetEconomyStoredRatio(resourceType)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetEconomyStoredRatio_LuaFuncDef();
+
+  /**
+   * Address: 0x0058F5B0 (FUN_0058F5B0, cfunc_CAiBrainGetEconomyStoredRatioL)
+   *
+   * What it does:
+   * Returns stored-to-capacity ratio for the requested economy resource lane.
+   */
+  int cfunc_CAiBrainGetEconomyStoredRatioL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058FE30 (FUN_0058FE30, cfunc_CAiBrainGetMapWaterRatio)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetMapWaterRatioL`.
+   */
+  int cfunc_CAiBrainGetMapWaterRatio(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058FE50 (FUN_0058FE50, func_CAiBrainGetMapWaterRatio_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetMapWaterRatio()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetMapWaterRatio_LuaFuncDef();
+
+  /**
+   * Address: 0x0058FEB0 (FUN_0058FEB0, cfunc_CAiBrainGetMapWaterRatioL)
+   *
+   * What it does:
+   * Samples the owning sim-map terrain and returns the map water-coverage ratio.
+   */
+  int cfunc_CAiBrainGetMapWaterRatioL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005881F0 (FUN_005881F0, cfunc_CAiBrainGiveResource)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGiveResourceL`.
+   */
+  int cfunc_CAiBrainGiveResource(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588210 (FUN_00588210, func_CAiBrainGiveResource_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GiveResource(type,amount)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGiveResource_LuaFuncDef();
+
+  /**
+   * Address: 0x00588270 (FUN_00588270, cfunc_CAiBrainGiveResourceL)
+   *
+   * What it does:
+   * Adds `amount` to one stored economy-resource lane selected by `type`
+   * after decoding `(brain, type, amount)` from Lua.
+   */
+  int cfunc_CAiBrainGiveResourceL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x005883E0 (FUN_005883E0, cfunc_CAiBrainGiveStorage)
    *
    * What it does:
@@ -443,6 +1183,22 @@ namespace moho
    * after decoding `(brain, resourceType, amount)` from Lua.
    */
   int cfunc_CAiBrainGiveStorageL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005885E0 (FUN_005885E0, cfunc_CAiBrainTakeResource)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainTakeResourceL`.
+   */
+  int cfunc_CAiBrainTakeResource(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588600 (FUN_00588600, func_CAiBrainTakeResource_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:TakeResource(type,amount)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainTakeResource_LuaFuncDef();
 
   /**
    * Address: 0x00588660 (FUN_00588660, cfunc_CAiBrainTakeResourceL)
@@ -477,6 +1233,31 @@ namespace moho
    * Publishes the `CAiBrain:FindUnit(unitCategory, needToBeIdle)` Lua binder.
    */
   CScrLuaInitForm* func_CAiBrainFindUnit_LuaFuncDef();
+
+  /**
+   * Address: 0x00588C10 (FUN_00588C10, cfunc_CAiBrainFindUpgradeBP)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainFindUpgradeBPL`.
+   */
+  int cfunc_CAiBrainFindUpgradeBP(lua_State* luaContext);
+
+  /**
+   * Address: 0x00588C30 (FUN_00588C30, func_CAiBrainFindUpgradeBP_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:FindUpgradeBP(unitName, upgradeList)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainFindUpgradeBP_LuaFuncDef();
+
+  /**
+   * Address: 0x00588C90 (FUN_00588C90, cfunc_CAiBrainFindUpgradeBPL)
+   *
+   * What it does:
+   * Finds one matching `unitName` entry in `upgradeList` and returns its
+   * upgrade blueprint id string, or `nil` when no match exists.
+   */
+  int cfunc_CAiBrainFindUpgradeBPL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00588EB0 (FUN_00588EB0, cfunc_CAiBrainFindUnitToUpgrade)
@@ -559,6 +1340,57 @@ namespace moho
   CScrLuaInitForm* func_CAiBrainBuildStructure_LuaFuncDef();
 
   /**
+   * Address: 0x0058BA40 (FUN_0058BA40, cfunc_CAiBrainNumCurrentlyBuilding)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainNumCurrentlyBuildingL`.
+   */
+  int cfunc_CAiBrainNumCurrentlyBuilding(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058BA60 (FUN_0058BA60, func_CAiBrainNumCurrentlyBuilding_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:NumCurrentlyBuilding(entityCategoryOfBuildee,entityCategoryOfBuilder)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainNumCurrentlyBuilding_LuaFuncDef();
+
+  /**
+   * Address: 0x0058BAC0 (FUN_0058BAC0, cfunc_CAiBrainNumCurrentlyBuildingL)
+   *
+   * What it does:
+   * Counts live non-destroy-queued builder-category units in `Building`/`Upgrading`
+   * state whose focused build target blueprint matches the requested buildee category.
+   */
+  int cfunc_CAiBrainNumCurrentlyBuildingL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058C840 (FUN_0058C840, cfunc_CAiBrainBuildUnit)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainBuildUnitL`.
+   */
+  int cfunc_CAiBrainBuildUnit(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058C860 (FUN_0058C860, func_CAiBrainBuildUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:BuildUnit()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainBuildUnit_LuaFuncDef();
+
+  /**
+   * Address: 0x0058C8C0 (FUN_0058C8C0, cfunc_CAiBrainBuildUnitL)
+   *
+   * What it does:
+   * Reads `(brain, builder, blueprintId, count)` from Lua and dispatches
+   * `CAiBrain::BuildUnit` when arg #3 is a string.
+   */
+  int cfunc_CAiBrainBuildUnitL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0058CA40 (FUN_0058CA40, cfunc_CAiBrainIsAnyEngineerBuilding)
    *
    * What it does:
@@ -583,6 +1415,205 @@ namespace moho
    * Publishes the `CAiBrain:IsAnyEngineerBuilding(category)` Lua binder.
    */
   CScrLuaInitForm* func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef();
+
+  /**
+   * Address: 0x0058CCA0 (FUN_0058CCA0, cfunc_CAiBrainGetNumPlatoonsWithAI)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetNumPlatoonsWithAIL`.
+   */
+  int cfunc_CAiBrainGetNumPlatoonsWithAI(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058CCC0 (FUN_0058CCC0, func_CAiBrainGetNumPlatoonsWithAI_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetNumPlatoonsWithAI(planName)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetNumPlatoonsWithAI_LuaFuncDef();
+
+  /**
+   * Address: 0x0058CD10 (FUN_0058CD10, cfunc_CAiBrainGetNumPlatoonsWithAIL)
+   *
+   * What it does:
+   * Resolves `(brain, planName)` and returns matching platoon count.
+   */
+  int cfunc_CAiBrainGetNumPlatoonsWithAIL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058CE30 (FUN_0058CE30, cfunc_CAiBrainGetNumPlatoonsTemplateNamed)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetNumPlatoonsTemplateNamedL`.
+   */
+  int cfunc_CAiBrainGetNumPlatoonsTemplateNamed(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058CE50 (FUN_0058CE50, func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetNumPlatoonsTemplateNamed(templateName)`
+   * Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef();
+
+  /**
+   * Address: 0x0058CEA0 (FUN_0058CEA0, cfunc_CAiBrainGetNumPlatoonsTemplateNamedL)
+   *
+   * What it does:
+   * Resolves `(brain, templateName)` and returns matching platoon count.
+   */
+  int cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058CFC0 (FUN_0058CFC0, cfunc_CAiBrainPlatoonExists)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainPlatoonExistsL`.
+   */
+  int cfunc_CAiBrainPlatoonExists(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058CFE0 (FUN_0058CFE0, func_CAiBrainPlatoonExists_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:PlatoonExists()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainPlatoonExists_LuaFuncDef();
+
+  /**
+   * Address: 0x0058D040 (FUN_0058D040, cfunc_CAiBrainPlatoonExistsL)
+   *
+   * What it does:
+   * Returns whether arg #2 resolves to a live platoon object.
+   */
+  int cfunc_CAiBrainPlatoonExistsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058D140 (FUN_0058D140, cfunc_CAiBrainGetPlatoonsList)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetPlatoonsListL`.
+   */
+  int cfunc_CAiBrainGetPlatoonsList(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058D160 (FUN_0058D160, func_CAiBrainGetPlatoonsList_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetPlatoonsList()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetPlatoonsList_LuaFuncDef();
+
+  /**
+   * Address: 0x0058D1C0 (FUN_0058D1C0, cfunc_CAiBrainGetPlatoonsListL)
+   *
+   * What it does:
+   * Returns a Lua array of non-empty platoons, excluding `ArmyPool`.
+   */
+  int cfunc_CAiBrainGetPlatoonsListL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058D360 (FUN_0058D360, cfunc_CAiBrainDisbandPlatoon)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainDisbandPlatoonL`.
+   */
+  int cfunc_CAiBrainDisbandPlatoon(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058D380 (FUN_0058D380, func_CAiBrainDisbandPlatoon_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:DisbandPlatoon()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainDisbandPlatoon_LuaFuncDef();
+
+  /**
+   * Address: 0x0058D3E0 (FUN_0058D3E0, cfunc_CAiBrainDisbandPlatoonL)
+   *
+   * What it does:
+   * Resolves `(brain, platoon)` from Lua and disbands the platoon via army
+   * ownership.
+   */
+  int cfunc_CAiBrainDisbandPlatoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058D4D0 (FUN_0058D4D0, cfunc_CAiBrainDisbandPlatoonUniquelyNamed)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainDisbandPlatoonUniquelyNamedL`.
+   */
+  int cfunc_CAiBrainDisbandPlatoonUniquelyNamed(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058D4F0 (FUN_0058D4F0, func_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:DisbandPlatoonUniquelyNamed()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef();
+
+  /**
+   * Address: 0x0058D550 (FUN_0058D550, cfunc_CAiBrainDisbandPlatoonUniquelyNamedL)
+   *
+   * What it does:
+   * Resolves `(brain, uniqueName)` and disbands one uniquely named platoon.
+   */
+  int cfunc_CAiBrainDisbandPlatoonUniquelyNamedL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058DFA0 (FUN_0058DFA0, cfunc_CAiBrainGetPlatoonUniquelyNamed)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetPlatoonUniquelyNamedL`.
+   */
+  int cfunc_CAiBrainGetPlatoonUniquelyNamed(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058DFC0 (FUN_0058DFC0, func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetPlatoonUniquelyNamed()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef();
+
+  /**
+   * Address: 0x0058E020 (FUN_0058E020, cfunc_CAiBrainGetPlatoonUniquelyNamedL)
+   *
+   * What it does:
+   * Resolves `(brain, platoonName)` and returns the matching platoon Lua object
+   * or `nil` when no matching platoon exists.
+   */
+  int cfunc_CAiBrainGetPlatoonUniquelyNamedL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005917F0 (FUN_005917F0, cfunc_CAiBrainGetNoRushTicks)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetNoRushTicksL`.
+   */
+  int cfunc_CAiBrainGetNoRushTicks(lua_State* luaContext);
+
+  /**
+   * Address: 0x00591810 (FUN_00591810, func_CAiBrainGetNoRushTicks_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetNoRushTicks()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetNoRushTicks_LuaFuncDef();
+
+  /**
+   * Address: 0x00591870 (FUN_00591870, cfunc_CAiBrainGetNoRushTicksL)
+   *
+   * What it does:
+   * Returns current no-rush timer ticks for the brain owning army.
+   */
+  int cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* state);
 } // namespace moho
 
 /**

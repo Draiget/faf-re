@@ -14,15 +14,37 @@ namespace gpg
   {
   public:
     /**
+     * Address: 0x006AE290 (FUN_006AE290, gpg::RMapType_string_float::GetName)
+     *
      * What it does:
-     * Returns the reflected type label for `std::map<std::string,float>`.
+     * Builds/caches the lexical map type label from runtime key/value RTTI
+     * names and returns `"map<key,value>"`.
      */
     [[nodiscard]] const char* GetName() const override;
 
     /**
+     * Address: 0x006AF250 (FUN_006AF250, gpg::RMapType_string_float::SerLoad)
+     *
      * What it does:
-     * Initializes reflected size/version metadata and finalizes field/base
-     * index data for this map type descriptor.
+     * Clears destination map storage, then reads `count` key/value pairs and
+     * inserts them into `std::map<std::string,float>`.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x006AF390 (FUN_006AF390, gpg::RMapType_string_float::SerSave)
+     *
+     * What it does:
+     * Writes map size and serializes each key/value pair in map-order.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x006AE350 (FUN_006AE350, gpg::RMapType_string_float::Init)
+     *
+     * What it does:
+     * Initializes reflected size/version metadata and binds map serializer
+     * callbacks.
      */
     void Init() override;
   };

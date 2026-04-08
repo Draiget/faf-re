@@ -54,6 +54,15 @@ namespace moho
 
   struct STransportPickUpInfo
   {
+    /**
+     * Address: 0x005E43A0 (FUN_005E43A0, Moho::STransportPickUpInfo::STransportPickUpInfo)
+     *
+     * What it does:
+     * Initializes fallback position/orientation lanes and resets pickup-unit
+     * set storage to an empty inline-backed state.
+     */
+    STransportPickUpInfo();
+
     [[nodiscard]] bool HasUnit(const Unit* unit) const noexcept;
     void RemoveUnit(Unit* unit) noexcept;
 
@@ -126,9 +135,13 @@ namespace moho
      * Address: 0x005E8280 (FUN_005E8280, scalar deleting thunk)
      * Address: 0x005E5C10 (FUN_005E5C10, core dtor)
      *
+     * What it does:
+     * Clears transport waiting-formation state and destroys live stored units
+     * before regular member/base teardown.
+     *
      * VFTable SLOT: 0
      */
-    ~CAiTransportImpl() override = default;
+    ~CAiTransportImpl() override;
 
     /**
      * Address: 0x005E60F0 (FUN_005E60F0)

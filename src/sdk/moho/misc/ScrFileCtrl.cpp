@@ -335,7 +335,7 @@ bool moho::ScrFileCtrl::ContainsSourceMatch(
   const msvc8::string& needle
 ) const
 {
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount() || needle.empty()) {
+  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
     return false;
   }
 
@@ -590,10 +590,6 @@ void moho::ScrFileCtrl::ClearCursorLocation()
  */
 int moho::ScrFileCtrl::GetLineMarkerState(const int lineIndexZeroBased) const
 {
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return -1;
-  }
-
   return mLines[static_cast<std::size_t>(lineIndexZeroBased)].mMarkerState;
 }
 
@@ -610,10 +606,6 @@ wxStringRuntime moho::ScrFileCtrl::GetVirtualItemText(
   const int columnIndex
 ) const
 {
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return wxStringRuntime::Borrow(L"");
-  }
-
   const ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
   if (columnIndex == 1) {
     return BorrowUtf8AsWxString(line.mLineNumberText);
@@ -635,10 +627,7 @@ wxStringRuntime moho::ScrFileCtrl::GetVirtualItemText(
 void moho::ScrFileCtrl::OnLineActivated(const void* const listEvent)
 {
   const auto* const eventView = reinterpret_cast<const wxListActivationEventRuntimeView*>(listEvent);
-  const int lineIndexZeroBased = eventView != nullptr ? eventView->mItemIndex : -1;
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return;
-  }
+  const int lineIndexZeroBased = eventView->mItemIndex;
 
   ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
   const int lineOneBased = lineIndexZeroBased + 1;

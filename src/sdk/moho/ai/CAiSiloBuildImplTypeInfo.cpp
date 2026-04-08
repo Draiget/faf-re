@@ -5,6 +5,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/String.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/ai/CAiSiloBuildImplConstruct.h"
 #include "moho/ai/CAiSiloBuildImplSerializer.h"
@@ -24,10 +25,7 @@ namespace
   class ESiloTypeListTypeInfo final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "list<ESiloType>";
-    }
+    [[nodiscard]] const char* GetName() const override;
   };
 
   static_assert(sizeof(SSiloBuildInfoTypeInfo) == 0x64, "SSiloBuildInfoTypeInfo size must be 0x64");
@@ -41,6 +39,8 @@ namespace
 
   alignas(ESiloTypeListTypeInfo) unsigned char gESiloTypeListTypeInfoStorage[sizeof(ESiloTypeListTypeInfo)];
   bool gESiloTypeListTypeInfoConstructed = false;
+  msvc8::string gESiloTypeListTypeName;
+  bool gESiloTypeListTypeNameCleanupRegistered = false;
 
   [[nodiscard]] SSiloBuildInfoTypeInfo* AcquireSSiloBuildInfoTypeInfo()
   {
@@ -74,6 +74,15 @@ namespace
     }
 
     return reinterpret_cast<ESiloTypeListTypeInfo*>(gESiloTypeListTypeInfoStorage);
+  }
+
+  [[nodiscard]] gpg::RType* CachedESiloTypeType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(ESiloType));
+    }
+    return cached;
   }
 
   /**
@@ -115,6 +124,12 @@ namespace
       IAiSiloBuild::sType = gpg::LookupRType(typeid(IAiSiloBuild));
     }
     return IAiSiloBuild::sType;
+  }
+
+  void cleanup_ESiloTypeListTypeName()
+  {
+    gESiloTypeListTypeName = msvc8::string{};
+    gESiloTypeListTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -223,6 +238,28 @@ void CAiSiloBuildImplTypeInfo::Init()
   }
 
   Finish();
+}
+
+/**
+ * Address: 0x005CFBD0 (FUN_005CFBD0, gpg::RListType_ESiloType::GetName)
+ *
+ * What it does:
+ * Lazily formats and caches the reflected type label for `list<ESiloType>`
+ * using the registered enum RTTI name.
+ */
+const char* ESiloTypeListTypeInfo::GetName() const
+{
+  if (gESiloTypeListTypeName.empty()) {
+    gpg::RType* const valueType = CachedESiloTypeType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "ESiloType";
+    gESiloTypeListTypeName = gpg::STR_Printf("list<%s>", valueTypeName ? valueTypeName : "ESiloType");
+    if (!gESiloTypeListTypeNameCleanupRegistered) {
+      gESiloTypeListTypeNameCleanupRegistered = true;
+      (void)std::atexit(&cleanup_ESiloTypeListTypeName);
+    }
+  }
+
+  return gESiloTypeListTypeName.c_str();
 }
 
 /**

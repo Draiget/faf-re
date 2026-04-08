@@ -82,6 +82,22 @@ namespace moho
     bool mCanDelete = false; // +0x44
   };
 
+  /**
+   * Address: 0x00BC43A0 (FUN_00BC43A0, register_mTextureMap)
+   *
+   * What it does:
+   * Startup thunk that materializes the global file-texture lookup map storage.
+   */
+  void register_mTextureMap();
+
+  /**
+   * Address: 0x00BC43E0 (FUN_00BC43E0, register_sFileTextures)
+   *
+   * What it does:
+   * Startup thunk that materializes the global file-texture retain queue storage.
+   */
+  void register_sFileTextures();
+
   static_assert(offsetof(CD3DFileBatchTexture, mFilename) == 0x28, "CD3DFileBatchTexture::mFilename offset must be 0x28");
   static_assert(offsetof(CD3DFileBatchTexture, mCanDelete) == 0x44, "CD3DFileBatchTexture::mCanDelete offset must be 0x44");
   static_assert(sizeof(CD3DFileBatchTexture) == 0x48, "CD3DFileBatchTexture size must be 0x48");

@@ -53,6 +53,17 @@ namespace moho
      */
     CCommandTask();
 
+    /**
+     * Address: 0x005F08D0 (FUN_005F08D0, ??0CCommandTask@Moho@@QAE@@Z)
+     *
+     * CCommandTask *
+     *
+     * What it does:
+     * Initializes one child command task from `parent` task context, inheriting
+     * task-thread/unit/sim lanes and chaining dispatch-result storage.
+     */
+    explicit CCommandTask(CCommandTask* parent);
+
   public:
     static gpg::RType* sType;
 
@@ -138,3 +149,15 @@ namespace moho
   static_assert(sizeof(CCommandTaskSerializer) == 0x14, "CCommandTaskSerializer size must be 0x14");
   static_assert(sizeof(CCommandTaskTypeInfo) == 0x64, "CCommandTaskTypeInfo size must be 0x64");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x005F22F0 (FUN_005F22F0, gpg::RRef_CCommandTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CCommandTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CCommandTask(gpg::RRef* outRef, moho::CCommandTask* value);
+} // namespace gpg

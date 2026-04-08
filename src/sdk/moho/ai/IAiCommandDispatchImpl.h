@@ -19,6 +19,7 @@ namespace gpg
 namespace moho
 {
   class CUnitCommandQueue;
+  class Unit;
 
   enum ETaskStatus : std::int32_t;
 
@@ -47,6 +48,46 @@ namespace moho
      * VFTable SLOT: 1
      */
     virtual ETaskStatus TaskTick() = 0;
+
+    /**
+     * Address: 0x006012B0 (FUN_006012B0, Moho::IAiCommandDispatchImpl::IssueCallTeleportTask)
+     *
+     * What it does:
+     * Validates one candidate unit for teleport-call support and either emits
+     * a warning for illegal categories or allocates one `CUnitCallTeleport`
+     * task bound to this dispatch context.
+     */
+    void IssueCallTeleportTask(Unit* unit);
+
+    /**
+     * Address: 0x00601CE0 (FUN_00601CE0, Moho::IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask)
+     *
+     * What it does:
+     * Validates one candidate unit for air-staging-call support and either
+     * emits a warning for illegal categories or allocates one
+     * `CUnitCallAirStagingPlatform` task bound to this dispatch context.
+     */
+    void IssueCallAirStagingPlatformTask(Unit* unit);
+
+    /**
+     * Address: 0x006007C0 (FUN_006007C0, Moho::IAiCommandDispatchImpl::IssueCallLandTransportTask)
+     *
+     * What it does:
+     * Validates one candidate unit for land-transport-call support and either
+     * emits an illegal-transport warning or allocates one
+     * `CUnitCallLandTransport` task bound to this dispatch context.
+     */
+    void IssueCallLandTransportTask(Unit* unit);
+
+    /**
+     * Address: 0x00622110 (FUN_00622110, Moho::IAiCommandDispatchImpl::IssueRefuelTask)
+     *
+     * What it does:
+     * Validates one candidate unit for refuel dispatch (alive, not being
+     * built, and backed by an air-staging transport) and allocates one
+     * `CUnitRefuel` task bound to this dispatch context.
+     */
+    void IssueRefuelTask(Unit* unit);
 
     /**
      * Address: 0x00599330 (FUN_00599330, Moho::IAiCommandDispatchImpl::MemberConstruct)

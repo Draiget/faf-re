@@ -1,6 +1,7 @@
 #include "moho/sim/SDelayedSubVizInfoReflection.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -849,16 +850,15 @@ namespace
     const moho::SDelayedSubVizInfo* const sourceEnd
   )
   {
-    if (!destination) {
-      return nullptr;
-    }
-
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
     while (sourceBegin != sourceEnd) {
-      *destination = *sourceBegin;
-      ++destination;
+      if (destinationAddress != 0u) {
+        *reinterpret_cast<moho::SDelayedSubVizInfo*>(destinationAddress) = *sourceBegin;
+      }
+      destinationAddress += sizeof(moho::SDelayedSubVizInfo);
       ++sourceBegin;
     }
-    return destination;
+    return reinterpret_cast<moho::SDelayedSubVizInfo*>(destinationAddress);
   }
 
   /**
@@ -1101,12 +1101,8 @@ namespace
     const moho::SDelayedSubVizInfo* const value
   )
   {
-    if (!value) {
-      return 0u;
-    }
-
-    const auto* const raw = reinterpret_cast<const std::uint32_t*>(value);
-    return raw[0];
+    GPG_ASSERT(value != nullptr);
+    return *reinterpret_cast<const std::uint32_t*>(value);
   }
 
   /**
@@ -1490,6 +1486,9 @@ namespace moho
     return ConstructAndRegisterDelayedSubVizVectorType();
   }
 
+  /**
+   * Address: 0x00BC79F0 (FUN_00BC79F0, register_SDelayedSubVizInfoVectorType_AtExit)
+   */
   int register_SDelayedSubVizInfoVectorType_AtExit()
   {
     (void)register_SDelayedSubVizInfoVectorType();

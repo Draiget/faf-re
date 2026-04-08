@@ -22,6 +22,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class CScrLuaInitForm;
   struct SWldSessionInfo;
 
   /**
@@ -89,6 +90,59 @@ namespace moho
   [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData);
 
   /**
+   * Address: 0x00876DD0 (FUN_00876DD0, cfunc_LaunchReplaySession)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_LaunchReplaySessionL`.
+   */
+  int cfunc_LaunchReplaySession(lua_State* luaContext);
+
+  /**
+   * Address: 0x00876DF0 (FUN_00876DF0, func_LaunchReplaySession_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `LaunchReplaySession`.
+   */
+  CScrLuaInitForm* func_LaunchReplaySession_LuaFuncDef();
+
+  /**
+   * Address: 0x00876E50 (FUN_00876E50, cfunc_LaunchReplaySessionL)
+   *
+   * What it does:
+   * Validates one replay filename arg, builds replay session info, starts
+   * world-session begin flow on success, and returns one boolean status.
+   */
+  int cfunc_LaunchReplaySessionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0088D340 (FUN_0088D340, cfunc_LaunchSinglePlayerSession)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_LaunchSinglePlayerSessionL`.
+   */
+  int cfunc_LaunchSinglePlayerSession(lua_State* luaContext);
+
+  /**
+   * Address: 0x0088D360 (FUN_0088D360, func_LaunchSinglePlayerSession_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `LaunchSinglePlayerSession`.
+   */
+  CScrLuaInitForm* func_LaunchSinglePlayerSession_LuaFuncDef();
+
+  /**
+   * Address: 0x0088D3C0 (FUN_0088D3C0, cfunc_LaunchSinglePlayerSessionL)
+   *
+   * What it does:
+   * Validates one launch payload from Lua, rejects launches while world-frame
+   * startup/runtime is active, builds single-player session info, and starts
+   * world-session begin flow.
+   */
+  int cfunc_LaunchSinglePlayerSessionL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0088DA80 (FUN_0088DA80, cfunc_SessionSendChatMessage)
    *
    * What it does:
@@ -96,6 +150,14 @@ namespace moho
    * `cfunc_SessionSendChatMessageL`.
    */
   int cfunc_SessionSendChatMessage(lua_State* luaContext);
+
+  /**
+   * Address: 0x0088DAA0 (FUN_0088DAA0, func_SessionSendChatMessage_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SessionSendChatMessage`.
+   */
+  CScrLuaInitForm* func_SessionSendChatMessage_LuaFuncDef();
 
   /**
    * Address: 0x0088DB00 (FUN_0088DB00, cfunc_SessionSendChatMessageL)
@@ -108,6 +170,32 @@ namespace moho
   int cfunc_SessionSendChatMessageL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00897AF0 (FUN_00897AF0, cfunc_SessionGetCommandSourceNames)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_SessionGetCommandSourceNamesL`.
+   */
+  int cfunc_SessionGetCommandSourceNames(lua_State* luaContext);
+
+  /**
+   * Address: 0x00897B10 (FUN_00897B10, func_SessionGetCommandSourceNames_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for
+   * `SessionGetCommandSourceNames`.
+   */
+  CScrLuaInitForm* func_SessionGetCommandSourceNames_LuaFuncDef();
+
+  /**
+   * Address: 0x00897B70 (FUN_00897B70, cfunc_SessionGetCommandSourceNamesL)
+   *
+   * What it does:
+   * Builds and returns a Lua table of active session command-source names.
+   */
+  int cfunc_SessionGetCommandSourceNamesL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00881AB0 (FUN_00881AB0, cfunc_InternalSaveGame)
    *
    * What it does:
@@ -115,6 +203,14 @@ namespace moho
    * `cfunc_InternalSaveGameL`.
    */
   int cfunc_InternalSaveGame(lua_State* luaContext);
+
+  /**
+   * Address: 0x00881AD0 (FUN_00881AD0, func_InternalSaveGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `InternalSaveGame`.
+   */
+  CScrLuaInitForm* func_InternalSaveGame_LuaFuncDef();
 
   /**
    * Address: 0x00881B30 (FUN_00881B30, cfunc_InternalSaveGameL)

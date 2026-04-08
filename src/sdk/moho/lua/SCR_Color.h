@@ -65,5 +65,12 @@ namespace moho
    * Publishes the global Lua binder definition for `EnumColorNames`.
    */
   CScrLuaInitForm* func_EnumColorNames_LuaFuncDef();
-} // namespace moho
 
+  /**
+   * Address: 0x00BC5CD0 (FUN_00BC5CD0, register_EnumColorNames_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk forwarding to `func_EnumColorNames_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EnumColorNames_LuaFuncDef();
+} // namespace moho

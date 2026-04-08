@@ -4,10 +4,12 @@
 #include <new>
 #include <stdexcept>
 #include <typeinfo>
+#include <type_traits>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/lua/CScrLuaBinder.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
@@ -19,10 +21,19 @@ namespace
   constexpr const char* kCreateEconomyEventHelp = "CreateEconomyEvent";
   constexpr const char* kRemoveEconomyEventHelp = "RemoveEconomyEvent";
   constexpr const char* kEconomyEventIsDoneHelp = "EconomyEventIsDone";
+  constexpr const char* kCreateEconomyEventLuaHelp = "event = CreateEconomyEvent(unit, energy, mass, timeInSeconds)";
+  constexpr const char* kRemoveEconomyEventLuaHelp = "RemoveEconomyEvent(unit, event)";
+  constexpr const char* kEconomyEventIsDoneLuaHelp = "bool = EconomyEventIsDone(event)";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    static moho::CScrLuaInitFormSet sSet("sim");
+    return sSet;
+  }
 
   /**
    * Address: 0x00775630 (FUN_00775630, context unwrap)
@@ -94,6 +105,99 @@ namespace
       cached = gpg::LookupRType(typeid(LuaPlus::LuaObject));
     }
     return cached;
+  }
+
+  struct TypeInfoRTypePair
+  {
+    const std::type_info* typeInfo;
+    gpg::RType* rType;
+  };
+
+  struct TypeInfoCache3
+  {
+    bool initialized;
+    TypeInfoRTypePair entries[3];
+  };
+
+  thread_local TypeInfoCache3 gCEconRequestRRefCache{false, {}};
+
+  template <typename TObject>
+  [[nodiscard]] gpg::RRef* BuildTypedRefWithCache(
+    gpg::RRef* const outRef,
+    TObject* const value,
+    const std::type_info& declaredType,
+    gpg::RType*& declaredTypeCache,
+    TypeInfoCache3& cache
+  )
+  {
+    if (outRef == nullptr) {
+      return nullptr;
+    }
+
+    gpg::RType* declaredRuntimeType = declaredTypeCache;
+    if (declaredRuntimeType == nullptr) {
+      declaredRuntimeType = gpg::LookupRType(declaredType);
+      declaredTypeCache = declaredRuntimeType;
+    }
+
+    const std::type_info* runtimeTypeInfo = &declaredType;
+    if constexpr (std::is_polymorphic_v<TObject>) {
+      if (value != nullptr) {
+        runtimeTypeInfo = &typeid(*value);
+      }
+    }
+
+    if (value == nullptr || (*runtimeTypeInfo == declaredType)) {
+      outRef->mObj = value;
+      outRef->mType = declaredRuntimeType;
+      return outRef;
+    }
+
+    if (!cache.initialized) {
+      cache.initialized = true;
+      for (TypeInfoRTypePair& entry : cache.entries) {
+        entry.typeInfo = nullptr;
+        entry.rType = nullptr;
+      }
+    }
+
+    int cacheSlot = 0;
+    while (cacheSlot < 3) {
+      const TypeInfoRTypePair& entry = cache.entries[cacheSlot];
+      if (entry.typeInfo == runtimeTypeInfo || (entry.typeInfo && (*entry.typeInfo == *runtimeTypeInfo))) {
+        break;
+      }
+      ++cacheSlot;
+    }
+
+    gpg::RType* runtimeType = nullptr;
+    if (cacheSlot >= 3) {
+      runtimeType = gpg::LookupRType(*runtimeTypeInfo);
+      cacheSlot = 2;
+    } else {
+      runtimeType = cache.entries[cacheSlot].rType;
+    }
+
+    for (int slot = cacheSlot; slot > 0; --slot) {
+      cache.entries[slot] = cache.entries[slot - 1];
+    }
+
+    cache.entries[0].typeInfo = runtimeTypeInfo;
+    cache.entries[0].rType = runtimeType;
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = runtimeType->IsDerivedFrom(declaredRuntimeType, &baseOffset);
+    GPG_ASSERT(isDerived);
+    if (!isDerived) {
+      outRef->mObj = value;
+      outRef->mType = runtimeType;
+      return outRef;
+    }
+
+    outRef->mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    outRef->mType = runtimeType;
+    return outRef;
   }
 
   template <typename TObject>
@@ -299,8 +403,8 @@ namespace
 
   void ClearUnitRequestedRates(moho::Unit* unit)
   {
-    unit->EconomyEventRequestedEnergyRate = 0.0f;
-    unit->EconomyEventRequestedMassRate = 0.0f;
+    unit->SharedEconomyRateEnergy = 0.0f;
+    unit->SharedEconomyRateMass = 0.0f;
   }
 
   /**
@@ -443,6 +547,24 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x005D1C70 (FUN_005D1C70, gpg::RRef_CEconRequest)
+ *
+ * What it does:
+ * Builds a typed reflection reference for `CEconRequest*`, resolving derived
+ * runtime type + base adjustment when required.
+ */
+gpg::RRef* gpg::RRef_CEconRequest(gpg::RRef* const outRef, moho::CEconRequest* const value)
+{
+  return BuildTypedRefWithCache(
+    outRef,
+    value,
+    typeid(moho::CEconRequest),
+    moho::CEconRequest::sType,
+    gCEconRequestRRefCache
+  );
+}
+
 namespace moho
 {
   gpg::RType* SEconValue::sType = nullptr;
@@ -545,8 +667,8 @@ gpg::RRef moho::CEconomyEvent::GetDerivedObjectRef()
 void moho::CEconomyEvent::ProcessTick()
 {
   if (mRemainingTicks != 0 && mRequest != nullptr && mUnit != nullptr) {
-    mUnit->EconomyEventRequestedEnergyRate = mRequestedPerTick.energy;
-    mUnit->EconomyEventRequestedMassRate = mRequestedPerTick.mass;
+    mUnit->SharedEconomyRateEnergy = mRequestedPerTick.energy;
+    mUnit->SharedEconomyRateMass = mRequestedPerTick.mass;
 
     if (mRequest->mGranted.energy >= mRequestedPerTick.energy && mRequest->mGranted.mass >= mRequestedPerTick.mass) {
       const SEconValue granted = TakeGrantedResourcesAndReset(mRequest);
@@ -653,6 +775,25 @@ int moho::cfunc_CreateEconomyEvent(lua_State* const luaContext)
 }
 
 /**
+ * Address: 0x00775650 (FUN_00775650, func_CreateEconomyEvent_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `CreateEconomyEvent`.
+ */
+moho::CScrLuaInitForm* moho::func_CreateEconomyEvent_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "CreateEconomyEvent",
+    &moho::cfunc_CreateEconomyEvent,
+    nullptr,
+    "<global>",
+    kCreateEconomyEventLuaHelp
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x007756B0 (FUN_007756B0, cfunc_CreateEconomyEventL)
  */
 int moho::cfunc_CreateEconomyEventL(LuaPlus::LuaState* const state)
@@ -689,6 +830,25 @@ int moho::cfunc_RemoveEconomyEvent(lua_State* const luaContext)
 }
 
 /**
+ * Address: 0x00775930 (FUN_00775930, func_RemoveEconomyEvent_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `RemoveEconomyEvent`.
+ */
+moho::CScrLuaInitForm* moho::func_RemoveEconomyEvent_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "RemoveEconomyEvent",
+    &moho::cfunc_RemoveEconomyEvent,
+    nullptr,
+    "<global>",
+    kRemoveEconomyEventLuaHelp
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x00775990 (FUN_00775990, cfunc_RemoveEconomyEventL)
  */
 int moho::cfunc_RemoveEconomyEventL(LuaPlus::LuaState* const state)
@@ -711,6 +871,25 @@ int moho::cfunc_EconomyEventIsDone(lua_State* const luaContext)
 {
   auto* const state = ResolveBindingState(luaContext);
   return cfunc_EconomyEventIsDoneL(state);
+}
+
+/**
+ * Address: 0x00775A60 (FUN_00775A60, func_EconomyEventIsDone_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `EconomyEventIsDone`.
+ */
+moho::CScrLuaInitForm* moho::func_EconomyEventIsDone_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "EconomyEventIsDone",
+    &moho::cfunc_EconomyEventIsDone,
+    nullptr,
+    "<global>",
+    kEconomyEventIsDoneLuaHelp
+  );
+  return &binder;
 }
 
 /**

@@ -142,6 +142,12 @@ namespace
   alignas(moho::CSimConFunc) unsigned char gReconFlushSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
   bool gReconFlushSimConFuncConstructed = false;
 
+  alignas(moho::CConAlias) unsigned char gScenarioMethodConAliasStorage[sizeof(moho::CConAlias)] = {};
+  bool gScenarioMethodConAliasConstructed = false;
+
+  alignas(moho::CSimConFunc) unsigned char gScenarioMethodSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
+  bool gScenarioMethodSimConFuncConstructed = false;
+
   template <typename T>
   struct SimConVarStartupStorage
   {
@@ -187,6 +193,36 @@ namespace
     }
 
     return ReconFlushSimConFunc();
+  }
+
+  [[nodiscard]] moho::CConAlias& ScenarioMethodConAlias()
+  {
+    return *std::launder(reinterpret_cast<moho::CConAlias*>(gScenarioMethodConAliasStorage));
+  }
+
+  [[nodiscard]] moho::CConAlias& ConstructScenarioMethodConAlias()
+  {
+    if (!gScenarioMethodConAliasConstructed) {
+      new (gScenarioMethodConAliasStorage) moho::CConAlias();
+      gScenarioMethodConAliasConstructed = true;
+    }
+
+    return ScenarioMethodConAlias();
+  }
+
+  [[nodiscard]] moho::CSimConFunc& ScenarioMethodSimConFunc()
+  {
+    return *std::launder(reinterpret_cast<moho::CSimConFunc*>(gScenarioMethodSimConFuncStorage));
+  }
+
+  [[nodiscard]] moho::CSimConFunc& ConstructScenarioMethodSimConFunc()
+  {
+    if (!gScenarioMethodSimConFuncConstructed) {
+      new (gScenarioMethodSimConFuncStorage) moho::CSimConFunc(true, "ScenarioMethod", &moho::Sim::ScenarioMethod);
+      gScenarioMethodSimConFuncConstructed = true;
+    }
+
+    return ScenarioMethodSimConFunc();
   }
 
   template <typename T>
@@ -273,6 +309,8 @@ namespace
       (void)moho::register_ReconBlipIsKnownFake_LuaFuncDef();
       moho::register_ReconFlush_ConAliasDef();
       moho::register_ReconFlush_SimConFuncDef();
+      moho::register_CConAlias_ScenarioMethod();
+      moho::register_ScenarioMethod_SimConFuncDef();
     }
   };
 
@@ -837,6 +875,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC8E40 (FUN_00BC8E40, register_SpecFootprints_LuaFUncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_SpecFootprints_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SpecFootprints_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_SpecFootprints_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BC97F0 (FUN_00BC97F0, register_CreateResourceDeposit_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_CreateResourceDeposit_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CreateResourceDeposit_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_CreateResourceDeposit_LuaFuncDef>();
+  }
+
+  /**
    * Address: 0x00BD9800 (FUN_00BD9800, sub_BD9800)
    *
    * What it does:
@@ -953,6 +1013,347 @@ namespace moho
   CScrLuaInitForm* j_func_ShouldCreateInitialArmyUnits_LuaFuncDef()
   {
     return ForwardSimStartupLuaThunk<&func_ShouldCreateInitialArmyUnits_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBDE0 (FUN_00BDBDE0, register_EndGame_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_EndGame_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EndGame_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_EndGame_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBDF0 (FUN_00BDBDF0, register_IsGameOver_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_IsGameOver_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_IsGameOver_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_IsGameOver_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBE00 (FUN_00BDBE00, register_GetEntityById_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetEntityById_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetEntityById_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetEntityById_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBE10 (FUN_00BDBE10, register_GetUnitByIdSim_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetUnitByIdSim_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetUnitByIdSim_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetUnitByIdSim_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BE4D10 (FUN_00BE4D10, register_ClearBuildTemplates_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_ClearBuildTemplates_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_ClearBuildTemplates_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_ClearBuildTemplates_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BE4D20 (FUN_00BE4D20, j_func_RenderOverlayMilitary_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_RenderOverlayMilitary_LuaFuncDef`.
+   */
+  CScrLuaInitForm* j_func_RenderOverlayMilitary_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_RenderOverlayMilitary_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BE4D30 (FUN_00BE4D30, register_RenderOverlayIntel_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_RenderOverlayIntel_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_RenderOverlayIntel_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_RenderOverlayIntel_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BE4D40 (FUN_00BE4D40, register_RenderOverlayEconomy_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_RenderOverlayEconomy_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_RenderOverlayEconomy_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_RenderOverlayEconomy_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BE4D50 (FUN_00BE4D50, j_func_TeamColorModeUser_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_TeamColorMode_LuaFuncDef`.
+   */
+  CScrLuaInitForm* j_func_TeamColorModeUser_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_TeamColorMode_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BE4D60 (FUN_00BE4D60, register_GetUnitByIdUser_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetUnitByIdUser_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetUnitByIdUser_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetUnitByIdUser_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBF00 (FUN_00BDBF00, register_SimConExecute_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_SimConExecute_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SimConExecute_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_SimConExecute_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBF90 (FUN_00BDBF90, register_EntityCategoryContains_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_EntityCategoryContainsSim_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EntityCategoryContains_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_EntityCategoryContainsSim_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBFA0 (FUN_00BDBFA0, register_EntityCategoryFilterDownSim_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_EntityCategoryFilterDownSim_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EntityCategoryFilterDownSim_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_EntityCategoryFilterDownSim_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBFB0 (FUN_00BDBFB0, register_EntityCategoryCount_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_EntityCategoryCount_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EntityCategoryCount_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_EntityCategoryCount_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBFD0 (FUN_00BDBFD0, register_GenerateRandomOrientation_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GenerateRandomOrientation_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GenerateRandomOrientation_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GenerateRandomOrientation_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBFE0 (FUN_00BDBFE0, register_GetGameTimeSecondsSim_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetGameTimeSecondsSim_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetGameTimeSecondsSim_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetGameTimeSecondsSim_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDBFF0 (FUN_00BDBFF0, register_GetGameTick_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetGameTick_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetGameTick_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetGameTick_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC000 (FUN_00BDC000, register_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC050 (FUN_00BDC050, register_Warp_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_Warp_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_Warp_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_Warp_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC070 (FUN_00BDC070, register_GetTerrainHeight_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetTerrainHeight_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetTerrainHeight_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetTerrainHeight_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC080 (FUN_00BDC080, register_GetSurfaceHeight_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetSurfaceHeight_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetSurfaceHeight_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetSurfaceHeight_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC090 (FUN_00BDC090, register_GetTerrainTypeOffset_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetTerrainTypeOffset_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetTerrainTypeOffset_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetTerrainTypeOffset_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC0A0 (FUN_00BDC0A0, register_GetTerrainType_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetTerrainType_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetTerrainType_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetTerrainType_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC0B0 (FUN_00BDC0B0, register_SetTerrainType_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_SetTerrainType_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SetTerrainType_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_SetTerrainType_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC0C0 (FUN_00BDC0C0, register_SetTerrainTypeRect_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_SetTerrainTypeRect_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SetTerrainTypeRect_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_SetTerrainTypeRect_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC0D0 (FUN_00BDC0D0, register_SetPlayableRect_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_SetPlayableRect_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SetPlayableRect_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_SetPlayableRect_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC0E0 (FUN_00BDC0E0, register_FlushIntelInRect_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_FlushIntelInRect_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_FlushIntelInRect_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_FlushIntelInRect_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC0F0 (FUN_00BDC0F0, register_GetUnitBlueprintByName_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_GetUnitBlueprintByName_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_GetUnitBlueprintByName_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_GetUnitBlueprintByName_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC290 (FUN_00BDC290, register_SetArmyStatsSyncArmy_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_SetArmyStatsSyncArmy_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SetArmyStatsSyncArmy_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_SetArmyStatsSyncArmy_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC2B0 (FUN_00BDC2B0, register_DrawLine_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_DrawLine_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_DrawLine_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_DrawLine_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x00BDC2D0 (FUN_00BDC2D0, register_DrawCircle_LuaFuncDef)
+   *
+   * What it does:
+   * Forwards startup thunk into `func_DrawCircle_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_DrawCircle_LuaFuncDef()
+  {
+    return ForwardSimStartupLuaThunk<&func_DrawCircle_LuaFuncDef>();
   }
 
   /**
@@ -1385,6 +1786,79 @@ namespace moho
     sRegistered = true;
     (void)ConstructReconFlushSimConFunc();
     RegisterAtexitCleanup<&cleanup_ReconFlush_SimConFuncDef>();
+  }
+
+  /**
+   * Address: 0x00C00EF0 (FUN_00C00EF0, CConAlias_ScenarioMethod cleanup)
+   *
+   * What it does:
+   * Tears down startup-owned `ScenarioMethod` console alias payload.
+   */
+  void cleanup_CConAlias_ScenarioMethod()
+  {
+    if (!gScenarioMethodConAliasConstructed) {
+      return;
+    }
+
+    ScenarioMethodConAlias().ShutdownRecovered();
+    gScenarioMethodConAliasConstructed = false;
+  }
+
+  /**
+   * Address: 0x00C00F40 (FUN_00C00F40, cleanup_ScenarioMethod_SimConFuncDef)
+   *
+   * What it does:
+   * Destroys startup-owned `ScenarioMethod` sim-command callback object.
+   */
+  void cleanup_ScenarioMethod_SimConFuncDef()
+  {
+    if (!gScenarioMethodSimConFuncConstructed) {
+      return;
+    }
+
+    auto& command = ScenarioMethodSimConFunc();
+    static_cast<CSimConCommand&>(command).~CSimConCommand();
+    gScenarioMethodSimConFuncConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BDBCD0 (FUN_00BDBCD0, register_CConAlias_ScenarioMethod)
+   *
+   * What it does:
+   * Registers startup-owned `ScenarioMethod` command alias.
+   */
+  void register_CConAlias_ScenarioMethod()
+  {
+    static bool sRegistered = false;
+    if (sRegistered) {
+      return;
+    }
+
+    sRegistered = true;
+    ConstructScenarioMethodConAlias().InitializeRecovered(
+      "Run a scenario-specific command",
+      "ScenarioMethod",
+      "DoSimCommand ScenarioMethod"
+    );
+    RegisterAtexitCleanup<&cleanup_CConAlias_ScenarioMethod>();
+  }
+
+  /**
+   * Address: 0x00BDBD00 (FUN_00BDBD00, register_ScenarioMethod_SimConFuncDef)
+   *
+   * What it does:
+   * Registers startup-owned `ScenarioMethod` sim-command callback.
+   */
+  void register_ScenarioMethod_SimConFuncDef()
+  {
+    static bool sRegistered = false;
+    if (sRegistered) {
+      return;
+    }
+
+    sRegistered = true;
+    (void)ConstructScenarioMethodSimConFunc();
+    RegisterAtexitCleanup<&cleanup_ScenarioMethod_SimConFuncDef>();
   }
 
 } // namespace moho

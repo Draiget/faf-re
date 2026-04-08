@@ -71,6 +71,7 @@ namespace moho
   extern std::uint8_t con_TestVarUByte;
   extern float con_TestVarFloat;
   extern msvc8::string con_TestVarStr;
+  extern bool snd_ExtraDoWorkCalls;
   extern int recon_debug;
 
   /**
@@ -281,6 +282,30 @@ namespace moho
   CScrLuaInitForm* func_ConExecuteSave_LuaFuncDef();
 
   /**
+   * Address: 0x00BC38B0 (FUN_00BC38B0, register_ConExecute_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_ConExecute_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_ConExecute_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC38C0 (FUN_00BC38C0, register_ConExecuteSave_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_ConExecuteSave_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_ConExecuteSave_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC3890 (FUN_00BC3890, register_console_command_buffer)
+   *
+   * What it does:
+   * Registers process-exit cleanup for the saved console command history buffer.
+   */
+  void register_console_command_buffer();
+
+  /**
    * Address: 0x0041EE10 (FUN_0041EE10, Moho::CON_Echo)
    *
    * What it does:
@@ -296,6 +321,31 @@ namespace moho
    * Emits one formatted line per registered command.
    */
   void CON_ListCommands(void* commandArgs);
+
+  /**
+   * Address: 0x004D3FC0 (FUN_004D3FC0, Moho::CON_GetVersion)
+   *
+   * What it does:
+   * Prints the current engine-version string to console output.
+   */
+  void CON_GetVersion(void* commandArgs);
+
+  /**
+   * Address: 0x004CDC90 (FUN_004CDC90, Moho::CON_LUADOC)
+   *
+   * What it does:
+   * Iterates all registered Lua init-form sets and dumps their binder docs.
+   */
+  void CON_LUADOC(void* commandArgs);
+
+  /**
+   * Address: 0x008C6740 (FUN_008C6740, Moho::Con_LUA)
+   *
+   * What it does:
+   * Joins command tokens from index 1 into one Lua chunk, echoes it to console,
+   * and executes it in the user Lua state.
+   */
+  void CON_LUA(void* commandArgs);
 
   /**
    * Address: 0x0047A670 (FUN_0047A670, Moho::CON_Log)
@@ -349,6 +399,121 @@ namespace moho
   void CON_Debug_Throw(void* commandArgs);
 
   /**
+   * Address: 0x00BC6450 (FUN_00BC6450, register_CConFunc_LUADOC)
+   *
+   * What it does:
+   * Registers the startup console command that dumps Lua API docs.
+   */
+  void register_CConFunc_LUADOC();
+
+  /**
+   * Address: 0x00BE8A20 (FUN_00BE8A20, register_CConFunc_LUA)
+   *
+   * What it does:
+   * Registers the startup console command that evaluates one Lua command line.
+   */
+  void register_CConFunc_LUA();
+
+  /**
+   * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
+   *
+   * What it does:
+   * Registers the startup console command that prints engine stats.
+   */
+  void register_CConFunc_PrintStats();
+
+  /**
+   * Address: 0x00BC3480 (FUN_00BC3480, register_CConFunc_ClearStats)
+   *
+   * What it does:
+   * Registers the startup console command that clears engine stats lanes.
+   */
+  void register_CConFunc_ClearStats();
+
+  /**
+   * Address: 0x00BC34C0 (FUN_00BC34C0, register_CConFunc_BeginLoggingStats)
+   *
+   * What it does:
+   * Registers the startup console command that begins stats logging.
+   */
+  void register_CConFunc_BeginLoggingStats();
+
+  /**
+   * Address: 0x00BC3500 (FUN_00BC3500, register_CConFunc_EndLoggingStats)
+   *
+   * What it does:
+   * Registers the startup console command that ends stats logging.
+   */
+  void register_CConFunc_EndLoggingStats();
+
+  /**
+   * Address: 0x00BC6630 (FUN_00BC6630, register_CConFunc_GetVersion)
+   *
+   * What it does:
+   * Registers the startup console command that prints engine version text.
+   */
+  void register_CConFunc_GetVersion();
+
+  /**
+   * Address: 0x00BC7270 (FUN_00BC7270, register_CConFunc_exit)
+   *
+   * What it does:
+   * Registers the startup console command that exits the application.
+   */
+  void register_CConFunc_exit();
+
+  /**
+   * Address: 0x00BC7360 (FUN_00BC7360, register_CConFunc_WIN_ToggleLogDialog)
+   *
+   * What it does:
+   * Registers the startup console command that toggles the log dialog.
+   */
+  void register_CConFunc_WIN_ToggleLogDialog();
+
+  /**
+   * Address: 0x00BC73A0 (FUN_00BC73A0, register_CConFunc_WIN_ShowLogDialog)
+   *
+   * What it does:
+   * Registers the startup console command that shows the log dialog.
+   */
+  void register_CConFunc_WIN_ShowLogDialog();
+
+  /**
+   * Address: 0x00BC73F0 (FUN_00BC73F0, register_CConFunc_WxInputBox)
+   *
+   * What it does:
+   * Registers the startup console command that opens the wx input box.
+   */
+  void register_CConFunc_WxInputBox();
+
+  /**
+   * Address: 0x00500AF0 (FUN_00500AF0, Moho::CON_p4_Edit)
+   *
+   * What it does:
+   * Emits one no-support line when invoked with a filespec argument; otherwise
+   * prints p4-edit usage text.
+   */
+  void CON_p4_Edit(void* commandArgs);
+
+  /**
+   * Address: 0x00500B60 (FUN_00500B60, Moho::CON_p4_IsOpenedForEdit)
+   *
+   * What it does:
+   * Emits one no-support line when invoked with a filespec argument; otherwise
+   * prints p4-is-opened usage text.
+   */
+  void CON_p4_IsOpenedForEdit(void* commandArgs);
+
+  /**
+   * Address: 0x007AE040 (FUN_007AE040, Moho::CON_DumpCamera)
+   *
+   * What it does:
+   * Logs active world-camera target position, heading/far-pitch orientation,
+   * and target zoom to the console log output.
+   */
+  void CON_DumpCamera(void* commandArgs);
+
+  /**
    * Address: 0x007B5A40 (FUN_007B5A40, Moho::CON_PopupCreateUnitMenu)
    *
    * What it does:
@@ -358,6 +523,32 @@ namespace moho
   void CON_PopupCreateUnitMenu(void* commandArgs);
 
   /**
+   * Address: 0x007B60F0 (FUN_007B60F0, Moho::CON_PathDebug)
+   *
+   * What it does:
+   * Toggles path-debugger UI module by calling Lua `CreateUI`/`DestroyUI`.
+   */
+  void CON_PathDebug(void* commandArgs);
+
+  /**
+   * Address: 0x00833E50 (FUN_00833E50, Moho::CON_DebugGenerateBuildTemplateFromSelection)
+   *
+   * What it does:
+   * Runs `CWldSession::GenerateBuildTemplates()` on the active session, or
+   * prints localized "no session" feedback.
+   */
+  void CON_DebugGenerateBuildTemplateFromSelection(void* commandArgs);
+
+  /**
+   * Address: 0x00833EF0 (FUN_00833EF0, Moho::CON_DebugClearBuildTemplates)
+   *
+   * What it does:
+   * Runs `CWldSession::ClearBuildTemplates()` on the active session, or prints
+   * localized "no session" feedback.
+   */
+  void CON_DebugClearBuildTemplates(void* commandArgs);
+
+  /**
    * Address: 0x00833F90 (FUN_00833F90, Moho::CON_TeleportSelectedUnits)
    *
    * What it does:
@@ -365,6 +556,50 @@ namespace moho
    * position, preserving each unit orientation and recomputing spawn elevation.
    */
   void CON_TeleportSelectedUnits(void* commandArgs);
+
+  /**
+   * Address: 0x00834E50 (FUN_00834E50, Moho::SetFocusArmy)
+   *
+   * What it does:
+   * Parses one focus-army index argument and applies it to the active world
+   * session; prints syntax/no-session console feedback when invalid.
+   */
+  void SetFocusArmy(void* commandArgs);
+
+  /**
+   * Address: 0x00834610 (FUN_00834610, Moho::CON_UI_SetSkin)
+   *
+   * What it does:
+   * Imports `/lua/ui/uiutil.lua` and calls `SetCurrentSkin(arg#1)` when a skin
+   * token is provided.
+   */
+  void CON_UI_SetSkin(void* commandArgs);
+
+  /**
+   * Address: 0x00834700 (FUN_00834700, Moho::UI_RotateSkin)
+   *
+   * What it does:
+   * Imports `/lua/ui/uiutil.lua` and calls `RotateSkin` with arg#1 or default
+   * `"+"` when no explicit direction token is provided.
+   */
+  void UI_RotateSkin(void* commandArgs);
+
+  /**
+   * Address: 0x00834860 (FUN_00834860, Moho::UI_RotateLayout)
+   *
+   * What it does:
+   * Imports `/lua/ui/uiutil.lua` and calls `RotateLayout` with arg#1 or
+   * default `"+"` when no explicit direction token is provided.
+   */
+  void UI_RotateLayout(void* commandArgs);
+
+  /**
+   * Address: 0x008349D0 (FUN_008349D0, Moho::CON_UI_ToggleGamePanels)
+   *
+   * What it does:
+   * Imports `/lua/ui/game/gamemain.lua` and calls `HideGameUI()`.
+   */
+  void CON_UI_ToggleGamePanels(void* commandArgs);
 
   /**
    * Address: 0x00834A80 (FUN_00834A80, Moho::UI_MakeSelectionSet)
@@ -383,6 +618,32 @@ namespace moho
    * `/lua/ui/game/selection.lua:ApplySelectionSet(name)`.
    */
   void UI_ApplySelectionSet(void* commandArgs);
+
+  /**
+   * Address: 0x00834DA0 (FUN_00834DA0, Moho::CON_UI_CreateHead1Map)
+   *
+   * What it does:
+   * Imports `/lua/ui/game/multihead.lua` and calls `CreateSecondView()`.
+   */
+  void CON_UI_CreateHead1Map(void* commandArgs);
+
+  /**
+   * Address: 0x00835370 (FUN_00835370, Moho::UI_Lua)
+   *
+   * What it does:
+   * Joins command tokens from index 1 and executes the resulting Lua chunk in
+   * the active UI manager Lua state.
+   */
+  void UI_Lua(void* commandArgs);
+
+  /**
+   * Address: 0x00835830 (FUN_00835830, Moho::UI_ShowRenameDialog)
+   *
+   * What it does:
+   * Validates world-session selection constraints and opens the in-game
+   * rename dialog seeded with selected unit custom-name text.
+   */
+  void UI_ShowRenameDialog();
 
   /**
    * Address: 0x0043D360 (FUN_0043D360, Moho::CON_ren_MipSkipLevels)

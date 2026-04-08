@@ -29,9 +29,11 @@
 
 #include "boost/mutex.h"
 #include "CWaitHandleSet.h"
+#include "CScApp.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/time/Timer.h"
 #include "IWinApp.h"
+#include "legacy/containers/Vector.h"
 #include "WxAppRuntime.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -42,6 +44,13 @@
 #pragma warning(disable : 4996)
 
 int wxEntry(HINSTANCE hInstance, HINSTANCE hPrevInstance, char* pCmdLine, int nCmdShow, bool shouldInit);
+int wxNewEventType();
+
+namespace moho
+{
+  msvc8::vector<ManagedWindowSlot> managedWindows{};
+  msvc8::vector<ManagedWindowSlot> managedFrames{};
+}
 
 namespace
 {
@@ -70,6 +79,36 @@ namespace
 
   moho::CWinLogTarget sLogWindowTarget{};
   moho::SplashScreenRuntime* sSplashScreenPtr = nullptr;
+  int gRecoveredWinAppEventType = 0;
+  using WinAppFactoryFn = moho::IWinApp* (*)();
+  WinAppFactoryFn sWinAppFactory = nullptr;
+
+  [[nodiscard]] moho::IWinApp* CreateRecoveredWinAppFactory()
+  {
+    return new CScApp();
+  }
+
+  void CleanupManagedWindowsAtExit()
+  {
+    moho::managedWindows = msvc8::vector<moho::ManagedWindowSlot>{};
+  }
+
+  void CleanupManagedFramesAtExit()
+  {
+    moho::managedFrames = msvc8::vector<moho::ManagedWindowSlot>{};
+  }
+
+  [[maybe_unused]] const bool gWinAppBootstrap = []() {
+    moho::register_startTime();
+    moho::register_wakeupTimer();
+    moho::register_wxAppFactory();
+    (void)moho::register_WinAppEventType();
+    (void)moho::register_managedWindowsCleanup();
+    (void)moho::register_managedFramesCleanup();
+    moho::register_winLogTarget();
+    moho::register_splashScreen();
+    return true;
+  }();
 
   void DestroyActiveSplashScreen() noexcept
   {
@@ -1779,6 +1818,13 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x004F0F50 (FUN_004F0F50, DialogFunc)
+   *
+   * What it does:
+   * Handles crash dialog init/commands, normalizes/copies UTF-8 crash text,
+   * and routes copy/close/terminate control actions.
+   */
   INT_PTR CALLBACK CrashDialogProc(HWND hWnd, const UINT message, const WPARAM wParam, const LPARAM lParam)
   {
     if (message == WM_INITDIALOG) {
@@ -2054,6 +2100,99 @@ namespace
 
 } // namespace
 
+/**
+ * Address: 0x00BC7230 (FUN_00BC7230, register_startTime)
+ *
+ * What it does:
+ * Re-initializes the shared wakeup timer baseline used by the main loop.
+ */
+void moho::register_startTime()
+{
+  new (&wakeupTimer) gpg::time::Timer();
+}
+
+/**
+ * Address: 0x00BC7240 (FUN_00BC7240, register_wakeupTimer)
+ *
+ * What it does:
+ * Restores the wakeup timer duration lane to the process-default infinity
+ * value used at startup.
+ */
+void moho::register_wakeupTimer()
+{
+  wakeupTimerDur = kInfiniteWakeupMs;
+}
+
+/**
+ * Address: 0x00BC7260 (FUN_00BC7260, register_wxAppFactory)
+ *
+ * What it does:
+ * Replays the bootstrap app-factory registration lane used by the process
+ * startup initializer.
+ */
+void moho::register_wxAppFactory()
+{
+  sWinAppFactory = &CreateRecoveredWinAppFactory;
+}
+
+/**
+ * Address: 0x00BC7310 (FUN_00BC7310, wxNewEventType init)
+ *
+ * What it does:
+ * Allocates and stores the process-wide custom wx event type token used by
+ * this bootstrap lane.
+ */
+int moho::register_WinAppEventType()
+{
+  gRecoveredWinAppEventType = wxNewEventType();
+  return gRecoveredWinAppEventType;
+}
+
+/**
+ * Address: 0x00BC7320 (FUN_00BC7320, register_managedWindowsCleanup)
+ *
+ * What it does:
+ * Installs process-exit cleanup for managed-dialog slot vector storage.
+ */
+int moho::register_managedWindowsCleanup()
+{
+  return std::atexit(&CleanupManagedWindowsAtExit);
+}
+
+/**
+ * Address: 0x00BC7330 (FUN_00BC7330, register_managedFramesCleanup)
+ *
+ * What it does:
+ * Installs process-exit cleanup for managed-frame slot vector storage.
+ */
+int moho::register_managedFramesCleanup()
+{
+  return std::atexit(&CleanupManagedFramesAtExit);
+}
+
+/**
+ * Address: 0x00BC7340 (FUN_00BC7340, register_winLogTarget)
+ *
+ * What it does:
+ * Touches the global log-target owner during startup so the source-side
+ * lifetime model stays aligned with the recovered binary lane.
+ */
+void moho::register_winLogTarget()
+{
+  sLogWindowTarget.dialog = nullptr;
+}
+
+/**
+ * Address: 0x00BC73E0 (FUN_00BC73E0, register_splashScreen)
+ *
+ * What it does:
+ * Installs splash-screen process-exit cleanup for the startup lane.
+ */
+void moho::register_splashScreen()
+{
+  (void)std::atexit(&DestroyActiveSplashScreen);
+}
+
 moho::CTaskStage* moho::WIN_GetBeforeEventsStage()
 {
   // 0x011043CC
@@ -2068,6 +2207,13 @@ moho::CTaskStage* moho::WIN_GetBeforeWaitStage()
   return &sBeforeWaitStage;
 }
 
+/**
+ * Address: 0x004F2420 (FUN_004F2420, Moho::WIN_GetWaitHandleSet)
+ *
+ * What it does:
+ * Lazily constructs and returns one process-global wait-handle set used by
+ * WinApp main-loop wait orchestration.
+ */
 moho::CWaitHandleSet* moho::WIN_GetWaitHandleSet()
 {
   // 0x011043E0
@@ -2292,6 +2438,21 @@ void moho::PLAT_RegisterFileForErrorReport(const wchar_t* const file)
 }
 
 /**
+ * Address: 0x0047A4F0 (FUN_0047A4F0)
+ * Mangled:
+ * ?LOG_GetRecentLines@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z
+ *
+ * What it does:
+ * Produces one UTF-8 log-history text blob consumed by crash/report export
+ * paths. The current recovered logging backend already applies bounded history.
+ */
+msvc8::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
+{
+  (void)maxLines;
+  return gpg::GetRecentLogLines();
+}
+
+/**
  * Address: 0x004A1230 (FUN_004A1230)
  * Mangled: ?PLAT_CreateGameLogForReport@Moho@@YAXXZ
  *
@@ -2301,7 +2462,7 @@ void moho::PLAT_RegisterFileForErrorReport(const wchar_t* const file)
  */
 void moho::PLAT_CreateGameLogForReport()
 {
-  const msvc8::string recentLogLines = gpg::GetRecentLogLines();
+  const msvc8::string recentLogLines = LOG_GetRecentLines(0);
   const char* const appShortName = (sSupComApp != nullptr && !sSupComApp->shortName.empty())
                                      ? sSupComApp->shortName.c_str()
                                      : "SupCom";
@@ -2699,6 +2860,40 @@ std::uint32_t moho::PLAT_GetRegistryValue(
 }
 
 /**
+ * Address: 0x004F25D0 (FUN_004F25D0)
+ * Mangled:
+ * ?WIN_GetClipboardText@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+ *
+ * What it does:
+ * Reads `CF_UNICODETEXT` from the Windows clipboard (owned by main window when
+ * present), converts UTF-16 content to UTF-8, and returns empty text when
+ * unavailable.
+ */
+msvc8::string moho::WIN_GetClipboardText()
+{
+  const HWND ownerWindow = sMainWindow != nullptr
+    ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
+    : nullptr;
+
+  if (::IsClipboardFormatAvailable(CF_UNICODETEXT) == FALSE || ::OpenClipboard(ownerWindow) == FALSE) {
+    return {};
+  }
+
+  msvc8::string clipboardText{};
+  const HANDLE clipboardData = ::GetClipboardData(CF_UNICODETEXT);
+  if (clipboardData != nullptr) {
+    const wchar_t* const lockedText = static_cast<const wchar_t*>(::GlobalLock(clipboardData));
+    if (lockedText != nullptr) {
+      clipboardText = gpg::STR_WideToUtf8(lockedText);
+      (void)::GlobalUnlock(clipboardData);
+    }
+  }
+
+  (void)::CloseClipboard();
+  return clipboardText;
+}
+
+/**
  * Address: 0x004F2A00 (FUN_004F2A00)
  * Mangled:
  * ?WIN_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
@@ -2785,7 +2980,7 @@ void moho::WIN_ShowCrashDialog(
 
   details << "\n";
   details << "Last 100 lines of log...\n\n";
-  const msvc8::string recentLogLines = gpg::GetRecentLogLines();
+  const msvc8::string recentLogLines = LOG_GetRecentLines(100u);
   details << recentLogLines.c_str();
 
   const std::string bodyText = details.str();

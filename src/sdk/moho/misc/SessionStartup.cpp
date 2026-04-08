@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -21,6 +22,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/client/Localization.h"
+#include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_String.h"
 #include "moho/lua/SCR_ToLua.h"
@@ -63,6 +65,11 @@ namespace
 
   constexpr std::uint8_t kInvalidSourceIndex = 255u;
   constexpr const char* kSessionSendChatMessageHelpText = "SessionSendChatMessage([client-or-clients,] message)";
+  constexpr const char* kLaunchReplaySessionHelpText =
+    "bool LaunchReplaySession(filename) - starts a replay of a given file, returns false if unable to launch";
+  constexpr const char* kLaunchSinglePlayerSessionHelpText = "LaunchSinglePlayerSession(launchData)";
+  constexpr const char* kLaunchSinglePlayerSessionBusyMessage =
+    "Can't launch a session while one is already launching or running.";
   constexpr const char* kNoActiveGameMessage = "GameSendChatMessage(): No active game.";
   constexpr const char* kInvalidClientIndexMessage = "Invalid client index.  Must be between 1 and %d inclusive, not %d.";
   constexpr const char* kInvalidClientSelectorMessage =
@@ -70,10 +77,17 @@ namespace
   constexpr const char* kChatEncodeFailureMessage = "Can't encode message.";
   constexpr const char* kChatMessageTooLongMessage = "Message too long.";
   constexpr const char* kInternalSaveGameHelpText = "InternalSaveGame";
+  constexpr const char* kSessionGetCommandSourceNamesHelpText = "Return a table of  command sources.";
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
+  {
+    static moho::CScrLuaInitFormSet set("user");
+    return set;
   }
 
   void EnsureDirectoryExistsOrThrow(const msvc8::string& directoryPath)
@@ -127,8 +141,8 @@ namespace
 
     moho::BVIntSet localSourceSet{};
     (void)localSourceSet.Add(0u);
-    for (moho::BVIntSet& armySourceSet : launchInfo->mArmyLaunchInfo) {
-      armySourceSet = localSourceSet;
+    for (moho::ArmyLaunchInfo& armySourceInfo : launchInfo->mArmyLaunchInfo) {
+      armySourceInfo.mUnitSources = localSourceSet;
     }
 
     moho::IClientManager* const createdManager = moho::CLIENT_CreateClientManager(1u, nullptr, 0, true);
@@ -337,7 +351,7 @@ namespace moho
         if (sourceIndex == kInvalidSourceIndex) {
           break;
         }
-        (void)launchInfo->mArmyLaunchInfo[armyIndex].Add(sourceIndex);
+        (void)launchInfo->mArmyLaunchInfo[armyIndex].mUnitSources.Add(sourceIndex);
       }
     }
 
@@ -389,7 +403,7 @@ namespace moho
       LuaPlus::LuaObject teamInfo = launchData["teamInfo"];
       LuaPlus::LuaTableIterator teamIterator(&teamInfo, 1);
       while (!teamIterator.m_isDone) {
-        launchInfo->mArmyLaunchInfo.push_back(BVIntSet{});
+        launchInfo->mArmyLaunchInfo.push_back(ArmyLaunchInfo{});
         launchInfo->mStrVec.push_back(SCR_ToString(teamIterator.GetValue()));
         teamIterator.Next();
       }
@@ -420,6 +434,124 @@ namespace moho
   }
 
   /**
+   * Address: 0x00876DD0 (FUN_00876DD0, cfunc_LaunchReplaySession)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_LaunchReplaySessionL`.
+   */
+  int cfunc_LaunchReplaySession(lua_State* const luaContext)
+  {
+    return cfunc_LaunchReplaySessionL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x00876DF0 (FUN_00876DF0, func_LaunchReplaySession_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `LaunchReplaySession`.
+   */
+  CScrLuaInitForm* func_LaunchReplaySession_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "LaunchReplaySession",
+      &moho::cfunc_LaunchReplaySession,
+      nullptr,
+      "<global>",
+      kLaunchReplaySessionHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00876E50 (FUN_00876E50, cfunc_LaunchReplaySessionL)
+   *
+   * What it does:
+   * Validates one replay filename arg, builds replay session info, starts
+   * world-session begin flow on success, and returns one boolean status.
+   */
+  int cfunc_LaunchReplaySessionL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLaunchReplaySessionHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaStackObject filenameArg(state, 1);
+    const char* replayFilename = lua_tostring(state->m_state, 1);
+    if (replayFilename == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&filenameArg, "string");
+      replayFilename = "";
+    }
+
+    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(replayFilename);
+    const bool launchStarted = sessionInfo.get() != nullptr;
+    if (launchStarted) {
+      WLD_BeginSession(sessionInfo);
+    }
+
+    lua_pushboolean(state->m_state, launchStarted ? 1 : 0);
+    return 1;
+  }
+
+  /**
+   * Address: 0x0088D340 (FUN_0088D340, cfunc_LaunchSinglePlayerSession)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_LaunchSinglePlayerSessionL`.
+   */
+  int cfunc_LaunchSinglePlayerSession(lua_State* const luaContext)
+  {
+    return cfunc_LaunchSinglePlayerSessionL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x0088D360 (FUN_0088D360, func_LaunchSinglePlayerSession_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `LaunchSinglePlayerSession`.
+   */
+  CScrLuaInitForm* func_LaunchSinglePlayerSession_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "LaunchSinglePlayerSession",
+      &moho::cfunc_LaunchSinglePlayerSession,
+      nullptr,
+      "<global>",
+      "LaunchSinglePlayerSession(sessionInfo) -- launch a new single player session."
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0088D3C0 (FUN_0088D3C0, cfunc_LaunchSinglePlayerSessionL)
+   *
+   * What it does:
+   * Validates one launch payload from Lua, rejects launches while world-frame
+   * startup/runtime is active, builds single-player session info, and starts
+   * world-session begin flow.
+   */
+  int cfunc_LaunchSinglePlayerSessionL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLaunchSinglePlayerSessionHelpText, 1, argumentCount);
+    }
+
+    if (WLD_GetFrameAction() != EWldFrameAction::Inactive) {
+      LuaPlus::LuaState::Error(state, kLaunchSinglePlayerSessionBusyMessage);
+    }
+
+    const LuaPlus::LuaObject launchData(LuaPlus::LuaStackObject(state, 1));
+    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = WLD_SetupSessionInfo(launchData);
+    WLD_BeginSession(sessionInfo);
+    return 0;
+  }
+
+  /**
    * Address: 0x0088DA80 (FUN_0088DA80, cfunc_SessionSendChatMessage)
    *
    * What it does:
@@ -429,6 +561,25 @@ namespace moho
   int cfunc_SessionSendChatMessage(lua_State* const luaContext)
   {
     return cfunc_SessionSendChatMessageL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x0088DAA0 (FUN_0088DAA0, func_SessionSendChatMessage_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SessionSendChatMessage`.
+   */
+  CScrLuaInitForm* func_SessionSendChatMessage_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "SessionSendChatMessage",
+      &moho::cfunc_SessionSendChatMessage,
+      nullptr,
+      "<global>",
+      kSessionSendChatMessageHelpText
+    );
+    return &binder;
   }
 
   /**
@@ -530,6 +681,72 @@ namespace moho
   }
 
   /**
+   * Address: 0x00897AF0 (FUN_00897AF0, cfunc_SessionGetCommandSourceNames)
+   *
+   * What it does:
+   * Lua C callback thunk that unwraps `lua_State*` and forwards to
+   * `cfunc_SessionGetCommandSourceNamesL`.
+   */
+  int cfunc_SessionGetCommandSourceNames(lua_State* const luaContext)
+  {
+    return cfunc_SessionGetCommandSourceNamesL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x00897B10 (FUN_00897B10, func_SessionGetCommandSourceNames_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for
+   * `SessionGetCommandSourceNames`.
+   */
+  CScrLuaInitForm* func_SessionGetCommandSourceNames_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "SessionGetCommandSourceNames",
+      &moho::cfunc_SessionGetCommandSourceNames,
+      nullptr,
+      "<global>",
+      kSessionGetCommandSourceNamesHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00897B70 (FUN_00897B70, cfunc_SessionGetCommandSourceNamesL)
+   *
+   * What it does:
+   * Builds and returns a Lua table of active session command-source names.
+   */
+  int cfunc_SessionGetCommandSourceNamesL(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 0) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSessionGetCommandSourceNamesHelpText, 0, argumentCount);
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      LuaPlus::LuaState::Error(state, "SessionGetCommandSourceNames(): no active session.");
+    }
+
+    LuaPlus::LuaObject commandSources{};
+    commandSources.AssignNewTable(state, 0, 0);
+    for (std::size_t sourceIndex = 0; sourceIndex < session->cmdSources.size(); ++sourceIndex) {
+      const int luaIndex = static_cast<int>(sourceIndex + 1u);
+      commandSources.SetString(luaIndex, session->cmdSources[sourceIndex].mName.c_str());
+    }
+
+    commandSources.PushStack(state);
+    return 1;
+  }
+
+  /**
    * Address: 0x00881AB0 (FUN_00881AB0, cfunc_InternalSaveGame)
    *
    * What it does:
@@ -539,6 +756,25 @@ namespace moho
   int cfunc_InternalSaveGame(lua_State* const luaContext)
   {
     return cfunc_InternalSaveGameL(ResolveBindingLuaState(luaContext));
+  }
+
+  /**
+   * Address: 0x00881AD0 (FUN_00881AD0, func_InternalSaveGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `InternalSaveGame`.
+   */
+  CScrLuaInitForm* func_InternalSaveGame_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      UserLuaInitSet(),
+      "InternalSaveGame",
+      &moho::cfunc_InternalSaveGame,
+      nullptr,
+      "<global>",
+      "InternalSaveGame(filename, friendlyname, oncompletion) -- save the current session."
+    );
+    return &binder;
   }
 
   /**
@@ -678,9 +914,9 @@ namespace moho
     launchInfo->mArmyLaunchInfo.clear();
     launchInfo->mArmyLaunchInfo.reserve(mHeader.mArmyInfo.size());
     for (std::size_t armyIndex = 0; armyIndex < mHeader.mArmyInfo.size(); ++armyIndex) {
-      BVIntSet armySourceSet{};
-      (void)armySourceSet.Add(0);
-      launchInfo->mArmyLaunchInfo.push_back(armySourceSet);
+      ArmyLaunchInfo armySourceInfo{};
+      (void)armySourceInfo.mUnitSources.Add(0);
+      launchInfo->mArmyLaunchInfo.push_back(armySourceInfo);
     }
 
     launchInfo->mCommandSources.mOriginalSource = mHeader.mFocusArmy;

@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "moho/containers/TDatList.h"
+#include "moho/path/SNavGoal.h"
 #include "moho/sim/SOCellPos.h"
 #include "wm3/Vector3.h"
 
@@ -64,37 +65,6 @@ namespace moho
   static_assert(
     offsetof(IAiNavigatorEventListener, mLink) == 0x04, "IAiNavigatorEventListener::mLink offset must be 0x04"
   );
-
-  /**
-   * Recovered goal rectangle payload passed to land/air navigator goal evaluators.
-   *
-   * Evidence:
-   * - CAiNavigatorLand::SetGoal (0x005A3ED0) writes/copies 9 dwords.
-   * - CAiNavigatorAir::SetGoal (0x005A4C60) consumes rectangle bounds from this payload.
-   */
-  struct SAiNavigatorGoal
-  {
-    std::int32_t minX;
-    std::int32_t minZ;
-    std::int32_t maxX;
-    std::int32_t maxZ;
-    std::int32_t aux0;
-    std::int32_t aux1;
-    std::int32_t aux2;
-    std::int32_t aux3;
-    std::int32_t aux4;
-  };
-
-  static_assert(sizeof(SAiNavigatorGoal) == 0x24, "SAiNavigatorGoal size must be 0x24");
-  static_assert(offsetof(SAiNavigatorGoal, minX) == 0x00, "SAiNavigatorGoal::minX offset must be 0x00");
-  static_assert(offsetof(SAiNavigatorGoal, minZ) == 0x04, "SAiNavigatorGoal::minZ offset must be 0x04");
-  static_assert(offsetof(SAiNavigatorGoal, maxX) == 0x08, "SAiNavigatorGoal::maxX offset must be 0x08");
-  static_assert(offsetof(SAiNavigatorGoal, maxZ) == 0x0C, "SAiNavigatorGoal::maxZ offset must be 0x0C");
-  static_assert(offsetof(SAiNavigatorGoal, aux0) == 0x10, "SAiNavigatorGoal::aux0 offset must be 0x10");
-  static_assert(offsetof(SAiNavigatorGoal, aux1) == 0x14, "SAiNavigatorGoal::aux1 offset must be 0x14");
-  static_assert(offsetof(SAiNavigatorGoal, aux2) == 0x18, "SAiNavigatorGoal::aux2 offset must be 0x18");
-  static_assert(offsetof(SAiNavigatorGoal, aux3) == 0x1C, "SAiNavigatorGoal::aux3 offset must be 0x1C");
-  static_assert(offsetof(SAiNavigatorGoal, aux4) == 0x20, "SAiNavigatorGoal::aux4 offset must be 0x20");
 
   /**
    * Packed grid-cell path payload used by land navigation callbacks.

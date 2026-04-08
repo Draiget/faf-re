@@ -48,5 +48,13 @@ namespace moho
   static_assert(
     sizeof(ThreadSafeCountedObjectTypeInfo) == 0x64, "ThreadSafeCountedObjectTypeInfo size must be 0x64"
   );
-} // namespace moho
 
+  /**
+   * Address: 0x00BC2D60 (FUN_00BC2D60, register_ThreadSafeCountedObjectTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `ThreadSafeCountedObjectTypeInfo` storage and
+   * registers process-exit teardown.
+   */
+  void register_ThreadSafeCountedObjectTypeInfo();
+} // namespace moho

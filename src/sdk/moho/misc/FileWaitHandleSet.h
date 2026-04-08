@@ -528,6 +528,54 @@ namespace moho
   [[nodiscard]] CScrLuaInitForm* func_FileCollapsePath_LuaFuncDef();
 
   /**
+   * Address: 0x00BC45C0 (FUN_00BC45C0, register_DiskFindFiles_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_DiskFindFiles_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_DiskFindFiles_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC45D0 (FUN_00BC45D0, register_DiskGetFileInfo_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_DiskGetFileInfo_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_DiskGetFileInfo_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC45E0 (FUN_00BC45E0, register_DiskToLocal_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_DiskToLocal_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_DiskToLocal_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC45F0 (FUN_00BC45F0, register_Basename_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_Basename_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_Basename_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC4600 (FUN_00BC4600, register_Dirname_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_Dirname_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_Dirname_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC4610 (FUN_00BC4610, register_FileCollapsePath_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_FileCollapsePath_LuaFuncDef`.
+   */
+  [[nodiscard]] CScrLuaInitForm* register_FileCollapsePath_LuaFuncDef();
+
+  /**
    * Address: 0x00458D30 (FUN_00458D30, Moho::FWaitHandleSet::GetFileInfo)
    *
    * What it does:

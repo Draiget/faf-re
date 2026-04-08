@@ -52,5 +52,12 @@ namespace moho
    */
   gpg::SerHelperBase* ResetCPrefetchSetSerializerLinksVariant2();
 
+  /**
+   * Address: 0x00BC5990 (FUN_00BC5990, register_CPrefetchSetSerializer)
+   *
+   * What it does:
+   * Initializes the global serializer node for `CPrefetchSet`, binds archive
+   * callback lanes, and schedules serializer-link cleanup at process exit.
+   */
   void register_CPrefetchSetSerializer();
 } // namespace moho

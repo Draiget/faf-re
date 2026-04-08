@@ -3,12 +3,14 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <string>
 #include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/misc/StatItem.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
@@ -113,6 +115,33 @@ namespace
       cached = gpg::LookupRType(typeid(EAiResult));
     }
     return cached;
+  }
+
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
+  {
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
+    }
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
+  }
+
+  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
   }
 
   void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
@@ -252,6 +281,31 @@ namespace
 gpg::RType* CCommandTask::sType = nullptr;
 
 /**
+ * Address: 0x00599740 (FUN_00599740, Moho::InstanceCounter<Moho::CCommandTask>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for command-task
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CCommandTask>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  if (!engineStats) {
+    return nullptr;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CCommandTask).name());
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
+
+/**
  * Address: 0x00608E90 (FUN_00608E90, non-deleting body)
  *
  * IDA signature:
@@ -261,7 +315,10 @@ gpg::RType* CCommandTask::sType = nullptr;
  * Resets `CCommandTask` vtable, decrements command-task instance counter
  * bookkeeping, then runs `CTask` teardown.
  */
-CCommandTask::~CCommandTask() = default;
+CCommandTask::~CCommandTask()
+{
+  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), -1);
+}
 
 /**
  * Address: 0x00598A20 (FUN_00598A20, ??0CCommandTask@Moho@@QAE@@Z_0)
@@ -283,7 +340,9 @@ CCommandTask::CCommandTask(Unit* const unit, Sim* const sim)
   , mTaskState(TASKSTATE_Preparing)
   , mDispatchResult(nullptr)
   , mLinkResult(static_cast<EAiResult>(0))
-{}
+{
+  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), 1);
+}
 
 /**
  * Address: 0x00598AB0 (FUN_00598AB0, ??0CCommandTask@Moho@@QAE@@Z_1)
@@ -302,7 +361,34 @@ CCommandTask::CCommandTask()
   , mTaskState(TASKSTATE_Preparing)
   , mDispatchResult(nullptr)
   , mLinkResult(static_cast<EAiResult>(0))
-{}
+{
+  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), 1);
+}
+
+/**
+ * Address: 0x005F08D0 (FUN_005F08D0, ??0CCommandTask@Moho@@QAE@@Z)
+ *
+ * CCommandTask *
+ *
+ * What it does:
+ * Initializes one child command task from `parent` task context, inheriting
+ * task-thread/unit/sim lanes and chaining dispatch-result storage.
+ */
+CCommandTask::CCommandTask(CCommandTask* const parent)
+  : CTask(parent ? parent->mOwnerThread : nullptr, parent != nullptr && parent->mOwnerThread != nullptr)
+  , mReserved18(0)
+  , mUnit(parent ? parent->mUnit : nullptr)
+  , mSim(parent ? parent->mSim : nullptr)
+  , mTaskState(TASKSTATE_Preparing)
+  , mDispatchResult(parent ? &parent->mLinkResult : nullptr)
+  , mLinkResult(static_cast<EAiResult>(0))
+{
+  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), 1);
+
+  if (parent) {
+    parent->mLinkResult = static_cast<EAiResult>(0);
+  }
+}
 
 /**
  * Address: 0x00608DE0 (FUN_00608DE0, Moho::CCommandTaskSerializer::Deserialize)
@@ -412,6 +498,26 @@ void CCommandTaskTypeInfo::Init()
   AddCTaskBaseToTypeInfo(this);
   Finish();
 }
+
+namespace gpg
+{
+  /**
+   * Address: 0x005F22F0 (FUN_005F22F0, gpg::RRef_CCommandTask)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CCommandTask*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CCommandTask(gpg::RRef* const outRef, moho::CCommandTask* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    *outRef = MakeDerivedRef(value, CachedCCommandTaskType());
+    return outRef;
+  }
+} // namespace gpg
 
 namespace moho
 {

@@ -1,14 +1,55 @@
 #include "CWaitForTask.h"
 
+#include <cstdlib>
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/misc/InstanceCounter.h"
+#include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 
 using namespace moho;
 
 namespace
 {
+  moho::CWaitForTaskSerializer gCWaitForTaskSerializer{};
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mNext);
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    auto* const next = static_cast<gpg::SerHelperBase*>(serializer.mNext);
+    auto* const prev = static_cast<gpg::SerHelperBase*>(serializer.mPrev);
+    if (next != nullptr && prev != nullptr) {
+      next->mPrev = prev;
+      prev->mNext = next;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mPrev = self;
+    serializer.mNext = self;
+    return self;
+  }
+
+  template <typename TSerializer>
+  void ResetSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mNext == nullptr || serializer.mPrev == nullptr) {
+      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+      serializer.mPrev = self;
+      serializer.mNext = self;
+      return;
+    }
+
+    (void)UnlinkSerializerNode(serializer);
+  }
+
   gpg::RType* CachedCWaitForTaskType()
   {
     static gpg::RType* cached = nullptr;
@@ -78,7 +119,40 @@ namespace
     GPG_ASSERT(task != nullptr);
     task->MemberSerialize(archive);
   }
+
+  void InitializeCWaitForTaskSerializer()
+  {
+    ResetSerializerNode(gCWaitForTaskSerializer);
+    gCWaitForTaskSerializer.mSerLoadFunc = &DeserializeCWaitForTask;
+    gCWaitForTaskSerializer.mSerSaveFunc = &SerializeCWaitForTask;
+  }
+
+  void CleanupCWaitForTaskSerializerAtExit()
+  {
+    (void)moho::cleanup_CWaitForTaskSerializer();
+  }
 } // namespace
+
+/**
+ * Address: 0x004CB460 (FUN_004CB460, Moho::InstanceCounter<Moho::CWaitForTask>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for CWaitForTask
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CWaitForTask>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::CWaitForTask).name());
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
 
 /**
  * Address: 0x004CA470 (FUN_004CA470, sub_4CA470)
@@ -213,6 +287,24 @@ void CWaitForTaskSerializer::RegisterSerializeFunctions()
   type->serLoadFunc_ = &DeserializeCWaitForTask;
   GPG_ASSERT(type->serSaveFunc_ == nullptr);
   type->serSaveFunc_ = &SerializeCWaitForTask;
+}
+
+gpg::SerHelperBase* moho::cleanup_CWaitForTaskSerializer()
+{
+  return UnlinkSerializerNode(gCWaitForTaskSerializer);
+}
+
+/**
+ * Address: 0x00BC62E0 (FUN_00BC62E0, register_CWaitForTaskSerializer)
+ *
+ * What it does:
+ * Initializes startup serializer callback lanes for `CWaitForTask` and
+ * schedules intrusive helper cleanup at process exit.
+ */
+void moho::register_CWaitForTaskSerializer()
+{
+  InitializeCWaitForTaskSerializer();
+  (void)std::atexit(&CleanupCWaitForTaskSerializerAtExit);
 }
 
 /**

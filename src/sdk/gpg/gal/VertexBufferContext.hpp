@@ -21,10 +21,21 @@ namespace gpg::gal
         VertexBufferContext();
 
         /**
-         * Address: 0x009408B0 (FUN_009408B0)
+         * Address: 0x00940870 (FUN_00940870, gpg::gal::VertexBufferContext::VertexBufferContext)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk for vertex-buffer context handles.
+         * Initializes vertex-buffer context lanes from explicit
+         * `width/height/type/usage` payload values.
+         */
+        VertexBufferContext(std::uint32_t width, std::uint32_t height, std::uint32_t type, std::uint32_t usage);
+
+        /**
+         * Address: 0x009408A0 (FUN_009408A0, gpg::gal::VertexBufferContext::~VertexBufferContext)
+         * Address: 0x009408B0 (FUN_009408B0, scalar deleting destructor thunk)
+         *
+         * What it does:
+         * Restores the vftable lane and owns the deleting-destructor thunk path
+         * for vertex-buffer context handles.
          */
         virtual ~VertexBufferContext();
 

@@ -101,6 +101,104 @@ namespace moho
     int FindCommandIndex(CmdId cmdId) const;
 
     /**
+     * Address: 0x006EDBF0 (FUN_006EDBF0, ?GetCurrentCommand@CUnitCommandQueue@Moho@@QAEPAVCUnitCommand@2@XZ)
+     *
+     * What it does:
+     * Returns the first queued command, or `nullptr` when the queue is empty
+     * or the head weak pointer is expired.
+     */
+    CUnitCommand* GetCurrentCommand();
+
+    /**
+     * Address: 0x006EDC20 (FUN_006EDC20, ?GetNextCommand@CUnitCommandQueue@Moho@@QAEPAVCUnitCommand@2@XZ)
+     *
+     * What it does:
+     * Returns the second queued command, or `nullptr` when fewer than two
+     * commands are available or the second weak pointer is expired.
+     */
+    CUnitCommand* GetNextCommand();
+
+    /**
+     * Address: 0x006EDC50 (FUN_006EDC50, ?GetLastCommand@CUnitCommandQueue@Moho@@QAEPAVCUnitCommand@2@XZ)
+     *
+     * What it does:
+     * Returns the current queue-tail command, or `nullptr` when the queue is
+     * empty or the tail weak pointer is expired.
+     */
+    CUnitCommand* GetLastCommand();
+
+    /**
+     * Address: 0x006EDC80 (FUN_006EDC80, ?GetCommandInQueue@CUnitCommandQueue@Moho@@QBEPAVCUnitCommand@2@I@Z)
+     *
+     * What it does:
+     * Returns one command at `index`, or `nullptr` when index is out of range
+     * or the weak pointer at that slot is expired.
+     */
+    CUnitCommand* GetCommandInQueue(unsigned int index) const;
+
+    /**
+     * Address: 0x00598B90 (FUN_00598B90, ?Finished@CUnitCommandQueue@Moho@@QAE_NXZ)
+     *
+     * What it does:
+     * Returns true when the queue has no remaining command entries.
+     */
+    bool Finished() const;
+
+    /**
+     * Address: 0x006EDCB0 (FUN_006EDCB0, ?InsertCommandToQueue@CUnitCommandQueue@Moho@@QAEXPAVCUnitCommand@2@H@Z)
+     *
+     * What it does:
+     * Inserts one command into this queue at `index`, updates sim command-digest
+     * lanes, marks refresh state, and emits queue inserted-event.
+     */
+    void InsertCommandToQueue(CUnitCommand* command, int index);
+
+    /**
+     * Address: 0x006EDD80 (FUN_006EDD80, ?AddCommandToQueue@CUnitCommandQueue@Moho@@QAEXPAVCUnitCommand@2@@Z)
+     *
+     * What it does:
+     * Chooses one insertion index for `command` (including patrol/follow-up
+     * ordering lane) and forwards into `InsertCommandToQueue`.
+     */
+    void AddCommandToQueue(CUnitCommand* command);
+
+    /**
+     * Address: 0x006EDE70 (FUN_006EDE70, ?RemoveFirstCommandFromQueue@CUnitCommandQueue@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Removes the current head command from this queue and emits refresh/changed
+     * queue-status events.
+     */
+    void RemoveFirstCommandFromQueue();
+
+    /**
+     * Address: 0x006EDFC0 (FUN_006EDFC0, ?MoveFirstCommandToBackOfQueue@CUnitCommandQueue@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Rotates the current queue-head command to queue tail and emits a
+     * reorder queue-status event.
+     */
+    void MoveFirstCommandToBackOfQueue();
+
+    /**
+     * Address: 0x006EE0B0 (FUN_006EE0B0, ?MoveCommandToBackOfQueue@CUnitCommandQueue@Moho@@QAE_NI@Z)
+     *
+     * What it does:
+     * Finds one queued command by command-object identity and moves that
+     * entry to queue tail, then emits a reorder queue-status event.
+     */
+    bool MoveCommandToBackOfQueue(unsigned int index);
+
+    /**
+     * Address: 0x006EE220 (FUN_006EE220)
+     *
+     * What it does:
+     * Finds one queued entry by command pointer and forwards to indexed
+     * move-to-back queue reordering.
+     */
+    bool MoveCommandToBackOfQueue(const CUnitCommand* command);
+
+    /**
      * Address: 0x006EDF80
      */
     bool RemoveCommandFromQueue(const CUnitCommand* command);
@@ -108,7 +206,7 @@ namespace moho
     /**
      * Address: 0x006EDEF0
      */
-    bool RemoveCommandFromQueue(int index);
+    bool RemoveCommandFromQueue(unsigned int index);
 
     /**
      * Address: 0x006EE2D0 (FUN_006EE2D0)
@@ -132,6 +230,34 @@ namespace moho
      * Runs full queue teardown logic (list unlink + internal buffers cleanup).
      */
     void DestroyForUnitKillCleanup();
+
+    /**
+     * Address: 0x006EE360 (FUN_006EE360, ?AbortActiveTask@CUnitCommandQueue@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Marks queue refresh state and emits one needs-refresh event for active
+     * command abort transitions.
+     */
+    void AbortActiveTask();
+
+    /**
+     * Address: 0x006EE3C0 (FUN_006EE3C0, ?SetCommandCount@CUnitCommandQueue@Moho@@QAEXII@Z)
+     *
+     * What it does:
+     * Sets one queued command count lane, updates command dirty flag state,
+     * and applies queue-head/queue-removal transitions when count is zero.
+     */
+    void SetCommandCount(unsigned int index, unsigned int count);
+
+  private:
+    /**
+     * Address: 0x006EE260 (FUN_006EE260, ?NeedsUIRefresh@CUnitCommandQueue@Moho@@AAE_NXZ)
+     *
+     * What it does:
+     * Returns true when the current head command family requires owner sync/UI
+     * refresh updates on queue-head transition.
+     */
+    bool NeedsUIRefresh();
 
   public:
     static gpg::RType* sType;

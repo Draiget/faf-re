@@ -58,6 +58,30 @@ namespace moho
      * Registers projectile-blueprint field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0051CDC0 (FUN_0051CDC0, gpg::RType::AddField_RProjectileBlueprintDisplay_0x198Display)
+     *
+     * What it does:
+     * Appends the `Display` reflected field entry (`+0x198`).
+     */
+    static gpg::RField* AddFieldDisplay(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0051CE40 (FUN_0051CE40, gpg::RType::AddField_RProjectileBlueprintEconomy_0x1D0Economy)
+     *
+     * What it does:
+     * Appends the `Economy` reflected field entry (`+0x1D0`).
+     */
+    static gpg::RField* AddFieldEconomy(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0051CEC0 (FUN_0051CEC0, gpg::RType::AddField_RProjectileBlueprintPhysics_0x1DCPhysics)
+     *
+     * What it does:
+     * Appends the `Physics` reflected field entry (`+0x1DC`).
+     */
+    static gpg::RField* AddFieldPhysics(gpg::RType* typeInfo);
   };
 
   /**

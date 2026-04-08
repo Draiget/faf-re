@@ -1,20 +1,31 @@
 #include "Prop.h"
 
+#include <cmath>
 #include <cstdint>
 #include <new>
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/misc/InstanceCounter.h"
+#include "moho/misc/Stats.h"
 #include "moho/path/PathTables.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 
 namespace
 {
+  constexpr const char* kPropLuaClassName = "Prop";
+  constexpr const char* kPropAddBoundedPropName = "AddBoundedProp";
+  constexpr const char* kPropAddBoundedPropHelpText = "Prop:AddBoundedProp(priority)";
+  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+
   constexpr std::uint8_t kPropEntityIdSourceIndex = moho::kEntityIdSourceIndexInvalid;
   constexpr std::uint32_t kPropEntityIdFamilySourceBits =
     moho::MakeEntityIdFamilySourceBits(moho::EEntityIdFamily::Prop, kPropEntityIdSourceIndex);
@@ -113,6 +124,17 @@ namespace
       grid->sim->mPathTables->DirtyClusters(rect);
     }
   }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    static moho::CScrLuaInitFormSet sSet("sim");
+    return sSet;
+  }
+
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
 } // namespace
 
 namespace moho
@@ -120,6 +142,29 @@ namespace moho
   gpg::RType* SPropPriorityInfo::sType = nullptr;
   gpg::RType* Prop::sType = nullptr;
   CScrLuaMetatableFactory<Prop> CScrLuaMetatableFactory<Prop>::sInstance{};
+  int cfunc_PropAddBoundedProp(lua_State* luaContext);
+  int cfunc_PropAddBoundedPropL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x006FAAD0 (FUN_006FAAD0, Moho::InstanceCounter<Moho::Prop>::GetStatItem)
+   *
+   * What it does:
+   * Lazily resolves and caches the engine stat slot used for Prop instance
+   * counting (`Instance Counts_<type-name-without-underscores>`).
+   */
+  template <>
+  moho::StatItem* moho::InstanceCounter<moho::Prop>::GetStatItem()
+  {
+    static moho::StatItem* sStatItem = nullptr;
+    if (sStatItem) {
+      return sStatItem;
+    }
+
+    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::Prop).name());
+    moho::EngineStats* const engineStats = moho::GetEngineStats();
+    sStatItem = engineStats->GetItem(statPath.c_str(), true);
+    return sStatItem;
+  }
 
   CScrLuaMetatableFactory<Prop>& CScrLuaMetatableFactory<Prop>::Instance()
   {
@@ -145,6 +190,69 @@ namespace moho
     const int index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
     CScrLuaMetatableFactory<Prop>::Instance().SetFactoryObjectIndexForRecovery(index);
     return index;
+  }
+
+  /**
+   * Address: 0x006FCF60 (FUN_006FCF60, func_PropAddBoundedProp_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Prop:AddBoundedProp(priority)` Lua binder form.
+   */
+  CScrLuaInitForm* func_PropAddBoundedProp_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kPropAddBoundedPropName,
+      &cfunc_PropAddBoundedProp,
+      &CScrLuaMetatableFactory<Prop>::Instance(),
+      kPropLuaClassName,
+      kPropAddBoundedPropHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x006FCF40 (FUN_006FCF40, cfunc_PropAddBoundedProp)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_PropAddBoundedPropL`.
+   */
+  int cfunc_PropAddBoundedProp(lua_State* const luaContext)
+  {
+    return cfunc_PropAddBoundedPropL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006FCFC0 (FUN_006FCFC0, cfunc_PropAddBoundedPropL)
+   *
+   * What it does:
+   * Resolves `(prop, priority)`, writes bounded-priority/tick lanes on the
+   * prop, and inserts it into `EntityDB::AddBoundedProp`.
+   */
+  int cfunc_PropAddBoundedPropL(LuaPlus::LuaState* const state)
+  {
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPropAddBoundedPropHelpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject propObject(LuaPlus::LuaStackObject(state, 1));
+    Prop* const prop = SCR_FromLua_Prop(propObject, state);
+
+    LuaPlus::LuaStackObject priorityObject(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      priorityObject.TypeError("number");
+    }
+
+    const float priorityValue = static_cast<float>(lua_tonumber(rawState, 2));
+    prop->mPriorityInfo.mPriority = static_cast<std::int32_t>(std::ceil(priorityValue));
+
+    Sim* const sim = prop->SimulationRef;
+    prop->mPriorityInfo.mBoundedTick = static_cast<std::int32_t>(sim->mCurTick);
+    prop->mHandleIndex = sim->mEntityDB->AddBoundedProp(prop);
+    return 0;
   }
 
   /**

@@ -43,10 +43,15 @@ namespace gpg
   enum class ArchiveToken : int
   {
     ObjectTerminator = 0,
-    NullPointer = 1,
-    ExistingPointer = 2,
-    NewObject = 3,
+    NewObjectToken = 1,
+    NullPointerToken = 2,
+    ExistingPointerToken = 3,
     ObjectStart = 4,
+
+    // Compatibility aliases used by existing recovered call sites.
+    NewObject = NewObjectToken,
+    NullPointer = NullPointerToken,
+    ExistingPointer = ExistingPointerToken,
   };
 
   /**

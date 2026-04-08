@@ -10,15 +10,11 @@ namespace gpg
 
 namespace moho
 {
-  /**
-   * Recovered enum lane used by collision-beam broadcaster/listener chains.
-   *
-   * Enumerator values remain pending deeper behavior reconstruction; only the
-   * ABI/storage lane is required for startup reflection recovery.
-   */
   enum ECollisionBeamEvent : int
   {
-    CollisionBeamEvent_None = 0
+    CollisionBeamEvent_HitTarget = 0,
+    CollisionBeamEvent_MissTarget = 1,
+    CollisionBeamEvent_Irrelavent = 2
   };
 
   template <class TEvent>
@@ -31,8 +27,8 @@ namespace moho
     static gpg::RType* sType;
 
   public:
-    std::uint32_t weakLinkHead_; // +0x00
-    std::uint32_t reserved04;    // +0x04
+    void* ownerLinkSlot; // +0x00
+    void* nextInOwner;   // +0x04
   };
 
   using ManyToOneBroadcaster_ECollisionBeamEvent = ManyToOneBroadcaster<ECollisionBeamEvent>;
@@ -42,12 +38,11 @@ namespace moho
     "ManyToOneBroadcaster<ECollisionBeamEvent> size must be 0x08"
   );
   static_assert(
-    offsetof(ManyToOneBroadcaster_ECollisionBeamEvent, weakLinkHead_) == 0x00,
-    "ManyToOneBroadcaster<ECollisionBeamEvent>::weakLinkHead_ offset must be 0x00"
+    offsetof(ManyToOneBroadcaster_ECollisionBeamEvent, ownerLinkSlot) == 0x00,
+    "ManyToOneBroadcaster<ECollisionBeamEvent>::ownerLinkSlot offset must be 0x00"
   );
   static_assert(
-    offsetof(ManyToOneBroadcaster_ECollisionBeamEvent, reserved04) == 0x04,
-    "ManyToOneBroadcaster<ECollisionBeamEvent>::reserved04 offset must be 0x04"
+    offsetof(ManyToOneBroadcaster_ECollisionBeamEvent, nextInOwner) == 0x04,
+    "ManyToOneBroadcaster<ECollisionBeamEvent>::nextInOwner offset must be 0x04"
   );
 } // namespace moho
-

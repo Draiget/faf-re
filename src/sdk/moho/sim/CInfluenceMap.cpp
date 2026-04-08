@@ -7,6 +7,7 @@
 #include <typeinfo>
 
 #include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/console/CConAlias.h"
@@ -20,6 +21,21 @@
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
+
+namespace gpg
+{
+  class RVectorType_InfluenceGrid final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override;
+  };
+
+  class RVectorType_SThreat final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override;
+  };
+} // namespace gpg
 
 namespace
 {
@@ -134,7 +150,86 @@ namespace
     static moho::TSimConVar<int> sVar(false, "imap_debug_grid_army", -1);
     return sVar;
   }
+
+  msvc8::string gInfluenceGridVectorTypeName{};
+  std::uint32_t gInfluenceGridVectorTypeNameInitGuard = 0u;
+  msvc8::string gSThreatVectorTypeName{};
+  std::uint32_t gSThreatVectorTypeNameInitGuard = 0u;
+
+  [[nodiscard]] gpg::RType* CachedInfluenceGridType()
+  {
+    gpg::RType* type = moho::InfluenceGrid::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::InfluenceGrid));
+      moho::InfluenceGrid::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSThreatType()
+  {
+    gpg::RType* type = moho::SThreat::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SThreat));
+      moho::SThreat::sType = type;
+    }
+    return type;
+  }
+
+  void cleanup_InfluenceGridVectorTypeName()
+  {
+    gInfluenceGridVectorTypeName.clear();
+    gInfluenceGridVectorTypeNameInitGuard = 0u;
+  }
+
+  void cleanup_SThreatVectorTypeName()
+  {
+    gSThreatVectorTypeName.clear();
+    gSThreatVectorTypeNameInitGuard = 0u;
+  }
 } // namespace
+
+/**
+ * Address: 0x00718DE0 (FUN_00718DE0, gpg::RVectorType_InfluenceGrid::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected lexical type label
+ * `vector<InfluenceGrid>` from runtime RTTI metadata.
+ */
+const char* gpg::RVectorType_InfluenceGrid::GetName() const
+{
+  if ((gInfluenceGridVectorTypeNameInitGuard & 1u) == 0u) {
+    gInfluenceGridVectorTypeNameInitGuard |= 1u;
+
+    gpg::RType* const valueType = CachedInfluenceGridType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "InfluenceGrid";
+    gInfluenceGridVectorTypeName = gpg::STR_Printf("vector<%s>", valueTypeName ? valueTypeName : "InfluenceGrid");
+    (void)std::atexit(&cleanup_InfluenceGridVectorTypeName);
+  }
+
+  return gInfluenceGridVectorTypeName.c_str();
+}
+
+/**
+ * Address: 0x00719150 (FUN_00719150, gpg::RVectorType_SThreat::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected lexical type label
+ * `vector<SThreat>` from runtime RTTI metadata.
+ */
+const char* gpg::RVectorType_SThreat::GetName() const
+{
+  if ((gSThreatVectorTypeNameInitGuard & 1u) == 0u) {
+    gSThreatVectorTypeNameInitGuard |= 1u;
+
+    gpg::RType* const valueType = CachedSThreatType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "SThreat";
+    gSThreatVectorTypeName = gpg::STR_Printf("vector<%s>", valueTypeName ? valueTypeName : "SThreat");
+    (void)std::atexit(&cleanup_SThreatVectorTypeName);
+  }
+
+  return gSThreatVectorTypeName.c_str();
+}
 
 namespace moho
 {
@@ -534,7 +629,7 @@ namespace moho
     }
 
     mMapEntries.resize(static_cast<std::size_t>(mTotal));
-    const std::size_t armyCount = sim ? sim->mArmiesList.size() : 0u;
+    const std::size_t armyCount = sim ? static_cast<std::size_t>(sim->ArmyCount()) : 0u;
     for (InfluenceGrid* cell = mMapEntries.begin(); cell != mMapEntries.end(); ++cell) {
       cell->EnsureThreatSlots(armyCount);
     }

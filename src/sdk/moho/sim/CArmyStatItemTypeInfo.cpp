@@ -1,5 +1,6 @@
 #include "moho/sim/CArmyStatItemTypeInfo.h"
 
+#include <cstdint>
 #include <new>
 #include <typeinfo>
 
@@ -139,6 +140,53 @@ namespace moho
     typeInfo->AddBase(baseField);
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00713BE0 (FUN_00713BE0, gpg::RRef_CArmyStatItem)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CArmyStatItem*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CArmyStatItem(gpg::RRef* const outRef, moho::CArmyStatItem* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    gpg::RType* const baseType = moho::CArmyStatItem::StaticGetClass();
+    outRef->mType = baseType;
+    outRef->mObj = value;
+    if (!value) {
+      return outRef;
+    }
+
+    gpg::RType* dynamicType = baseType;
+    try {
+      dynamicType = gpg::LookupRType(typeid(*value));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    if (!dynamicType || dynamicType == baseType) {
+      return outRef;
+    }
+
+    std::int32_t baseOffset = 0;
+    if (!dynamicType->IsDerivedFrom(baseType, &baseOffset)) {
+      outRef->mType = dynamicType;
+      outRef->mObj = value;
+      return outRef;
+    }
+
+    outRef->mType = dynamicType;
+    outRef->mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    return outRef;
+  }
+} // namespace gpg
 
 namespace
 {

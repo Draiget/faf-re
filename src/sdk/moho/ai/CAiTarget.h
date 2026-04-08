@@ -57,6 +57,42 @@ namespace moho
     CAiTarget* UpdateTarget(Entity* entity);
 
     /**
+     * Address: 0x00623240 (FUN_00623240, Moho::CAiTarget::GetLuaTarget)
+     *
+     * What it does:
+     * Parses one Lua target object (`Type` + payload fields) and updates this
+     * target to entity or ground form.
+     */
+    CAiTarget* GetLuaTarget(Sim* sim, const LuaPlus::LuaObject& object);
+
+    /**
+     * Address: 0x005E2A90 (FUN_005E2A90, Moho::CAiTarget::GetTargetPosGun)
+     *
+     * What it does:
+     * Resolves one weapon-target world position from this target payload and
+     * either uses exact live position lanes or selected target-point lanes.
+     */
+    [[nodiscard]] Wm3::Vec3f GetTargetPosGun(bool useActualPos);
+
+    /**
+     * Address: 0x005E2A10 (FUN_005E2A10, Moho::CAiTarget::HasTarget)
+     *
+     * What it does:
+     * Reports whether this target currently resolves to a valid alive target
+     * payload (entity or ground target).
+     */
+    [[nodiscard]] bool HasTarget() const;
+
+    /**
+     * Address: 0x005E2CE0 (FUN_005E2CE0, Moho::CAiTarget::GetEntity)
+     *
+     * What it does:
+     * Returns the current entity target; when target is a recon blip this
+     * resolves to that blip's source unit entity.
+     */
+    [[nodiscard]] Entity* GetEntity() const;
+
+    /**
      * Address: 0x005E2860 (FUN_005E2860)
      *
      * What it does:

@@ -34,6 +34,18 @@ namespace moho
      * Default per-tick debug overlay hook. Base implementation is a no-op.
      */
     virtual void Tick(Sim* sim);
+
+    /**
+     * Address: 0x006527B0 (FUN_006527B0, Moho::RDebugOverlay::NewPtr)
+     *
+     * What it does:
+     * Creates one reflected object through `typeInfo`, upcasts it to
+     * `RDebugOverlay`, and returns the typed object pointer.
+     */
+    [[nodiscard]] static RDebugOverlay* NewPtr(gpg::RType& typeInfo);
+
+  public:
+    static gpg::RType* sType;
   };
 
   static_assert(sizeof(RDebugOverlay) == 0x0C, "RDebugOverlay size must be 0x0C");

@@ -1,0 +1,1120 @@
+diff --git a/src/common/datetime.cpp b/src/common/datetime.cpp
+index bf550b7..6a753b1 100644
+--- a/src/common/datetime.cpp
++++ b/src/common/datetime.cpp
+@@ -98,7 +98,7 @@
+ #endif // broken strptime()
+ 
+ #if !defined(WX_TIMEZONE) && !defined(WX_GMTOFF_IN_TM)
+-    #if defined(__BORLANDC__) || defined(__MINGW32__) || defined(__VISAGECPP__)
++    #if defined(__BORLANDC__) || defined(__MINGW32__) || defined(__VISAGECPP__) || defined(_MSC_VER)
+         #define WX_TIMEZONE _timezone
+     #elif defined(__MWERKS__)
+         long wxmw_timezone = 28800;
+
+diff --git a/src/common/intl.cpp b/src/common/intl.cpp
+index 17d9f81..6568f78 100644
+--- a/src/common/intl.cpp
++++ b/src/common/intl.cpp
+@@ -771,8 +771,17 @@ bool wxLocale::Init(int language, int flags)
+             int codepage = -1;
+             wxUint32 lcid = MAKELCID(MAKELANGID(info->WinLang, info->WinSublang),
+                                      SORT_DEFAULT);
+-            SetThreadLocale(lcid);
+-
++            // SetThreadLocale is deprecated and may be omitted by modern SDK
++            // headers; call it dynamically when available.
++            typedef BOOL (WINAPI *wxSetThreadLocaleFn)(LCID);
++            HMODULE kernel32 = ::GetModuleHandleA("kernel32.dll");
++            if (kernel32)
++            {
++                wxSetThreadLocaleFn pSetThreadLocale =
++                    (wxSetThreadLocaleFn)::GetProcAddress(kernel32, "SetThreadLocale");
++                if (pSetThreadLocale)
++                    pSetThreadLocale(lcid);
++            }
+             // NB: we must translate LCID to CRT's setlocale string ourselves,
+             //     because SetThreadLocale does not modify change the
+             //     interpretation of setlocale(LC_ALL, "") call:
+
+diff --git a/src/makevc.env b/src/makevc.env
+index 630efce..e4c5e03 100644
+--- a/src/makevc.env
++++ b/src/makevc.env
+@@ -6,12 +6,28 @@
+ #
+ #	MSVC++ 32-bit makefile include file
+ #
+-!include <ntwin32.mak>
++!if exist("ntwin32.mak")
++!include "ntwin32.mak"
++!elseif exist("$(WXWIN)\src\ntwin32.mak")
++!include "$(WXWIN)\src\ntwin32.mak"
++!endif
+ 
+ !if "$(RM)" == ""
+ RM= erase
+ !endif
+ 
++!if "$(implib)" == ""
++implib=lib
++!endif
++
++!if "$(link)" == ""
++link=link
++!endif
++
++!if "$(rc)" == ""
++rc=rc
++!endif
++
+ # read version numbers
+ !include "version.mak"
+ WXVERSION=$(wxMAJOR_VERSION)$(wxMINOR_VERSION)$(wxRELEASE_NUMBER_IFUNSTABLE)
+@@ -244,7 +260,7 @@ PCH=wxBase.pch
+ PCH=wxWindows.pch
+ !endif
+ 
+-PRECOMP=/YuWX/WXPREC.H /Fp$(WXDIR)\$D\$(PCH) /Fd$(WXDIR)\$D\vc60.pdb
++PRECOMP=/YuWX/WXPREC.H /Fp$(WXDIR)\$(D)\$(PCH) /Fd$(WXDIR)\$(D)\vc60.pdb
+ MAKEPRECOMP=/YcWX/WXPREC.H
+ !endif
+ 
+@@ -270,13 +286,13 @@ PCH=wxWindows.pch
+ DUMMY=dummy
+ !endif
+ 
+-PRECOMP=/YuWX/WXPREC.H /Fp$(WXDIR)\$D\$(PCH) /Fd$(WXDIR)\lib\$(WXLIBNAME).pdb
++PRECOMP=/YuWX/WXPREC.H /Fp$(WXDIR)\$(D)\$(PCH) /Fd$(WXDIR)\lib\$(WXLIBNAME).pdb
+ CPPFLAGS=$(WINFLAGS) $(DEBUG_FLAGS) $(PRECOMP) $(EXTRAFLAGS) /D__WXMSW__ $(INC) $(OPT) /D_DLL $(CRTFLAG) $(EXTRADLLFLAGS) /D_WINDOWS /D__WINDOWS__ /D_WINDLL
+ CPPFLAGS2=$(WINFLAGS) $(DEBUG_FLAGS) /D__WXMSW__ $(INC) $(EXTRAFLAGS) $(OPT) /D_DLL $(CRTFLAG) $(EXTRADLLFLAGS) /D_WINDOWS /D__WINDOWS__ /D_WINDLL
+ LINKFLAGS=$(LINK_DEBUG_FLAGS) -machine:i386 -subsystem:windows,$(APPVER) -dll # -entry:_DllMainCRTStartup$(DLLENTRY)
+ !endif
+ 
+-DUMMYOBJ=$(WXDIR)\$D\$(DUMMY).obj
++DUMMYOBJ=$(WXDIR)\$(D)\$(DUMMY).obj
+ 
+ .c.obj:
+ 	cl @<<
+@@ -289,12 +305,12 @@ $(CPPFLAGS2) /Fo$@ /c $<
+ <<
+ 
+ #use CPPFLAGS2 so as not to use precompiled headers
+-{}.c{$D}.obj:
++{}.c{$(D)}.obj:
+ 	cl @<<
+ $(CPPFLAGS2) /Fo$@ /c $<
+ <<
+ 
+-{}.cpp{$D}.obj:
++{}.cpp{$(D)}.obj:
+ 	cl @<<
+ $(CPPFLAGS) /Fo$@ /c /Tp $<
+ <<
+
+diff --git a/src/msw/makefile.vc b/src/msw/makefile.vc
+index 76aaee2..b039960 100644
+--- a/src/msw/makefile.vc
++++ b/src/msw/makefile.vc
+@@ -53,354 +53,340 @@ TIFFDIR = $(WXDIR)\src\tiff
+ REGEXDIR = $(WXDIR)\src\regex
+ 
+ 
+-{$(GENDIR)}.cpp{$(GENDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS) /Fo$@ /c /Tp $<
+-<<
+-
+-{$(COMMDIR)}.cpp{$(COMMDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS) /Fo$@ /c /Tp $<
+-<<
+-
+-{$(COMMDIR)}.c{$(COMMDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS2) /Fo$@ /c /Tc $<
+-<<
+-
+-{$(MSWDIR)}.cpp{$(MSWDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS) /Fo$@ /c /Tp $<
+-<<
+-
+-{$(MSWDIR)}.c{$(MSWDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS2) /Fo$@ /c /Tc $<
+-<<
+-
+-{$(OLEDIR)}.cpp{$(OLEDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS) /Fo$@ /c /Tp $<
+-<<
+-
+-{$(HTMLDIR)}.cpp{$(HTMLDIR)\$D}.obj:
+-	cl @<<
+-$(CPPFLAGS) /Fo$@ /c /Tp $<
+-<<
+-
+-GENERICOBJS= $(GENDIR)\$D\busyinfo.obj \
+-		$(GENDIR)\$D\calctrl.obj \
+-		$(GENDIR)\$D\choicdgg.obj \
+-		$(GENDIR)\$D\dcbuffer.obj \
+-		$(GENDIR)\$D\dcpsg.obj \
+-		$(GENDIR)\$D\dirctrlg.obj \
+-		$(GENDIR)\$D\dragimgg.obj \
+-		$(GENDIR)\$D\grid.obj \
+-		$(GENDIR)\$D\gridctrl.obj \
+-		$(GENDIR)\$D\gridsel.obj \
+-		$(GENDIR)\$D\laywin.obj \
+-		$(GENDIR)\$D\logg.obj \
+-		$(GENDIR)\$D\numdlgg.obj \
+-		$(GENDIR)\$D\panelg.obj \
+-		$(GENDIR)\$D\progdlgg.obj \
+-		$(GENDIR)\$D\prop.obj \
+-		$(GENDIR)\$D\propform.obj \
+-		$(GENDIR)\$D\proplist.obj \
+-		$(GENDIR)\$D\sashwin.obj \
+-		$(GENDIR)\$D\scrlwing.obj \
+-		$(GENDIR)\$D\spinctlg.obj \
+-		$(GENDIR)\$D\splash.obj \
+-		$(GENDIR)\$D\splitter.obj \
+-		$(GENDIR)\$D\statusbr.obj \
+-		$(GENDIR)\$D\tbarsmpl.obj \
+-		$(GENDIR)\$D\textdlgg.obj \
+-		$(GENDIR)\$D\tipdlg.obj \
+-		$(GENDIR)\$D\tipwin.obj \
+-		$(GENDIR)\$D\treectlg.obj \
+-		$(GENDIR)\$D\treelay.obj \
+-		$(GENDIR)\$D\wizard.obj
++{$(GENDIR)}.cpp{$(GENDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++{$(COMMDIR)}.cpp{$(COMMDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++{$(COMMDIR)}.c{$(COMMDIR)\$(D)}.obj:
++	cl $(CPPFLAGS2) /Fo$@ /c /Tc $<
++
++{$(MSWDIR)}.cpp{$(MSWDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++{$(MSWDIR)}.c{$(MSWDIR)\$(D)}.obj:
++	cl $(CPPFLAGS2) /Fo$@ /c /Tc $<
++
++{$(OLEDIR)}.cpp{$(OLEDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++{$(HTMLDIR)}.cpp{$(HTMLDIR)\$(D)}.obj:
++	cl $(CPPFLAGS) /Fo$@ /c /Tp $<
++
++GENERICOBJS= $(GENDIR)\$(D)\busyinfo.obj \
++		$(GENDIR)\$(D)\calctrl.obj \
++		$(GENDIR)\$(D)\choicdgg.obj \
++		$(GENDIR)\$(D)\dcbuffer.obj \
++		$(GENDIR)\$(D)\dcpsg.obj \
++		$(GENDIR)\$(D)\dirctrlg.obj \
++		$(GENDIR)\$(D)\dragimgg.obj \
++		$(GENDIR)\$(D)\grid.obj \
++		$(GENDIR)\$(D)\gridctrl.obj \
++		$(GENDIR)\$(D)\gridsel.obj \
++		$(GENDIR)\$(D)\laywin.obj \
++		$(GENDIR)\$(D)\logg.obj \
++		$(GENDIR)\$(D)\numdlgg.obj \
++		$(GENDIR)\$(D)\panelg.obj \
++		$(GENDIR)\$(D)\progdlgg.obj \
++		$(GENDIR)\$(D)\prop.obj \
++		$(GENDIR)\$(D)\propform.obj \
++		$(GENDIR)\$(D)\proplist.obj \
++		$(GENDIR)\$(D)\sashwin.obj \
++		$(GENDIR)\$(D)\scrlwing.obj \
++		$(GENDIR)\$(D)\spinctlg.obj \
++		$(GENDIR)\$(D)\splash.obj \
++		$(GENDIR)\$(D)\splitter.obj \
++		$(GENDIR)\$(D)\statusbr.obj \
++		$(GENDIR)\$(D)\tbarsmpl.obj \
++		$(GENDIR)\$(D)\textdlgg.obj \
++		$(GENDIR)\$(D)\tipdlg.obj \
++		$(GENDIR)\$(D)\tipwin.obj \
++		$(GENDIR)\$(D)\treectlg.obj \
++		$(GENDIR)\$(D)\treelay.obj \
++		$(GENDIR)\$(D)\wizard.obj
+ 
+ # These are generic things that don't need to be compiled on MSW,
+ # but sometimes it's useful to do so for testing purposes.
+-NONESSENTIALOBJS= $(GENDIR)\$D\colrdlgg.obj \
+-		$(GENDIR)\$D\dirdlgg.obj \
+-		$(GENDIR)\$D\filedlgg.obj \
+-		$(GENDIR)\$D\fontdlgg.obj \
+-		$(GENDIR)\$D\helpext.obj \
+-		$(GENDIR)\$D\helphtml.obj \
+-		$(GENDIR)\$D\imaglist.obj \
+-		$(GENDIR)\$D\listctrl.obj \
+-		$(GENDIR)\$D\mdig.obj \
+-		$(GENDIR)\$D\msgdlgg.obj \
+-		$(GENDIR)\$D\notebook.obj \
+-		$(GENDIR)\$D\tabg.obj
++NONESSENTIALOBJS= $(GENDIR)\$(D)\colrdlgg.obj \
++		$(GENDIR)\$(D)\dirdlgg.obj \
++		$(GENDIR)\$(D)\filedlgg.obj \
++		$(GENDIR)\$(D)\fontdlgg.obj \
++		$(GENDIR)\$(D)\helpext.obj \
++		$(GENDIR)\$(D)\helphtml.obj \
++		$(GENDIR)\$(D)\imaglist.obj \
++		$(GENDIR)\$(D)\listctrl.obj \
++		$(GENDIR)\$(D)\mdig.obj \
++		$(GENDIR)\$(D)\msgdlgg.obj \
++		$(GENDIR)\$(D)\notebook.obj \
++		$(GENDIR)\$(D)\tabg.obj
+ 
+ COMMONOBJS = \
+-		$(COMMDIR)\$D\y_tab.obj \
+-		$(COMMDIR)\$D\appcmn.obj \
+-		$(COMMDIR)\$D\artprov.obj \
+-		$(COMMDIR)\$D\artstd.obj \
+-		$(COMMDIR)\$D\choiccmn.obj \
+-		$(COMMDIR)\$D\clipcmn.obj \
+-		$(COMMDIR)\$D\clntdata.obj \
+-		$(COMMDIR)\$D\cmdline.obj \
+-		$(COMMDIR)\$D\cmdproc.obj \
+-		$(COMMDIR)\$D\cmndata.obj \
+-		$(COMMDIR)\$D\config.obj \
+-		$(COMMDIR)\$D\containr.obj \
+-		$(COMMDIR)\$D\cshelp.obj \
+-		$(COMMDIR)\$D\ctrlcmn.obj \
+-		$(COMMDIR)\$D\ctrlsub.obj \
+-		$(COMMDIR)\$D\datetime.obj \
+-		$(COMMDIR)\$D\datstrm.obj \
+-		$(COMMDIR)\$D\db.obj \
+-		$(COMMDIR)\$D\dbgrid.obj \
+-		$(COMMDIR)\$D\dbtable.obj \
+-		$(COMMDIR)\$D\dcbase.obj \
+-		$(COMMDIR)\$D\dircmn.obj \
+-		$(COMMDIR)\$D\dlgcmn.obj \
+-		$(COMMDIR)\$D\dndcmn.obj \
+-		$(COMMDIR)\$D\dobjcmn.obj \
+-		$(COMMDIR)\$D\docmdi.obj \
+-		$(COMMDIR)\$D\docview.obj \
+-		$(COMMDIR)\$D\dseldlg.obj \
+-		$(COMMDIR)\$D\dynarray.obj \
+-		$(COMMDIR)\$D\dynlib.obj \
+-		$(COMMDIR)\$D\dynload.obj \
+-		$(COMMDIR)\$D\effects.obj \
+-		$(COMMDIR)\$D\encconv.obj \
+-		$(COMMDIR)\$D\event.obj \
+-		$(COMMDIR)\$D\extended.obj \
+-		$(COMMDIR)\$D\fddlgcmn.obj \
+-		$(COMMDIR)\$D\ffile.obj \
+-		$(COMMDIR)\$D\file.obj \
+-		$(COMMDIR)\$D\fileconf.obj \
+-		$(COMMDIR)\$D\filefn.obj \
+-		$(COMMDIR)\$D\filename.obj \
+-		$(COMMDIR)\$D\filesys.obj \
+-		$(COMMDIR)\$D\fontcmn.obj \
+-		$(COMMDIR)\$D\fontmap.obj \
+-		$(COMMDIR)\$D\framecmn.obj \
+-		$(COMMDIR)\$D\fs_inet.obj \
+-		$(COMMDIR)\$D\fs_mem.obj \
+-		$(COMMDIR)\$D\fs_zip.obj \
+-		$(COMMDIR)\$D\ftp.obj \
+-		$(COMMDIR)\$D\gaugecmn.obj \
+-		$(COMMDIR)\$D\gdicmn.obj \
+-		$(COMMDIR)\$D\geometry.obj \
+-		$(COMMDIR)\$D\gifdecod.obj \
+-		$(COMMDIR)\$D\hash.obj \
+-		$(COMMDIR)\$D\hashmap.obj \
+-		$(COMMDIR)\$D\helpbase.obj \
+-		$(COMMDIR)\$D\http.obj \
+-		$(COMMDIR)\$D\iconbndl.obj \
+-		$(COMMDIR)\$D\imagall.obj \
+-		$(COMMDIR)\$D\imagbmp.obj \
+-		$(COMMDIR)\$D\image.obj \
+-		$(COMMDIR)\$D\imagfill.obj \
+-		$(COMMDIR)\$D\imaggif.obj \
+-		$(COMMDIR)\$D\imagiff.obj \
+-		$(COMMDIR)\$D\imagjpeg.obj \
+-		$(COMMDIR)\$D\imagpcx.obj \
+-		$(COMMDIR)\$D\imagpng.obj \
+-		$(COMMDIR)\$D\imagpnm.obj \
+-		$(COMMDIR)\$D\imagtiff.obj \
+-		$(COMMDIR)\$D\imagxpm.obj \
+-		$(COMMDIR)\$D\intl.obj \
+-		$(COMMDIR)\$D\ipcbase.obj \
+-		$(COMMDIR)\$D\layout.obj \
+-		$(COMMDIR)\$D\lboxcmn.obj \
+-		$(COMMDIR)\$D\list.obj \
+-		$(COMMDIR)\$D\log.obj \
+-		$(COMMDIR)\$D\longlong.obj \
+-		$(COMMDIR)\$D\matrix.obj \
+-		$(COMMDIR)\$D\memory.obj \
+-		$(COMMDIR)\$D\menucmn.obj \
+-		$(COMMDIR)\$D\mimecmn.obj \
+-		$(COMMDIR)\$D\module.obj \
+-		$(COMMDIR)\$D\msgout.obj \
+-		$(COMMDIR)\$D\mstream.obj \
+-		$(COMMDIR)\$D\nbkbase.obj \
+-		$(COMMDIR)\$D\object.obj \
+-		$(COMMDIR)\$D\odbc.obj \
+-		$(COMMDIR)\$D\paper.obj \
+-		$(COMMDIR)\$D\popupcmn.obj \
+-		$(COMMDIR)\$D\prntbase.obj \
+-		$(COMMDIR)\$D\process.obj \
+-		$(COMMDIR)\$D\protocol.obj \
+-		$(COMMDIR)\$D\quantize.obj \
+-		$(COMMDIR)\$D\radiocmn.obj \
+-		$(COMMDIR)\$D\regex.obj \
+-		$(COMMDIR)\$D\resource.obj \
+-		$(COMMDIR)\$D\rgncmn.obj \
+-		$(COMMDIR)\$D\sckaddr.obj \
+-		$(COMMDIR)\$D\sckfile.obj \
+-		$(COMMDIR)\$D\sckipc.obj \
+-		$(COMMDIR)\$D\sckstrm.obj \
+-		$(COMMDIR)\$D\settcmn.obj \
+-		$(COMMDIR)\$D\sizer.obj \
+-		$(COMMDIR)\$D\socket.obj \
+-		$(COMMDIR)\$D\statbar.obj \
+-		$(COMMDIR)\$D\strconv.obj \
+-		$(COMMDIR)\$D\stream.obj \
+-		$(COMMDIR)\$D\string.obj \
+-		$(COMMDIR)\$D\sysopt.obj \
+-		$(COMMDIR)\$D\tbarbase.obj \
+-		$(COMMDIR)\$D\textbuf.obj \
+-		$(COMMDIR)\$D\textcmn.obj \
+-		$(COMMDIR)\$D\textfile.obj \
+-		$(COMMDIR)\$D\timercmn.obj \
+-		$(COMMDIR)\$D\tokenzr.obj \
+-		$(COMMDIR)\$D\toplvcmn.obj \
+-		$(COMMDIR)\$D\treebase.obj \
+-		$(COMMDIR)\$D\txtstrm.obj \
+-		$(COMMDIR)\$D\unzip.obj \
+-		$(COMMDIR)\$D\url.obj \
+-		$(COMMDIR)\$D\utilscmn.obj \
+-		$(COMMDIR)\$D\valgen.obj \
+-		$(COMMDIR)\$D\validate.obj \
+-		$(COMMDIR)\$D\valtext.obj \
+-		$(COMMDIR)\$D\variant.obj \
+-		$(COMMDIR)\$D\wfstream.obj \
+-		$(COMMDIR)\$D\wincmn.obj \
+-		$(COMMDIR)\$D\wxchar.obj \
+-		$(COMMDIR)\$D\wxexpr.obj \
+-		$(COMMDIR)\$D\xpmdecod.obj \
+-		$(COMMDIR)\$D\zipstrm.obj \
+-		$(COMMDIR)\$D\zstream.obj
+-
+-MSWOBJS = $(MSWDIR)\$D\accel.obj \
+-		$(MSWDIR)\$D\app.obj \
+-		$(OLEDIR)\$D\automtn.obj \
+-		$(MSWDIR)\$D\bitmap.obj \
+-		$(MSWDIR)\$D\bmpbuttn.obj \
+-		$(MSWDIR)\$D\brush.obj \
+-		$(MSWDIR)\$D\button.obj \
+-		$(MSWDIR)\$D\caret.obj \
+-		$(MSWDIR)\$D\checkbox.obj \
+-		$(MSWDIR)\$D\checklst.obj \
+-		$(MSWDIR)\$D\choice.obj \
+-		$(MSWDIR)\$D\clipbrd.obj \
+-		$(MSWDIR)\$D\colordlg.obj \
+-		$(MSWDIR)\$D\colour.obj \
+-		$(MSWDIR)\$D\combobox.obj \
+-		$(MSWDIR)\$D\control.obj \
+-		$(MSWDIR)\$D\curico.obj \
+-		$(MSWDIR)\$D\cursor.obj \
+-		$(MSWDIR)\$D\data.obj \
+-		$(OLEDIR)\$D\dataobj.obj \
+-		$(MSWDIR)\$D\dc.obj \
+-		$(MSWDIR)\$D\dcclient.obj \
+-		$(MSWDIR)\$D\dcmemory.obj \
+-		$(MSWDIR)\$D\dcprint.obj \
+-		$(MSWDIR)\$D\dcscreen.obj \
+-		$(MSWDIR)\$D\dde.obj \
+-		$(MSWDIR)\$D\dialog.obj \
+-		$(MSWDIR)\$D\dialup.obj \
+-		$(MSWDIR)\$D\dib.obj \
+-		$(MSWDIR)\$D\dibutils.obj \
+-		$(MSWDIR)\$D\dir.obj \
+-		$(MSWDIR)\$D\dirdlg.obj \
+-		$(MSWDIR)\$D\dragimag.obj \
+-		$(OLEDIR)\$D\dropsrc.obj \
+-		$(OLEDIR)\$D\droptgt.obj \
+-		$(MSWDIR)\$D\enhmeta.obj \
+-		$(MSWDIR)\$D\evtloop.obj \
+-		$(MSWDIR)\$D\fdrepdlg.obj \
+-		$(MSWDIR)\$D\filedlg.obj \
+-		$(MSWDIR)\$D\font.obj \
+-		$(MSWDIR)\$D\fontdlg.obj \
+-		$(MSWDIR)\$D\fontenum.obj \
+-		$(MSWDIR)\$D\fontutil.obj \
+-		$(MSWDIR)\$D\frame.obj \
+-		$(MSWDIR)\$D\gauge95.obj \
+-		$(MSWDIR)\$D\gdiimage.obj \
+-		$(MSWDIR)\$D\gdiobj.obj \
+-		$(MSWDIR)\$D\glcanvas.obj \
+-		$(MSWDIR)\$D\gsocket.obj \
+-		$(MSWDIR)\$D\gsockmsw.obj \
+-		$(MSWDIR)\$D\helpbest.obj \
+-		$(MSWDIR)\$D\helpchm.obj \
+-		$(MSWDIR)\$D\helpwin.obj \
+-		$(MSWDIR)\$D\icon.obj \
+-		$(MSWDIR)\$D\imaglist.obj \
+-		$(MSWDIR)\$D\iniconf.obj \
+-		$(MSWDIR)\$D\joystick.obj \
+-		$(MSWDIR)\$D\listbox.obj \
+-		$(MSWDIR)\$D\listctrl.obj \
+-		$(MSWDIR)\$D\main.obj \
+-		$(MSWDIR)\$D\mdi.obj \
+-		$(MSWDIR)\$D\menu.obj \
+-		$(MSWDIR)\$D\menuitem.obj \
+-		$(MSWDIR)\$D\metafile.obj \
+-		$(MSWDIR)\$D\mimetype.obj \
+-		$(MSWDIR)\$D\minifram.obj \
+-		$(MSWDIR)\$D\msgdlg.obj \
+-		$(MSWDIR)\$D\mslu.obj \
+-		$(MSWDIR)\$D\nativdlg.obj \
+-		$(MSWDIR)\$D\notebook.obj \
+-		$(OLEDIR)\$D\oleutils.obj \
+-		$(MSWDIR)\$D\ownerdrw.obj \
+-		$(MSWDIR)\$D\palette.obj \
+-		$(MSWDIR)\$D\pen.obj \
+-		$(MSWDIR)\$D\penwin.obj \
+-		$(MSWDIR)\$D\popupwin.obj \
+-		$(MSWDIR)\$D\printdlg.obj \
+-		$(MSWDIR)\$D\printwin.obj \
+-		$(MSWDIR)\$D\radiobox.obj \
+-		$(MSWDIR)\$D\radiobut.obj \
+-		$(MSWDIR)\$D\regconf.obj \
+-		$(MSWDIR)\$D\region.obj \
+-		$(MSWDIR)\$D\registry.obj \
+-		$(MSWDIR)\$D\scrolbar.obj \
+-		$(MSWDIR)\$D\settings.obj \
+-		$(MSWDIR)\$D\slider95.obj \
+-		$(MSWDIR)\$D\snglinst.obj \
+-		$(MSWDIR)\$D\spinbutt.obj \
+-		$(MSWDIR)\$D\spinctrl.obj \
+-		$(MSWDIR)\$D\statbmp.obj \
+-		$(MSWDIR)\$D\statbox.obj \
+-		$(MSWDIR)\$D\statbr95.obj \
+-		$(MSWDIR)\$D\statline.obj \
+-		$(MSWDIR)\$D\stattext.obj \
+-		$(MSWDIR)\$D\tabctrl.obj \
+-		$(MSWDIR)\$D\taskbar.obj \
+-		$(MSWDIR)\$D\tbar95.obj \
+-		$(MSWDIR)\$D\textctrl.obj \
+-		$(MSWDIR)\$D\tglbtn.obj \
+-		$(MSWDIR)\$D\thread.obj \
+-		$(MSWDIR)\$D\timer.obj \
+-		$(MSWDIR)\$D\tooltip.obj \
+-		$(MSWDIR)\$D\toplevel.obj \
+-		$(MSWDIR)\$D\treectrl.obj \
+-		$(MSWDIR)\$D\utils.obj \
+-		$(MSWDIR)\$D\utilsexc.obj \
+-		$(OLEDIR)\$D\uuid.obj \
+-		$(MSWDIR)\$D\uxtheme.obj \
+-		$(MSWDIR)\$D\volume.obj \
+-		$(MSWDIR)\$D\wave.obj \
+-		$(MSWDIR)\$D\window.obj
+-
+-HTMLOBJS = $(HTMLDIR)\$D\helpctrl.obj \
+-		$(HTMLDIR)\$D\helpdata.obj \
+-		$(HTMLDIR)\$D\helpfrm.obj \
+-		$(HTMLDIR)\$D\htmlcell.obj \
+-		$(HTMLDIR)\$D\htmlfilt.obj \
+-		$(HTMLDIR)\$D\htmlpars.obj \
+-		$(HTMLDIR)\$D\htmltag.obj \
+-		$(HTMLDIR)\$D\htmlwin.obj \
+-		$(HTMLDIR)\$D\htmprint.obj \
+-		$(HTMLDIR)\$D\m_dflist.obj \
+-		$(HTMLDIR)\$D\m_fonts.obj \
+-		$(HTMLDIR)\$D\m_hline.obj \
+-		$(HTMLDIR)\$D\m_image.obj \
+-		$(HTMLDIR)\$D\m_layout.obj \
+-		$(HTMLDIR)\$D\m_links.obj \
+-		$(HTMLDIR)\$D\m_list.obj \
+-		$(HTMLDIR)\$D\m_pre.obj \
+-		$(HTMLDIR)\$D\m_style.obj \
+-		$(HTMLDIR)\$D\m_tables.obj \
+-		$(HTMLDIR)\$D\winpars.obj
++		$(COMMDIR)\$(D)\y_tab.obj \
++		$(COMMDIR)\$(D)\appcmn.obj \
++		$(COMMDIR)\$(D)\artprov.obj \
++		$(COMMDIR)\$(D)\artstd.obj \
++		$(COMMDIR)\$(D)\choiccmn.obj \
++		$(COMMDIR)\$(D)\clipcmn.obj \
++		$(COMMDIR)\$(D)\clntdata.obj \
++		$(COMMDIR)\$(D)\cmdline.obj \
++		$(COMMDIR)\$(D)\cmdproc.obj \
++		$(COMMDIR)\$(D)\cmndata.obj \
++		$(COMMDIR)\$(D)\config.obj \
++		$(COMMDIR)\$(D)\containr.obj \
++		$(COMMDIR)\$(D)\cshelp.obj \
++		$(COMMDIR)\$(D)\ctrlcmn.obj \
++		$(COMMDIR)\$(D)\ctrlsub.obj \
++		$(COMMDIR)\$(D)\datetime.obj \
++		$(COMMDIR)\$(D)\datstrm.obj \
++		$(COMMDIR)\$(D)\db.obj \
++		$(COMMDIR)\$(D)\dbgrid.obj \
++		$(COMMDIR)\$(D)\dbtable.obj \
++		$(COMMDIR)\$(D)\dcbase.obj \
++		$(COMMDIR)\$(D)\dircmn.obj \
++		$(COMMDIR)\$(D)\dlgcmn.obj \
++		$(COMMDIR)\$(D)\dndcmn.obj \
++		$(COMMDIR)\$(D)\dobjcmn.obj \
++		$(COMMDIR)\$(D)\docmdi.obj \
++		$(COMMDIR)\$(D)\docview.obj \
++		$(COMMDIR)\$(D)\dseldlg.obj \
++		$(COMMDIR)\$(D)\dynarray.obj \
++		$(COMMDIR)\$(D)\dynlib.obj \
++		$(COMMDIR)\$(D)\dynload.obj \
++		$(COMMDIR)\$(D)\effects.obj \
++		$(COMMDIR)\$(D)\encconv.obj \
++		$(COMMDIR)\$(D)\event.obj \
++		$(COMMDIR)\$(D)\extended.obj \
++		$(COMMDIR)\$(D)\fddlgcmn.obj \
++		$(COMMDIR)\$(D)\ffile.obj \
++		$(COMMDIR)\$(D)\file.obj \
++		$(COMMDIR)\$(D)\fileconf.obj \
++		$(COMMDIR)\$(D)\filefn.obj \
++		$(COMMDIR)\$(D)\filename.obj \
++		$(COMMDIR)\$(D)\filesys.obj \
++		$(COMMDIR)\$(D)\fontcmn.obj \
++		$(COMMDIR)\$(D)\fontmap.obj \
++		$(COMMDIR)\$(D)\framecmn.obj \
++		$(COMMDIR)\$(D)\fs_inet.obj \
++		$(COMMDIR)\$(D)\fs_mem.obj \
++		$(COMMDIR)\$(D)\fs_zip.obj \
++		$(COMMDIR)\$(D)\ftp.obj \
++		$(COMMDIR)\$(D)\gaugecmn.obj \
++		$(COMMDIR)\$(D)\gdicmn.obj \
++		$(COMMDIR)\$(D)\geometry.obj \
++		$(COMMDIR)\$(D)\gifdecod.obj \
++		$(COMMDIR)\$(D)\hash.obj \
++		$(COMMDIR)\$(D)\hashmap.obj \
++		$(COMMDIR)\$(D)\helpbase.obj \
++		$(COMMDIR)\$(D)\http.obj \
++		$(COMMDIR)\$(D)\iconbndl.obj \
++		$(COMMDIR)\$(D)\imagall.obj \
++		$(COMMDIR)\$(D)\imagbmp.obj \
++		$(COMMDIR)\$(D)\image.obj \
++		$(COMMDIR)\$(D)\imagfill.obj \
++		$(COMMDIR)\$(D)\imaggif.obj \
++		$(COMMDIR)\$(D)\imagiff.obj \
++		$(COMMDIR)\$(D)\imagjpeg.obj \
++		$(COMMDIR)\$(D)\imagpcx.obj \
++		$(COMMDIR)\$(D)\imagpng.obj \
++		$(COMMDIR)\$(D)\imagpnm.obj \
++		$(COMMDIR)\$(D)\imagtiff.obj \
++		$(COMMDIR)\$(D)\imagxpm.obj \
++		$(COMMDIR)\$(D)\intl.obj \
++		$(COMMDIR)\$(D)\ipcbase.obj \
++		$(COMMDIR)\$(D)\layout.obj \
++		$(COMMDIR)\$(D)\lboxcmn.obj \
++		$(COMMDIR)\$(D)\list.obj \
++		$(COMMDIR)\$(D)\log.obj \
++		$(COMMDIR)\$(D)\longlong.obj \
++		$(COMMDIR)\$(D)\matrix.obj \
++		$(COMMDIR)\$(D)\memory.obj \
++		$(COMMDIR)\$(D)\menucmn.obj \
++		$(COMMDIR)\$(D)\mimecmn.obj \
++		$(COMMDIR)\$(D)\module.obj \
++		$(COMMDIR)\$(D)\msgout.obj \
++		$(COMMDIR)\$(D)\mstream.obj \
++		$(COMMDIR)\$(D)\nbkbase.obj \
++		$(COMMDIR)\$(D)\object.obj \
++		$(COMMDIR)\$(D)\odbc.obj \
++		$(COMMDIR)\$(D)\paper.obj \
++		$(COMMDIR)\$(D)\popupcmn.obj \
++		$(COMMDIR)\$(D)\prntbase.obj \
++		$(COMMDIR)\$(D)\process.obj \
++		$(COMMDIR)\$(D)\protocol.obj \
++		$(COMMDIR)\$(D)\quantize.obj \
++		$(COMMDIR)\$(D)\radiocmn.obj \
++		$(COMMDIR)\$(D)\regex.obj \
++		$(COMMDIR)\$(D)\resource.obj \
++		$(COMMDIR)\$(D)\rgncmn.obj \
++		$(COMMDIR)\$(D)\sckaddr.obj \
++		$(COMMDIR)\$(D)\sckfile.obj \
++		$(COMMDIR)\$(D)\sckipc.obj \
++		$(COMMDIR)\$(D)\sckstrm.obj \
++		$(COMMDIR)\$(D)\settcmn.obj \
++		$(COMMDIR)\$(D)\sizer.obj \
++		$(COMMDIR)\$(D)\socket.obj \
++		$(COMMDIR)\$(D)\statbar.obj \
++		$(COMMDIR)\$(D)\strconv.obj \
++		$(COMMDIR)\$(D)\stream.obj \
++		$(COMMDIR)\$(D)\string.obj \
++		$(COMMDIR)\$(D)\sysopt.obj \
++		$(COMMDIR)\$(D)\tbarbase.obj \
++		$(COMMDIR)\$(D)\textbuf.obj \
++		$(COMMDIR)\$(D)\textcmn.obj \
++		$(COMMDIR)\$(D)\textfile.obj \
++		$(COMMDIR)\$(D)\timercmn.obj \
++		$(COMMDIR)\$(D)\tokenzr.obj \
++		$(COMMDIR)\$(D)\toplvcmn.obj \
++		$(COMMDIR)\$(D)\treebase.obj \
++		$(COMMDIR)\$(D)\txtstrm.obj \
++		$(COMMDIR)\$(D)\unzip.obj \
++		$(COMMDIR)\$(D)\url.obj \
++		$(COMMDIR)\$(D)\utilscmn.obj \
++		$(COMMDIR)\$(D)\valgen.obj \
++		$(COMMDIR)\$(D)\validate.obj \
++		$(COMMDIR)\$(D)\valtext.obj \
++		$(COMMDIR)\$(D)\variant.obj \
++		$(COMMDIR)\$(D)\wfstream.obj \
++		$(COMMDIR)\$(D)\wincmn.obj \
++		$(COMMDIR)\$(D)\wxchar.obj \
++		$(COMMDIR)\$(D)\wxexpr.obj \
++		$(COMMDIR)\$(D)\xpmdecod.obj \
++		$(COMMDIR)\$(D)\zipstrm.obj \
++		$(COMMDIR)\$(D)\zstream.obj
++
++MSWOBJS = $(MSWDIR)\$(D)\accel.obj \
++		$(MSWDIR)\$(D)\app.obj \
++		$(OLEDIR)\$(D)\automtn.obj \
++		$(MSWDIR)\$(D)\bitmap.obj \
++		$(MSWDIR)\$(D)\bmpbuttn.obj \
++		$(MSWDIR)\$(D)\brush.obj \
++		$(MSWDIR)\$(D)\button.obj \
++		$(MSWDIR)\$(D)\caret.obj \
++		$(MSWDIR)\$(D)\checkbox.obj \
++		$(MSWDIR)\$(D)\checklst.obj \
++		$(MSWDIR)\$(D)\choice.obj \
++		$(MSWDIR)\$(D)\clipbrd.obj \
++		$(MSWDIR)\$(D)\colordlg.obj \
++		$(MSWDIR)\$(D)\colour.obj \
++		$(MSWDIR)\$(D)\combobox.obj \
++		$(MSWDIR)\$(D)\control.obj \
++		$(MSWDIR)\$(D)\curico.obj \
++		$(MSWDIR)\$(D)\cursor.obj \
++		$(MSWDIR)\$(D)\data.obj \
++		$(OLEDIR)\$(D)\dataobj.obj \
++		$(MSWDIR)\$(D)\dc.obj \
++		$(MSWDIR)\$(D)\dcclient.obj \
++		$(MSWDIR)\$(D)\dcmemory.obj \
++		$(MSWDIR)\$(D)\dcprint.obj \
++		$(MSWDIR)\$(D)\dcscreen.obj \
++		$(MSWDIR)\$(D)\dde.obj \
++		$(MSWDIR)\$(D)\dialog.obj \
++		$(MSWDIR)\$(D)\dialup.obj \
++		$(MSWDIR)\$(D)\dib.obj \
++		$(MSWDIR)\$(D)\dibutils.obj \
++		$(MSWDIR)\$(D)\dir.obj \
++		$(MSWDIR)\$(D)\dirdlg.obj \
++		$(MSWDIR)\$(D)\dragimag.obj \
++		$(OLEDIR)\$(D)\dropsrc.obj \
++		$(OLEDIR)\$(D)\droptgt.obj \
++		$(MSWDIR)\$(D)\enhmeta.obj \
++		$(MSWDIR)\$(D)\evtloop.obj \
++		$(MSWDIR)\$(D)\fdrepdlg.obj \
++		$(MSWDIR)\$(D)\filedlg.obj \
++		$(MSWDIR)\$(D)\font.obj \
++		$(MSWDIR)\$(D)\fontdlg.obj \
++		$(MSWDIR)\$(D)\fontenum.obj \
++		$(MSWDIR)\$(D)\fontutil.obj \
++		$(MSWDIR)\$(D)\frame.obj \
++		$(MSWDIR)\$(D)\gauge95.obj \
++		$(MSWDIR)\$(D)\gdiimage.obj \
++		$(MSWDIR)\$(D)\gdiobj.obj \
++		$(MSWDIR)\$(D)\glcanvas.obj \
++		$(MSWDIR)\$(D)\gsocket.obj \
++		$(MSWDIR)\$(D)\gsockmsw.obj \
++		$(MSWDIR)\$(D)\helpbest.obj \
++		$(MSWDIR)\$(D)\helpchm.obj \
++		$(MSWDIR)\$(D)\helpwin.obj \
++		$(MSWDIR)\$(D)\icon.obj \
++		$(MSWDIR)\$(D)\imaglist.obj \
++		$(MSWDIR)\$(D)\iniconf.obj \
++		$(MSWDIR)\$(D)\joystick.obj \
++		$(MSWDIR)\$(D)\listbox.obj \
++		$(MSWDIR)\$(D)\listctrl.obj \
++		$(MSWDIR)\$(D)\main.obj \
++		$(MSWDIR)\$(D)\mdi.obj \
++		$(MSWDIR)\$(D)\menu.obj \
++		$(MSWDIR)\$(D)\menuitem.obj \
++		$(MSWDIR)\$(D)\metafile.obj \
++		$(MSWDIR)\$(D)\mimetype.obj \
++		$(MSWDIR)\$(D)\minifram.obj \
++		$(MSWDIR)\$(D)\msgdlg.obj \
++		$(MSWDIR)\$(D)\mslu.obj \
++		$(MSWDIR)\$(D)\nativdlg.obj \
++		$(MSWDIR)\$(D)\notebook.obj \
++		$(OLEDIR)\$(D)\oleutils.obj \
++		$(MSWDIR)\$(D)\ownerdrw.obj \
++		$(MSWDIR)\$(D)\palette.obj \
++		$(MSWDIR)\$(D)\pen.obj \
++		$(MSWDIR)\$(D)\penwin.obj \
++		$(MSWDIR)\$(D)\popupwin.obj \
++		$(MSWDIR)\$(D)\printdlg.obj \
++		$(MSWDIR)\$(D)\printwin.obj \
++		$(MSWDIR)\$(D)\radiobox.obj \
++		$(MSWDIR)\$(D)\radiobut.obj \
++		$(MSWDIR)\$(D)\regconf.obj \
++		$(MSWDIR)\$(D)\region.obj \
++		$(MSWDIR)\$(D)\registry.obj \
++		$(MSWDIR)\$(D)\scrolbar.obj \
++		$(MSWDIR)\$(D)\settings.obj \
++		$(MSWDIR)\$(D)\slider95.obj \
++		$(MSWDIR)\$(D)\snglinst.obj \
++		$(MSWDIR)\$(D)\spinbutt.obj \
++		$(MSWDIR)\$(D)\spinctrl.obj \
++		$(MSWDIR)\$(D)\statbmp.obj \
++		$(MSWDIR)\$(D)\statbox.obj \
++		$(MSWDIR)\$(D)\statbr95.obj \
++		$(MSWDIR)\$(D)\statline.obj \
++		$(MSWDIR)\$(D)\stattext.obj \
++		$(MSWDIR)\$(D)\tabctrl.obj \
++		$(MSWDIR)\$(D)\taskbar.obj \
++		$(MSWDIR)\$(D)\tbar95.obj \
++		$(MSWDIR)\$(D)\textctrl.obj \
++		$(MSWDIR)\$(D)\tglbtn.obj \
++		$(MSWDIR)\$(D)\thread.obj \
++		$(MSWDIR)\$(D)\timer.obj \
++		$(MSWDIR)\$(D)\tooltip.obj \
++		$(MSWDIR)\$(D)\toplevel.obj \
++		$(MSWDIR)\$(D)\treectrl.obj \
++		$(MSWDIR)\$(D)\utils.obj \
++		$(MSWDIR)\$(D)\utilsexc.obj \
++		$(OLEDIR)\$(D)\uuid.obj \
++		$(MSWDIR)\$(D)\uxtheme.obj \
++		$(MSWDIR)\$(D)\volume.obj \
++		$(MSWDIR)\$(D)\wave.obj \
++		$(MSWDIR)\$(D)\window.obj
++
++HTMLOBJS = $(HTMLDIR)\$(D)\helpctrl.obj \
++		$(HTMLDIR)\$(D)\helpdata.obj \
++		$(HTMLDIR)\$(D)\helpfrm.obj \
++		$(HTMLDIR)\$(D)\htmlcell.obj \
++		$(HTMLDIR)\$(D)\htmlfilt.obj \
++		$(HTMLDIR)\$(D)\htmlpars.obj \
++		$(HTMLDIR)\$(D)\htmltag.obj \
++		$(HTMLDIR)\$(D)\htmlwin.obj \
++		$(HTMLDIR)\$(D)\htmprint.obj \
++		$(HTMLDIR)\$(D)\m_dflist.obj \
++		$(HTMLDIR)\$(D)\m_fonts.obj \
++		$(HTMLDIR)\$(D)\m_hline.obj \
++		$(HTMLDIR)\$(D)\m_image.obj \
++		$(HTMLDIR)\$(D)\m_layout.obj \
++		$(HTMLDIR)\$(D)\m_links.obj \
++		$(HTMLDIR)\$(D)\m_list.obj \
++		$(HTMLDIR)\$(D)\m_pre.obj \
++		$(HTMLDIR)\$(D)\m_style.obj \
++		$(HTMLDIR)\$(D)\m_tables.obj \
++		$(HTMLDIR)\$(D)\winpars.obj
+ 
+ 
+ # Add $(NONESSENTIALOBJS) if wanting generic dialogs, PostScript etc.
+@@ -425,37 +411,37 @@ $(WXDIR)\include\wx\msw\setup.h:
+ $(SETUP_H): $(WXDIR)\include\wx\msw\setup.h
+     copy $(WXDIR)\include\wx\msw\setup.h $@
+ 
+-dirs: $(MSWDIR)\$D $(COMMDIR)\$D $(GENDIR)\$D $(OLEDIR)\$D $(HTMLDIR)\$D $(JPEGDIR)\$D $(TIFFDIR)\$D $(REGEXDIR)\$D $(ARCHINCDIR)\wx $(WXDIR)\$D
++dirs: $(MSWDIR)\$(D) $(COMMDIR)\$(D) $(GENDIR)\$(D) $(OLEDIR)\$(D) $(HTMLDIR)\$(D) $(JPEGDIR)\$(D) $(TIFFDIR)\$(D) $(REGEXDIR)\$(D) $(ARCHINCDIR)\wx $(WXDIR)\$(D)
+ 
+ $D:
+     mkdir $D
+ 
+-$(COMMDIR)\$D:
+-    mkdir $(COMMDIR)\$D
++$(COMMDIR)\$(D):
++    mkdir $(COMMDIR)\$(D)
+ 
+-$(MSWDIR)\$D:
+-    mkdir $(MSWDIR)\$D
++$(MSWDIR)\$(D):
++    mkdir $(MSWDIR)\$(D)
+ 
+-$(GENDIR)\$D:
+-    mkdir $(GENDIR)\$D
++$(GENDIR)\$(D):
++    mkdir $(GENDIR)\$(D)
+ 
+-$(OLEDIR)\$D:
+-    mkdir $(OLEDIR)\$D
++$(OLEDIR)\$(D):
++    mkdir $(OLEDIR)\$(D)
+ 
+-$(HTMLDIR)\$D:
+-    mkdir $(HTMLDIR)\$D
++$(HTMLDIR)\$(D):
++    mkdir $(HTMLDIR)\$(D)
+ 
+-$(JPEGDIR)\$D:
+-    mkdir $(JPEGDIR)\$D
++$(JPEGDIR)\$(D):
++    mkdir $(JPEGDIR)\$(D)
+ 
+-$(TIFFDIR)\$D:
+-    mkdir $(TIFFDIR)\$D
++$(TIFFDIR)\$(D):
++    mkdir $(TIFFDIR)\$(D)
+ 
+-$(REGEXDIR)\$D:
+-    mkdir $(REGEXDIR)\$D
++$(REGEXDIR)\$(D):
++    mkdir $(REGEXDIR)\$(D)
+ 
+-$(WXDIR)\$D:
+-    mkdir $(WXDIR)\$D
++$(WXDIR)\$(D):
++    mkdir $(WXDIR)\$(D)
+ 
+ 
+ # wxWindows library as DLL
+@@ -555,67 +541,67 @@ $(DUMMYOBJ): $(DUMMY).$(SRCSUFF) $(WXDIR)\include\wx\wx.h $(SETUP_H)
+ # Don't forget to put FINAL=1 on the command line.
+ noopt:
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\datetime.obj /c /Tp $(COMMDIR)\datetime.cpp
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\datetime.obj /c /Tp $(COMMDIR)\datetime.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\encconv.obj /c /Tp $(COMMDIR)\encconv.cpp
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\encconv.obj /c /Tp $(COMMDIR)\encconv.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\fileconf.obj /c /Tp $(COMMDIR)\fileconf.cpp
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\fileconf.obj /c /Tp $(COMMDIR)\fileconf.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\hash.obj /c /Tp $(COMMDIR)\hash.cpp
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\hash.obj /c /Tp $(COMMDIR)\hash.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\resource.obj /c /Tp $(COMMDIR)\resource.cpp
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\resource.obj /c /Tp $(COMMDIR)\resource.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$D\textfile.obj /c /Tp $(COMMDIR)\textfile.cpp
++$(CPPFLAGS2) /Od /Fo$(COMMDIR)\$(D)\textfile.obj /c /Tp $(COMMDIR)\textfile.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\choicdgg.obj /c /Tp $(GENDIR)\choicdgg.cpp
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\choicdgg.obj /c /Tp $(GENDIR)\choicdgg.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\grid.obj /c /Tp $(GENDIR)\grid.cpp
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\grid.obj /c /Tp $(GENDIR)\grid.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\gridsel.obj /c /Tp $(GENDIR)\gridsel.cpp
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\gridsel.obj /c /Tp $(GENDIR)\gridsel.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\logg.obj /c /Tp $(GENDIR)\logg.cpp
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\logg.obj /c /Tp $(GENDIR)\logg.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(GENDIR)\$D\proplist.obj /c /Tp $(GENDIR)\proplist.cpp
++$(CPPFLAGS2) /Od /Fo$(GENDIR)\$(D)\proplist.obj /c /Tp $(GENDIR)\proplist.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\clipbrd.obj /c /Tp $(MSWDIR)\clipbrd.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\clipbrd.obj /c /Tp $(MSWDIR)\clipbrd.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\control.obj /c /Tp $(MSWDIR)\control.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\control.obj /c /Tp $(MSWDIR)\control.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\listbox.obj /c /Tp $(MSWDIR)\listbox.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\listbox.obj /c /Tp $(MSWDIR)\listbox.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\mdi.obj /c /Tp $(MSWDIR)\mdi.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\mdi.obj /c /Tp $(MSWDIR)\mdi.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\menu.obj /c /Tp $(MSWDIR)\menu.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\menu.obj /c /Tp $(MSWDIR)\menu.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\notebook.obj /c /Tp $(MSWDIR)\notebook.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\notebook.obj /c /Tp $(MSWDIR)\notebook.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\tbar95.obj /c /Tp $(MSWDIR)\tbar95.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\tbar95.obj /c /Tp $(MSWDIR)\tbar95.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$D\treectrl.obj /c /Tp $(MSWDIR)\treectrl.cpp
++$(CPPFLAGS2) /Od /Fo$(MSWDIR)\$(D)\treectrl.obj /c /Tp $(MSWDIR)\treectrl.cpp
+ <<
+ 	cl @<<
+-$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$D\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
++$(CPPFLAGS2) /Od /Fo$(HTMLDIR)\$(D)\helpfrm.obj /c /Tp $(HTMLDIR)\helpfrm.cpp
+ <<
+ 
+-$(COMMDIR)\$D\y_tab.obj:     $(COMMDIR)\y_tab.c $(COMMDIR)\lex_yy.c
++$(COMMDIR)\$(D)\y_tab.obj:     $(COMMDIR)\y_tab.c $(COMMDIR)\lex_yy.c
+         cl @<<
+ $(CPPFLAGS2) /c $(COMMDIR)\y_tab.c -DUSE_DEFINE -DYY_USE_PROTOS /Fo$@
+ <<
+@@ -628,7 +614,7 @@ $(COMMDIR)\lex_yy.c:    $(COMMDIR)\doslex.c
+ 
+ $(OBJECTS):	$(SETUP_H)
+ 
+-$(COMMDIR)\$D\unzip.obj:     $(COMMDIR)\unzip.c
++$(COMMDIR)\$(D)\unzip.obj:     $(COMMDIR)\unzip.c
+         cl @<<
+ $(CPPFLAGS2) /c $(COMMDIR)\unzip.c /Fo$@
+ <<
+@@ -704,35 +690,35 @@ clean: $(PERIPH_CLEAN_TARGET)
+         -erase *.pdb
+         -erase *.sbr
+         -erase $(WXLIBNAME).pch
+-	-erase $(WXDIR)\$D\$(PCH)
+-	-erase $(WXDIR)\$D\*.pdb
+-	-erase $(WXDIR)\$D\*.obj
+-        -erase $(GENDIR)\$D\*.obj
+-        -erase $(GENDIR)\$D\*.pdb
+-        -erase $(GENDIR)\$D\*.sbr
+-        -erase $(COMMDIR)\$D\*.obj
+-        -erase $(COMMDIR)\$D\*.pdb
+-        -erase $(COMMDIR)\$D\*.sbr
++	-erase $(WXDIR)\$(D)\$(PCH)
++	-erase $(WXDIR)\$(D)\*.pdb
++	-erase $(WXDIR)\$(D)\*.obj
++        -erase $(GENDIR)\$(D)\*.obj
++        -erase $(GENDIR)\$(D)\*.pdb
++        -erase $(GENDIR)\$(D)\*.sbr
++        -erase $(COMMDIR)\$(D)\*.obj
++        -erase $(COMMDIR)\$(D)\*.pdb
++        -erase $(COMMDIR)\$(D)\*.sbr
+         -erase $(COMMDIR)\y_tab.c
+         -erase $(COMMDIR)\lex_yy.c
+-        -erase $(MSWDIR)\$D\*.obj
+-        -erase $(MSWDIR)\$D\*.sbr
+-        -erase $(MSWDIR)\$D\*.pdb
+-        -erase $(MSWDIR)\$D\*.pch
+-        -erase $(OLEDIR)\$D\*.obj
+-        -erase $(OLEDIR)\$D\*.sbr
+-        -erase $(OLEDIR)\$D\*.pdb
+-        -erase $(HTMLDIR)\$D\*.obj
+-        -erase $(HTMLDIR)\$D\*.sbr
+-        -erase $(HTMLDIR)\$D\*.pdb
+-        -erase $(JPEGDIR)\$D\*.obj
+-        -erase $(JPEGDIR)\$D\*.sbr
+-        -erase $(JPEGDIR)\$D\*.idb
+-        -erase $(JPEGDIR)\$D\*.pdb
+-        -erase $(TIFFDIR)\$D\*.obj
+-        -erase $(TIFFDIR)\$D\*.sbr
+-        -erase $(TIFFDIR)\$D\*.pdb
+-        -erase $(TIFFDIR)\$D\*.idb
++        -erase $(MSWDIR)\$(D)\*.obj
++        -erase $(MSWDIR)\$(D)\*.sbr
++        -erase $(MSWDIR)\$(D)\*.pdb
++        -erase $(MSWDIR)\$(D)\*.pch
++        -erase $(OLEDIR)\$(D)\*.obj
++        -erase $(OLEDIR)\$(D)\*.sbr
++        -erase $(OLEDIR)\$(D)\*.pdb
++        -erase $(HTMLDIR)\$(D)\*.obj
++        -erase $(HTMLDIR)\$(D)\*.sbr
++        -erase $(HTMLDIR)\$(D)\*.pdb
++        -erase $(JPEGDIR)\$(D)\*.obj
++        -erase $(JPEGDIR)\$(D)\*.sbr
++        -erase $(JPEGDIR)\$(D)\*.idb
++        -erase $(JPEGDIR)\$(D)\*.pdb
++        -erase $(TIFFDIR)\$(D)\*.obj
++        -erase $(TIFFDIR)\$(D)\*.sbr
++        -erase $(TIFFDIR)\$(D)\*.pdb
++        -erase $(TIFFDIR)\$(D)\*.idb
+         -rmdir $(D)
+         -rmdir $(GENDIR)\$(D)
+         -rmdir $(COMMDIR)\$(D)
+@@ -741,7 +727,7 @@ clean: $(PERIPH_CLEAN_TARGET)
+         -rmdir $(HTMLDIR)\$(D)
+         -rmdir $(JPEGDIR)\$(D)
+         -rmdir $(TIFFDIR)\$(D)
+-	-rmdir $(WXDIR)\$D
++	-rmdir $(WXDIR)\$(D)
+ 
+ # Making documents
+ docs:   allhlp allhtml allpdfrtf allhtb allhtmlhelp
+@@ -930,3 +916,4 @@ makefile.$(MFTYPE) : $(WXWIN)\distrib\msw\tmake\filelist.txt $(WXWIN)\distrib\ms
+ 	tmake -t $(MFTYPE) wxwin.pro -o makefile.$(MFTYPE)
+ 	copy makefile.$(MFTYPE) $(WXWIN)\src\msw
+ 
++
+
+diff --git a/src/zlib/makefile.vc b/src/zlib/makefile.vc
+index a3c7488..331a882 100644
+--- a/src/zlib/makefile.vc
++++ b/src/zlib/makefile.vc
+@@ -15,13 +15,13 @@ FINAL=0
+ !endif
+ 
+ !if "$(FINAL)" == "0"
+-CFLAGS=/nologo /Od $(CRTFLAG) /GX /Fo$@
++CFLAGS=/nologo /Od $(CRTFLAG) /GX
+ _CRTFLAG=/MDd
+ !else if "$(FINAL)" == "hybrid"
+-CFLAGS=/nologo /Ox $(CRTFLAG) /GX /Fo$@
++CFLAGS=/nologo /Ox $(CRTFLAG) /GX
+ _CRTFLAG=/MD
+ !else
+-CFLAGS=/nologo -O2 $(CRTFLAG) /GX /Fo$@
++CFLAGS=/nologo -O2 $(CRTFLAG) /GX
+ _CRTFLAG=/MD
+ !endif
+ 
+@@ -59,48 +59,48 @@ $D:
+     mkdir .\$D
+ 
+ $D\adler32.obj: adler32.c zutil.h zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\compress.obj: compress.c zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\crc32.obj: crc32.c zutil.h zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\deflate.obj: deflate.c deflate.h zutil.h zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\gzio.obj: gzio.c zutil.h zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\infblock.obj: infblock.c zutil.h zlib.h zconf.h infblock.h inftrees.h\
+    infcodes.h infutil.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\infcodes.obj: infcodes.c zutil.h zlib.h zconf.h inftrees.h infutil.h\
+    infcodes.h inffast.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\inflate.obj: inflate.c zutil.h zlib.h zconf.h infblock.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\inftrees.obj: inftrees.c zutil.h zlib.h zconf.h inftrees.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\infutil.obj: infutil.c zutil.h zlib.h zconf.h inftrees.h infutil.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\inffast.obj: inffast.c zutil.h zlib.h zconf.h inftrees.h infutil.h inffast.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\trees.obj: trees.c deflate.h zutil.h zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\uncompr.obj: uncompr.c zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ $D\zutil.obj: zutil.c zutil.h zlib.h zconf.h
+-	$(CC) -c $(CFLAGS) $(*B).c
++	$(CC) -c $(CFLAGS) /Fo$@ $(*B).c
+ 
+ LIBOBJECTS = $(OBJ1) $(OBJ2)
+ 
+

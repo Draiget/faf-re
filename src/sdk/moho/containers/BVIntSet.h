@@ -147,6 +147,14 @@ namespace moho
     [[nodiscard]] bool Contains(unsigned int val) const;
 
     /**
+     * Address: 0x006D3090 (FUN_006D3090, Moho::BVIntSet::Get)
+     *
+     * What it does:
+     * Returns `{this, val}` when the bit exists; otherwise returns `{this, Max()}`.
+     */
+    [[nodiscard]] BVIntSetIndex Get(unsigned int val) const;
+
+    /**
      * Address: 0x004017B0 (FUN_004017B0)
      * Address: 0x100014C0
      *

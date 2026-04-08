@@ -44,6 +44,20 @@ void moho::SSyncFilterMaskBlock::CopyFrom(const SSyncFilterMaskBlock& source)
 }
 
 /**
+ * Address: 0x0073B980 (FUN_0073B980)
+ * Mangled: ??1struct_SimDriverSubObj1@@QAE@@Z
+ *
+ * What it does:
+ * Releases heap-backed lanes for both mask vectors and restores their inline
+ * storage metadata before `geoCams` is destructed by member teardown order.
+ */
+moho::SSyncFilter::~SSyncFilter()
+{
+  maskB.masks.ResetStorageToInline();
+  maskA.masks.ResetStorageToInline();
+}
+
+/**
  * Address: 0x0073DD10 (FUN_0073DD10)
  *
  * What it does:

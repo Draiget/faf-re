@@ -8,6 +8,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/net/IClientManager.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
 
@@ -45,6 +46,21 @@ namespace moho
       handle = nullptr;
     }
   } // namespace
+
+  /**
+   * Address: 0x007C90E0 (FUN_007C90E0, ??1SWldSessionInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Releases owned client-manager bootstrap pointer before regular member
+   * destruction tears down launch-info and map-name lanes.
+   */
+  SWldSessionInfo::~SWldSessionInfo()
+  {
+    if (mClientManager != nullptr) {
+      delete mClientManager;
+      mClientManager = nullptr;
+    }
+  }
 
   /**
    * Address: 0x00412DC0 (FUN_00412DC0)

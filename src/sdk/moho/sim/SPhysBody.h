@@ -33,6 +33,15 @@ namespace moho
     Wm3::Quaternionf mOrientation;    // +0x2C
     Wm3::Vec3f mVelocity;             // +0x3C
     Wm3::Vec3f mWorldImpulse;         // +0x48
+
+    /**
+     * Address: 0x00697E70 (FUN_00697E70, Moho::SPhysBody::GetImpulse)
+     *
+     * What it does:
+     * Projects world impulse into body-axis space with inverse-inertia scaling,
+     * then reconstructs the resulting world impulse vector.
+     */
+    Wm3::Vec3f* GetImpulse(Wm3::Vec3f* out) const;
   };
 
   static_assert(offsetof(SPhysBody, mConstants) == 0x00, "SPhysBody::mConstants offset must be 0x00");

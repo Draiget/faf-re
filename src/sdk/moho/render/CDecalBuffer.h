@@ -72,7 +72,16 @@ namespace moho
      */
     void CleanupTick();
 
-  private:
+    /**
+     * Address: 0x007793D0 (FUN_007793D0, Moho::CDecalBuffer::CreateHandle)
+     *
+     * What it does:
+     * Creates one script-visible decal handle, links it into active tracking,
+     * and initializes per-army visibility flags for the new decal.
+     */
+    [[nodiscard]]
+    CDecalHandle* CreateHandle(const SDecalInfo& info);
+
     /**
      * Address: 0x00779680 (FUN_00779680, sub_779680)
      *
@@ -81,6 +90,7 @@ namespace moho
      */
     void DestroyHandle(CDecalHandle* handle);
 
+  private:
     /**
      * What it does:
      * Delegates one recycle-window tick to `IdPool::Update`.

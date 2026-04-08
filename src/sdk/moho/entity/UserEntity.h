@@ -17,6 +17,7 @@ namespace moho
   class UserCommandQueue;
   class CAniPose;
   class MeshInstance;
+  class CD3DBatchTexture;
   class UserArmy;
   class CSndParams;
   struct REntityBlueprint;
@@ -194,6 +195,15 @@ namespace moho
      * Releases mesh instance and animation pose resources.
      */
     virtual void DestroyMeshInstance();
+
+    /**
+     * Address: 0x007FD3F0 (FUN_007FD3F0, Moho::UserEntity::GetSelectionBracketTexture)
+     *
+     * What it does:
+     * Selects UI selection-bracket texture lane from alliance relation and unit
+     * intel-state flags.
+     */
+    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> GetSelectionBracketTexture(const UserArmy* viewingArmy) const;
 
     /**
      * Address: 0x008B97C0 (FUN_008B97C0,

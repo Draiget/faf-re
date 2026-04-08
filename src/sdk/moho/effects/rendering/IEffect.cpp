@@ -1,8 +1,10 @@
 #include "moho/effects/rendering/IEffect.h"
 
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/misc/Stats.h"
 
 namespace moho
 {
@@ -149,3 +151,31 @@ namespace moho
   void IEffect::OnTick()
   {}
 } // namespace moho
+
+/**
+ * Address: 0x00657C40 (FUN_00657C40, Moho::InstanceCounter<Moho::IEffect>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for effect instance
+ * counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::IEffect>::GetStatItem()
+{
+  static moho::StatItem* sEngineStat_InstanceCounts_IEffect = nullptr;
+  if (sEngineStat_InstanceCounts_IEffect) {
+    return sEngineStat_InstanceCounts_IEffect;
+  }
+
+  std::string statPath("Instance Counts_");
+  const char* const rawTypeName = typeid(moho::IEffect).name();
+  for (const char* it = rawTypeName; it && *it != '\0'; ++it) {
+    if (*it != '_') {
+      statPath.push_back(*it);
+    }
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  sEngineStat_InstanceCounts_IEffect = engineStats->GetItem(statPath.c_str(), true);
+  return sEngineStat_InstanceCounts_IEffect;
+}

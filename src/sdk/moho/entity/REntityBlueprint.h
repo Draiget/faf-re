@@ -5,8 +5,20 @@
 
 #include "boost/weak_ptr.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "moho/collision/ECollisionShape.h"
 #include "moho/sim/SFootprint.h"
+
+namespace gpg
+{
+  class RType;
+}
+
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+}
 
 namespace moho
 {
@@ -32,9 +44,8 @@ namespace moho
     msvc8::string mBlueprintLabel;                            // +0x24 (optional label used by unique-name formatting)
     msvc8::string mSource;                                    // +0x40 (source blueprint path/id string)
     std::uint32_t mCategoryBitIndex;                          // +0x5C
-    std::uint8_t pad_0060_006C[0x0C];                         // +0x60
-    msvc8::string mScriptModule;                              // +0x6C
-    std::uint8_t pad_0088_008C[0x04];                         // +0x88
+    msvc8::vector<msvc8::string> mCategories;                // +0x60
+    msvc8::string mScriptModule;                              // +0x70
     msvc8::string mScriptClass;                               // +0x8C
     ECollisionShape mCollisionShape;                          // +0xA8
     float mSizeX;                                             // +0xAC
@@ -57,6 +68,18 @@ namespace moho
     boost::weak_ptr<CD3DBatchTexture> mStrategicIconSelected; // +0x164
     boost::weak_ptr<CD3DBatchTexture> mStrategicIconOver;     // +0x16C
     boost::weak_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
+
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x00511E80 (FUN_00511E80)
+     * Mangled: ??1REntityBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Releases strategic-icon weak-pointer lanes, destroys derived entity
+     * string/vector fields, then tears down base blueprint ownership lanes.
+     */
+    ~REntityBlueprint();
 
     /**
      * Address: 0x00512060 (FUN_00512060)
@@ -82,6 +105,15 @@ namespace moho
      * Base entity-blueprint unit cast hook. Returns nullptr for the base type.
      */
     [[nodiscard]] const RUnitBlueprint* IsUnitBlueprint() const;
+
+    /**
+     * Address: 0x0050DF90 (FUN_0050DF90, Moho::RBlueprint::GetLuaBlueprint)
+     *
+     * What it does:
+     * Returns `__blueprints[BlueprintOrdinal]` through the base `RBlueprint`
+     * layout prefix shared by `REntityBlueprint`.
+     */
+    [[nodiscard]] LuaPlus::LuaObject GetLuaBlueprint(LuaPlus::LuaState* state) const;
   };
 
   static_assert(offsetof(REntityBlueprint, mOwner) == 0x04, "REntityBlueprint::mOwner offset must be 0x04");
@@ -94,7 +126,10 @@ namespace moho
     offsetof(REntityBlueprint, mCategoryBitIndex) == 0x5C, "REntityBlueprint::mCategoryBitIndex offset must be 0x5C"
   );
   static_assert(
-    offsetof(REntityBlueprint, mScriptModule) == 0x6C, "REntityBlueprint::mScriptModule offset must be 0x6C"
+    offsetof(REntityBlueprint, mCategories) == 0x60, "REntityBlueprint::mCategories offset must be 0x60"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mScriptModule) == 0x70, "REntityBlueprint::mScriptModule offset must be 0x70"
   );
   static_assert(offsetof(REntityBlueprint, mScriptClass) == 0x8C, "REntityBlueprint::mScriptClass offset must be 0x8C");
   static_assert(

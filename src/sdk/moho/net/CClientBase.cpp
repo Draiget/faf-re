@@ -31,7 +31,12 @@ BVIntSet* CClientBase::GetValidCommandSources()
 }
 
 /**
- * Address: 0x0053BE30 (FUN_0053BE30)
+ * Address: 0x0053BE50 (FUN_0053BE50, Moho::CClientBase::~CClientBase)
+ * Address: 0x0053BE30 (FUN_0053BE30, dtor thunk)
+ *
+ * What it does:
+ * Defaulted source owner for base-client teardown; compiler-emitted member
+ * destruction matches the binary non-deleting destructor lane.
  */
 CClientBase::~CClientBase() = default;
 

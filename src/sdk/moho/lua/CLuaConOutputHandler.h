@@ -175,6 +175,24 @@ namespace moho
   CScrLuaInitForm* func_RemoveConsoleOutputReciever_LuaFuncDef();
 
   /**
+   * Address: 0x00BC38F0 (FUN_00BC38F0, register_AddConsoleOutputReciever_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_AddConsoleOutputReciever_LuaFuncDef`.
+   */
+  [[nodiscard]]
+  CScrLuaInitForm* register_AddConsoleOutputReciever_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC3900 (FUN_00BC3900, register_RemoveConsoleOutputReciever_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_RemoveConsoleOutputReciever_LuaFuncDef`.
+   */
+  [[nodiscard]]
+  CScrLuaInitForm* register_RemoveConsoleOutputReciever_LuaFuncDef();
+
+  /**
    * Address: 0x00420910 (FUN_00420910, sub_420910)
    *
    * What it does:

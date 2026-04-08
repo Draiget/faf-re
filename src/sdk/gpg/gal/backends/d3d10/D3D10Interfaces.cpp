@@ -34,6 +34,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <stdexcept>
 
 namespace gpg::gal
 {
@@ -3102,6 +3103,30 @@ namespace gpg::gal
       runtime.end = nullptr;
     }
 
+    /**
+     * Address: 0x008FAA50 (FUN_008FAA50)
+     *
+     * What it does:
+     * Throws the legacy MSVC vector-length error used by effect-macro vector
+     * growth helpers.
+     */
+    [[noreturn]] void ThrowVectorTooLongLengthErrorA()
+    {
+      throw std::length_error("vector<T> too long");
+    }
+
+    /**
+     * Address: 0x008FAAC0 (FUN_008FAAC0)
+     *
+     * What it does:
+     * Throws the legacy MSVC vector-length error used by effect-macro vector
+     * growth helpers.
+     */
+    [[noreturn]] void ThrowVectorTooLongLengthErrorB()
+    {
+      throw std::length_error("vector<T> too long");
+    }
+
     bool TryReserveEffectMacroStorage(EffectContextLane54Runtime& runtime, const std::size_t elementCount) noexcept
     {
       if (elementCount == 0U) {
@@ -3109,6 +3134,10 @@ namespace gpg::gal
         runtime.last = nullptr;
         runtime.end = nullptr;
         return false;
+      }
+
+      if (elementCount > 0x04444444U) {
+        ThrowVectorTooLongLengthErrorA();
       }
 
       try {
@@ -3141,19 +3170,151 @@ namespace gpg::gal
       return write;
     }
 
-    EffectMacro* UninitializedCopyEffectMacroRange(
+    /**
+     * Address: 0x008FAB30 (FUN_008FAB30)
+     *
+     * What it does:
+     * Conditionally copy-constructs one `EffectMacro` entry at destination and
+     * returns destination.
+     */
+    EffectMacro* ConstructEffectMacroIfPresent(EffectMacro* const destination, const EffectMacro& source)
+    {
+      if (destination != nullptr) {
+        ::new (static_cast<void*>(destination)) EffectMacro(source);
+      }
+
+      return destination;
+    }
+
+    /**
+     * Address: 0x0093F810 (FUN_0093F810)
+     *
+     * What it does:
+     * Copy-constructs one contiguous uninitialized destination range from one
+     * source `[first,last)` effect-macro range.
+     */
+    EffectMacro* UninitializedCopyEffectMacroRangeCore(
       const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
     )
     {
       const EffectMacro* read = sourceFirst;
       EffectMacro* write = destinationFirst;
-      while (read != sourceLast) {
-        ::new (static_cast<void*>(write)) EffectMacro(*read);
-        ++read;
-        ++write;
+      try {
+        while (read != sourceLast) {
+          ConstructEffectMacroIfPresent(write, *read);
+          ++read;
+          ++write;
+        }
+      }
+      catch (...) {
+        DestroyEffectMacroRange(destinationFirst, write);
+        throw;
       }
 
       return write;
+    }
+
+    /**
+     * Address: 0x0093FA10 (FUN_0093FA10)
+     *
+     * What it does:
+     * Copy-constructs `count` effect-macro entries from one source entry into
+     * contiguous uninitialized destination lanes.
+     */
+    [[maybe_unused]] EffectMacro* UninitializedFillEffectMacroRangeCore(
+      EffectMacro* destinationFirst, std::size_t count, const EffectMacro& source
+    )
+    {
+      EffectMacro* write = destinationFirst;
+      try {
+        while (count != 0U) {
+          ConstructEffectMacroIfPresent(write, source);
+          ++write;
+          --count;
+        }
+      }
+      catch (...) {
+        DestroyEffectMacroRange(destinationFirst, write);
+        throw;
+      }
+
+      return write;
+    }
+
+    EffectMacro* UninitializedCopyEffectMacroRange(
+      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
+    )
+    {
+      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
+    }
+
+    /**
+     * Address: 0x0093FB20 (FUN_0093FB20)
+     *
+     * What it does:
+     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
+     * helper.
+     */
+    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchA(
+      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
+    )
+    {
+      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
+    }
+
+    /**
+     * Address: 0x0093FBC0 (FUN_0093FBC0)
+     *
+     * What it does:
+     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
+     * helper.
+     */
+    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchB(
+      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
+    )
+    {
+      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
+    }
+
+    /**
+     * Address: 0x0093FC50 (FUN_0093FC50)
+     *
+     * What it does:
+     * Dispatch bridge into the core uninitialized `EffectMacro` fill helper.
+     */
+    [[maybe_unused]] EffectMacro* UninitializedFillEffectMacroRangeDispatchA(
+      EffectMacro* destinationFirst, const std::size_t count, const EffectMacro& source
+    )
+    {
+      return UninitializedFillEffectMacroRangeCore(destinationFirst, count, source);
+    }
+
+    /**
+     * Address: 0x0093FC90 (FUN_0093FC90)
+     *
+     * What it does:
+     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
+     * helper.
+     */
+    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchC(
+      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
+    )
+    {
+      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
+    }
+
+    /**
+     * Address: 0x0093FE80 (FUN_0093FE80)
+     *
+     * What it does:
+     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
+     * helper.
+     */
+    [[maybe_unused]] EffectMacro* UninitializedCopyEffectMacroRangeDispatchD(
+      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
+    )
+    {
+      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
     }
 
     void AssignEffectContextLane54(EffectContextLane54Runtime& destination, const EffectContextLane54Runtime& source)
@@ -3312,6 +3473,40 @@ namespace gpg::gal
       variable->name_.tidy(true, 0U);
     }
 
+    template <class T>
+    void DestroyVectorOwnedStorage(msvc8::vector<T>& storage) noexcept
+    {
+      T* const begin = storage.begin();
+      storage.clear();
+      if (begin != nullptr) {
+        ::operator delete(static_cast<void*>(begin));
+      }
+      storage.reset_range_lanes_preserve_proxy();
+    }
+
+    /**
+     * Address: 0x008FA920 (FUN_008FA920)
+     *
+     * What it does:
+     * Runs `AdapterD3D10` range destruction for one retained adapter vector and
+     * releases the owned storage lane while preserving the proxy lane.
+     */
+    void DestroyDeviceAdapterStorage(msvc8::vector<AdapterD3D10>& adapters) noexcept
+    {
+      DestroyVectorOwnedStorage(adapters);
+    }
+
+    /**
+     * Address: 0x008FAA40 (FUN_008FAA40)
+     *
+     * What it does:
+     * Preserves the one-jump thunk lane into `DestroyDeviceAdapterStorage`.
+     */
+    void DestroyDeviceAdapterStorageThunk(msvc8::vector<AdapterD3D10>& adapters) noexcept
+    {
+      DestroyDeviceAdapterStorage(adapters);
+    }
+
     /**
      * Address: 0x009001B0 (FUN_009001B0)
      *
@@ -3373,6 +3568,29 @@ namespace gpg::gal
       backend->saveTextureToMemoryApi_ = nullptr;
       backend->createDxgiFactoryApi_ = nullptr;
       return result;
+    }
+
+    /**
+     * Address: 0x00900450 (FUN_00900450)
+     *
+     * What it does:
+     * Executes non-deleting destructor body lanes for `DeviceD3D10` by running
+     * runtime reset, then final member teardown/deallocation in binary order.
+     */
+    void DestroyDeviceD3D10Body(DeviceD3D10BackendObject* const backend)
+    {
+      if (backend == nullptr) {
+        return;
+      }
+
+      static_cast<void>(ResetDeviceD3D10Runtime(backend));
+      backend->cursor_.~CursorD3D10();
+      backend->pipelineState_.reset();
+      DestroyVectorOwnedStorage(backend->swapChains_);
+      DestroyDeviceAdapterStorageThunk(backend->adapters_);
+      backend->deviceContext_.~DeviceContext();
+      DestroyVectorOwnedStorage(backend->logStorage_);
+      backend->outputContext_.~OutputContext();
     }
   } // namespace
 
@@ -4932,8 +5150,8 @@ namespace gpg::gal
   void DeviceD3D10::DestroyBackendObject()
   {
     auto* const backend = AsDeviceD3D10BackendObject(this);
-    static_cast<void>(ResetDeviceD3D10Runtime(backend));
-    delete backend;
+    DestroyDeviceD3D10Body(backend);
+    ::operator delete(static_cast<void*>(backend));
   }
 
   /**

@@ -1,6 +1,8 @@
 #include "CUnitCommandQueue.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -8,7 +10,9 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/EUnitCommandQueueStatus.h"
 
 using namespace moho;
 
@@ -67,17 +71,6 @@ namespace
     return out;
   }
 
-  void RefreshQueueHeadType(CUnitCommandQueue& queue)
-  {
-    if (queue.mCommandVec.empty()) {
-      queue.mCommandType = EUnitCommandType::UNITCOMMAND_None;
-      return;
-    }
-
-    CUnitCommand* const headCommand = queue.mCommandVec.front().GetObjectPtr();
-    queue.mCommandType = headCommand ? headCommand->mVarDat.mCmdType : EUnitCommandType::UNITCOMMAND_None;
-  }
-
   [[nodiscard]] bool ShouldMarkOwnerSyncStateForQueueHead(const CUnitCommandQueue& queue)
   {
     if (queue.mCommandVec.empty()) {
@@ -106,6 +99,11 @@ namespace
     default:
       return false;
     }
+  }
+
+  void EmitQueueEvent(CUnitCommandQueue& queue, const EUnitCommandQueueStatus event)
+  {
+    queue.BroadcastEvent(event);
   }
 
   void MarkOwningUnitSyncDirty(Unit* const unit)
@@ -261,6 +259,192 @@ int CUnitCommandQueue::FindCommandIndex(const CmdId cmdId) const
 }
 
 /**
+ * Address: 0x006EDBF0 (FUN_006EDBF0, ?GetCurrentCommand@CUnitCommandQueue@Moho@@QAEPAVCUnitCommand@2@XZ)
+ *
+ * What it does:
+ * Returns the active head command when present.
+ */
+CUnitCommand* CUnitCommandQueue::GetCurrentCommand()
+{
+  if (mCommandVec.empty()) {
+    return nullptr;
+  }
+
+  return mCommandVec.front().GetObjectPtr();
+}
+
+/**
+ * Address: 0x006EDC20 (FUN_006EDC20, ?GetNextCommand@CUnitCommandQueue@Moho@@QAEPAVCUnitCommand@2@XZ)
+ *
+ * What it does:
+ * Returns the queued command immediately after the head command when present.
+ */
+CUnitCommand* CUnitCommandQueue::GetNextCommand()
+{
+  if (mCommandVec.size() < 2u) {
+    return nullptr;
+  }
+
+  return mCommandVec[1].GetObjectPtr();
+}
+
+/**
+ * Address: 0x006EDC50 (FUN_006EDC50, ?GetLastCommand@CUnitCommandQueue@Moho@@QAEPAVCUnitCommand@2@XZ)
+ *
+ * What it does:
+ * Returns the current queue-tail command when present.
+ */
+CUnitCommand* CUnitCommandQueue::GetLastCommand()
+{
+  if (mCommandVec.empty()) {
+    return nullptr;
+  }
+
+  return mCommandVec.back().GetObjectPtr();
+}
+
+/**
+ * Address: 0x006EDC80 (FUN_006EDC80, ?GetCommandInQueue@CUnitCommandQueue@Moho@@QBEPAVCUnitCommand@2@I@Z)
+ *
+ * What it does:
+ * Returns one queued command by index when that slot is valid.
+ */
+CUnitCommand* CUnitCommandQueue::GetCommandInQueue(const unsigned int index) const
+{
+  const std::size_t queueIndex = static_cast<std::size_t>(index);
+  if (queueIndex >= mCommandVec.size()) {
+    return nullptr;
+  }
+
+  return mCommandVec[queueIndex].GetObjectPtr();
+}
+
+/**
+ * Address: 0x00598B90 (FUN_00598B90, ?Finished@CUnitCommandQueue@Moho@@QAE_NXZ)
+ *
+ * What it does:
+ * Returns true when no queued command entries remain.
+ */
+bool CUnitCommandQueue::Finished() const
+{
+  return mCommandVec.empty();
+}
+
+/**
+ * Address: 0x006EDCB0 (FUN_006EDCB0, ?InsertCommandToQueue@CUnitCommandQueue@Moho@@QAEXPAVCUnitCommand@2@H@Z)
+ *
+ * What it does:
+ * Inserts one command into this queue at `index`, updates command digest lanes,
+ * marks refresh state, and emits inserted-event.
+ */
+void CUnitCommandQueue::InsertCommandToQueue(CUnitCommand* const command, const int index)
+{
+  if (!command || !mUnit) {
+    return;
+  }
+
+  Sim* const sim = command->mSim;
+  if (sim != nullptr) {
+    const EntId unitId = mUnit->GetEntityId();
+    const CmdId commandId = command->mConstDat.cmd;
+    sim->Logf(
+      "InsertCommandToQueue, mUnit=0x%08x, cmd=0x%08x\n",
+      static_cast<std::uint32_t>(unitId),
+      static_cast<std::uint32_t>(commandId)
+    );
+    sim->mContext.Update(&unitId, sizeof(unitId));
+    sim->mContext.Update(&commandId, sizeof(commandId));
+  }
+
+  command->AddUnit(mUnit, mCommandVec, index);
+  mNeedsRefresh = true;
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_CommandInserted);
+}
+
+/**
+ * Address: 0x006EDD80 (FUN_006EDD80, ?AddCommandToQueue@CUnitCommandQueue@Moho@@QAEXPAVCUnitCommand@2@@Z)
+ *
+ * What it does:
+ * Selects insertion lane for one command (including patrol-chain ordering)
+ * and forwards into `InsertCommandToQueue`.
+ */
+void CUnitCommandQueue::AddCommandToQueue(CUnitCommand* const command)
+{
+  const int queueSize = static_cast<int>(mCommandVec.size());
+  int insertIndex = queueSize;
+
+  if (
+    command != nullptr && queueSize > 1
+    && (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Patrol
+        || command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_FormPatrol)
+  ) {
+    const CUnitCommand* const head = GetCurrentCommand();
+    if (
+      head != nullptr && (head->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Patrol
+                          || head->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_FormPatrol)
+    ) {
+      int minSerialIndex = 0;
+      std::uint32_t minSerial = std::numeric_limits<std::uint32_t>::max();
+
+      for (int i = 0; i < queueSize; ++i) {
+        const CUnitCommand* const queued = mCommandVec[static_cast<std::size_t>(i)].GetObjectPtr();
+        if (!queued) {
+          continue;
+        }
+
+        const std::uint32_t serial = static_cast<std::uint32_t>(queued->mInstanceSerial);
+        if (serial < minSerial) {
+          minSerial = serial;
+          minSerialIndex = i;
+        }
+      }
+
+      insertIndex = (minSerialIndex > 0) ? minSerialIndex : queueSize;
+    }
+  }
+
+  InsertCommandToQueue(command, insertIndex);
+}
+
+/**
+ * Address: 0x006EDE70 (FUN_006EDE70, ?RemoveFirstCommandFromQueue@CUnitCommandQueue@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Removes the head command and emits needs-refresh/changed events.
+ */
+void CUnitCommandQueue::RemoveFirstCommandFromQueue()
+{
+  if (GetCurrentCommand() == nullptr) {
+    return;
+  }
+
+  if (NeedsUIRefresh()) {
+    MarkOwningUnitSyncDirty(mUnit);
+  }
+
+  mNeedsRefresh = true;
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_NeedsRefresh);
+
+  if (CUnitCommand* const command = GetCurrentCommand()) {
+    command->RemoveUnit(mUnit, mCommandVec);
+    mNeedsRefresh = true;
+    EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Changed);
+  }
+}
+
+/**
+ * Address: 0x006EE260 (FUN_006EE260, ?NeedsUIRefresh@CUnitCommandQueue@Moho@@AAE_NXZ)
+ *
+ * What it does:
+ * Checks whether current queue-head command type requires owner sync/UI
+ * refresh signaling during queue-head transitions.
+ */
+bool CUnitCommandQueue::NeedsUIRefresh()
+{
+  return ShouldMarkOwnerSyncStateForQueueHead(*this);
+}
+
+/**
  * Address: 0x006EDF80 (FUN_006EDF80)
  *
  * What it does:
@@ -270,7 +454,7 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const CUnitCommand* command)
 {
   for (std::size_t i = 0; i < mCommandVec.size(); ++i) {
     if (mCommandVec[i].GetObjectPtr() == command) {
-      return RemoveCommandFromQueue(static_cast<int>(i));
+      return RemoveCommandFromQueue(static_cast<unsigned int>(i));
     }
   }
 
@@ -283,15 +467,19 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const CUnitCommand* command)
  * What it does:
  * Removes a queued command by index and marks queue refresh state.
  */
-bool CUnitCommandQueue::RemoveCommandFromQueue(const int index)
+bool CUnitCommandQueue::RemoveCommandFromQueue(const unsigned int index)
 {
-  if (index < 0 || static_cast<std::size_t>(index) >= mCommandVec.size()) {
+  if (static_cast<std::size_t>(index) >= mCommandVec.size()) {
     return false;
   }
 
   const std::size_t queueIndex = static_cast<std::size_t>(index);
-  if (queueIndex == 0u && ShouldMarkOwnerSyncStateForQueueHead(*this)) {
-    MarkOwningUnitSyncDirty(mUnit);
+  if (queueIndex == 0u) {
+    if (NeedsUIRefresh()) {
+      MarkOwningUnitSyncDirty(mUnit);
+    }
+    mNeedsRefresh = true;
+    EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_NeedsRefresh);
   }
 
   CUnitCommand* const command = mCommandVec[queueIndex].GetObjectPtr();
@@ -301,9 +489,83 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const int index)
     EraseWeakVectorEntry(mCommandVec, queueIndex);
   }
 
-  RefreshQueueHeadType(*this);
   mNeedsRefresh = true;
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Changed);
   return true;
+}
+
+/**
+ * Address: 0x006EDFC0 (FUN_006EDFC0, ?MoveFirstCommandToBackOfQueue@CUnitCommandQueue@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Rotates the current queue-head entry to queue tail and emits a reorder event.
+ */
+void CUnitCommandQueue::MoveFirstCommandToBackOfQueue()
+{
+  if (mCommandVec.size() <= 1u) {
+    return;
+  }
+
+  CUnitCommand* const command = mCommandVec.front().GetObjectPtr();
+  EraseWeakVectorEntry(mCommandVec, 0u);
+  InsertWeakPtrVectorObjectAt(mCommandVec, command, mCommandVec.size());
+
+  mNeedsRefresh = true;
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Reordered);
+}
+
+/**
+ * Address: 0x006EE0B0 (FUN_006EE0B0, ?MoveCommandToBackOfQueue@CUnitCommandQueue@Moho@@QAE_NI@Z)
+ *
+ * What it does:
+ * Finds one queue entry matching the selected command-object identity, moves
+ * it to queue tail, and emits one reorder event.
+ */
+bool CUnitCommandQueue::MoveCommandToBackOfQueue(const unsigned int index)
+{
+  const std::size_t queueSize = mCommandVec.size();
+  const std::size_t requestedIndex = static_cast<std::size_t>(index);
+  if (queueSize == 0u || requestedIndex >= queueSize) {
+    return false;
+  }
+
+  CUnitCommand* const targetCommand = mCommandVec[requestedIndex].GetObjectPtr();
+
+  std::size_t matchedIndex = queueSize;
+  for (std::size_t i = 0; i < queueSize; ++i) {
+    if (mCommandVec[i].GetObjectPtr() == targetCommand) {
+      matchedIndex = i;
+      break;
+    }
+  }
+
+  if (matchedIndex == queueSize) {
+    return false;
+  }
+
+  EraseWeakVectorEntry(mCommandVec, matchedIndex);
+  InsertWeakPtrVectorObjectAt(mCommandVec, targetCommand, mCommandVec.size());
+
+  mNeedsRefresh = true;
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Reordered);
+  return true;
+}
+
+/**
+ * Address: 0x006EE220 (FUN_006EE220)
+ *
+ * What it does:
+ * Finds the first queued slot matching `command` and moves that entry to tail.
+ */
+bool CUnitCommandQueue::MoveCommandToBackOfQueue(const CUnitCommand* const command)
+{
+  for (std::size_t i = 0; i < mCommandVec.size(); ++i) {
+    if (mCommandVec[i].GetObjectPtr() == command) {
+      return MoveCommandToBackOfQueue(static_cast<unsigned int>(i));
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -315,9 +577,11 @@ bool CUnitCommandQueue::RemoveCommandFromQueue(const int index)
  */
 void CUnitCommandQueue::ClearCommandQueue()
 {
-  if (ShouldMarkOwnerSyncStateForQueueHead(*this)) {
+  if (NeedsUIRefresh()) {
     MarkOwningUnitSyncDirty(mUnit);
   }
+
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_Cleared);
 
   while (!mCommandVec.empty()) {
     CUnitCommand* const command = mCommandVec.back().GetObjectPtr();
@@ -329,7 +593,6 @@ void CUnitCommandQueue::ClearCommandQueue()
   }
 
   mCommandType = EUnitCommandType::UNITCOMMAND_None;
-  unk0 = 0;
   mNeedsRefresh = true;
 }
 
@@ -355,4 +618,56 @@ void CUnitCommandQueue::DestroyForUnitKillCleanup()
   ClearCommandQueue();
   ReleaseCommandVectorStorage(mCommandVec);
   ListUnlink();
+}
+
+/**
+ * Address: 0x006EE360 (FUN_006EE360, ?AbortActiveTask@CUnitCommandQueue@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Marks queue refresh state and emits one needs-refresh event.
+ */
+void CUnitCommandQueue::AbortActiveTask()
+{
+  if (NeedsUIRefresh()) {
+    MarkOwningUnitSyncDirty(mUnit);
+  }
+
+  mNeedsRefresh = true;
+  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_NeedsRefresh);
+}
+
+/**
+ * Address: 0x006EE3C0 (FUN_006EE3C0, ?SetCommandCount@CUnitCommandQueue@Moho@@QAEXII@Z)
+ *
+ * What it does:
+ * Sets queued-command count data for one slot, marks command dirty state, and
+ * applies zero-count head/removal transitions.
+ */
+void CUnitCommandQueue::SetCommandCount(const unsigned int index, const unsigned int count)
+{
+  CUnitCommand* const command = GetCommandInQueue(index);
+  if (!command) {
+    mNeedsRefresh = true;
+    return;
+  }
+
+  command->mVarDat.mCount = static_cast<std::int32_t>(count);
+  command->mNeedsUpdate = true;
+
+  if (index == 0u) {
+    if (count == 0u) {
+      AbortActiveTask();
+    }
+    mNeedsRefresh = true;
+    return;
+  }
+
+  if (count == 0u) {
+    CUnitCommandQueue* const ownerQueue = (mUnit != nullptr) ? mUnit->CommandQueue : this;
+    if (ownerQueue != nullptr) {
+      (void)ownerQueue->RemoveCommandFromQueue(index);
+    }
+  }
+
+  mNeedsRefresh = true;
 }

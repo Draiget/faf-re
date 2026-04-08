@@ -14,6 +14,40 @@ namespace
   alignas(CAiNavigatorLandSerializer) unsigned char gCAiNavigatorLandSerializerStorage[sizeof(CAiNavigatorLandSerializer)] = {};
   bool gCAiNavigatorLandSerializerConstructed = false;
 
+  /**
+   * Address: 0x005A7E60 (FUN_005A7E60, j_Moho::CAiNavigatorLand::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiNavigatorLand::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiNavigatorLandMemberSerializeThunk(
+    const moho::CAiNavigatorLand* const navigator, gpg::WriteArchive* const archive
+  )
+  {
+    if (!navigator) {
+      return;
+    }
+
+    moho::CAiNavigatorLand::MemberSerialize(navigator, archive);
+  }
+
+  /**
+   * Address: 0x005A8790 (FUN_005A8790, j_Moho::CAiNavigatorLand::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiNavigatorLand::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiNavigatorLandMemberSerializeThunkSecondary(
+    const moho::CAiNavigatorLand* const navigator, gpg::WriteArchive* const archive
+  )
+  {
+    if (!navigator) {
+      return;
+    }
+
+    moho::CAiNavigatorLand::MemberSerialize(navigator, archive);
+  }
+
   [[nodiscard]] CAiNavigatorLandSerializer* AcquireCAiNavigatorLandSerializer()
   {
     if (!gCAiNavigatorLandSerializerConstructed) {
@@ -107,13 +141,16 @@ void CAiNavigatorLandSerializer::Serialize(
   gpg::WriteArchive* const archive,
   const int objectPtr,
   const int,
-  gpg::RRef* const
+  gpg::RRef* const ownerRef
 )
 {
-  CAiNavigatorLand::MemberSerialize(
-    reinterpret_cast<const CAiNavigatorLand*>(static_cast<std::uintptr_t>(objectPtr)),
-    archive
-  );
+  const auto* const navigator = reinterpret_cast<const CAiNavigatorLand*>(static_cast<std::uintptr_t>(objectPtr));
+  if (ownerRef != nullptr) {
+    CAiNavigatorLand::MemberSerialize(navigator, archive);
+    return;
+  }
+
+  CAiNavigatorLandMemberSerializeThunk(navigator, archive);
 }
 
 /**

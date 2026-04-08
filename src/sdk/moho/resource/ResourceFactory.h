@@ -4,6 +4,7 @@
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/utils/BoostWrappers.h"
+#include "moho/resource/RScmResource.h"
 
 namespace gpg
 {
@@ -280,4 +281,53 @@ namespace moho
       return handle;
     }
   };
+
+  class CScmResourceFactory final : public ResourceFactory<RScmResource>
+  {
+  public:
+    using ResourceHandle = boost::shared_ptr<RScmResource>;
+
+    /**
+     * Address: 0x00539290 (FUN_00539290, Moho::CScmResourceFactory::Load)
+     *
+     * What it does:
+     * Reads one SCM payload from disk, validates minimum byte length, then
+     * materializes one `RScmResource` bound to aliased file bytes.
+     */
+    ResourceHandle& Load(ResourceHandle& outResource, const char* path) override;
+
+    /**
+     * What it does:
+     * Shares the same SCM load lane as `Load` for base template dispatch.
+     */
+    ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
+  };
+
+  /**
+   * Address: 0x00539200 (FUN_00539200, Moho::ResourceFactory_RScmResource::ResourceFactory_RScmResource)
+   *
+   * What it does:
+   * Attaches the process-lifetime SCM resource-factory singleton to
+   * `ResourceManager` and returns it.
+   */
+  [[nodiscard]] CScmResourceFactory* construct_CScmResourceFactory();
+
+  /**
+   * Address: 0x00BC9180 (FUN_00BC9180, register_CScmResourceFactory)
+   *
+   * What it does:
+   * Registers SCM factory startup and schedules process-exit cleanup.
+   */
+  void register_CScmResourceFactory();
+
+  /**
+   * Address: 0x00BF3CA0 (FUN_00BF3CA0, Moho::CScmResourceFactory::~CScmResourceFactory teardown lane)
+   *
+   * What it does:
+   * Detaches SCM factory startup registration from the resource-manager
+   * singleton.
+   */
+  void cleanup_CScmResourceFactory();
+
+  static_assert(sizeof(CScmResourceFactory) == 0x0C, "CScmResourceFactory size must be 0x0C");
 } // namespace moho

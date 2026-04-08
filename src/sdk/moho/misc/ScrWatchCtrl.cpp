@@ -25,8 +25,11 @@ namespace
 
   void SortWatchRootChildren(moho::ScrWatchCtrl& control, const wxTreeItemIdRuntime& rootItem) noexcept
   {
-    (void)control;
-    (void)rootItem;
+    if (!rootItem.IsValid()) {
+      return;
+    }
+
+    control.SortChildren(rootItem);
   }
 
   /**

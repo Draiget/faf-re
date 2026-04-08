@@ -15,6 +15,46 @@ namespace
 
   Serializer gCFireWeaponTaskSerializer{};
 
+  /**
+   * Address: 0x006DD3C0 (FUN_006DD3C0, j_Moho::CFireWeaponTask::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CFireWeaponTask::MemberSerialize`.
+   */
+  [[maybe_unused]] void CFireWeaponTaskMemberSerializeThunk(
+    moho::CFireWeaponTask* const task,
+    gpg::WriteArchive* const archive,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || task == nullptr) {
+      return;
+    }
+
+    moho::CFireWeaponTask::MemberSerialize(archive, task, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x006DE5F0 (FUN_006DE5F0, j_Moho::CFireWeaponTask::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CFireWeaponTask::MemberSerialize`.
+   */
+  [[maybe_unused]] void CFireWeaponTaskMemberSerializeThunkSecondary(
+    moho::CFireWeaponTask* const task,
+    gpg::WriteArchive* const archive,
+    const int version,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || task == nullptr) {
+      return;
+    }
+
+    moho::CFireWeaponTask::MemberSerialize(archive, task, version, ownerRef);
+  }
+
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(Serializer& serializer) noexcept
   {
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
@@ -63,7 +103,13 @@ namespace moho
    */
   void CFireWeaponTaskSerializer::Serialize(gpg::WriteArchive* const archive, int objectPtr, int version, gpg::RRef* ownerRef)
   {
-    CFireWeaponTask::MemberSerialize(archive, reinterpret_cast<const CFireWeaponTask*>(objectPtr), version, ownerRef);
+    auto* const task = reinterpret_cast<CFireWeaponTask*>(objectPtr);
+    if (ownerRef != nullptr) {
+      CFireWeaponTask::MemberSerialize(archive, task, version, ownerRef);
+      return;
+    }
+
+    CFireWeaponTaskMemberSerializeThunk(task, archive, version, ownerRef);
   }
 
   /**

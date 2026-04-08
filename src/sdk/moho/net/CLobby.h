@@ -10,11 +10,16 @@
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Map.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/task/CTask.h"
 #include "SPeer.h"
+
+struct lua_State;
+
 namespace moho
 {
+  class CScrLuaInitForm;
   class SSTICommandSource;
 
   class INetConnector;
@@ -63,7 +68,8 @@ namespace moho
     );
 
     /**
-     * Address: 0x007C0C60 (FUN_007C0C60 deleting wrapper, body via ?1CLobby@Moho@@UAE@XZ)
+     * Address: 0x007C0C60 (FUN_007C0C60 deleting wrapper)
+     * Address: 0x007C1180 (FUN_007C1180, ?1CLobby@Moho@@UAE@XZ non-deleting body)
      *
      * What it does:
      * Tears down lobby connector/socket/wait-handle wiring and destroys peer list.
@@ -195,6 +201,15 @@ namespace moho
     void ProcessEjected();
 
     /**
+     * Address: 0x007C7990 (FUN_007C7990, Moho::CLobby::EjectPeer)
+     *
+     * What it does:
+     * Host-only eject helper that rejects self-eject and unknown uid targets,
+     * then dispatches `KickPeer(peer, reason)` for the matched peer.
+     */
+    void EjectPeer(int32_t id, const char* reason);
+
+    /**
      * Address: 0x007C7190
      *
      * @param address
@@ -220,18 +235,36 @@ namespace moho
     void KickPeer(SPeer* peer, const char* reason);
 
     /**
+     * Address: 0x007C5490 (FUN_007C5490, Moho::CLobby::PushTask)
+     *
+     * What it does:
+     * Runs lobby push-phase network processing for pending connector/socket events.
+     */
+    void PushTask();
+
+    /**
      * Address: 0x007C8CB0 (FUN_007C8CB0, `CPushTask_CLobby::PushTask` wrapper)
      *
      * What it does:
-     * Called by push-task wrapper to execute lobby push-phase network processing.
+     * Wrapper that forwards into `PushTask()`.
      */
     void Push();
+
+    /**
+     * Address: 0x007C56B0 (FUN_007C56B0, Moho::CLobby::PullTask)
+     *
+     * What it does:
+     * When peer replication is dirty, builds one `LOBMSG_EstablishedPeers`
+     * payload, appends all established peer UIDs plus `-1` terminator, and
+     * broadcasts the packet to established peers.
+     */
+    void PullTask();
 
     /**
      * Address: 0x007C8BF0 (FUN_007C8BF0, `CPullTask_CLobby::PullTask` wrapper)
      *
      * What it does:
-     * Called by pull-task wrapper to execute lobby pull-phase replication.
+     * Wrapper that forwards into `PullTask()`.
      */
     void Pull();
 
@@ -274,6 +307,15 @@ namespace moho
      * @param dat
      */
     void LaunchGame(const LuaPlus::LuaObject& dat);
+
+    /**
+     * Address: 0x007C5240 (FUN_007C5240, Moho::CLobby::DebugDump)
+     *
+     * What it does:
+     * Logs one summary line for each lobby peer and forwards to connector
+     * debug hook.
+     */
+    void DebugDump();
 
     /**
      * Address: 0x007C4E80 (FUN_007C4E80)
@@ -326,4 +368,297 @@ namespace moho
   static_assert(offsetof(CLobby, mNextId) == 0xBC, "mNextId offset");
   static_assert(offsetof(CLobby, mSocket) == 0xC0, "mSocket offset");
   static_assert(offsetof(CLobby, hostedTime) == 0xC4, "hostedTime offset");
+
+  template <>
+  class CScrLuaMetatableFactory<CLobby> final : public CScrLuaObjectFactory
+  {
+  public:
+    [[nodiscard]] static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(sizeof(CScrLuaMetatableFactory<CLobby>) == 0x08, "CScrLuaMetatableFactory<CLobby> size must be 0x08");
+
+  /**
+   * Address: 0x007C13E0 (FUN_007C13E0, cfunc_CLobbyDestroy)
+   */
+  int cfunc_CLobbyDestroy(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C1460 (FUN_007C1460, cfunc_CLobbyDestroyL)
+   */
+  int cfunc_CLobbyDestroyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C1400 (FUN_007C1400, func_CLobbyDestroy_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyDestroy_LuaFuncDef();
+
+  /**
+   * Address: 0x007C1530 (FUN_007C1530, cfunc_CLobbyMakeValidGameName)
+   */
+  int cfunc_CLobbyMakeValidGameName(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C15B0 (FUN_007C15B0, cfunc_CLobbyMakeValidGameNameL)
+   */
+  int cfunc_CLobbyMakeValidGameNameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C1550 (FUN_007C1550, func_CLobbyMakeValidGameName_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyMakeValidGameName_LuaFuncDef();
+
+  /**
+   * Address: 0x007C18D0 (FUN_007C18D0, cfunc_CLobbyMakeValidPlayerName)
+   */
+  int cfunc_CLobbyMakeValidPlayerName(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C1950 (FUN_007C1950, cfunc_CLobbyMakeValidPlayerNameL)
+   */
+  int cfunc_CLobbyMakeValidPlayerNameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C18F0 (FUN_007C18F0, func_CLobbyMakeValidPlayerName_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyMakeValidPlayerName_LuaFuncDef();
+
+  /**
+   * Address: 0x007C1C80 (FUN_007C1C80, cfunc_CLobbyHostGame)
+   */
+  int cfunc_CLobbyHostGame(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C1CA0 (FUN_007C1CA0, func_CLobbyHostGame_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyHostGame_LuaFuncDef();
+
+  /**
+   * Address: 0x007C1D00 (FUN_007C1D00, cfunc_CLobbyHostGameL)
+   */
+  int cfunc_CLobbyHostGameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C1FA0 (FUN_007C1FA0, cfunc_CLobbyJoinGame)
+   */
+  int cfunc_CLobbyJoinGame(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C1FC0 (FUN_007C1FC0, func_CLobbyJoinGame_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyJoinGame_LuaFuncDef();
+
+  /**
+   * Address: 0x007C2020 (FUN_007C2020, cfunc_CLobbyJoinGameL)
+   */
+  int cfunc_CLobbyJoinGameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C2350 (FUN_007C2350, cfunc_CLobbyBroadcastData)
+   */
+  int cfunc_CLobbyBroadcastData(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C2370 (FUN_007C2370, func_CLobbyBroadcastData_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyBroadcastData_LuaFuncDef();
+
+  /**
+   * Address: 0x007C23D0 (FUN_007C23D0, cfunc_CLobbyBroadcastDataL)
+   */
+  int cfunc_CLobbyBroadcastDataL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C2650 (FUN_007C2650, cfunc_CLobbySendData)
+   */
+  int cfunc_CLobbySendData(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C26D0 (FUN_007C26D0, cfunc_CLobbySendDataL)
+   */
+  int cfunc_CLobbySendDataL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C2670 (FUN_007C2670, func_CLobbySendData_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbySendData_LuaFuncDef();
+
+  /**
+   * Address: 0x007C2B00 (FUN_007C2B00, cfunc_CLobbyGetPeers)
+   */
+  int cfunc_CLobbyGetPeers(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C2B20 (FUN_007C2B20, func_CLobbyGetPeers_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyGetPeers_LuaFuncDef();
+
+  /**
+   * Address: 0x007C2B80 (FUN_007C2B80, cfunc_CLobbyGetPeersL)
+   */
+  int cfunc_CLobbyGetPeersL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C2C60 (FUN_007C2C60, cfunc_CLobbyGetPeer)
+   */
+  int cfunc_CLobbyGetPeer(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C2C80 (FUN_007C2C80, func_CLobbyGetPeer_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyGetPeer_LuaFuncDef();
+
+  /**
+   * Address: 0x007C2CE0 (FUN_007C2CE0, cfunc_CLobbyGetPeerL)
+   */
+  int cfunc_CLobbyGetPeerL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C2DF0 (FUN_007C2DF0, cfunc_CLobbyGetLocalPlayerName)
+   */
+  int cfunc_CLobbyGetLocalPlayerName(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C2E10 (FUN_007C2E10, func_CLobbyGetLocalPlayerName_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyGetLocalPlayerName_LuaFuncDef();
+
+  /**
+   * Address: 0x007C2E70 (FUN_007C2E70, cfunc_CLobbyGetLocalPlayerNameL)
+   */
+  int cfunc_CLobbyGetLocalPlayerNameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C2F40 (FUN_007C2F40, cfunc_CLobbyGetLocalPlayerID)
+   */
+  int cfunc_CLobbyGetLocalPlayerID(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C2F60 (FUN_007C2F60, func_CLobbyGetLocalPlayerID_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyGetLocalPlayerID_LuaFuncDef();
+
+  /**
+   * Address: 0x007C2FC0 (FUN_007C2FC0, cfunc_CLobbyGetLocalPlayerIDL)
+   */
+  int cfunc_CLobbyGetLocalPlayerIDL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C3090 (FUN_007C3090, cfunc_CLobbyIsHost)
+   */
+  int cfunc_CLobbyIsHost(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C30B0 (FUN_007C30B0, func_CLobbyIsHost_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyIsHost_LuaFuncDef();
+
+  /**
+   * Address: 0x007C3110 (FUN_007C3110, cfunc_CLobbyIsHostL)
+   */
+  int cfunc_CLobbyIsHostL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C31D0 (FUN_007C31D0, cfunc_CLobbyGetLocalPort)
+   */
+  int cfunc_CLobbyGetLocalPort(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C31F0 (FUN_007C31F0, func_CLobbyGetLocalPort_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyGetLocalPort_LuaFuncDef();
+
+  /**
+   * Address: 0x007C3250 (FUN_007C3250, cfunc_CLobbyGetLocalPortL)
+   */
+  int cfunc_CLobbyGetLocalPortL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C3340 (FUN_007C3340, cfunc_CLobbyEjectPeer)
+   */
+  int cfunc_CLobbyEjectPeer(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C33C0 (FUN_007C33C0, cfunc_CLobbyEjectPeerL)
+   */
+  int cfunc_CLobbyEjectPeerL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C3360 (FUN_007C3360, func_CLobbyEjectPeer_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyEjectPeer_LuaFuncDef();
+
+  /**
+   * Address: 0x007C34D0 (FUN_007C34D0, cfunc_CLobbyConnectToPeer)
+   */
+  int cfunc_CLobbyConnectToPeer(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C34F0 (FUN_007C34F0, func_CLobbyConnectToPeer_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyConnectToPeer_LuaFuncDef();
+
+  /**
+   * Address: 0x007C3550 (FUN_007C3550, cfunc_CLobbyConnectToPeerL)
+   */
+  int cfunc_CLobbyConnectToPeerL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C3760 (FUN_007C3760, cfunc_CLobbyDisconnectFromPeer)
+   */
+  int cfunc_CLobbyDisconnectFromPeer(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C3780 (FUN_007C3780, func_CLobbyDisconnectFromPeer_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyDisconnectFromPeer_LuaFuncDef();
+
+  /**
+   * Address: 0x007C37E0 (FUN_007C37E0, cfunc_CLobbyDisconnectFromPeerL)
+   */
+  int cfunc_CLobbyDisconnectFromPeerL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C50E0 (FUN_007C50E0, cfunc_CLobbyLaunchGame)
+   */
+  int cfunc_CLobbyLaunchGame(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C5100 (FUN_007C5100, func_CLobbyLaunchGame_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyLaunchGame_LuaFuncDef();
+
+  /**
+   * Address: 0x007C5160 (FUN_007C5160, cfunc_CLobbyLaunchGameL)
+   */
+  int cfunc_CLobbyLaunchGameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C5360 (FUN_007C5360, cfunc_CLobbyDebugDump)
+   */
+  int cfunc_CLobbyDebugDump(lua_State* luaContext);
+
+  /**
+   * Address: 0x007C5380 (FUN_007C5380, func_CLobbyDebugDump_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CLobbyDebugDump_LuaFuncDef();
+
+  /**
+   * Address: 0x007C53E0 (FUN_007C53E0, cfunc_CLobbyDebugDumpL)
+   */
+  int cfunc_CLobbyDebugDumpL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007C8300 (FUN_007C8300, func_ValidateIPAddress_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `ValidateIPAddress`.
+   */
+  CScrLuaInitForm* func_ValidateIPAddress_LuaFuncDef();
 } // namespace moho
