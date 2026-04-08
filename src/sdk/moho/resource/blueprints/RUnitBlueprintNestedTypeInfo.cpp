@@ -206,11 +206,6 @@ namespace
     return CachedType<std::uint32_t>();
   }
 
-  [[nodiscard]] gpg::RType* CachedUInt8Type()
-  {
-    return CachedType<std::uint8_t>();
-  }
-
   [[nodiscard]] gpg::RType* CachedStringType()
   {
     return CachedType<msvc8::string>();
@@ -219,21 +214,6 @@ namespace
   [[nodiscard]] gpg::RType* CachedRResIdType()
   {
     return CachedType<moho::RResId>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedVectorStringType()
-  {
-    return CachedType<msvc8::vector<msvc8::string>>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedVectorOccupyRectType()
-  {
-    return CachedType<msvc8::vector<moho::RUnitBlueprintOccupyRect>>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedVectorRaisedPlatformType()
-  {
-    return CachedType<msvc8::vector<moho::RUnitBlueprintRaisedPlatform>>();
   }
 
   [[nodiscard]] gpg::RType* CachedCommandCapsType()
@@ -351,6 +331,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x005252A0 (FUN_005252A0, gpg::RType::AddField_ERuleBPUnitCommandCaps_0x0CommandCaps)
+   *
+   * What it does:
+   * Appends the reflected `CommandCaps` field descriptor at offset `0x00`.
+   */
+  gpg::RField* RUnitBlueprintGeneralTypeInfo::AddFieldCommandCaps(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("CommandCaps", CachedCommandCapsType(), 0x00, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x00525320 (FUN_00525320, gpg::RType::AddField_ERuleBPUnitToggleCaps_0x4ToggleCaps)
+   *
+   * What it does:
+   * Appends the reflected `ToggleCaps` field descriptor at offset `0x04`.
+   */
+  gpg::RField* RUnitBlueprintGeneralTypeInfo::AddFieldToggleCaps(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("ToggleCaps", CachedToggleCapsType(), 0x04, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
    * Address: 0x00520660 (FUN_00520660)
    *
    * What it does:
@@ -358,8 +372,14 @@ namespace moho
    */
   void RUnitBlueprintGeneralTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "CommandCaps", CachedCommandCapsType(), 0x00, "Command capability flags for this unit");
-    AddFieldWithDescription(typeInfo, "ToggleCaps", CachedToggleCapsType(), 0x04, "Command capability flags for this unit");
+    gpg::RField* const commandCapsField = AddFieldCommandCaps(typeInfo);
+    commandCapsField->v4 = 3;
+    commandCapsField->mDesc = "Command capability flags for this unit";
+
+    gpg::RField* const toggleCapsField = AddFieldToggleCaps(typeInfo);
+    toggleCapsField->v4 = 3;
+    toggleCapsField->mDesc = "Command capability flags for this unit";
+
     AddFieldWithDescription(typeInfo, "UpgradesTo", CachedRResIdType(), 8, "What unit, if any, does this unit upgrade to.");
     AddFieldWithDescription(typeInfo, "UpgradesFrom", CachedRResIdType(), 36, "What unit, if any, was this unit upgrade from.");
     AddFieldWithDescription(
@@ -483,6 +503,87 @@ namespace moho
   }
 
   /**
+   * Address: 0x005253A0 (FUN_005253A0, gpg::RType::AddField_ERuleBPUnitMovementType)
+   *
+   * What it does:
+   * Appends a reflected movement-type field descriptor at the requested offset.
+   */
+  gpg::RField* RUnitBlueprintPhysicsTypeInfo::AddFieldMovementType(
+    gpg::RType* const typeInfo,
+    const char* const fieldName,
+    const int offset
+  )
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField(fieldName, CachedMovementType(), offset, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x00525420 (FUN_00525420, gpg::RType::AddField_ELayer_0x7CBuildOnLayerCaps)
+   *
+   * What it does:
+   * Appends the reflected `BuildOnLayerCaps` field descriptor at offset `0x7C`.
+   */
+  gpg::RField* RUnitBlueprintPhysicsTypeInfo::AddFieldBuildOnLayerCaps(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("BuildOnLayerCaps", CachedLayerType(), 0x7C, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x005254A0 (FUN_005254A0, gpg::RType::AddField_ERuleBPUnitBuildRestriction_0x80BuildRestriction)
+   *
+   * What it does:
+   * Appends the reflected `BuildRestriction` field descriptor at offset `0x80`.
+   */
+  gpg::RField* RUnitBlueprintPhysicsTypeInfo::AddFieldBuildRestriction(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("BuildRestriction", CachedBuildRestrictionType(), 0x80, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x00525520 (FUN_00525520, gpg::RType::AddField_vector_float)
+   *
+   * What it does:
+   * Appends a reflected `vector<float>` field descriptor.
+   */
+  gpg::RField* RUnitBlueprintPhysicsTypeInfo::AddFieldVectorFloat(
+    gpg::RType* const typeInfo,
+    const char* const fieldName,
+    const int offset
+  )
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    static gpg::RType* cachedVectorFloatType = nullptr;
+    if (!cachedVectorFloatType) {
+      cachedVectorFloatType = gpg::LookupRType(typeid(msvc8::vector<float>));
+    }
+
+    typeInfo->fields_.push_back(gpg::RField(fieldName, cachedVectorFloatType, offset, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
    * Address: 0x00520A40 (FUN_00520A40)
    *
    * What it does:
@@ -520,8 +621,12 @@ namespace moho
       0x14,
       "Maximum elevation difference across skirt for build site"
     );
-    AddFieldWithDescription(typeInfo, "MotionType", CachedMovementType(), 0x18, "Method of locomotion");
-    AddFieldWithDescription(typeInfo, "AltMotionType", CachedMovementType(), 0x1C, "Alternate method of locomotion");
+    gpg::RField* const motionTypeField = AddFieldMovementType(typeInfo, "MotionType", 0x18);
+    motionTypeField->v4 = 3;
+    motionTypeField->mDesc = "Method of locomotion";
+    gpg::RField* const altMotionTypeField = AddFieldMovementType(typeInfo, "AltMotionType", 0x1C);
+    altMotionTypeField->v4 = 3;
+    altMotionTypeField->mDesc = "Alternate method of locomotion";
     AddFieldWithDescription(typeInfo, "StandUpright", CachedBoolType(), 0x20, "Stands upright regardless of terrain");
     AddFieldWithDescription(typeInfo, "SinkLower", CachedBoolType(), 0x21, "Stands upright regardless of terrain");
     AddFieldWithDescription(
@@ -603,20 +708,12 @@ namespace moho
       0x68,
       "Preferred attack height when attacking ground targets... used by dive bombers"
     );
-    AddFieldWithDescription(
-      typeInfo,
-      "BuildOnLayerCaps",
-      CachedLayerType(),
-      0x7C,
-      "Unit may be built on these layers (only applies to structures"
-    );
-    AddFieldWithDescription(
-      typeInfo,
-      "BuildRestriction",
-      CachedBuildRestrictionType(),
-      0x80,
-      "Special build restrictions (mass deposit, thermal vent, etc)"
-    );
+    gpg::RField* const buildOnLayerCapsField = AddFieldBuildOnLayerCaps(typeInfo);
+    buildOnLayerCapsField->v4 = 3;
+    buildOnLayerCapsField->mDesc = "Unit may be built on these layers (only applies to structures";
+    gpg::RField* const buildRestrictionField = AddFieldBuildRestriction(typeInfo);
+    buildRestrictionField->v4 = 3;
+    buildRestrictionField->mDesc = "Special build restrictions (mass deposit, thermal vent, etc)";
     AddFieldWithDescription(
       typeInfo,
       "CatchUpAcc",
@@ -649,23 +746,15 @@ namespace moho
     AddFieldWithDescription(typeInfo, "FuelRechargeRate", CachedFloatType(), 0x90, "Unit fuels up at this rate per second");
     AddFieldWithDescription(typeInfo, "GroundCollisionOffset", CachedFloatType(), 0x94, "Collision with ground offset");
 
-    AddFieldWithDescription(
-      typeInfo,
-      "RaisedPlatforms",
-      CachedVectorRaisedPlatformType(),
-      0xA8,
-      "Raised platoform definition for ground units to move on"
-    );
-    SetLastFieldName(typeInfo, "RaisedPlatforms");
+    gpg::RField* const raisedPlatformsField = AddFieldVectorFloat(typeInfo, "RaisedPlatforms", 0xA8);
+    raisedPlatformsField->mName = "RaisedPlatforms";
+    raisedPlatformsField->v4 = 3;
+    raisedPlatformsField->mDesc = "Raised platoform definition for ground units to move on";
 
-    AddFieldWithDescription(
-      typeInfo,
-      "OccupyRects",
-      CachedVectorOccupyRectType(),
-      0x98,
-      "Set up the occupy rectangles of the unit that will override the footprint."
-    );
-    SetLastFieldName(typeInfo, "OccupyRects");
+    gpg::RField* const occupyRectsField = AddFieldVectorFloat(typeInfo, "OccupyRects", 0x98);
+    occupyRectsField->mName = "OccupyRects";
+    occupyRectsField->v4 = 3;
+    occupyRectsField->mDesc = "Set up the occupy rectangles of the unit that will override the footprint.";
   }
 
   /**
@@ -1040,13 +1129,9 @@ namespace moho
       48,
       "Thie is the beacon that this unit will create under some circumstances"
     );
-    AddFieldWithDescription(
-      typeInfo,
-      "TargetBones",
-      CachedVectorStringType(),
-      76,
-      "Some target bones setup for other units to aim at instead of the default center pos"
-    );
+    gpg::RField* const targetBonesField = typeInfo->AddFieldVectorString("TargetBones", 76);
+    targetBonesField->v4 = 3;
+    targetBonesField->mDesc = "Some target bones setup for other units to aim at instead of the default center pos";
     AddFieldWithDescription(
       typeInfo,
       "RefuelingMultiplier",
@@ -1128,6 +1213,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x005255A0 (FUN_005255A0, gpg::RType::AddField_RUnitBlueprintDefenseShield_0x38Shield)
+   *
+   * What it does:
+   * Appends the reflected `Shield` field descriptor at offset `0x38`.
+   */
+  gpg::RField* RUnitBlueprintDefenseTypeInfo::AddFieldShield(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("Shield", CachedDefenseShieldType(), 0x38, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
    * Address: 0x00521AB0 (FUN_00521AB0)
    *
    * What it does:
@@ -1167,7 +1269,9 @@ namespace moho
       "Amount of threat this poses to the enemy air units"
     );
     AddFieldWithDescription(typeInfo, "ArmorType", CachedStringType(), 28, "The Armor type name");
-    AddFieldWithDescription(typeInfo, "Shield", CachedDefenseShieldType(), 0x38, "Shield information");
+    gpg::RField* const shieldField = AddFieldShield(typeInfo);
+    shieldField->v4 = 3;
+    shieldField->mDesc = "Shield information";
   }
 
   /**
@@ -1206,6 +1310,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x00525620 (FUN_00525620, gpg::RType::AddFieldSMinMaxUint)
+   *
+   * What it does:
+   * Appends a reflected `SMinMax<uint32_t>` field descriptor.
+   */
+  gpg::RField* RUnitBlueprintIntelTypeInfo::AddFieldSMinMaxUInt(
+    gpg::RType* const typeInfo,
+    const char* const fieldName,
+    const int offset
+  )
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField(fieldName, CachedSMinMaxUInt32Type(), offset, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
    * Address: 0x00521CB0 (FUN_00521CB0)
    *
    * What it does:
@@ -1237,9 +1362,15 @@ namespace moho
       "How far our sonar stealth goes"
     );
     AddFieldWithDescription(typeInfo, "CloakFieldRadius", CachedUInt32Type(), 0x20, "How far our cloaking goes");
-    AddFieldWithDescription(typeInfo, "JamRadius", CachedSMinMaxUInt32Type(), 0x24, "How far we create fake blips");
-    AddFieldWithDescription(typeInfo, "SpoofRadius", CachedSMinMaxUInt32Type(), 0x30, "How far off to displace blip");
-    AddFieldWithDescription(typeInfo, "JammerBlips", CachedUInt8Type(), 0x2C, "How many blips does a jammer produce?");
+    gpg::RField* const jamRadiusField = AddFieldSMinMaxUInt(typeInfo, "JamRadius", 0x24);
+    jamRadiusField->v4 = 3;
+    jamRadiusField->mDesc = "How far we create fake blips";
+    gpg::RField* const spoofRadiusField = AddFieldSMinMaxUInt(typeInfo, "SpoofRadius", 0x30);
+    spoofRadiusField->v4 = 3;
+    spoofRadiusField->mDesc = "How far off to displace blip";
+    gpg::RField* const jammerBlipsField = typeInfo->AddFieldUChar("JammerBlips", 0x2C);
+    jammerBlipsField->v4 = 3;
+    jammerBlipsField->mDesc = "How many blips does a jammer produce?";
   }
 
   /**
@@ -1306,22 +1437,14 @@ namespace moho
       "Produces resouce naturally and does not consume anything"
     );
 
-    AddFieldWithDescription(
-      typeInfo,
-      "BuildableCategories",
-      CachedVectorStringType(),
-      0x1C,
-      "One of the unit categories that can be built by this unit"
-    );
+    gpg::RField* const buildableCategoriesField = typeInfo->AddFieldVectorString("BuildableCategories", 0x1C);
+    buildableCategoriesField->v4 = 3;
+    buildableCategoriesField->mDesc = "One of the unit categories that can be built by this unit";
     SetLastFieldName(typeInfo, "BuildableCategory");
 
-    AddFieldWithDescription(
-      typeInfo,
-      "RebuildBonusIds",
-      CachedVectorStringType(),
-      0x2C,
-      "You will get bonus if you rebuild this unit over the wreckage of these wreckages"
-    );
+    gpg::RField* const rebuildBonusIdsField = typeInfo->AddFieldVectorString("RebuildBonusIds", 0x2C);
+    rebuildBonusIdsField->v4 = 3;
+    rebuildBonusIdsField->mDesc = "You will get bonus if you rebuild this unit over the wreckage of these wreckages";
 
     AddFieldWithDescription(typeInfo, "InitialRallyX", CachedFloatType(), 0x68, "default rally point Xfor the factory");
     AddFieldWithDescription(typeInfo, "InitialRallyZ", CachedFloatType(), 0x6C, "default rally point Z for the factory");
@@ -1391,6 +1514,57 @@ namespace moho
   }
 
   /**
+   * Address: 0x005256A0 (FUN_005256A0, gpg::RType::AddField_UnitWeaponRangeCategory_0x40RangeCategory)
+   *
+   * What it does:
+   * Appends the reflected `RangeCategory` field descriptor at offset `0x40`.
+   */
+  gpg::RField* RUnitBlueprintWeaponTypeInfo::AddFieldRangeCategory(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("RangeCategory", CachedWeaponRangeCategoryType(), 0x40, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x00525720 (FUN_00525720, gpg::RType::AddField_ERuleBPUnitWeaponBallisticArc_0xE4BallisticArc)
+   *
+   * What it does:
+   * Appends the reflected `BallisticArc` field descriptor at offset `0xE4`.
+   */
+  gpg::RField* RUnitBlueprintWeaponTypeInfo::AddFieldBallisticArc(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("BallisticArc", CachedWeaponBallisticArcType(), 0xE4, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
+   * Address: 0x005257A0 (FUN_005257A0, gpg::RType::AddField_ERuleBPUnitWeaponTargetType_0x130TargetType)
+   *
+   * What it does:
+   * Appends the reflected `TargetType` field descriptor at offset `0x130`.
+   */
+  gpg::RField* RUnitBlueprintWeaponTypeInfo::AddFieldTargetType(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("TargetType", CachedWeaponTargetType(), 0x130, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
    * Address: 0x00522340 (FUN_00522340)
    *
    * What it does:
@@ -1400,7 +1574,9 @@ namespace moho
   {
     AddFieldWithDescription(typeInfo, "Label", CachedStringType(), 8, "The label to pass to scripts to id this weapon.");
     AddFieldWithDescription(typeInfo, "DisplayName", CachedStringType(), 0x24, "The display name of this weapon.");
-    AddFieldWithDescription(typeInfo, "RangeCategory", CachedWeaponRangeCategoryType(), 0x40, "The range category this weapon satisfies.");
+    gpg::RField* const rangeCategoryField = AddFieldRangeCategory(typeInfo);
+    rangeCategoryField->v4 = 3;
+    rangeCategoryField->mDesc = "The range category this weapon satisfies.";
     AddFieldWithDescription(
       typeInfo,
       "DummyWeapon",
@@ -1505,7 +1681,9 @@ namespace moho
     AddFieldWithDescription(typeInfo, "DamageType", CachedStringType(), 0xA8, "Type of damage this weapon deals");
     AddFieldWithDescription(typeInfo, "RateOfFire", CachedFloatType(), 0xC4, "How many shots/second we can fire.");
     AddFieldWithDescription(typeInfo, "ProjectileId", CachedRResIdType(), 0xC8, "Blueprint Id for projectile, if any.");
-    AddFieldWithDescription(typeInfo, "BallisticArc", CachedWeaponBallisticArcType(), 0xE4, "High or low arc for projectiles");
+    gpg::RField* const ballisticArcField = AddFieldBallisticArc(typeInfo);
+    ballisticArcField->v4 = 3;
+    ballisticArcField->mDesc = "High or low arc for projectiles";
     AddFieldWithDescription(
       typeInfo,
       "TargetRestrictOnlyAllow",
@@ -1520,7 +1698,9 @@ namespace moho
       0x104,
       "Comma separated list of Entity Category that are always invalid targets."
     );
-    AddFieldWithDescription(typeInfo, "TargetType", CachedWeaponTargetType(), 0x130, "The type of entity this unit can target.");
+    gpg::RField* const targetTypeField = AddFieldTargetType(typeInfo);
+    targetTypeField->v4 = 3;
+    targetTypeField->mDesc = "The type of entity this unit can target.";
     AddFieldWithDescription(typeInfo, "ManualFire", CachedBoolType(), 0x120, "Never fires automaticly.");
     AddFieldWithDescription(typeInfo, "NukeWeapon", CachedBoolType(), 0x121, "Nuke weapon flag.");
     AddFieldWithDescription(typeInfo, "OverChargeWeapon", CachedBoolType(), 0x122, "Overcharge weapon flag.");

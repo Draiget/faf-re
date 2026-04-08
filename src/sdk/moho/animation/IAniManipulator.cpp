@@ -3,17 +3,61 @@
 #include <cstdlib>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "moho/animation/CAniActor.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
 
 namespace
 {
   constexpr std::uint16_t kWatchBoneActiveFlag = 0x8000;
+  constexpr const char* kIAniManipulatorLuaClassName = "IAniManipulator";
+  constexpr const char* kIAniManipulatorSetPrecedenceName = "SetPrecedence";
+  constexpr const char* kIAniManipulatorEnableName = "Enable";
+  constexpr const char* kIAniManipulatorDisableName = "Disable";
+  constexpr const char* kIAniManipulatorDestroyName = "Destroy";
+  constexpr const char* kIAniManipulatorSetPrecedenceHelpText =
+    "Manipulator:SetPrecedence(integer) -- change the precedence of this manipulator. "
+    "Manipulators with higher precedence run first.";
+  constexpr const char* kIAniManipulatorEnableHelpText =
+    "Manipulator:Enable() -- enable a manipulator. Manipulators start out enabled so you only need this after "
+    "calling Disable().";
+  constexpr const char* kIAniManipulatorDisableHelpText =
+    "Manipulator:Disable() -- disable a manipulator. This immediately removes it from the bone computation, which "
+    "may result in the bone's position snapping.";
+  constexpr const char* kIAniManipulatorDestroyHelpText = "Manipulator:Destroy() -- destroy a manipulator.";
+
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
+  {
+    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
+  }
 
   [[nodiscard]] moho::SAniManipBinding* InlineWatchBoneStorage(moho::IAniManipulator* const manipulator) noexcept
   {
@@ -437,6 +481,251 @@ namespace moho
     watchBone.mFlags = kWatchBoneActiveFlag;
     AppendWatchBoneBinding(&mWatchBones, watchBone);
     return static_cast<int>(mWatchBones.mEnd - mWatchBones.mBegin - 1);
+  }
+
+  /**
+   * Address: 0x0063BAC0 (FUN_0063BAC0, cfunc_IAniManipulatorSetPrecedence)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorSetPrecedenceL`.
+   */
+  int cfunc_IAniManipulatorSetPrecedence(lua_State* const luaContext)
+  {
+    return cfunc_IAniManipulatorSetPrecedenceL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0063BAE0 (FUN_0063BAE0, func_IAniManipulatorSetPrecedence_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:SetPrecedence(integer)` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorSetPrecedence_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kIAniManipulatorSetPrecedenceName,
+      &moho::cfunc_IAniManipulatorSetPrecedence,
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      kIAniManipulatorLuaClassName,
+      kIAniManipulatorSetPrecedenceHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0063BB40 (FUN_0063BB40, cfunc_IAniManipulatorSetPrecedenceL)
+   *
+   * What it does:
+   * Reads `(manipulator, precedence)`, updates manipulator precedence, and
+   * reinserts it into the owning actor precedence list.
+   */
+  int cfunc_IAniManipulatorSetPrecedenceL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorSetPrecedenceHelpText, 2, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    IAniManipulator* const manipulator = SCR_FromLua_IAniManipulator(manipulatorObject, state);
+
+    LuaPlus::LuaStackObject precedenceArg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      precedenceArg.TypeError("integer");
+    }
+
+    const int precedence = static_cast<int>(lua_tonumber(rawState, 2));
+
+    manipulator->mActorOrderLink.ListUnlink();
+    manipulator->mPrecedence = precedence;
+    RegisterWithOwnerActorOrderList(manipulator->mOwnerActor, manipulator);
+
+    lua_settop(rawState, 1);
+    return 1;
+  }
+
+  /**
+   * Address: 0x0063BC60 (FUN_0063BC60, cfunc_IAniManipulatorEnable)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorEnableL`.
+   */
+  int cfunc_IAniManipulatorEnable(lua_State* const luaContext)
+  {
+    return cfunc_IAniManipulatorEnableL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0063BC80 (FUN_0063BC80, func_IAniManipulatorEnable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:Enable()` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorEnable_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kIAniManipulatorEnableName,
+      &moho::cfunc_IAniManipulatorEnable,
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      kIAniManipulatorLuaClassName,
+      kIAniManipulatorEnableHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0063BCE0 (FUN_0063BCE0, cfunc_IAniManipulatorEnableL)
+   *
+   * What it does:
+   * Validates `IAniManipulator:Enable()`, resolves one manipulator, and marks
+   * it enabled.
+   */
+  int cfunc_IAniManipulatorEnableL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorEnableHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    IAniManipulator* const manipulator = SCR_FromLua_IAniManipulator(manipulatorObject, state);
+    if (manipulator) {
+      manipulator->mEnabled = true;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x0063BD90 (FUN_0063BD90, cfunc_IAniManipulatorDisable)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorDisableL`.
+   */
+  int cfunc_IAniManipulatorDisable(lua_State* const luaContext)
+  {
+    return cfunc_IAniManipulatorDisableL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0063BDB0 (FUN_0063BDB0, func_IAniManipulatorDisable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:Disable()` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorDisable_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kIAniManipulatorDisableName,
+      &moho::cfunc_IAniManipulatorDisable,
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      kIAniManipulatorLuaClassName,
+      kIAniManipulatorDisableHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0063BE10 (FUN_0063BE10, cfunc_IAniManipulatorDisableL)
+   *
+   * What it does:
+   * Validates `IAniManipulator:Disable()`, resolves one manipulator, and marks
+   * it disabled.
+   */
+  int cfunc_IAniManipulatorDisableL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorDisableHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    IAniManipulator* const manipulator = SCR_FromLua_IAniManipulator(manipulatorObject, state);
+    if (manipulator) {
+      manipulator->mEnabled = false;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x0063BEC0 (FUN_0063BEC0, cfunc_IAniManipulatorDestroy)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorDestroyL`.
+   */
+  int cfunc_IAniManipulatorDestroy(lua_State* const luaContext)
+  {
+    return cfunc_IAniManipulatorDestroyL(ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x0063BEE0 (FUN_0063BEE0, func_IAniManipulatorDestroy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:Destroy()` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorDestroy_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      kIAniManipulatorDestroyName,
+      &moho::cfunc_IAniManipulatorDestroy,
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      kIAniManipulatorLuaClassName,
+      kIAniManipulatorDestroyHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x0063BF40 (FUN_0063BF40, cfunc_IAniManipulatorDestroyL)
+   *
+   * What it does:
+   * Validates `IAniManipulator:Destroy()`, resolves one optional manipulator
+   * pointer, and destroys the object when still alive.
+   */
+  int cfunc_IAniManipulatorDestroyL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorDestroyHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    IAniManipulator* const manipulator = SCR_FromLua_IAniManipulatorOpt(manipulatorObject, state);
+    if (manipulator) {
+      delete manipulator;
+    }
+
+    return 0;
   }
 
   void IAniManipulator::ResetWatchBoneStorage()

@@ -5,6 +5,8 @@
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 }
 
 namespace moho
@@ -16,8 +18,25 @@ namespace moho
   struct VMatrix4
   {
     inline static gpg::RType* sType = nullptr;
+    static VMatrix4 NaN;
 
     Vector4f r[4]; // rows
+
+    /**
+     * Address: 0x004F0390 (FUN_004F0390, Moho::VMatrix4::MemberDeserialize)
+     *
+     * What it does:
+     * Loads matrix lanes from archive in row-major order.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x004F03D0 (FUN_004F03D0, Moho::VMatrix4::MemberSerialize)
+     *
+     * What it does:
+     * Stores matrix lanes to archive in row-major order.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /** Identity. */
     static VMatrix4 Identity()

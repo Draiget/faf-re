@@ -138,6 +138,13 @@ namespace moho
   gpg::SerHelperBase* cleanup_SDelayedSubVizInfoSerializerVariant2();
 
   [[nodiscard]] gpg::RType* register_SDelayedSubVizInfoVectorType();
+
+  /**
+   * Address: 0x00BC79F0 (FUN_00BC79F0, register_SDelayedSubVizInfoVectorType_AtExit)
+   *
+   * What it does:
+   * Registers the delayed-sub-viz vector RTTI lane and installs process-exit
+   * cleanup.
+   */
   int register_SDelayedSubVizInfoVectorType_AtExit();
 } // namespace moho
-

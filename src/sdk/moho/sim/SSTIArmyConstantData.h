@@ -6,6 +6,11 @@
 #include "../../boost/shared_ptr.h"
 #include "../../legacy/containers/String.h"
 
+namespace gpg
+{
+  class WriteArchive;
+}
+
 namespace moho
 {
   class CIntelGrid;
@@ -22,6 +27,24 @@ namespace moho
    */
   struct SSTIArmyConstantData
   {
+    /**
+     * Address: 0x006FD570 (FUN_006FD570, Moho::SSTIArmyConstantData::~SSTIArmyConstantData)
+     *
+     * What it does:
+     * Releases shared intel-grid lanes and tears down owned name strings in
+     * reverse member order.
+     */
+    ~SSTIArmyConstantData();
+
+    /**
+     * Address: 0x005510C0 (FUN_005510C0, Moho::SSTIArmyConstantData::MemberSerialize)
+     *
+     * What it does:
+     * Serializes fixed army identity lanes and all eight tracked shared
+     * `CIntelGrid` pointer lanes to a write archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     std::int32_t mArmyIndex;                          // +0x00
     msvc8::string mArmyName;                          // +0x04
     msvc8::string mPlayerName;                        // +0x20

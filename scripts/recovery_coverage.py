@@ -48,6 +48,11 @@ ZLIB_RAW_NAMES = {
 }
 FILE_EXTENSIONS = {".h", ".hpp", ".hh", ".hxx", ".c", ".cpp", ".cc", ".cxx", ".inl", ".ipp"}
 DEFAULT_EXCLUDED_EXTERNAL_DEPENDENCIES = {"Boost", "zlib"}
+DEFAULT_PROGRESS_NAMESPACE = "fa_full_2026_03_26"
+DEFAULT_RECOVERED_PROGRESS_PATH = Path("decomp/recovery/recovered_progress.json")
+COMPLETED_PROGRESS_STATUSES = {"recovered", "accepted", "done", "skip", "skipped", "external_dependency"}
+BLOCKED_PROGRESS_STATUSES = {"blocked", "needs_evidence"}
+IN_PROGRESS_STATUSES = {"in_progress", "wip"}
 
 
 @dataclass(frozen=True)
@@ -97,6 +102,21 @@ def parse_args() -> argparse.Namespace:
             "(for example Boost)."
         ),
     )
+    parser.add_argument(
+        "--recovered-progress",
+        default=str(DEFAULT_RECOVERED_PROGRESS_PATH),
+        help="Path to recovered_progress.json used for progress-aware coverage metrics.",
+    )
+    parser.add_argument(
+        "--progress-namespace",
+        default=DEFAULT_PROGRESS_NAMESPACE,
+        help="Namespace key in recovered_progress.json for progress-aware metrics.",
+    )
+    parser.add_argument(
+        "--no-progress-metrics",
+        action="store_true",
+        help="Disable progress-aware metrics from recovered_progress.json.",
+    )
     return parser.parse_args()
 
 
@@ -112,6 +132,58 @@ def normalize_token(token: str) -> str:
     while token.startswith("j_"):
         token = token[2:]
     return token
+
+
+def normalize_fun_token(token: str | None) -> str | None:
+    if not token:
+        return None
+    raw = token.strip()
+    if not raw:
+        return None
+
+    raw = raw.split(",")[0].strip()
+    raw = re.sub(r"^FUN_", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r"^sub_", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r"^0x", "", raw, flags=re.IGNORECASE)
+
+    value: int
+    if re.fullmatch(r"[0-9A-Fa-f]{6,16}", raw):
+        value = int(raw, 16)
+    elif re.fullmatch(r"\d+", raw):
+        value = int(raw, 10)
+    else:
+        return None
+
+    width = 8 if value <= 0xFFFFFFFF else 16
+    return f"FUN_{value:0{width}X}"
+
+
+def load_progress_status_map(recovered_progress_path: Path, namespace: str) -> Dict[int, str]:
+    if not recovered_progress_path.exists():
+        return {}
+
+    payload = json.loads(recovered_progress_path.read_text(encoding="utf-8"))
+    ns = payload.get("namespaces", {}).get(namespace, {})
+    recovered = ns.get("recovered", {})
+    if not isinstance(recovered, dict):
+        return {}
+
+    out: Dict[int, str] = {}
+    for token, info in recovered.items():
+        if not isinstance(info, dict):
+            continue
+        status = str(info.get("status", "")).strip().lower()
+        if not status:
+            continue
+        norm = normalize_fun_token(token)
+        if not norm:
+            continue
+        try:
+            addr = int(norm[4:], 16)
+        except ValueError:
+            continue
+        out[addr] = status
+    return out
 
 
 def extract_root_token(raw_name: str, demangled: str) -> Optional[str]:
@@ -295,6 +367,8 @@ def build_report(
     src_root: Path,
     excluded_external_dependencies: Optional[set[str]] = None,
     include_excluded_external_entries: bool = False,
+    progress_status_by_addr: Optional[Dict[int, str]] = None,
+    progress_namespace: str = "",
 ) -> Dict:
     excluded_external_dependencies = {dep for dep in (excluded_external_dependencies or set()) if dep}
     obj = json.loads(names_json_path.read_text(encoding="utf-8"))
@@ -398,6 +472,45 @@ def build_report(
     scoped_total = sum(family_total[f] for f in ("moho", "gpg", "external"))
     scoped_recovered = sum(family_recovered[f] for f in ("moho", "gpg", "external"))
 
+    progress_status_by_addr = progress_status_by_addr or {}
+    progress_completed_addresses = set()
+    progress_external_dependency_addresses = set()
+    progress_blocked_addresses = set()
+    progress_in_progress_addresses = set()
+    progress_other_status_addresses = set()
+    progress_dependency_externalized = Counter()
+
+    for addr in fa_addresses:
+        status = (progress_status_by_addr.get(addr) or "").strip().lower()
+        if not status:
+            continue
+        if status in COMPLETED_PROGRESS_STATUSES:
+            progress_completed_addresses.add(addr)
+            if status == "external_dependency":
+                progress_external_dependency_addresses.add(addr)
+                owner = owner_by_addr.get(addr)
+                if owner and owner.family == "external" and include_external_by_addr.get(addr, False):
+                    progress_dependency_externalized[owner.dependency or "OtherExternal"] += 1
+        elif status in BLOCKED_PROGRESS_STATUSES:
+            progress_blocked_addresses.add(addr)
+        elif status in IN_PROGRESS_STATUSES:
+            progress_in_progress_addresses.add(addr)
+        else:
+            progress_other_status_addresses.add(addr)
+
+    progress_untracked_count = (
+        function_count
+        - len(progress_completed_addresses)
+        - len(progress_blocked_addresses)
+        - len(progress_in_progress_addresses)
+        - len(progress_other_status_addresses)
+    )
+
+    coverage_source_or_externalized = recovered_fa_addresses | progress_external_dependency_addresses
+    recovery_required_total = max(function_count - len(progress_external_dependency_addresses), 0)
+    recovery_required_annotated = len(recovered_fa_addresses - progress_external_dependency_addresses)
+    completed_non_external = len(progress_completed_addresses - progress_external_dependency_addresses)
+
     report = {
         "names_json": str(names_json_path),
         "source_root": str(src_root),
@@ -454,6 +567,41 @@ def build_report(
             }
             for dep in sorted(external_excluded_no_body_total.keys())
         },
+        "progress": {
+            "namespace": progress_namespace,
+            "available": bool(progress_status_by_addr),
+            "status_counts": {
+                "completed": len(progress_completed_addresses),
+                "external_dependency": len(progress_external_dependency_addresses),
+                "blocked": len(progress_blocked_addresses),
+                "in_progress": len(progress_in_progress_addresses),
+                "other_status": len(progress_other_status_addresses),
+                "untracked": max(progress_untracked_count, 0),
+            },
+            "coverage_source_or_externalized": {
+                "recovered": len(coverage_source_or_externalized),
+                "max": function_count,
+                "percent": pct(len(coverage_source_or_externalized), function_count),
+            },
+            "coverage_recovery_required_source": {
+                "recovered": int(recovery_required_annotated),
+                "max": int(recovery_required_total),
+                "percent": pct(int(recovery_required_annotated), int(recovery_required_total)),
+            },
+            "coverage_recovery_required_progress_completed": {
+                "recovered": int(completed_non_external),
+                "max": int(recovery_required_total),
+                "percent": pct(int(completed_non_external), int(recovery_required_total)),
+            },
+            "external_dependency_split": {
+                dep: {
+                    "externalized": int(progress_dependency_externalized[dep]),
+                    "max": int(dependency_total[dep]),
+                    "percent": pct(int(progress_dependency_externalized[dep]), int(dependency_total[dep])),
+                }
+                for dep in sorted(dependency_total.keys())
+            },
+        },
     }
 
     if include_excluded_external_entries:
@@ -499,6 +647,20 @@ def print_text(report: Dict) -> None:
         "Scoped coverage (moho+gpg+external): "
         f"{format_ratio(report['coverage_scoped']['recovered'], report['coverage_scoped']['max'])}"
     )
+    progress = report.get("progress", {})
+    if progress and progress.get("available"):
+        print(
+            "Effective coverage (source annotations OR external_dependency): "
+            f"{format_ratio(progress['coverage_source_or_externalized']['recovered'], progress['coverage_source_or_externalized']['max'])}"
+        )
+        print(
+            "Recovery-required coverage (excluding external_dependency denominator): "
+            f"{format_ratio(progress['coverage_recovery_required_source']['recovered'], progress['coverage_recovery_required_source']['max'])}"
+        )
+        print(
+            "Recovery-required completion (progress statuses, non-external): "
+            f"{format_ratio(progress['coverage_recovery_required_progress_completed']['recovered'], progress['coverage_recovery_required_progress_completed']['max'])}"
+        )
     print()
     print(
         "Annotated addresses under src root: "
@@ -540,13 +702,35 @@ def print_text(report: Dict) -> None:
     print("-------------------------")
     if not report["external_dependencies"]:
         print("- (none detected)")
-        return
-    for dep, block in sorted(
-        report["external_dependencies"].items(),
-        key=lambda item: item[1]["max"],
-        reverse=True,
-    ):
-        print(f"- {dep}: {format_ratio(block['recovered'], block['max'])}")
+    else:
+        for dep, block in sorted(
+            report["external_dependencies"].items(),
+            key=lambda item: item[1]["max"],
+            reverse=True,
+        ):
+            print(f"- {dep}: {format_ratio(block['recovered'], block['max'])}")
+
+    if progress and progress.get("available"):
+        print()
+        print("External Dependency Status (progress)")
+        print("-------------------------------------")
+        split = progress.get("external_dependency_split", {})
+        if not split:
+            print("- (none)")
+        else:
+            for dep, block in sorted(split.items(), key=lambda item: item[1]["max"], reverse=True):
+                print(f"- {dep}: {format_ratio(block['externalized'], block['max'])}")
+
+        print()
+        print("Progress status over FAF universe")
+        print("---------------------------------")
+        status_counts = progress.get("status_counts", {})
+        print(f"- completed: {status_counts.get('completed', 0):,}")
+        print(f"- external_dependency: {status_counts.get('external_dependency', 0):,}")
+        print(f"- blocked: {status_counts.get('blocked', 0):,}")
+        print(f"- in_progress: {status_counts.get('in_progress', 0):,}")
+        print(f"- other_status: {status_counts.get('other_status', 0):,}")
+        print(f"- untracked: {status_counts.get('untracked', 0):,}")
 
 
 def main() -> int:
@@ -565,12 +749,19 @@ def main() -> int:
     excluded_external_dependencies = {
         dep.strip() for dep in args.exclude_external_dependency if dep and dep.strip()
     }
+    progress_status_by_addr: Dict[int, str] = {}
+    if not args.no_progress_metrics:
+        progress_path = Path(args.recovered_progress).resolve()
+        progress_status_by_addr = load_progress_status_map(progress_path, args.progress_namespace)
+
     dump_excluded_external_csv_path = Path(args.dump_excluded_external_csv).resolve() if args.dump_excluded_external_csv else None
     report = build_report(
         names_json_path=names_json_path,
         src_root=src_root,
         excluded_external_dependencies=excluded_external_dependencies,
         include_excluded_external_entries=bool(dump_excluded_external_csv_path),
+        progress_status_by_addr=progress_status_by_addr,
+        progress_namespace=args.progress_namespace,
     )
 
     if dump_excluded_external_csv_path:

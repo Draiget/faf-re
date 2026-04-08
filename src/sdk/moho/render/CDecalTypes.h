@@ -7,6 +7,11 @@
 #include "moho/containers/TDatList.h"
 #include "wm3/Vector3.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class CDecalHandle;
@@ -16,6 +21,38 @@ namespace moho
 
   struct SDecalInfo
   {
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x00778B60 (FUN_00778B60, SDecalInfo::SDecalInfo)
+     *
+     * What it does:
+     * Initializes one default decal payload with empty textures/type and
+     * default fidelity.
+     */
+    SDecalInfo();
+
+    /**
+     * Address: 0x0066D210 (FUN_0066D210, Moho::SDecalInfo::SDecalInfo)
+     *
+     * What it does:
+     * Copies position/size/rotation + texture/type strings and seeds runtime
+     * decal metadata fields.
+     */
+    SDecalInfo(
+      const Wm3::Vec3f& size,
+      const Wm3::Vec3f& position,
+      const Wm3::Vec3f& rotation,
+      const msvc8::string& textureNamePrimary,
+      const msvc8::string& textureNameSecondary,
+      bool isSplat,
+      float lodParam,
+      std::uint32_t startTick,
+      const msvc8::string& typeName,
+      std::uint32_t armyIndex,
+      std::uint32_t fidelity
+    );
+
     Wm3::Vec3f mPos;         // +0x00
     Wm3::Vec3f mSize;        // +0x0C
     Wm3::Vec3f mRot;         // +0x18
@@ -23,7 +60,7 @@ namespace moho
     msvc8::string mTexName2; // +0x40
     std::uint8_t mIsSplat;   // +0x5C
     std::uint8_t mPad5D[0x03];
-    float mLODParam;         // +0x60
+    float mLODParam;          // +0x60
     std::uint32_t mStartTick; // +0x64
     msvc8::string mType;      // +0x68
     std::uint32_t mObj;       // +0x84

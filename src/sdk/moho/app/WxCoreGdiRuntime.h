@@ -182,6 +182,15 @@ public:
   wxFontRuntimeObject();
 
   /**
+   * Address: 0x0096E9F0 (FUN_0096E9F0)
+   * Mangled: ??1wxFont@@QAE@@Z
+   *
+   * What it does:
+   * Tears down wxFont runtime lanes and releases base wxObject ref-data state.
+   */
+  ~wxFontRuntimeObject() override;
+
+  /**
    * Address: 0x0042AF90 (FUN_0042AF90)
    * Mangled: ?GetClassInfo@wxFont@@UBEPAVwxClassInfo@@XZ
    *

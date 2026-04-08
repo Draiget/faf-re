@@ -44,19 +44,29 @@ moho::SCR_ToLua<gpg::Rect2<float>>(LuaPlus::LuaState* const state, const gpg::Re
 }
 
 /**
- * Address: 0x100C1240 (FUN_100C1240)
- *
- * LuaPlus::LuaState*, Wm3::Quaternion<float> const&
- *
- * IDA signature:
- * LuaPlus::LuaObject *__cdecl Moho::SCR_ToLua<Wm3::Quaternion<float>>(
- *     LuaPlus::LuaObject *result,
- *     LuaPlus::LuaState *state,
- *     float *quat
- * );
+ * Address: 0x004D0990 (FUN_004D0990, Moho::SCR_ToLua<gpg::Rect2<int>>)
  *
  * What it does:
- * Builds a 4-slot Lua table in quaternion field order x,y,z,w
+ * Builds a 4-key Lua hash table (`x0`,`y0`,`x1`,`y1`) from one `Rect2i`.
+ */
+template <>
+LuaPlus::LuaObject
+moho::SCR_ToLua<gpg::Rect2<int>>(LuaPlus::LuaState* const state, const gpg::Rect2<int>& value)
+{
+  LuaPlus::LuaObject result;
+  result.AssignNewTable(state, 0, 4);
+  result.SetNumber("x0", static_cast<float>(value.x0));
+  result.SetNumber("y0", static_cast<float>(value.z0));
+  result.SetNumber("x1", static_cast<float>(value.x1));
+  result.SetNumber("y1", static_cast<float>(value.z1));
+  return result;
+}
+
+/**
+ * Address: 0x004CFB00 (FUN_004CFB00, Moho::SCR_ToLua<Wm3::Quaternion<float>>)
+ *
+ * What it does:
+ * Builds a 4-slot Lua table in quaternion field order `x,y,z,w`
  * and attaches the shared vector metatable.
  */
 template <>
@@ -76,19 +86,10 @@ moho::SCR_ToLua<Wm3::Quaternion<float>>(LuaPlus::LuaState* const state, const Wm
 }
 
 /**
- * Address: 0x100C1410 (FUN_100C1410)
- *
- * LuaPlus::LuaState*, Wm3::Vector2<float> const&
- *
- * IDA signature:
- * LuaPlus::LuaObject *__cdecl Moho::SCR_ToLua<Wm3::Vector2<float>>(
- *     LuaPlus::LuaObject *result,
- *     LuaPlus::LuaState *state,
- *     float *vec2
- * );
+ * Address: 0x004CFCC0 (FUN_004CFCC0, Moho::SCR_ToLua<Wm3::Vector2<float>>)
  *
  * What it does:
- * Builds a 2-slot Lua table in x,y order and attaches
+ * Builds a 2-slot Lua table in `x,y` order and attaches
  * the shared vector metatable.
  */
 template <>
@@ -106,19 +107,10 @@ moho::SCR_ToLua<Wm3::Vector2<float>>(LuaPlus::LuaState* const state, const Wm3::
 }
 
 /**
- * Address: 0x100C16D0 (FUN_100C16D0)
- *
- * LuaPlus::LuaState*, Wm3::Vector3<float> const&
- *
- * IDA signature:
- * LuaPlus::LuaObject *__cdecl Moho::SCR_ToLua<Wm3::Vector3<float>>(
- *     LuaPlus::LuaObject *result,
- *     LuaPlus::LuaState *state,
- *     float *vec3
- * );
+ * Address: 0x004CFFC0 (FUN_004CFFC0, Moho::SCR_ToLua<Wm3::Vector3<float>>)
  *
  * What it does:
- * Builds a 3-slot Lua table in x,y,z order and attaches
+ * Builds a 3-slot Lua table in `x,y,z` order and attaches
  * the shared vector metatable.
  */
 template <>

@@ -86,6 +86,32 @@ namespace moho
     std::uint8_t mPad_015C_0160[0x04]{};
 
     /**
+     * Address: 0x006FD390 (FUN_006FD390, Moho::SSTIArmyVariableData::SSTIArmyVariableData)
+     *
+     * What it does:
+     * Initializes army variable payload defaults (economy zeros, "None" army
+     * type, no-rush defaults, enabled ally/show-score lanes).
+     */
+    SSTIArmyVariableData();
+
+    /**
+     * Address: 0x0055FF80 (FUN_0055FF80, Moho::SSTIArmyVariableData::SSTIArmyVariableData copy-ctor)
+     *
+     * What it does:
+     * Clones army-variable runtime payload lanes, including Set/category
+     * bitfields and legacy vector/string members, from one source object.
+     */
+    SSTIArmyVariableData(const SSTIArmyVariableData& other);
+
+    /**
+     * Address: 0x0055FEA0 (FUN_0055FEA0, Moho::SSTIArmyVariableData::~SSTIArmyVariableData)
+     *
+     * What it does:
+     * Tears down set/vector/string member lanes for one army-variable payload.
+     */
+    ~SSTIArmyVariableData();
+
+    /**
      * Address: 0x00551270 (FUN_00551270, Moho::SSTIArmyVariableDataSerializer::Deserialize)
      *
      * What it does:

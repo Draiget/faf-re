@@ -45,7 +45,8 @@ AllowShortLoopsOnASingleLine: false
 BinPackArguments: false
 BinPackParameters: false
 AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
+BreakFunctionDefinitionParameters: true
 
 # Alignment
 # BlockIndent: when args don't fit on one line, break after '(' and put ')' on its own line.
@@ -86,6 +87,7 @@ SpacesInSquareBrackets: false
 AccessModifierOffset: -2
 AlwaysBreakTemplateDeclarations: Yes
 BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: AfterColon
 ConstructorInitializerIndentWidth: 2
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false

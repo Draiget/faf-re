@@ -1,5 +1,6 @@
 #include "moho/ai/CAiTarget.h"
 
+#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/ReconBlip.h"
@@ -106,6 +108,17 @@ namespace
     out.y = static_cast<float>(yObject.GetNumber());
     out.z = static_cast<float>(zObject.GetNumber());
     return out;
+  }
+
+  [[nodiscard]] const Wm3::Vec3f& InvalidTargetVector() noexcept
+  {
+    static bool initialized = false;
+    static Wm3::Vec3f invalid{};
+    if (!initialized) {
+      invalid = Wm3::Vec3f::NaN();
+      initialized = true;
+    }
+    return invalid;
   }
 } // namespace
 
@@ -242,6 +255,135 @@ CAiTarget* CAiTarget::UpdateTarget(Entity* const entity)
 
   PickTargetPoint();
   return this;
+}
+
+/**
+ * Address: 0x00623240 (FUN_00623240, Moho::CAiTarget::GetLuaTarget)
+ *
+ * What it does:
+ * Parses one Lua target table; reads either `"EntityId"` for entity targets
+ * or `"Position"` for ground targets.
+ */
+CAiTarget* CAiTarget::GetLuaTarget(Sim* const sim, const LuaPlus::LuaObject& object)
+{
+  const LuaPlus::LuaObject typeObject = object.GetByName("Type");
+  const char* const typeLexical = typeObject.GetString();
+  if (_stricmp(typeLexical, "entity") == 0) {
+    const LuaPlus::LuaObject entityIdObject = object.GetByName("EntityId");
+    const EntId entityId = static_cast<EntId>(std::atoi(entityIdObject.GetString()));
+    Entity* const entity = FindEntityById(sim ? sim->mEntityDB : nullptr, entityId);
+    (void)UpdateTarget(entity);
+    return this;
+  }
+
+  const LuaPlus::LuaObject positionObject = object.GetByName("Position");
+  const Wm3::Vec3f targetPosition = SCR_FromLuaCopy<Wm3::Vec3f>(positionObject);
+  targetType = EAiTargetType::AITARGET_Ground;
+  position = targetPosition;
+  targetEntity.ClearLinkState();
+  targetPoint = -1;
+  targetIsMobile = false;
+  return this;
+}
+
+/**
+ * Address: 0x005E2A10 (FUN_005E2A10, Moho::CAiTarget::HasTarget)
+ *
+ * What it does:
+ * Reports whether this target currently resolves to a valid alive target
+ * payload (entity or ground target).
+ */
+bool CAiTarget::HasTarget() const
+{
+  switch (targetType) {
+    case EAiTargetType::AITARGET_None:
+      return false;
+
+    case EAiTargetType::AITARGET_Entity: {
+      Entity* const entity = targetEntity.GetObjectPtr();
+      if (entity == nullptr) {
+        return false;
+      }
+
+      if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+        return !unit->IsDead();
+      }
+
+      if (ReconBlip* const reconBlip = entity->IsReconBlip(); reconBlip != nullptr) {
+        return reconBlip->Dead == 0u;
+      }
+
+      return true;
+    }
+
+    case EAiTargetType::AITARGET_Ground:
+      return true;
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005E2A90 (FUN_005E2A90, Moho::CAiTarget::GetTargetPosGun)
+ *
+ * What it does:
+ * Resolves one weapon-target world position from this target payload and
+ * either uses exact live position lanes or selected target-point lanes.
+ */
+Wm3::Vec3f CAiTarget::GetTargetPosGun(const bool useActualPos)
+{
+  if (targetType == EAiTargetType::AITARGET_Ground) {
+    return position;
+  }
+
+  if (targetType != EAiTargetType::AITARGET_Entity) {
+    return InvalidTargetVector();
+  }
+
+  Entity* const entity = targetEntity.GetObjectPtr();
+  if (!entity) {
+    return InvalidTargetVector();
+  }
+
+  if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+    if (useActualPos) {
+      return unit->GetPosition();
+    }
+    return unit->GetTargetPoint(targetPoint);
+  }
+
+  if (ReconBlip* const reconBlip = entity->IsReconBlip(); reconBlip != nullptr) {
+    if (useActualPos) {
+      return reconBlip->GetPositionWm3();
+    }
+    return reconBlip->GetTargetPoint(targetPoint);
+  }
+
+  return entity->GetBoneWorldTransform(-1).pos_;
+}
+
+/**
+ * Address: 0x005E2CE0 (FUN_005E2CE0, Moho::CAiTarget::GetEntity)
+ *
+ * What it does:
+ * Returns the current entity target. When the target resolves to a recon blip,
+ * it returns that blip's source unit entity when available.
+ */
+Entity* CAiTarget::GetEntity() const
+{
+  Entity* const entity = targetEntity.GetObjectPtr();
+  if (entity == nullptr) {
+    return nullptr;
+  }
+
+  if (ReconBlip* const reconBlip = entity->IsReconBlip(); reconBlip != nullptr) {
+    if (Unit* const sourceUnit = reconBlip->GetSourceUnit(); sourceUnit != nullptr) {
+      return static_cast<Entity*>(sourceUnit);
+    }
+    return nullptr;
+  }
+
+  return entity;
 }
 
 /**

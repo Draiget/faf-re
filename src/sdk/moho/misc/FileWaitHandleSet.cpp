@@ -2650,6 +2650,54 @@ moho::CScrLuaInitForm* moho::func_FileCollapsePath_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00BC45C0 (FUN_00BC45C0, register_DiskFindFiles_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_DiskFindFiles_LuaFuncDef()
+{
+  return func_DiskFindFiles_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC45D0 (FUN_00BC45D0, register_DiskGetFileInfo_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_DiskGetFileInfo_LuaFuncDef()
+{
+  return func_DiskGetFileInfo_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC45E0 (FUN_00BC45E0, register_DiskToLocal_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_DiskToLocal_LuaFuncDef()
+{
+  return func_DiskToLocal_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC45F0 (FUN_00BC45F0, register_Basename_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_Basename_LuaFuncDef()
+{
+  return func_Basename_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC4600 (FUN_00BC4600, register_Dirname_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_Dirname_LuaFuncDef()
+{
+  return func_Dirname_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC4610 (FUN_00BC4610, register_FileCollapsePath_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_FileCollapsePath_LuaFuncDef()
+{
+  return func_FileCollapsePath_LuaFuncDef();
+}
+
+/**
  * Address: 0x00413F90 (FUN_00413F90, Moho::FWaitHandleSet::Wait)
  *
  * What it does:

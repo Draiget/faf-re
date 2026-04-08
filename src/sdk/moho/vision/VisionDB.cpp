@@ -1,4 +1,3 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/vision/VisionDB.h"
 
 using namespace moho;
@@ -26,6 +25,27 @@ namespace
     ::operator delete(head);
     head = nullptr;
   }
+
+  void ResetVisionEntry(
+    VisionDB::Pool::Entry* const entry,
+    const VisionDB::Pool::EntryCircle& previousCircle,
+    const VisionDB::Pool::EntryCircle& currentCircle,
+    const bool isReal
+  )
+  {
+    if (entry == nullptr) {
+      return;
+    }
+
+    entry->mParent = nullptr;
+    entry->mContained = nullptr;
+    entry->mNext = nullptr;
+    entry->mIsReal = isReal ? 1u : 0u;
+    entry->mVis = 0u;
+    entry->mPad0E = 0u;
+    entry->mPrevCircle = previousCircle;
+    entry->mCurCircle = currentCircle;
+  }
 } // namespace
 
 /**
@@ -37,11 +57,11 @@ namespace
  */
 VisionDB::Pool::Pool()
 {
-  zoneBlocksHead_ = new ZoneBlockEntry();
-  zoneBlockCount_ = 0;
+  mEntriesHead = new ZoneBlockEntry();
+  mEntriesSize = 0;
 
-  freeNodeHead_ = new FreeNodeEntry();
-  freeNodeCount_ = 0;
+  mEntryPoolHead = new FreeNodeEntry();
+  mEntryPoolSize = 0;
 }
 
 /**
@@ -53,10 +73,10 @@ VisionDB::Pool::Pool()
  */
 void VisionDB::Pool::Clear()
 {
-  FreeZoneBlocks(zoneBlocksHead_);
+  FreeZoneBlocks(mEntriesHead);
 
-  ClearRingAndDeleteHead(freeNodeHead_, freeNodeCount_);
-  ClearRingAndDeleteHead(zoneBlocksHead_, zoneBlockCount_);
+  ClearRingAndDeleteHead(mEntryPoolHead, mEntryPoolSize);
+  ClearRingAndDeleteHead(mEntriesHead, mEntriesSize);
 }
 
 /**
@@ -71,6 +91,55 @@ VisionDB::Pool::~Pool()
   Clear();
 }
 
+/**
+ * Address: 0x0081AA00 (FUN_0081AA00)
+ *
+ * What it does:
+ * Obtains one entry from the reusable pool, allocating and seeding a 500-entry
+ * block when the free-list is empty.
+ */
+VisionDB::Pool::Entry*
+VisionDB::Pool::NewEntry(const EntryCircle& previousCircle, const EntryCircle& currentCircle, const bool isReal)
+{
+  if (mEntryPoolSize == 0) {
+    constexpr std::uint32_t kEntryBlockCount = 500;
+    const std::size_t blockBytes = sizeof(std::uint32_t) + sizeof(Entry) * kEntryBlockCount;
+    auto* const rawBlock = static_cast<std::uint8_t*>(::operator new[](blockBytes));
+    auto* const entryCountLane = reinterpret_cast<std::uint32_t*>(rawBlock);
+    *entryCountLane = kEntryBlockCount;
+
+    auto* const entryBlock = reinterpret_cast<Entry*>(rawBlock + sizeof(std::uint32_t));
+    for (std::uint32_t index = 0; index < kEntryBlockCount; ++index) {
+      ResetVisionEntry(&entryBlock[index], EntryCircle{}, EntryCircle{}, false);
+    }
+
+    auto* const blockNode = new ZoneBlockEntry();
+    blockNode->blockBase = entryBlock;
+    blockNode->ListLinkBefore(mEntriesHead);
+    ++mEntriesSize;
+
+    for (std::uint32_t index = 0; index < kEntryBlockCount; ++index) {
+      auto* const freeEntry = new FreeNodeEntry();
+      freeEntry->node = &entryBlock[index];
+      freeEntry->ListLinkBefore(mEntryPoolHead);
+      ++mEntryPoolSize;
+    }
+  }
+
+  if (mEntryPoolHead == nullptr || mEntryPoolHead->mNext == mEntryPoolHead) {
+    return nullptr;
+  }
+
+  auto* const freeEntry = static_cast<FreeNodeEntry*>(mEntryPoolHead->mNext);
+  Entry* const entry = freeEntry->node;
+  freeEntry->ListUnlink();
+  ::operator delete(freeEntry);
+  --mEntryPoolSize;
+
+  ResetVisionEntry(entry, previousCircle, currentCircle, isReal);
+  return entry;
+}
+
 void VisionDB::Pool::FreeZoneBlocks(ZoneBlockEntry* head)
 {
   if (!head) {
@@ -83,7 +152,7 @@ void VisionDB::Pool::FreeZoneBlocks(ZoneBlockEntry* head)
       continue;
     }
 
-    // The block is allocated via operator new as: [count dword][count * PooledNode].
+    // The block is allocated as: [count dword][count * Entry].
     auto* rawBlock = reinterpret_cast<std::uint32_t*>(it->blockBase) - 1;
     ::operator delete[](rawBlock);
     it->blockBase = nullptr;
@@ -103,8 +172,8 @@ VisionDB::Handle::Init(Handle* self, const std::uintptr_t pooledNodePtr, const s
     return nullptr;
   }
 
-  self->ownerPtr_ = ownerPtr;
-  self->pooledNodePtr_ = pooledNodePtr;
+  self->mDB = ownerPtr;
+  self->mNode = pooledNodePtr;
   return self;
 }
 
@@ -121,12 +190,12 @@ void VisionDB::Handle::AttachSiblingChain(Pool::PooledNode* tailChain, Pool::Poo
     return;
   }
 
-  while (tailChain->nextSibling != nullptr) {
-    tailChain = tailChain->nextSibling;
+  while (tailChain->mNext != nullptr) {
+    tailChain = tailChain->mNext;
   }
 
-  tailChain->nextSibling = chainHead;
-  chainHead->ownerOrChain = tailChain->ownerOrChain;
+  tailChain->mNext = chainHead;
+  chainHead->mParent = tailChain->mParent;
 }
 
 /**
@@ -142,43 +211,43 @@ void VisionDB::Handle::UnlinkFromOwnerTree(OwnerChainView* ownerChain, Pool::Poo
     return;
   }
 
-  Pool::PooledNode*& rootSlot = ownerChain->rootNode;
+  Pool::PooledNode*& rootSlot = ownerChain->mRoot;
   Pool::PooledNode* cursor = rootSlot;
 
   if (cursor == node) {
-    rootSlot = cursor->nextSibling;
+    rootSlot = cursor->mNext;
   } else if (cursor) {
-    while (cursor->nextSibling) {
-      if (cursor->nextSibling == node) {
-        cursor->nextSibling = cursor->nextSibling->nextSibling;
+    while (cursor->mNext) {
+      if (cursor->mNext == node) {
+        cursor->mNext = cursor->mNext->mNext;
         break;
       }
-      cursor = cursor->nextSibling;
+      cursor = cursor->mNext;
     }
   }
 
-  if (node->firstChild) {
+  if (node->mContained) {
     Pool::PooledNode* const ownerRoot = rootSlot;
     if (ownerRoot) {
-      if (ownerRoot->nextSibling) {
-        AttachSiblingChain(ownerRoot->nextSibling, node->firstChild);
+      if (ownerRoot->mNext) {
+        AttachSiblingChain(ownerRoot->mNext, node->mContained);
       } else {
-        ownerRoot->nextSibling = node->firstChild;
-        node->firstChild->ownerOrChain = ownerRoot->ownerOrChain;
+        ownerRoot->mNext = node->mContained;
+        node->mContained->mParent = ownerRoot->mParent;
       }
     } else {
-      rootSlot = node->firstChild;
-      node->firstChild->ownerOrChain = ownerChain;
+      rootSlot = node->mContained;
+      node->mContained->mParent = ownerChain;
     }
 
-    for (Pool::PooledNode* child = node->firstChild; child; child = child->nextSibling) {
-      child->ownerOrChain = ownerChain;
+    for (Pool::PooledNode* child = node->mContained; child; child = child->mNext) {
+      child->mParent = ownerChain;
     }
   }
 
-  node->ownerOrChain = nullptr;
-  node->firstChild = nullptr;
-  node->nextSibling = nullptr;
+  node->mParent = nullptr;
+  node->mContained = nullptr;
+  node->mNext = nullptr;
 }
 
 /**
@@ -190,21 +259,17 @@ void VisionDB::Handle::UnlinkFromOwnerTree(OwnerChainView* ownerChain, Pool::Poo
  */
 void VisionDB::Handle::ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* node)
 {
-  if (!node || !ownerPool || !ownerPool->freeNodeHead_) {
+  if (!node || !ownerPool || !ownerPool->mEntryPoolHead) {
     return;
   }
 
-  node->ownerOrChain = nullptr;
-  node->firstChild = nullptr;
-  node->nextSibling = nullptr;
-  node->typeFlag = 0;
-  node->markFlag = 0;
+  ResetVisionEntry(node, Pool::EntryCircle{}, Pool::EntryCircle{}, false);
 
   auto* const entry = static_cast<Pool::FreeNodeEntry*>(::operator new(sizeof(Pool::FreeNodeEntry)));
   entry->node = node;
-  entry->ListLinkBefore(ownerPool->freeNodeHead_);
+  entry->ListLinkBefore(ownerPool->mEntryPoolHead);
 
-  ++ownerPool->freeNodeCount_;
+  ++ownerPool->mEntryPoolSize;
 }
 
 /**
@@ -216,16 +281,16 @@ void VisionDB::Handle::ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* n
  */
 VisionDB::Handle::~Handle()
 {
-  auto* const pooledNode = reinterpret_cast<Pool::PooledNode*>(pooledNodePtr_);
-  auto* const owner = reinterpret_cast<VisionDB*>(ownerPtr_);
+  auto* const pooledNode = reinterpret_cast<Pool::PooledNode*>(mNode);
+  auto* const owner = reinterpret_cast<VisionDB*>(mDB);
   if (pooledNode && owner) {
-    auto* const ownerChain = static_cast<OwnerChainView*>(pooledNode->ownerOrChain);
+    auto* const ownerChain = static_cast<OwnerChainView*>(pooledNode->mParent);
     UnlinkFromOwnerTree(ownerChain, pooledNode);
     ReturnNodeToFreeList(&owner->pool_, pooledNode);
   }
 
-  ownerPtr_ = 0;
-  pooledNodePtr_ = 0;
+  mDB = 0;
+  mNode = 0;
 }
 
 VisionDB::VisionDB()

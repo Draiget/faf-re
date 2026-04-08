@@ -41,10 +41,10 @@ namespace moho
   CScrLuaInitForm* func_UnitGetUnitId_LuaFuncDef();
 
   /**
-   * Address: 0x008BB9B0 (FUN_008BB9B0, func_SetFireState_LuaFuncDef)
+   * Address: 0x006C7D30 (FUN_006C7D30, func_UnitSetFireState_LuaFuncDef)
    *
    * What it does:
-   * Publishes the global user-Lua binder for `SetFireState(units, newFireState)`.
+   * Publishes the `Unit:SetFireState(stateName)` Lua binder definition.
    */
   CScrLuaInitForm* func_UnitSetFireState_LuaFuncDef();
   CScrLuaInitForm* func_UnitToggleFireState_LuaFuncDef();
@@ -62,6 +62,13 @@ namespace moho
   CScrLuaInitForm* func_UnitSetStunned_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetImmobile_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetBlockCommandQueue_LuaFuncDef();
+
+  /**
+   * Address: 0x006C9480 (FUN_006C9480, func_UnitSetReclaimable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:SetReclaimable(flag)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitSetReclaimable_LuaFuncDef();
   CScrLuaInitForm* func_UnitRevertRegenRate_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetRegenRate_LuaFuncDef();
@@ -72,9 +79,9 @@ namespace moho
   CScrLuaInitForm* func_UnitTestCommandCaps_LuaFuncDef();
   CScrLuaInitForm* func_UnitRestoreCommandCaps_LuaFuncDef();
   CScrLuaInitForm* func_UnitRemoveCommandCap_LuaFuncDef();
-  void func_UnitAddCommandCap_LuaFuncDef();
+  CScrLuaInitForm* func_UnitAddCommandCap_LuaFuncDef();
   CScrLuaInitForm* func_UnitRestoreBuildRestrictions_LuaFuncDef();
-  void func_UnitRemoveBuildRestriction_LuaFuncDef();
+  CScrLuaInitForm* func_UnitRemoveBuildRestriction_LuaFuncDef();
   CScrLuaInitForm* func_UnitAddBuildRestriction_LuaFuncDef();
 
   /**
@@ -97,19 +104,110 @@ namespace moho
   CScrLuaInitForm* func_UnitSetConsumptionPerSecondEnergy_LuaFuncDef();
   CScrLuaInitForm* func_UnitGetBuildRate_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetBuildRate_LuaFuncDef();
+
+  /**
+   * Address: 0x006C99A0 (FUN_006C99A0, func_UnitIsOverchargePaused_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:IsOverchargePaused()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitIsOverchargePaused_LuaFuncDef();
+
+  /**
+   * Address: 0x006C9860 (FUN_006C9860, func_UnitSetOverchargePaused_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:SetOverchargePaused(flag)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitSetOverchargePaused_LuaFuncDef();
+
+  /**
+   * Address: 0x006C9720 (FUN_006C9720, func_UnitIsCapturable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:IsCapturable()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitIsCapturable_LuaFuncDef();
+
+  /**
+   * Address: 0x006C95D0 (FUN_006C95D0, func_UnitSetCapturable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:SetCapturable(flag)` Lua binder definition.
+  */
   CScrLuaInitForm* func_UnitSetCapturable_LuaFuncDef();
-  CScrLuaInitForm* func_UnitGetStat_LuaFuncDef();
+
+  /**
+   * Address: 0x006CC440 (FUN_006CC440, func_UnitGetVelocity_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetVelocity() -> x,y,z` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetVelocity_LuaFuncDef();
+
+  /**
+   * Address: 0x006CC5C0 (FUN_006CC5C0, func_UnitGetStat_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetStat(name[, defaultValue])` Lua binder definition.
+   */
+  CScrLuaInitForm* func_UnitGetStat_LuaFuncDef();
+
+  /**
+   * Address: 0x006CC2F0 (FUN_006CC2F0, func_UnitGetNavigator_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetNavigator()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetNavigator_LuaFuncDef();
+
+  /**
+   * Address: 0x006CC1A0 (FUN_006CC1A0, func_UnitIsMoving_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:IsMoving()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitIsMoving_LuaFuncDef();
+
+  /**
+   * Address: 0x006CC060 (FUN_006CC060, func_UnitIsMobile_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:IsMobile()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitIsMobile_LuaFuncDef();
   CScrLuaInitForm* func_UnitCanPathToRect_LuaFuncDef();
+
+  /**
+   * Address: 0x006CB900 (FUN_006CB900, func_UnitCanPathTo_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:CanPathTo(goal)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitCanPathTo_LuaFuncDef();
+
+  /**
+   * Address: 0x006CB7B0 (FUN_006CB7B0, func_UnitGetCurrentLayer_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetCurrentLayer()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetCurrentLayer_LuaFuncDef();
+
+  /**
+   * Address: 0x006CB5A0 (FUN_006CB5A0, func_UnitRecoilImpulse_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:RecoilImpulse(x, y, z)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitRecoilImpulse_LuaFuncDef();
+
+  /**
+   * Address: 0x006CB470 (FUN_006CB470, func_UnitRevertCollisionShape_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:RevertCollisionShape()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitRevertCollisionShape_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetBreakOffDistanceMult_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetBreakOffTriggerMult_LuaFuncDef();
@@ -117,8 +215,29 @@ namespace moho
   CScrLuaInitForm* func_UnitSetAccMult_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetSpeedMult_LuaFuncDef();
   CScrLuaInitForm* func_UnitRevertElevation_LuaFuncDef();
+
+  /**
+   * Address: 0x006CECE0 (FUN_006CECE0, func_UnitGiveNukeSiloAmmo_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GiveNukeSiloAmmo(num)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGiveNukeSiloAmmo_LuaFuncDef();
+
+  /**
+   * Address: 0x006CEA80 (FUN_006CEA80, func_UnitGetCurrentMoveLocation_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GetCurrentMoveLocation()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetCurrentMoveLocation_LuaFuncDef();
+
+  /**
+   * Address: 0x006CE440 (FUN_006CE440, func_UnitPrintCommandQueue_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:PrintCommandQueue()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitPrintCommandQueue_LuaFuncDef();
 
   /**
@@ -131,36 +250,191 @@ namespace moho
   CScrLuaInitForm* func_UnitMeleeWarpAdjacentToTarget_LuaFuncDef();
   CScrLuaInitForm* func_UnitHasMeleeSpaceAroundTarget_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetCustomName_LuaFuncDef();
+
+  /**
+   * Address: 0x006CD970 (FUN_006CD970, func_UnitAddUnitToStorage_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:AddUnitToStorage(storedUnit)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitAddUnitToStorage_LuaFuncDef();
+
+  /**
+   * Address: 0x006CD800 (FUN_006CD800, func_UnitHasValidTeleportDest_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:HasValidTeleportDest()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitHasValidTeleportDest_LuaFuncDef();
+
+  /**
+   * Address: 0x006CD680 (FUN_006CD680, func_UnitGetTransportFerryBeacon_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GetTransportFerryBeacon()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetTransportFerryBeacon_LuaFuncDef();
+
+  /**
+   * Address: 0x006CD480 (FUN_006CD480, func_UnitGetGuards_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GetGuards()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetGuards_LuaFuncDef();
+
+  /**
+   * Address: 0x006CD320 (FUN_006CD320, func_UnitGetGuardedUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GetGuardedUnit()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetGuardedUnit_LuaFuncDef();
   void func_NotifyUpgrade_LuaFuncDef();
+
+  /**
+   * Address: 0x006CCCD0 (FUN_006CCCD0, func_UnitGetWorkProgress_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetWorkProgress()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetWorkProgress_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetWorkProgress_LuaFuncDef();
+
+  /**
+   * Address: 0x006CC900 (FUN_006CC900, func_UnitSetStat_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:SetStat(name, value)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitSetStat_LuaFuncDef();
+
+  /**
+   * Address: 0x006CEE30 (FUN_006CEE30, func_UnitRemoveNukeSiloAmmo_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:RemoveNukeSiloAmmo(num)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitRemoveNukeSiloAmmo_LuaFuncDef();
+
+  /**
+   * Address: 0x006CEF80 (FUN_006CEF80, func_UnitGetNukeSiloAmmoCount_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GetNukeSiloAmmoCount()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetNukeSiloAmmoCount_LuaFuncDef();
+
+  /**
+   * Address: 0x006CF0F0 (FUN_006CF0F0, func_UnitGiveTacticalSiloAmmo_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GiveTacticalSiloAmmo(num)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGiveTacticalSiloAmmo_LuaFuncDef();
+
+  /**
+   * Address: 0x006CF240 (FUN_006CF240, func_UnitRemoveTacticalSiloAmmo_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:RemoveTacticalSiloAmmo(num)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitRemoveTacticalSiloAmmo_LuaFuncDef();
+
+  /**
+   * Address: 0x006CF390 (FUN_006CF390, func_UnitGetTacticalSiloAmmoCount_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Unit:GetTacticalSiloAmmoCount()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetTacticalSiloAmmoCount_LuaFuncDef();
   CScrLuaInitForm* func_CreateUnit_LuaFuncDef();
   CScrLuaInitForm* func_CreateUnitHPR_LuaFuncDef();
   CScrLuaInitForm* func_CreateUnit2_LuaFuncDef();
   CScrLuaInitForm* func_UnitCanBuild_LuaFuncDef();
+
+  /**
+   * Address: 0x006D05F0 (FUN_006D05F0, func_UnitGetRallyPoint_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetRallyPoint()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetRallyPoint_LuaFuncDef();
+
+  /**
+   * Address: 0x006D0790 (FUN_006D0790, func_UnitGetFuelUseTime_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetFuelUseTime()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetFuelUseTime_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetFuelUseTime_LuaFuncDef();
+
+  /**
+   * Address: 0x006D0A70 (FUN_006D0A70, func_UnitGetFuelRatio_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetFuelRatio()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetFuelRatio_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetFuelRatio_LuaFuncDef();
   CScrLuaInitForm* func_UnitSetShieldRatio_LuaFuncDef();
+
+  /**
+   * Address: 0x006D0EC0 (FUN_006D0EC0, func_UnitGetShieldRatio_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetShieldRatio()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetShieldRatio_LuaFuncDef();
+
+  /**
+   * Address: 0x006D1000 (FUN_006D1000, func_UnitGetBlip_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:GetBlip(armyIndex)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitGetBlip_LuaFuncDef();
+
+  /**
+   * Address: 0x006D1190 (FUN_006D1190, func_UnitTransportHasSpaceFor_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:TransportHasSpaceFor(target)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitTransportHasSpaceFor_LuaFuncDef();
+
+  /**
+   * Address: 0x006D1340 (FUN_006D1340, func_UnitTransportHasAvailableStorage_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:TransportHasAvailableStorage()` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitTransportHasAvailableStorage_LuaFuncDef();
+
+  /**
+   * Address: 0x005E8660 (FUN_005E8660, func_UnitTransportDetachAllUnits_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:TransportDetachAllUnits(destroySomeUnits)` Lua binder
+   * definition.
+   */
   CScrLuaInitForm* func_UnitTransportDetachAllUnits_LuaFuncDef();
+
+  /**
+   * Address: 0x006D1490 (FUN_006D1490, func_UnitShowBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:ShowBone(self,bone,affectChildren)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitShowBone_LuaFuncDef();
+
+  /**
+   * Address: 0x006D1630 (FUN_006D1630, func_UnitHideBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `Unit:HideBone(self,bone,affectChildren)` Lua binder definition.
+   */
   CScrLuaInitForm* func_UnitHideBone_LuaFuncDef();
   CScrLuaInitForm* func_CUnitScriptTaskGetUnit_LuaFuncDef();
   CScrLuaInitForm* func_CUnitScriptTaskSetAIResult_LuaFuncDef();

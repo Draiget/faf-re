@@ -1,6 +1,9 @@
 #include "moho/task/CTaskThreadWeakPtrReflection.h"
 
+#include <cstddef>
+#include <cstdlib>
 #include <cstdint>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -80,7 +83,14 @@ namespace
     throw gpg::SerializationError(msg.c_str());
   }
 
-  moho::RWeakPtrType<moho::CTaskThread> gWeakPtrCTaskThreadType;
+  alignas(moho::RWeakPtrType<moho::CTaskThread>)
+    std::byte gWeakPtrCTaskThreadTypeStorage[sizeof(moho::RWeakPtrType<moho::CTaskThread>)]{};
+  bool gWeakPtrCTaskThreadTypeConstructed = false;
+
+  [[nodiscard]] moho::RWeakPtrType<moho::CTaskThread>& WeakPtrCTaskThreadTypeSlot()
+  {
+    return *reinterpret_cast<moho::RWeakPtrType<moho::CTaskThread>*>(gWeakPtrCTaskThreadTypeStorage);
+  }
 } // namespace
 
 /**
@@ -234,3 +244,53 @@ void moho::WeakPtr_CTaskThread::Serialize(
   const gpg::RRef objectRef = MakeCTaskThreadRef(weak ? weak->GetObjectPtr() : nullptr);
   gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, owner);
 }
+
+namespace moho
+{
+  /**
+   * Address: 0x00BEE620 (FUN_00BEE620, ??1RWeakPtrType_CTaskThread@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Executes process-exit teardown for startup `RWeakPtrType<CTaskThread>`
+   * storage.
+   */
+  void cleanup_RWeakPtrType_CTaskThread()
+  {
+    if (!gWeakPtrCTaskThreadTypeConstructed) {
+      return;
+    }
+
+    WeakPtrCTaskThreadTypeSlot().~RWeakPtrType();
+    gWeakPtrCTaskThreadTypeConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BC3120 (FUN_00BC3120, register_RWeakPtrType_CTaskThread)
+   *
+   * What it does:
+   * Materializes startup `RWeakPtrType<CTaskThread>` storage and registers
+   * process-exit teardown.
+   */
+  void register_RWeakPtrType_CTaskThread()
+  {
+    if (!gWeakPtrCTaskThreadTypeConstructed) {
+      ::new (static_cast<void*>(&WeakPtrCTaskThreadTypeSlot())) RWeakPtrType<CTaskThread>();
+      gWeakPtrCTaskThreadTypeConstructed = true;
+    }
+
+    (void)std::atexit(&cleanup_RWeakPtrType_CTaskThread);
+  }
+} // namespace moho
+
+namespace
+{
+  struct WeakPtrCTaskThreadReflectionBootstrap
+  {
+    WeakPtrCTaskThreadReflectionBootstrap()
+    {
+      moho::register_RWeakPtrType_CTaskThread();
+    }
+  };
+
+  [[maybe_unused]] WeakPtrCTaskThreadReflectionBootstrap gWeakPtrCTaskThreadReflectionBootstrap;
+} // namespace

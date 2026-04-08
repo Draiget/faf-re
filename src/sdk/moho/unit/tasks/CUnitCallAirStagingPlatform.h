@@ -16,6 +16,18 @@ namespace moho
   public:
     static gpg::RType* sType;
 
+    CUnitCallAirStagingPlatform() = default;
+
+    /**
+     * Address: 0x006018E0 (FUN_006018E0, ??0CUnitCallAirStagingPlatform@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes an air-staging-call task using parent dispatch context,
+     * binds the platform weak-pointer lane, clears completion state, and sets
+     * unit-state bits required by the call-lane.
+     */
+    CUnitCallAirStagingPlatform(CCommandTask* parentTask, Unit* platformUnit);
+
     /**
      * Address: 0x00603DF0 (FUN_00603DF0)
      *
@@ -36,6 +48,13 @@ namespace moho
     static void
     MemberSerialize(gpg::WriteArchive* archive, const CUnitCallAirStagingPlatform* task, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x00601E00 (FUN_00601E00, Moho::CUnitCallAirStagingPlatform::TaskTick)
+     *
+     * What it does:
+     * Runs the air-staging call state machine: validates unit/platform state,
+     * steers to pickup/attach goals, and finalizes attach completion flags.
+     */
     int Execute() override;
 
   public:
@@ -54,3 +73,15 @@ namespace moho
     "CUnitCallAirStagingPlatform::mDone offset must be 0x38"
   );
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x006036E0 (FUN_006036E0, gpg::RRef_CUnitCallAirStagingPlatform)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitCallAirStagingPlatform*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitCallAirStagingPlatform(gpg::RRef* outRef, moho::CUnitCallAirStagingPlatform* value);
+} // namespace gpg

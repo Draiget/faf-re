@@ -894,6 +894,33 @@ namespace moho
   }
 
   /**
+   * Address: 0x006FE5B0 (FUN_006FE5B0, ??0CArmyImpl@Moho@@QAE@@Z_0)
+   *
+   * What it does:
+   * Initializes CArmyImpl-owned runtime pointer lanes and binds platoon-pool
+   * storage pointers to inline storage.
+   */
+  CArmyImpl::CArmyImpl()
+    : Simulation(nullptr)
+    , AiBrain(nullptr)
+    , AiReconDb(nullptr)
+    , EconomyInfo(nullptr)
+    , ArmyPlans()
+    , Stats(nullptr)
+    , InfluenceMap(nullptr)
+    , PathFinder(nullptr)
+    , UnknownShared220{}
+    , UnitCategorySetsBegin(nullptr)
+    , UnitCategorySetsEnd(nullptr)
+    , UnitCategorySetsCapacityEnd(nullptr)
+  {
+    PlatoonPool.platoons.start_ = PlatoonPool.platoons.inlineVec_;
+    PlatoonPool.platoons.end_ = PlatoonPool.platoons.inlineVec_;
+    PlatoonPool.platoons.capacity_ = PlatoonPool.platoons.inlineVec_ + 8;
+    PlatoonPool.platoons.originalVec_ = PlatoonPool.platoons.inlineVec_;
+  }
+
+  /**
    * Address: 0x006FE670 (FUN_006FE670, Moho::CArmyImpl::~CArmyImpl)
    *
    * What it does:

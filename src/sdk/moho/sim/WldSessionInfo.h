@@ -45,6 +45,15 @@ namespace moho
     std::uint8_t pad_27{};                         // 0x27
     IClientManager* mClientManager;                // 0x28
     std::uint32_t mSourceId;                       // 0x2C
+
+    /**
+     * Address: 0x007C90E0 (FUN_007C90E0, ??1SWldSessionInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Releases owned client-manager bootstrap object, then tears down launch
+     * info and map-name lanes via normal member destruction.
+     */
+    ~SWldSessionInfo();
   };
 
   static_assert(sizeof(SWldSessionInfo) == 0x30, "SWldSessionInfo size must be 0x30");

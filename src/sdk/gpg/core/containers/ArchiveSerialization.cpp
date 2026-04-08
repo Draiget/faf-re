@@ -1,10 +1,13 @@
 #include "ArchiveSerialization.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -20,8 +23,95 @@
 
 using namespace gpg;
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    /**
+     * Address: 0x0094F5E0 (FUN_0094F5E0, gpg::SerConstructResult::SetOwned)
+     *
+     * What it does:
+     * Marks load-construct result ownership as `OWNED` and stores the
+     * constructed reflected reference.
+     */
+    void SetOwned(const RRef& ref, unsigned int flags);
+
+    /**
+     * Address: 0x0094F630 (FUN_0094F630, gpg::SerConstructResult::SetUnowned)
+     *
+     * What it does:
+     * Marks load-construct result ownership as `UNOWNED` and stores the
+     * constructed reflected reference.
+     */
+    void SetUnowned(const RRef& ref, unsigned int flags);
+
+    /**
+     * Address: 0x0094F6D0 (FUN_0094F6D0, gpg::SerConstructResult::SetShared)
+     *
+     * What it does:
+     * Marks load-construct result ownership as `SHARED`, retains one
+     * `boost::shared_ptr<void>` lane, and stores the reflected reference.
+     */
+    void SetShared(const boost::shared_ptr<void>& object, RType* type, unsigned int flags);
+  };
+
+  class SerSaveConstructArgsResult
+  {
+  public:
+    /**
+     * Address: 0x0094F7D0 (FUN_0094F7D0, gpg::SerSaveConstructArgsResult::SetShared)
+     *
+     * What it does:
+     * Marks save-construct ownership lane as `SHARED` from the reserved state.
+     */
+    void SetShared(unsigned int flags);
+
+    /**
+     * Address: 0x0094F790 (FUN_0094F790, gpg::SerSaveConstructArgsResult::SetUnowned)
+     *
+     * What it does:
+     * Marks save-construct ownership lane as `UNOWNED` from the reserved state.
+     */
+    void SetUnowned(unsigned int flags);
+  };
+} // namespace gpg
+
 namespace
 {
+  struct SerConstructResultView
+  {
+    gpg::RRef mRef;                   // +0x00
+    boost::SharedPtrRaw<void> mSharedPtr; // +0x08
+    TrackedPointerState mState;       // +0x10
+    std::uint8_t mSharedFlag;         // +0x14
+  };
+  static_assert(offsetof(SerConstructResultView, mRef) == 0x0, "SerConstructResultView::mRef offset must be 0x0");
+  static_assert(
+    offsetof(SerConstructResultView, mSharedPtr) == 0x8, "SerConstructResultView::mSharedPtr offset must be 0x8"
+  );
+  static_assert(offsetof(SerConstructResultView, mState) == 0x10, "SerConstructResultView::mState offset must be 0x10");
+  static_assert(
+    offsetof(SerConstructResultView, mSharedFlag) == 0x14, "SerConstructResultView::mSharedFlag offset must be 0x14"
+  );
+  static_assert(sizeof(SerConstructResultView) == 0x18, "SerConstructResultView size must be 0x18");
+
+  struct SerSaveConstructArgsResultView
+  {
+    TrackedPointerState mOwnership;
+    std::uint8_t mFlagByte4;
+  };
+  static_assert(
+    offsetof(SerSaveConstructArgsResultView, mOwnership) == 0x0,
+    "SerSaveConstructArgsResultView::mOwnership offset must be 0x0"
+  );
+  static_assert(
+    offsetof(SerSaveConstructArgsResultView, mFlagByte4) == 0x4,
+    "SerSaveConstructArgsResultView::mFlagByte4 offset must be 0x4"
+  );
+
+  constexpr const char* kSerializationCppPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.cpp";
+
   [[noreturn]] void ThrowSerializationError(const char* const message)
   {
     throw SerializationError(message ? message : "");
@@ -203,6 +293,119 @@ namespace
     outPointer.assign_retain(source);
   }
 } // namespace
+
+/**
+ * Address: 0x0094F5E0 (FUN_0094F5E0, gpg::SerConstructResult::SetOwned)
+ *
+ * What it does:
+ * Transitions one construct-result lane from `RESERVED` to `OWNED`, stores the
+ * reflected object reference, and clears the shared-flag byte when bit 0 in
+ * `flags` is set.
+ */
+void gpg::SerConstructResult::SetOwned(const RRef& ref, const unsigned int flags)
+{
+  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
+  if (view->mState != TrackedPointerState::Reserved) {
+    gpg::HandleAssertFailure("mInfo.mState == RESERVED", 196, kSerializationCppPath);
+  }
+
+  view->mRef = ref;
+  view->mState = TrackedPointerState::Owned;
+  if ((flags & 1u) != 0u) {
+    view->mSharedFlag = 0;
+  }
+}
+
+/**
+ * Address: 0x0094F630 (FUN_0094F630, gpg::SerConstructResult::SetUnowned)
+ *
+ * What it does:
+ * Transitions one construct-result lane from `RESERVED` to `UNOWNED`, stores
+ * the reflected object reference, and clears the shared-flag byte when bit 0
+ * in `flags` is set.
+ */
+void gpg::SerConstructResult::SetUnowned(const RRef& ref, const unsigned int flags)
+{
+  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
+  if (view->mState != TrackedPointerState::Reserved) {
+    gpg::HandleAssertFailure("mInfo.mState == RESERVED", 204, kSerializationCppPath);
+  }
+
+  view->mRef = ref;
+  view->mState = TrackedPointerState::Unowned;
+  if ((flags & 1u) != 0u) {
+    view->mSharedFlag = 0;
+  }
+}
+
+/**
+ * Address: 0x0094F6D0 (FUN_0094F6D0, gpg::SerConstructResult::SetShared)
+ *
+ * What it does:
+ * Transitions one construct-result lane from `RESERVED` to `SHARED`, retains
+ * the incoming shared control block, stores the reflected object reference,
+ * and clears the shared-flag byte when bit 0 in `flags` is set.
+ */
+void gpg::SerConstructResult::SetShared(
+  const boost::shared_ptr<void>& object,
+  RType* const type,
+  const unsigned int flags
+)
+{
+  auto* const view = reinterpret_cast<SerConstructResultView*>(this);
+  if (view->mState != TrackedPointerState::Reserved) {
+    gpg::HandleAssertFailure("mInfo.mState == RESERVED", 220, kSerializationCppPath);
+  }
+
+  const boost::SharedPtrRaw<void> sourceShared = boost::SharedPtrRawFromSharedBorrow(object);
+  view->mSharedPtr.assign_retain(sourceShared);
+  view->mRef.mObj = sourceShared.px;
+  view->mRef.mType = type;
+  view->mState = TrackedPointerState::Shared;
+  if ((flags & 1u) != 0u) {
+    view->mSharedFlag = 0;
+  }
+}
+
+/**
+ * Address: 0x0094F790 (FUN_0094F790, gpg::SerSaveConstructArgsResult::SetUnowned)
+ *
+ * What it does:
+ * Transitions one save-construct result lane from `RESERVED` to `UNOWNED`
+ * and clears the byte-at-+4 lane when bit 0 in `flags` is set.
+ */
+void gpg::SerSaveConstructArgsResult::SetUnowned(const unsigned int flags)
+{
+  auto* const view = reinterpret_cast<SerSaveConstructArgsResultView*>(this);
+  if (view->mOwnership != TrackedPointerState::Reserved) {
+    gpg::HandleAssertFailure("mOwnership == RESERVED", 409, kSerializationCppPath);
+  }
+
+  view->mOwnership = TrackedPointerState::Unowned;
+  if ((flags & 1u) != 0u) {
+    view->mFlagByte4 = 0;
+  }
+}
+
+/**
+ * Address: 0x0094F7D0 (FUN_0094F7D0, gpg::SerSaveConstructArgsResult::SetShared)
+ *
+ * What it does:
+ * Transitions one save-construct result lane from `RESERVED` to `SHARED`
+ * and clears the byte-at-+4 lane when bit 0 in `flags` is set.
+ */
+void gpg::SerSaveConstructArgsResult::SetShared(const unsigned int flags)
+{
+  auto* const view = reinterpret_cast<SerSaveConstructArgsResultView*>(this);
+  if (view->mOwnership != TrackedPointerState::Reserved) {
+    gpg::HandleAssertFailure("mOwnership == RESERVED", 416, kSerializationCppPath);
+  }
+
+  view->mOwnership = TrackedPointerState::Shared;
+  if ((flags & 1u) != 0u) {
+    view->mFlagByte4 = 0;
+  }
+}
 
 /**
  * Address: 0x00953320 (FUN_00953320)

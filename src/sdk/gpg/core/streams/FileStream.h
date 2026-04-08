@@ -36,6 +36,13 @@ namespace gpg
             DWORD mMsg{ 0 };
 
         private:
+            /**
+             * Address: 0x00957950 (FUN_00957950, gpg::GetWin32ErrorString)
+             *
+             * What it does:
+             * Formats a Win32 error id to UTF-8 text and falls back to
+             * `"Unknown error 0x%08x"` when system message lookup fails.
+             */
             static std::string BuildMessage(DWORD messageId);
         };
 

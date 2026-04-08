@@ -17,9 +17,18 @@ namespace
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    /**
+     * Address: 0x00519300 (FUN_00519300, gpg::RVectorType_RMeshBlueprintLOD::GetLexical)
+     *
+     * What it does:
+     * Returns base lexical text plus reflected vector size for one
+     * `msvc8::vector<moho::RMeshBlueprintLOD>` instance.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -69,6 +78,13 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x00519240 (FUN_00519240, gpg::RVectorType_RMeshBlueprintLOD::GetName)
+   *
+   * What it does:
+   * Builds and caches lexical reflection name `vector<element>` for
+   * `msvc8::vector<moho::RMeshBlueprintLOD>`.
+   */
   const char* VectorTypeInfo::GetName() const
   {
     static msvc8::string cachedName{};
@@ -80,6 +96,13 @@ namespace
     return cachedName.c_str();
   }
 
+  /**
+   * Address: 0x00519300 (FUN_00519300, gpg::RVectorType_RMeshBlueprintLOD::GetLexical)
+   *
+   * What it does:
+   * Returns base lexical text plus reflected vector size for one
+   * `msvc8::vector<moho::RMeshBlueprintLOD>` instance.
+   */
   msvc8::string VectorTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
@@ -95,6 +118,85 @@ namespace
   {
     size_ = sizeof(LODVector);
     version_ = 1;
+    serLoadFunc_ = &VectorTypeInfo::SerLoad;
+    serSaveFunc_ = &VectorTypeInfo::SerSave;
+  }
+
+  /**
+   * Address: 0x00519620 (FUN_00519620, gpg::RVectorType_RMeshBlueprintLOD::SerLoad)
+   *
+   * What it does:
+   * Deserializes one `vector<RMeshBlueprintLOD>` payload and replaces destination
+   * storage in one assignment.
+   */
+  void VectorTypeInfo::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  {
+    auto* const storage = reinterpret_cast<LODVector*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    LODVector loaded{};
+    loaded.reserve(static_cast<std::size_t>(count));
+
+    gpg::RType* const elementType = CachedRMeshBlueprintLODType();
+    GPG_ASSERT(elementType != nullptr);
+    if (!elementType) {
+      *storage = loaded;
+      return;
+    }
+
+    const gpg::RRef emptyOwner{};
+    for (unsigned int i = 0; i < count; ++i) {
+      moho::RMeshBlueprintLOD element{};
+      archive->Read(elementType, &element, emptyOwner);
+      loaded.push_back(element);
+    }
+
+    *storage = loaded;
+  }
+
+  /**
+   * Address: 0x00519750 (FUN_00519750, gpg::RVectorType_RMeshBlueprintLOD::SerSave)
+   *
+   * What it does:
+   * Serializes one `vector<RMeshBlueprintLOD>` payload element-by-element.
+   */
+  void VectorTypeInfo::SerSave(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const storage = reinterpret_cast<const LODVector*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const unsigned int count = static_cast<unsigned int>(storage->size());
+    archive->WriteUInt(count);
+    if (count == 0u) {
+      return;
+    }
+
+    gpg::RType* const elementType = CachedRMeshBlueprintLODType();
+    GPG_ASSERT(elementType != nullptr);
+    if (!elementType) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(elementType, &(*storage)[static_cast<std::size_t>(i)], owner);
+    }
   }
 
   gpg::RRef VectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const

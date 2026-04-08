@@ -84,10 +84,6 @@ namespace moho
   void CAimManipulatorSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
     auto* const object = reinterpret_cast<CAimManipulator*>(static_cast<std::uintptr_t>(objectPtr));
-    if (!archive || !object) {
-      return;
-    }
-
     CAimManipulator::MemberDeserialize(object, archive);
   }
 
@@ -97,10 +93,6 @@ namespace moho
   void CAimManipulatorSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
   {
     auto* const object = reinterpret_cast<const CAimManipulator*>(static_cast<std::uintptr_t>(objectPtr));
-    if (!archive || !object) {
-      return;
-    }
-
     CAimManipulator::MemberSerialize(object, archive);
   }
 

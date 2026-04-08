@@ -135,7 +135,7 @@ namespace gpg
   {
   public:
     /**
-     * Address: 0x00694380 (FUN_00694380, type startup lane)
+     * Address: 0x00693C00 (FUN_00693C00, gpg::RFastVectorType_EntityP::GetName)
      */
     [[nodiscard]] const char* GetName() const override;
 

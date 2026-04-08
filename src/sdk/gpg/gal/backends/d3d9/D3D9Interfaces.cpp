@@ -6911,6 +6911,22 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F5190 (FUN_008F5190, gpg::gal::IndexBufferD3D9::GetBuffer)
+     *
+     * What it does:
+     * Returns the retained D3D9 index-buffer handle and throws when unset.
+     */
+    void* IndexBufferD3D9::GetBuffer()
+    {
+        if (d3dIndexBuffer_ == nullptr)
+        {
+            ThrowGalError("IndexBufferD3D9.cpp", 105, "invalid index buffer");
+        }
+
+        return d3dIndexBuffer_;
+    }
+
+    /**
      * Address: 0x0094A030 (FUN_0094A030)
      *
      * What it does:
@@ -7532,6 +7548,22 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F5CE0 (FUN_008F5CE0, gpg::gal::VertexBufferD3D9::GetD3D)
+     *
+     * What it does:
+     * Returns the retained D3D9 vertex-buffer handle and throws when unset.
+     */
+    void* VertexBufferD3D9::GetD3D()
+    {
+        if (d3dVertexBuffer_ == nullptr)
+        {
+            ThrowGalError("VertexBufferD3D9.cpp", 105, "invalid vertex buffer");
+        }
+
+        return d3dVertexBuffer_;
+    }
+
+    /**
      * Address: 0x0094AD40 (FUN_0094AD40)
      *
      * What it does:
@@ -7540,5 +7572,21 @@ namespace gpg::gal
     VertexFormatD3D9::~VertexFormatD3D9()
     {
         DestroyVertexFormatD3D9Body(this);
+    }
+
+    /**
+     * Address: 0x0094AD60 (FUN_0094AD60, gpg::gal::VertexFormatD3D9::GetDeclaration)
+     *
+     * What it does:
+     * Returns the retained D3D9 vertex-declaration handle and throws when unset.
+     */
+    void* VertexFormatD3D9::GetDeclaration()
+    {
+        if (vertexDeclaration_ == nullptr)
+        {
+            ThrowGalError("VertexFormatD3D9.cpp", 120, "invalid vertex format");
+        }
+
+        return vertexDeclaration_;
     }
 }

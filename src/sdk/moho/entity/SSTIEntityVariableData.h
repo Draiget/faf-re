@@ -89,6 +89,15 @@ namespace moho
      */
     SSTIEntityVariableData& operator=(const SSTIEntityVariableData& rhs);
 
+    /**
+     * Address: 0x00559E00 (FUN_00559E00, Moho::SSTIEntityVariableData::MemberSerialize)
+     *
+     * What it does:
+     * Serializes replicated variable payload lanes using reflection RTTI.
+     * Rejects serializer versions older than 2.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version);
+
     [[nodiscard]] std::uint32_t GetVisibilityGridMask() const noexcept;
     void SetVisibilityGridMask(std::uint32_t gridMask) noexcept;
     [[nodiscard]] bool UsesUnderwaterReconGrid() const noexcept;

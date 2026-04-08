@@ -62,4 +62,13 @@ namespace moho
   };
 
   static_assert(sizeof(IdPoolTypeInfo) == 0x64, "IdPoolTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BC2D80 (FUN_00BC2D80, register_IdPoolTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `IdPoolTypeInfo` storage and registers process-exit
+   * teardown.
+   */
+  void register_IdPoolTypeInfo();
 } // namespace moho

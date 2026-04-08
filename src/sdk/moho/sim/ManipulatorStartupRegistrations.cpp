@@ -5,10 +5,12 @@
 #include <cstring>
 #include <vector>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAimManipulator.h"
 #include "moho/ai/CAimManipulatorSerializer.h"
 #include "moho/ai/CAimManipulatorTypeInfo.h"
+#include "moho/animation/CSlideManipulator.h"
 #include "moho/console/CConCommand.h"
 #include "moho/containers/BitStorage32.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -133,6 +135,8 @@ namespace
   alignas(RVectorTypeBool) unsigned char gRecoveredRVectorTypeBoolStorage[sizeof(RVectorTypeBool)] = {};
   bool gRecoveredRVectorTypeBoolConstructed = false;
   thread_local bool gRecoveredRVectorTypeBoolSubscriptScratch = false;
+  msvc8::string gRecoveredRVectorTypeBoolName;
+  bool gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
 
   [[nodiscard]] RVectorTypeBool* AcquireRecoveredRVectorTypeBool()
   {
@@ -152,6 +156,15 @@ namespace
       if (!cached) {
         cached = gpg::REF_FindTypeNamed("bool");
       }
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVectorBoolElementType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(bool));
     }
     return cached;
   }
@@ -186,9 +199,31 @@ namespace
     gRecoveredRVectorTypeBoolConstructed = false;
   }
 
+  void cleanup_RVectorTypeBoolName()
+  {
+    gRecoveredRVectorTypeBoolName.clear();
+    gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
+  }
+
+  /**
+   * Address: 0x00641C20 (FUN_00641C20, gpg::RVectorType_bool::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `vector<bool>` type name.
+   */
   const char* RVectorTypeBool::GetName() const
   {
-    return "vector<bool>";
+    if (gRecoveredRVectorTypeBoolName.empty()) {
+      const gpg::RType* const elementType = CachedVectorBoolElementType();
+      const char* const elementName = elementType ? elementType->GetName() : "bool";
+      gRecoveredRVectorTypeBoolName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "bool");
+      if (!gRecoveredRVectorTypeBoolNameCleanupRegistered) {
+        gRecoveredRVectorTypeBoolNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_RVectorTypeBoolName);
+      }
+    }
+
+    return gRecoveredRVectorTypeBoolName.c_str();
   }
 
   const gpg::RIndexed* RVectorTypeBool::IsIndexed() const
@@ -633,7 +668,9 @@ namespace moho
    */
   int register_CScrLuaMetatableFactory_CSlideManipulator_Index()
   {
-    return RegisterRecoveredFactoryIndex<&gRecoveredCScrLuaMetatableFactoryCSlideManipulatorIndex>();
+    const int index = RegisterRecoveredFactoryIndex<&gRecoveredCScrLuaMetatableFactoryCSlideManipulatorIndex>();
+    CScrLuaMetatableFactory<CSlideManipulator>::Instance().SetFactoryObjectIndexForRecovery(index);
+    return index;
   }
 
   /**

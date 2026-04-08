@@ -6,6 +6,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/misc/ScrSourceCtrl.h"
 
 namespace moho
 {
@@ -299,7 +300,7 @@ namespace moho
     std::uint8_t mIsInitializingControls = 0; // +0x178
     std::uint8_t mUnknown179To17F[0x7]{};
     void* mSourcePathOwnerControl = nullptr;  // +0x180
-    void* mSourceControl = nullptr;           // +0x184
+    ScrSourceCtrl* mSourceControl = nullptr;  // +0x184
     void* mCallStackControl = nullptr;        // +0x188
     ScrWatchCtrl* mLocalWatchControl = nullptr;   // +0x18C
     ScrWatchCtrl* mGlobalWatchControl = nullptr;  // +0x190

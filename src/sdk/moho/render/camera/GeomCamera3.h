@@ -41,6 +41,15 @@ namespace moho
     GeomCamera3();
 
     /**
+     * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Releases frustum-plane heap buffers for both solids and rebinds each
+     * lane to inline storage before member teardown.
+     */
+    ~GeomCamera3();
+
+    /**
      * Address: 0x0046FFA0 (FUN_0046FFA0, Moho::GeomCamera3::GeomCamera3)
      *
      * Moho::VTransform const&, Moho::VMatrix4 const&

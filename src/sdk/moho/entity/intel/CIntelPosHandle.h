@@ -58,6 +58,15 @@ namespace moho
     std::int32_t UpdatePos(std::int32_t curTick, const Wm3::Vec3f& newPos);
 
     /**
+     * Address: 0x0076D980 (FUN_0076D980, Moho::CIntelPosHandle::ChangeRadius)
+     *
+     * What it does:
+     * Rebuilds active grid coverage when the requested radius differs from the
+     * current one, preserving the existing world position.
+     */
+    void ChangeRadius(std::int32_t newRadius);
+
+    /**
      * Address: 0x00770000 (FUN_00770000, Moho::CIntelPosHandle::MemberDeserialize)
      *
      * gpg::ReadArchive *

@@ -65,4 +65,12 @@ namespace moho
    * runtime type metadata.
    */
   void register_SBatchTextureDataPrefetchType();
+
+  /**
+   * Address: 0x00BC4440 (FUN_00BC4440, register_PrefetchType_batch_textures)
+   *
+   * What it does:
+   * Startup thunk that forwards to `register_SBatchTextureDataPrefetchType`.
+   */
+  void register_PrefetchType_batch_textures();
 } // namespace moho

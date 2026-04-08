@@ -118,7 +118,6 @@ namespace moho
     using FileTextureRetainQueue = msvc8::vector<FileTextureHandle>;
     constexpr std::size_t kRetainQueueLimit = 30u;
 
-    boost::mutex sResourceLock;
     TextureLookupMap sTextureMap;
     FileTextureRetainQueue sFileTextures;
 
@@ -488,6 +487,22 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x00BC43A0 (FUN_00BC43A0, register_mTextureMap)
+   */
+  void register_mTextureMap()
+  {
+    (void)InitializeTextureLookupMapStorage();
+  }
+
+  /**
+   * Address: 0x00BC43E0 (FUN_00BC43E0, register_sFileTextures)
+   */
+  void register_sFileTextures()
+  {
+    (void)InitializeFileTextureRetainQueueStorage();
+  }
+
+  /**
    * Address: 0x004483E0 (FUN_004483E0, Moho::CD3DFileBatchTexture::CD3DFileBatchTexture)
    */
   CD3DFileBatchTexture::CD3DFileBatchTexture(
@@ -636,3 +651,17 @@ namespace moho
     return detail::CopyResult(outTexture);
   }
 } // namespace moho
+
+namespace
+{
+  struct FileBatchTextureCacheBootstrap
+  {
+    FileBatchTextureCacheBootstrap()
+    {
+      moho::register_mTextureMap();
+      moho::register_sFileTextures();
+    }
+  };
+
+  FileBatchTextureCacheBootstrap gFileBatchTextureCacheBootstrap;
+} // namespace

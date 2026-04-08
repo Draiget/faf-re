@@ -12,7 +12,7 @@ typedef int ls_hash;
 typedef unsigned int Instruction;
 typedef __int64 type_ptrdiff_t;
 typedef int(__cdecl* CFunction)(lua_State* L);
-typedef void(__cdecl* Hook)(lua_State* L, void* ar);
+typedef void(__cdecl* Hook)(lua_State* L, lua_Debug* ar);
 typedef void* (__cdecl* ReallocFunction)(void* ptr, int oldsize, int size, void* data, const char* allocName, unsigned int flags);
 typedef void(__cdecl* FreeFunction)(void* ptr, int oldsize, void* data);
 
@@ -195,12 +195,12 @@ struct global_State
 {
 	stringtable strt;            // Interned string table.
 	GCObject* rootgc;            // Main GC root list.
+	GCObject* rootgc1;           // Secondary GC root list lane (debug traversal).
 	GCObject* rootudata;         // Userdata root list.
-	GCObject* tmudata;           // Userdata pending finalization.
 	Mbuffer buff;                // Scratch concat buffer.
 	lu_mem GCthreshold;          // Next GC trigger threshold.
 	CFunction panic;             // Panic callback.
-	int32_t nblocks;             // Allocated-byte counter.
+	int32_t gcTraversalLockDepth; // GC traversal lock counter used by debug helpers.
 	LuaPlus::TObject _registry;  // Registry table.
 	LuaPlus::TObject _defaultmeta; // Default table/userdata metatable.
 	lua_State* mainthread;       // Main thread.
@@ -282,12 +282,27 @@ union GCObject
 	lua_State th;
 };
 
+inline moho::Sim* lua_getglobaluserdata(lua_State* const state)
+{
+	if (state == nullptr || state->l_G == nullptr) {
+		return nullptr;
+	}
+	return state->l_G->globalUserData;
+}
+
 #if INTPTR_MAX == INT32_MAX
 static_assert(offsetof(lua_State, l_G) == 0x10, "lua_State::l_G must be at +0x10 (x86)");
 static_assert(offsetof(lua_State, _gt) == 0x30, "lua_State::_gt must be at +0x30 (x86)");
 static_assert(offsetof(lua_State, stateUserData) == 0x44, "lua_State::stateUserData must be at +0x44 (x86)");
 static_assert(sizeof(CallInfo) == 0x28, "CallInfo must be 0x28 bytes (x86)");
 
+static_assert(offsetof(global_State, rootgc) == 0x0C, "global_State::rootgc must be at +0x0C (x86)");
+static_assert(offsetof(global_State, rootgc1) == 0x10, "global_State::rootgc1 must be at +0x10 (x86)");
+static_assert(offsetof(global_State, rootudata) == 0x14, "global_State::rootudata must be at +0x14 (x86)");
+static_assert(
+	offsetof(global_State, gcTraversalLockDepth) == 0x28,
+	"global_State::gcTraversalLockDepth must be at +0x28 (x86)"
+);
 static_assert(offsetof(global_State, lstate) == 0x40, "global_State::lstate must be at +0x40 (x86)");
 static_assert(offsetof(global_State, userGCFunction) == 0x14C, "global_State::userGCFunction must be at +0x14C (x86)");
 static_assert(offsetof(global_State, hookmask) == 0x151, "global_State::hookmask must be at +0x151 (x86)");

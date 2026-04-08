@@ -33,10 +33,11 @@ namespace gpg::gal
     void AssignFrom(const TextureContext& other);
 
     /**
-     * Address: 0x008E7AE0 (FUN_008E7AE0)
+     * Address: 0x008E7CC0 (FUN_008E7CC0, __imp_??1TextureContext@gal@gpg@@UAE@XZ)
+     * Address: 0x008E7AE0 (FUN_008E7AE0, scalar deleting destructor thunk)
      *
      * What it does:
-     * Owns the scalar-deleting destructor thunk for texture context handles.
+     * Releases texture payload shared-count ownership and tears down object state.
      */
     virtual ~TextureContext();
 

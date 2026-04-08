@@ -499,6 +499,11 @@ namespace
     return true;
   }
 
+  [[nodiscard]] bool LoadSourcePageFromMountedPath(
+    ScrSourcePageRuntime* sourcePage,
+    const msvc8::string& mountedSourcePath
+  );
+
   [[nodiscard]] std::int32_t FindSourcePageIndexByMountedPath(
     const ScrSourceControlRuntimeView* const sourceControl,
     const msvc8::string& mountedSourcePath
@@ -515,12 +520,36 @@ namespace
         continue;
       }
 
-      if (gpg::STR_EqualsNoCase(sourcePage->mSourcePath.c_str(), mountedSourcePath.c_str())) {
+      if (sourcePage->mSourcePath.view() == mountedSourcePath.view()) {
         return pageIndex;
       }
     }
 
     return -1;
+  }
+
+  /**
+   * Address: 0x004C39A0 (FUN_004C39A0)
+   *
+   * What it does:
+   * Reloads all currently open source pages from their mounted source paths.
+   */
+  [[maybe_unused]] void ReloadOpenSourcePages(ScrSourceControlRuntimeView* const sourceControl)
+  {
+    if (sourceControl == nullptr || sourceControl->mPagesBegin == nullptr || sourceControl->mPagesEnd == nullptr) {
+      return;
+    }
+
+    for (ScrSourcePageRuntime** page = sourceControl->mPagesBegin; page != sourceControl->mPagesEnd; ++page) {
+      ScrSourcePageRuntime* const sourcePage = *page;
+      if (sourcePage == nullptr) {
+        continue;
+      }
+
+      msvc8::string mountedSourcePath{};
+      mountedSourcePath.assign(sourcePage->mSourcePath, 0U, msvc8::string::npos);
+      (void)LoadSourcePageFromMountedPath(sourcePage, mountedSourcePath);
+    }
   }
 
   void ApplyBreakpointMarkersToSourcePage(ScrSourcePageRuntime* const sourcePage)
@@ -538,7 +567,7 @@ namespace
         continue;
       }
 
-      sourcePage->mLineRecordsBegin[lineIndexZeroBased].mMarkerState = breakpoint.enabled ? 1 : 2;
+      sourcePage->mLineRecordsBegin[lineIndexZeroBased].mMarkerState = breakpoint.enabled ? 3 : 4;
     }
   }
 
@@ -596,6 +625,13 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x004C3670 (FUN_004C3670)
+   *
+   * What it does:
+   * Opens one mounted source path as a new source page or selects the already
+   * open page owning that path.
+   */
   [[nodiscard]] bool OpenOrSelectMountedSourcePath(
     ScrSourceControlRuntimeView* const sourceControl,
     const msvc8::string& mountedSourcePath
@@ -634,6 +670,12 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x004C39E0 (FUN_004C39E0)
+   *
+   * What it does:
+   * Copies the currently selected source-page mounted path into `outSourcePath`.
+   */
   void GetSelectedSourcePagePath(
     ScrSourceControlRuntimeView* const sourceControl,
     msvc8::string& outSourcePath
@@ -659,6 +701,59 @@ namespace
     outSourcePath.assign(selectedPage->mSourcePath, 0, 0xFFFFFFFF);
   }
 
+  [[nodiscard]] bool RemoveSourcePageAtIndex(
+    ScrSourceControlRuntimeView* const sourceControl,
+    const std::int32_t pageIndex
+  )
+  {
+    if (sourceControl == nullptr || pageIndex < 0) {
+      return false;
+    }
+
+    const std::int32_t pageCount = GetSourceControlPageCount(sourceControl);
+    if (pageIndex >= pageCount) {
+      return false;
+    }
+
+    auto const deletePage = ResolveSourceControlDeletePage(sourceControl);
+    if (deletePage != nullptr) {
+      deletePage(sourceControl, pageIndex);
+    }
+
+    ScrSourcePageRuntime** const removeSlot = sourceControl->mPagesBegin + pageIndex;
+    ScrSourcePageRuntime** const nextSlot = removeSlot + 1;
+    const std::int32_t trailingPageCount = static_cast<std::int32_t>(sourceControl->mPagesEnd - nextSlot);
+    if (trailingPageCount > 0) {
+      const std::size_t moveBytes =
+        static_cast<std::size_t>(trailingPageCount) * sizeof(ScrSourcePageRuntime*);
+      (void)memmove_s(removeSlot, moveBytes, nextSlot, moveBytes);
+    }
+
+    sourceControl->mPagesEnd -= 1;
+    return true;
+  }
+
+  /**
+   * Address: 0x004C38A0 (FUN_004C38A0)
+   *
+   * What it does:
+   * Removes one open source page by mounted source-path match.
+   */
+  [[maybe_unused]] bool RemoveSourcePageByMountedPath(
+    ScrSourceControlRuntimeView* const sourceControl,
+    const msvc8::string& mountedSourcePath
+  )
+  {
+    const std::int32_t pageIndex = FindSourcePageIndexByMountedPath(sourceControl, mountedSourcePath);
+    return RemoveSourcePageAtIndex(sourceControl, pageIndex);
+  }
+
+  /**
+   * Address: 0x004C3940 (FUN_004C3940)
+   *
+   * What it does:
+   * Removes the currently selected source page from the open-page list.
+   */
   void RemoveSelectedSourcePage(ScrSourceControlRuntimeView* const sourceControl)
   {
     if (sourceControl == nullptr) {
@@ -670,26 +765,7 @@ namespace
       return;
     }
 
-    auto const deletePage = ResolveSourceControlDeletePage(sourceControl);
-    if (deletePage != nullptr) {
-      deletePage(sourceControl, selectedPageIndex);
-    }
-
-    const std::int32_t pageCount = GetSourceControlPageCount(sourceControl);
-    if (selectedPageIndex >= pageCount) {
-      return;
-    }
-
-    ScrSourcePageRuntime** const removeSlot = sourceControl->mPagesBegin + selectedPageIndex;
-    ScrSourcePageRuntime** const nextSlot = removeSlot + 1;
-    const std::int32_t trailingPageCount = static_cast<std::int32_t>(sourceControl->mPagesEnd - nextSlot);
-    if (trailingPageCount > 0) {
-      const std::size_t moveBytes =
-        static_cast<std::size_t>(trailingPageCount) * sizeof(ScrSourcePageRuntime*);
-      (void)memmove_s(removeSlot, moveBytes, nextSlot, moveBytes);
-    }
-
-    sourceControl->mPagesEnd -= 1;
+    (void)RemoveSourcePageAtIndex(sourceControl, selectedPageIndex);
   }
 
   void FocusSourcePageLine(ScrSourcePageRuntime* const sourcePage, const std::int32_t lineOneBased)
@@ -737,7 +813,7 @@ namespace
     const msvc8::string& searchText
   )
   {
-    if (sourcePage == nullptr || searchText.empty()) {
+    if (sourcePage == nullptr) {
       return;
     }
 
@@ -906,6 +982,13 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x004C3C00 (FUN_004C3C00)
+   *
+   * What it does:
+   * Clears active execution markers, selects the source page matching one
+   * mounted path, and applies the active execution marker at `lineOneBased`.
+   */
   [[nodiscard]] bool FocusMountedSourcePathLine(
     ScrSourceControlRuntimeView* const sourceControl,
     const msvc8::string& mountedSourcePath,
@@ -918,7 +1001,8 @@ namespace
 
     ClearAllSourcePageActiveExecutionMarkers(sourceControl);
 
-    const std::int32_t pageIndex = FindSourcePageIndexByMountedPath(sourceControl, mountedSourcePath);
+    const msvc8::string mountedSourcePathLower = gpg::STR_ToLower(mountedSourcePath);
+    const std::int32_t pageIndex = FindSourcePageIndexByMountedPath(sourceControl, mountedSourcePathLower);
     const std::int32_t pageCount = GetSourceControlPageCount(sourceControl);
     if (pageIndex < 0 || pageIndex >= pageCount) {
       return false;
@@ -928,6 +1012,12 @@ namespace
     return SetSourcePageActiveExecutionMarker(sourceControl->mPagesBegin[pageIndex], lineOneBased);
   }
 
+  /**
+   * Address: 0x004C3B00 (FUN_004C3B00)
+   *
+   * What it does:
+   * Enables or disables breakpoint marker lanes across all open source pages.
+   */
   void SetAllSourcePageBreakpointMarkersEnabled(
     ScrSourceControlRuntimeView* const sourceControl,
     const bool enabled

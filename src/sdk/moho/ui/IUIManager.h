@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ui/UiRuntimeTypes.h"
@@ -142,6 +144,17 @@ namespace moho
 
   extern CUIManager* g_UIManager;
 
+  struct UICommandModeData
+  {
+    msvc8::string mMode;          // +0x00
+    LuaPlus::LuaObject mPayload{}; // +0x1C
+  };
+
+  static_assert(sizeof(UICommandModeData) == 0x30, "moho::UICommandModeData size must be 0x30");
+  static_assert(
+    offsetof(UICommandModeData, mPayload) == 0x1C, "moho::UICommandModeData::mPayload offset must be 0x1C"
+  );
+
   /**
    * Address: 0x0084C5E0 (FUN_0084C5E0)
    */
@@ -195,6 +208,63 @@ namespace moho
    * `/lua/ui/uimain.lua:StartJoinLobbyUI(...)`.
    */
   [[nodiscard]] bool UI_StartJoinLobbyUI(const char* protocol, const char* endpoint, const char* playerName);
+
+  /**
+   * Address: 0x0083D240 (FUN_0083D240, func_StartGameUI)
+   *
+   * What it does:
+   * Rebinds UI to the supplied Lua state and runs
+   * `/lua/ui/uimain.lua:StartGameUI()`.
+   */
+  [[nodiscard]] bool UI_StartGameUI(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0083D340 (FUN_0083D340, Moho::ShowEscapeDialog)
+   *
+   * What it does:
+   * Invokes `/lua/ui/uimain.lua:ShowEscapeDialog(showDialog)`.
+   */
+  [[nodiscard]] bool ShowEscapeDialog(bool showDialog);
+
+  /**
+   * Address: 0x0083D420 (FUN_0083D420, func_UpdateDisconnectDialogCallback)
+   *
+   * What it does:
+   * Invokes `/lua/ui/uimain.lua:UpdateDisconnectDialog()` on the active UI
+   * Lua state.
+   */
+  [[nodiscard]] bool UI_UpdateDisconnectDialogCallback();
+
+  /**
+   * Address: 0x0083DF90 (FUN_0083DF90, ?UI_StartCommandMode@Moho@@YAXABUUICommandModeData@1@@Z)
+   *
+   * What it does:
+   * Invokes `/lua/ui/game/commandmode.lua:StartCommandMode(modeName, payload)`.
+   */
+  void UI_StartCommandMode(const UICommandModeData& commandModeData);
+
+  /**
+   * Address: 0x0083E080 (FUN_0083E080, ?UI_EndCommandMode@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Invokes `/lua/ui/game/commandmode.lua:EndCommandMode()` through the active
+   * UI Lua state.
+   */
+  void UI_EndCommandMode();
+
+  /**
+   * Address: 0x0083ECF0 (FUN_0083ECF0, func_StartCursorText)
+   *
+   * What it does:
+   * Invokes `/lua/ui/uimain.lua:StartCursorText(x, y, text, color, duration, anchorToCursor)`.
+   */
+  void UI_StartCursorText(
+    const SMauiMousePos& screenPos,
+    const char* text,
+    std::uint32_t colorValue,
+    float durationSeconds,
+    bool anchorToCursor
+  );
 
   /**
    * Address: 0x0083D500 (FUN_0083D500, ?UI_ShowDesyncDialog@Moho@@YAXHABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z)

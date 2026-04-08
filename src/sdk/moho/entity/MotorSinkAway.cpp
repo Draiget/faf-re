@@ -3,10 +3,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
 
 #pragma init_seg(lib)
 
@@ -61,6 +64,26 @@ namespace
 
     GPG_ASSERT(moho::CScriptObject::sType != nullptr);
     return moho::CScriptObject::sType;
+  }
+
+  /**
+   * Address: 0x00696E70 (FUN_00696E70, Lua factory lookup thunk)
+   */
+  [[nodiscard]] LuaPlus::LuaObject GetMotorSinkAwayLuaFactoryObject(LuaPlus::LuaState* const state)
+  {
+    return moho::CScrLuaMetatableFactory<moho::MotorSinkAway>::Instance().Get(state);
+  }
+
+  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
+  {
+    if (!statItem) {
+      return;
+    }
+#if defined(_WIN32)
+    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+#else
+    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
+#endif
   }
 
   [[nodiscard]] gpg::RRef MakeMotorSinkAwayRef(moho::MotorSinkAway* const object)
@@ -175,6 +198,20 @@ namespace
 namespace moho
 {
   gpg::RType* MotorSinkAway::sType = nullptr;
+  CScrLuaMetatableFactory<MotorSinkAway> CScrLuaMetatableFactory<MotorSinkAway>::sInstance{};
+
+  CScrLuaMetatableFactory<MotorSinkAway>& CScrLuaMetatableFactory<MotorSinkAway>::Instance()
+  {
+    return sInstance;
+  }
+
+  /**
+   * Address: 0x00696FD0 (FUN_00696FD0, Moho::CScrLuaMetatableFactory<Moho::MotorSinkAway>::Create)
+   */
+  LuaPlus::LuaObject CScrLuaMetatableFactory<MotorSinkAway>::Create(LuaPlus::LuaState* const state)
+  {
+    return SCR_CreateSimpleMetatable(state);
+  }
 
   /**
    * Address: 0x00696500 (FUN_00696500, default ctor)
@@ -183,15 +220,32 @@ namespace moho
     : EntityMotor()
     , CScriptObject()
     , mSinkDeltaY(0.0f)
-  {}
+  {
+    AddInstanceCounterDelta(InstanceCounter<MotorSinkAway>::GetStatItem(), 1);
+  }
+
+  /**
+   * Address: 0x006963F0 (FUN_006963F0, Lua ctor lane)
+   */
+  MotorSinkAway::MotorSinkAway(LuaPlus::LuaState* const state, const float sinkDeltaY)
+    : EntityMotor()
+    , CScriptObject(GetMotorSinkAwayLuaFactoryObject(state), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
+    , mSinkDeltaY(sinkDeltaY)
+  {
+    AddInstanceCounterDelta(InstanceCounter<MotorSinkAway>::GetStatItem(), 1);
+  }
 
   /**
    * Address: 0x00696580 (FUN_00696580, deleting-thunk chain)
+   * Address: 0x006965A0 (FUN_006965A0, non-deleting body)
    */
-  MotorSinkAway::~MotorSinkAway() = default;
+  MotorSinkAway::~MotorSinkAway()
+  {
+    AddInstanceCounterDelta(InstanceCounter<MotorSinkAway>::GetStatItem(), -1);
+  }
 
   /**
-   * Address: 0x006965A0 (FUN_006965A0, Moho::MotorSinkAway::GetClass)
+   * Address: 0x006963B0 (FUN_006963B0, Moho::MotorSinkAway::GetClass)
    */
   gpg::RType* MotorSinkAway::GetClass() const
   {
@@ -199,7 +253,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00696700 (FUN_00696700, Moho::MotorSinkAway::GetDerivedObjectRef)
+   * Address: 0x006963D0 (FUN_006963D0, Moho::MotorSinkAway::GetDerivedObjectRef)
    */
   gpg::RRef MotorSinkAway::GetDerivedObjectRef()
   {
@@ -210,7 +264,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x00696750 (FUN_00696750, update lane)
+   * Address: 0x00696940 (FUN_00696940, update lane)
    */
   void MotorSinkAway::Update(Entity* const)
   {}
@@ -397,10 +451,39 @@ namespace moho
   int register_CScrLuaMetatableFactory_MotorSinkAway_Index()
   {
     const int index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
+    CScrLuaMetatableFactory<MotorSinkAway>::Instance().SetFactoryObjectIndexForRecovery(index);
     gRecoveredCScrLuaMetatableFactoryMotorSinkAwayIndex = index;
     return index;
   }
 } // namespace moho
+
+/**
+ * Address: 0x00696D90 (FUN_00696D90, Moho::InstanceCounter<Moho::MotorSinkAway>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for motor-sink-away
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::MotorSinkAway>::GetStatItem()
+{
+  static moho::StatItem* sEngineStat_InstanceCounts_MotorSinkAway = nullptr;
+  if (sEngineStat_InstanceCounts_MotorSinkAway) {
+    return sEngineStat_InstanceCounts_MotorSinkAway;
+  }
+
+  std::string statPath("Instance Counts_");
+  const char* const rawTypeName = typeid(moho::MotorSinkAway).name();
+  for (const char* it = rawTypeName; it && *it != '\0'; ++it) {
+    if (*it != '_') {
+      statPath.push_back(*it);
+    }
+  }
+
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  sEngineStat_InstanceCounts_MotorSinkAway = engineStats->GetItem(statPath.c_str(), true);
+  return sEngineStat_InstanceCounts_MotorSinkAway;
+}
 
 namespace
 {
@@ -417,4 +500,3 @@ namespace
 
   [[maybe_unused]] MotorSinkAwayBootstrap gMotorSinkAwayBootstrap;
 } // namespace
-

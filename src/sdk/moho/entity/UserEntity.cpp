@@ -11,9 +11,12 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/mesh/Mesh.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/UserArmy.h"
+#include "moho/unit/core/UserUnit.h"
 
 namespace
 {
@@ -148,6 +151,39 @@ namespace
     blended.z *= inverseLength;
     return blended;
   }
+
+  [[nodiscard]] moho::EAlliance
+  ResolveSelectionAlliance(const moho::UserArmy* const viewingArmy, const moho::UserArmy* const targetArmy) noexcept
+  {
+    if (!viewingArmy || !targetArmy) {
+      return moho::ALLIANCE_Neutral;
+    }
+
+    if (viewingArmy->mArmyIndex == targetArmy->mArmyIndex) {
+      return moho::ALLIANCE_Ally;
+    }
+
+    const std::uint32_t targetArmyIndex = targetArmy->mArmyIndex;
+    if (viewingArmy->mVarDat.mNeutrals.Contains(targetArmyIndex)) {
+      return moho::ALLIANCE_Neutral;
+    }
+
+    if (viewingArmy->mVarDat.mAllies.Contains(targetArmyIndex)) {
+      return moho::ALLIANCE_Ally;
+    }
+
+    if (viewingArmy->mVarDat.mEnemies.Contains(targetArmyIndex)) {
+      return moho::ALLIANCE_Enemy;
+    }
+
+    return moho::ALLIANCE_Neutral;
+  }
+
+  constexpr std::uint32_t kSelectionBracketEnemyVisibleMask = 0x10u;
+  constexpr const char* kSelectionBracketNeutralTexture = "/textures/ui/common/game/selection/selection_brackets_neutral.dds";
+  constexpr const char* kSelectionBracketEnemyTexture = "/textures/ui/common/game/selection/selection_brackets_enemy.dds";
+  constexpr const char* kSelectionBracketAlliedTexture =
+    "/textures/ui/common/game/selection/selection_brackets_player_highlighted.dds";
 } // namespace
 
 namespace moho
@@ -404,6 +440,33 @@ namespace moho
     mMeshInstance = nullptr;
     mPosePrimary.reset();
     mPoseSecondary.reset();
+  }
+
+  /**
+   * Address: 0x007FD3F0 (FUN_007FD3F0, Moho::UserEntity::GetSelectionBracketTexture)
+   *
+   * What it does:
+   * Selects one selection-bracket texture from alliance relation, and suppresses
+   * enemy brackets when the user-unit intel-state visibility bit is clear.
+   */
+  boost::shared_ptr<CD3DBatchTexture> UserEntity::GetSelectionBracketTexture(const UserArmy* const viewingArmy) const
+  {
+    const EAlliance alliance = ResolveSelectionAlliance(viewingArmy, mArmy);
+
+    if (alliance == ALLIANCE_Ally) {
+      return CD3DBatchTexture::FromFile(kSelectionBracketAlliedTexture, 1u);
+    }
+
+    if (alliance == ALLIANCE_Enemy) {
+      const UserUnit* const userUnit = IsUserUnit();
+      if (userUnit == nullptr || (userUnit->mIntelStateFlags & kSelectionBracketEnemyVisibleMask) != 0u) {
+        return CD3DBatchTexture::FromFile(kSelectionBracketEnemyTexture, 1u);
+      }
+
+      return {};
+    }
+
+    return CD3DBatchTexture::FromFile(kSelectionBracketNeutralTexture, 1u);
   }
 
   /**

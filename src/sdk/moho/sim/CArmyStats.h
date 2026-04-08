@@ -3,8 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
 #include "../../gpg/core/utils/BoostUtils.h"
-#include "../containers/TDatList.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "../misc/StatItem.h"
 #include "../misc/Stats.h"
 
@@ -12,13 +13,21 @@ namespace moho
 {
   class CArmyStatItem;
   class CAiBrain;
+  struct STrigger;
+  enum ETriggerOperator : std::int32_t;
 
   struct ArmyBlueprintNameView
   {
     std::uint8_t pad_0000[0x08];
     msvc8::string mName;
+    std::uint8_t pad_0024[0x38];
+    std::int32_t mBlueprintOrdinal;
   };
   static_assert(offsetof(ArmyBlueprintNameView, mName) == 0x08, "ArmyBlueprintNameView::mName offset must be 0x08");
+  static_assert(
+    offsetof(ArmyBlueprintNameView, mBlueprintOrdinal) == 0x5C,
+    "ArmyBlueprintNameView::mBlueprintOrdinal offset must be 0x5C"
+  );
 
   struct ArmyBlueprintStatNode
   {
@@ -65,8 +74,13 @@ namespace moho
   };
   static_assert(sizeof(ArmyNameIndexTree) == 0x10, "ArmyNameIndexTree size must be 0x10");
 
-  using ArmyAuxListNode = TDatListItem<void, void>;
-  static_assert(sizeof(ArmyAuxListNode) == 0x08, "ArmyAuxListNode size must be 0x08");
+  struct ArmyTriggerNode
+  {
+    ArmyTriggerNode* next;                // +0x00
+    ArmyTriggerNode* prev;                // +0x04
+    boost::shared_ptr<STrigger> trigger;  // +0x08
+  };
+  static_assert(sizeof(ArmyTriggerNode) == 0x10, "ArmyTriggerNode size must be 0x10");
 
   class CArmyStatItem : public StatItem
   {
@@ -93,6 +107,15 @@ namespace moho
      * VFTable SLOT: 1
      */
     void ToLua(LuaPlus::LuaState* state, LuaPlus::LuaObject* outObject) override;
+
+    /**
+     * Address: 0x0070B580 (FUN_0070B580, Moho::CArmyStatItem::SumCategory)
+     *
+     * What it does:
+     * Sums blueprint-lane values whose blueprint ordinal is present in the
+     * provided category bitset.
+     */
+    [[nodiscard]] float SumCategory(const EntityCategorySet* categorySet) const;
 
   private:
     void DestroyBlueprintTree();
@@ -127,6 +150,58 @@ namespace moho
     void Delete(const char* statPath) override;
 
     /**
+     * Address: 0x0070B860 (FUN_0070B860, Moho::CArmyStats::GetStat)
+     *
+     * What it does:
+     * Resolves one army-stat item by path through cached map lanes and falls
+     * back to stat-tree lookup without creating missing paths.
+     */
+    [[nodiscard]] CArmyStatItem* GetStat(const char* statPath);
+
+    /**
+     * Address: 0x0070BAB0 (FUN_0070BAB0, Moho::CArmyStats::GetTrigger)
+     *
+     * What it does:
+     * Finds one trigger by case-insensitive name from trigger-list lanes and
+     * returns one retained shared pointer in `outTrigger`.
+     */
+    boost::shared_ptr<STrigger>* GetTrigger(boost::shared_ptr<STrigger>* outTrigger, const char* triggerName);
+
+    /**
+     * Address: 0x0070BCA0 (FUN_0070BCA0, Moho::CArmyStats::SetArmyStatsTrigger)
+     *
+     * What it does:
+     * Resolves trigger/stat lanes, builds one `SCondition` record, and appends
+     * it to the target trigger condition vector.
+     */
+    static void SetArmyStatsTrigger(
+      const EntityCategorySet* categorySet,
+      CArmyStats* armyStats,
+      const char* triggerName,
+      const char* statPath,
+      ETriggerOperator triggerOperator,
+      float triggerValue
+    );
+
+    /**
+     * Address: 0x0070BB40 (FUN_0070BB40, sub_70BB40)
+     *
+     * What it does:
+     * Ensures one named trigger exists in the trigger-list lane, creating and
+     * appending it when missing.
+     */
+    void EnsureTriggerExists(const char* triggerName);
+
+    /**
+     * Address: 0x0070BE50 (FUN_0070BE50, Moho::CArmyStats::RemoveArmyStatsTrigger)
+     *
+     * What it does:
+     * Finds one trigger by case-insensitive name and removes the first match
+     * from the trigger list.
+     */
+    void RemoveArmyStatsTrigger(const char* triggerName);
+
+    /**
      * Address: 0x00704FD0 (FUN_00704FD0, sub_704FD0)
      *
      * What it does:
@@ -156,7 +231,7 @@ namespace moho
   public:
     CAiBrain* mOwnerArmy;         // +0x10
     ArmyNameIndexTree mNameIndex; // +0x14
-    ArmyAuxListNode* mAuxHead;    // +0x24
+    ArmyTriggerNode* mAuxHead;    // +0x24
     std::uint32_t mAuxSize;       // +0x28
   };
   static_assert(offsetof(CArmyStats, mOwnerArmy) == 0x10, "CArmyStats::mOwnerArmy offset must be 0x10");
@@ -165,3 +240,15 @@ namespace moho
   static_assert(offsetof(CArmyStats, mAuxSize) == 0x28, "CArmyStats::mAuxSize offset must be 0x28");
   static_assert(sizeof(CArmyStats) == 0x2C, "CArmyStats size must be 0x2C");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00713BE0 (FUN_00713BE0, gpg::RRef_CArmyStatItem)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CArmyStatItem*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CArmyStatItem(gpg::RRef* outRef, moho::CArmyStatItem* value);
+} // namespace gpg

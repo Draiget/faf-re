@@ -69,5 +69,14 @@ namespace moho
   );
   static_assert(sizeof(DeviceExitListener) == 0x14, "DeviceExitListener size must be 0x14");
 
+  /**
+   * Address: 0x00BC43F0 (FUN_00BC43F0, register_sDeviceExitListener)
+   *
+   * What it does:
+   * Registers one process-exit cleanup lane that releases the global
+   * `sDeviceExitListener` instance when still present.
+   */
+  void register_sDeviceExitListener();
+
   extern DeviceExitListener* sDeviceExitListener;
 } // namespace moho

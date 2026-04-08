@@ -39,7 +39,7 @@ namespace moho
      */
     RCountedPtrType();
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::dtr)
+     * Address: 0x0065AC80 (FUN_0065AC80, Moho::RCountedPtrType_CParticleTexture::dtr)
      */
     ~RCountedPtrType() override;
 
@@ -48,36 +48,36 @@ namespace moho
      */
     [[nodiscard]] const char* GetName() const override;
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::GetLexical)
+     * Address: 0x00659C80 (FUN_00659C80, Moho::RCountedPtrType_CParticleTexture::GetLexical)
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::IsIndexed)
+     * Address: 0x00659E00 (FUN_00659E00, Moho::RCountedPtrType_CParticleTexture::IsIndexed)
      */
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::IsPointer)
+     * Address: 0x00659E10 (FUN_00659E10, Moho::RCountedPtrType_CParticleTexture::IsPointer)
      */
     [[nodiscard]] const gpg::RIndexed* IsPointer() const override;
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::Init)
+     * Address: 0x00659C60 (FUN_00659C60, Moho::RCountedPtrType_CParticleTexture::Init)
      */
     void Init() override;
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::SubscriptIndex)
+     * Address: 0x00659E30 (FUN_00659E30, Moho::RCountedPtrType_CParticleTexture::SubscriptIndex)
      */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::GetCount)
+     * Address: 0x00659E20 (FUN_00659E20, Moho::RCountedPtrType_CParticleTexture::GetCount)
      */
     size_t GetCount(void* obj) const override;
 
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::SerLoad)
+     * Address: 0x0065A430 (FUN_0065A430, Moho::RCountedPtrType_CParticleTexture::SerLoad)
      */
     static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     /**
-     * Address: 0x0065AAD0 family (RCountedPtrType<CParticleTexture>::SerSave)
+     * Address: 0x0065A490 (FUN_0065A490, Moho::RCountedPtrType_CParticleTexture::SerSave)
      */
     static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };

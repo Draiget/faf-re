@@ -732,6 +732,31 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063ACA0 (FUN_0063ACA0, Moho::CAniActor::KillManipulator)
+   *
+   * What it does:
+   * Deletes the exact manipulator object when found in this actor's precedence
+   * list.
+   */
+  void CAniActor::KillManipulator(IAniManipulator* const manipulator)
+  {
+    if (manipulator == nullptr) {
+      return;
+    }
+
+    auto* const listHead = static_cast<TDatListItem<IAniManipulator, void>*>(&mManipulatorsByPrecedence);
+    for (auto* node = mManipulatorsByPrecedence.mNext; node != listHead; node = node->mNext) {
+      IAniManipulator* const current = ListNodeToManipulator(node);
+      if (current != manipulator) {
+        continue;
+      }
+
+      delete current;
+      return;
+    }
+  }
+
+  /**
    * Address: 0x0063B020 (FUN_0063B020, Moho::CAniActorConstruct::Construct)
    */
   void CAniActorConstruct::Construct(gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const result)

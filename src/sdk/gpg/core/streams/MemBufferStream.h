@@ -261,6 +261,15 @@ namespace gpg
          */
         void VirtFlush() override;
 
+        /**
+         * Address: 0x004CCCD0 (FUN_004CCCD0, gpg::MemBufferStream::GetBuffer)
+         *
+         * What it does:
+         * Returns one mutable buffer view for writable streams and throws on
+         * immutable stream instances.
+         */
+        MemBuffer<char> GetBuffer() const;
+
     private:
         /**
          * Address: 0x008E5EE0 (FUN_008E5EE0)

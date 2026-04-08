@@ -15,16 +15,59 @@ namespace moho
   CScrLuaInitForm* func_CAimManipulatorSetAimHeadingOffset_LuaFuncDef();
   CScrLuaInitForm* func_CreateFootPlantController_LuaFuncDef();
   CScrLuaInitForm* func_CreateBuilderArmController_LuaFuncDef();
+
+  /**
+   * Address: 0x00634C90 (FUN_00634C90, func_CBoneEntityManipulatorSetPivot_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CBoneEntityManipulator:SetPivot(x, y, z)` Lua binder.
+   */
   CScrLuaInitForm* func_CBoneEntityManipulatorSetPivot_LuaFuncDef();
+
+  /**
+   * Address: 0x00634EA0 (FUN_00634EA0, func_EntityAttachBoneToEntityBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `Entity:AttachBoneToEntityBone(...)` Lua binder.
+   */
   CScrLuaInitForm* func_EntityAttachBoneToEntityBone_LuaFuncDef();
+
+  /**
+   * Address: 0x006369F0 (FUN_006369F0, func_CBuilderArmManipulatorSetAimingArc_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CBuilderArmManipulator:SetAimingArc(...)` Lua binder.
+   */
   CScrLuaInitForm* func_CBuilderArmManipulatorSetAimingArc_LuaFuncDef();
+
+  /**
+   * Address: 0x00636BF0 (FUN_00636BF0, func_CBuilderArmManipulatorGetHeadingPitch_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CBuilderArmManipulator:GetHeadingPitch()` Lua binder.
+   */
   CScrLuaInitForm* func_CBuilderArmManipulatorGetHeadingPitch_LuaFuncDef();
+
+  /**
+   * Address: 0x00636D50 (FUN_00636D50, func_CBuilderArmManipulatorSetHeadingPitch_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CBuilderArmManipulator:SetHeadingPitch(heading, pitch)` Lua
+   * binder.
+   */
   CScrLuaInitForm* func_CBuilderArmManipulatorSetHeadingPitch_LuaFuncDef();
   CScrLuaInitForm* func_IAniManipulatorSetPrecedence_LuaFuncDef();
   CScrLuaInitForm* func_IAniManipulatorEnable_LuaFuncDef();
   CScrLuaInitForm* func_IAniManipulatorDisable_LuaFuncDef();
   CScrLuaInitForm* func_IAniManipulatorDestroy_LuaFuncDef();
   CScrLuaInitForm* func_CreateAnimator_LuaFuncDef();
+
+  /**
+   * Address: 0x00640690 (FUN_00640690, func_CAnimationManipulatorPlayAnim_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:PlayAnim(...)` Lua binder.
+   */
   CScrLuaInitForm* func_CAnimationManipulatorPlayAnim_LuaFuncDef();
   CScrLuaInitForm* func_CAnimationManipulatorGetRate_LuaFuncDef();
   CScrLuaInitForm* func_CAnimationManipulatorSetRate_LuaFuncDef();
@@ -37,16 +80,86 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetOverwriteMode_LuaFuncDef();
   CScrLuaInitForm* func_CAnimationManipulatorSetDisableOnSignal_LuaFuncDef();
   CScrLuaInitForm* func_CAnimationManipulatorSetDirectionalAnim_LuaFuncDef();
+
+  /**
+   * Address: 0x006445E0 (FUN_006445E0, func_CRotateManipulatorClearGoal_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:ClearGoal()` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorClearGoal_LuaFuncDef();
   CScrLuaInitForm* func_CreateRotator_LuaFuncDef();
+
+  /**
+   * Address: 0x006442A0 (FUN_006442A0, func_CRotateManipulatorSetSpinDown_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetSpinDown(flag)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetSpinDown_LuaFuncDef();
+
+  /**
+   * Address: 0x00644410 (FUN_00644410, func_CRotateManipulatorSetGoal_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetGoal(degrees)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetGoal_LuaFuncDef();
+
+  /**
+   * Address: 0x00644730 (FUN_00644730, func_CRotateManipulatorSetSpeed_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetSpeed(...)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetSpeed_LuaFuncDef();
+
+  /**
+   * Address: 0x006448D0 (FUN_006448D0, func_CRotateManipulatorSetTargetSpeed_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetTargetSpeed(...)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetTargetSpeed_LuaFuncDef();
+
+  /**
+   * Address: 0x00644AA0 (FUN_00644AA0, func_CRotateManipulatorSetAccel_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetAccel(...)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetAccel_LuaFuncDef();
+
+  /**
+   * Address: 0x00644C40 (FUN_00644C40, func_CRotateManipulatorClearFollowBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:ClearFollowBone()` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorClearFollowBone_LuaFuncDef();
+
+  /**
+   * Address: 0x00644DB0 (FUN_00644DB0, func_CRotateManipulatorSetFollowBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetFollowBone(bone)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetFollowBone_LuaFuncDef();
+
+  /**
+   * Address: 0x00644F50 (FUN_00644F50, func_CRotateManipulatorGetCurrentAngle_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:GetCurrentAngle()` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorGetCurrentAngle_LuaFuncDef();
+
+  /**
+   * Address: 0x006450C0 (FUN_006450C0, func_CRotateManipulatorSetCurrentAngle_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CRotateManipulator:SetCurrentAngle(angle)` Lua binder.
+   */
   CScrLuaInitForm* func_CRotateManipulatorSetCurrentAngle_LuaFuncDef();
   CScrLuaInitForm* func_CreateSlaver_LuaFuncDef();
   CScrLuaInitForm* func_CSlaveManipulatorSetMaxRate_LuaFuncDef();
@@ -59,6 +172,13 @@ namespace moho
   CScrLuaInitForm* func_CSlideManipulatorBeenDestroyed_LuaFuncDef();
   CScrLuaInitForm* func_CreateStorageManip_LuaFuncDef();
   CScrLuaInitForm* func_CreateThrustController_LuaFuncDef();
+
+  /**
+   * Address: 0x0064AD30 (FUN_0064AD30, func_CThrustManipulatorSetThrustingParam_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CThrustManipulator:SetThrustingParam(...)` Lua binder.
+   */
   CScrLuaInitForm* func_CThrustManipulatorSetThrustingParam_LuaFuncDef();
   CScrLuaInitForm* func_CreateCollisionDetector_LuaFuncDef();
   CScrLuaInitForm* func_CCollisionManipulatorEnableTerrainCheck_LuaFuncDef();

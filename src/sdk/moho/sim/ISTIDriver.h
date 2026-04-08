@@ -94,11 +94,13 @@ namespace moho
 
     // Slot 17. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C660 (FUN_0073C660),
     // ECmdStreamOp::CMDST_RequestPause (4)
-    virtual void RequestPause() = 0;
+    // Returns command cookie via optional out lane when provided.
+    virtual void RequestPause(std::int32_t* outCommandCookie = nullptr) = 0;
 
     // Slot 18. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C700 (FUN_0073C700), ECmdStreamOp::CMDST_Resume
     // (5)
-    virtual void Resume() = 0;
+    // Returns command cookie via optional out lane when provided.
+    virtual void Resume(std::int32_t* outCommandCookie = nullptr) = 0;
 
     // Slot 19. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073C7A0 (FUN_0073C7A0),
     // ECmdStreamOp::CMDST_SingleStep (6)

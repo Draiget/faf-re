@@ -274,6 +274,33 @@ namespace moho
   gpg::RType* SPhysBody::sType = nullptr;
 
   /**
+   * Address: 0x00697E70 (FUN_00697E70, Moho::SPhysBody::GetImpulse)
+   *
+   * What it does:
+   * Projects `mWorldImpulse` onto orientation basis vectors, scales by
+   * inverse-inertia tensor lanes, then reconstructs world-space impulse.
+   */
+  Wm3::Vec3f* SPhysBody::GetImpulse(Wm3::Vec3f* const out) const
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    const Wm3::Vec3f basisX = mOrientation.Rotate(Wm3::Vec3f(1.0f, 0.0f, 0.0f));
+    const Wm3::Vec3f basisY = mOrientation.Rotate(Wm3::Vec3f(0.0f, 1.0f, 0.0f));
+    const Wm3::Vec3f basisZ = mOrientation.Rotate(Wm3::Vec3f(0.0f, 0.0f, 1.0f));
+
+    const float impulseX = mInvInertiaTensor.x * Wm3::Vec3f::Dot(mWorldImpulse, basisX);
+    const float impulseY = mInvInertiaTensor.y * Wm3::Vec3f::Dot(mWorldImpulse, basisY);
+    const float impulseZ = mInvInertiaTensor.z * Wm3::Vec3f::Dot(mWorldImpulse, basisZ);
+
+    out->x = (basisX.x * impulseX) + (basisY.x * impulseY) + (basisZ.x * impulseZ);
+    out->y = (basisX.y * impulseX) + (basisY.y * impulseY) + (basisZ.y * impulseZ);
+    out->z = (basisX.z * impulseX) + (basisY.z * impulseY) + (basisZ.z * impulseZ);
+    return out;
+  }
+
+  /**
    * Address: 0x006973F0 (FUN_006973F0, Moho::SPhysBodyTypeInfo::SPhysBodyTypeInfo)
    */
   SPhysBodyTypeInfo::SPhysBodyTypeInfo()

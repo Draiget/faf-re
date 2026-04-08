@@ -6,6 +6,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "wm3/Vector3.h"
 
 namespace gpg
 {
@@ -14,11 +15,49 @@ namespace gpg
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    /**
+     * Address: 0x00659AA0 (FUN_00659AA0, gpg::RFastVectorType_float::GetLexical)
+     *
+     * What it does:
+     * Returns base lexical text plus reflected vector size for one
+     * `fastvector<float>` instance.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    /**
+     * Address: 0x00659B30 (FUN_00659B30, gpg::RFastVectorType_float::IsIndexed)
+     *
+     * What it does:
+     * Returns this indexed-interface lane for `fastvector<float>` reflection.
+     */
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+    /**
+     * Address: 0x00659A80 (FUN_00659A80, gpg::RFastVectorType_float::Init)
+     *
+     * What it does:
+     * Configures reflected element size/version and binds float fastvector
+     * serializer callbacks.
+     */
     void Init() override;
+    /**
+     * Address: 0x00659B80 (FUN_00659B80, gpg::RFastVectorType_float::SubscriptIndex)
+     *
+     * What it does:
+     * Builds one reflected element reference for `fastvector<float>[ind]`.
+     */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+    /**
+     * Address: 0x00659B40 (FUN_00659B40, gpg::RFastVectorType_float::GetCount)
+     *
+     * What it does:
+     * Returns runtime element count for one reflected `fastvector<float>`.
+     */
     size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x00659B50 (FUN_00659B50, gpg::RFastVectorType_float::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `fastvector<float>` and zero-fills new lanes.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
@@ -29,6 +68,70 @@ namespace gpg
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    /**
+     * Address: 0x0065A120 (FUN_0065A120, gpg::RFastVectorType_String::GetLexical)
+     *
+     * What it does:
+     * Returns base lexical text plus reflected vector size for one
+     * `fastvector<msvc8::string>` instance.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    /**
+     * Address: 0x0065A1B0 (FUN_0065A1B0, gpg::RFastVectorType_String::IsIndexed)
+     *
+     * What it does:
+     * Returns this indexed-interface lane for `fastvector<msvc8::string>`
+     * reflection.
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+    /**
+     * Address: 0x0065A100 (FUN_0065A100, gpg::RFastVectorType_String::Init)
+     *
+     * What it does:
+     * Configures reflected element size/version and binds string fastvector
+     * serializer callbacks.
+     */
+    void Init() override;
+    /**
+     * Address: 0x0065A250 (FUN_0065A250, gpg::RFastVectorType_String::SubscriptIndex)
+     *
+     * What it does:
+     * Builds one reflected element reference for
+     * `fastvector<msvc8::string>[ind]`.
+     */
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+    /**
+     * Address: 0x0065A1C0 (FUN_0065A1C0, gpg::RFastVectorType_String::GetCount)
+     *
+     * What it does:
+     * Returns runtime element count for one reflected
+     * `fastvector<msvc8::string>`.
+     */
+    size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x0065A1E0 (FUN_0065A1E0, gpg::RFastVectorType_String::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `fastvector<msvc8::string>` and default-fills new
+     * lanes with empty strings.
+     */
+    void SetCount(void* obj, int count) const override;
+  };
+
+  static_assert(sizeof(RFastVectorType<msvc8::string>) == 0x68, "RFastVectorType<msvc8::string> size must be 0x68");
+
+  template <>
+  class RFastVectorType<Wm3::Vector3f> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override;
+    /**
+     * Address: 0x005159E0 (FUN_005159E0, gpg::RFastVectorType_Vector3f::GetLexical)
+     *
+     * What it does:
+     * Returns base lexical text plus reflected vector size for one
+     * `fastvector<Wm3::Vector3f>` instance.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
@@ -37,7 +140,7 @@ namespace gpg
     void SetCount(void* obj, int count) const override;
   };
 
-  static_assert(sizeof(RFastVectorType<msvc8::string>) == 0x68, "RFastVectorType<msvc8::string> size must be 0x68");
+  static_assert(sizeof(RFastVectorType<Wm3::Vector3f>) == 0x68, "RFastVectorType<Vector3f> size must be 0x68");
 } // namespace gpg
 
 namespace
@@ -122,6 +225,19 @@ namespace
 
   gpg::RFastVectorType<unsigned int> gFastVectorUIntType;
 
+  /**
+   * Address: 0x00BEDF40 (FUN_00BEDF40, ??1RFastVectorType_uint@gpg@@QAE@@Z)
+   *
+   * What it does:
+   * Process-exit cleanup for global `RFastVectorType<unsigned int>` dynamic
+   * field/base lanes.
+   */
+  void cleanup_RFastVectorType_uint()
+  {
+    gFastVectorUIntType.fields_.clear();
+    gFastVectorUIntType.bases_.clear();
+  }
+
   using FastVectorFloatType = gpg::RFastVectorType<float>;
 
   alignas(FastVectorFloatType) unsigned char gFastVectorFloatTypeStorage[sizeof(FastVectorFloatType)]{};
@@ -167,6 +283,12 @@ namespace
     gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
   }
 
+  /**
+   * Address: 0x0065A380 (FUN_0065A380, gpg::RFastVectorType_float::SerLoad)
+   *
+   * What it does:
+   * Loads one reflected `fastvector<float>` payload from archive count + lanes.
+   */
   void LoadFastVectorFloat(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
@@ -188,6 +310,12 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0065A3E0 (FUN_0065A3E0, gpg::RFastVectorType_float::SerSave)
+   *
+   * What it does:
+   * Saves one reflected `fastvector<float>` payload as archive count + lanes.
+   */
   void SaveFastVectorFloat(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
@@ -244,6 +372,13 @@ namespace
     gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
   }
 
+  /**
+   * Address: 0x0065A5E0 (FUN_0065A5E0, gpg::RFastVectorType_String::SerLoad)
+   *
+   * What it does:
+   * Loads one reflected `fastvector<msvc8::string>` payload from archive count
+   * + lanes.
+   */
   void LoadFastVectorString(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
@@ -265,6 +400,13 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0065A6A0 (FUN_0065A6A0, gpg::RFastVectorType_String::SerSave)
+   *
+   * What it does:
+   * Saves one reflected `fastvector<msvc8::string>` payload as archive count +
+   * lanes.
+   */
   void SaveFastVectorString(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef*)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
@@ -281,11 +423,106 @@ namespace
       archive->WriteString(const_cast<msvc8::string*>(view.ElementAtUnchecked(i)));
     }
   }
+
+  using FastVectorVector3fType = gpg::RFastVectorType<Wm3::Vector3f>;
+
+  alignas(FastVectorVector3fType) unsigned char gFastVectorVector3fTypeStorage[sizeof(FastVectorVector3fType)]{};
+  bool gFastVectorVector3fTypeConstructed = false;
+
+  msvc8::string gFastVectorVector3fTypeName;
+  bool gFastVectorVector3fTypeNameCleanupRegistered = false;
+
+  [[nodiscard]] FastVectorVector3fType* AcquireFastVectorVector3fType()
+  {
+    if (!gFastVectorVector3fTypeConstructed) {
+      new (gFastVectorVector3fTypeStorage) FastVectorVector3fType();
+      gFastVectorVector3fTypeConstructed = true;
+    }
+
+    return reinterpret_cast<FastVectorVector3fType*>(gFastVectorVector3fTypeStorage);
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return cached;
+  }
+
+  void cleanup_FastVectorVector3fTypeName()
+  {
+    gFastVectorVector3fTypeName = msvc8::string{};
+    gFastVectorVector3fTypeNameCleanupRegistered = false;
+  }
+
+  void FastVectorVector3fResize(const Wm3::Vector3f* fillValue, const unsigned int newSize, void* objectStorage)
+  {
+    auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(objectStorage);
+    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+  }
+
+  void LoadFastVectorVector3f(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    const Wm3::Vector3f fill{};
+    FastVectorVector3fResize(&fill, count, storage);
+
+    auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(storage);
+    gpg::RType* const vector3Type = CachedVector3fType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(vector3Type, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  void SaveFastVectorVector3f(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(storage);
+    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    archive->WriteUInt(count);
+
+    gpg::RType* const vector3Type = CachedVector3fType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(vector3Type, view.ElementAtUnchecked(i), owner);
+    }
+  }
 } // namespace
 
 gpg::RType* gpg::ResolveFastVectorUIntType()
 {
   return gpg::LookupRType(typeid(gpg::fastvector<unsigned int>));
+}
+
+/**
+ * Address: 0x00BC2D40 (FUN_00BC2D40, register_RFastVectorType_uint)
+ *
+ * What it does:
+ * Materializes startup reflection storage for `fastvector<unsigned int>` and
+ * registers process-exit teardown.
+ */
+void gpg::register_RFastVectorType_uint()
+{
+  (void)gFastVectorUIntType;
+  (void)std::atexit(&cleanup_RFastVectorType_uint);
 }
 
 /**
@@ -450,12 +687,17 @@ namespace gpg
 } // namespace gpg
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x006599E0 (FUN_006599E0, gpg::RFastVectorType_float::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches `fastvector<element>` reflection text using the
+ * resolved `float` type name.
  */
 const char* gpg::RFastVectorType<float>::GetName() const
 {
   if (gFastVectorFloatTypeName.empty()) {
-    const char* const elementName = CachedFloatType() ? CachedFloatType()->GetName() : "float";
+    gpg::RType* const elementType = CachedFloatType();
+    const char* const elementName = elementType ? elementType->GetName() : "float";
     gFastVectorFloatTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "float");
     if (!gFastVectorFloatTypeNameCleanupRegistered) {
       gFastVectorFloatTypeNameCleanupRegistered = true;
@@ -467,7 +709,11 @@ const char* gpg::RFastVectorType<float>::GetName() const
 }
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x00659AA0 (FUN_00659AA0, gpg::RFastVectorType_float::GetLexical)
+ *
+ * What it does:
+ * Returns base lexical text plus reflected vector size for one
+ * `fastvector<float>` instance.
  */
 msvc8::string gpg::RFastVectorType<float>::GetLexical(const gpg::RRef& ref) const
 {
@@ -476,7 +722,10 @@ msvc8::string gpg::RFastVectorType<float>::GetLexical(const gpg::RRef& ref) cons
 }
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x00659B30 (FUN_00659B30, gpg::RFastVectorType_float::IsIndexed)
+ *
+ * What it does:
+ * Returns this indexed-interface lane for `fastvector<float>` reflection.
  */
 const gpg::RIndexed* gpg::RFastVectorType<float>::IsIndexed() const
 {
@@ -484,7 +733,11 @@ const gpg::RIndexed* gpg::RFastVectorType<float>::IsIndexed() const
 }
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x00659A80 (FUN_00659A80, gpg::RFastVectorType_float::Init)
+ *
+ * What it does:
+ * Configures reflected element size/version and binds float fastvector
+ * serializer callbacks.
  */
 void gpg::RFastVectorType<float>::Init()
 {
@@ -495,7 +748,10 @@ void gpg::RFastVectorType<float>::Init()
 }
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x00659B80 (FUN_00659B80, gpg::RFastVectorType_float::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference for `fastvector<float>[ind]`.
  */
 gpg::RRef gpg::RFastVectorType<float>::SubscriptIndex(void* obj, const int ind) const
 {
@@ -524,7 +780,10 @@ gpg::RRef gpg::RFastVectorType<float>::SubscriptIndex(void* obj, const int ind) 
 }
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x00659B40 (FUN_00659B40, gpg::RFastVectorType_float::GetCount)
+ *
+ * What it does:
+ * Returns runtime element count for one reflected `fastvector<float>`.
  */
 size_t gpg::RFastVectorType<float>::GetCount(void* obj) const
 {
@@ -540,7 +799,10 @@ size_t gpg::RFastVectorType<float>::GetCount(void* obj) const
 }
 
 /**
- * Address: 0x0065AA60 family
+ * Address: 0x00659B50 (FUN_00659B50, gpg::RFastVectorType_float::SetCount)
+ *
+ * What it does:
+ * Resizes one reflected `fastvector<float>` and zero-fills new lanes.
  */
 void gpg::RFastVectorType<float>::SetCount(void* obj, const int count) const
 {
@@ -600,12 +862,17 @@ namespace gpg
 } // namespace gpg
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A060 (FUN_0065A060, gpg::RFastVectorType_String::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected `fastvector<msvc8::string>` name and
+ * registers process-exit cleanup for the cached string storage.
  */
 const char* gpg::RFastVectorType<msvc8::string>::GetName() const
 {
   if (gFastVectorStringTypeName.empty()) {
-    const char* const elementName = CachedStringType() ? CachedStringType()->GetName() : "msvc8::string";
+    const gpg::RType* const elementType = CachedStringType();
+    const char* const elementName = elementType ? elementType->GetName() : "msvc8::string";
     gFastVectorStringTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "msvc8::string");
     if (!gFastVectorStringTypeNameCleanupRegistered) {
       gFastVectorStringTypeNameCleanupRegistered = true;
@@ -617,7 +884,11 @@ const char* gpg::RFastVectorType<msvc8::string>::GetName() const
 }
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A120 (FUN_0065A120, gpg::RFastVectorType_String::GetLexical)
+ *
+ * What it does:
+ * Returns base lexical text plus reflected vector size for one
+ * `fastvector<msvc8::string>` instance.
  */
 msvc8::string gpg::RFastVectorType<msvc8::string>::GetLexical(const gpg::RRef& ref) const
 {
@@ -626,7 +897,11 @@ msvc8::string gpg::RFastVectorType<msvc8::string>::GetLexical(const gpg::RRef& r
 }
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A1B0 (FUN_0065A1B0, gpg::RFastVectorType_String::IsIndexed)
+ *
+ * What it does:
+ * Returns this indexed-interface lane for `fastvector<msvc8::string>`
+ * reflection.
  */
 const gpg::RIndexed* gpg::RFastVectorType<msvc8::string>::IsIndexed() const
 {
@@ -634,7 +909,11 @@ const gpg::RIndexed* gpg::RFastVectorType<msvc8::string>::IsIndexed() const
 }
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A100 (FUN_0065A100, gpg::RFastVectorType_String::Init)
+ *
+ * What it does:
+ * Configures reflected element size/version and binds string fastvector
+ * serializer callbacks.
  */
 void gpg::RFastVectorType<msvc8::string>::Init()
 {
@@ -645,7 +924,10 @@ void gpg::RFastVectorType<msvc8::string>::Init()
 }
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A250 (FUN_0065A250, gpg::RFastVectorType_String::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference for `fastvector<msvc8::string>[ind]`.
  */
 gpg::RRef gpg::RFastVectorType<msvc8::string>::SubscriptIndex(void* obj, const int ind) const
 {
@@ -674,7 +956,11 @@ gpg::RRef gpg::RFastVectorType<msvc8::string>::SubscriptIndex(void* obj, const i
 }
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A1C0 (FUN_0065A1C0, gpg::RFastVectorType_String::GetCount)
+ *
+ * What it does:
+ * Returns runtime element count for one reflected
+ * `fastvector<msvc8::string>`.
  */
 size_t gpg::RFastVectorType<msvc8::string>::GetCount(void* obj) const
 {
@@ -690,7 +976,11 @@ size_t gpg::RFastVectorType<msvc8::string>::GetCount(void* obj) const
 }
 
 /**
- * Address: 0x0065ABB0 family
+ * Address: 0x0065A1E0 (FUN_0065A1E0, gpg::RFastVectorType_String::SetCount)
+ *
+ * What it does:
+ * Resizes one reflected `fastvector<msvc8::string>` and default-fills new
+ * lanes with empty strings.
  */
 void gpg::RFastVectorType<msvc8::string>::SetCount(void* obj, const int count) const
 {
@@ -704,8 +994,178 @@ void gpg::RFastVectorType<msvc8::string>::SetCount(void* obj, const int count) c
   FastVectorStringResize(&fill, static_cast<unsigned int>(count), obj);
 }
 
+namespace gpg
+{
+/**
+ * Address: 0x005173B0 (FUN_005173B0, preregister_FastVectorVector3fType)
+ *
+ * What it does:
+ * Constructs and preregisters startup RTTI descriptor for
+ * `gpg::fastvector<Wm3::Vector3<float>>`.
+ */
+gpg::RType* preregister_FastVectorVector3fType()
+{
+  FastVectorVector3fType* const type = AcquireFastVectorVector3fType();
+  gpg::PreRegisterRType(typeid(gpg::fastvector<Wm3::Vector3f>), type);
+  return type;
+}
+
+/**
+ * Address: 0x00BF2B80 (FUN_00BF2B80, cleanup_FastVectorVector3fType)
+ *
+ * What it does:
+ * Process-exit teardown for startup-owned
+ * `gpg::fastvector<Wm3::Vector3<float>>` descriptor storage.
+ */
+void cleanup_FastVectorVector3fType()
+{
+  if (!gFastVectorVector3fTypeConstructed) {
+    return;
+  }
+
+  AcquireFastVectorVector3fType()->~FastVectorVector3fType();
+  gFastVectorVector3fTypeConstructed = false;
+}
+
+/**
+ * Address: 0x00BC84C0 (FUN_00BC84C0, register_FastVectorVector3fTypeAtexit)
+ *
+ * What it does:
+ * Startup wrapper that preregisters `gpg::fastvector<Wm3::Vector3<float>>`
+ * and installs process-exit teardown through `atexit`.
+ */
+int register_FastVectorVector3fTypeAtexit()
+{
+  (void)preregister_FastVectorVector3fType();
+  return std::atexit(&cleanup_FastVectorVector3fType);
+}
+} // namespace gpg
+
+/**
+ * Address: 0x00515920 (FUN_00515920, gpg::RFastVectorType_Vector3f::GetName)
+ *
+ * What it does:
+ * Builds and caches lexical reflection name `fastvector<element>` for
+ * `gpg::fastvector<Wm3::Vector3f>`.
+ */
+const char* gpg::RFastVectorType<Wm3::Vector3f>::GetName() const
+{
+  if (gFastVectorVector3fTypeName.empty()) {
+    const char* const elementName = CachedVector3fType() ? CachedVector3fType()->GetName() : "Vector3f";
+    gFastVectorVector3fTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "Vector3f");
+    if (!gFastVectorVector3fTypeNameCleanupRegistered) {
+      gFastVectorVector3fTypeNameCleanupRegistered = true;
+      (void)std::atexit(&cleanup_FastVectorVector3fTypeName);
+    }
+  }
+
+  return gFastVectorVector3fTypeName.c_str();
+}
+
+/**
+ * Address: 0x005159E0 (FUN_005159E0, gpg::RFastVectorType_Vector3f::GetLexical)
+ *
+ * What it does:
+ * Returns base lexical text plus reflected vector size for one
+ * `fastvector<Wm3::Vector3f>` instance.
+ */
+msvc8::string gpg::RFastVectorType<Wm3::Vector3f>::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+}
+
+/**
+ * Address: 0x005173B0 family
+ */
+const gpg::RIndexed* gpg::RFastVectorType<Wm3::Vector3f>::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x005173B0 family
+ */
+void gpg::RFastVectorType<Wm3::Vector3f>::Init()
+{
+  size_ = 0x10;
+  version_ = 1;
+  serLoadFunc_ = &LoadFastVectorVector3f;
+  serSaveFunc_ = &SaveFastVectorVector3f;
+}
+
+/**
+ * Address: 0x005173B0 family
+ */
+gpg::RRef gpg::RFastVectorType<Wm3::Vector3f>::SubscriptIndex(void* obj, const int ind) const
+{
+  GPG_ASSERT(ind >= 0);
+  GPG_ASSERT(obj != nullptr);
+  if (!obj) {
+    gpg::RRef out{};
+    out.mType = CachedVector3fType();
+    out.mObj = nullptr;
+    return out;
+  }
+
+  auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(obj);
+  GPG_ASSERT(view.Data() != nullptr);
+  GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
+
+  gpg::RRef out{};
+  out.mType = CachedVector3fType();
+  if (ind < 0 || !view.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+    out.mObj = nullptr;
+    return out;
+  }
+
+  out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+  return out;
+}
+
+/**
+ * Address: 0x005173B0 family
+ */
+size_t gpg::RFastVectorType<Wm3::Vector3f>::GetCount(void* obj) const
+{
+  if (!obj) {
+    return 0u;
+  }
+
+  const auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(obj);
+  if (!view.Data()) {
+    return 0u;
+  }
+  return view.Size();
+}
+
+/**
+ * Address: 0x005173B0 family
+ */
+void gpg::RFastVectorType<Wm3::Vector3f>::SetCount(void* obj, const int count) const
+{
+  GPG_ASSERT(obj != nullptr);
+  GPG_ASSERT(count >= 0);
+  if (!obj || count < 0) {
+    return;
+  }
+
+  const Wm3::Vector3f fill{};
+  FastVectorVector3fResize(&fill, static_cast<unsigned int>(count), obj);
+}
+
 namespace
 {
+  struct FastVectorUIntReflectionBootstrap
+  {
+    FastVectorUIntReflectionBootstrap()
+    {
+      gpg::register_RFastVectorType_uint();
+    }
+  };
+
+  [[maybe_unused]] FastVectorUIntReflectionBootstrap gFastVectorUIntReflectionBootstrap;
+
   struct FastVectorFloatReflectionBootstrap
   {
     FastVectorFloatReflectionBootstrap()
@@ -725,5 +1185,15 @@ namespace
   };
 
   [[maybe_unused]] FastVectorStringReflectionBootstrap gFastVectorStringReflectionBootstrap;
+
+  struct FastVectorVector3fReflectionBootstrap
+  {
+    FastVectorVector3fReflectionBootstrap()
+    {
+      (void)gpg::register_FastVectorVector3fTypeAtexit();
+    }
+  };
+
+  [[maybe_unused]] FastVectorVector3fReflectionBootstrap gFastVectorVector3fReflectionBootstrap;
 } // namespace
 

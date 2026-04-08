@@ -9,7 +9,15 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/ai/IAiTransport.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitCallAirStagingPlatform.h"
+#include "moho/unit/tasks/CUnitCallLandTransport.h"
+#include "moho/unit/tasks/CUnitCallTeleport.h"
+#include "moho/unit/tasks/CUnitRefuel.h"
 
 using namespace moho;
 
@@ -156,6 +164,20 @@ namespace
     out.mType = dynamicType;
     return out;
   }
+
+  [[nodiscard]] const char* BlueprintIdOrUnknown(const Unit* const unit) noexcept
+  {
+    if (!unit) {
+      return "<unknown>";
+    }
+
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    if (!blueprint) {
+      return "<unknown>";
+    }
+
+    return blueprint->mBlueprintId.c_str();
+  }
 } // namespace
 
 gpg::RType* IAiCommandDispatchImpl::sType = nullptr;
@@ -164,6 +186,76 @@ gpg::RType* IAiCommandDispatchImpl::sType = nullptr;
  * Address: 0x005990F0 (FUN_005990F0, scalar deleting thunk)
  */
 IAiCommandDispatchImpl::~IAiCommandDispatchImpl() = default;
+
+/**
+ * Address: 0x006012B0 (FUN_006012B0, Moho::IAiCommandDispatchImpl::IssueCallTeleportTask)
+ */
+void IAiCommandDispatchImpl::IssueCallTeleportTask(Unit* const unit)
+{
+  if (!unit || unit->IsDead()) {
+    return;
+  }
+
+  if (!unit->IsInCategory("TELEPORTATION")) {
+    gpg::Warnf("Attepted to call illegal teleport %s", BlueprintIdOrUnknown(unit));
+    return;
+  }
+
+  (void)new (std::nothrow) CUnitCallTeleport(this, unit);
+}
+
+/**
+ * Address: 0x00601CE0 (FUN_00601CE0, Moho::IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask)
+ */
+void IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask(Unit* const unit)
+{
+  if (!unit || unit->IsDead()) {
+    return;
+  }
+
+  if (!unit->IsInCategory("AIRSTAGINGPLATFORM")) {
+    gpg::Warnf("Attepted to call illegal air staging platform %s", BlueprintIdOrUnknown(unit));
+    return;
+  }
+
+  (void)new (std::nothrow) CUnitCallAirStagingPlatform(this, unit);
+}
+
+/**
+ * Address: 0x006007C0 (FUN_006007C0, Moho::IAiCommandDispatchImpl::IssueCallLandTransportTask)
+ */
+void IAiCommandDispatchImpl::IssueCallLandTransportTask(Unit* const unit)
+{
+  if (!unit || unit->IsDead()) {
+    return;
+  }
+
+  if (unit->AiTransport != nullptr) {
+    (void)new (std::nothrow) CUnitCallLandTransport(this, unit);
+    return;
+  }
+
+  gpg::Warnf("Attepted to call illegal transport %s", BlueprintIdOrUnknown(unit));
+}
+
+/**
+ * Address: 0x00622110 (FUN_00622110, Moho::IAiCommandDispatchImpl::IssueRefuelTask)
+ */
+void IAiCommandDispatchImpl::IssueRefuelTask(Unit* const unit)
+{
+  if (!unit || unit->IsDead() || unit->IsBeingBuilt()) {
+    return;
+  }
+
+  IAiTransport* const transport = unit->AiTransport;
+  if (!transport || !transport->TransportIsAirStagingPlatform()) {
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    const char* const blueprintId = (blueprint != nullptr) ? blueprint->mBlueprintId.c_str() : "<unknown>";
+    gpg::Die("Attepted to call illegal refuel on non-air staging platform %s", blueprintId);
+  }
+
+  (void)new (std::nothrow) CUnitRefuel(unit, this);
+}
 
 /**
  * Address: 0x00599330 (FUN_00599330, Moho::IAiCommandDispatchImpl::MemberConstruct)

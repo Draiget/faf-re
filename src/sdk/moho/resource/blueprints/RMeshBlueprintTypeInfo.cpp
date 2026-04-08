@@ -136,6 +136,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x0051A330 (FUN_0051A330, gpg::RType::AddField_vector_RMeshBlueprintLOD_0x60LODs)
+   *
+   * What it does:
+   * Appends the reflected `LODs` field descriptor at offset `0x60`.
+   */
+  gpg::RField* RMeshBlueprintTypeInfo::AddFieldLods(gpg::RType* const typeInfo)
+  {
+    if (!typeInfo) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!typeInfo->initFinished_);
+    typeInfo->fields_.push_back(gpg::RField("LODs", CachedMeshLodVectorType(), 0x60, 0, nullptr));
+    return &typeInfo->fields_.back();
+  }
+
+  /**
    * Address: 0x005187F0 (FUN_005187F0)
    *
    * What it does:
@@ -143,7 +160,9 @@ namespace moho
    */
   void RMeshBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    AddFieldWithDescription(typeInfo, "LODs", CachedMeshLodVectorType(), 0x60, "List of LOD info");
+    gpg::RField* const lodsField = AddFieldLods(typeInfo);
+    lodsField->v4 = 3;
+    lodsField->mDesc = "List of LOD info";
     AddFieldWithDescription(
       typeInfo,
       "IconFadeInZoom",

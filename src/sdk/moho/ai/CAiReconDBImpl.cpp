@@ -1324,8 +1324,7 @@ void CAiReconDBImpl::CheckEvent(ReconBlip* const blip, const int newFlags, const
   }
 
   const bool gained = (newFlags & static_cast<int>(changedFlag)) != 0;
-  auto* const scriptObject = reinterpret_cast<CScriptObject*>(reinterpret_cast<Entity*>(blip));
-  brain->RunScript("OnIntelChange", scriptObject->mLuaObj, ReconSenseLexical(changedFlag), gained);
+  brain->RunScriptOnIntelChange(blip, ReconSenseLexical(changedFlag), gained);
 }
 
 /**

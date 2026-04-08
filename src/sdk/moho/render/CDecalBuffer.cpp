@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -97,6 +98,51 @@ namespace
     DestroyBucketHead(node->bucketHead);
     ::operator delete(node);
   }
+
+  [[nodiscard]]
+  std::uint32_t AllocateDecalObjectId(IdPool& pool)
+  {
+    if (pool.mReleasedLows.mWords.Empty()) {
+      const std::uint32_t nextId = static_cast<std::uint32_t>(pool.mNextLowId);
+      ++pool.mNextLowId;
+      return nextId;
+    }
+
+    const std::uint32_t recycled = pool.mReleasedLows.GetNext(std::numeric_limits<std::uint32_t>::max());
+    pool.mReleasedLows.Remove(recycled);
+    return recycled;
+  }
+
+  [[nodiscard]]
+  std::size_t ResolveArmyCount(CArmyImpl* const* const armiesBegin, CArmyImpl* const* const armiesEnd) noexcept
+  {
+    if (!armiesBegin || !armiesEnd || armiesEnd < armiesBegin) {
+      return 0u;
+    }
+    return static_cast<std::size_t>(armiesEnd - armiesBegin);
+  }
+
+  void SetArmyVisibilityFlag(CDecalHandle& handle, const std::size_t armyIndex) noexcept
+  {
+    if (armyIndex < 32u) {
+      handle.mArmyVisibilityFlags |= (1u << static_cast<std::uint32_t>(armyIndex));
+    }
+  }
+
+  void PropagateVisibilityToObserverAllies(
+    CDecalHandle& handle,
+    CArmyImpl* const* const armiesBegin,
+    const std::size_t armyCount,
+    const std::size_t observerIndex
+  )
+  {
+    for (std::size_t allyIndex = observerIndex; allyIndex < armyCount; ++allyIndex) {
+      CArmyImpl* const allyArmy = armiesBegin[allyIndex];
+      if (allyArmy && allyArmy->Allies.Contains(static_cast<std::uint32_t>(observerIndex))) {
+        SetArmyVisibilityFlag(handle, allyIndex);
+      }
+    }
+  }
 } // namespace
 
 gpg::RType* CDecalBuffer::StaticGetClass()
@@ -165,6 +211,70 @@ CDecalBuffer::~CDecalBuffer()
   mStartTickBuckets.size = 0;
   mStartTickBuckets.allocatorCookie = nullptr;
   mHandleListHead.ListResetLinks();
+}
+
+/**
+ * Address: 0x007793D0 (FUN_007793D0, Moho::CDecalBuffer::CreateHandle)
+ *
+ * What it does:
+ * Creates one script-visible decal handle, links it into active tracking, and
+ * initializes per-army visibility flags for the new decal.
+ */
+CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
+{
+  if (!mSim) {
+    return nullptr;
+  }
+
+  const std::uint32_t objectId = AllocateDecalObjectId(mPool);
+
+  CDecalHandle* const handle = new CDecalHandle(mSim->mLuaState, objectId, info, mSim->mCurTick);
+  if (handle == nullptr) {
+    return nullptr;
+  }
+
+  handle->mListNode.ListLinkBefore(&mHandleListHead);
+
+  // Start-tick bucket-tree insertion is deferred until map mutation helpers
+  // are fully lifted from sub_77A250/sub_77A930.
+
+  CArmyImpl** const armiesBegin = mSim->mArmiesList.begin();
+  CArmyImpl** const armiesEnd = mSim->mArmiesList.end();
+  const std::size_t armyCount = ResolveArmyCount(armiesBegin, armiesEnd);
+
+  CArmyImpl* sourceArmy = nullptr;
+  if (handle->mInfo.mArmy < armyCount) {
+    sourceArmy = armiesBegin[handle->mInfo.mArmy];
+  }
+
+  if (sourceArmy != nullptr && handle->mInfo.mIsSplat != 0u) {
+    const bool sourceIsCivilian = sourceArmy->IsCivilian != 0u;
+    for (std::size_t i = 0; i < armyCount; ++i) {
+      if (sourceArmy->Allies.Contains(static_cast<std::uint32_t>(i)) || !sourceIsCivilian) {
+        SetArmyVisibilityFlag(*handle, i);
+      }
+    }
+    return handle;
+  }
+
+  for (std::size_t i = 0; i < armyCount; ++i) {
+    if (i < 32u && ((handle->mArmyVisibilityFlags & (1u << static_cast<std::uint32_t>(i))) != 0u)) {
+      continue;
+    }
+
+    CArmyImpl* const observerArmy = armiesBegin[i];
+    if (!observerArmy || observerArmy->IsCivilian != 0u) {
+      continue;
+    }
+
+    if (sourceArmy && !IsDecalVisibleForArmy(sourceArmy, handle->mInfo, observerArmy)) {
+      continue;
+    }
+
+    PropagateVisibilityToObserverAllies(*handle, armiesBegin, armyCount, i);
+  }
+
+  return handle;
 }
 
 /**

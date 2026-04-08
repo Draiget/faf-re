@@ -4,12 +4,18 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/entity/EntityMotor.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CScriptObject.h"
 
 namespace gpg
 {
   struct SerHelperBase;
 } // namespace gpg
+
+namespace LuaPlus
+{
+  class LuaState;
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -30,22 +36,28 @@ namespace moho
     MotorSinkAway();
 
     /**
+     * Address: 0x006963F0 (FUN_006963F0, Lua ctor lane)
+     */
+    MotorSinkAway(LuaPlus::LuaState* state, float sinkDeltaY);
+
+    /**
      * Address: 0x00696580 (FUN_00696580, deleting-thunk chain)
+     * Address: 0x006965A0 (FUN_006965A0, non-deleting body)
      */
     ~MotorSinkAway() override;
 
     /**
-     * Address: 0x006965A0 (FUN_006965A0, Moho::MotorSinkAway::GetClass)
+     * Address: 0x006963B0 (FUN_006963B0, Moho::MotorSinkAway::GetClass)
      */
     [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
-     * Address: 0x00696700 (FUN_00696700, Moho::MotorSinkAway::GetDerivedObjectRef)
+     * Address: 0x006963D0 (FUN_006963D0, Moho::MotorSinkAway::GetDerivedObjectRef)
      */
     gpg::RRef GetDerivedObjectRef() override;
 
     /**
-     * Address: 0x00696750 (FUN_00696750, update lane)
+     * Address: 0x00696940 (FUN_00696940, update lane)
      */
     void Update(Entity* entity) override;
 
@@ -55,6 +67,28 @@ namespace moho
 
   static_assert(offsetof(MotorSinkAway, mSinkDeltaY) == 0x38, "MotorSinkAway::mSinkDeltaY offset must be 0x38");
   static_assert(sizeof(MotorSinkAway) == 0x3C, "MotorSinkAway size must be 0x3C");
+
+  template <>
+  class CScrLuaMetatableFactory<MotorSinkAway> final : public CScrLuaObjectFactory
+  {
+  public:
+    [[nodiscard]]
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    /**
+     * Address: 0x00696FD0 (FUN_00696FD0, Moho::CScrLuaMetatableFactory<Moho::MotorSinkAway>::Create)
+     */
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<MotorSinkAway>) == 0x08,
+    "CScrLuaMetatableFactory<MotorSinkAway> size must be 0x8"
+  );
 
   class MotorSinkAwayTypeInfo final : public gpg::RType
   {
@@ -194,4 +228,3 @@ namespace moho
    */
   int register_CScrLuaMetatableFactory_MotorSinkAway_Index();
 } // namespace moho
-

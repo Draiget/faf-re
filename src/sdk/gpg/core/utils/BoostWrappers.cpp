@@ -6,9 +6,66 @@
 #include <new>
 
 #include <boost/ptr_container/exception.hpp>
+#include <boost/thread/condition.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace boost
 {
+  namespace detail
+  {
+#if defined(BOOST_HAS_WINTHREADS)
+    /**
+     * Address: 0x00AC2190 (FUN_00AC2190, boost::detail::condition_impl::condition_impl)
+     *
+     * What it does:
+     * Initializes Win32 semaphore/mutex primitives for one condition
+     * implementation lane and throws `boost::thread_resource_error` when any
+     * primitive allocation fails.
+     */
+    condition_impl::condition_impl() : m_gate(nullptr), m_queue(nullptr), m_mutex(nullptr), m_gone(0), m_blocked(0), m_waiting(0)
+    {
+      m_gate = ::CreateSemaphoreA(nullptr, 1, 1, nullptr);
+      m_queue = ::CreateSemaphoreA(nullptr, 0, 0x7FFFFFFF, nullptr);
+      m_mutex = ::CreateMutexA(nullptr, FALSE, nullptr);
+
+      if (m_gate != nullptr && m_queue != nullptr && m_mutex != nullptr) {
+        return;
+      }
+
+      if (m_gate != nullptr) {
+        ::CloseHandle(static_cast<HANDLE>(m_gate));
+        m_gate = nullptr;
+      }
+      if (m_queue != nullptr) {
+        ::CloseHandle(static_cast<HANDLE>(m_queue));
+        m_queue = nullptr;
+      }
+      if (m_mutex != nullptr) {
+        ::CloseHandle(static_cast<HANDLE>(m_mutex));
+        m_mutex = nullptr;
+      }
+
+      throw boost::thread_resource_error();
+    }
+#endif
+  } // namespace detail
+
+#if defined(BOOST_HAS_WINTHREADS)
+  /**
+   * Address: 0x00AC2760 (FUN_00AC2760, boost::thread::~thread)
+   *
+   * What it does:
+   * Closes one native thread handle when this thread lane is still marked
+   * joinable.
+   */
+  thread::~thread()
+  {
+    if (m_joinable) {
+      ::CloseHandle(static_cast<HANDLE>(m_thread));
+    }
+  }
+#endif
+
   namespace
   {
     struct SpCountedBaseRuntimeView

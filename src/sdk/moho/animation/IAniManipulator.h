@@ -7,6 +7,8 @@
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/script/CScriptEvent.h"
 
+struct lua_State;
+
 namespace moho
 {
   class CAniActor;
@@ -131,6 +133,111 @@ namespace moho
   using IAniManipulatorEnable_LuaFuncDef = ::moho::CScrLuaBinder;
   using IAniManipulatorDisable_LuaFuncDef = ::moho::CScrLuaBinder;
   using IAniManipulatorDestroy_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * Address: 0x0063BAE0 (FUN_0063BAE0, func_IAniManipulatorSetPrecedence_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:SetPrecedence(integer)` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorSetPrecedence_LuaFuncDef();
+
+  /**
+   * Address: 0x0063BC80 (FUN_0063BC80, func_IAniManipulatorEnable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:Enable()` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorEnable_LuaFuncDef();
+
+  /**
+   * Address: 0x0063BDB0 (FUN_0063BDB0, func_IAniManipulatorDisable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:Disable()` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorDisable_LuaFuncDef();
+
+  /**
+   * Address: 0x0063BEE0 (FUN_0063BEE0, func_IAniManipulatorDestroy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `IAniManipulator:Destroy()` Lua binder.
+   */
+  CScrLuaInitForm* func_IAniManipulatorDestroy_LuaFuncDef();
+
+  /**
+   * Address: 0x0063BAC0 (FUN_0063BAC0, cfunc_IAniManipulatorSetPrecedence)
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorSetPrecedenceL`.
+   */
+  int cfunc_IAniManipulatorSetPrecedence(lua_State* luaContext);
+
+  /**
+   * Address: 0x0063BC60 (FUN_0063BC60, cfunc_IAniManipulatorEnable)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorEnableL`.
+   */
+  int cfunc_IAniManipulatorEnable(lua_State* luaContext);
+
+  /**
+   * Address: 0x0063BD90 (FUN_0063BD90, cfunc_IAniManipulatorDisable)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorDisableL`.
+   */
+  int cfunc_IAniManipulatorDisable(lua_State* luaContext);
+
+  /**
+   * Address: 0x0063BEC0 (FUN_0063BEC0, cfunc_IAniManipulatorDestroy)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IAniManipulatorDestroyL`.
+   */
+  int cfunc_IAniManipulatorDestroy(lua_State* luaContext);
+
+  /**
+   * Address: 0x0063BB40 (FUN_0063BB40, cfunc_IAniManipulatorSetPrecedenceL)
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Reads `(manipulator, precedence)`, reorders the manipulator in owner-actor
+   * precedence order, and returns the manipulator Lua object.
+   */
+  int cfunc_IAniManipulatorSetPrecedenceL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0063BCE0 (FUN_0063BCE0, cfunc_IAniManipulatorEnableL)
+   *
+   * What it does:
+   * Reads `(manipulator)`, marks it enabled, and returns no Lua values.
+   */
+  int cfunc_IAniManipulatorEnableL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0063BE10 (FUN_0063BE10, cfunc_IAniManipulatorDisableL)
+   *
+   * What it does:
+   * Reads `(manipulator)`, marks it disabled, and returns no Lua values.
+   */
+  int cfunc_IAniManipulatorDisableL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0063BF40 (FUN_0063BF40, cfunc_IAniManipulatorDestroyL)
+   *
+   * What it does:
+   * Reads an optional manipulator object and destroys it when present.
+   */
+  int cfunc_IAniManipulatorDestroyL(LuaPlus::LuaState* state);
 
   class IAniManipulatorSerializer
   {

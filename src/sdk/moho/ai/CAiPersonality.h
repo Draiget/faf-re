@@ -12,6 +12,8 @@
 
 #include "legacy/containers/String.h"
 
+struct lua_State;
+
 namespace moho
 {
   class Sim;
@@ -123,7 +125,7 @@ namespace moho
     SAiPersonalityRange mTargetSpread;                // +0x160
     SAiPersonalityRange mQuittingTendency;            // +0x168
     SAiPersonalityRange mChatFrequency;               // +0x170
-    float mAdjustDelay;                               // +0x178
+    float mDifficulty;                                // +0x178
   };
 
   static_assert(sizeof(CAiPersonality) == 0x17C, "CAiPersonality size must be 0x17C");
@@ -155,7 +157,7 @@ namespace moho
   static_assert(
     offsetof(CAiPersonality, mChatFrequency) == 0x170, "CAiPersonality::mChatFrequency offset must be 0x170"
   );
-  static_assert(offsetof(CAiPersonality, mAdjustDelay) == 0x178, "CAiPersonality::mAdjustDelay offset must be 0x178");
+  static_assert(offsetof(CAiPersonality, mDifficulty) == 0x178, "CAiPersonality::mDifficulty offset must be 0x178");
 
   /**
    * VFTABLE: 0x00E1CAB8
@@ -223,6 +225,141 @@ namespace moho
    * COL:  0x00E736DC
    */
   using CAiPersonalityAdjustDelay_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * Address: 0x005BA970 (FUN_005BA970, cfunc_CAiPersonalityAdjustDelay)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityAdjustDelayL`.
+   */
+  int cfunc_CAiPersonalityAdjustDelay(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BA990 (FUN_005BA990, func_CAiPersonalityAdjustDelay_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:AdjustDelay()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityAdjustDelay_LuaFuncDef();
+
+  /**
+   * Address: 0x005BA9F0 (FUN_005BA9F0, cfunc_CAiPersonalityAdjustDelayL)
+   *
+   * What it does:
+   * Applies one difficulty-scaled delay adjustment and returns the final
+   * integer delay value.
+   */
+  int cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BBE00 (FUN_005BBE00, cfunc_CAiPersonalityGetFavouriteStructures)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetFavouriteStructuresL`.
+   */
+  int cfunc_CAiPersonalityGetFavouriteStructures(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BBE80 (FUN_005BBE80, cfunc_CAiPersonalityGetFavouriteStructuresL)
+   *
+   * What it does:
+   * Pushes `mFavouriteStructures` as one Lua array-table of strings.
+   */
+  int cfunc_CAiPersonalityGetFavouriteStructuresL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC9D0 (FUN_005BC9D0, cfunc_CAiPersonalityGetFavouriteUnits)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetFavouriteUnitsL`.
+   */
+  int cfunc_CAiPersonalityGetFavouriteUnits(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BCA50 (FUN_005BCA50, cfunc_CAiPersonalityGetFavouriteUnitsL)
+   *
+   * What it does:
+   * Pushes `mFavouriteUnits` as one Lua array-table of strings.
+   */
+  int cfunc_CAiPersonalityGetFavouriteUnitsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BCF60 (FUN_005BCF60, cfunc_CAiPersonalityGetTargetSpread)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetTargetSpreadL`.
+   */
+  int cfunc_CAiPersonalityGetTargetSpread(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BCF80 (FUN_005BCF80, func_CAiPersonalityGetTargetSpread_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:GetTargetSpread()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityGetTargetSpread_LuaFuncDef();
+
+  /**
+   * Address: 0x005BCFE0 (FUN_005BCFE0, cfunc_CAiPersonalityGetTargetSpreadL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted target-spread value.
+   */
+  int cfunc_CAiPersonalityGetTargetSpreadL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BD0A0 (FUN_005BD0A0, cfunc_CAiPersonalityGetQuittingTendency)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetQuittingTendencyL`.
+   */
+  int cfunc_CAiPersonalityGetQuittingTendency(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BD0C0 (FUN_005BD0C0, func_CAiPersonalityGetQuittingTendency_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:GetQuittingTendency()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityGetQuittingTendency_LuaFuncDef();
+
+  /**
+   * Address: 0x005BD120 (FUN_005BD120, cfunc_CAiPersonalityGetQuittingTendencyL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted quitting-tendency value.
+   */
+  int cfunc_CAiPersonalityGetQuittingTendencyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BD1E0 (FUN_005BD1E0, cfunc_CAiPersonalityGetChatFrequency)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetChatFrequencyL`.
+   */
+  int cfunc_CAiPersonalityGetChatFrequency(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BD200 (FUN_005BD200, func_CAiPersonalityGetChatFrequency_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:GetChatFrequency()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityGetChatFrequency_LuaFuncDef();
+
+  /**
+   * Address: 0x005BD260 (FUN_005BD260, cfunc_CAiPersonalityGetChatFrequencyL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted chat-frequency value.
+   */
+  int cfunc_CAiPersonalityGetChatFrequencyL(LuaPlus::LuaState* state);
 
   /**
    * VFTABLE: 0x00E1D2F0

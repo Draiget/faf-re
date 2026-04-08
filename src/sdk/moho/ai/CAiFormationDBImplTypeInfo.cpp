@@ -269,6 +269,13 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x0059C9A0 (FUN_0059C9A0, gpg::RFastVectorType_IFormationInstance_P::GetName)
+ *
+ * What it does:
+ * Lazily formats and caches the reflected type name for
+ * `gpg::fastvector<moho::IFormationInstance*>`.
+ */
 const char* IFormationInstanceFastVectorTypeInfo::GetName() const
 {
   if (gFastVectorIFormationInstanceTypeName.empty()) {

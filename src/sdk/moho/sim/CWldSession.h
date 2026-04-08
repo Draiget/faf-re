@@ -198,6 +198,15 @@ namespace moho
     SSelectionNodeUserEntity* mHead;   // +0x04
     std::uint32_t mSize;               // +0x08
     std::uint32_t mSizeMirrorOrUnused; // +0x0C
+
+    /**
+     * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
+     *
+     * What it does:
+     * Counts live weak-set tree nodes by in-order traversal of the selection
+     * RB-tree lane.
+     */
+    [[nodiscard]] std::int32_t size() const;
   };
 
   static_assert(sizeof(SSelectionSetUserEntity) == 0x10, "SSelectionSetUserEntity size must be 0x10");
@@ -289,6 +298,15 @@ namespace moho
     [[nodiscard]] const UserArmy* GetFocusUserArmy() const;
 
     /**
+     * Address: 0x008965E0 (FUN_008965E0, ?RequestFocusArmy@CWldSession@Moho@@QAEXH@Z)
+     *
+     * What it does:
+     * Validates one zero-based focus-army index (`-1` allowed) and forwards
+     * accepted changes to the active sim driver.
+     */
+    void RequestFocusArmy(int index);
+
+    /**
      * Address: 0x008B97C0/0x008621B0 callsites (rule category lookup path).
      *
      * What it does:
@@ -313,6 +331,31 @@ namespace moho
      * Removes an entity from the world-session viz-update RB-tree.
      */
     void RemoveFromVizUpdate(UserEntity* entity);
+
+    /**
+     * Address: 0x008942B0 (FUN_008942B0, ?RequestPause@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Applies session pause request state and notifies registered pause listeners.
+     */
+    void RequestPause();
+
+    /**
+     * Address: 0x00894330 (FUN_00894330, ?Resume@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Applies session resume request state and notifies registered pause listeners.
+     */
+    void Resume();
+
+    /**
+     * Address: 0x008943E0 (FUN_008943E0, ?CheckForNecessaryUIRefresh@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Rebuilds selection when selected entities request UI refresh or when
+     * stale/dead weak links reduce the live selection set.
+     */
+    void CheckForNecessaryUIRefresh();
 
     /**
      * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)
@@ -340,6 +383,53 @@ namespace moho
      * entries for currently live selected units.
      */
     void GetSelectionUnits(msvc8::vector<UserUnit*>& outUnits) const;
+
+    /**
+     * Address context:
+     * - `cfunc_SelectUnitsL` / `cfunc_AddSelectUnitsL` user-Lua selection paths.
+     *
+     * What it does:
+     * Replaces world-session selection with the supplied user-unit list,
+     * updates selection-size bookkeeping, and refreshes sync filter mask B
+     * when the selection set changes.
+     */
+    void SetSelectionUnits(const msvc8::vector<UserUnit*>& units);
+
+    /**
+     * Address: 0x00896780 (FUN_00896780, ?AddToExtraSelectList@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+     *
+     * What it does:
+     * Starts transport order command mode and adds one entity into the
+     * world-session extra-selection weak-set.
+     */
+    void AddToExtraSelectList(UserEntity* entity);
+
+    /**
+     * Address: 0x00896830 (FUN_00896830, ?RemoveFromExtraSelectList@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+     *
+     * What it does:
+     * Removes one entity from the world-session extra-selection weak-set and
+     * exits command mode when the set becomes empty.
+     */
+    void RemoveFromExtraSelectList(UserEntity* entity);
+
+    /**
+     * Address: 0x00896870 (FUN_00896870, ?ClearExtraSelectList@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Clears world-session extra selection weak-set and exits command mode when
+     * any entries were present.
+     */
+    void ClearExtraSelectList();
+
+    /**
+     * Address: 0x00896960 (FUN_00896960, ?SyncPlayableRect@CWldSession@Moho@@QAEXABV?$Rect2@H@gpg@@@Z)
+     *
+     * What it does:
+     * Applies one playable rectangle to terrain and updates user-entity mesh
+     * hidden flags to match whether each entity lies inside that rectangle.
+     */
+    void SyncPlayableRect(const gpg::Rect2i& playableRect);
 
     /**
      * Address: 0x00896F00 (FUN_00896F00,
@@ -404,7 +494,7 @@ namespace moho
      */
     void RenderResources(GeomCamera3* camera, CD3DPrimBatcher* primBatcher);
 
-  private:
+  public:
     /**
      * Address: 0x008969E0 (FUN_008969E0, ?ClearBuildTemplates@CWldSession@Moho@@QAEXXZ)
      *
@@ -414,6 +504,7 @@ namespace moho
      */
     void ClearBuildTemplates();
 
+  private:
     /**
      * Address: 0x00895EB0 (FUN_00895EB0,
      * ?GetCommandGraph@CWldSession@Moho@@QAE?AV?$shared_ptr@VUICommandGraph@Moho@@@boost@@_N@Z)
@@ -422,6 +513,25 @@ namespace moho
      * Locks/returns cached command-graph weak handle and optionally creates it.
      */
     [[nodiscard]] boost::SharedPtrRaw<UICommandGraph> GetCommandGraph(bool allowCreate);
+
+    /**
+     * Address: 0x00896670 (FUN_00896670, ?ValidateFocusArmyRequest@CWldSession@Moho@@AAE_NH@Z)
+     *
+     * What it does:
+     * Returns whether one focus-army switch is allowed for the current command
+     * source/session observation state.
+     */
+    [[nodiscard]] bool ValidateFocusArmyRequest(int index);
+
+    /**
+     * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
+     *
+     * What it does:
+     * Returns typed view for the extra-selection weak-set embedded inside the
+     * spatial-db storage block.
+     */
+    [[nodiscard]] SSelectionSetUserEntity& ExtraSelectionView();
+    [[nodiscard]] const SSelectionSetUserEntity& ExtraSelectionView() const;
 
   public:
     gpg::core::IntrusiveLink<CWldSession*> head0;
@@ -461,9 +571,10 @@ namespace moho
     std::int32_t mLastBeatWasTick;                          // 0x045C
     float mTimeSinceLastTick;                               // 0x0460
     std::uint8_t mSessionPauseStateA;                       // 0x0464
-    uint8_t N00001903;                                      // 0x0465
-    uint8_t mSessionPauseStateB;                            // 0x0466
-    char pad_0467[5];                                       // 0x0467
+    std::uint8_t mRequestingPauseState;                     // 0x0465
+    std::uint8_t mRequestingPause;                          // 0x0466
+    std::uint8_t pad_0467[1];                               // 0x0467
+    std::int32_t mPauseRequester;                           // 0x0468
     std::uint8_t mReplayIsPaused;                           // 0x046C
     char pad_046D[3];                                       // 0x046D
     msvc8::vector<SSTICommandSource> cmdSources;            // 0x0470
@@ -501,6 +612,10 @@ namespace moho
   static_assert(
     offsetof(CWldSession, mEntitySpatialDbStorage) == 0x50, "CWldSession::mEntitySpatialDbStorage offset must be 0x50"
   );
+  static_assert(
+    (offsetof(CWldSession, mEntitySpatialDbStorage) + 0x90) == 0xE0,
+    "CWldSession extra-selection view base must remain at 0xE0"
+  );
   static_assert(offsetof(CWldSession, mBuildTemplates) == 0xF0, "CWldSession::mBuildTemplates offset must be 0xF0");
   static_assert(
     offsetof(CWldSession, mBuildTemplateArg1) == 0x3C0, "CWldSession::mBuildTemplateArg1 offset must be 0x3C0"
@@ -513,6 +628,9 @@ namespace moho
   );
   static_assert(
     offsetof(CWldSession, mTimeSinceLastTick) == 0x460, "CWldSession::mTimeSinceLastTick offset must be 0x460"
+  );
+  static_assert(
+    offsetof(CWldSession, mPauseRequester) == 0x468, "CWldSession::mPauseRequester offset must be 0x468"
   );
   static_assert(
     offsetof(CWldSession, mReplayIsPaused) == 0x46C, "CWldSession::mReplayIsPaused offset must be 0x46C"
@@ -538,6 +656,21 @@ namespace moho
 
   static_assert(sizeof(EWldFrameAction) == 0x4, "EWldFrameAction size must be 0x4");
 
+  class IWldTeardownCallback
+  {
+  public:
+    virtual ~IWldTeardownCallback() = default;
+
+    /**
+     * Address family: callback invoke lane used by world teardown callback
+     * dispatch (`FUN_00869870`).
+     */
+    virtual int OnWldSessionTeardown(CWldSession* session) = 0;
+  };
+  static_assert(sizeof(IWldTeardownCallback) == 0x4, "IWldTeardownCallback size must be 0x4");
+
+  using WldTeardownCallbackVector = msvc8::vector<IWldTeardownCallback*>;
+
   /**
    * Address context:
    * - process-global world-frame action lane (`sWldFrameAction`) consumed by
@@ -559,6 +692,15 @@ namespace moho
    * Dispatches world-frame state transitions and per-state frame handlers.
    */
   [[nodiscard]] bool WLD_Frame(float deltaSeconds);
+
+  /**
+   * Address: 0x00869810 (FUN_00869810, func_WldSessionLoader_GetOnTeardownCallbacks)
+   *
+   * What it does:
+   * Lazily initializes and returns the process-global world-teardown callback
+   * vector used by session-loader teardown paths.
+   */
+  [[nodiscard]] WldTeardownCallbackVector* WLD_GetOnTeardownCallbacks();
 
   /**
    * Address: 0x0088C860 (FUN_0088C860, ?WLD_Teardown@Moho@@YAXXZ)

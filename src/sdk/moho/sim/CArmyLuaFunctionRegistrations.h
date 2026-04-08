@@ -1,8 +1,79 @@
 #pragma once
 
+#include <cstdint>
+
+#include "legacy/containers/String.h"
+
 namespace moho
 {
   class CScrLuaInitForm;
+
+  /**
+   * Address: 0x005068B0 (FUN_005068B0, ?GetPlayerColor@Moho@@YAIH@Z)
+   *
+   * int idx
+   *
+   * What it does:
+   * Resolves one configured player color entry by index and decodes it into
+   * packed ARGB.
+   */
+  std::uint32_t GetPlayerColor(int idx);
+
+  /**
+   * Address: 0x00506970 (FUN_00506970, ?GetArmyColor@Moho@@YAIH@Z)
+   *
+   * int idx
+   *
+   * What it does:
+   * Resolves one configured army color entry by index and decodes it into
+   * packed ARGB.
+   */
+  std::uint32_t GetArmyColor(int idx);
+
+  /**
+   * Address: 0x00506A30 (FUN_00506A30, ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
+   *
+   * int idx
+   *
+   * What it does:
+   * Returns one player-color token string from the game color table.
+   */
+  msvc8::string GetPlayerColorName(int idx);
+
+  /**
+   * Address: 0x00506B20 (FUN_00506B20, ?GetPlayerColorCount@Moho@@YAIXZ)
+   *
+   * What it does:
+   * Returns the number of configured player colors.
+   */
+  std::uint32_t GetPlayerColorCount();
+
+  /**
+   * Address: 0x00506BB0 (FUN_00506BB0, ?GetCivilianArmyColor@Moho@@YAIXZ)
+   *
+   * What it does:
+   * Decodes the configured civilian army color token into packed ARGB.
+   */
+  std::uint32_t GetCivilianArmyColor();
+
+  /**
+   * Address: 0x00506C40 (FUN_00506C40, ?GetUnidentifiedColor@Moho@@YAIXZ)
+   *
+   * What it does:
+   * Decodes the configured unidentified color token into packed ARGB.
+   */
+  std::uint32_t GetUnidentifiedColor();
+
+  /**
+   * Address: 0x00506CD0 (FUN_00506CD0, func_GetColorIndex)
+   *
+   * int packedColor
+   *
+   * What it does:
+   * Scans the configured army-color table and returns the first index whose
+   * decoded color matches `packedColor`; defaults to `3` when not found.
+   */
+  int func_GetColorIndex(int packedColor);
 
   // Underlying Lua function-definition publishers referenced by this thunk pack.
   CScrLuaInitForm* func_ListArmies_LuaFuncDef();
@@ -19,23 +90,107 @@ namespace moho
   CScrLuaInitForm* func_SetArmyUnitCap_LuaFuncDef();
   CScrLuaInitForm* func_SetIgnoreArmyUnitCap_LuaFuncDef();
   CScrLuaInitForm* func_SetIgnorePlayableRect_LuaFuncDef();
+
+  /**
+   * Address: 0x007092E0 (FUN_007092E0, func_CreateInitialArmyUnit_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `CreateInitialArmyUnit`.
+   */
   CScrLuaInitForm* func_CreateInitialArmyUnit_LuaFuncDef();
   CScrLuaInitForm* func_SetAlliance_LuaFuncDef();
   CScrLuaInitForm* func_SetAllianceOneWay_LuaFuncDef();
   CScrLuaInitForm* func_SetAlliedVictory_LuaFuncDef();
+
+  /**
+   * Address: 0x007099E0 (FUN_007099E0, func_IsAllySim_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `IsAlly`.
+   */
   CScrLuaInitForm* func_IsAllySim_LuaFuncDef();
+
+  /**
+   * Address: 0x00709B10 (FUN_00709B10, func_IsEnemySim_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `IsEnemy`.
+   */
   CScrLuaInitForm* func_IsEnemySim_LuaFuncDef();
+
+  /**
+   * Address: 0x00709C40 (FUN_00709C40, func_IsNeutralSim_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `IsNeutral`.
+   */
   CScrLuaInitForm* func_IsNeutralSim_LuaFuncDef();
+
+  /**
+   * Address: 0x00709D70 (FUN_00709D70, func_ArmyIsCivilian_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `ArmyIsCivilian`.
+   */
   CScrLuaInitForm* func_ArmyIsCivilian_LuaFuncDef();
+
+  /**
+   * Address: 0x00709E70 (FUN_00709E70, func_SetArmyColorIndex_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SetArmyColorIndex`.
+   */
   CScrLuaInitForm* func_SetArmyColorIndex_LuaFuncDef();
+
+  /**
+   * Address: 0x00709FD0 (FUN_00709FD0, func_SetArmyFactionIndex_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SetArmyFactionIndex`.
+   */
   CScrLuaInitForm* func_SetArmyFactionIndex_LuaFuncDef();
   CScrLuaInitForm* func_SetArmyAIPersonality_LuaFuncDef();
   CScrLuaInitForm* func_SetArmyColor_LuaFuncDef();
   CScrLuaInitForm* func_SetArmyShowScore_LuaFuncDef();
+
+  /**
+   * Address: 0x0070A700 (FUN_0070A700, func_AddBuildRestriction_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `AddBuildRestriction`.
+   */
   CScrLuaInitForm* func_AddBuildRestriction_LuaFuncDef();
+
+  /**
+   * Address: 0x0070A820 (FUN_0070A820, func_RemoveBuildRestriction_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `RemoveBuildRestriction`.
+   */
   CScrLuaInitForm* func_RemoveBuildRestriction_LuaFuncDef();
+
+  /**
+   * Address: 0x0070A940 (FUN_0070A940, func_OkayToMessWithArmy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `OkayToMessWithArmy`.
+   */
   CScrLuaInitForm* func_OkayToMessWithArmy_LuaFuncDef();
+
+  /**
+   * Address: 0x0070AA80 (FUN_0070AA80, func_ArmyIsOutOfGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `ArmyIsOutOfGame`.
+   */
   CScrLuaInitForm* func_ArmyIsOutOfGame_LuaFuncDef();
+
+  /**
+   * Address: 0x0070AB80 (FUN_0070AB80, func_SetArmyOutOfGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SetArmyOutOfGame`.
+   */
   CScrLuaInitForm* func_SetArmyOutOfGame_LuaFuncDef();
 
   /**

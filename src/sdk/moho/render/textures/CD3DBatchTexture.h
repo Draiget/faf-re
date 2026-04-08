@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/mutex.h"
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "moho/containers/TDatList.h"
@@ -146,6 +147,17 @@ namespace moho
     std::uint32_t mBorder;                   // +0x14
     DynamicTextureSheetHandle mTextureSheet; // +0x18
   };
+
+  /**
+   * Address: 0x00BC4340 (FUN_00BC4340, register_sResourceLock)
+   *
+   * What it does:
+   * Startup thunk that ensures the shared batch-texture cache mutex is
+   * materialized before texture-cache startup lanes run.
+   */
+  void register_sResourceLock();
+
+  extern boost::mutex sResourceLock;
 
   static_assert(offsetof(CD3DBatchTexture, mListLink) == 0x04, "CD3DBatchTexture::mListLink offset must be 0x04");
   static_assert(offsetof(CD3DBatchTexture, mWidth) == 0x0C, "CD3DBatchTexture::mWidth offset must be 0x0C");

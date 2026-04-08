@@ -5,18 +5,41 @@
 #include <list>
 #include <limits>
 #include <map>
+#include <memory>
 #include <new>
 #include <typeinfo>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "Entity.h"
 #include "legacy/containers/Tree.h"
 #include "moho/containers/BVIntSet.h"
+#include "moho/entity/Prop.h"
 #include "moho/misc/StatItem.h"
+#include "moho/misc/WeakPtr.h"
 #include "moho/sim/IdPool.h"
 #include "moho/unit/core/Unit.h"
+
+namespace moho
+{
+  struct CEntityDbIdPoolNode
+  {
+    CEntityDbIdPoolNode* left;              // +0x000
+    CEntityDbIdPoolNode* parent;            // +0x004
+    CEntityDbIdPoolNode* right;             // +0x008
+    std::uint8_t payload_00C_0CC7[0xCBC]{}; // +0x00C
+    std::uint8_t color;                     // +0xCC8
+    std::uint8_t isNil;                     // +0xCC9
+    std::uint8_t tail_0CCA_0CCF[0x06]{};    // +0xCCA
+  };
+  static_assert(offsetof(CEntityDbIdPoolNode, color) == 0xCC8, "CEntityDbIdPoolNode::color offset must be 0xCC8");
+  static_assert(offsetof(CEntityDbIdPoolNode, isNil) == 0xCC9, "CEntityDbIdPoolNode::isNil offset must be 0xCC9");
+  static_assert(sizeof(CEntityDbIdPoolNode) == 0xCD0, "CEntityDbIdPoolNode size must be 0xCD0");
+} // namespace moho
 
 namespace
 {
@@ -43,6 +66,7 @@ namespace
   std::unordered_map<const moho::CEntityDb*, msvc8::list<moho::Entity*>> gRuntimeEntityLists;
   moho::EntityDBSerializer gEntityDBSerializer;
   constexpr std::uint32_t kEntityIdInvalidSentinel = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
+  constexpr std::size_t kBoundedPropQueueMaxSize = 1000u;
   moho::StatItem* sEngineStat_EntityCount = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Prop = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Unit = nullptr;
@@ -51,6 +75,181 @@ namespace
   moho::StatItem* sEngineStat_EntityCount_Projectile = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Shield = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Unknown = nullptr;
+
+  struct BoundedPropQueueEntry
+  {
+    std::int32_t priority = 0;
+    std::int32_t boundedTick = 0;
+    moho::WeakPtr<moho::Prop> weakProp{};
+    std::int32_t handleIndex = -1;
+  };
+
+  struct BoundedPropQueueRuntime
+  {
+    std::vector<std::unique_ptr<BoundedPropQueueEntry>> heap{};
+    std::vector<std::int32_t> handleToHeapIndex{};
+    std::int32_t lastFreeHandle = -1;
+  };
+
+  std::unordered_map<const moho::CEntityDb*, BoundedPropQueueRuntime> gRuntimeBoundedProps;
+
+  [[nodiscard]] bool IsHigherBoundedPropPriority(
+    const BoundedPropQueueEntry& lhs, const BoundedPropQueueEntry& rhs
+  ) noexcept
+  {
+    // Binary comparator is lexicographic min-heap on (priority, boundedTick).
+    if (lhs.priority != rhs.priority) {
+      return lhs.priority < rhs.priority;
+    }
+
+    return lhs.boundedTick < rhs.boundedTick;
+  }
+
+  [[nodiscard]] std::int32_t AcquireBoundedPropHandle(
+    BoundedPropQueueRuntime& queue, const std::int32_t heapIndex
+  )
+  {
+    if (queue.lastFreeHandle == -1) {
+      const std::int32_t newHandle = static_cast<std::int32_t>(queue.handleToHeapIndex.size());
+      queue.handleToHeapIndex.push_back(heapIndex);
+      return newHandle;
+    }
+
+    const std::int32_t reusedHandle = queue.lastFreeHandle;
+    queue.lastFreeHandle = queue.handleToHeapIndex[static_cast<std::size_t>(reusedHandle)];
+    queue.handleToHeapIndex[static_cast<std::size_t>(reusedHandle)] = heapIndex;
+    return reusedHandle;
+  }
+
+  void ReleaseBoundedPropHandle(BoundedPropQueueRuntime& queue, const std::int32_t handleIndex)
+  {
+    if (handleIndex < 0) {
+      return;
+    }
+
+    const std::size_t handle = static_cast<std::size_t>(handleIndex);
+    if (handle >= queue.handleToHeapIndex.size()) {
+      queue.handleToHeapIndex.resize(handle + 1u, -1);
+    }
+
+    queue.handleToHeapIndex[handle] = queue.lastFreeHandle;
+    queue.lastFreeHandle = handleIndex;
+  }
+
+  void UpdateBoundedPropHandleMapping(BoundedPropQueueRuntime& queue, const std::size_t heapIndex)
+  {
+    if (heapIndex >= queue.heap.size() || !queue.heap[heapIndex]) {
+      return;
+    }
+
+    const std::int32_t handleIndex = queue.heap[heapIndex]->handleIndex;
+    if (handleIndex < 0) {
+      return;
+    }
+
+    const std::size_t handle = static_cast<std::size_t>(handleIndex);
+    if (handle >= queue.handleToHeapIndex.size()) {
+      queue.handleToHeapIndex.resize(handle + 1u, -1);
+    }
+    queue.handleToHeapIndex[handle] = static_cast<std::int32_t>(heapIndex);
+  }
+
+  void SwapBoundedPropHeapEntries(BoundedPropQueueRuntime& queue, const std::size_t lhs, const std::size_t rhs)
+  {
+    if (lhs == rhs) {
+      return;
+    }
+
+    std::swap(queue.heap[lhs], queue.heap[rhs]);
+    UpdateBoundedPropHandleMapping(queue, lhs);
+    UpdateBoundedPropHandleMapping(queue, rhs);
+  }
+
+  void SiftBoundedPropUp(BoundedPropQueueRuntime& queue, std::size_t heapIndex)
+  {
+    while (heapIndex > 0u) {
+      const std::size_t parent = (heapIndex - 1u) / 2u;
+      if (!IsHigherBoundedPropPriority(*queue.heap[heapIndex], *queue.heap[parent])) {
+        break;
+      }
+
+      SwapBoundedPropHeapEntries(queue, parent, heapIndex);
+      heapIndex = parent;
+    }
+  }
+
+  void SiftBoundedPropDown(BoundedPropQueueRuntime& queue, std::size_t heapIndex)
+  {
+    const std::size_t count = queue.heap.size();
+    for (;;) {
+      const std::size_t leftChild = heapIndex * 2u + 1u;
+      if (leftChild >= count) {
+        return;
+      }
+
+      std::size_t best = heapIndex;
+      if (IsHigherBoundedPropPriority(*queue.heap[leftChild], *queue.heap[best])) {
+        best = leftChild;
+      }
+
+      const std::size_t rightChild = leftChild + 1u;
+      if (rightChild < count && IsHigherBoundedPropPriority(*queue.heap[rightChild], *queue.heap[best])) {
+        best = rightChild;
+      }
+
+      if (best == heapIndex) {
+        return;
+      }
+
+      SwapBoundedPropHeapEntries(queue, heapIndex, best);
+      heapIndex = best;
+    }
+  }
+
+  [[nodiscard]] std::int32_t PushBoundedPropEntry(
+    BoundedPropQueueRuntime& queue, moho::Prop* const prop, const std::int32_t priority, const std::int32_t boundedTick
+  )
+  {
+    const std::int32_t heapIndex = static_cast<std::int32_t>(queue.heap.size());
+    const std::int32_t handleIndex = AcquireBoundedPropHandle(queue, heapIndex);
+
+    auto entry = std::make_unique<BoundedPropQueueEntry>();
+    entry->priority = priority;
+    entry->boundedTick = boundedTick;
+    entry->weakProp.ResetFromObject(prop);
+    entry->handleIndex = handleIndex;
+
+    queue.heap.push_back(std::move(entry));
+    SiftBoundedPropUp(queue, queue.heap.size() - 1u);
+    UpdateBoundedPropHandleMapping(queue, queue.heap.size() - 1u);
+    return handleIndex;
+  }
+
+  [[nodiscard]] moho::Prop* PopBoundedPropHead(BoundedPropQueueRuntime& queue)
+  {
+    if (queue.heap.empty()) {
+      return nullptr;
+    }
+
+    const std::size_t lastIndex = queue.heap.size() - 1u;
+    SwapBoundedPropHeapEntries(queue, 0u, lastIndex);
+
+    std::unique_ptr<BoundedPropQueueEntry> removed = std::move(queue.heap.back());
+    queue.heap.pop_back();
+
+    moho::Prop* removedProp = nullptr;
+    if (removed) {
+      removedProp = removed->weakProp.GetObject();
+      removed->weakProp.ResetFromObject(nullptr);
+      ReleaseBoundedPropHandle(queue, removed->handleIndex);
+    }
+
+    if (!queue.heap.empty()) {
+      SiftBoundedPropDown(queue, 0u);
+    }
+
+    return removedProp;
+  }
 
   [[nodiscard]] moho::StatItem* EnsureEntityCountStatSlot(moho::StatItem*& slot, const char* const statPath)
   {
@@ -269,8 +468,8 @@ namespace
     EnsureSetListHeadInitialized(head);
 
     if (node->next && node->prev) {
-      static_cast<moho::CEntityDbListHead*>(node->next)->prev = node->prev;
-      static_cast<moho::CEntityDbListHead*>(node->prev)->next = node->next;
+      node->next->prev = node->prev;
+      node->prev->next = node->next;
     }
 
     node->next = node;
@@ -278,7 +477,7 @@ namespace
 
     node->next = head.next;
     node->prev = &head;
-    static_cast<moho::CEntityDbListHead*>(head.next)->prev = node;
+    head.next->prev = node;
     head.next = node;
   }
 
@@ -353,6 +552,117 @@ namespace
       next = next->left;
     }
     return childOrParent;
+  }
+
+  template <typename TNode>
+  [[nodiscard]] TNode* NextNodeInSentinelTree(TNode* node) noexcept
+  {
+    if (node == nullptr || node->isNil != 0u) {
+      return node;
+    }
+
+    TNode* childOrParent = node->right;
+    if (childOrParent == nullptr) {
+      return nullptr;
+    }
+
+    if (childOrParent->isNil != 0u) {
+      for (TNode* next = node->parent; next != nullptr && next->isNil == 0u; next = next->parent) {
+        if (node != next->right) {
+          return next;
+        }
+        node = next;
+      }
+      return node != nullptr ? node->parent : nullptr;
+    }
+
+    TNode* next = childOrParent->left;
+    while (next != nullptr && next->isNil == 0u) {
+      childOrParent = next;
+      next = next->left;
+    }
+    return childOrParent;
+  }
+
+  template <typename TNode>
+  void ClearSentinelTreeNodes(TNode* const head) noexcept
+  {
+    if (!head) {
+      return;
+    }
+
+    for (TNode* node = head->left; node && node != head && node->isNil == 0u;) {
+      TNode* const next = NextNodeInSentinelTree(node);
+      ::operator delete(node);
+      node = next;
+    }
+
+    head->parent = head;
+    head->left = head;
+    head->right = head;
+  }
+
+  [[nodiscard]] moho::CEntityDbAllUnitsNode* AllocateAllUnitsTreeNode()
+  {
+    auto* const node = static_cast<moho::CEntityDbAllUnitsNode*>(::operator new(sizeof(moho::CEntityDbAllUnitsNode)));
+    node->left = nullptr;
+    node->parent = nullptr;
+    node->right = nullptr;
+    node->color = 1u;
+    node->isNil = 0u;
+    return node;
+  }
+
+  [[nodiscard]] moho::CEntityDbIdPoolNode* AllocateIdPoolTreeNode()
+  {
+    auto* const node = static_cast<moho::CEntityDbIdPoolNode*>(::operator new(sizeof(moho::CEntityDbIdPoolNode)));
+    node->left = nullptr;
+    node->parent = nullptr;
+    node->right = nullptr;
+    node->color = 1u;
+    node->isNil = 0u;
+    return node;
+  }
+
+  [[nodiscard]] moho::CEntityDbListHead* AllocateEntityListHeadNode()
+  {
+    auto* const head = static_cast<moho::CEntityDbListHead*>(::operator new(sizeof(moho::CEntityDbListHead)));
+    head->next = head;
+    head->prev = head;
+    return head;
+  }
+
+  void ResetBoundedPropQueueLane(moho::CEntityDbBoundedPropQueueRuntime& queue) noexcept
+  {
+    if (queue.storageBegin) {
+      // The binary runs an element-dtor walk before deleting storage; this lane
+      // remains unresolved because gameplay-side bounded props live in
+      // `gRuntimeBoundedProps` in the current recovered implementation.
+      ::operator delete(queue.storageBegin);
+    }
+
+    queue.storageBegin = nullptr;
+    queue.storageCurrent = nullptr;
+    queue.storageEnd = nullptr;
+    queue.start = 0u;
+    queue.end = 0u;
+    queue.capacity = 0u;
+  }
+
+  void ClearEntityListNodes(moho::CEntityDbListHead* const head) noexcept
+  {
+    if (!head) {
+      return;
+    }
+
+    for (moho::CEntityDbListHead* node = head->next; node && node != head;) {
+      moho::CEntityDbListHead* const next = node->next;
+      ::operator delete(node);
+      node = next;
+    }
+
+    head->next = head;
+    head->prev = head;
   }
 
   [[nodiscard]] bool
@@ -438,12 +748,44 @@ namespace
   };
   static_assert(sizeof(EntityDbTypeInfo) == 0x64, "EntityDbTypeInfo size must be 0x64");
 
+  extern msvc8::string gEntityDbIdPoolMapTypeName;
+  extern std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard;
+  void cleanup_EntityDbIdPoolMapTypeName();
+
+  extern msvc8::string gEntityDbEntityListTypeName;
+  extern std::uint32_t gEntityDbEntityListTypeNameInitGuard;
+  void cleanup_EntityDbEntityListTypeName();
+
   class EntityDbIdPoolMapTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00685C80 (FUN_00685C80, gpg::RMapType_uint_IdPool::GetName)
+     *
+     * What it does:
+     * Builds/caches one lexical map type label from runtime key/value RTTI
+     * names and returns `"map<key,value>"`.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "std::map<unsigned int,Moho::IdPool>";
+      if ((gEntityDbIdPoolMapTypeNameInitGuard & 1u) == 0u) {
+        gEntityDbIdPoolMapTypeNameInitGuard |= 1u;
+
+        gpg::RType* valueType = moho::IdPool::sType;
+        if (valueType == nullptr) {
+          valueType = gpg::LookupRType(typeid(moho::IdPool));
+          moho::IdPool::sType = valueType;
+        }
+
+        gpg::RType* keyType = gpg::LookupRType(typeid(unsigned int));
+        const char* const keyName = keyType != nullptr ? keyType->GetName() : "unsigned int";
+        const char* const valueName = valueType != nullptr ? valueType->GetName() : "Moho::IdPool";
+
+        gEntityDbIdPoolMapTypeName = gpg::STR_Printf("map<%s,%s>", keyName, valueName);
+        (void)std::atexit(&cleanup_EntityDbIdPoolMapTypeName);
+      }
+
+      return gEntityDbIdPoolMapTypeName.c_str();
     }
 
     void Init() override
@@ -458,9 +800,25 @@ namespace
   class EntityDbEntityListTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00685DF0 (FUN_00685DF0, gpg::RListType_EntityP::GetName)
+     *
+     * What it does:
+     * Builds/caches one lexical list type label from runtime `Entity*` RTTI
+     * and returns `"list<value>"`.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "std::list<Moho::Entity *>";
+      if ((gEntityDbEntityListTypeNameInitGuard & 1u) == 0u) {
+        gEntityDbEntityListTypeNameInitGuard |= 1u;
+
+        gpg::RType* const valueType = gpg::LookupRType(typeid(moho::Entity*));
+        const char* const valueName = valueType != nullptr ? valueType->GetName() : "Entity *";
+        gEntityDbEntityListTypeName = gpg::STR_Printf("list<%s>", valueName ? valueName : "Entity *");
+        (void)std::atexit(&cleanup_EntityDbEntityListTypeName);
+      }
+
+      return gEntityDbEntityListTypeName.c_str();
     }
 
     void Init() override
@@ -476,9 +834,37 @@ namespace
   bool gEntityDbTypeInfoConstructed = false;
   alignas(EntityDbIdPoolMapTypeInfo) std::byte gEntityDbIdPoolMapTypeInfoStorage[sizeof(EntityDbIdPoolMapTypeInfo)]{};
   bool gEntityDbIdPoolMapTypeInfoConstructed = false;
+  msvc8::string gEntityDbIdPoolMapTypeName{};
+  std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard = 0u;
+  msvc8::string gEntityDbEntityListTypeName{};
+  std::uint32_t gEntityDbEntityListTypeNameInitGuard = 0u;
   alignas(EntityDbEntityListTypeInfo)
     std::byte gEntityDbEntityListTypeInfoStorage[sizeof(EntityDbEntityListTypeInfo)]{};
   bool gEntityDbEntityListTypeInfoConstructed = false;
+
+  /**
+   * Address: 0x00BFCB90 (FUN_00BFCB90)
+   *
+   * What it does:
+   * Releases cached lexical storage for `gpg::RMapType_uint_IdPool::GetName`.
+   */
+  void cleanup_EntityDbIdPoolMapTypeName()
+  {
+    gEntityDbIdPoolMapTypeName.clear();
+    gEntityDbIdPoolMapTypeNameInitGuard = 0u;
+  }
+
+  /**
+   * Address: 0x00B867B0 (FUN_00B867B0, cleanup_EntityDbEntityListTypeName)
+   *
+   * What it does:
+   * Releases cached lexical storage for `gpg::RListType_EntityP::GetName`.
+   */
+  void cleanup_EntityDbEntityListTypeName()
+  {
+    gEntityDbEntityListTypeName.clear();
+    gEntityDbEntityListTypeNameInitGuard = 0u;
+  }
 
   [[nodiscard]] EntityDbTypeInfo& AcquireEntityDbTypeInfo()
   {
@@ -510,6 +896,74 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00684230 (FUN_00684230, Moho::EntityDB::EntityDB)
+   */
+  CEntityDb::CEntityDb()
+  {
+    mAllUnits = AllocateAllUnitsTreeNode();
+    mAllUnits->isNil = 1u;
+    mAllUnits->parent = mAllUnits;
+    mAllUnits->left = mAllUnits;
+    mAllUnits->right = mAllUnits;
+    mAllUnitsSize = 0u;
+
+    mIdPoolTree.head = AllocateIdPoolTreeNode();
+    mIdPoolTree.head->isNil = 1u;
+    mIdPoolTree.head->parent = mIdPoolTree.head;
+    mIdPoolTree.head->left = mIdPoolTree.head;
+    mIdPoolTree.head->right = mIdPoolTree.head;
+    mIdPoolTree.size = 0u;
+
+    mRegisteredEntitySets.next = &mRegisteredEntitySets;
+    mRegisteredEntitySets.prev = &mRegisteredEntitySets;
+
+    mEntityList.head = AllocateEntityListHeadNode();
+    mEntityList.size = 0u;
+
+    mBoundedProps.start = 0u;
+    mBoundedProps.end = 0u;
+    mBoundedProps.capacity = 0u;
+    mBoundedProps.storageBegin = nullptr;
+    mBoundedProps.storageCurrent = nullptr;
+    mBoundedProps.storageEnd = nullptr;
+    mBoundedProps.lastHandle = -1;
+  }
+
+  /**
+   * Address: 0x006843B0 (FUN_006843B0, Moho::EntityDB::~EntityDB)
+   */
+  CEntityDb::~CEntityDb()
+  {
+    ResetBoundedPropQueueLane(mBoundedProps);
+
+    ClearEntityListNodes(mEntityList.head);
+    ::operator delete(mEntityList.head);
+    mEntityList.head = nullptr;
+    mEntityList.size = 0u;
+
+    if (mRegisteredEntitySets.next && mRegisteredEntitySets.prev) {
+      mRegisteredEntitySets.prev->next = mRegisteredEntitySets.next;
+      mRegisteredEntitySets.next->prev = mRegisteredEntitySets.prev;
+    }
+    mRegisteredEntitySets.next = &mRegisteredEntitySets;
+    mRegisteredEntitySets.prev = &mRegisteredEntitySets;
+
+    ClearSentinelTreeNodes(mIdPoolTree.head);
+    ::operator delete(mIdPoolTree.head);
+    mIdPoolTree.head = nullptr;
+    mIdPoolTree.size = 0u;
+
+    ClearSentinelTreeNodes(mAllUnits);
+    ::operator delete(mAllUnits);
+    mAllUnits = nullptr;
+    mAllUnitsSize = 0u;
+
+    gRuntimeBoundedProps.erase(this);
+    gRuntimeEntityLists.erase(this);
+    gRuntimePools.erase(this);
+  }
+
   /**
    * Address: 0x00683C90 (FUN_00683C90,
    * ?AllUnitsEnd@EntityDB@Moho@@QAE?AV?$Iterator@VUnit@Moho@@@EntityDBIterators@2@XZ)
@@ -583,6 +1037,33 @@ namespace moho
     return fallbackEntityId;
   }
 
+  /**
+   * Address: 0x00684C30 (FUN_00684C30, Moho::EntityDB::AddBoundedProp)
+   *
+   * What it does:
+   * Pushes one Prop into the bounded reclaim-priority queue and evicts queue
+   * head entries while occupancy is at least 1000.
+   */
+  std::int32_t CEntityDb::AddBoundedProp(Prop* const prop)
+  {
+    BoundedPropQueueRuntime& queue = gRuntimeBoundedProps[this];
+    while (queue.heap.size() >= kBoundedPropQueueMaxSize) {
+      Prop* const evictedProp = PopBoundedPropHead(queue);
+      if (!evictedProp) {
+        continue;
+      }
+
+      evictedProp->mHandleIndex = -1;
+      evictedProp->Destroy();
+    }
+
+    if (!prop) {
+      return -1;
+    }
+
+    return PushBoundedPropEntry(queue, prop, prop->mPriorityInfo.mPriority, prop->mPriorityInfo.mBoundedTick);
+  }
+
   msvc8::list<Entity*>& CEntityDb::Entities() noexcept
   {
     return gRuntimeEntityLists[this];
@@ -600,6 +1081,11 @@ namespace moho
   }
 
   void CEntityDb::RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept
+  {
+    LinkSetNodeToFront(mRegisteredEntitySets, reinterpret_cast<CEntityDbListHead*>(&set));
+  }
+
+  void CEntityDb::RegisterEntitySet(EntitySetBase& set) noexcept
   {
     LinkSetNodeToFront(mRegisteredEntitySets, reinterpret_cast<CEntityDbListHead*>(&set));
   }
@@ -702,8 +1188,8 @@ namespace moho
     EnsureSetListHeadInitialized(mRegisteredEntitySets);
     gpg::RType* const setType = ResolveEntitySetBaseType();
 
-    for (CEntityDbListHead* node = static_cast<CEntityDbListHead*>(mRegisteredEntitySets.next); node && node != &mRegisteredEntitySets;
-         node = static_cast<CEntityDbListHead*>(node->next)) {
+    for (CEntityDbListHead* node = mRegisteredEntitySets.next; node && node != &mRegisteredEntitySets;
+         node = node->next) {
       gpg::WriteRawPointer(
         archive,
         MakeObjectRef(node, setType),
@@ -731,7 +1217,9 @@ namespace moho
 
     SerEntities(archive);
 
-    if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName({"std::map<unsigned int,Moho::IdPool>"})) {
+    if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName(
+          {"std::map<unsigned int,Moho::IdPool>", "map<unsigned int,Moho::IdPool>"}
+        )) {
       std::map<unsigned int, moho::IdPool> serializedIdPools;
       archive->Read(idPoolMapType, &serializedIdPools, NullOwnerRef());
 
@@ -772,7 +1260,9 @@ namespace moho
 
     SerEntities(archive);
 
-    if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName({"std::map<unsigned int,Moho::IdPool>"})) {
+    if (gpg::RType* const idPoolMapType = ResolveTypeByAnyName(
+          {"std::map<unsigned int,Moho::IdPool>", "map<unsigned int,Moho::IdPool>"}
+        )) {
       std::map<unsigned int, moho::IdPool> serializedIdPools;
       const auto poolsIt = gRuntimePools.find(this);
       if (poolsIt != gRuntimePools.end()) {
@@ -831,15 +1321,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x00688A90 (FUN_00688A90, Moho::EntityDBSerializer::RegisterSerializeFunctions)
+   * Address: 0x00686010 (FUN_00686010, gpg::SerSaveLoadHelper_EntityDB::Init)
    */
   void EntityDBSerializer::RegisterSerializeFunctions()
   {
     gpg::RType* const entityDbType = ResolveEntityDbType();
+    GPG_ASSERT(entityDbType != nullptr);
     if (!entityDbType) {
       return;
     }
 
+    GPG_ASSERT(entityDbType->serLoadFunc_ == nullptr);
+    GPG_ASSERT(entityDbType->serSaveFunc_ == nullptr);
     entityDbType->serLoadFunc_ = mDeserialize;
     entityDbType->serSaveFunc_ = mSerialize;
   }

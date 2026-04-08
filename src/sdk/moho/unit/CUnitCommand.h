@@ -150,7 +150,24 @@ namespace moho
      */
     void RefreshBlipState();
 
+    /**
+     * Address: 0x006E9000 (FUN_006E9000, ?CoordinateWith@CUnitCommand@Moho@@QAEXPAV12@@Z)
+     *
+     * What it does:
+     * Adds a one-way coordinating-order link from this command to `other`
+     * when command types are compatible.
+     */
+    void CoordinateWith(CUnitCommand* other);
+
   private:
+    /**
+     * Address: 0x006E7FF0 (FUN_006E7FF0, ??0CUnitCommand@Moho@@AAE@XZ)
+     *
+     * What it does:
+     * Default-initializes one command instance for serializer construction flow.
+     */
+    CUnitCommand();
+
     friend class CUnitCommandConstruct;
 
     /**
@@ -161,18 +178,20 @@ namespace moho
     void DestroyInternal();
 
     /**
+     * Address: 0x006E8140 (FUN_006E8140, Moho::CUnitCommand::dtr)
+     *
+     * What it does:
+     * Executes non-deleting teardown and conditionally frees object storage
+     * when `deleteFlag & 1` is set.
+     */
+    static CScriptObject* DestroyWithDeleteFlag(CScriptObject* object, std::uint8_t deleteFlag);
+
+    /**
      * Address: 0x006E8DC0 (FUN_006E8DC0)
      *
      * Rebuilds cached unit/event payload state when pending updates exist.
      */
     void RefreshPublishedCommandEvent(bool forceRefresh, SSyncData* syncData);
-
-    /**
-     * Address: 0x006E9000 (FUN_006E9000)
-     *
-     * Links compatible commands into the coordinating-order ring.
-     */
-    void LinkCoordinatingOrder(CUnitCommand* other);
 
   public:
     // Placeholder for unresolved leading subobject/layout slice.

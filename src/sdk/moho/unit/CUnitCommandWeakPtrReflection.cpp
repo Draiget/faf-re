@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -246,6 +247,64 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x005A2270 (FUN_005A2270, Moho::WeakPtr_CUnitCommand::destruct_range)
+   *
+   * What it does:
+   * Walks one contiguous weak-pointer range and detaches each node from its
+   * owner chain by rewriting predecessor links to skip the node.
+   */
+  void DetachWeakPtrCUnitCommandRange(WeakPtr<CUnitCommand>* begin, WeakPtr<CUnitCommand>* end)
+  {
+    while (begin != end) {
+      WeakPtr<CUnitCommand>& weak = *begin;
+      if (weak.ownerLinkSlot != nullptr && !WeakPtr<CUnitCommand>::IsSentinelSlot(weak.ownerLinkSlot)) {
+        auto** link = reinterpret_cast<WeakPtr<CUnitCommand>**>(weak.ownerLinkSlot);
+        while (*link != nullptr && *link != &weak) {
+          link = &(*link)->nextInOwner;
+        }
+
+        if (*link == &weak) {
+          *link = weak.nextInOwner;
+        }
+      }
+
+      weak.ownerLinkSlot = nullptr;
+      weak.nextInOwner = nullptr;
+      ++begin;
+    }
+  }
+
+  /**
+   * Address: 0x005DB610 (FUN_005DB610, std::vector_WeakPtr_CUnitCommand::cpy)
+   *
+   * What it does:
+   * Copies one legacy `vector<WeakPtr<CUnitCommand>>` payload into destination
+   * storage using the VC8 vector copy semantics.
+   */
+  [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>>* CopyWeakPtrCUnitCommandVector(
+    const msvc8::vector<WeakPtr<CUnitCommand>>& source,
+    msvc8::vector<WeakPtr<CUnitCommand>>& destination
+  )
+  {
+    if (source.size() > 0x1FFFFFFFu) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    if (!destination.empty()) {
+      auto& view = msvc8::AsVectorRuntimeView(destination);
+      if (view.begin && view.end) {
+        DetachWeakPtrCUnitCommandRange(view.begin, view.end);
+      }
+    }
+
+    destination = source;
+    return &destination;
+  }
+} // namespace moho
+
+namespace moho
+{
+  /**
    * Address: 0x006E9890 (FUN_006E9890, Moho::RWeakPtrType_CUnitCommand::GetName)
    */
   const char* RWeakPtrType<CUnitCommand>::GetName() const
@@ -467,8 +526,9 @@ namespace gpg
 
     const std::size_t requested = static_cast<std::size_t>(count);
     if (requested < storage->size()) {
-      for (std::size_t i = requested; i < storage->size(); ++i) {
-        (*storage)[i].ResetFromObject(nullptr);
+      auto& view = msvc8::AsVectorRuntimeView(*storage);
+      if (view.begin && view.end) {
+        moho::DetachWeakPtrCUnitCommandRange(view.begin + requested, view.end);
       }
     }
 

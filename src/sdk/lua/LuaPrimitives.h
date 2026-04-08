@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #if defined(__has_include)
 #if __has_include(<lua.h>)
 #include <lua.h>
@@ -22,6 +27,10 @@
 #include <lualib.h>
 #endif
 
+#ifdef __cplusplus
+}
+#endif
+
 #include <cstdint>
 
 #include "legacy/containers/String.h"
@@ -38,8 +47,16 @@
 #define LUA_GLOBALSINDEX (-10001)
 #endif
 
+#ifndef LUA_ENVIRONINDEX
+#define LUA_ENVIRONINDEX LUA_GLOBALSINDEX
+#endif
+
 #ifndef lua_upvalueindex
 #define lua_upvalueindex(i) (LUA_GLOBALSINDEX - (i))
+#endif
+
+#ifndef lua_getn
+#define lua_getn luaL_getn
 #endif
 
 #ifndef LUA_OK
@@ -119,6 +136,8 @@ namespace moho
 	class Sim;
 	class CLuaTask;
 }
+
+moho::Sim* lua_getglobaluserdata(lua_State* state);
 
 namespace LuaPlus
 {

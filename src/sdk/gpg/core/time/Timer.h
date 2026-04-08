@@ -9,8 +9,21 @@ namespace gpg::time
 	public:
 		LONGLONG mTime;
 
-		Timer();      // 0x009556F0 or 0x009556D0
-		void Reset(); // 0x009556D0 or 0x009556F0
+    /**
+     * Address: 0x009556D0 (FUN_009556D0, gpg::time::Timer::Timer)
+     *
+     * What it does:
+     * Captures the current monotonic cycle counter as the timer baseline.
+     */
+		Timer();
+
+    /**
+     * Address: 0x009556F0 (FUN_009556F0, gpg::time::Timer::Reset)
+     *
+     * What it does:
+     * Replaces the timer baseline with the current monotonic cycle counter.
+     */
+		void Reset();
 		/**
 		 * Address: 0x00955710 (FUN_00955710)
 		 *
@@ -42,10 +55,39 @@ namespace gpg::time
 		float ElapsedMilliseconds() const;
 	};
 
-    LONGLONG GetTime(); // 0x00955400
-    LONGLONG CyclesToMicroseconds(LONGLONG); // 0x00955520
-    float CyclesToMilliseconds(LONGLONG); // 0x009554E0
-    float CyclesToSeconds(LONGLONG); // 0x009554A0
+    /**
+     * Address: 0x00955400 (FUN_00955400, gpg::time::GetCycle)
+     *
+     * What it does:
+     * Returns a monotonic process cycle value derived from
+     * `QueryPerformanceCounter`, clamped to never move backward.
+     */
+    LONGLONG GetCycle();
+
+    /**
+     * Address: 0x00955520 (FUN_00955520, gpg::time::CyclesToMicroseconds)
+     *
+     * What it does:
+     * Converts performance-counter cycles to microseconds using cached
+     * frequency state.
+     */
+    LONGLONG CyclesToMicroseconds(LONGLONG cycles);
+
+    /**
+     * Address: 0x009554E0 (FUN_009554E0, gpg::time::CyclesToMilliseconds)
+     *
+     * What it does:
+     * Converts performance-counter cycles to milliseconds.
+     */
+    float CyclesToMilliseconds(LONGLONG cycles);
+
+    /**
+     * Address: 0x009554A0 (FUN_009554A0, gpg::time::CyclesToSeconds)
+     *
+     * What it does:
+     * Converts performance-counter cycles to seconds.
+     */
+    float CyclesToSeconds(LONGLONG cycles);
     /**
      * Address: 0x00955730 (FUN_00955730)
      *
@@ -53,8 +95,29 @@ namespace gpg::time
      * Returns process-wide system timer singleton with one-time baseline initialization.
      */
     Timer const& GetSystemTimer();
-    LONGLONG MicrosecondsToCycles(LONGLONG); // 0x00955630
-    LONGLONG MillisecondsToCycles(float); // 0x009555F0
-    LONGLONG SecondsToCycles(float); // 0x009555B0
+
+    /**
+     * Address: 0x00955630 (FUN_00955630, gpg::time::MicrosecondsToCycles)
+     *
+     * What it does:
+     * Converts microseconds to performance-counter cycles.
+     */
+    LONGLONG MicrosecondsToCycles(LONGLONG microseconds);
+
+    /**
+     * Address: 0x009555F0 (FUN_009555F0, gpg::time::MillisecondsToCycles)
+     *
+     * What it does:
+     * Converts milliseconds to performance-counter cycles.
+     */
+    LONGLONG MillisecondsToCycles(float milliseconds);
+
+    /**
+     * Address: 0x009555B0 (FUN_009555B0, gpg::time::SecondsToCycles)
+     *
+     * What it does:
+     * Converts seconds to performance-counter cycles.
+     */
+    LONGLONG SecondsToCycles(float seconds);
 }
 

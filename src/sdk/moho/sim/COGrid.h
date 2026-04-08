@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "gpg/core/containers/BitArray2D.h"
+#include "gpg/core/reflection/Reflection.h"
 
 namespace moho
 {
@@ -32,6 +33,8 @@ namespace moho
   class COGrid
   {
   public:
+    inline static gpg::RType* sType = nullptr;
+
     Sim* sim;
     EntityOccupationGrid entityGrid;
     gpg::BitArray2D terrainOccupation;

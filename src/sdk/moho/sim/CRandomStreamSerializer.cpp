@@ -1,5 +1,8 @@
 #include "moho/sim/CRandomStreamSerializer.h"
 
+#include <cstddef>
+#include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
@@ -70,18 +73,56 @@ namespace
     SaveMemberThunk<moho::CRandomStream>(archive, objectPtr, 0, nullptr);
   }
 
-  moho::CRandomStreamTypeInfo gCRandomStreamTypeInfo;
-  moho::CRandomStreamSerializer gCRandomStreamSerializer;
+  alignas(moho::CRandomStreamTypeInfo) std::byte gCRandomStreamTypeInfoStorage[sizeof(moho::CRandomStreamTypeInfo)]{};
+  alignas(moho::CRandomStreamSerializer) std::byte gCRandomStreamSerializerStorage[sizeof(moho::CRandomStreamSerializer)]{};
+  bool gCRandomStreamTypeInfoInitialized = false;
+  bool gCRandomStreamSerializerInitialized = false;
+
+  [[nodiscard]] moho::CRandomStreamTypeInfo& CRandomStreamTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CRandomStreamTypeInfo*>(gCRandomStreamTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::CRandomStreamSerializer& CRandomStreamSerializerSlot()
+  {
+    return *reinterpret_cast<moho::CRandomStreamSerializer*>(gCRandomStreamSerializerStorage);
+  }
+
+  /**
+   * Address: 0x00BEE720 (FUN_00BEE720, ??1CRandomStreamTypeInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Executes process-exit teardown for CRandomStream type-info startup storage.
+   */
+  void cleanup_CRandomStreamTypeInfo()
+  {
+    if (gCRandomStreamTypeInfoInitialized) {
+      CRandomStreamTypeInfoSlot().~CRandomStreamTypeInfo();
+      gCRandomStreamTypeInfoInitialized = false;
+    }
+  }
+
+  /**
+   * Address: 0x00BEE780 (FUN_00BEE780, ??1CRandomStreamSerializer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Executes process-exit teardown for CRandomStream serializer helper storage.
+   */
+  void cleanup_CRandomStreamSerializer()
+  {
+    if (gCRandomStreamSerializerInitialized) {
+      CRandomStreamSerializerSlot().~CRandomStreamSerializer();
+      gCRandomStreamSerializerInitialized = false;
+    }
+  }
 
   struct CRandomStreamReflectionRegistration
   {
     CRandomStreamReflectionRegistration()
     {
-      gCRandomStreamSerializer.mHelperNext = nullptr;
-      gCRandomStreamSerializer.mHelperPrev = nullptr;
-      gCRandomStreamSerializer.mLoadCallback = &LoadCRandomStream;
-      gCRandomStreamSerializer.mSaveCallback = &SaveCRandomStream;
-      gCRandomStreamSerializer.RegisterSerializeFunctions();
+      moho::register_CRandomStreamTypeInfo();
+      moho::register_CRandomStreamSerializer();
+      CRandomStreamSerializerSlot().RegisterSerializeFunctions();
     }
   };
 
@@ -90,6 +131,44 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC3360 (FUN_00BC3360, register_CRandomStreamTypeInfo)
+   *
+   * What it does:
+   * Startup thunk that materializes CRandomStream type-info storage and
+   * registers its process-exit destructor.
+   */
+  void register_CRandomStreamTypeInfo()
+  {
+    if (!gCRandomStreamTypeInfoInitialized) {
+      new (&CRandomStreamTypeInfoSlot()) CRandomStreamTypeInfo();
+      gCRandomStreamTypeInfoInitialized = true;
+    }
+    (void)std::atexit(&cleanup_CRandomStreamTypeInfo);
+  }
+
+  /**
+   * Address: 0x00BC3380 (FUN_00BC3380, register_CRandomStreamSerializer)
+   *
+   * What it does:
+   * Startup thunk that initializes CRandomStream serializer helper lanes and
+   * registers process-exit teardown.
+   */
+  void register_CRandomStreamSerializer()
+  {
+    CRandomStreamSerializer& serializer = CRandomStreamSerializerSlot();
+    if (!gCRandomStreamSerializerInitialized) {
+      new (&serializer) CRandomStreamSerializer();
+      gCRandomStreamSerializerInitialized = true;
+    }
+
+    serializer.mHelperNext = nullptr;
+    serializer.mHelperPrev = nullptr;
+    serializer.mLoadCallback = &LoadCRandomStream;
+    serializer.mSaveCallback = &SaveCRandomStream;
+    (void)std::atexit(&cleanup_CRandomStreamSerializer);
+  }
+
   /**
    * Address: 0x0040F380 (FUN_0040F380, gpg::SerSaveLoadHelper<class Moho::CRandomStream>::Init)
    *

@@ -64,6 +64,15 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
+     * Address: 0x006FE5B0 (FUN_006FE5B0, ??0CArmyImpl@Moho@@QAE@@Z_0)
+     *
+     * What it does:
+     * Initializes CArmyImpl-owned runtime pointer lanes and inline platoon
+     * pool header storage.
+     */
+    CArmyImpl();
+
+    /**
      * Address: 0x006FE670 (FUN_006FE670)
      *
      * What it does:
@@ -166,7 +175,7 @@ namespace moho
     /** Address: 0x006FDED0 (FUN_006FDED0, Moho::CArmyImpl::UseWholeMap) */
     bool UseWholeMap() override;
     /** Address: 0x006FE1B0 (FUN_006FE1B0, Moho::CArmyImpl::AddBuildRestriction) */
-    virtual void AddBuildRestriction() override = 0;
+    virtual void AddBuildRestriction(void* restriction) override = 0;
     /** Address: 0x006FE220 (FUN_006FE220, Moho::CArmyImpl::RemoveBuildRestriction) */
     virtual void RemoveBuildRestriction(void* restriction) override = 0;
     /** Address: 0x006FE290 (FUN_006FE290, Moho::CArmyImpl::SetNoRushTimer) */
@@ -274,8 +283,7 @@ namespace moho
     float NoRushRadius;                                  // 0x01D0
     float NoRushOffsetX;                                 // 0x01D4
     float NoRushOffsetY;                                 // 0x01D8
-    std::uint8_t HasHandicap;                            // 0x01DC
-    char pad_01DD[3];                                    // 0x01DD
+    float HasHandicap;                                   // 0x01DC
     float Handicap;                                      // 0x01E0
     char pad_01E4[4];                                    // 0x01E4
     Sim* Simulation;                                     // 0x01E8

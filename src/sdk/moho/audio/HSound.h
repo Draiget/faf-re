@@ -3,10 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/containers/TDatList.h"
+#include "moho/script/CScriptEvent.h"
 
 namespace moho
 {
+  class CSndParams;
   class IXACTCue;
 
   /**
@@ -21,29 +24,42 @@ namespace moho
    *
    * Only fields consumed by recovered sim audio code are semantically named.
    */
-  class HSound
+  class HSound : public CScriptEvent
   {
   public:
     /**
-     * Address: 0x004E1120 (FUN_004E1120)
-     *
-     * std::uint8_t deleteFlags
-     *
-     * IDA signature:
-     * void *__thiscall FUN_004E1120(void *this, char deleteFlags);
+     * Address: 0x004E10F0 (FUN_004E10F0, ??0HSound@Moho@@QAE@@Z)
      *
      * What it does:
-     * Deleting-style virtual slot used when loop handles are released.
+     * Builds one script-backed loop-handle object and binds its owner
+     * `CSndParams` context pointer for follow-up loop-state checks.
      */
-    virtual HSound* Destroy(std::uint8_t flags) = 0;
+    explicit HSound(CSndParams* ownerParams);
+
+    /**
+     * Address: 0x004E1120 (FUN_004E1120, sub_4E1120)
+     *
+     * What it does:
+     * Unlinks this handle from the intrusive loop list, runs base
+     * `CScriptEvent` teardown, and optionally frees object storage.
+     */
+    virtual HSound* Destroy(std::uint8_t flags);
 
   public:
-    std::uint8_t mOpaque04[0x40];            // +0x04
     TDatListItem<HSound, void> mSimLoopLink; // +0x44
     IXACTCue* mLoopCue;                      // +0x4C
-    void* mLoopOwnerContext;                 // +0x50
+    CSndParams* mLoopOwnerContext;           // +0x50
     std::uint8_t mAffectsDucking;            // +0x54
     std::uint8_t mOpaque55[0x03];            // +0x55
+
+    /**
+     * Address: 0x004E1260 (FUN_004E1260, sub_4E1260)
+     *
+     * What it does:
+     * Checks whether the active loop cue has stopped (or lost engine context)
+     * and signals this task-event when the handle is complete.
+     */
+    [[nodiscard]] bool UpdateLoopCompletionState();
   };
 
   static_assert(sizeof(HSound) == 0x58, "HSound size must be 0x58");
@@ -51,4 +67,47 @@ namespace moho
   static_assert(offsetof(HSound, mLoopCue) == 0x4C, "HSound::mLoopCue offset must be 0x4C");
   static_assert(offsetof(HSound, mLoopOwnerContext) == 0x50, "HSound::mLoopOwnerContext offset must be 0x50");
   static_assert(offsetof(HSound, mAffectsDucking) == 0x54, "HSound::mAffectsDucking offset must be 0x54");
+
+  /**
+   * VFTABLE: 0x00E0BAE8
+   * COL: 0x00E72A04
+   */
+  template <>
+  class CScrLuaMetatableFactory<HSound> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    /**
+     * Address: 0x004E1F20 (FUN_004E1F20, Moho::CScrLuaMetatableFactory<Moho::HSound>::Create)
+     *
+     * What it does:
+     * Builds the default metatable for `HSound` Lua userdata.
+     */
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(sizeof(CScrLuaMetatableFactory<HSound>) == 0x8, "CScrLuaMetatableFactory<HSound> size must be 0x8");
+
+  /**
+   * Address: 0x004E4E60 (FUN_004E4E60, func_CreateLuaHSound)
+   *
+   * What it does:
+   * Returns cached `HSound` metatable object from Lua object-factory storage.
+   */
+  LuaPlus::LuaObject* func_CreateLuaHSound(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004E1190 (FUN_004E1190, func_CreateLuaHSoundObject)
+   *
+   * What it does:
+   * Creates and binds Lua userdata/object state for one script-visible
+   * `HSound` instance.
+   */
+  void func_CreateLuaHSoundObject(LuaPlus::LuaState* state, HSound* sound);
 } // namespace moho

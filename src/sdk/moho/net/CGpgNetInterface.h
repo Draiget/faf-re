@@ -11,7 +11,10 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/task/CTask.h"
+
+struct lua_State;
 
 namespace moho
 {
@@ -31,12 +34,16 @@ namespace moho
     int32_t mNum{0};
     msvc8::string mStr{};
 
-    explicit SNetCommandArg(const int32_t num)
+    explicit SNetCommandArg(
+      const int32_t num
+    )
       : mType{NETARG_Num}
       , mNum{num}
     {}
 
-    explicit SNetCommandArg(const msvc8::string& str)
+    explicit SNetCommandArg(
+      const msvc8::string& str
+    )
       : mType{NETARG_String}
       , mNum{0}
       , mStr{str}
@@ -52,9 +59,10 @@ namespace moho
   };
   static_assert(sizeof(SNetCommand) == 0x30, "SNetCommand size must be 0x30");
 
-  class CGpgNetInterface : public CPullTask<CGpgNetInterface>,
-                           public INetNATTraversalProvider,
-                           public boost::enable_shared_from_this<CGpgNetInterface>
+  class CGpgNetInterface :
+    public CPullTask<CGpgNetInterface>,
+    public INetNATTraversalProvider,
+    public boost::enable_shared_from_this<CGpgNetInterface>
   {
   public:
     /**
@@ -183,7 +191,10 @@ namespace moho
      * @param arg3
      */
     void WriteCommandWith3Args(
-      const char* name, const SNetCommandArg* arg1, const SNetCommandArg* arg2, const SNetCommandArg* arg3
+      const char* name,
+      const SNetCommandArg* arg1,
+      const SNetCommandArg* arg2,
+      const SNetCommandArg* arg3
     );
 
     /**
@@ -377,6 +388,15 @@ namespace moho
   void GPGNET_ReportDesync(int beat, int army, const msvc8::string& hash1, const msvc8::string& hash2);
 
   /**
+   * Address: 0x007B9CD0 (FUN_007B9CD0, Moho::GPGNET_SubmitArmyStats)
+   *
+   * What it does:
+   * Sends one `"Stats"` command with the provided army-stats payload through
+   * the active process-global GPGNet interface (when available).
+   */
+  void GPGNET_SubmitArmyStats(const msvc8::string& statsPayload);
+
+  /**
    * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
    *
    * What it does:
@@ -391,4 +411,55 @@ namespace moho
    * Shuts down and clears the process-global GPGNet interface pointer.
    */
   void GPGNET_Shutdown();
+
+  /**
+   * Address: 0x007B9DE0 (FUN_007B9DE0, cfunc_GpgNetActive)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_GpgNetActiveL`.
+   */
+  int cfunc_GpgNetActive(lua_State* luaContext);
+
+  /**
+   * Address: 0x007B9E00 (FUN_007B9E00, func_GpgNetActive_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `GpgNetActive()` Lua binder in the user init set.
+   */
+  CScrLuaInitForm* func_GpgNetActive_LuaFuncDef();
+
+  /**
+   * Address: 0x007B9E60 (FUN_007B9E60, cfunc_GpgNetActiveL)
+   *
+   * What it does:
+   * Validates no Lua args and pushes whether a process-global GPGNet
+   * interface pointer is active.
+   */
+  int cfunc_GpgNetActiveL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007B9EB0 (FUN_007B9EB0, cfunc_GpgNetSend)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_GpgNetSendL`.
+   */
+  int cfunc_GpgNetSend(lua_State* luaContext);
+
+  /**
+   * Address: 0x007B9ED0 (FUN_007B9ED0, func_GpgNetSend_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `GpgNetSend(command, args...)` Lua binder in the user
+   * init set.
+   */
+  CScrLuaInitForm* func_GpgNetSend_LuaFuncDef();
+
+  /**
+   * Address: 0x007B9F30 (FUN_007B9F30, cfunc_GpgNetSendL)
+   *
+   * What it does:
+   * Validates and marshals Lua args into `SNetCommandArg` lanes, then sends
+   * one command through active process-global GPGNet interface (if present).
+   */
+  int cfunc_GpgNetSendL(LuaPlus::LuaState* state);
 } // namespace moho

@@ -1,6 +1,119 @@
 #include "moho/script/CScriptObjectSerializer.h"
 
+#include <cstdlib>
+
 #include "moho/script/CScriptObject.h"
+
+namespace
+{
+  moho::CScriptObjectSerializer gCScriptObjectSerializer{};
+
+  /**
+   * Address: 0x004C8340 (FUN_004C8340, j_Moho::CScriptObject::MemberDeserialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CScriptObject::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CScriptObjectMemberDeserializeThunk(
+    moho::CScriptObject* const object, gpg::ReadArchive* const archive
+  )
+  {
+    if (object) {
+      object->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x004C8440 (FUN_004C8440, j_Moho::CScriptObject::MemberDeserialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CScriptObject::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CScriptObjectMemberDeserializeThunkSecondary(
+    moho::CScriptObject* const object, gpg::ReadArchive* const archive
+  )
+  {
+    if (object) {
+      object->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x004C8350 (FUN_004C8350, j_Moho::CScriptObject::MemberSerialize)
+   *
+   * What it does:
+   * Forwards serializer save callback with owner-ref lane into
+   * `CScriptObject::MemberSerialize`.
+   */
+  [[maybe_unused]] void CScriptObjectMemberSerializeThunkWithOwner(
+    moho::CScriptObject* const object, gpg::RRef* const /*ownerRef*/, gpg::WriteArchive* const archive
+  )
+  {
+    if (object) {
+      object->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x004C8450 (FUN_004C8450, j_Moho::CScriptObject::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CScriptObject::MemberSerialize`.
+   */
+  [[maybe_unused]] void CScriptObjectMemberSerializeThunkSecondary(
+    moho::CScriptObject* const object, gpg::WriteArchive* const archive
+  )
+  {
+    if (object) {
+      object->MemberSerialize(archive);
+    }
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  {
+    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+  }
+
+  template <typename TSerializer>
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
+      serializer.mHelperNext->mPrev = serializer.mHelperPrev;
+      serializer.mHelperPrev->mNext = serializer.mHelperNext;
+    }
+
+    gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+    serializer.mHelperPrev = self;
+    serializer.mHelperNext = self;
+    return self;
+  }
+
+  template <typename TSerializer>
+  void ResetSerializerNode(TSerializer& serializer) noexcept
+  {
+    if (serializer.mHelperNext == nullptr || serializer.mHelperPrev == nullptr) {
+      gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
+      serializer.mHelperPrev = self;
+      serializer.mHelperNext = self;
+      return;
+    }
+
+    (void)UnlinkSerializerNode(serializer);
+  }
+
+  void InitializeCScriptObjectSerializer()
+  {
+    ResetSerializerNode(gCScriptObjectSerializer);
+    gCScriptObjectSerializer.mLoadCallback = &moho::CScriptObjectSerializer::Deserialize;
+    gCScriptObjectSerializer.mSaveCallback = &moho::CScriptObjectSerializer::Serialize;
+  }
+
+  void CleanupCScriptObjectSerializerAtExit()
+  {
+    (void)moho::cleanup_CScriptObjectSerializer();
+  }
+} // namespace
 
 namespace moho
 {
@@ -12,18 +125,18 @@ namespace moho
   )
   {
     auto* const object = reinterpret_cast<CScriptObject*>(objectPtr);
-    object->MemberDeserialize(archive);
+    CScriptObjectMemberDeserializeThunk(object, archive);
   }
 
   /**
    * Address: 0x004C79F0 (FUN_004C79F0, Moho::CScriptObjectSerializer::Serialize)
    */
   void CScriptObjectSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const /*ownerRef*/
+    gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
     auto* const object = reinterpret_cast<CScriptObject*>(objectPtr);
-    object->MemberSerialize(archive);
+    CScriptObjectMemberSerializeThunkWithOwner(object, ownerRef, archive);
   }
 
   /**
@@ -39,5 +152,23 @@ namespace moho
     type->serLoadFunc_ = mLoadCallback;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSaveCallback;
+  }
+
+  gpg::SerHelperBase* cleanup_CScriptObjectSerializer()
+  {
+    return UnlinkSerializerNode(gCScriptObjectSerializer);
+  }
+
+  /**
+   * Address: 0x00BC6080 (FUN_00BC6080, register_CScriptObjectSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callback lanes for `CScriptObject` and
+   * schedules intrusive helper cleanup at process exit.
+   */
+  void register_CScriptObjectSerializer()
+  {
+    InitializeCScriptObjectSerializer();
+    (void)std::atexit(&CleanupCScriptObjectSerializerAtExit);
   }
 } // namespace moho

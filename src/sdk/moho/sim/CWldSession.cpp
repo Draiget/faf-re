@@ -3,14 +3,22 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <new>
+#include <stdexcept>
+#include <typeinfo>
 
+#include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/audio/IUserSoundManager.h"
+#include "moho/containers/BVIntSet.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
+#include "moho/mesh/Mesh.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/net/CClientManagerImpl.h"
@@ -20,8 +28,120 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
+#include "moho/sim/UserArmy.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
+
+namespace gpg
+{
+  class RMultiMapType_EntId_string : public RType
+  {
+  public:
+    /**
+     * Address: 0x00899060 (FUN_00899060, gpg::RMultiMapType_EntId_string::GetName)
+     *
+     * What it does:
+     * Returns the cached lexical label for the reflected
+     * `multimap<EntId,std::string>` lane.
+     */
+    [[nodiscard]] const char* GetName() const override;
+  };
+} // namespace gpg
+
+namespace
+{
+  msvc8::string gEntIdStringMultiMapTypeName;
+  std::uint32_t gEntIdStringMultiMapTypeNameInitGuard = 0;
+  gpg::RType* gEntIdStringMultiMapKeyType = nullptr;
+  gpg::RType* gEntIdStringMultiMapValueType = nullptr;
+
+  [[nodiscard]] gpg::RType* ResolveEntIdTypeForMultiMapName()
+  {
+    if (gEntIdStringMultiMapKeyType == nullptr) {
+      constexpr const char* kTypeNames[] = {
+        "EntId",
+        "Moho::EntId",
+        "int",
+        "signed int",
+      };
+
+      for (const char* const typeName : kTypeNames) {
+        if (gpg::RType* const resolved = gpg::REF_FindTypeNamed(typeName); resolved != nullptr) {
+          gEntIdStringMultiMapKeyType = resolved;
+          break;
+        }
+      }
+
+      if (gEntIdStringMultiMapKeyType == nullptr) {
+        gEntIdStringMultiMapKeyType = gpg::LookupRType(typeid(std::int32_t));
+      }
+    }
+
+    return gEntIdStringMultiMapKeyType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveStringTypeForMultiMapName()
+  {
+    if (gEntIdStringMultiMapValueType == nullptr) {
+      constexpr const char* kTypeNames[] = {
+        "std::string",
+        "msvc8::string",
+        "string",
+      };
+
+      for (const char* const typeName : kTypeNames) {
+        if (gpg::RType* const resolved = gpg::REF_FindTypeNamed(typeName); resolved != nullptr) {
+          gEntIdStringMultiMapValueType = resolved;
+          break;
+        }
+      }
+
+      if (gEntIdStringMultiMapValueType == nullptr) {
+        gEntIdStringMultiMapValueType = gpg::LookupRType(typeid(msvc8::string));
+      }
+    }
+
+    return gEntIdStringMultiMapValueType;
+  }
+
+  /**
+   * Address: 0x00C082E0 (FUN_00C082E0, cleanup_RMultiMapType_EntId_string_Name)
+   *
+   * What it does:
+   * Releases cached lexical storage for
+   * `gpg::RMultiMapType_EntId_string::GetName`.
+   */
+  void cleanup_RMultiMapType_EntId_string_Name()
+  {
+    gEntIdStringMultiMapTypeName.clear();
+    gEntIdStringMultiMapTypeNameInitGuard = 0;
+  }
+} // namespace
+
+/**
+ * Address: 0x00899060 (FUN_00899060, gpg::RMultiMapType_EntId_string::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches one reflection label for the
+ * `multimap<EntId,std::string>` lane.
+ */
+const char* gpg::RMultiMapType_EntId_string::GetName() const
+{
+  if ((gEntIdStringMultiMapTypeNameInitGuard & 1u) == 0u) {
+    gEntIdStringMultiMapTypeNameInitGuard |= 1u;
+
+    const gpg::RType* const keyType = ResolveEntIdTypeForMultiMapName();
+    const gpg::RType* const valueType = ResolveStringTypeForMultiMapName();
+    const char* const keyName = keyType != nullptr ? keyType->GetName() : "EntId";
+    const char* const valueName = valueType != nullptr ? valueType->GetName() : "std::string";
+
+    gEntIdStringMultiMapTypeName = gpg::STR_Printf("multimap<%s,%s>", keyName, valueName);
+    (void)std::atexit(&cleanup_RMultiMapType_EntId_string_Name);
+  }
+
+  return gEntIdStringMultiMapTypeName.c_str();
+}
 
 namespace moho
 {
@@ -226,6 +346,14 @@ namespace moho
     CWldSession* gActiveWldSession = nullptr;
     SWldSessionInfo* gPendingWldSessionInfo = nullptr;
     EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
+    WldTeardownCallbackVector gWldTeardownCallbacks{};
+    std::uint32_t gWldTeardownCallbacksInitMask = 0;
+
+    void CleanupWldTeardownCallbacks()
+    {
+      gWldTeardownCallbacks.clear();
+      gWldTeardownCallbacksInitMask &= ~1u;
+    }
 
     [[nodiscard]] bool RunLuaScriptWithEnv(
       LuaPlus::LuaState* const state, const char* const scriptPath, const LuaPlus::LuaObject& environment
@@ -292,6 +420,101 @@ namespace moho
     [[nodiscard]] const VizUpdateTree* GetVizUpdateTree(const CWldSession* session)
     {
       return reinterpret_cast<const VizUpdateTree*>(&session->mVizUpdateRoot);
+    }
+
+    struct SessionPauseCallbackLink
+    {
+      SessionPauseCallbackLink* prev;
+      SessionPauseCallbackLink* next;
+    };
+
+    class ISessionPauseCallback
+    {
+    public:
+      virtual void OnSessionPauseStateChanged(bool isPaused) = 0;
+    };
+
+    struct SessionPauseCallbackOwnerLayout
+    {
+      void* vftable;
+      SessionPauseCallbackLink link;
+    };
+
+    static_assert(sizeof(SessionPauseCallbackLink) == 0x8, "SessionPauseCallbackLink size must be 0x8");
+    static_assert(
+      offsetof(SessionPauseCallbackOwnerLayout, link) == sizeof(void*),
+      "SessionPauseCallbackOwnerLayout::link offset must follow vftable lane"
+    );
+
+    [[nodiscard]] SessionPauseCallbackLink* AsSessionPauseCallbackLink(gpg::core::IntrusiveLink<CWldSession*>* link) noexcept
+    {
+      return reinterpret_cast<SessionPauseCallbackLink*>(link);
+    }
+
+    [[nodiscard]] ISessionPauseCallback* AsSessionPauseCallbackOwner(SessionPauseCallbackLink* const link) noexcept
+    {
+      constexpr std::size_t kCallbackLinkOffset = offsetof(SessionPauseCallbackOwnerLayout, link);
+      auto* const raw = reinterpret_cast<std::uint8_t*>(link) - kCallbackLinkOffset;
+      return reinterpret_cast<ISessionPauseCallback*>(raw);
+    }
+
+    void InitSessionPauseCallbackHead(gpg::core::IntrusiveLink<CWldSession*>& head) noexcept
+    {
+      auto* const link = AsSessionPauseCallbackLink(&head);
+      link->prev = link;
+      link->next = link;
+    }
+
+    [[nodiscard]] bool IsSessionPauseCallbackHeadEmpty(const gpg::core::IntrusiveLink<CWldSession*>& head) noexcept
+    {
+      const SessionPauseCallbackLink* const link =
+        reinterpret_cast<const SessionPauseCallbackLink*>(&head);
+      return link->next == link;
+    }
+
+    void UnlinkSessionPauseCallbackNode(SessionPauseCallbackLink* const link) noexcept
+    {
+      link->prev->next = link->next;
+      link->next->prev = link->prev;
+      link->prev = link;
+      link->next = link;
+    }
+
+    void LinkSessionPauseCallbackNodeBefore(
+      SessionPauseCallbackLink* const anchor,
+      SessionPauseCallbackLink* const link
+    ) noexcept
+    {
+      link->prev = anchor->prev;
+      link->next = anchor;
+      anchor->prev->next = link;
+      anchor->prev = link;
+    }
+
+    void DispatchSessionPauseCallbacks(gpg::core::IntrusiveLink<CWldSession*>& head, const bool isPaused)
+    {
+      if (IsSessionPauseCallbackHeadEmpty(head)) {
+        return;
+      }
+
+      SessionPauseCallbackLink staging{};
+      staging.prev = &staging;
+      staging.next = &staging;
+
+      SessionPauseCallbackLink* const headLink = AsSessionPauseCallbackLink(&head);
+      staging.prev = headLink->prev;
+      staging.next = headLink->next;
+      staging.prev->next = &staging;
+      staging.next->prev = &staging;
+      headLink->prev = headLink;
+      headLink->next = headLink;
+
+      while (staging.next != &staging) {
+        SessionPauseCallbackLink* const callbackLink = staging.next;
+        UnlinkSessionPauseCallbackNode(callbackLink);
+        LinkSessionPauseCallbackNodeBefore(headLink, callbackLink);
+        AsSessionPauseCallbackOwner(callbackLink)->OnSessionPauseStateChanged(isPaused);
+      }
     }
 
     void DestroyBuildTemplateRange(SBuildTemplateInfo* first, SBuildTemplateInfo* last)
@@ -769,6 +992,44 @@ namespace moho
       offsetof(SessionSaveSourceNode, mIsSentinel) == 0x15, "SessionSaveSourceNode::mIsSentinel offset must be 0x15"
     );
 
+    struct SessionEntityMapNode
+    {
+      SessionEntityMapNode* mLeft;   // +0x00
+      SessionEntityMapNode* mParent; // +0x04
+      SessionEntityMapNode* mRight;  // +0x08
+      std::uint32_t mEntityId;       // +0x0C
+      UserEntity* mEntity;           // +0x10
+      std::uint8_t pad_14_17[4];     // +0x14
+      std::uint8_t mColor;           // +0x18
+      std::uint8_t mIsSentinel;      // +0x19
+      std::uint8_t pad_1A[2];
+    };
+
+    static_assert(sizeof(SessionEntityMapNode) == 0x1C, "SessionEntityMapNode size must be 0x1C");
+    static_assert(
+      offsetof(SessionEntityMapNode, mEntityId) == 0x0C,
+      "SessionEntityMapNode::mEntityId offset must be 0x0C"
+    );
+    static_assert(
+      offsetof(SessionEntityMapNode, mEntity) == 0x10,
+      "SessionEntityMapNode::mEntity offset must be 0x10"
+    );
+    static_assert(
+      offsetof(SessionEntityMapNode, mIsSentinel) == 0x19,
+      "SessionEntityMapNode::mIsSentinel offset must be 0x19"
+    );
+
+    struct SessionEntityMap
+    {
+      void* mAllocProxy;            // +0x00
+      SessionEntityMapNode* mHead;  // +0x04
+      std::uint32_t mSize;          // +0x08
+    };
+
+    static_assert(sizeof(SessionEntityMap) == 0x0C, "SessionEntityMap size must be 0x0C");
+    static_assert(offsetof(SessionEntityMap, mHead) == 0x04, "SessionEntityMap::mHead offset must be 0x04");
+    static_assert(offsetof(SessionEntityMap, mSize) == 0x08, "SessionEntityMap::mSize offset must be 0x08");
+
     struct SessionSaveTagNode
     {
       SessionSaveTagNode* mLeft;   // +0x00
@@ -854,9 +1115,576 @@ namespace moho
       return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
     }
 
+    [[nodiscard]] bool ContainsEntityPtr(const msvc8::vector<UserEntity*>& entities, const UserEntity* const entity)
+    {
+      return std::find(entities.begin(), entities.end(), entity) != entities.end();
+    }
+
+    void CollectSelectionEntities(const SSelectionSetUserEntity& selection, msvc8::vector<UserEntity*>& outEntities)
+    {
+      outEntities.clear();
+
+      const SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return;
+      }
+
+      for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        if (entity == nullptr || ContainsEntityPtr(outEntities, entity)) {
+          continue;
+        }
+        outEntities.push_back(entity);
+      }
+    }
+
+    [[nodiscard]] bool
+    AreEntitySetsEqual(const msvc8::vector<UserEntity*>& lhs, const msvc8::vector<UserEntity*>& rhs)
+    {
+      if (lhs.size() != rhs.size()) {
+        return false;
+      }
+
+      for (const UserEntity* const entity : lhs) {
+        if (!ContainsEntityPtr(rhs, entity)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
+    EraseSelectionNodeAndAdvance(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node);
+
+    void ClearSelectionSet(SSelectionSetUserEntity& selection)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        selection.mSize = 0u;
+        selection.mSizeMirrorOrUnused = 0u;
+        return;
+      }
+
+      for (SSelectionNodeUserEntity* node = head->mLeft; node && node != head;) {
+        node = EraseSelectionNodeAndAdvance(selection, node);
+      }
+
+      selection.mSize = 0u;
+      selection.mSizeMirrorOrUnused = 0u;
+      head->mParent = head;
+      head->mLeft = head;
+      head->mRight = head;
+    }
+
+    struct CWldSessionSelectionStatsRuntimeView
+    {
+      std::uint8_t pad_0000_04AC[0x4AC];
+      std::int32_t maxSelectionSize; // +0x4AC
+    };
+    static_assert(
+      offsetof(CWldSessionSelectionStatsRuntimeView, maxSelectionSize) == 0x4AC,
+      "CWldSessionSelectionStatsRuntimeView::maxSelectionSize offset must be 0x4AC"
+    );
+
+    void BuildSelectionSyncMask(const SSelectionSetUserEntity& selection, SSyncFilterMaskBlock& outMask)
+    {
+      BVIntSet selectionIds{};
+      const SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head != nullptr) {
+        for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
+          UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+          if (entity == nullptr || entity->IsUserUnit() == nullptr) {
+            continue;
+          }
+          (void)selectionIds.Add(static_cast<unsigned int>(entity->mParams.mEntityId));
+        }
+      }
+
+      outMask.rawWord = selectionIds.mFirstWordIndex;
+      outMask.maskVectorAuxWord = selectionIds.mReservedMetaWord;
+      outMask.masks.ResetFrom(selectionIds.mWords);
+    }
+
+    [[nodiscard]] bool IsSelectionNil(const SSelectionNodeUserEntity* const node)
+    {
+      return node == nullptr || node->mIsSentinel != 0u;
+    }
+
+    [[nodiscard]] SSelectionNodeUserEntity*
+    SelectionMin(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head)
+    {
+      while (!IsSelectionNil(node) && !IsSelectionNil(node->mLeft)) {
+        node = node->mLeft;
+      }
+      return IsSelectionNil(node) ? head : node;
+    }
+
+    [[nodiscard]] SSelectionNodeUserEntity*
+    SelectionMax(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head)
+    {
+      while (!IsSelectionNil(node) && !IsSelectionNil(node->mRight)) {
+        node = node->mRight;
+      }
+      return IsSelectionNil(node) ? head : node;
+    }
+
+    void RecomputeSelectionExtrema(SSelectionSetUserEntity& selection)
+    {
+      if (selection.mHead == nullptr) {
+        return;
+      }
+
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      SSelectionNodeUserEntity* const root = head->mParent;
+      if (IsSelectionNil(root)) {
+        head->mParent = head;
+        head->mLeft = head;
+        head->mRight = head;
+        return;
+      }
+
+      head->mLeft = SelectionMin(root, head);
+      head->mRight = SelectionMax(root, head);
+    }
+
+    void ReplaceSelectionSubtree(
+      SSelectionSetUserEntity& selection,
+      SSelectionNodeUserEntity* const oldNode,
+      SSelectionNodeUserEntity* const newNode
+    )
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (oldNode->mParent == head) {
+        head->mParent = newNode;
+      } else if (oldNode == oldNode->mParent->mLeft) {
+        oldNode->mParent->mLeft = newNode;
+      } else {
+        oldNode->mParent->mRight = newNode;
+      }
+
+      if (!IsSelectionNil(newNode)) {
+        newNode->mParent = oldNode->mParent;
+      }
+    }
+
+    void RotateSelectionLeft(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      SSelectionNodeUserEntity* const pivot = node->mRight;
+      node->mRight = pivot->mLeft;
+      if (!IsSelectionNil(pivot->mLeft)) {
+        pivot->mLeft->mParent = node;
+      }
+
+      pivot->mParent = node->mParent;
+      if (node->mParent == head) {
+        head->mParent = pivot;
+      } else if (node == node->mParent->mLeft) {
+        node->mParent->mLeft = pivot;
+      } else {
+        node->mParent->mRight = pivot;
+      }
+
+      pivot->mLeft = node;
+      node->mParent = pivot;
+    }
+
+    void RotateSelectionRight(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      SSelectionNodeUserEntity* const pivot = node->mLeft;
+      node->mLeft = pivot->mRight;
+      if (!IsSelectionNil(pivot->mRight)) {
+        pivot->mRight->mParent = node;
+      }
+
+      pivot->mParent = node->mParent;
+      if (node->mParent == head) {
+        head->mParent = pivot;
+      } else if (node == node->mParent->mRight) {
+        node->mParent->mRight = pivot;
+      } else {
+        node->mParent->mLeft = pivot;
+      }
+
+      pivot->mRight = node;
+      node->mParent = pivot;
+    }
+
+    [[nodiscard]] std::uint32_t SelectionKeyFromEntity(const UserEntity* const entity) noexcept
+    {
+      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entity));
+    }
+
+    [[nodiscard]] SSelectionNodeUserEntity*
+    FindSelectionNodeByKey(const SSelectionSetUserEntity& selection, const std::uint32_t key)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr) {
+        return nullptr;
+      }
+
+      SSelectionNodeUserEntity* node = head->mParent;
+      while (!IsSelectionNil(node)) {
+        if (key < node->mKey) {
+          node = node->mLeft;
+        } else if (node->mKey < key) {
+          node = node->mRight;
+        } else {
+          return node;
+        }
+      }
+
+      return head;
+    }
+
+    void LinkSelectionWeakOwnerRef(UserEntity* const entity, SSelectionWeakRefUserEntity& weakRef)
+    {
+      weakRef.mOwnerLinkSlot = nullptr;
+      weakRef.mNextOwner = nullptr;
+      if (entity == nullptr) {
+        return;
+      }
+
+      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
+      weakRef.mOwnerLinkSlot = ownerLinkSlot;
+      weakRef.mNextOwner = *ownerLinkSlot;
+      *ownerLinkSlot = &weakRef;
+    }
+
+    void FixupAfterSelectionInsert(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      while (node != head->mParent && node->mParent->mColor == 0u) {
+        SSelectionNodeUserEntity* const parent = node->mParent;
+        SSelectionNodeUserEntity* const grand = parent->mParent;
+        if (parent == grand->mLeft) {
+          SSelectionNodeUserEntity* const uncle = grand->mRight;
+          if (uncle->mColor == 0u) {
+            parent->mColor = 1u;
+            uncle->mColor = 1u;
+            grand->mColor = 0u;
+            node = grand;
+          } else {
+            if (node == parent->mRight) {
+              node = parent;
+              RotateSelectionLeft(selection, node);
+            }
+            node->mParent->mColor = 1u;
+            grand->mColor = 0u;
+            RotateSelectionRight(selection, grand);
+          }
+        } else {
+          SSelectionNodeUserEntity* const uncle = grand->mLeft;
+          if (uncle->mColor == 0u) {
+            parent->mColor = 1u;
+            uncle->mColor = 1u;
+            grand->mColor = 0u;
+            node = grand;
+          } else {
+            if (node == parent->mLeft) {
+              node = parent;
+              RotateSelectionRight(selection, node);
+            }
+            node->mParent->mColor = 1u;
+            grand->mColor = 0u;
+            RotateSelectionLeft(selection, grand);
+          }
+        }
+      }
+
+      head->mParent->mColor = 1u;
+    }
+
+    [[nodiscard]] bool InsertSelectionEntity(SSelectionSetUserEntity& selection, UserEntity* const entity)
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr || entity == nullptr) {
+        return false;
+      }
+
+      const std::uint32_t key = SelectionKeyFromEntity(entity);
+      SSelectionNodeUserEntity* parent = head;
+      SSelectionNodeUserEntity* probe = head->mParent;
+      while (!IsSelectionNil(probe)) {
+        parent = probe;
+        if (key < probe->mKey) {
+          probe = probe->mLeft;
+        } else if (probe->mKey < key) {
+          probe = probe->mRight;
+        } else {
+          return false;
+        }
+      }
+
+      auto* const inserted = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
+      inserted->mLeft = head;
+      inserted->mRight = head;
+      inserted->mParent = parent;
+      inserted->mKey = key;
+      inserted->mColor = 0u;
+      inserted->mIsSentinel = 0u;
+      inserted->pad_1A[0] = 0u;
+      inserted->pad_1A[1] = 0u;
+      LinkSelectionWeakOwnerRef(entity, inserted->mEnt);
+
+      if (parent == head) {
+        head->mParent = inserted;
+      } else if (key < parent->mKey) {
+        parent->mLeft = inserted;
+      } else {
+        parent->mRight = inserted;
+      }
+
+      ++selection.mSize;
+      FixupAfterSelectionInsert(selection, inserted);
+      RecomputeSelectionExtrema(selection);
+      return true;
+    }
+
+    [[nodiscard]] bool EraseSelectionEntity(SSelectionSetUserEntity& selection, UserEntity* const entity)
+    {
+      const SSelectionNodeUserEntity* const head = selection.mHead;
+      if (head == nullptr || entity == nullptr) {
+        return false;
+      }
+
+      SSelectionNodeUserEntity* const node = FindSelectionNodeByKey(selection, SelectionKeyFromEntity(entity));
+      if (node == nullptr || node == head) {
+        return false;
+      }
+
+      (void)EraseSelectionNodeAndAdvance(selection, node);
+      return true;
+    }
+
+    void FixupAfterSelectionErase(
+      SSelectionSetUserEntity& selection,
+      SSelectionNodeUserEntity* node,
+      SSelectionNodeUserEntity* nodeParent
+    )
+    {
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      SSelectionNodeUserEntity* parent = !IsSelectionNil(node) ? node->mParent : nodeParent;
+      while (node != head->mParent && (IsSelectionNil(node) || node->mColor == 1u)) {
+        if (parent == nullptr) {
+          break;
+        }
+
+        if (node == parent->mLeft) {
+          SSelectionNodeUserEntity* sibling = parent->mRight;
+          if (sibling == head) {
+            node = parent;
+            parent = node->mParent;
+            continue;
+          }
+          if (sibling->mColor == 0u) {
+            sibling->mColor = 1;
+            parent->mColor = 0;
+            RotateSelectionLeft(selection, parent);
+            sibling = parent->mRight;
+          }
+
+          const bool leftBlack = IsSelectionNil(sibling->mLeft) || sibling->mLeft->mColor == 1u;
+          const bool rightBlack = IsSelectionNil(sibling->mRight) || sibling->mRight->mColor == 1u;
+          if (leftBlack && rightBlack) {
+            sibling->mColor = 0;
+            node = parent;
+            parent = node->mParent;
+            continue;
+          }
+
+          if (IsSelectionNil(sibling->mRight) || sibling->mRight->mColor == 1u) {
+            if (!IsSelectionNil(sibling->mLeft)) {
+              sibling->mLeft->mColor = 1;
+            }
+            sibling->mColor = 0;
+            RotateSelectionRight(selection, sibling);
+            sibling = parent->mRight;
+          }
+
+          sibling->mColor = parent->mColor;
+          parent->mColor = 1;
+          if (!IsSelectionNil(sibling->mRight)) {
+            sibling->mRight->mColor = 1;
+          }
+          RotateSelectionLeft(selection, parent);
+          node = head->mParent;
+          break;
+        }
+
+        SSelectionNodeUserEntity* sibling = parent->mLeft;
+        if (sibling == head) {
+          node = parent;
+          parent = node->mParent;
+          continue;
+        }
+        if (sibling->mColor == 0u) {
+          sibling->mColor = 1;
+          parent->mColor = 0;
+          RotateSelectionRight(selection, parent);
+          sibling = parent->mLeft;
+        }
+
+        const bool rightBlack = IsSelectionNil(sibling->mRight) || sibling->mRight->mColor == 1u;
+        const bool leftBlack = IsSelectionNil(sibling->mLeft) || sibling->mLeft->mColor == 1u;
+        if (rightBlack && leftBlack) {
+          sibling->mColor = 0;
+          node = parent;
+          parent = node->mParent;
+          continue;
+        }
+
+        if (IsSelectionNil(sibling->mLeft) || sibling->mLeft->mColor == 1u) {
+          if (!IsSelectionNil(sibling->mRight)) {
+            sibling->mRight->mColor = 1;
+          }
+          sibling->mColor = 0;
+          RotateSelectionLeft(selection, sibling);
+          sibling = parent->mLeft;
+        }
+
+        sibling->mColor = parent->mColor;
+        parent->mColor = 1;
+        if (!IsSelectionNil(sibling->mLeft)) {
+          sibling->mLeft->mColor = 1;
+        }
+        RotateSelectionRight(selection, parent);
+        node = head->mParent;
+        break;
+      }
+
+      if (!IsSelectionNil(node)) {
+        node->mColor = 1u;
+      }
+    }
+
+    void UnlinkSelectionWeakOwnerRef(SSelectionWeakRefUserEntity& weakRef)
+    {
+      auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
+      if (ownerLinkSlot == nullptr) {
+        return;
+      }
+
+      while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
+        ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
+      }
+
+      if (*ownerLinkSlot == &weakRef) {
+        *ownerLinkSlot = weakRef.mNextOwner;
+      }
+      weakRef.mOwnerLinkSlot = nullptr;
+      weakRef.mNextOwner = nullptr;
+    }
+
+    /**
+     * Address: 0x0066A550 (FUN_0066A550, Moho::WeakSet_UserEntity::next)
+     *
+     * What it does:
+     * Erases one `UserEntity` weak-set node from the selection RB-tree, unlinks
+     * its intrusive weak-owner chain lane, and returns the next in-order node.
+     */
+    [[maybe_unused]] [[nodiscard]] SSelectionNodeUserEntity*
+    EraseSelectionNodeAndAdvance(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node)
+    {
+      if (selection.mHead == nullptr || IsSelectionNil(node)) {
+        throw std::out_of_range("invalid map/set<T> iterator");
+      }
+
+      SSelectionNodeUserEntity* const head = selection.mHead;
+      SSelectionNodeUserEntity* const next = NextTreeNode(node);
+
+      SSelectionNodeUserEntity* removed = node;
+      SSelectionNodeUserEntity* spliceTarget = node;
+      std::uint8_t removedColor = spliceTarget->mColor;
+      SSelectionNodeUserEntity* fixNode = head;
+      SSelectionNodeUserEntity* fixParent = head;
+
+      if (IsSelectionNil(node->mLeft)) {
+        fixNode = node->mRight;
+        fixParent = node->mParent;
+        ReplaceSelectionSubtree(selection, node, node->mRight);
+      } else if (IsSelectionNil(node->mRight)) {
+        fixNode = node->mLeft;
+        fixParent = node->mParent;
+        ReplaceSelectionSubtree(selection, node, node->mLeft);
+      } else {
+        spliceTarget = SelectionMin(node->mRight, head);
+        removedColor = spliceTarget->mColor;
+        fixNode = spliceTarget->mRight;
+        if (spliceTarget->mParent == node) {
+          fixParent = spliceTarget;
+          if (!IsSelectionNil(fixNode)) {
+            fixNode->mParent = spliceTarget;
+          }
+        } else {
+          fixParent = spliceTarget->mParent;
+          ReplaceSelectionSubtree(selection, spliceTarget, spliceTarget->mRight);
+          spliceTarget->mRight = node->mRight;
+          spliceTarget->mRight->mParent = spliceTarget;
+        }
+
+        ReplaceSelectionSubtree(selection, node, spliceTarget);
+        spliceTarget->mLeft = node->mLeft;
+        spliceTarget->mLeft->mParent = spliceTarget;
+        spliceTarget->mColor = node->mColor;
+      }
+
+      UnlinkSelectionWeakOwnerRef(removed->mEnt);
+      ::operator delete(removed);
+
+      if (selection.mSize > 0u) {
+        --selection.mSize;
+      }
+      if (removedColor == 1u) {
+        FixupAfterSelectionErase(selection, fixNode, fixParent);
+      }
+
+      RecomputeSelectionExtrema(selection);
+      return next;
+    }
+
     [[nodiscard]] SessionSaveSourceNode* GetSaveSourceTreeHead(const CWldSession* const session)
     {
       return static_cast<SessionSaveSourceNode*>(session->mSaveSourceTreeHead);
+    }
+
+    [[nodiscard]] SessionEntityMap& GetSessionEntityMap(CWldSession* const session)
+    {
+      static_assert(offsetof(CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
+      static_assert(
+        offsetof(CWldSession, mSaveSourceTreeHead) == 0x48,
+        "CWldSession::mSaveSourceTreeHead offset must be 0x48"
+      );
+      static_assert(
+        offsetof(CWldSession, mSaveSourceTreeSize) == 0x4C,
+        "CWldSession::mSaveSourceTreeSize offset must be 0x4C"
+      );
+      return *reinterpret_cast<SessionEntityMap*>(&session->mUnknownOwner44);
+    }
+
+    struct TerrainResMapBridge
+    {
+      void* mVftable; // +0x00
+      STIMap* mMap;   // +0x04
+    };
+
+    static_assert(sizeof(TerrainResMapBridge) == 0x08, "TerrainResMapBridge size must be 0x08");
+    static_assert(offsetof(TerrainResMapBridge, mMap) == 0x04, "TerrainResMapBridge::mMap offset must be 0x04");
+
+    [[nodiscard]] bool ApplyTerrainPlayableRect(IWldTerrainRes* const terrainRes, const gpg::Rect2i& playableRect)
+    {
+      if (terrainRes == nullptr) {
+        return false;
+      }
+
+      auto* const terrainBridge = reinterpret_cast<TerrainResMapBridge*>(terrainRes);
+      if (terrainBridge->mMap == nullptr) {
+        return false;
+      }
+
+      return terrainBridge->mMap->SetPlayableMapRect(playableRect);
     }
 
     /**
@@ -1125,12 +1953,13 @@ namespace moho
       return isFn;
     }
 
-    struct UICommandModeData
-    {
-      msvc8::string mode;
-      LuaPlus::LuaObject obj;
-    };
-
+    /**
+     * Address: 0x0083DDA0 (FUN_0083DDA0, Moho::UI_GetCommandMode)
+     *
+     * What it does:
+     * Imports `/lua/ui/game/commandmode.lua`, calls `GetCommandMode()`, and
+     * extracts `(modeString, payloadTable)` when present.
+     */
     [[nodiscard]] bool TryGetUICommandMode(LuaPlus::LuaState* state, UICommandModeData& out)
     {
       LuaPlus::LuaObject module = moho::SCR_ImportLuaModule(state, "/lua/ui/game/commandmode.lua");
@@ -1152,12 +1981,12 @@ namespace moho
       LuaPlus::LuaObject modeField = GetLuaIndex(state, result, 1);
       if (modeField && modeField.IsString()) {
         const char* const modeName = modeField.GetString();
-        out.mode = modeName ? modeName : "";
+        out.mMode = modeName ? modeName : "";
       }
 
       LuaPlus::LuaObject payloadField = GetLuaIndex(state, result, 2);
       if (payloadField && payloadField.IsTable()) {
-        out.obj = payloadField;
+        out.mPayload = payloadField;
       }
 
       return true;
@@ -1435,6 +2264,48 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
+   *
+   * What it does:
+   * Counts live weak-set tree nodes by in-order traversal of the selection
+   * RB-tree lane.
+   */
+  std::int32_t SSelectionSetUserEntity::size() const
+  {
+    const SSelectionNodeUserEntity* const head = mHead;
+    if (head == nullptr) {
+      return 0;
+    }
+
+    auto isSentinel = [](const SSelectionNodeUserEntity* const node) -> bool {
+      return node == nullptr || node->mIsSentinel != 0u;
+    };
+
+    std::int32_t count = 0;
+    const SSelectionNodeUserEntity* node = head->mLeft;
+    while (!isSentinel(node) && node != head) {
+      ++count;
+
+      if (!isSentinel(node->mRight)) {
+        node = node->mRight;
+        while (!isSentinel(node->mLeft)) {
+          node = node->mLeft;
+        }
+        continue;
+      }
+
+      const SSelectionNodeUserEntity* parent = node->mParent;
+      while (!isSentinel(parent) && node == parent->mRight) {
+        node = parent;
+        parent = parent->mParent;
+      }
+      node = parent;
+    }
+
+    return count;
+  }
+
+  /**
    * Address: 0x00896F00 init path (FUN_00896F00 -> sub_89A930).
    */
   SSessionSaveData::SSessionSaveData()
@@ -1481,10 +2352,8 @@ namespace moho
     // Partial lift of 0x00893160: ownership transfers + proven field initialization.
     // Remaining helper-heavy initialization chain (vision/task/lua options/spatial builders)
     // is tracked for subsequent recovery pass.
-    head0.prev = this;
-    head0.next = this;
-    head1.prev = this;
-    head1.next = this;
+    InitSessionPauseCallbackHead(head0);
+    InitSessionPauseCallbackHead(head1);
 
     mState = state.release();
     mCurThread = nullptr;
@@ -1527,8 +2396,9 @@ namespace moho
     mLastBeatWasTick = 0;
     mTimeSinceLastTick = 0.0f;
     mSessionPauseStateA = 0;
-    N00001903 = 0;
-    mSessionPauseStateB = 0;
+    mRequestingPauseState = 0;
+    mRequestingPause = 0;
+    mPauseRequester = 0;
     mReplayIsPaused = 0;
 
     ourCmdSource = static_cast<std::int32_t>(sessionInfo.mSourceId);
@@ -1588,10 +2458,8 @@ namespace moho
     }
     mLaunchInfo.reset();
 
-    head0.prev = this;
-    head0.next = this;
-    head1.prev = this;
-    head1.next = this;
+    InitSessionPauseCallbackHead(head0);
+    InitSessionPauseCallbackHead(head1);
 
     if (gActiveWldSession == this) {
       gActiveWldSession = nullptr;
@@ -1640,6 +2508,77 @@ namespace moho
   }
 
   /**
+   * Address: 0x008965E0 (FUN_008965E0, ?RequestFocusArmy@CWldSession@Moho@@QAEXH@Z)
+   *
+   * What it does:
+   * Validates one zero-based focus-army index (`-1` allowed) and forwards
+   * accepted changes to the active sim driver.
+   */
+  void CWldSession::RequestFocusArmy(const int index)
+  {
+    const int maxArmyIndex = static_cast<int>(userArmies.size()) - 1;
+    if (index < -1 || index > maxArmyIndex) {
+      gpg::Logf(
+        "CWldSession::RequestFocusArmy(): invalid army index %d.  Must be between -1 and %d inclusive",
+        index,
+        maxArmyIndex
+      );
+      return;
+    }
+
+    if (!ValidateFocusArmyRequest(index)) {
+      return;
+    }
+
+    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver()) {
+      activeDriver->SetArmyIndex(index);
+    }
+  }
+
+  /**
+   * Address: 0x00896670 (FUN_00896670, ?ValidateFocusArmyRequest@CWldSession@Moho@@AAE_NH@Z)
+   *
+   * What it does:
+   * Returns whether one focus-army switch is allowed for the current command
+   * source/session observation state.
+   */
+  bool CWldSession::ValidateFocusArmyRequest(const int index)
+  {
+    const unsigned int localCommandSource = static_cast<unsigned int>(ourCmdSource);
+
+    bool hasDirectCommandSourceAccess = false;
+    if (index != -1 && index >= 0) {
+      const std::size_t focusIndex = static_cast<std::size_t>(index);
+      if (focusIndex < userArmies.size()) {
+        const UserArmy* const targetArmy = userArmies[focusIndex];
+        if (targetArmy != nullptr) {
+          hasDirectCommandSourceAccess = targetArmy->mVarDat.mValidCommandSources.Contains(localCommandSource);
+        }
+      }
+    }
+
+    if (localCommandSource == 0xFFu || IsCheatsEnabled || hasDirectCommandSourceAccess || IsGameOver != 0u) {
+      return true;
+    }
+
+    if (!IsObservingAllowed) {
+      return false;
+    }
+
+    for (UserArmy* const army : userArmies) {
+      if (army == nullptr) {
+        continue;
+      }
+
+      if (army->mVarDat.mValidCommandSources.Contains(localCommandSource) && army->mVarDat.mIsOutOfGame == 0u) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Address: 0x008B97C0/0x008621B0 callsites (rule category lookup path).
    */
   EntityCategoryLookupResolver* CWldSession::GetCategoryLookupResolver()
@@ -1680,6 +2619,92 @@ namespace moho
   }
 
   /**
+   * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
+   */
+  SSelectionSetUserEntity& CWldSession::ExtraSelectionView()
+  {
+    constexpr std::size_t kExtraSelectionOffsetInStorage = 0x90;
+    static_assert(
+      offsetof(CWldSession, mEntitySpatialDbStorage) + kExtraSelectionOffsetInStorage == 0xE0,
+      "CWldSession::ExtraSelectionView offset must be 0xE0"
+    );
+    return *reinterpret_cast<SSelectionSetUserEntity*>(mEntitySpatialDbStorage + kExtraSelectionOffsetInStorage);
+  }
+
+  /**
+   * Address context: 0x00896870 (`ClearExtraSelectList`) field lane.
+   */
+  const SSelectionSetUserEntity& CWldSession::ExtraSelectionView() const
+  {
+    return const_cast<CWldSession*>(this)->ExtraSelectionView();
+  }
+
+  /**
+   * Address: 0x00896780 (FUN_00896780, ?AddToExtraSelectList@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+   *
+   * What it does:
+   * Starts transport order command mode and inserts one entity into the
+   * world-session extra-selection weak-set.
+   */
+  void CWldSession::AddToExtraSelectList(UserEntity* const entity)
+  {
+    UICommandModeData commandModeData{};
+    commandModeData.mMode = msvc8::string("order", 5u);
+    commandModeData.mPayload.AssignNewTable(mState, 0, 0);
+    commandModeData.mPayload.SetString("name", "RULEUCC_Transport");
+    UI_StartCommandMode(commandModeData);
+
+    SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
+    (void)InsertSelectionEntity(extraSelection, entity);
+  }
+
+  /**
+   * Address: 0x00896830 (FUN_00896830, ?RemoveFromExtraSelectList@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+   *
+   * What it does:
+   * Removes one entity from the world-session extra-selection weak-set and
+   * exits command mode when the set becomes empty.
+   */
+  void CWldSession::RemoveFromExtraSelectList(UserEntity* const entity)
+  {
+    SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
+    if (!EraseSelectionEntity(extraSelection, entity)) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* const head = extraSelection.mHead;
+    if (head != nullptr && head->mLeft == head) {
+      UI_EndCommandMode();
+    }
+  }
+
+  /**
+   * Address: 0x00896870 (FUN_00896870, ?ClearExtraSelectList@CWldSession@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Clears world-session extra selection weak-set and exits command mode when
+   * any entries were present.
+   */
+  void CWldSession::ClearExtraSelectList()
+  {
+    SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
+    SSelectionNodeUserEntity* const head = extraSelection.mHead;
+    if (head == nullptr || head->mLeft == head) {
+      return;
+    }
+
+    for (SSelectionNodeUserEntity* node = head->mLeft; node != nullptr && node != head;) {
+      node = EraseSelectionNodeAndAdvance(extraSelection, node);
+    }
+
+    head->mParent = head;
+    head->mLeft = head;
+    head->mRight = head;
+    extraSelection.mSize = 0u;
+    UI_EndCommandMode();
+  }
+
+  /**
    * Address: 0x00894230 (FUN_00894230, ?RemoveFromVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
    */
   void CWldSession::RemoveFromVizUpdate(UserEntity* const entity)
@@ -1699,6 +2724,127 @@ namespace moho
     }
 
     EraseVizUpdateNode(tree, node);
+  }
+
+  /**
+   * Address: 0x008942B0 (FUN_008942B0, ?RequestPause@CWldSession@Moho@@QAEXXZ)
+   */
+  void CWldSession::RequestPause()
+  {
+    std::int32_t commandCookie = 0;
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    if (IsReplay) {
+      if (mReplayIsPaused == 0u) {
+        mReplayIsPaused = 1;
+        simDriver->IncrementOutstandingRequests();
+      }
+    } else {
+      simDriver->RequestPause(&commandCookie);
+      mRequestingPauseState = 1;
+      mRequestingPause = 1;
+      mPauseRequester = commandCookie;
+    }
+
+    DispatchSessionPauseCallbacks(head0, true);
+  }
+
+  /**
+   * Address: 0x00894330 (FUN_00894330, ?Resume@CWldSession@Moho@@QAEXXZ)
+   */
+  void CWldSession::Resume()
+  {
+    std::int32_t commandCookie = 0;
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    if (IsReplay) {
+      if (mReplayIsPaused != 0u) {
+        mReplayIsPaused = 0;
+        simDriver->DecrementOutstandingRequestsAndSignal();
+      }
+    } else {
+      simDriver->Resume(&commandCookie);
+      mRequestingPauseState = 1;
+      mRequestingPause = 0;
+      mPauseRequester = commandCookie;
+    }
+
+    DispatchSessionPauseCallbacks(head0, false);
+  }
+
+  /**
+   * Address: 0x008943E0 (FUN_008943E0, ?CheckForNecessaryUIRefresh@CWldSession@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Rebuilds the current selection when stale/dead weak entries are detected
+   * or selected entities requested a UI refresh during beat processing.
+   */
+  void CWldSession::CheckForNecessaryUIRefresh()
+  {
+    const std::uint32_t previousSelectionSize = mSelection.mSize;
+    bool needsSelectionRefresh = false;
+
+    msvc8::vector<UserEntity*> filteredSelection{};
+    filteredSelection.reserve(static_cast<std::size_t>(previousSelectionSize));
+
+    const SSelectionNodeUserEntity* const head = mSelection.mHead;
+    if (head != nullptr) {
+      for (const SSelectionNodeUserEntity* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)
+      ) {
+        UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+        if (entity == nullptr) {
+          needsSelectionRefresh = true;
+          continue;
+        }
+
+        if (entity->RequiresUIRefresh()) {
+          needsSelectionRefresh = true;
+        }
+
+        if (entity->mVariableData.mIsDead != 0u) {
+          needsSelectionRefresh = true;
+          continue;
+        }
+
+        if (!ContainsEntityPtr(filteredSelection, entity)) {
+          filteredSelection.push_back(entity);
+        }
+      }
+    }
+
+    const std::int32_t maxSelectionSizeRuntime =
+      reinterpret_cast<const CWldSessionSelectionStatsRuntimeView*>(this)->maxSelectionSize;
+    const std::uint32_t maxSelectionSize = maxSelectionSizeRuntime > 0 ? static_cast<std::uint32_t>(maxSelectionSizeRuntime)
+                                                                        : 0u;
+    const std::uint32_t liveSelectionSize = static_cast<std::uint32_t>(filteredSelection.size());
+
+    if (!needsSelectionRefresh && !(previousSelectionSize < maxSelectionSize) && !(liveSelectionSize < previousSelectionSize
+        )) {
+      return;
+    }
+
+    msvc8::vector<UserEntity*> previousSelection{};
+    CollectSelectionEntities(mSelection, previousSelection);
+    const bool selectionChanged = !AreEntitySetsEqual(previousSelection, filteredSelection);
+
+    ClearSelectionSet(mSelection);
+    for (UserEntity* const entity : filteredSelection) {
+      (void)InsertSelectionEntity(mSelection, entity);
+    }
+
+    mSelection.mSizeMirrorOrUnused = mSelection.mSize;
+    reinterpret_cast<CWldSessionSelectionStatsRuntimeView*>(this)->maxSelectionSize =
+      static_cast<std::int32_t>(mSelection.mSize);
+
+    if (!selectionChanged) {
+      return;
+    }
+
+    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+      SSyncFilterMaskBlock selectionMask{};
+      BuildSelectionSyncMask(mSelection, selectionMask);
+      activeDriver->SetSyncFilterMaskB(selectionMask);
+    }
+
+    UI_EndCommandMode();
   }
 
   /**
@@ -1805,6 +2951,47 @@ namespace moho
     }
   }
 
+  void CWldSession::SetSelectionUnits(const msvc8::vector<UserUnit*>& units)
+  {
+    msvc8::vector<UserEntity*> desiredEntities{};
+    desiredEntities.reserve(units.size());
+    for (UserUnit* const unit : units) {
+      if (unit == nullptr) {
+        continue;
+      }
+
+      UserEntity* const entity = reinterpret_cast<UserEntity*>(unit);
+      if (!ContainsEntityPtr(desiredEntities, entity)) {
+        desiredEntities.push_back(entity);
+      }
+    }
+
+    msvc8::vector<UserEntity*> previousEntities{};
+    CollectSelectionEntities(mSelection, previousEntities);
+    const bool selectionChanged = !AreEntitySetsEqual(previousEntities, desiredEntities);
+
+    ClearSelectionSet(mSelection);
+    for (UserEntity* const entity : desiredEntities) {
+      (void)InsertSelectionEntity(mSelection, entity);
+    }
+
+    mSelection.mSizeMirrorOrUnused = mSelection.mSize;
+    reinterpret_cast<CWldSessionSelectionStatsRuntimeView*>(this)->maxSelectionSize =
+      static_cast<std::int32_t>(mSelection.mSize);
+
+    if (!selectionChanged) {
+      return;
+    }
+
+    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+      SSyncFilterMaskBlock selectionMask{};
+      BuildSelectionSyncMask(mSelection, selectionMask);
+      activeDriver->SetSyncFilterMaskB(selectionMask);
+    }
+
+    UI_EndCommandMode();
+  }
+
   /**
    * Address: 0x00896900 (FUN_00896900, ?GetDelayToNextBeat@CWldSession@Moho@@QBEMXZ)
    */
@@ -1819,6 +3006,44 @@ namespace moho
     }
 
     return 0.0f;
+  }
+
+  /**
+   * Address: 0x00896960 (FUN_00896960, ?SyncPlayableRect@CWldSession@Moho@@QAEXABV?$Rect2@H@gpg@@@Z)
+   *
+   * What it does:
+   * Applies one playable rectangle to terrain and updates user-entity mesh
+   * hidden flags to match whether each entity lies inside that rectangle.
+   */
+  void CWldSession::SyncPlayableRect(const gpg::Rect2i& playableRect)
+  {
+    if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr) {
+      (void)ApplyTerrainPlayableRect(mWldMap->mTerrainRes, playableRect);
+    }
+
+    SessionEntityMap& entityMap = GetSessionEntityMap(this);
+    SessionEntityMapNode* const head = entityMap.mHead;
+    if (head == nullptr || head->mLeft == head) {
+      return;
+    }
+
+    for (SessionEntityMapNode* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)) {
+      UserEntity* const entity = node->mEntity;
+      if (entity == nullptr) {
+        continue;
+      }
+
+      MeshInstance* const meshInstance = entity->mMeshInstance;
+      if (meshInstance == nullptr) {
+        continue;
+      }
+
+      const int mapX = static_cast<int>(entity->mVariableData.mCurTransform.pos_.x);
+      const int mapZ = static_cast<int>(entity->mVariableData.mCurTransform.pos_.z);
+      const bool insidePlayableRect = mapX >= playableRect.x0 && mapX < playableRect.x1 && mapZ >= playableRect.z0 &&
+        mapZ < playableRect.z1;
+      meshInstance->isHidden = insidePlayableRect ? 0u : 1u;
+    }
   }
 
   /**
@@ -1888,13 +3113,13 @@ namespace moho
           if (focusIndex < userArmies.size() && userArmies[focusIndex] != nullptr) {
             UICommandModeData uiMode{};
             if (TryGetUICommandMode(mState, uiMode)) {
-              if (uiMode.mode.empty()) {
+              if (uiMode.mMode.empty()) {
                 resolvedByUi = false;
-              } else if (uiMode.mode == "order") {
+              } else if (uiMode.mMode == "order") {
                 resolvedByUi = true;
                 mode.mMode = COMMOD_Order;
 
-                LuaPlus::LuaObject commandName = moho::SCR_GetLuaTableField(mState, uiMode.obj, "name");
+                LuaPlus::LuaObject commandName = moho::SCR_GetLuaTableField(mState, uiMode.mPayload, "name");
                 if (commandName && commandName.IsString()) {
                   const char* const commandCapsName = commandName.GetString();
                   if (commandCapsName && std::strcmp(commandCapsName, "Transport") == 0) {
@@ -1903,9 +3128,9 @@ namespace moho
                     mode.mCommandCaps = RULEUCC_CallTransport;
                   }
                 }
-              } else if (uiMode.mode == "build" || uiMode.mode == "buildanchored") {
+              } else if (uiMode.mMode == "build" || uiMode.mMode == "buildanchored") {
                 resolvedByUi = true;
-                LuaPlus::LuaObject blueprintNameField = moho::SCR_GetLuaTableField(mState, uiMode.obj, "name");
+                LuaPlus::LuaObject blueprintNameField = moho::SCR_GetLuaTableField(mState, uiMode.mPayload, "name");
                 if (blueprintNameField && blueprintNameField.IsString()) {
                   const char* const blueprintName = blueprintNameField.GetString();
                   RResId blueprintId{};
@@ -1914,16 +3139,16 @@ namespace moho
                   void* const blueprint =
                     mRules ? static_cast<RRuleGameRules*>(mRules)->GetUnitBlueprint(blueprintId) : nullptr;
                   if (blueprint) {
-                    mode.mMode = (uiMode.mode == "build") ? COMMOD_Build : COMMOD_BuildAnchored;
+                    mode.mMode = (uiMode.mMode == "build") ? COMMOD_Build : COMMOD_BuildAnchored;
                     mode.mBlueprint = blueprint;
                   }
                 }
-              } else if (uiMode.mode == "ping") {
+              } else if (uiMode.mMode == "ping") {
                 resolvedByUi = true;
                 mode.mMode = COMMOD_Ping;
-              } else if (!uiMode.mode.empty()) {
+              } else if (!uiMode.mMode.empty()) {
                 resolvedByUi = true;
-                gpg::Warnf("CWldSession::GetLeftMouseButtonAction invalid command mode: %s", uiMode.mode.c_str());
+                gpg::Warnf("CWldSession::GetLeftMouseButtonAction invalid command mode: %s", uiMode.mMode.c_str());
               }
             }
           }
@@ -2045,6 +3270,10 @@ namespace moho
       // runtime before moving to the loading action.
       WLD_Teardown();
 
+      if (LuaPlus::LuaState* const state = USER_GetLuaState(); state != nullptr) {
+        (void)UI_StartGameUI(state);
+      }
+
       if (CWldSessionLoaderImpl* const loader = GetWldSessionLoader(); loader != nullptr) {
         loader->SetCreated();
       }
@@ -2086,6 +3315,9 @@ namespace moho
 
       simDriver->Dispatch();
       if (simDriver->HasSyncData()) {
+        if (gActiveWldSession != nullptr && gActiveWldSession->mState != nullptr) {
+          (void)UI_StartGameUI(gActiveWldSession->mState);
+        }
         gWldFrameAction = EWldFrameAction::PostInitialize;
       }
     }
@@ -2135,6 +3367,8 @@ namespace moho
         if (outContinue != nullptr) {
           *outContinue = true;
         }
+      } else {
+        (void)UI_UpdateDisconnectDialogCallback();
       }
     }
 
@@ -2151,6 +3385,8 @@ namespace moho
       if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
         simDriver->NoOp();
       }
+
+      (void)UI_UpdateDisconnectDialogCallback();
     }
 
     void WLD_CreateSessionInfo()
@@ -2226,6 +3462,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00869810 (FUN_00869810, func_WldSessionLoader_GetOnTeardownCallbacks)
+   */
+  WldTeardownCallbackVector* WLD_GetOnTeardownCallbacks()
+  {
+    if ((gWldTeardownCallbacksInitMask & 1u) == 0u) {
+      gWldTeardownCallbacksInitMask |= 1u;
+      gWldTeardownCallbacks.clear();
+      (void)std::atexit(&CleanupWldTeardownCallbacks);
+    }
+
+    return &gWldTeardownCallbacks;
+  }
+
+  /**
    * Address: 0x0088C860 (FUN_0088C860, ?WLD_Teardown@Moho@@YAXXZ)
    */
   void WLD_Teardown()
@@ -2239,7 +3489,18 @@ namespace moho
       (void)uiManager->SetNewLuaState(nullptr);
     }
 
-    if (CWldSession* const activeSession = WLD_GetActiveSession(); activeSession != nullptr) {
+    if (IUserSoundManager* const userSound = USER_GetSound(); userSound != nullptr) {
+      userSound->StopAllSounds();
+    }
+
+    CWldSession* const activeSession = WLD_GetActiveSession();
+    for (IWldTeardownCallback* const callback : *WLD_GetOnTeardownCallbacks()) {
+      if (callback != nullptr) {
+        (void)callback->OnWldSessionTeardown(activeSession);
+      }
+    }
+
+    if (activeSession != nullptr) {
       delete activeSession;
     }
 

@@ -21,10 +21,21 @@ namespace gpg::gal
         IndexBufferContext();
 
         /**
-         * Address: 0x00940640 (FUN_00940640)
+         * Address: 0x00940610 (FUN_00940610, gpg::gal::IndexBufferContext::IndexBufferContext)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk for index-buffer context handles.
+         * Initializes index-buffer context lanes from explicit
+         * `size/format/type` payload values.
+         */
+        IndexBufferContext(std::uint32_t size, std::uint32_t format, std::uint32_t type);
+
+        /**
+         * Address: 0x00940630 (FUN_00940630, gpg::gal::IndexBufferContext::~IndexBufferContext)
+         * Address: 0x00940640 (FUN_00940640, scalar deleting destructor thunk)
+         *
+         * What it does:
+         * Restores the vftable lane and owns the deleting-destructor thunk path
+         * for index-buffer context handles.
          */
         virtual ~IndexBufferContext();
 

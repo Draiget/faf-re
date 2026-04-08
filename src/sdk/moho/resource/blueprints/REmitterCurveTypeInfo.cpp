@@ -18,9 +18,27 @@ namespace
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    /**
+     * Address: 0x00515C60 (FUN_00515C60, gpg::RVectorType_REmitterCurveKey::GetLexical)
+     *
+     * What it does:
+     * Returns base lexical text plus reflected vector size for one
+     * `msvc8::vector<moho::REmitterCurveKey>` instance.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+    /**
+     * Address: 0x00515C40 (FUN_00515C40, gpg::RVectorType_REmitterCurveKey::Init)
+     */
     void Init() override;
+    /**
+     * Address: 0x00516100 (FUN_00516100, gpg::RVectorType_REmitterCurveKey::SerLoad)
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    /**
+     * Address: 0x00516230 (FUN_00516230, gpg::RVectorType_REmitterCurveKey::SerSave)
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -80,6 +98,13 @@ namespace
     return cached;
   }
 
+  /**
+   * Address: 0x00515BA0 (FUN_00515BA0, gpg::RVectorType_REmitterCurveKey::GetName)
+   *
+   * What it does:
+   * Builds and caches lexical reflection name `vector<element>` for
+   * `msvc8::vector<moho::REmitterCurveKey>`.
+   */
   const char* CurveKeyVectorTypeInfo::GetName() const
   {
     static msvc8::string cachedName{};
@@ -91,6 +116,13 @@ namespace
     return cachedName.c_str();
   }
 
+  /**
+   * Address: 0x00515C60 (FUN_00515C60, gpg::RVectorType_REmitterCurveKey::GetLexical)
+   *
+   * What it does:
+   * Returns base lexical text plus reflected vector size for one
+   * `msvc8::vector<moho::REmitterCurveKey>` instance.
+   */
   msvc8::string CurveKeyVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
@@ -102,10 +134,83 @@ namespace
     return this;
   }
 
+  /**
+   * Address: 0x00515C40 (FUN_00515C40, gpg::RVectorType_REmitterCurveKey::Init)
+   *
+   * What it does:
+   * Sets vector type metadata and installs serializer callbacks for
+   * `msvc8::vector<moho::REmitterCurveKey>`.
+   */
   void CurveKeyVectorTypeInfo::Init()
   {
     size_ = sizeof(CurveKeyVector);
     version_ = 1;
+    serLoadFunc_ = &CurveKeyVectorTypeInfo::SerLoad;
+    serSaveFunc_ = &CurveKeyVectorTypeInfo::SerSave;
+  }
+
+  /**
+   * Address: 0x00516100 (FUN_00516100, gpg::RVectorType_REmitterCurveKey::SerLoad)
+   *
+   * What it does:
+   * Reads vector element count, deserializes each `REmitterCurveKey` element,
+   * and replaces destination storage with the loaded sequence.
+   */
+  void CurveKeyVectorTypeInfo::SerLoad(
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    auto* const destination = reinterpret_cast<CurveKeyVector*>(objectPtr);
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+
+    CurveKeyVector loaded;
+    loaded.reserve(static_cast<std::size_t>(count));
+
+    gpg::RType* const elementType = CachedEmitterCurveKeyType();
+    for (unsigned int index = 0u; index < count; ++index) {
+      moho::REmitterCurveKey key{};
+      gpg::RRef elementOwner{};
+      archive->Read(elementType, &key, elementOwner);
+      loaded.push_back(key);
+    }
+
+    *destination = loaded;
+  }
+
+  /**
+   * Address: 0x00516230 (FUN_00516230, gpg::RVectorType_REmitterCurveKey::SerSave)
+   *
+   * What it does:
+   * Writes vector size and serializes each `REmitterCurveKey` element using
+   * reflected write callbacks.
+   */
+  void CurveKeyVectorTypeInfo::SerSave(
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const auto* const source = reinterpret_cast<const CurveKeyVector*>(objectPtr);
+    const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
+    archive->WriteUInt(count);
+
+    if (source == nullptr || count == 0u) {
+      return;
+    }
+
+    const gpg::RType* const elementType = CachedEmitterCurveKeyType();
+    gpg::RRef emptyOwner{};
+    const gpg::RRef& effectiveOwner = ownerRef != nullptr ? *ownerRef : emptyOwner;
+    for (const moho::REmitterCurveKey& element : *source) {
+      archive->Write(elementType, &element, effectiveOwner);
+    }
   }
 
   gpg::RRef CurveKeyVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const

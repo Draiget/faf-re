@@ -1,6 +1,15 @@
 #pragma once
 
 #include "Entity.h"
+#include "moho/lua/CScrLuaBinderFwd.h"
+
+struct lua_State;
+
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -11,6 +20,25 @@ namespace moho
   class Shield : public Entity
   {
   public:
+    /**
+     * Address: 0x00776590 (FUN_00776590, ??0Shield@Moho@@QAE@@ZZ)
+     *
+     * What it does:
+     * Serializer construction lane: initializes Shield with default collision
+     * bucket flags under one simulation owner.
+     */
+    explicit Shield(Sim* sim);
+
+    /**
+     * Address: 0x00776490 (FUN_00776490, ??0Shield@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Lua construction lane: reserves one Shield-family entity id using the
+     * provided source index, binds Lua object state, and links into
+     * `Sim::mShields`.
+     */
+    Shield(Sim* sim, const LuaPlus::LuaObject& luaObject, std::uint32_t armySourceIndex);
+
     /**
      * Address: 0x007762F0 (FUN_007762F0)
      *
@@ -44,6 +72,31 @@ namespace moho
      */
     Shield* IsShield() override;
   };
+
+  /**
+   * Address: 0x00776A20 (FUN_00776A20, cfunc__c_CreateShield)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc__c_CreateShieldL`.
+   */
+  int cfunc__c_CreateShield(lua_State* luaContext);
+
+  /**
+   * Address: 0x00776A40 (FUN_00776A40, func__c_CreateShield_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder metadata for `_c_CreateShield`.
+   */
+  CScrLuaInitForm* func__c_CreateShield_LuaFuncDef();
+
+  /**
+   * Address: 0x00776AA0 (FUN_00776AA0, cfunc__c_CreateShieldL)
+   *
+   * What it does:
+   * Validates `(luaobj, spec)`, derives shield source index from optional
+   * `spec.Owner`, creates one `Shield`, and pushes its Lua object.
+   */
+  int cfunc__c_CreateShieldL(LuaPlus::LuaState* state);
 
   /**
    * VFTABLE: 0x00E3713C

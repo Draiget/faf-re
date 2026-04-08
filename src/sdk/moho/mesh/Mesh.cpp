@@ -962,6 +962,37 @@ namespace moho
   }
 
   /**
+   * Address: 0x007DCA40 (FUN_007DCA40,
+   * ??0MeshLOD@Moho@@QAE@V?$shared_ptr@VRScmResource@Moho@@@boost@@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+   *
+   * What it does:
+   * Initializes one runtime LOD from already-resolved resource/material
+   * pointers and clears batch/runtime flag lanes.
+   */
+  MeshLOD::MeshLOD(const boost::shared_ptr<RScmResource> resourceArg, const boost::shared_ptr<MeshMaterial> materialArg)
+    : useDissolve(0)
+    , cutoff(1000.0f)
+    , mat()
+    , previousResource()
+    , res(resourceArg)
+    , scrolling(0)
+    , occlude(0)
+    , silhouette(0)
+    , pad_AF(0)
+    , lodBlueprintCopy()
+    , staticBatch()
+    , dynamicBatch()
+  {
+    if (materialArg) {
+      mat = *materialArg;
+      return;
+    }
+
+    MeshMaterial defaultMaterial;
+    mat = defaultMaterial;
+  }
+
+  /**
    * Address: 0x007DD4D0 (FUN_007DD4D0)
    *
    * What it does:
@@ -1044,6 +1075,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x007DD750 (FUN_007DD750,
+   * ??0Mesh@Moho@@QAE@V?$shared_ptr@VRScmResource@Moho@@@boost@@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+   *
+   * What it does:
+   * Initializes one mesh with a pre-resolved resource/material LOD lane.
+   */
+  Mesh::Mesh(const boost::shared_ptr<RScmResource> resourceArg, const boost::shared_ptr<MeshMaterial> materialArg)
+    : bp(nullptr)
+    , material()
+    , unk2C(0)
+    , lods()
+    , unk3C(0)
+  {
+    (void)CreateLOD(resourceArg, materialArg);
+  }
+
+  /**
    * Address: 0x007DDAC0 (FUN_007DDAC0)
    */
   void Mesh::Clear()
@@ -1119,6 +1167,20 @@ namespace moho
     }
 
     MeshLOD* const lod = new MeshLOD(blueprintLod, previousResource, materialArg, this);
+    lods.push_back(lod);
+    return lod;
+  }
+
+  /**
+   * Address: 0x007DDE50 (FUN_007DDE50,
+   * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@V?$shared_ptr@VRScmResource@Moho@@@boost@@V?$shared_ptr@VMeshMaterial@Moho@@@5@@Z)
+   *
+   * What it does:
+   * Adds one direct resource/material-backed mesh LOD entry.
+   */
+  MeshLOD* Mesh::CreateLOD(const boost::shared_ptr<RScmResource> resourceArg, const boost::shared_ptr<MeshMaterial> materialArg)
+  {
+    MeshLOD* const lod = new MeshLOD(resourceArg, materialArg);
     lods.push_back(lod);
     return lod;
   }
@@ -1336,6 +1398,51 @@ namespace moho
     frameCounter = static_cast<std::int8_t>(sFrameCounter);
     currInterpolant = -1.0f;
     boundsValid = 1;
+  }
+
+  /**
+   * Address: 0x007DEA30 (FUN_007DEA30,
+   * ?SetStance@MeshInstance@Moho@@QAEXABVVTransform@2@0V?$shared_ptr@VCAniPose@Moho@@@boost@@1@Z)
+   *
+   * What it does:
+   * Applies the static-pose stance lane used by UserEntity updates, including
+   * pose-handle assignment and optional transform/bounds refresh.
+   */
+  void MeshInstance::SetStance(
+    const VTransform& startTransformArg,
+    const VTransform& endTransformArg,
+    const bool forceRefresh,
+    boost::shared_ptr<CAniPose> startPoseArg,
+    boost::shared_ptr<CAniPose> endPoseArg
+  )
+  {
+    if (isStaticPose == 0) {
+      SetStance(startTransformArg, endTransformArg);
+      return;
+    }
+
+    startPose = startPoseArg;
+    endPose = endPoseArg;
+
+    frameCounter = static_cast<std::int8_t>(sFrameCounter);
+    currInterpolant = -1.0f;
+    hasStanceUpdatePending = 1;
+
+    const bool changed = !Vec3EqualExact(endTransform.pos_, endTransformArg.pos_) ||
+      !QuatEqualExact(endTransform.orient_, endTransformArg.orient_) ||
+      !Vec3EqualExact(startTransform.pos_, startTransformArg.pos_) ||
+      !QuatEqualExact(startTransform.orient_, startTransformArg.orient_);
+    if (!changed && !forceRefresh) {
+      return;
+    }
+
+    endTransform = endTransformArg;
+    startTransform = startTransformArg;
+    boundsValid = 1;
+
+    // Keep bounds coherent with recovered stance lanes until full
+    // swept-box/spatial-entry helper kernels are fully lifted.
+    UpdateInterpolatedFields();
   }
 
   /**

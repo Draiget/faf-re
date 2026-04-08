@@ -8,8 +8,11 @@
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
+struct lua_State;
+
 namespace moho
 {
+  class CScrLuaInitForm;
   class Unit;
   class Sim;
 
@@ -162,6 +165,7 @@ namespace moho
   class CScrLuaMetatableFactory<CCollisionManipulator> final : public CScrLuaObjectFactory
   {
   public:
+    static CScrLuaMetatableFactory& Instance();
     explicit CScrLuaMetatableFactory(std::int32_t factoryObjectIndex);
 
   protected:
@@ -246,4 +250,101 @@ namespace moho
   );
   static_assert(sizeof(CCollisionManipulatorSerializer) == 0x14, "CCollisionManipulatorSerializer size must be 0x14");
   static_assert(sizeof(CCollisionManipulatorTypeInfo) == 0x64, "CCollisionManipulatorTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00637FA0 (FUN_00637FA0, cfunc_CreateCollisionDetector)
+   *
+   * What it does:
+   * Unwraps the Lua callback context and dispatches the collision-detector
+   * constructor binder.
+   */
+  int cfunc_CreateCollisionDetector(lua_State* luaContext);
+
+  /**
+   * Address: 0x00637FC0 (FUN_00637FC0, func_CreateCollisionDetector_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateCollisionDetector(unit)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateCollisionDetector_LuaFuncDef();
+
+  /**
+   * Address: 0x00638110 (FUN_00638110, cfunc_CCollisionManipulatorEnableTerrainCheck)
+   *
+   * What it does:
+   * Unwraps the Lua callback context and dispatches the terrain-check enable
+   * binder.
+   */
+  int cfunc_CCollisionManipulatorEnableTerrainCheck(lua_State* luaContext);
+
+  /**
+   * Address: 0x00638130 (FUN_00638130, func_CCollisionManipulatorEnableTerrainCheck_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:EnableTerrainCheck(bool)` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorEnableTerrainCheck_LuaFuncDef();
+
+  /**
+   * Address: 0x00638250 (FUN_00638250, cfunc_CCollisionManipulatorEnable)
+   *
+   * What it does:
+   * Unwraps the Lua callback context and dispatches the collision enable
+   * binder.
+   */
+  int cfunc_CCollisionManipulatorEnable(lua_State* luaContext);
+
+  /**
+   * Address: 0x00638270 (FUN_00638270, func_CCollisionManipulatorEnable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:Enable()` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorEnable_LuaFuncDef();
+
+  /**
+   * Address: 0x00638380 (FUN_00638380, cfunc_CCollisionManipulatorDisable)
+   *
+   * What it does:
+   * Unwraps the Lua callback context and dispatches the collision disable
+   * binder.
+   */
+  int cfunc_CCollisionManipulatorDisable(lua_State* luaContext);
+
+  /**
+   * Address: 0x006383A0 (FUN_006383A0, func_CCollisionManipulatorDisable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:Disable()` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorDisable_LuaFuncDef();
+
+  /**
+   * Address: 0x006384C0 (FUN_006384C0, cfunc_CCollisionManipulatorWatchBone)
+   *
+   * What it does:
+   * Unwraps the Lua callback context and dispatches the watch-bone binder.
+   */
+  int cfunc_CCollisionManipulatorWatchBone(lua_State* luaContext);
+
+  /**
+   * Address: 0x006384E0 (FUN_006384E0, func_CCollisionManipulatorWatchBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:WatchBone(bone)` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorWatchBone_LuaFuncDef();
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00638D50 (FUN_00638D50, gpg::RRef_CCollisionManipulator)
+   *
+   * What it does:
+   * Builds one typed reflection reference for
+   * `moho::CCollisionManipulator*`, preserving dynamic-derived ownership and
+   * base-offset adjustment.
+   */
+  gpg::RRef* RRef_CCollisionManipulator(gpg::RRef* outRef, moho::CCollisionManipulator* value);
+} // namespace gpg

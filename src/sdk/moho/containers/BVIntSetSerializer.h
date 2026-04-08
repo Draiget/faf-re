@@ -46,4 +46,13 @@ namespace moho
   static_assert(offsetof(BVIntSetSerializer, mLoadCallback) == 0x0C, "BVIntSetSerializer::mLoadCallback offset must be 0x0C");
   static_assert(offsetof(BVIntSetSerializer, mSaveCallback) == 0x10, "BVIntSetSerializer::mSaveCallback offset must be 0x10");
   static_assert(sizeof(BVIntSetSerializer) == 0x14, "BVIntSetSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00BC2D00 (FUN_00BC2D00, register_BVIntSetSerializer)
+   *
+   * What it does:
+   * Materializes startup `BVIntSetSerializer` storage, installs serializer
+   * callback lanes, and registers process-exit teardown.
+   */
+  void register_BVIntSetSerializer();
 } // namespace moho

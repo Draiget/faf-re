@@ -162,4 +162,13 @@ namespace moho
   CPullTask<T>::CPullTask()
     : CTask(new CTaskThread(WIN_GetBeforeEventsStage()), false)
   {}
+
+  /**
+   * Address: 0x00BC2FC0 (FUN_00BC2FC0, register_CTaskTypeInfo)
+   *
+   * What it does:
+   * Materializes the startup `CTaskTypeInfo` descriptor and registers
+   * process-exit teardown.
+   */
+  void register_CTaskTypeInfo();
 } // namespace moho

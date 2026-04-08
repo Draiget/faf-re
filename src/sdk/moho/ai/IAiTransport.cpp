@@ -1,5 +1,6 @@
 #include "moho/ai/IAiTransport.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
@@ -29,10 +30,7 @@ namespace moho
   class RBroadcasterRType_EAiTransportEvent final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "Broadcaster<EAiTransportEvent>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
@@ -44,10 +42,7 @@ namespace moho
   class RListenerRType_EAiTransportEvent final : public gpg::RType
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "Listener<EAiTransportEvent>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
@@ -62,10 +57,51 @@ namespace gpg
   class RVectorType_int final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005ECD00 (FUN_005ECD00, gpg::RVectorType_int::RVectorType_int)
+     *
+     * What it does:
+     * Constructs and preregisters reflection metadata for
+     * `msvc8::vector<int>`.
+     */
+    RVectorType_int();
+
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x005E8E30 (FUN_005E8E30, gpg::RVectorType_int::GetLexical)
+     *
+     * What it does:
+     * Appends `size=<count>` suffix to the base lexical representation for
+     * one `vector<int>` payload.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x005E8E10 (FUN_005E8E10, gpg::RVectorType_int::Init)
+     *
+     * What it does:
+     * Initializes vector<int> RTTI metadata lanes including ser callbacks.
+     */
     void Init() override;
+
+    /**
+     * Address: 0x005E9F20 (FUN_005E9F20, gpg::RVectorType_int::SerLoad)
+     *
+     * What it does:
+     * Deserializes one `msvc8::vector<int>` payload from archive lanes.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005EA020 (FUN_005EA020, gpg::RVectorType_int::SerSave)
+     *
+     * What it does:
+     * Serializes one `msvc8::vector<int>` payload into archive lanes.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -74,10 +110,51 @@ namespace gpg
   class RVectorType_SAiReservedTransportBone final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005ECD70 (FUN_005ECD70, gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone)
+     *
+     * What it does:
+     * Constructs and preregisters reflection metadata for
+     * `msvc8::vector<SAiReservedTransportBone>`.
+     */
+    RVectorType_SAiReservedTransportBone();
+
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x005E90A0 (FUN_005E90A0, gpg::RVectorType_SAiReservedTransportBone::GetLexical)
+     *
+     * What it does:
+     * Appends `size=<count>` suffix to the base lexical representation for
+     * one `vector<SAiReservedTransportBone>` payload.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x005E9080 (FUN_005E9080, gpg::RVectorType_SAiReservedTransportBone::Init)
+     *
+     * What it does:
+     * Initializes `vector<SAiReservedTransportBone>` RTTI metadata lanes.
+     */
     void Init() override;
+
+    /**
+     * Address: 0x005EA070 (FUN_005EA070, gpg::RVectorType_SAiReservedTransportBone::SerLoad)
+     *
+     * What it does:
+     * Deserializes one `vector<SAiReservedTransportBone>` payload.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005EA1E0 (FUN_005EA1E0, gpg::RVectorType_SAiReservedTransportBone::SerSave)
+     *
+     * What it does:
+     * Serializes one `vector<SAiReservedTransportBone>` payload.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -86,10 +163,51 @@ namespace gpg
   class RVectorType_SAttachPoint final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x005ECDE0 (FUN_005ECDE0, gpg::RVectorType_SAttachPoint::RVectorType_SAttachPoint)
+     *
+     * What it does:
+     * Constructs and preregisters reflection metadata for
+     * `msvc8::vector<SAttachPoint>`.
+     */
+    RVectorType_SAttachPoint();
+
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x005E9310 (FUN_005E9310, gpg::RVectorType_SAttachPoint::GetLexical)
+     *
+     * What it does:
+     * Appends `size=<count>` suffix to the base lexical representation for
+     * one `vector<SAttachPoint>` payload.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x005E92F0 (FUN_005E92F0, gpg::RVectorType_SAttachPoint::Init)
+     *
+     * What it does:
+     * Initializes `vector<SAttachPoint>` RTTI metadata lanes.
+     */
     void Init() override;
+
+    /**
+     * Address: 0x005EA260 (FUN_005EA260, gpg::RVectorType_SAttachPoint::SerLoad)
+     *
+     * What it does:
+     * Deserializes one `vector<SAttachPoint>` payload.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005EA370 (FUN_005EA370, gpg::RVectorType_SAttachPoint::SerSave)
+     *
+     * What it does:
+     * Serializes one `vector<SAttachPoint>` payload.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -103,6 +221,12 @@ namespace
   using IntVectorType = gpg::RVectorType_int;
   using ReservedTransportBoneVectorType = gpg::RVectorType_SAiReservedTransportBone;
   using AttachPointVectorType = gpg::RVectorType_SAttachPoint;
+
+  struct CachedTypeName
+  {
+    msvc8::string value;
+    bool initialized = false;
+  };
 
   using IntVector = msvc8::vector<int>;
   using ReservedTransportBoneVector = msvc8::vector<moho::SAiReservedTransportBone>;
@@ -186,6 +310,18 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::RType* ResolveEAiTransportEventType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::EAiTransportEvent));
+      if (!cached) {
+        cached = gpg::REF_FindTypeNamed("EAiTransportEvent");
+      }
+    }
+    return cached;
+  }
+
   [[nodiscard]] gpg::RType* ResolveReservedTransportBoneType()
   {
     static gpg::RType* cached = nullptr;
@@ -210,10 +346,52 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] CachedTypeName& CachedBroadcasterEAiTransportEventTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedListenerEAiTransportEventTypeName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedRVectorTypeIntName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedRVectorTypeSAiReservedTransportBoneName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  [[nodiscard]] CachedTypeName& CachedRVectorTypeSAttachPointName()
+  {
+    static CachedTypeName cache{};
+    return cache;
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
+
+  template <class TObject>
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
+
   template <class TVector>
   [[nodiscard]] msvc8::string MakeVectorLexical(const gpg::RType* const ownerType, const gpg::RRef& ref, const TVector* vec)
   {
-    const msvc8::string base = ownerType != nullptr ? ownerType->GetLexical(ref) : msvc8::string("vector");
+    const msvc8::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : msvc8::string("vector");
     const int size = vec ? static_cast<int>(vec->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
@@ -267,19 +445,122 @@ namespace
     AcquireAttachPointVectorType()->~AttachPointVectorType();
     gAttachPointVectorTypeConstructed = false;
   }
+
+  void cleanup_RBroadcasterRType_EAiTransportEvent_GetName()
+  {
+    CachedTypeName& cache = CachedBroadcasterEAiTransportEventTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RListenerRType_EAiTransportEvent_GetName()
+  {
+    CachedTypeName& cache = CachedListenerEAiTransportEventTypeName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RVectorType_int_GetName()
+  {
+    CachedTypeName& cache = CachedRVectorTypeIntName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RVectorType_SAiReservedTransportBone_GetName()
+  {
+    CachedTypeName& cache = CachedRVectorTypeSAiReservedTransportBoneName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
+
+  void cleanup_RVectorType_SAttachPoint_GetName()
+  {
+    CachedTypeName& cache = CachedRVectorTypeSAttachPointName();
+    cache.value = msvc8::string{};
+    cache.initialized = false;
+  }
 } // namespace
 
-const char* gpg::RVectorType_int::GetName() const
+/**
+ * Address: 0x005E8C00 (FUN_005E8C00, Moho::RBroadcasterRType_EAiTransportEvent::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name
+ * `Broadcaster<EAiTransportEvent>` using the registered enum type name.
+ */
+const char* moho::RBroadcasterRType_EAiTransportEvent::GetName() const
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const gpg::RType* const elementType = ResolveIntType();
-    const char* const elementName = elementType ? elementType->GetName() : "int";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "int");
+  CachedTypeName& cache = CachedBroadcasterEAiTransportEventTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    gpg::RType* const eventType = ResolveEAiTransportEventType();
+    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiTransportEvent";
+    cache.value = gpg::STR_Printf("Broadcaster<%s>", eventTypeName ? eventTypeName : "EAiTransportEvent");
+    (void)std::atexit(&cleanup_RBroadcasterRType_EAiTransportEvent_GetName);
   }
-  return sName.c_str();
+  return cache.value.c_str();
 }
 
+/**
+ * Address: 0x005E8CC0 (FUN_005E8CC0, Moho::RListenerRType_EAiTransportEvent::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name
+ * `Listener<EAiTransportEvent>` using the registered enum type name.
+ */
+const char* moho::RListenerRType_EAiTransportEvent::GetName() const
+{
+  CachedTypeName& cache = CachedListenerEAiTransportEventTypeName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    gpg::RType* const eventType = ResolveEAiTransportEventType();
+    const char* const eventTypeName = eventType ? eventType->GetName() : "EAiTransportEvent";
+    cache.value = gpg::STR_Printf("Listener<%s>", eventTypeName ? eventTypeName : "EAiTransportEvent");
+    (void)std::atexit(&cleanup_RListenerRType_EAiTransportEvent_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005ECD00 (FUN_005ECD00, gpg::RVectorType_int::RVectorType_int)
+ *
+ * What it does:
+ * Constructs and preregisters reflection metadata for
+ * `msvc8::vector<int>`.
+ */
+gpg::RVectorType_int::RVectorType_int()
+{
+  gpg::PreRegisterRType(typeid(msvc8::vector<int>), this);
+}
+
+/**
+ * Address: 0x005E8D70 (FUN_005E8D70, gpg::RVectorType_int::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name `vector<int>` using the
+ * currently registered `int` reflection type.
+ */
+const char* gpg::RVectorType_int::GetName() const
+{
+  CachedTypeName& cache = CachedRVectorTypeIntName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    const gpg::RType* const elementType = ResolveIntType();
+    const char* const elementName = elementType ? elementType->GetName() : "int";
+    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "int");
+    (void)std::atexit(&cleanup_RVectorType_int_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005E8E30 (FUN_005E8E30, gpg::RVectorType_int::GetLexical)
+ *
+ * What it does:
+ * Appends `size=<count>` suffix to the base lexical representation for one
+ * `vector<int>` payload.
+ */
 msvc8::string gpg::RVectorType_int::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const IntVector*>(ref.mObj));
@@ -290,10 +571,70 @@ const gpg::RIndexed* gpg::RVectorType_int::IsIndexed() const
   return this;
 }
 
+/**
+ * Address: 0x005E8E10 (FUN_005E8E10, gpg::RVectorType_int::Init)
+ *
+ * What it does:
+ * Initializes vector<int> RTTI metadata lanes including ser callbacks.
+ */
 void gpg::RVectorType_int::Init()
 {
   size_ = sizeof(IntVector);
   version_ = 1;
+  serLoadFunc_ = &RVectorType_int::SerLoad;
+  serSaveFunc_ = &RVectorType_int::SerSave;
+}
+
+/**
+ * Address: 0x005E9F20 (FUN_005E9F20, gpg::RVectorType_int::SerLoad)
+ *
+ * What it does:
+ * Deserializes one integer vector from archive lanes and replaces destination
+ * storage in one assignment.
+ */
+void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+{
+  auto* const storage = PointerFromArchiveInt<IntVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  IntVector loaded{};
+  loaded.reserve(static_cast<std::size_t>(count));
+  for (unsigned int i = 0; i < count; ++i) {
+    int value = 0;
+    archive->ReadInt(&value);
+    loaded.push_back(value);
+  }
+
+  *storage = loaded;
+}
+
+/**
+ * Address: 0x005EA020 (FUN_005EA020, gpg::RVectorType_int::SerSave)
+ *
+ * What it does:
+ * Serializes one integer vector payload element-by-element.
+ */
+void gpg::RVectorType_int::SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+{
+  const auto* const storage = ConstPointerFromArchiveInt<IntVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  const unsigned int count = static_cast<unsigned int>(storage->size());
+  archive->WriteUInt(count);
+  for (unsigned int i = 0; i < count; ++i) {
+    archive->WriteInt((*storage)[static_cast<std::size_t>(i)]);
+  }
 }
 
 gpg::RRef gpg::RVectorType_int::SubscriptIndex(void* const obj, const int ind) const
@@ -328,17 +669,45 @@ void gpg::RVectorType_int::SetCount(void* const obj, const int count) const
   storage->resize(static_cast<std::size_t>(count), 0);
 }
 
-const char* gpg::RVectorType_SAiReservedTransportBone::GetName() const
+/**
+ * Address: 0x005ECD70 (FUN_005ECD70, gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone)
+ *
+ * What it does:
+ * Constructs and preregisters reflection metadata for
+ * `msvc8::vector<SAiReservedTransportBone>`.
+ */
+gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone()
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const gpg::RType* const elementType = ResolveReservedTransportBoneType();
-    const char* const elementName = elementType ? elementType->GetName() : "SAiReservedTransportBone";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SAiReservedTransportBone");
-  }
-  return sName.c_str();
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAiReservedTransportBone>), this);
 }
 
+/**
+ * Address: 0x005E8FE0 (FUN_005E8FE0, gpg::RVectorType_SAiReservedTransportBone::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name for
+ * `vector<SAiReservedTransportBone>`.
+ */
+const char* gpg::RVectorType_SAiReservedTransportBone::GetName() const
+{
+  CachedTypeName& cache = CachedRVectorTypeSAiReservedTransportBoneName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    const gpg::RType* const elementType = ResolveReservedTransportBoneType();
+    const char* const elementName = elementType ? elementType->GetName() : "SAiReservedTransportBone";
+    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SAiReservedTransportBone");
+    (void)std::atexit(&cleanup_RVectorType_SAiReservedTransportBone_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005E90A0 (FUN_005E90A0, gpg::RVectorType_SAiReservedTransportBone::GetLexical)
+ *
+ * What it does:
+ * Appends `size=<count>` suffix to the base lexical representation for one
+ * `vector<SAiReservedTransportBone>` payload.
+ */
 msvc8::string gpg::RVectorType_SAiReservedTransportBone::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const ReservedTransportBoneVector*>(ref.mObj));
@@ -349,10 +718,96 @@ const gpg::RIndexed* gpg::RVectorType_SAiReservedTransportBone::IsIndexed() cons
   return this;
 }
 
+/**
+ * Address: 0x005E9080 (FUN_005E9080, gpg::RVectorType_SAiReservedTransportBone::Init)
+ *
+ * What it does:
+ * Initializes reserved-bone vector RTTI metadata lanes including ser callbacks.
+ */
 void gpg::RVectorType_SAiReservedTransportBone::Init()
 {
   size_ = sizeof(ReservedTransportBoneVector);
   version_ = 1;
+  serLoadFunc_ = &RVectorType_SAiReservedTransportBone::SerLoad;
+  serSaveFunc_ = &RVectorType_SAiReservedTransportBone::SerSave;
+}
+
+/**
+ * Address: 0x005EA070 (FUN_005EA070, gpg::RVectorType_SAiReservedTransportBone::SerLoad)
+ *
+ * What it does:
+ * Deserializes reserved-transport-bone vector payload and replaces destination
+ * storage.
+ */
+void gpg::RVectorType_SAiReservedTransportBone::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const
+)
+{
+  auto* const storage = PointerFromArchiveInt<ReservedTransportBoneVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  ReservedTransportBoneVector loaded{};
+  loaded.reserve(static_cast<std::size_t>(count));
+
+  gpg::RType* const elementType = ResolveReservedTransportBoneType();
+  GPG_ASSERT(elementType != nullptr);
+  if (!elementType) {
+    return;
+  }
+
+  const gpg::RRef elementOwner{};
+  for (unsigned int i = 0; i < count; ++i) {
+    moho::SAiReservedTransportBone entry{};
+    archive->Read(elementType, &entry, elementOwner);
+    loaded.push_back(entry);
+  }
+
+  *storage = loaded;
+}
+
+/**
+ * Address: 0x005EA1E0 (FUN_005EA1E0, gpg::RVectorType_SAiReservedTransportBone::SerSave)
+ *
+ * What it does:
+ * Serializes reserved-transport-bone vector payload element-by-element.
+ */
+void gpg::RVectorType_SAiReservedTransportBone::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  const auto* const storage = ConstPointerFromArchiveInt<ReservedTransportBoneVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  const unsigned int count = static_cast<unsigned int>(storage->size());
+  archive->WriteUInt(count);
+
+  gpg::RType* const elementType = ResolveReservedTransportBoneType();
+  GPG_ASSERT(elementType != nullptr);
+  if (!elementType) {
+    return;
+  }
+
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    archive->Write(elementType, &(*storage)[static_cast<std::size_t>(i)], owner);
+  }
 }
 
 gpg::RRef gpg::RVectorType_SAiReservedTransportBone::SubscriptIndex(void* const obj, const int ind) const
@@ -387,17 +842,44 @@ void gpg::RVectorType_SAiReservedTransportBone::SetCount(void* const obj, const 
   storage->resize(static_cast<std::size_t>(count));
 }
 
-const char* gpg::RVectorType_SAttachPoint::GetName() const
+/**
+ * Address: 0x005ECDE0 (FUN_005ECDE0, gpg::RVectorType_SAttachPoint::RVectorType_SAttachPoint)
+ *
+ * What it does:
+ * Constructs and preregisters reflection metadata for
+ * `msvc8::vector<SAttachPoint>`.
+ */
+gpg::RVectorType_SAttachPoint::RVectorType_SAttachPoint()
 {
-  static msvc8::string sName;
-  if (sName.empty()) {
-    const gpg::RType* const elementType = ResolveAttachPointType();
-    const char* const elementName = elementType ? elementType->GetName() : "SAttachPoint";
-    sName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SAttachPoint");
-  }
-  return sName.c_str();
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAttachPoint>), this);
 }
 
+/**
+ * Address: 0x005E9250 (FUN_005E9250, gpg::RVectorType_SAttachPoint::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the runtime type name for `vector<SAttachPoint>`.
+ */
+const char* gpg::RVectorType_SAttachPoint::GetName() const
+{
+  CachedTypeName& cache = CachedRVectorTypeSAttachPointName();
+  if (!cache.initialized) {
+    cache.initialized = true;
+    const gpg::RType* const elementType = ResolveAttachPointType();
+    const char* const elementName = elementType ? elementType->GetName() : "SAttachPoint";
+    cache.value = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SAttachPoint");
+    (void)std::atexit(&cleanup_RVectorType_SAttachPoint_GetName);
+  }
+  return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005E9310 (FUN_005E9310, gpg::RVectorType_SAttachPoint::GetLexical)
+ *
+ * What it does:
+ * Appends `size=<count>` suffix to the base lexical representation for one
+ * `vector<SAttachPoint>` payload.
+ */
 msvc8::string gpg::RVectorType_SAttachPoint::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const AttachPointVector*>(ref.mObj));
@@ -408,10 +890,90 @@ const gpg::RIndexed* gpg::RVectorType_SAttachPoint::IsIndexed() const
   return this;
 }
 
+/**
+ * Address: 0x005E92F0 (FUN_005E92F0, gpg::RVectorType_SAttachPoint::Init)
+ *
+ * What it does:
+ * Initializes attach-point vector RTTI metadata lanes including ser callbacks.
+ */
 void gpg::RVectorType_SAttachPoint::Init()
 {
   size_ = sizeof(AttachPointVector);
   version_ = 1;
+  serLoadFunc_ = &RVectorType_SAttachPoint::SerLoad;
+  serSaveFunc_ = &RVectorType_SAttachPoint::SerSave;
+}
+
+/**
+ * Address: 0x005EA260 (FUN_005EA260, gpg::RVectorType_SAttachPoint::SerLoad)
+ *
+ * What it does:
+ * Deserializes attach-point vector payload and replaces destination storage.
+ */
+void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+{
+  auto* const storage = PointerFromArchiveInt<AttachPointVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  AttachPointVector loaded{};
+  loaded.reserve(static_cast<std::size_t>(count));
+
+  gpg::RType* const elementType = ResolveAttachPointType();
+  GPG_ASSERT(elementType != nullptr);
+  if (!elementType) {
+    return;
+  }
+
+  const gpg::RRef elementOwner{};
+  for (unsigned int i = 0; i < count; ++i) {
+    moho::SAttachPoint point{};
+    archive->Read(elementType, &point, elementOwner);
+    loaded.push_back(point);
+  }
+
+  *storage = loaded;
+}
+
+/**
+ * Address: 0x005EA370 (FUN_005EA370, gpg::RVectorType_SAttachPoint::SerSave)
+ *
+ * What it does:
+ * Serializes attach-point vector payload element-by-element.
+ */
+void gpg::RVectorType_SAttachPoint::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  const auto* const storage = ConstPointerFromArchiveInt<AttachPointVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  const unsigned int count = static_cast<unsigned int>(storage->size());
+  archive->WriteUInt(count);
+
+  gpg::RType* const elementType = ResolveAttachPointType();
+  GPG_ASSERT(elementType != nullptr);
+  if (!elementType) {
+    return;
+  }
+
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    archive->Write(elementType, &(*storage)[static_cast<std::size_t>(i)], owner);
+  }
 }
 
 gpg::RRef gpg::RVectorType_SAttachPoint::SubscriptIndex(void* const obj, const int ind) const
@@ -514,12 +1076,12 @@ int moho::register_RListenerRType_EAiTransportEvent()
  * Address: 0x00BCEFE0 (FUN_00BCEFE0, register_RVectorType_int)
  *
  * What it does:
- * Registers `msvc8::vector<int>` reflection metadata and installs cleanup.
+ * Constructs/preregisters the `msvc8::vector<int>` reflection type and
+ * installs process-exit cleanup.
  */
 int moho::register_RVectorType_int()
 {
-  auto* const type = AcquireIntVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<int>), type);
+  (void)AcquireIntVectorType();
   return std::atexit(&cleanup_RVectorType_int);
 }
 
@@ -527,13 +1089,12 @@ int moho::register_RVectorType_int()
  * Address: 0x00BCF000 (FUN_00BCF000, register_RVectorType_SAiReservedTransportBone)
  *
  * What it does:
- * Registers `msvc8::vector<SAiReservedTransportBone>` reflection metadata and
- * installs cleanup.
+ * Constructs/preregisters the `msvc8::vector<SAiReservedTransportBone>`
+ * reflection type and installs process-exit cleanup.
  */
 int moho::register_RVectorType_SAiReservedTransportBone()
 {
-  auto* const type = AcquireReservedTransportBoneVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAiReservedTransportBone>), type);
+  (void)AcquireReservedTransportBoneVectorType();
   return std::atexit(&cleanup_RVectorType_SAiReservedTransportBone);
 }
 
@@ -541,13 +1102,12 @@ int moho::register_RVectorType_SAiReservedTransportBone()
  * Address: 0x00BCF020 (FUN_00BCF020, register_RVectorType_SAttachPoint)
  *
  * What it does:
- * Registers `msvc8::vector<SAttachPoint>` reflection metadata and installs
- * cleanup.
+ * Constructs/preregisters the `msvc8::vector<SAttachPoint>` reflection type
+ * and installs process-exit cleanup.
  */
 int moho::register_RVectorType_SAttachPoint()
 {
-  auto* const type = AcquireAttachPointVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAttachPoint>), type);
+  (void)AcquireAttachPointVectorType();
   return std::atexit(&cleanup_RVectorType_SAttachPoint);
 }
 

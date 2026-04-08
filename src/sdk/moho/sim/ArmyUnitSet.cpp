@@ -106,13 +106,16 @@ namespace moho
     return it != end && *it == needle;
   }
 
+  /**
+   * Address: 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Unit::Add)
+   *
+   * What it does:
+   * Binary-searches one insertion point by entity id, inserts one unit/entity
+   * pointer lane when missing, and returns true only when insertion happened.
+   */
   bool SEntitySetTemplateUnit::AddUnit(Unit* const unit)
   {
-    if (!unit) {
-      return false;
-    }
-
-    Entity* const value = static_cast<Entity*>(unit);
+    Entity* const value = unit ? static_cast<Entity*>(unit) : nullptr;
     const std::uint32_t key = EntitySetSortKey(value);
     Entity** const begin = mVec.begin();
     Entity** const end = mVec.end();
@@ -127,6 +130,13 @@ namespace moho
     return true;
   }
 
+  /**
+   * Address: 0x005E8960 (FUN_005E8960, Moho::EntitySetTemplate_Unit::Remove)
+   *
+   * What it does:
+   * Binary-searches one candidate slot by `Entity::id_`, verifies exact unit
+   * pointer identity, and erases one slot from sorted unit storage.
+   */
   bool SEntitySetTemplateUnit::RemoveUnit(Unit* const unit)
   {
     if (!unit) {
@@ -164,7 +174,9 @@ namespace moho
 
   void SEntitySetTemplateUnit::AddUnits(const EntitySetTemplate<Unit>& source)
   {
-    AddRange(source.begin(), source.end());
+    for (Unit* const* it = source.begin(); it != source.end(); ++it) {
+      (void)AddUnit(*it);
+    }
   }
 
   void SEntitySetTemplateUnit::CopyTo(EntitySetTemplate<Unit>& out) const
@@ -172,7 +184,7 @@ namespace moho
     for (Entity* const* it = mVec.begin(); it != mVec.end(); ++it) {
       Unit* const unit = UnitFromEntry(*it);
       if (unit) {
-        (void)out.Add(static_cast<Entity*>(unit));
+        (void)out.Add(unit);
       }
     }
   }
@@ -194,7 +206,7 @@ namespace moho
     for (Entity* const* it = mVec.begin(); it != mVec.end(); ++it) {
       Unit* const unit = UnitFromEntry(*it);
       if (unit && !unit->IsDead()) {
-        (void)out.Add(static_cast<Entity*>(unit));
+        (void)out.Add(unit);
       }
     }
   }

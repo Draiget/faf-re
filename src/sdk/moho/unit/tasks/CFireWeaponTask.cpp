@@ -139,22 +139,13 @@ namespace
     return weapon != nullptr && weapon->mTarget.targetType != EAiTargetType::AITARGET_None;
   }
 
-  [[nodiscard]] bool WeaponCanAttackTarget(const UnitWeapon* const weapon) noexcept
+  [[nodiscard]] bool WeaponCanAttackTarget(UnitWeapon* const weapon) noexcept
   {
-    if (!weapon || !WeaponHasTarget(weapon)) {
+    if (weapon == nullptr || !WeaponHasTarget(weapon)) {
       return false;
     }
 
-    const RUnitBlueprintWeapon* const blueprint = weapon->mWeaponBlueprint;
-    if (blueprint && blueprint->IgnoreIfDisabled && weapon->mEnabled == 0u) {
-      return false;
-    }
-
-    if (weapon->mTarget.targetType == EAiTargetType::AITARGET_Ground) {
-      return blueprint == nullptr || blueprint->CannotAttackGround == 0u;
-    }
-
-    return true;
+    return UnitWeapon::CanAttackTarget(&weapon->mTarget, weapon);
   }
 
   [[nodiscard]] bool WeaponCheckSilo(const UnitWeapon* const weapon) noexcept

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <new>
 #include <stdexcept>
 #include <typeinfo>
@@ -11,8 +12,12 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/animation/CAniActor.h"
 #include "moho/entity/Entity.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
@@ -20,6 +25,17 @@
 
 namespace
 {
+  constexpr const char* kCollisionManipulatorLuaClassName = "CCollisionManipulator";
+  constexpr const char* kCollisionManipulatorCreateCollisionDetectorHelpText =
+    "CreateCollisionDetector(unit) -- create a collision detection manipulator";
+  constexpr const char* kCollisionManipulatorEnableTerrainCheckHelpText =
+    "Make manipulator check for terrain height intersection";
+  constexpr const char* kCollisionManipulatorEnableHelpText =
+    "Fixme: this should just use base manipulator enable/disable";
+  constexpr const char* kCollisionManipulatorDisableHelpText =
+    "Fixme: this should just use base manipulator enable/disable";
+  constexpr const char* kCollisionManipulatorWatchBoneHelpText =
+    "CollisionDetector:WatchBone(bone) -- add the given bone to those watched by this manipulator";
   constexpr std::uint32_t kWatchBoneActiveMask = 0x8000u;
   constexpr std::uint32_t kAnimCollisionNotifiedMask = 0x0001u;
   constexpr std::uint32_t kTerrainCollisionNotifiedMask = 0x0002u;
@@ -43,6 +59,32 @@ namespace
     gpg::SerHelperBase* const self = HelperSelfNode(helper);
     helper.mNext = self;
     helper.mPrev = self;
+  }
+
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
+  {
+    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
   }
 
   [[nodiscard]] moho::CCollisionManipulatorTypeInfo& AcquireCCollisionManipulatorTypeInfo()
@@ -362,11 +404,254 @@ namespace moho
   }
 
   /**
+   * Address: 0x00637FA0 (FUN_00637FA0, cfunc_CreateCollisionDetector)
+   *
+   * What it does:
+   * Reads one unit argument, allocates a collision manipulator, and pushes its
+   * Lua userdata back to the stack.
+   */
+  int cfunc_CreateCollisionDetector(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected %d args, but got %d",
+        kCollisionManipulatorCreateCollisionDetectorHelpText,
+        1,
+        argumentCount
+      );
+    }
+
+    LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    Unit* const ownerUnit = SCR_FromLua_Unit(unitObject);
+    CCollisionManipulator* const manipulator = CCollisionManipulator::CreateCollisionDetector(ownerUnit);
+    if (manipulator != nullptr) {
+      manipulator->mLuaObj.PushStack(state);
+      return 1;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x00637FC0 (FUN_00637FC0, func_CreateCollisionDetector_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateCollisionDetector(unit)` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateCollisionDetector_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      "CreateCollisionDetector",
+      &moho::cfunc_CreateCollisionDetector,
+      nullptr,
+      "<global>",
+      kCollisionManipulatorCreateCollisionDetectorHelpText
+    );
+    return &binder;
+  }
+
+  /**
    * Address: 0x00638190 (FUN_00638190, Lua wrapper path)
    */
   void CCollisionManipulator::SetTerrainCollisionCheckEnabled(const bool enabled) noexcept
   {
     mTerrainCollisionCheckEnabled = enabled;
+  }
+
+  /**
+   * Address: 0x00638110 (FUN_00638110, cfunc_CCollisionManipulatorEnableTerrainCheck)
+   *
+   * What it does:
+   * Reads `(manipulator, enabled)` and toggles terrain collision checks.
+   */
+  int cfunc_CCollisionManipulatorEnableTerrainCheck(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected %d args, but got %d",
+        kCollisionManipulatorEnableTerrainCheckHelpText,
+        2,
+        argumentCount
+      );
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
+
+    LuaPlus::LuaStackObject enabledArg(state, 2);
+    manipulator->SetTerrainCollisionCheckEnabled(enabledArg.GetBoolean());
+    return 0;
+  }
+
+  /**
+   * Address: 0x00638130 (FUN_00638130, func_CCollisionManipulatorEnableTerrainCheck_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:EnableTerrainCheck(bool)` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorEnableTerrainCheck_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      "EnableTerrainCheck",
+      &moho::cfunc_CCollisionManipulatorEnableTerrainCheck,
+      &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
+      kCollisionManipulatorLuaClassName,
+      kCollisionManipulatorEnableTerrainCheckHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00638250 (FUN_00638250, cfunc_CCollisionManipulatorEnable)
+   *
+   * What it does:
+   * Reads one manipulator argument and enables collision callback checks.
+   */
+  int cfunc_CCollisionManipulatorEnable(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCollisionManipulatorEnableHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
+    manipulator->EnableCollisionCallbacks();
+    return 0;
+  }
+
+  /**
+   * Address: 0x00638270 (FUN_00638270, func_CCollisionManipulatorEnable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:Enable()` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorEnable_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      "Enable",
+      &moho::cfunc_CCollisionManipulatorEnable,
+      &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
+      kCollisionManipulatorLuaClassName,
+      kCollisionManipulatorEnableHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x00638380 (FUN_00638380, cfunc_CCollisionManipulatorDisable)
+   *
+   * What it does:
+   * Reads one manipulator argument and disables collision callback checks.
+   */
+  int cfunc_CCollisionManipulatorDisable(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCollisionManipulatorDisableHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
+    manipulator->DisableCollisionCallbacks();
+    return 0;
+  }
+
+  /**
+   * Address: 0x006383A0 (FUN_006383A0, func_CCollisionManipulatorDisable_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:Disable()` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorDisable_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      "Disable",
+      &moho::cfunc_CCollisionManipulatorDisable,
+      &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
+      kCollisionManipulatorLuaClassName,
+      kCollisionManipulatorDisableHelpText
+    );
+    return &binder;
+  }
+
+  /**
+   * Address: 0x006384C0 (FUN_006384C0, cfunc_CCollisionManipulatorWatchBone)
+   *
+   * What it does:
+   * Reads `(manipulator, bone)` and adds the resolved bone to the watch list.
+   */
+  int cfunc_CCollisionManipulatorWatchBone(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCollisionManipulatorWatchBoneHelpText, 2, argumentCount);
+    }
+
+    LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
+
+    LuaPlus::LuaStackObject boneArg(state, 2);
+    CAniActor* const aniActor = static_cast<CAniActor*>(manipulator->mOwnerActor);
+    const int boneIndex = aniActor ? aniActor->ResolveBoneIndex(boneArg) : -1;
+    if (boneIndex < 0) {
+      LuaPlus::LuaState::Error(boneArg.m_state, "A valid bone is required");
+    }
+
+    (void)manipulator->WatchBone(boneIndex);
+    return 0;
+  }
+
+  /**
+   * Address: 0x006384E0 (FUN_006384E0, func_CCollisionManipulatorWatchBone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CCollisionManipulator:WatchBone(bone)` Lua binder.
+   */
+  CScrLuaInitForm* func_CCollisionManipulatorWatchBone_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      SimLuaInitSet(),
+      "WatchBone",
+      &moho::cfunc_CCollisionManipulatorWatchBone,
+      &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
+      kCollisionManipulatorLuaClassName,
+      kCollisionManipulatorWatchBoneHelpText
+    );
+    return &binder;
   }
 
   /**
@@ -465,6 +750,18 @@ namespace moho
     }
 
     return raisedCallback;
+  }
+
+  /**
+   * What it does:
+   * Stores one factory-table slot index used by CScrLuaObjectFactory::Get.
+   */
+  CScrLuaMetatableFactory<CCollisionManipulator>& CScrLuaMetatableFactory<CCollisionManipulator>::Instance()
+  {
+    static CScrLuaMetatableFactory<CCollisionManipulator> instance(
+      CScrLuaObjectFactory::AllocateFactoryObjectIndex()
+    );
+    return instance;
   }
 
   /**
@@ -598,6 +895,27 @@ namespace moho
     return std::atexit(&cleanup_CCollisionManipulatorTypeInfo);
   }
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x00638D50 (FUN_00638D50, gpg::RRef_CCollisionManipulator)
+   *
+   * What it does:
+   * Builds one typed reflection reference for
+   * `moho::CCollisionManipulator*`, preserving dynamic-derived ownership and
+   * base-offset adjustment.
+   */
+  gpg::RRef* RRef_CCollisionManipulator(gpg::RRef* const outRef, moho::CCollisionManipulator* const value)
+  {
+    if (!outRef) {
+      return nullptr;
+    }
+
+    *outRef = MakeTypedRef(value, CachedCCollisionManipulatorType());
+    return outRef;
+  }
+} // namespace gpg
 
 namespace
 {

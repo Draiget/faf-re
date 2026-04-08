@@ -94,16 +94,9 @@ namespace
 
   [[nodiscard]] Wm3::Vector3f EstimateAirAbortStopPosition(const Unit& unit) noexcept
   {
-    const Wm3::Vector3f& position = unit.GetPosition();
-    const Wm3::Vector3f velocity = unit.GetVelocity();
-
-    // FUN_0062CD40 predicts a short near-future stop point; without full
-    // SPhysBody access here we keep the same horizon and preserve Y.
-    return {
-      position.x + (velocity.x * 10.0f),
-      position.y,
-      position.z + (velocity.z * 10.0f),
-    };
+    Wm3::Vector3f out = Wm3::Vector3f::Zero();
+    unit.PredictAheadBomb(&out, 1.0f);
+    return out;
   }
 
   [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()

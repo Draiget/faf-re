@@ -57,6 +57,14 @@ namespace moho
      * Registers mesh-blueprint field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0051A330 (FUN_0051A330, gpg::RType::AddField_vector_RMeshBlueprintLOD_0x60LODs)
+     *
+     * What it does:
+     * Appends the `LODs` reflected field entry (`+0x60`).
+     */
+    static gpg::RField* AddFieldLods(gpg::RType* typeInfo);
   };
 
   /**

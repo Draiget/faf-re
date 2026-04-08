@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <string>
 
 #include "gpg/core/containers/String.h"
@@ -9,10 +10,34 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaTableIterator.h"
+#include "moho/misc/FileWaitHandleSet.h"
 
 namespace
 {
   constexpr const char* kFactoryObjectsGlobalName = "__factory_objects";
+  constexpr const char* kActiveModsGlobalName = "__active_mods";
+  constexpr const char* kLocationFieldName = "location";
+  constexpr const char* kHookDirFieldName = "hookdir";
+  constexpr const char* kDefaultHookDirPath = "/hook";
+  constexpr const char kConcatSyntheticNewline[] = "\n";
+  std::int32_t gRecoveredCScrLuaMetatableFactoryCScriptObjectIndex = 0;
+  msvc8::vector<msvc8::string> gScriptHookDirectories{};
+
+  struct LuaFileLoaderDat final
+  {
+    gpg::MemBuffer<const char> buf{};
+    bool done{false};
+  };
+  static_assert(sizeof(LuaFileLoaderDat) == 0x14, "LuaFileLoaderDat size must be 0x14");
+
+  struct LuaConcatLoadData final
+  {
+    gpg::MemBuffer<const char> currentChunk{};
+    const msvc8::vector<msvc8::string>* files{nullptr};
+    std::uint32_t nextFileIndex{0};
+    bool pendingTrailingNewline{false};
+  };
+  static_assert(sizeof(LuaConcatLoadData) == 0x1C, "LuaConcatLoadData size must be 0x1C");
 
   [[nodiscard]] std::uint32_t AsAddress32(const void* const value) noexcept
   {
@@ -77,6 +102,169 @@ namespace
     return nilObject;
   }
 
+  [[nodiscard]] bool ResolveMountedScriptPath(const char* const sourcePath, msvc8::string& outPath)
+  {
+    moho::FILE_EnsureWaitHandleSet();
+    moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+    if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
+      outPath.assign_owned(sourcePath != nullptr ? sourcePath : "");
+      return !outPath.empty();
+    }
+
+    waitHandleSet->mHandle->FindFile(&outPath, sourcePath != nullptr ? sourcePath : "", nullptr);
+    return !outPath.empty();
+  }
+
+  void TryAppendHookScriptPath(
+    msvc8::vector<msvc8::string>& outFiles,
+    const char* const scriptPath,
+    const msvc8::string& candidatePath
+  )
+  {
+    msvc8::string resolvedPath{};
+    if (!ResolveMountedScriptPath(candidatePath.c_str(), resolvedPath) || resolvedPath.empty()) {
+      return;
+    }
+
+    gpg::Logf("Hooked %s with %s", scriptPath != nullptr ? scriptPath : "", candidatePath.c_str());
+    outFiles.push_back(resolvedPath);
+  }
+
+  [[nodiscard]] msvc8::string BuildHookCandidatePath(
+    const char* const rootPath,
+    const char* const hookPath,
+    const char* const scriptPath
+  )
+  {
+    msvc8::string candidate(rootPath != nullptr ? rootPath : "");
+    candidate.append(hookPath != nullptr ? hookPath : "");
+    candidate.append(scriptPath != nullptr ? scriptPath : "");
+    return candidate;
+  }
+
+  void CollectActiveModHookScripts(
+    LuaPlus::LuaState* const state,
+    const char* const scriptPath,
+    msvc8::vector<msvc8::string>& outFiles
+  )
+  {
+    const LuaPlus::LuaObject activeMods = state->GetGlobal(kActiveModsGlobalName);
+    if (!activeMods) {
+      return;
+    }
+
+    for (int modIndex = 1;; ++modIndex) {
+      const LuaPlus::LuaObject modObject = activeMods[modIndex];
+      if (!modObject) {
+        break;
+      }
+
+      const LuaPlus::LuaObject locationObject = modObject[kLocationFieldName];
+      if (!locationObject) {
+        continue;
+      }
+
+      const char* const modLocation = locationObject.ToString();
+      if (modLocation == nullptr || *modLocation == '\0') {
+        continue;
+      }
+
+      const LuaPlus::LuaObject hookDirObject = modObject[kHookDirFieldName];
+      const char* hookDir = hookDirObject ? hookDirObject.ToString() : kDefaultHookDirPath;
+      if (hookDir == nullptr || *hookDir == '\0') {
+        hookDir = kDefaultHookDirPath;
+      }
+
+      const msvc8::string candidatePath = BuildHookCandidatePath(modLocation, hookDir, scriptPath);
+      TryAppendHookScriptPath(outFiles, scriptPath, candidatePath);
+    }
+  }
+
+  /**
+   * Address: 0x004CDCF0 (FUN_004CDCF0, func_LuaFileLoader)
+   *
+   * What it does:
+   * Returns one mapped-file chunk exactly once for `lua_load`, then reports EOF.
+   */
+  [[maybe_unused]] const char* func_LuaFileLoader(
+    lua_State* const state, void* const userData, std::size_t* const outSize
+  )
+  {
+    (void)state;
+    auto* const loaderData = static_cast<LuaFileLoaderDat*>(userData);
+
+    const char* const begin = loaderData->buf.mBegin;
+    if (begin == nullptr) {
+      return nullptr;
+    }
+
+    const std::size_t byteCount = static_cast<std::size_t>(loaderData->buf.mEnd - begin);
+    if (byteCount == 0u || loaderData->done) {
+      return nullptr;
+    }
+
+    *outSize = byteCount;
+    loaderData->done = true;
+    return loaderData->buf.mBegin;
+  }
+
+  /**
+   * Address: 0x004CDD40 (FUN_004CDD40, sub_4CDD40)
+   *
+   * What it does:
+   * Streams concatenated script data to `lua_load`, mapping each file in order
+   * and injecting one synthetic newline between chunks when needed.
+   */
+  const char* ReadLoadConcatChunk(LuaConcatLoadData* const data, std::size_t* const outSize)
+  {
+    if (data->pendingTrailingNewline) {
+      data->pendingTrailingNewline = false;
+      *outSize = 1u;
+      return kConcatSyntheticNewline;
+    }
+
+    while (true) {
+      const msvc8::vector<msvc8::string>* const files = data->files;
+      if (files == nullptr || data->nextFileIndex >= files->size()) {
+        return nullptr;
+      }
+
+      const msvc8::string& filePath = (*files)[data->nextFileIndex];
+      ++data->nextFileIndex;
+
+      data->currentChunk = moho::DISK_MemoryMapFile(filePath.c_str());
+      if (data->currentChunk.mBegin == nullptr) {
+        gpg::Warnf("Can't open lua file \"%s\"", filePath.c_str());
+        continue;
+      }
+
+      if (data->currentChunk.mEnd == data->currentChunk.mBegin) {
+        continue;
+      }
+
+      data->pendingTrailingNewline = data->currentChunk.mEnd[-1] != '\n';
+      *outSize = static_cast<std::size_t>(data->currentChunk.mEnd - data->currentChunk.mBegin);
+      return data->currentChunk.mBegin;
+    }
+  }
+
+  /**
+   * Address: 0x004CDF40 (FUN_004CDF40, func_LoadConcat)
+   *
+   * What it does:
+   * Lua chunk-reader shim that forwards concat-loader state into
+   * `ReadLoadConcatChunk`.
+   */
+  const char* func_LoadConcat(lua_State* const state, void* const userData, std::size_t* const outSize)
+  {
+    (void)state;
+    if (userData == nullptr) {
+      return nullptr;
+    }
+
+    return ReadLoadConcatChunk(static_cast<LuaConcatLoadData*>(userData), outSize);
+  }
+
   /**
    * Address: 0x004CEEB0 (FUN_004CEEB0, func_ParseNumList)
    *
@@ -133,6 +321,21 @@ namespace moho
 {
   int32_t CScrLuaObjectFactory::sNumIds = 0;
   CScrLuaMetatableFactory<CScriptObject*> CScrLuaMetatableFactory<CScriptObject*>::sInstance{};
+
+  /**
+   * Address: 0x00BC60D0 (FUN_00BC60D0)
+   *
+   * What it does:
+   * Allocates the next Lua metatable-factory object index and stores it in the
+   * recovered `CScrLuaMetatableFactory<CScriptObject*>` startup index lane.
+   */
+  int register_CScrLuaMetatableFactory_CScriptObject_Index()
+  {
+    const int index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
+    CScrLuaMetatableFactory<CScriptObject*>::Instance().SetFactoryObjectIndexForRecovery(index);
+    gRecoveredCScrLuaMetatableFactoryCScriptObjectIndex = index;
+    return index;
+  }
 
   /**
    * Address: 0x004D22D0 (FUN_004D22D0, ?SCR_CreateSimpleMetatable@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@@Z)
@@ -381,6 +584,21 @@ namespace moho
   }
 
   /**
+   * Address: 0x004CF4A0 (FUN_004CF4A0, ?SCR_RObjectToLua@Moho@@...)
+   *
+   * What it does:
+   * Builds one Lua object initialized as `nil` and merges one reflected source
+   * reference into it.
+   */
+  LuaPlus::LuaObject SCR_RObjectToLua(const gpg::RRef& source, LuaPlus::LuaState* const state)
+  {
+    LuaPlus::LuaObject out{};
+    out.AssignNil(state);
+    SCR_RObjectToLuaMerge(source, out);
+    return out;
+  }
+
+  /**
    * Address: 0x004D2550 (FUN_004D2550, ?SCR_GetEnum@Moho@@YAXPAVLuaState@LuaPlus@@VStrArg@gpg@@AAVRRef@5@@Z)
    *
    * What it does:
@@ -444,6 +662,140 @@ namespace moho
 
     lua_settop(rawState, savedTop);
     return true;
+  }
+
+  /**
+   * Address: 0x004CEA20 (FUN_004CEA20, ?SCR_LuaDoScript@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
+   *
+   * What it does:
+   * Executes one script path through `func_LuaDoScript`, restores the Lua
+   * stack top on both success/failure paths, and reports caught exceptions.
+   */
+  bool SCR_LuaDoScript(
+    LuaPlus::LuaState* const state,
+    const gpg::StrArg scriptPath,
+    LuaPlus::LuaObject* const outEnvironment
+  )
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return false;
+    }
+
+    const char* const filePath = scriptPath != nullptr ? scriptPath : "";
+    lua_State* const rawState = state->m_state;
+    const int savedTop = lua_gettop(rawState);
+
+    try {
+      func_LuaDoScript(state, filePath, outEnvironment);
+    } catch (const std::exception& exception) {
+      gpg::Warnf("Error in file %s : %s", filePath, exception.what() != nullptr ? exception.what() : "");
+      lua_settop(rawState, savedTop);
+      return false;
+    } catch (...) {
+      gpg::Warnf("Error in file %s : %s", filePath, "<unknown>");
+      lua_settop(rawState, savedTop);
+      return false;
+    }
+
+    lua_settop(rawState, savedTop);
+    return true;
+  }
+
+  /**
+   * Address: 0x004CECD0 (FUN_004CECD0, Moho::SCR_LuaDoFileConcat)
+   *
+   * What it does:
+   * Concatenates mapped script files, compiles the merged chunk, optionally
+   * applies one environment table, then executes the loaded chunk.
+   */
+  void SCR_LuaDoFileConcat(
+    LuaPlus::LuaState* const state,
+    LuaPlus::LuaObject* const outEnvironment,
+    msvc8::vector<msvc8::string> files
+  )
+  {
+    if (files.empty()) {
+      gpg::Warnf("SCR_LuaDoFileConcat: No files specified");
+      return;
+    }
+
+    LuaConcatLoadData loadData{};
+    loadData.files = &files;
+    loadData.nextFileIndex = 0;
+    loadData.pendingTrailingNewline = false;
+
+    const msvc8::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
+    const int loadStatus = lua_load(state->m_state, func_LoadConcat, &loadData, chunkName.c_str());
+    if (loadStatus != 0) {
+      LuaPlus::LuaStackObject errorObject{};
+      errorObject.m_state = state;
+      errorObject.m_stackIndex = -1;
+
+      const char* const errorText = lua_tostring(state->m_state, -1);
+      if (errorText == nullptr) {
+        LuaPlus::LuaStackObject::TypeError(&errorObject, "string");
+      }
+
+      gpg::Warnf(
+        "SCR_LuaDoFileConcat: Loading \"%s\" failed: %s",
+        files.front().c_str(),
+        errorText
+      );
+      return;
+    }
+
+    if (outEnvironment != nullptr) {
+      outEnvironment->PushStack(state);
+      lua_setfenv(state->m_state, -2);
+    }
+
+    lua_call(state->m_state, 0, 0);
+  }
+
+  /**
+   * Address: 0x004CE2C0 (FUN_004CE2C0, func_LuaDoScript)
+   *
+   * What it does:
+   * Resolves a base script path, appends legacy hook directories and active-mod
+   * hook overlays, then executes the concatenated file chain.
+   */
+  void func_LuaDoScript(
+    LuaPlus::LuaState* const state,
+    const char* const scriptPath,
+    LuaPlus::LuaObject* const outEnvironment
+  )
+  {
+    if (state == nullptr || scriptPath == nullptr || *scriptPath == '\0') {
+      return;
+    }
+
+    msvc8::string resolvedPath{};
+    if (!ResolveMountedScriptPath(scriptPath, resolvedPath) || resolvedPath.empty()) {
+      const msvc8::string errorText = gpg::STR_Printf("Unable to find file %s", scriptPath);
+      LuaPlus::LuaState::Error(state, "%s", errorText.c_str());
+    }
+
+    msvc8::vector<msvc8::string> files{};
+    files.push_back(resolvedPath);
+
+    for (const msvc8::string& hookDirectory : gScriptHookDirectories) {
+      const msvc8::string candidatePath = BuildHookCandidatePath(hookDirectory.c_str(), "", scriptPath);
+      TryAppendHookScriptPath(files, scriptPath, candidatePath);
+    }
+
+    CollectActiveModHookScripts(state, scriptPath, files);
+    SCR_LuaDoFileConcat(state, outEnvironment, files);
+  }
+
+  /**
+   * Address: 0x004CDF60 (FUN_004CDF60, Moho::SCR_AddHookDirectory)
+   *
+   * What it does:
+   * Registers one hook directory prefix used during `doscript` hook lookup.
+   */
+  void SCR_AddHookDirectory(const char* const hookDirectory)
+  {
+    gScriptHookDirectories.push_back(msvc8::string(hookDirectory != nullptr ? hookDirectory : ""));
   }
 
   /**

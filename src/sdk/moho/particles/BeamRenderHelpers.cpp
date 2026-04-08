@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -10,6 +11,7 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -22,12 +24,24 @@
 #include "moho/particles/SWorldBeam.h"
 #include "moho/resource/CParticleTexture.h"
 
+namespace moho
+{
+  extern bool ren_Beams;
+}
+
 namespace
 {
+  moho::TConVar<bool> gTConVar_ren_Beams("ren_Beams", "", &moho::ren_Beams);
+
   constexpr const char* kParticleRendererSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\ParticleRenderer.cpp";
   constexpr const char* kUnreachableAssertText = "Reached the supposably unreachable.";
   constexpr int kParticleSelectTechniqueAssertLine = 1359;
   constexpr int kParticleSelectTechniqueWithDragAssertLine = 1026;
+
+  void CleanupTConVar_ren_Beams() noexcept
+  {
+    moho::TeardownConCommandRegistration(gTConVar_ren_Beams);
+  }
 
   template <typename TType>
   [[nodiscard]] bool IsSharedHandleLessForBucket(
@@ -2062,7 +2076,7 @@ namespace
 
 namespace moho
 {
-  extern bool ren_Beams;
+  bool ren_Beams = true;
 
   bool BeamTextureBucketKeyLess::operator()(
     const BeamTextureBucketKeyRuntime& lhs, const BeamTextureBucketKeyRuntime& rhs
@@ -2076,6 +2090,18 @@ namespace moho
       return true;
     }
     return IsSharedHandleLessForBucket(lhs.texture1, rhs.texture1);
+  }
+
+  /**
+   * Address: 0x00BC5530 (FUN_00BC5530, register_TConVar_ren_Beams)
+   *
+   * What it does:
+   * Registers the beam-render enable convar and schedules process-exit teardown.
+   */
+  void register_TConVar_ren_Beams()
+  {
+    RegisterConCommand(gTConVar_ren_Beams);
+    (void)std::atexit(&CleanupTConVar_ren_Beams);
   }
 
   /**
@@ -2814,3 +2840,16 @@ namespace moho
     key.texture0.reset();
   }
 } // namespace moho
+
+namespace
+{
+  struct BeamRenderHelpersStartupBootstrap
+  {
+    BeamRenderHelpersStartupBootstrap()
+    {
+      moho::register_TConVar_ren_Beams();
+    }
+  };
+
+  [[maybe_unused]] BeamRenderHelpersStartupBootstrap gBeamRenderHelpersStartupBootstrap;
+} // namespace

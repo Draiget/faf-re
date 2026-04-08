@@ -7,6 +7,8 @@
 
 namespace moho
 {
+  class ID3DVertexSheet;
+
   class CRenFrame
   {
   public:
@@ -46,7 +48,7 @@ namespace moho
 
   public:
     msvc8::string mName;                   // +0x00
-    void* mVertexSheet = nullptr;          // +0x1C
+    ID3DVertexSheet* mVertexSheet = nullptr; // +0x1C
     float mWidth = 0.0f;                   // +0x20
     float mHeight = 0.0f;                  // +0x24
     boost::shared_ptr<void> mFrameTexture1; // +0x28

@@ -7,8 +7,10 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 
 #include "moho/entity/Entity.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/path/SNamedFootprint.h"
 #include "moho/resource/RResId.h"
 #include "moho/sim/CRandomStream.h"
@@ -17,6 +19,8 @@
 
 namespace moho
 {
+  gpg::RType* RUnitBlueprint::sPointerType = nullptr;
+
   namespace
   {
     constexpr std::uint8_t kGroundOccupancyMask = 0x0F;
@@ -81,6 +85,52 @@ namespace moho
       destination.assign_owned(normalized);
     }
   } // namespace
+
+  /**
+   * Address: 0x0051EE10 (FUN_0051EE10)
+   * Mangled: ??0RUnitBlueprintGeneral@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Initializes capability bitmasks, upgrade-id defaults, and command-priority
+   * lanes for general unit-blueprint metadata.
+   */
+  RUnitBlueprintGeneral::RUnitBlueprintGeneral()
+    : CommandCaps(RULEUCC_None),
+      ToggleCaps(static_cast<ERuleBPUnitToggleCaps>(0)),
+      QuickSelectPriority(0),
+      CapCost(1.0f),
+      SelectionPriority(1)
+  {
+    gpg::STR_InitFilename(&UpgradesTo.name, "");
+    gpg::STR_InitFilename(&UpgradesFrom.name, "none");
+    gpg::STR_InitFilename(&UpgradesFromBase.name, "none");
+    gpg::STR_InitFilename(&SeedUnit.name, "");
+  }
+
+  /**
+   * Address: 0x0051F7D0 (FUN_0051F7D0, ??0RUnitBlueprintAI@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes AI blueprint defaults for guard behavior, beacon metadata,
+   * and refueling/repair tuning lanes.
+   */
+  RUnitBlueprintAI::RUnitBlueprintAI()
+    : GuardScanRadius(25.0f)
+    , GuardReturnRadius(50.0f)
+    , StagingPlatformScanRadius(300.0f)
+    , ShowAssistRangeOnSelect(0)
+    , GuardFormationName("GuardFormation")
+    , NeedUnpack(0)
+    , InitialAutoMode(0)
+    , BeaconName()
+    , TargetBones()
+    , RefuelingMultiplier(1.0f)
+    , RefuelingRepairAmount(20.0f)
+    , RepairConsumeEnergy(2.0f)
+    , RepairConsumeMass(0.5f)
+    , AutoSurfaceToAttack(1)
+    , AttackAngle(0.0f)
+  {}
 
   /**
    * Address: 0x0051F260 (FUN_0051F260)
@@ -211,6 +261,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x005A1330 (FUN_005A1330, Moho::RUnitBlueprint::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches the reflection descriptor for
+   * `RUnitBlueprint*`.
+   */
+  gpg::RType* RUnitBlueprint::GetPointerType()
+  {
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(RUnitBlueprint*));
+      sPointerType = cached;
+    }
+    return cached;
+  }
+
+  /**
    * Address: 0x0051E460 (FUN_0051E460)
    * Mangled: ?IsMobile@RUnitBlueprint@Moho@@UBE_NXZ
    *
@@ -233,6 +300,55 @@ namespace moho
   {
     return this;
   }
+
+  /**
+   * Address: 0x0051EC50 (FUN_0051EC50)
+   * Mangled: ?GetSkirtRect@RUnitBlueprint@Moho@@QBE?AV?$Rect2@M@gpg@@ABUSCoordsVec2@2@@Z
+   *
+   * What it does:
+   * Builds world-space XZ skirt occupancy bounds around `position`, using
+   * explicit skirt offsets/sizes when present and falling back to footprint
+   * extents otherwise.
+   */
+  gpg::Rect2f RUnitBlueprint::GetSkirtRect(const SCoordsVec2& position) const
+  {
+    const std::int16_t xLower = static_cast<std::int16_t>(
+      static_cast<std::int32_t>(position.x - (static_cast<float>(mFootprint.mSizeX) * 0.5f))
+    );
+    const std::int16_t zLower = static_cast<std::int16_t>(
+      static_cast<std::int32_t>(position.z - (static_cast<float>(mFootprint.mSizeZ) * 0.5f))
+    );
+
+    gpg::Rect2f skirtRect{};
+
+    const float skirtSizeX = Physics.SkirtSizeX;
+    if (skirtSizeX == 0.0f) {
+      skirtRect.x0 = static_cast<float>(xLower);
+      skirtRect.x1 = skirtRect.x0 + static_cast<float>(mFootprint.mSizeX);
+    } else {
+      skirtRect.x0 = Physics.SkirtOffsetX + static_cast<float>(xLower);
+      skirtRect.x1 = skirtRect.x0 + skirtSizeX;
+    }
+
+    const float skirtSizeZ = Physics.SkirtSizeZ;
+    if (skirtSizeZ == 0.0f) {
+      skirtRect.z0 = static_cast<float>(zLower);
+      skirtRect.z1 = skirtRect.z0 + static_cast<float>(mFootprint.mSizeZ);
+    } else {
+      skirtRect.z0 = Physics.SkirtOffsetZ + static_cast<float>(zLower);
+      skirtRect.z1 = skirtRect.z0 + skirtSizeZ;
+    }
+
+    return skirtRect;
+  }
+
+  /**
+   * Address: 0x00523F90 (FUN_00523F90, Moho::RUnitBlueprintWeapon::~RUnitBlueprintWeapon)
+   *
+   * What it does:
+   * Releases owned string lanes in reverse declaration order.
+   */
+  RUnitBlueprintWeapon::~RUnitBlueprintWeapon() = default;
 
   /**
    * Address: 0x1010E1C0 (FUN_1010E1C0)

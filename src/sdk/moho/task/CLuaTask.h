@@ -10,6 +10,8 @@
 
 namespace moho
 {
+  class CScrLuaInitForm;
+
   /**
    * Address: 0x004D33A0 (FUN_004D33A0,
    * ?SCR_Traceback@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PAVLuaState@LuaPlus@@VStrArg@gpg@@@Z)
@@ -148,6 +150,39 @@ namespace moho
   static_assert(sizeof(CLuaTaskTypeInfo) == 0x64, "CLuaTaskTypeInfo size must be 0x64");
 
   /**
+   * Address: 0x004CA890 (FUN_004CA890, cfunc_WaitFor)
+   *
+   * What it does:
+   * Unwraps Lua binding callback context and forwards to `cfunc_WaitForL`.
+   */
+  int cfunc_WaitFor(lua_State* luaContext);
+
+  /**
+   * Address: 0x004CA910 (FUN_004CA910, cfunc_WaitForL)
+   *
+   * What it does:
+   * Validates one event argument, pushes a `CWaitForTask` above the current
+   * Lua task on the owner thread stack, then yields for one frame tick lane.
+   */
+  int cfunc_WaitForL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CA8B0 (FUN_004CA8B0, func_WaitFor_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global core-lane Lua binder definition for `WaitFor`.
+   */
+  CScrLuaInitForm* func_WaitFor_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC6320 (FUN_00BC6320, register_WaitFor_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_WaitFor_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_WaitFor_LuaFuncDef();
+
+  /**
    * Address: 0x004C9D00 (FUN_004C9D00, cfunc_ForkThread)
    *
    * What it does:
@@ -165,6 +200,88 @@ namespace moho
   int cfunc_ForkThreadL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x004C9D20 (FUN_004C9D20, func_ForkThread_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global core-lane Lua binder definition for `ForkThread`.
+   */
+  CScrLuaInitForm* func_ForkThread_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC6200 (FUN_00BC6200, register_ForkThread_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_ForkThread_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_ForkThread_LuaFuncDef();
+
+  /**
+   * Address: 0x004C9FE0 (FUN_004C9FE0, cfunc_KillThread)
+   *
+   * What it does:
+   * Unwraps Lua binding callback context and forwards to `cfunc_KillThreadL`.
+   */
+  int cfunc_KillThread(lua_State* luaContext);
+
+  /**
+   * Address: 0x004CA060 (FUN_004CA060, cfunc_KillThreadL)
+   *
+   * What it does:
+   * Validates one thread argument and destroys a ForkThread-created task thread.
+   */
+  int cfunc_KillThreadL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CA000 (FUN_004CA000, func_KillThread_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global core-lane Lua binder definition for `KillThread`.
+   */
+  CScrLuaInitForm* func_KillThread_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC6210 (FUN_00BC6210, register_KillThread_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_KillThread_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_KillThread_LuaFuncDef();
+
+  /**
+   * Address: 0x004CAA70 (FUN_004CAA70, cfunc_SuspendCurrentThread)
+   *
+   * What it does:
+   * Unwraps binding context and forwards to `cfunc_SuspendCurrentThreadL`.
+   */
+  int cfunc_SuspendCurrentThread(lua_State* luaContext);
+
+  /**
+   * Address: 0x004CAAF0 (FUN_004CAAF0, cfunc_SuspendCurrentThreadL)
+   *
+   * What it does:
+   * Validates zero args and suspends the current ForkThread-created task.
+   */
+  int cfunc_SuspendCurrentThreadL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CAA90 (FUN_004CAA90, func_SuspendCurrentThread_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global core-lane Lua binder definition for
+   * `SuspendCurrentThread`.
+   */
+  CScrLuaInitForm* func_SuspendCurrentThread_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC6330 (FUN_00BC6330, register_SuspendCurrentThread_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_SuspendCurrentThread_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_SuspendCurrentThread_LuaFuncDef();
+
+  /**
    * Address: 0x004CAB90 (FUN_004CAB90, cfunc_ResumeThread)
    *
    * What it does:
@@ -180,4 +297,68 @@ namespace moho
    * resumes a ForkThread-created task thread on the next scheduler frame.
    */
   int cfunc_ResumeThreadL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CABB0 (FUN_004CABB0, func_ResumeThread_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global core-lane Lua binder definition for `ResumeThread`.
+   */
+  CScrLuaInitForm* func_ResumeThread_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC6340 (FUN_00BC6340, register_ResumeThread_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_ResumeThread_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_ResumeThread_LuaFuncDef();
+
+  /**
+   * Address: 0x004CAD60 (FUN_004CAD60, cfunc_CurrentThread)
+   *
+   * What it does:
+   * Unwraps binding context and forwards to `cfunc_CurrentThreadL`.
+   */
+  int cfunc_CurrentThread(lua_State* luaContext);
+
+  /**
+   * Address: 0x004CADE0 (FUN_004CADE0, cfunc_CurrentThreadL)
+   *
+   * What it does:
+   * Pushes a Lua thread-handle object for the currently running task thread.
+   */
+  int cfunc_CurrentThreadL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x004CAD80 (FUN_004CAD80, func_CurrentThread_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global core-lane Lua binder definition for `CurrentThread`.
+   */
+  CScrLuaInitForm* func_CurrentThread_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC6350 (FUN_00BC6350, register_CurrentThread_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to `func_CurrentThread_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CurrentThread_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC61C0 (FUN_00BC61C0, register_CLuaTaskSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callback lanes for `CLuaTask` and schedules
+   * intrusive helper cleanup at process exit.
+   */
+  void register_CLuaTaskSerializer();
+
+  /**
+   * What it does:
+   * Unlinks static serializer helper node from the intrusive helper list and
+   * restores self-links.
+   */
+  gpg::SerHelperBase* cleanup_CLuaTaskSerializer();
 } // namespace moho

@@ -7,7 +7,9 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <string>
 #include <string_view>
+#include <typeinfo>
 
 #include "../resource/RResId.h"
 #include "gpg/core/algorithms/MD5.h"
@@ -17,6 +19,8 @@
 #include "lua/LuaObject.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/InstanceCounter.h"
+#include "moho/misc/StatItem.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "moho/resource/blueprints/REmitterBlueprint.h"
@@ -53,6 +57,22 @@ namespace moho
     };
 
     static_assert(sizeof(LuaReloadRequestNode) == 0x2C, "LuaReloadRequestNode size must be 0x2C");
+
+    [[nodiscard]] std::string BuildInstanceCounterStatPathLocal(const char* const rawTypeName)
+    {
+      std::string path("Instance Counts_");
+      if (!rawTypeName) {
+        return path;
+      }
+
+      for (const char* it = rawTypeName; *it != '\0'; ++it) {
+        if (*it != '_') {
+          path.push_back(*it);
+        }
+      }
+
+      return path;
+    }
 
     [[nodiscard]] int CompareLex(const std::string_view lhs, const std::string_view rhs) noexcept
     {
@@ -378,6 +398,31 @@ namespace moho
       }
     }
   } // namespace
+
+  /**
+   * Address: 0x0052CA60 (FUN_0052CA60, Moho::InstanceCounter<Moho::RRuleGameRules>::GetStatItem)
+   *
+   * What it does:
+   * Lazily resolves and caches the engine stat slot used for
+   * `RRuleGameRules` instance counting.
+   */
+  template <>
+  moho::StatItem* moho::InstanceCounter<moho::RRuleGameRules>::GetStatItem()
+  {
+    static moho::StatItem* sStatItem = nullptr;
+    if (sStatItem) {
+      return sStatItem;
+    }
+
+    moho::EngineStats* const engineStats = moho::GetEngineStats();
+    if (!engineStats) {
+      return nullptr;
+    }
+
+    const std::string statPath = BuildInstanceCounterStatPathLocal(typeid(moho::RRuleGameRules).name());
+    sStatItem = engineStats->GetItem(statPath.c_str(), true);
+    return sStatItem;
+  }
 
   /**
    * Address: 0x0052B960 (FUN_0052B960)

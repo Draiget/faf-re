@@ -14,6 +14,40 @@ namespace
   alignas(CAiTransportImplSerializer) unsigned char gCAiTransportImplSerializerStorage[sizeof(CAiTransportImplSerializer)];
   bool gCAiTransportImplSerializerConstructed = false;
 
+  /**
+   * Address: 0x005EC3F0 (FUN_005EC3F0, j_Moho::CAiTransportImpl::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiTransportImpl::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiTransportImplMemberSerializeThunk(
+    moho::CAiTransportImpl* const object, gpg::WriteArchive* const archive
+  )
+  {
+    if (!object || !archive) {
+      return;
+    }
+
+    object->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x005EDCC0 (FUN_005EDCC0, j_Moho::CAiTransportImpl::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiTransportImpl::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiTransportImplMemberSerializeThunkSecondary(
+    moho::CAiTransportImpl* const object, gpg::WriteArchive* const archive
+  )
+  {
+    if (!object || !archive) {
+      return;
+    }
+
+    object->MemberSerialize(archive);
+  }
+
   [[nodiscard]] CAiTransportImplSerializer* AcquireCAiTransportImplSerializer()
   {
     if (!gCAiTransportImplSerializerConstructed) {
@@ -88,14 +122,21 @@ void CAiTransportImplSerializer::Deserialize(gpg::ReadArchive* const archive, co
 /**
  * Address: 0x005E85A0 (FUN_005E85A0, Moho::CAiTransportImplSerializer::Serialize)
  */
-void CAiTransportImplSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+void CAiTransportImplSerializer::Serialize(
+  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+)
 {
   auto* const object = reinterpret_cast<CAiTransportImpl*>(static_cast<std::uintptr_t>(objectPtr));
   if (!archive || !object) {
     return;
   }
 
-  object->MemberSerialize(archive);
+  if (ownerRef != nullptr) {
+    object->MemberSerialize(archive);
+    return;
+  }
+
+  CAiTransportImplMemberSerializeThunk(object, archive);
 }
 
 /**

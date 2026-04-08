@@ -289,15 +289,61 @@ namespace
   {
     ScrDiskWatcherTaskReflectionBootstrap()
     {
-      (void)RegisterScrDiskWatcherTaskTypeInfo();
-      RegisterScrDiskWatcherTaskSaveConstruct();
-      RegisterScrDiskWatcherTaskConstruct();
-      (void)std::atexit(&CleanupScrDiskWatcherTaskTypeInfo);
+      moho::register_ScrDiskWatcherTaskTypeInfo();
+      moho::register_ScrDiskWatcherTaskSaveConstruct();
+      moho::register_ScrDiskWatcherTaskConstruct();
     }
   };
 
   ScrDiskWatcherTaskReflectionBootstrap gScrDiskWatcherTaskReflectionBootstrap{};
 } // namespace
+
+/**
+ * Address: 0x00BC5F60 (FUN_00BC5F60, ScrDiskWatcherTask startup type-info registration)
+ *
+ * What it does:
+ * Registers `ScrDiskWatcherTask` reflected type descriptor and schedules
+ * type-info cleanup at process exit.
+ */
+void moho::register_ScrDiskWatcherTaskTypeInfo()
+{
+  static const bool kRegistered = []() {
+    (void)RegisterScrDiskWatcherTaskTypeInfo();
+    (void)std::atexit(&CleanupScrDiskWatcherTaskTypeInfo);
+    return true;
+  }();
+  (void)kRegistered;
+}
+
+/**
+ * Address: 0x00BC5F80 (FUN_00BC5F80, ScrDiskWatcherTask startup save-construct registration)
+ *
+ * What it does:
+ * Registers save-construct callback helper for `ScrDiskWatcherTask`.
+ */
+void moho::register_ScrDiskWatcherTaskSaveConstruct()
+{
+  static const bool kRegistered = []() {
+    RegisterScrDiskWatcherTaskSaveConstruct();
+    return true;
+  }();
+  (void)kRegistered;
+}
+
+/**
+ * Address: 0x00BC5FB0 (FUN_00BC5FB0, ScrDiskWatcherTask startup construct registration)
+ *
+ * What it does:
+ * Registers construct/delete callback helper for `ScrDiskWatcherTask`.
+ */
+void moho::register_ScrDiskWatcherTaskConstruct()
+{
+  static const bool kRegistered = []() {
+    RegisterScrDiskWatcherTaskConstruct();
+    return true;
+  }();
+  (void)kRegistered;
+}
 
 gpg::RType* ScrDiskWatcherTask::sType = nullptr;
 

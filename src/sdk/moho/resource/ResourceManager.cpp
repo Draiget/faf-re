@@ -24,6 +24,15 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/BoostWrappers.h"
+#include "moho/console/CConCommand.h"
+
+namespace moho
+{
+  bool res_EnablePrefetching = true;
+  int res_PrefetcherActivityDelay = 0;
+  int res_AfterPrefetchDelay = 0;
+  bool res_SpewLoadSpam = false;
+} // namespace moho
 
 namespace
 {
@@ -742,9 +751,6 @@ namespace
 
   PrefetchWeakPairRingQueueRuntime sPrefetchPayloadQueue_004AB180{};
   std::chrono::steady_clock::time_point sLastResourceResolveTime_004AA690{};
-  bool gResourcePrefetchEnabled = true;
-  std::uint32_t gResourcePrefetcherActivityDelaySeconds = 0U;
-  std::uint32_t gResourceAfterPrefetchDelaySeconds = 0U;
 
   [[nodiscard]] boost::SharedCountPair SharedPairBorrowFromPrefetchShared(
     const boost::shared_ptr<moho::PrefetchData>& sharedPayload
@@ -4311,7 +4317,33 @@ fixup_after_transplant:
     watcher->mWatchedEnd = end;
   }
 
-  bool gResourceLoadSpamEnabled = false;
+  constexpr const char* kResSpewLoadSpamDescription = "Enable resource-manager load/prefetch debug spew.";
+  constexpr const char* kResEnablePrefetchingDescription = "Enable asynchronous resource prefetching.";
+  constexpr const char* kResPrefetcherActivityDelayDescription =
+    "Delay in seconds between prefetcher work iterations.";
+  constexpr const char* kResAfterPrefetchDelayDescription =
+    "Sleep duration in seconds after each prefetch work item.";
+
+  moho::TConVar<bool> gTConVar_res_SpewLoadSpam(
+    "res_SpewLoadSpam",
+    kResSpewLoadSpamDescription,
+    &moho::res_SpewLoadSpam
+  );
+  moho::TConVar<bool> gTConVar_res_EnablePrefetching(
+    "res_EnablePrefetching",
+    kResEnablePrefetchingDescription,
+    &moho::res_EnablePrefetching
+  );
+  moho::TConVar<int> gTConVar_res_PrefetcherActivityDelay(
+    "res_PrefetcherActivityDelay",
+    kResPrefetcherActivityDelayDescription,
+    &moho::res_PrefetcherActivityDelay
+  );
+  moho::TConVar<int> gTConVar_res_AfterPrefetchDelay(
+    "res_AfterPrefetchDelay",
+    kResAfterPrefetchDelayDescription,
+    &moho::res_AfterPrefetchDelay
+  );
 
   void DestroyResourceManager()
   {
@@ -4328,6 +4360,117 @@ fixup_after_transplant:
     sPResourceManager = new moho::ResourceManager();
     std::atexit(&DestroyResourceManager);
   }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BF04F0 (FUN_00BF04F0, ??1TConVar_res_SpewLoadSpam@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `res_SpewLoadSpam`.
+   */
+  void cleanup_TConVar_res_SpewLoadSpam()
+  {
+    TeardownConCommandRegistration(gTConVar_res_SpewLoadSpam);
+  }
+
+  /**
+   * Address: 0x00BC5AC0 (FUN_00BC5AC0, register_TConVar_res_SpewLoadSpam)
+   *
+   * What it does:
+   * Registers startup convar for `res_SpewLoadSpam`.
+   */
+  void register_TConVar_res_SpewLoadSpam()
+  {
+    RegisterConCommand(gTConVar_res_SpewLoadSpam);
+    (void)std::atexit(&cleanup_TConVar_res_SpewLoadSpam);
+  }
+
+  /**
+   * Address: 0x00BF0520 (FUN_00BF0520, ??1TConVar_res_EnablePrefetching@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `res_EnablePrefetching`.
+   */
+  void cleanup_TConVar_res_EnablePrefetching()
+  {
+    TeardownConCommandRegistration(gTConVar_res_EnablePrefetching);
+  }
+
+  /**
+   * Address: 0x00BC5B00 (FUN_00BC5B00, register_TConVar_res_EnablePrefetching)
+   *
+   * What it does:
+   * Registers startup convar for `res_EnablePrefetching`.
+   */
+  void register_TConVar_res_EnablePrefetching()
+  {
+    RegisterConCommand(gTConVar_res_EnablePrefetching);
+    (void)std::atexit(&cleanup_TConVar_res_EnablePrefetching);
+  }
+
+  /**
+   * Address: 0x00BF0550 (FUN_00BF0550, ??1TConVar_res_PrefetcherActivityDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `res_PrefetcherActivityDelay`.
+   */
+  void cleanup_TConVar_res_PrefetcherActivityDelay()
+  {
+    TeardownConCommandRegistration(gTConVar_res_PrefetcherActivityDelay);
+  }
+
+  /**
+   * Address: 0x00BC5B40 (FUN_00BC5B40, register_TConVar_res_PrefetcherActivityDelay)
+   *
+   * What it does:
+   * Registers startup convar for `res_PrefetcherActivityDelay`.
+   */
+  void register_TConVar_res_PrefetcherActivityDelay()
+  {
+    RegisterConCommand(gTConVar_res_PrefetcherActivityDelay);
+    (void)std::atexit(&cleanup_TConVar_res_PrefetcherActivityDelay);
+  }
+
+  /**
+   * Address: 0x00BF0580 (FUN_00BF0580, ??1TConVar_res_AfterPrefetchDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `res_AfterPrefetchDelay`.
+   */
+  void cleanup_TConVar_res_AfterPrefetchDelay()
+  {
+    TeardownConCommandRegistration(gTConVar_res_AfterPrefetchDelay);
+  }
+
+  /**
+   * Address: 0x00BC5B80 (FUN_00BC5B80, register_TConVar_res_AfterPrefetchDelay)
+   *
+   * What it does:
+   * Registers startup convar for `res_AfterPrefetchDelay`.
+   */
+  void register_TConVar_res_AfterPrefetchDelay()
+  {
+    RegisterConCommand(gTConVar_res_AfterPrefetchDelay);
+    (void)std::atexit(&cleanup_TConVar_res_AfterPrefetchDelay);
+  }
+} // namespace moho
+
+namespace
+{
+  struct ResourceManagerConVarStartupBootstrap
+  {
+    ResourceManagerConVarStartupBootstrap()
+    {
+      moho::register_TConVar_res_SpewLoadSpam();
+      moho::register_TConVar_res_EnablePrefetching();
+      moho::register_TConVar_res_PrefetcherActivityDelay();
+      moho::register_TConVar_res_AfterPrefetchDelay();
+    }
+  };
+
+  [[maybe_unused]] ResourceManagerConVarStartupBootstrap gResourceManagerConVarStartupBootstrap;
 } // namespace
 
 /**
@@ -4630,7 +4773,7 @@ void moho::ResourceManager::PrefetchThreadMain()
   boost::recursive_mutex::scoped_lock workerLock(mWorkerLock);
 
   while (mWorkerRunning) {
-    if (!gResourcePrefetchEnabled) {
+    if (!moho::res_EnablePrefetching) {
       workerLock.unlock();
       std::this_thread::sleep_for(std::chrono::seconds(10));
       workerLock.lock();
@@ -4647,9 +4790,9 @@ void moho::ResourceManager::PrefetchThreadMain()
       continue;
     }
 
-    if (gResourcePrefetcherActivityDelaySeconds > 0U) {
+    if (moho::res_PrefetcherActivityDelay > 0) {
       const auto nextAllowed =
-        sLastResourceResolveTime_004AA690 + std::chrono::seconds(gResourcePrefetcherActivityDelaySeconds);
+        sLastResourceResolveTime_004AA690 + std::chrono::seconds(moho::res_PrefetcherActivityDelay);
       const auto now = std::chrono::steady_clock::now();
       if (now < nextAllowed) {
         workerLock.unlock();
@@ -4683,7 +4826,7 @@ void moho::ResourceManager::PrefetchThreadMain()
     boost::SharedCountPair prefetchedData{};
     (void)ResetSharedPairToNullVariant1(&prefetchedData);
     if (factory != nullptr) {
-      if (gResourceLoadSpamEnabled && request->mResourceType != nullptr) {
+      if (moho::res_SpewLoadSpam && request->mResourceType != nullptr) {
         gpg::Debugf("Prefetching %s resource from %s", request->mResourceType->GetName(), request->mResourceId.name.c_str());
       }
       (void)factory->PreloadResourcePair(
@@ -4706,9 +4849,9 @@ void moho::ResourceManager::PrefetchThreadMain()
     request->mIsLoading = 0;
     mWorkerIdleCondition.notify_all();
 
-    if (gResourceAfterPrefetchDelaySeconds > 0U) {
+    if (moho::res_AfterPrefetchDelay > 0) {
       workerLock.unlock();
-      std::this_thread::sleep_for(std::chrono::seconds(gResourceAfterPrefetchDelaySeconds));
+      std::this_thread::sleep_for(std::chrono::seconds(moho::res_AfterPrefetchDelay));
       workerLock.lock();
     }
   }
@@ -4835,7 +4978,7 @@ boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
       if (pendingPrefetchWeak.px != nullptr) {
         auto* const prefetchPayload = static_cast<PrefetchData*>(pendingPrefetchWeak.px);
         if (prefetchPayload->mResolved.px != nullptr) {
-          if (gResourceLoadSpamEnabled && request.mResourceType != nullptr) {
+          if (moho::res_SpewLoadSpam && request.mResourceType != nullptr) {
             gpg::Debugf(
               "Finishing %s resource prefetched from %s",
               request.mResourceType->GetName(),
@@ -4855,7 +4998,7 @@ boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
 
           (void)ResetSharedPairReleaseControl(&prefetchPayload->mResolved);
         } else {
-          if (gResourceLoadSpamEnabled && request.mResourceType != nullptr) {
+          if (moho::res_SpewLoadSpam && request.mResourceType != nullptr) {
             gpg::Debugf("Loading %s resource from %s", request.mResourceType->GetName(), request.mResourceId.name.c_str());
           }
 
@@ -4870,7 +5013,7 @@ boost::SharedCountPair* moho::ResourceManager::ResolvePendingResourceRequest(
 
         (void)AssignSharedPairRetainRelease_004AEF90(&prefetchPayload->mPrefetch, outResource);
       } else {
-        if (gResourceLoadSpamEnabled && request.mResourceType != nullptr) {
+        if (moho::res_SpewLoadSpam && request.mResourceType != nullptr) {
           gpg::Debugf("Loading %s resource from %s", request.mResourceType->GetName(), request.mResourceId.name.c_str());
         }
 

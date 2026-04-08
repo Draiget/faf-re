@@ -1,5 +1,8 @@
 #include "CTask.h"
 
+#include <cstddef>
+#include <cstdlib>
+#include <new>
 #include <string>
 #include <stdexcept>
 #include <typeinfo>
@@ -14,6 +17,25 @@ using namespace moho;
 
 namespace
 {
+  alignas(moho::CTaskTypeInfo) std::byte gCTaskTypeInfoStorage[sizeof(moho::CTaskTypeInfo)]{};
+  bool gCTaskTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CTaskTypeInfo& CTaskTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CTaskTypeInfo*>(gCTaskTypeInfoStorage);
+  }
+
+  [[nodiscard]] gpg::RType* InitializeCTaskTypeInfoStorage()
+  {
+    if (!gCTaskTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CTaskTypeInfoSlot())) moho::CTaskTypeInfo();
+      gpg::PreRegisterRType(typeid(moho::CTask), &CTaskTypeInfoSlot());
+      gCTaskTypeInfoConstructed = true;
+    }
+
+    return &CTaskTypeInfoSlot();
+  }
+
   [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
   {
     std::string path("Instance Counts_");
@@ -176,7 +198,50 @@ namespace
     gCTaskSerializer.RegisterSerializeFunctions();
   }
 
+  struct CTaskReflectionBootstrap
+  {
+    CTaskReflectionBootstrap()
+    {
+      moho::register_CTaskTypeInfo();
+      RegisterCTaskSerializerBootstrap();
+    }
+  };
+
+  [[maybe_unused]] CTaskReflectionBootstrap gCTaskReflectionBootstrap;
+
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00BEE2B0 (FUN_00BEE2B0, sub_BEE2B0)
+   *
+   * What it does:
+   * Executes process-exit teardown for startup `CTaskTypeInfo` storage.
+   */
+  void cleanup_CTaskTypeInfo()
+  {
+    if (!gCTaskTypeInfoConstructed) {
+      return;
+    }
+
+    CTaskTypeInfoSlot().~CTaskTypeInfo();
+    gCTaskTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BC2FC0 (FUN_00BC2FC0, register_CTaskTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `CTaskTypeInfo` storage and registers process-exit
+   * teardown.
+   */
+  void register_CTaskTypeInfo()
+  {
+    (void)InitializeCTaskTypeInfoStorage();
+    (void)std::atexit(&cleanup_CTaskTypeInfo);
+  }
+} // namespace moho
 
 gpg::RType* CTask::sType = nullptr;
 

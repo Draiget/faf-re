@@ -14,6 +14,74 @@ namespace
   alignas(CAiPathSplineSerializer) unsigned char gCAiPathSplineSerializerStorage[sizeof(CAiPathSplineSerializer)];
   bool gCAiPathSplineSerializerConstructed = false;
 
+  /**
+   * Address: 0x005B56F0 (FUN_005B56F0, j_Moho::CAiPathSpline::MemberDeserialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiPathSpline::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CAiPathSplineMemberDeserializeThunk(
+    moho::CAiPathSpline* const pathSpline, gpg::ReadArchive* const archive
+  )
+  {
+    if (!pathSpline || !archive) {
+      return;
+    }
+
+    pathSpline->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x005B5700 (FUN_005B5700, j_Moho::CAiPathSpline::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiPathSpline::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiPathSplineMemberSerializeThunk(
+    moho::CAiPathSpline* const pathSpline, gpg::WriteArchive* const archive
+  )
+  {
+    if (!pathSpline || !archive) {
+      return;
+    }
+
+    pathSpline->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x005B5A70 (FUN_005B5A70, j_Moho::CAiPathSpline::MemberDeserialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiPathSpline::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CAiPathSplineMemberDeserializeThunkSecondary(
+    moho::CAiPathSpline* const pathSpline, gpg::ReadArchive* const archive
+  )
+  {
+    if (!pathSpline || !archive) {
+      return;
+    }
+
+    pathSpline->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x005B5A80 (FUN_005B5A80, j_Moho::CAiPathSpline::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiPathSpline::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiPathSplineMemberSerializeThunkSecondary(
+    moho::CAiPathSpline* const pathSpline, gpg::WriteArchive* const archive
+  )
+  {
+    if (!pathSpline || !archive) {
+      return;
+    }
+
+    pathSpline->MemberSerialize(archive);
+  }
+
   [[nodiscard]] CAiPathSplineSerializer* AcquireCAiPathSplineSerializer()
   {
     if (!gCAiPathSplineSerializerConstructed) {
@@ -86,27 +154,41 @@ namespace
 /**
  * Address: 0x005B24A0 (FUN_005B24A0, Moho::CAiPathSplineSerializer::Deserialize)
  */
-void CAiPathSplineSerializer::Deserialize(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+void CAiPathSplineSerializer::Deserialize(
+  gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+)
 {
   auto* const pathSpline = reinterpret_cast<CAiPathSpline*>(static_cast<std::uintptr_t>(objectPtr));
   if (!archive || !pathSpline) {
     return;
   }
 
-  pathSpline->MemberDeserialize(archive);
+  if (ownerRef != nullptr) {
+    pathSpline->MemberDeserialize(archive);
+    return;
+  }
+
+  CAiPathSplineMemberDeserializeThunk(pathSpline, archive);
 }
 
 /**
  * Address: 0x005B24B0 (FUN_005B24B0, Moho::CAiPathSplineSerializer::Serialize)
  */
-void CAiPathSplineSerializer::Serialize(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+void CAiPathSplineSerializer::Serialize(
+  gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
+)
 {
   auto* const pathSpline = reinterpret_cast<CAiPathSpline*>(static_cast<std::uintptr_t>(objectPtr));
   if (!archive || !pathSpline) {
     return;
   }
 
-  pathSpline->MemberSerialize(archive);
+  if (ownerRef != nullptr) {
+    pathSpline->MemberSerialize(archive);
+    return;
+  }
+
+  CAiPathSplineMemberSerializeThunk(pathSpline, archive);
 }
 
 /**

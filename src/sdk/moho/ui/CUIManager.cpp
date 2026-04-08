@@ -182,7 +182,7 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
       WX_PushEventHandler(mInputWindows[head], frameView->mEventHandler);
     }
 
-    frameView->mEventMapper = static_cast<std::int32_t>(head);
+    frameView->mTargetHead = static_cast<std::int32_t>(head);
   }
 
   if (!MAUI_StartMainScript()) {

@@ -91,8 +91,8 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };
@@ -302,8 +302,8 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
-    void* mNext;
-    void* mPrev;
+    gpg::SerHelperBase* mNext;
+    gpg::SerHelperBase* mPrev;
     gpg::RType::load_func_t mSerLoadFunc;
     gpg::RType::save_func_t mSerSaveFunc;
   };
@@ -311,6 +311,14 @@ namespace moho
   class CTaskEventTypeInfo : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00406AD0 (FUN_00406AD0, Moho::CTaskEventTypeInfo::CTaskEventTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters RTTI descriptor for `CTaskEvent`.
+     */
+    CTaskEventTypeInfo();
+
     /**
      * Address: 0x00406B60 (FUN_00406B60, scalar deleting destructor thunk)
      * Slot: 2
@@ -336,4 +344,31 @@ namespace moho
   static_assert(sizeof(RWeakPtrType<STaskEventLinkage>) == 0x68, "RWeakPtrType<STaskEventLinkage> size must be 0x68");
   static_assert(sizeof(CTaskEventSerializer) == 0x14, "CTaskEventSerializer size must be 0x14");
   static_assert(sizeof(CTaskEventTypeInfo) == 0x64, "CTaskEventTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BC2ED0 (FUN_00BC2ED0, register_STaskEventLinkageTypeInfo)
+   *
+   * What it does:
+   * Materializes the startup `STaskEventLinkageTypeInfo` descriptor and
+   * registers process-exit teardown.
+   */
+  void register_STaskEventLinkageTypeInfo();
+
+  /**
+   * Address: 0x00BC2EF0 (FUN_00BC2EF0, register_STaskEventLinkageSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callbacks for `STaskEventLinkage` and
+   * registers process-exit intrusive-link cleanup.
+   */
+  void register_STaskEventLinkageSerializer();
+
+  /**
+   * Address: 0x00BC2F30 (FUN_00BC2F30, register_CTaskEventTypeInfo)
+   *
+   * What it does:
+   * Materializes the startup `CTaskEventTypeInfo` descriptor and registers
+   * process-exit teardown.
+   */
+  void register_CTaskEventTypeInfo();
 } // namespace moho

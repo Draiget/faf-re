@@ -20,13 +20,56 @@ namespace gpg
   class RFastVectorType<moho::SEfxCurve> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0065EEC0 (FUN_0065EEC0, gpg::RFastVectorType_SEfxCurve::GetName)
+     */
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0065EF80 (FUN_0065EF80, gpg::RFastVectorType_SEfxCurve::GetLexical)
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x0065F010 (FUN_0065F010, gpg::RFastVectorType_SEfxCurve::IsIndexed)
+     */
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0065EF60 (FUN_0065EF60, gpg::RFastVectorType_SEfxCurve::Init)
+     */
     void Init() override;
+
+    /**
+     * Address: 0x0065F0C0 (FUN_0065F0C0, gpg::RFastVectorType_SEfxCurve::SubscriptIndex)
+     */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0065F020 (FUN_0065F020, gpg::RFastVectorType_SEfxCurve::GetCount)
+     */
     size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0065F040 (FUN_0065F040, gpg::RFastVectorType_SEfxCurve::SetCount)
+     */
     void SetCount(void* obj, int count) const override;
+
+    /**
+     * Address: 0x0065FC70 (FUN_0065FC70, gpg::RFastVectorType_SEfxCurve::dtr)
+     */
+    ~RFastVectorType() override;
+
+  private:
+    /**
+     * Address: 0x0065F450 (FUN_0065F450, gpg::RFastVectorType_SEfxCurve::SerLoad)
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0065F540 (FUN_0065F540, gpg::RFastVectorType_SEfxCurve::SerSave)
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(RFastVectorType<moho::SEfxCurve>) == 0x68, "RFastVectorType<SEfxCurve> size must be 0x68");
@@ -60,13 +103,21 @@ namespace
     gFastVectorSEfxCurveTypeName = msvc8::string{};
     gFastVectorSEfxCurveTypeNameCleanupRegistered = false;
   }
+} // namespace
 
-  void LoadFastVectorSEfxCurve(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+namespace gpg
+{
+  /**
+   * Address: 0x0065F450 (FUN_0065F450, gpg::RFastVectorType_SEfxCurve::SerLoad)
+   *
+   * What it does:
+   * Reads vector length, resizes payload storage with default `SEfxCurve`
+   * fill, then deserializes each element with the archived owner reference.
+   */
+  void RFastVectorType<moho::SEfxCurve>::SerLoad(
+    gpg::ReadArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
+  )
   {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
     auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(reinterpret_cast<void*>(objectPtr));
 
     unsigned int count = 0;
@@ -75,37 +126,44 @@ namespace
     moho::SEfxCurve fill{};
     gpg::FastVectorRuntimeResizeFill(&fill, count, view);
 
-    gpg::RType* const elementType = CachedSEfxCurveType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &view.begin[i], owner);
+      gpg::RType* elementType = CachedSEfxCurveType();
+      archive->Read(elementType, &view.begin[i], *ownerRef);
     }
   }
 
-  void SaveFastVectorSEfxCurve(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  /**
+   * Address: 0x0065F540 (FUN_0065F540, gpg::RFastVectorType_SEfxCurve::SerSave)
+   *
+   * What it does:
+   * Writes current vector length, then serializes each `SEfxCurve` element.
+   */
+  void RFastVectorType<moho::SEfxCurve>::SerSave(
+    gpg::WriteArchive* const archive, const int objectPtr, const int /*version*/, gpg::RRef* const ownerRef
+  )
   {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
     const auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(reinterpret_cast<const void*>(objectPtr));
-    const unsigned int count = view.begin ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    const unsigned int count = static_cast<unsigned int>(view.end - view.begin);
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedSEfxCurveType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &view.begin[i], owner);
+      gpg::RType* elementType = CachedSEfxCurveType();
+      archive->Write(elementType, &view.begin[i], *ownerRef);
     }
   }
-} // namespace
 
-namespace gpg
-{
+  /**
+   * Address: 0x0065EEC0 (FUN_0065EEC0, gpg::RFastVectorType_SEfxCurve::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches the reflected `fastvector<SEfxCurve>` name and
+   * registers process-exit cleanup for the cached string storage.
+   */
   const char* RFastVectorType<moho::SEfxCurve>::GetName() const
   {
     if (gFastVectorSEfxCurveTypeName.empty()) {
-      const char* const elementName = CachedSEfxCurveType() ? CachedSEfxCurveType()->GetName() : "SEfxCurve";
+      const gpg::RType* const elementType = CachedSEfxCurveType();
+      const char* const elementName = elementType ? elementType->GetName() : "SEfxCurve";
       gFastVectorSEfxCurveTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "SEfxCurve");
       if (!gFastVectorSEfxCurveTypeNameCleanupRegistered) {
         gFastVectorSEfxCurveTypeNameCleanupRegistered = true;
@@ -116,67 +174,89 @@ namespace gpg
     return gFastVectorSEfxCurveTypeName.c_str();
   }
 
+  /**
+   * Address: 0x0065EF80 (FUN_0065EF80, gpg::RFastVectorType_SEfxCurve::GetLexical)
+   *
+   * What it does:
+   * Appends `size=<count>` to the base reflection lexical dump string.
+   */
   msvc8::string RFastVectorType<moho::SEfxCurve>::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
+  /**
+   * Address: 0x0065F010 (FUN_0065F010, gpg::RFastVectorType_SEfxCurve::IsIndexed)
+   *
+   * What it does:
+   * Exposes indexed reflection interface for fastvector element lookup.
+   */
   const gpg::RIndexed* RFastVectorType<moho::SEfxCurve>::IsIndexed() const
   {
     return this;
   }
 
+  /**
+   * Address: 0x0065EF60 (FUN_0065EF60, gpg::RFastVectorType_SEfxCurve::Init)
+   *
+   * What it does:
+   * Initializes runtime layout/version metadata and archive callbacks.
+   */
   void RFastVectorType<moho::SEfxCurve>::Init()
   {
     size_ = 0x10;
     version_ = 1;
-    serLoadFunc_ = &LoadFastVectorSEfxCurve;
-    serSaveFunc_ = &SaveFastVectorSEfxCurve;
+    serLoadFunc_ = &RFastVectorType<moho::SEfxCurve>::SerLoad;
+    serSaveFunc_ = &RFastVectorType<moho::SEfxCurve>::SerSave;
   }
 
+  /**
+   * Address: 0x0065F0C0 (FUN_0065F0C0, gpg::RFastVectorType_SEfxCurve::SubscriptIndex)
+   *
+   * What it does:
+   * Returns reflected element reference for index `ind` in raw vector storage.
+   */
   gpg::RRef RFastVectorType<moho::SEfxCurve>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = CachedSEfxCurveType();
-    out.mObj = nullptr;
-    if (!obj || ind < 0) {
-      return out;
-    }
-
     auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(obj);
-    if (!view.begin || static_cast<std::size_t>(ind) >= GetCount(obj)) {
-      return out;
-    }
-
-    out.mObj = view.begin + ind;
+    gpg::RRef_SEfxCurve(&out, view.begin + ind);
     return out;
   }
 
+  /**
+   * Address: 0x0065F020 (FUN_0065F020, gpg::RFastVectorType_SEfxCurve::GetCount)
+   *
+   * What it does:
+   * Returns number of `SEfxCurve` elements in raw fastvector storage.
+   */
   size_t RFastVectorType<moho::SEfxCurve>::GetCount(void* obj) const
   {
-    if (!obj) {
-      return 0u;
-    }
-
     const auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(obj);
-    if (!view.begin) {
-      return 0u;
-    }
-
     return static_cast<std::size_t>(view.end - view.begin);
   }
 
+  /**
+   * Address: 0x0065F040 (FUN_0065F040, gpg::RFastVectorType_SEfxCurve::SetCount)
+   *
+   * What it does:
+   * Resizes raw fastvector storage to `count`, default-constructing fill values.
+   */
   void RFastVectorType<moho::SEfxCurve>::SetCount(void* obj, const int count) const
   {
-    if (!obj || count < 0) {
-      return;
-    }
-
     auto& view = gpg::AsFastVectorRuntimeView<moho::SEfxCurve>(obj);
     moho::SEfxCurve fill{};
     gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
   }
+
+  /**
+   * Address: 0x0065FC70 (FUN_0065FC70, gpg::RFastVectorType_SEfxCurve::dtr)
+   *
+   * What it does:
+   * Destroys vector/reflection owned buffers through `RType` base teardown.
+   */
+  RFastVectorType<moho::SEfxCurve>::~RFastVectorType() = default;
 } // namespace gpg
 
 namespace moho

@@ -1,34 +1,34 @@
 #include "GridPos.h"
+
 #include <cmath>
-using namespace moho;
 
-GridPos::GridPos(Wm3::Vec3f* wldPos, int gridSize) noexcept
-  : x(0)
-  , z(0)
+namespace
 {
-#if defined(USE_X87_COMPATIBILITY)
-  // Original-style path: float reciprocal then x87-like rounding fix
-  const float inv_f = 1.0f / static_cast<float>(gridSize);
+  [[nodiscard]] int ComputeGridCellCoordinate(const float worldCoordinate, const int gridSize) noexcept
+  {
+    const float reciprocal = 1.0f / static_cast<float>(gridSize);
+    const float scaled = worldCoordinate * reciprocal;
 
-  const double gx = static_cast<double>(wldPos->x * inv_f);
-  const double gz = static_cast<double>(wldPos->z * inv_f);
+    // Binary shape: frndint + conditional -1 adjust when source < rounded.
+    const double rounded = std::nearbyint(static_cast<double>(scaled));
+    return static_cast<int>(rounded) + ((scaled < rounded) ? -1 : 0);
+  }
+} // namespace
 
-  const double rx = std::nearbyint(gx); // round-to-nearest (ties-to-even), like FRNDINT in default mode
-  const double rz = std::nearbyint(gz);
-
-  long long ix = static_cast<long long>(rx);
-  long long iz = static_cast<long long>(rz);
-  if (gx < rx)
-    --ix; // emulate: if (v < rounded) rounded -= 1 => floor(v)
-  if (gz < rz)
-    --iz;
-
-  x = static_cast<int>(ix);
-  z = static_cast<int>(iz);
-#else
-  // Optimized path: compute in double and use std::floor (clear & fast on modern CPUs)
-  const double inv = 1.0 / static_cast<double>(gridSize);
-  x = static_cast<int>(std::floor(static_cast<double>(wldPos->x) * inv));
-  z = static_cast<int>(std::floor(static_cast<double>(wldPos->z) * inv));
-#endif
-}
+namespace moho
+{
+  /**
+   * Address: 0x00506E20 (FUN_00506E20, ??0GridPos@Moho@@QAE@@Z)
+   *
+   * Wm3::Vector3f* wldPos, int gridSize
+   *
+   * What it does:
+   * Converts world-space x/z lanes into integer grid coordinates with the
+   * original reciprocal-scale and frndint-adjusted floor semantics.
+   */
+  GridPos::GridPos(Wm3::Vec3f* const wldPos, const int gridSize) noexcept
+    : x(ComputeGridCellCoordinate(wldPos->x, gridSize))
+    , z(ComputeGridCellCoordinate(wldPos->z, gridSize))
+  {
+  }
+} // namespace moho

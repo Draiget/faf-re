@@ -1835,6 +1835,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BC3540 (FUN_00BC3540, register_BeginLoggingStats_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_BeginLoggingStats_LuaFuncDef`.
+   */
+  void register_BeginLoggingStats_LuaFuncDef()
+  {
+    (void)func_BeginLoggingStats_LuaFuncDef();
+  }
+
+  /**
+   * Address: 0x00BC3550 (FUN_00BC3550, register_EndLoggingStats_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards registration to
+   * `func_EndLoggingStats_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_EndLoggingStats_LuaFuncDef()
+  {
+    return func_EndLoggingStats_LuaFuncDef();
+  }
+
+  /**
    * Address: 0x00408730 (FUN_00408730, Moho::StatItem::StatItem)
    */
   StatItem::StatItem(const char* name)

@@ -20,6 +20,7 @@
 #include <dsound.h>
 #include <shellapi.h>
 #include <ShlObj.h>
+#include <Shlwapi.h>
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -28,6 +29,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
+#include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
@@ -37,6 +39,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/XFileError.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/sim/SpecialFileType.h"
 #include "moho/ui/CUIManager.h"
 
 extern int __argc;
@@ -82,8 +85,13 @@ namespace
   constexpr char kProfileNameFieldName[] = "Name";
   constexpr char kProfilesExistMethodName[] = "ProfilesExist";
   constexpr char kCreateProfileMethodName[] = "CreateProfile";
+  constexpr char kApplyMethodName[] = "Apply";
   constexpr char kSetCustomDataMethodName[] = "SetCustomData";
   constexpr char kUserPrefsLuaRunErrorPrefix[] = "Error running '/lua/user/prefs.lua' : %s";
+  constexpr char kUserPrefsGetOptionLuaRunErrorPrefix[] = "Error running '/lua/user/prefs.lua:GetOption' : %s";
+  constexpr char kOptionsApplyLuaRunErrorPrefix[] = "Error running '/lua/options/optionslogic.lua':Apply %s";
+  constexpr char kOptionsSetCustomDataLuaRunErrorPrefix[] =
+    "Error running '/lua/options/optionslogic.lua':OPTIONS_SetCustomData %s";
   constexpr char kPrimaryAdapterKey[] = "primary_adapter";
   constexpr char kSecondaryAdapterKey[] = "secondary_adapter";
   constexpr char kFidelityPresetsKey[] = "fidelity_presets";
@@ -97,6 +105,16 @@ namespace
   constexpr char kHasCommandLineArgHelpText[] = "HasCommandLineArg(option)";
   constexpr char kSHGetFolderPathHelpText[] = "(name, create?) -- Interface to Win32 SHGetFolderPath api";
   constexpr char kGetTextureDimensionsHelpText[] = "width, height GetTextureDimensions(filename, border = 1)";
+  constexpr char kSetMovieVolumeHelpText[] = "SetMovieVolume(volume): 0.0 - 2.0";
+  constexpr char kGetMovieVolumeHelpText[] = "GetMovieVolume()";
+  constexpr char kGetMovieDurationHelpText[] = "GetMovieDuration(localFileName)";
+  constexpr char kGetAntiAliasingOptionsHelpText[] = "obj GetAntiAliasingOptions()";
+  constexpr char kGetOptionsHelpText[] = "obj GetOptions()";
+  constexpr char kGetPreferenceHelpText[] = "obj GetPreference(string, [default])";
+  constexpr char kSetPreferenceHelpText[] = "SetPreference(string, obj)";
+  constexpr char kSavePreferencesHelpText[] = "SavePreferences()";
+  constexpr char kDebugFacilitiesEnabledHelpText[] =
+    "bool DebugFacilitiesEnabled() - returns true if debug facilities are enabled.";
   constexpr char kUnknownShGetFolderPathIdErrorText[] = "Unknown id for SHGetFolderPath: %s";
   constexpr char kShGetFolderPathFailedErrorText[] = "SHGetFolderPath failed: %x";
   constexpr char kLuaExpectedArgRangeWarning[] = "%s\n  expected between %d and %d args, but got %d";
@@ -108,6 +126,135 @@ namespace
   constexpr float kLuaMovieVolumeDbFloor = -10000.0f;
   constexpr float kMovieSofdecVideoRefreshHz = 59.939999f;
   constexpr float kWordFloatScale = 65536.0f;
+  constexpr std::int32_t kSofdecHeaderTypeMovie = 1;
+  constexpr std::int32_t kSofdecHeaderTypeMovieAlt = 3;
+
+  /**
+   * Address: 0x008C8700 (FUN_008C8700, func_CpyFile)
+   *
+   * What it does:
+   * Replaces destination with source when destination already exists; otherwise
+   * moves source to destination, logging Win32 error codes on failure.
+   */
+  [[maybe_unused]] void CopyOrReplacePreferenceFile(const wchar_t* const sourcePath, const wchar_t* const destinationPath)
+  {
+    if (sourcePath == nullptr || destinationPath == nullptr) {
+      return;
+    }
+
+    if (::PathFileExistsW(destinationPath) != FALSE) {
+      if (::ReplaceFileW(destinationPath, sourcePath, nullptr, 0u, nullptr, nullptr) == FALSE) {
+        const DWORD errorCode = ::GetLastError();
+        gpg::Warnf(
+          "unable to replace file %s with %s [error %x]",
+          reinterpret_cast<const char*>(destinationPath),
+          reinterpret_cast<const char*>(sourcePath),
+          errorCode
+        );
+      }
+      return;
+    }
+
+    if (::MoveFileW(sourcePath, destinationPath) == FALSE) {
+      const DWORD errorCode = ::GetLastError();
+      gpg::Warnf(
+        "unable to move file to %s from %s [error %x]",
+        reinterpret_cast<const char*>(destinationPath),
+        reinterpret_cast<const char*>(sourcePath),
+        errorCode
+      );
+    }
+  }
+
+  struct SofdecHeaderInfoRuntimeView
+  {
+    std::int32_t headerValid = 0;            // +0x00
+    std::int32_t streamType = 0;             // +0x04
+    std::int32_t reserved08 = 0;             // +0x08
+    std::int32_t reserved0C = 0;             // +0x0C
+    std::int32_t frameRateTimes1000 = 0;     // +0x10
+    std::int32_t frameCount = 0;             // +0x14
+    std::int32_t reserved18 = 0;             // +0x18
+    std::int32_t reserved1C = 0;             // +0x1C
+    std::int32_t reserved20 = 0;             // +0x20
+    std::int32_t reserved24 = 0;             // +0x24
+    std::int32_t reserved28 = 0;             // +0x28
+  };
+
+  static_assert(offsetof(SofdecHeaderInfoRuntimeView, headerValid) == 0x00, "headerValid offset must be 0x00");
+  static_assert(offsetof(SofdecHeaderInfoRuntimeView, streamType) == 0x04, "streamType offset must be 0x04");
+  static_assert(
+    offsetof(SofdecHeaderInfoRuntimeView, frameRateTimes1000) == 0x10,
+    "frameRateTimes1000 offset must be 0x10"
+  );
+  static_assert(offsetof(SofdecHeaderInfoRuntimeView, frameCount) == 0x14, "frameCount offset must be 0x14");
+  static_assert(sizeof(SofdecHeaderInfoRuntimeView) == 0x2C, "SofdecHeaderInfoRuntimeView size must be 0x2C");
+
+  struct SofdecCreateInfoRuntimeView
+  {
+    std::int32_t headerWord0 = 0;          // +0x00
+    std::int32_t headerWord1 = 0;          // +0x04
+    std::int32_t frameRateTimes1000 = 0;   // +0x08
+    std::int32_t height = 0;               // +0x0C
+    std::int32_t width = 0;                // +0x10
+    std::int32_t frameCount = 0;           // +0x14
+    std::int32_t extraFrameMetric = 0;     // +0x18
+  };
+  static_assert(sizeof(SofdecCreateInfoRuntimeView) == 0x1C, "SofdecCreateInfoRuntimeView size must be 0x1C");
+
+  extern "C" void SFD_AnalyCreInf(const char* buffer, std::int32_t size, SofdecCreateInfoRuntimeView* outInfo);
+  extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const SofdecCreateInfoRuntimeView* headerInfo);
+  extern "C" std::int32_t mwsfdcre_IsPlayableByHdrInf(const SofdecHeaderInfoRuntimeView* headerInfo);
+  extern "C" void
+    MWSFFRM_AnalyzeSofdecHeader(const char* buffer, std::int32_t size, SofdecHeaderInfoRuntimeView* headerInfo);
+  extern "C" void MWSFSVM_Error(const char* message);
+
+  /**
+   * Address: 0x00AC8DF0 (FUN_00AC8DF0, mwPlyGetHdrInf)
+   *
+   * What it does:
+   * Parses Sofdec header lanes from a mapped movie buffer, fills the runtime
+   * header-info struct used by `MOV_GetDuration`, and reports invalid input
+   * through Sofdec error sink lanes.
+   */
+  extern "C" std::int32_t mwPlyGetHdrInf(const char* const buffer, const std::int32_t size, void* const outHeaderInfo)
+  {
+    SofdecHeaderInfoRuntimeView parsedHeader{};
+    std::memset(&parsedHeader, 0, sizeof(parsedHeader));
+    if (outHeaderInfo != nullptr) {
+      std::memset(outHeaderInfo, 0, sizeof(SofdecHeaderInfoRuntimeView));
+    }
+
+    if (buffer == nullptr || outHeaderInfo == nullptr) {
+      MWSFSVM_Error("E204161 mwPlyGetHdrInf");
+      return 0;
+    }
+
+    if (size <= 0) {
+      MWSFSVM_Error("E204162 mwPlyGetHdrInf");
+      return 0;
+    }
+
+    SofdecCreateInfoRuntimeView createInfo{};
+    std::memset(&createInfo, 0, sizeof(createInfo));
+    SFD_AnalyCreInf(buffer, size, &createInfo);
+    if (createInfo.headerWord0 == 0 || createInfo.headerWord1 == 0) {
+      parsedHeader.headerValid = 0;
+      std::memcpy(outHeaderInfo, &parsedHeader, sizeof(parsedHeader));
+      return 0;
+    }
+
+    parsedHeader.streamType = mwsfcre_DecideFtypeByHdrInf(&createInfo);
+    parsedHeader.frameRateTimes1000 = createInfo.frameRateTimes1000;
+    parsedHeader.reserved18 = createInfo.height;
+    parsedHeader.reserved1C = createInfo.width;
+    parsedHeader.frameCount = createInfo.frameCount;
+    parsedHeader.reserved24 = createInfo.extraFrameMetric;
+    MWSFFRM_AnalyzeSofdecHeader(buffer, size, &parsedHeader);
+    parsedHeader.headerValid = mwsfdcre_IsPlayableByHdrInf(&parsedHeader);
+    std::memcpy(outHeaderInfo, &parsedHeader, sizeof(parsedHeader));
+    return parsedHeader.headerValid;
+  }
 
   struct UnsafePathEntry
   {
@@ -163,6 +310,12 @@ namespace
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
     static moho::CScrLuaInitFormSet sSet("user");
+    return sSet;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
+  {
+    static moho::CScrLuaInitFormSet sSet("core");
     return sSet;
   }
 
@@ -303,6 +456,30 @@ namespace
   {
     static const msvc8::string kSaveGameExt("SaveGame");
     return kSaveGameExt;
+  }
+
+  [[nodiscard]] const msvc8::string& ReplayDirName()
+  {
+    static const msvc8::string kReplayDir("replays");
+    return kReplayDir;
+  }
+
+  [[nodiscard]] const msvc8::string& ReplayExtName()
+  {
+    static const msvc8::string kReplayExt("Replay");
+    return kReplayExt;
+  }
+
+  [[nodiscard]] const msvc8::string& CampaignSaveExtName()
+  {
+    static const msvc8::string kCampaignSaveExt("CampaignSave");
+    return kCampaignSaveExt;
+  }
+
+  [[nodiscard]] const msvc8::string& ScreenshotDirName()
+  {
+    static const msvc8::string kScreenshotDir("screenshots");
+    return kScreenshotDir;
   }
 
   /**
@@ -652,27 +829,6 @@ namespace
     stateEntry.SetString("text", text != nullptr ? text : "");
     stateEntry.SetInteger("key", key);
     statesTable->SetObject(index, stateEntry);
-  }
-
-  void OptionsSetCustomData(
-    LuaPlus::LuaState* const state,
-    const char* const optionKey,
-    const LuaPlus::LuaObject& optionRoot,
-    const LuaPlus::LuaObject& defaultValue
-  )
-  {
-    if (state == nullptr || optionKey == nullptr || optionKey[0] == '\0') {
-      return;
-    }
-
-    const LuaPlus::LuaObject optionsModule = ImportLuaModule(state, kOptionsLogicModulePath);
-    const LuaPlus::LuaObject setCustomDataFn = GetLuaModuleFunction(state, optionsModule, kSetCustomDataMethodName);
-    if (setCustomDataFn.IsNil()) {
-      return;
-    }
-
-    LuaPlus::LuaFunction<void> setCustomDataCallable(setCustomDataFn);
-    setCustomDataCallable(optionKey, defaultValue, optionRoot);
   }
 
   void RefreshFidelitySupportLanes(const gpg::gal::DeviceContext* const context)
@@ -1211,10 +1367,17 @@ namespace
   class CUserPrefsRuntime final : public moho::IUserPrefs
   {
   public:
+    /**
+     * Address: 0x008C7410 (FUN_008C7410, Moho::IUserPrefs::IUserPrefs)
+     *
+     * What it does:
+     * Initializes preferences state storage (strings + Lua state/object) and
+     * creates an empty root preference table.
+     */
     CUserPrefsRuntime()
       : mPreferencesFilePath()
       , mPreferencesProfileName()
-      , mState()
+      , mState(LuaPlus::LuaState::LIB_BASE)
       , mRoot()
     {
       mRoot.AssignNewTable(&mState, 0, 0);
@@ -1275,14 +1438,30 @@ namespace
       return fallback;
     }
 
+    /**
+     * Address: 0x008C7710 (FUN_008C7710, Moho::CUserPrefs::GetHex)
+     *
+     * What it does:
+     * Reads one preference value as Lua string-convertible text and parses it
+     * as hexadecimal (optional `0x` prefix), returning fallback on conversion failure.
+     */
     std::uint32_t GetHex(const msvc8::string& key, const std::uint32_t fallback) override
     {
-      std::uint32_t valueAsHex = fallback;
       const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
-      if (TryGetHexFromLuaValue(value, &valueAsHex)) {
-        return valueAsHex;
+      if (!value.IsConvertibleToString()) {
+        return fallback;
       }
-      return fallback;
+
+      const char* hexText = value.ToString();
+      if (hexText == nullptr || hexText[0] == '\0') {
+        return fallback;
+      }
+
+      if (_strnicmp(hexText, "0x", 2) == 0) {
+        hexText += 2;
+      }
+
+      return static_cast<std::uint32_t>(gpg::STR_Xtoi(hexText));
     }
 
     msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) override
@@ -1354,20 +1533,68 @@ namespace
       SetPreferenceStringArrayRecursive(&mState, &mRoot, key, values);
     }
 
+    /**
+     * Address: 0x008C7EA0 (FUN_008C7EA0, Moho::CUserPrefs::LookupCurrentOption)
+     *
+     * What it does:
+     * Resolves one option value from the currently selected profile:
+     * `profile.profiles[profile.current].options[key]`.
+     */
+    [[nodiscard]] LuaPlus::LuaObject LookupCurrentOptionObject(const msvc8::string& key)
+    {
+      LuaPlus::LuaObject currentProfile = mRoot.Lookup("profile.current");
+      if (currentProfile.IsNil()) {
+        return currentProfile;
+      }
+
+      LuaPlus::LuaObject profiles = mRoot.Lookup("profile.profiles");
+      if (profiles.IsNil()) {
+        return profiles;
+      }
+
+      const int profileIndex = static_cast<int>(currentProfile.GetNumber());
+      LuaPlus::LuaObject profileObject = profiles[profileIndex];
+      LuaPlus::LuaObject optionsObject = profileObject.Lookup("options");
+      if (optionsObject.IsNil() || !optionsObject.IsTable()) {
+        return optionsObject;
+      }
+
+      return optionsObject.Lookup(key.c_str());
+    }
+
+    /**
+     * Address: 0x008C8040 (FUN_008C8040, Moho::CUserPrefs::LookupKey)
+     *
+     * What it does:
+     * Resolves one root preference table entry by key from `mRoot`.
+     */
+    [[nodiscard]] LuaPlus::LuaObject LookupKeyObject(const msvc8::string& key)
+    {
+      if (mRoot.IsNil()) {
+        return LuaPlus::LuaObject(mRoot);
+      }
+
+      return mRoot.Lookup(key.c_str());
+    }
+
     bool LookupCurrentOption(msvc8::string* const outOption, const msvc8::string& key) override
     {
       if (outOption == nullptr) {
         return false;
       }
 
-      const msvc8::string fallback;
-      *outOption = GetString(key, fallback);
-      return !outOption->empty();
+      const LuaPlus::LuaObject optionObject = LookupCurrentOptionObject(key);
+      return TryGetStringFromLuaValue(optionObject, outOption);
     }
 
     bool LookupKey(msvc8::string* const outOption, const msvc8::string& key) override
     {
-      return LookupCurrentOption(outOption, key);
+      if (outOption == nullptr) {
+        return false;
+      }
+
+      const LuaPlus::LuaObject optionObject = LookupKeyObject(key);
+      return TryGetStringFromLuaValue(optionObject, outOption);
     }
 
     void* GetPreferenceTable() override
@@ -1449,6 +1676,13 @@ const moho::CfgAliasSet& moho::CFG_GetWindowedOptionAliases()
   return kWindowedAliasesSet;
 }
 
+/**
+ * Address: 0x008CFF00 (FUN_008CFF00, func_FindOptionAmong)
+ *
+ * What it does:
+ * Scans prefixed alias pairs (`prefix + left + right`) and returns true on the
+ * first command-line option that resolves through `CFG_GetArgOption`.
+ */
 bool moho::CFG_GetArgOptionComposedAliases(
   const CfgAliasSet& leftAliases,
   const CfgAliasSet& rightAliases,
@@ -1494,6 +1728,16 @@ bool moho::CFG_GetArgOptionComposedAliases(
   return false;
 }
 
+/**
+ * Address family:
+ * - 0x008D00E0 (FUN_008D00E0)
+ * - 0x008D0260 (FUN_008D0260)
+ * - 0x008D02D0 (FUN_008D02D0)
+ *
+ * What it does:
+ * Scans prefixed single aliases (`prefix + alias`) and returns true on the
+ * first command-line option that resolves through `CFG_GetArgOption`.
+ */
 bool moho::CFG_GetArgOptionAliases(
   const CfgAliasSet& aliases, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
 )
@@ -1925,6 +2169,90 @@ moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00BC3800 (FUN_00BC3800, register_GetCommandLineArg_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to
+ * `func_GetCommandLineArg_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_GetCommandLineArg_LuaFuncDef()
+{
+  return func_GetCommandLineArg_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC3810 (FUN_00BC3810, register_HasCommandLineArg_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to
+ * `func_HasCommandLineArg_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_HasCommandLineArg_LuaFuncDef()
+{
+  return func_HasCommandLineArg_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC63D0 (FUN_00BC63D0, register_coreInitFormSet)
+ *
+ * What it does:
+ * Links the core init-form set at the head of `CScrLuaInitFormSet::sSets`
+ * and returns the previous head.
+ */
+moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
+{
+  CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
+  CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
+  coreSet.mNextSet = previousHead;
+  CScrLuaInitFormSet::sSets = &coreSet;
+  return previousHead;
+}
+
+/**
+ * Address: 0x00BC63F0 (FUN_00BC63F0, register_userInitFormSet)
+ *
+ * What it does:
+ * Links the user init-form set at the head of `CScrLuaInitFormSet::sSets`
+ * and returns the previous head.
+ */
+moho::CScrLuaInitFormSet* moho::register_userInitFormSet()
+{
+  CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
+  CScrLuaInitFormSet& userSet = UserLuaInitSet();
+  userSet.mNextSet = previousHead;
+  CScrLuaInitFormSet::sSets = &userSet;
+  return previousHead;
+}
+
+/**
+ * Address: 0x00BC66E0 (FUN_00BC66E0, register_unsafeInitFormSet)
+ *
+ * What it does:
+ * Links the unsafe init-form set at the head of `CScrLuaInitFormSet::sSets`
+ * and returns the previous head.
+ */
+moho::CScrLuaInitFormSet* moho::register_unsafeInitFormSet()
+{
+  CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
+  CScrLuaInitFormSet& unsafeSet = UnsafeLuaInitSet();
+  unsafeSet.mNextSet = previousHead;
+  CScrLuaInitFormSet::sSets = &unsafeSet;
+  return previousHead;
+}
+
+/**
+ * Address: 0x00BC6700 (FUN_00BC6700, register_SHGetFolderPath_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to
+ * `func_SHGetFolderPath_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_SHGetFolderPath_LuaFuncDef()
+{
+  return func_SHGetFolderPath_LuaFuncDef();
+}
+
+/**
  * Address: 0x00780AF0 (FUN_00780AF0, cfunc_GetTextureDimensionsL)
  *
  * What it does:
@@ -2006,6 +2334,601 @@ moho::CScrLuaInitForm* moho::func_GetTextureDimensions_LuaFuncDef()
     kGetTextureDimensionsHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x00874FA0 (FUN_00874FA0, cfunc_SetMovieVolume)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_SetMovieVolumeL`.
+ */
+int moho::cfunc_SetMovieVolume(lua_State* const luaContext)
+{
+  return cfunc_SetMovieVolumeL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x00874FC0 (FUN_00874FC0, func_SetMovieVolume_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `SetMovieVolume`.
+ */
+moho::CScrLuaInitForm* moho::func_SetMovieVolume_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetMovieVolume",
+    &moho::cfunc_SetMovieVolume,
+    nullptr,
+    "<global>",
+    kSetMovieVolumeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00875020 (FUN_00875020, cfunc_SetMovieVolumeL)
+ *
+ * What it does:
+ * Reads one volume argument, validates numeric type, and applies movie-volume
+ * transform through process-global movie manager lane when present.
+ */
+int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetMovieVolumeHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject volumeArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    volumeArg.TypeError("number");
+  }
+
+  const float requestedVolume = static_cast<float>(lua_tonumber(rawState, 1));
+  if (gMovieManager != nullptr) {
+    gMovieManager->SetVolumeFromLua(requestedVolume);
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x00875100 (FUN_00875100, cfunc_GetMovieVolume)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_GetMovieVolumeL`.
+ */
+int moho::cfunc_GetMovieVolume(lua_State* const luaContext)
+{
+  return cfunc_GetMovieVolumeL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x00875120 (FUN_00875120, func_GetMovieVolume_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `GetMovieVolume`.
+ */
+moho::CScrLuaInitForm* moho::func_GetMovieVolume_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetMovieVolume",
+    &moho::cfunc_GetMovieVolume,
+    nullptr,
+    "<global>",
+    kGetMovieVolumeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00875180 (FUN_00875180, cfunc_GetMovieVolumeL)
+ *
+ * What it does:
+ * Validates zero-argument call shape and returns current movie-volume lane
+ * (fallback `1.0` when no movie manager exists).
+ */
+int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetMovieVolumeHelpText, 0, argumentCount);
+  }
+
+  float volume = 1.0f;
+  if (gMovieManager != nullptr) {
+    volume = gMovieManager->GetVolumeForLua();
+  }
+
+  lua_pushnumber(rawState, volume);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x008753A0 (FUN_008753A0, cfunc_GetMovieDuration)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_GetMovieDurationL`.
+ */
+int moho::cfunc_GetMovieDuration(lua_State* const luaContext)
+{
+  return cfunc_GetMovieDurationL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x008753C0 (FUN_008753C0, func_GetMovieDuration_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `GetMovieDuration`
+ * in the core init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "GetMovieDuration",
+    &moho::cfunc_GetMovieDuration,
+    nullptr,
+    "<global>",
+    kGetMovieDurationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00875420 (FUN_00875420, cfunc_GetMovieDurationL)
+ *
+ * What it does:
+ * Reads one movie path argument, validates string type, and returns
+ * duration in seconds through `MOV_GetDuration`.
+ */
+int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected %d args, but got %d", kGetMovieDurationHelpText, 1, argumentCount
+    );
+  }
+
+  LuaPlus::LuaStackObject moviePathArg(state, 1);
+  const char* moviePath = lua_tostring(rawState, 1);
+  if (moviePath == nullptr) {
+    moviePathArg.TypeError("string");
+    moviePath = "";
+  }
+
+  const float durationSeconds = MOV_GetDuration(moviePath);
+  lua_pushnumber(rawState, durationSeconds);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x008C9660 (FUN_008C9660, cfunc_GetAntiAliasingOptions)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_GetAntiAliasingOptionsL`.
+ */
+int moho::cfunc_GetAntiAliasingOptions(lua_State* const luaContext)
+{
+  return cfunc_GetAntiAliasingOptionsL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x008C9680 (FUN_008C9680, func_GetAntiAliasingOptions_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for
+ * `GetAntiAliasingOptions` in the user init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetAntiAliasingOptions_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetAntiAliasingOptions",
+    &moho::cfunc_GetAntiAliasingOptions,
+    nullptr,
+    "<global>",
+    kGetAntiAliasingOptionsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008C96E0 (FUN_008C96E0, cfunc_GetAntiAliasingOptionsL)
+ *
+ * What it does:
+ * Builds and returns a Lua array-like table of anti-aliasing option keys from
+ * active head sample modes (`0` disabled plus packed mode entries).
+ */
+int moho::cfunc_GetAntiAliasingOptionsL(LuaPlus::LuaState* const state)
+{
+  if (state == nullptr || state->m_state == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected %d args, but got %d", kGetAntiAliasingOptionsHelpText, 0, argumentCount
+    );
+  }
+
+  LuaPlus::LuaObject optionsTable(state);
+  optionsTable.AssignNewTable(state, 0, 0);
+  optionsTable.SetInteger(1, 0);
+
+  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+  gpg::gal::DeviceContext* const context = device ? device->GetDeviceContext() : nullptr;
+  const gpg::gal::Head* const head =
+    (context != nullptr && context->GetHeadCount() > 0) ? &context->GetHead(0) : nullptr;
+
+  if (head != nullptr) {
+    const gpg::gal::HeadSampleOption* const begin = head->mStrs.begin();
+    const gpg::gal::HeadSampleOption* const end = head->mStrs.end();
+    if (begin != nullptr && end != nullptr) {
+      std::int32_t tableIndex = 2;
+      for (const gpg::gal::HeadSampleOption* it = begin; it != end; ++it) {
+        const std::uint32_t packedMode =
+          static_cast<std::uint32_t>(it->sampleType) | (static_cast<std::uint32_t>(it->sampleQuality) << 5u);
+        optionsTable.SetInteger(tableIndex++, static_cast<std::int32_t>(packedMode));
+      }
+    }
+  }
+
+  optionsTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008C9490 (FUN_008C9490, cfunc_GetOptions)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_GetOptionsL`.
+ */
+int moho::cfunc_GetOptions(lua_State* const luaContext)
+{
+  return cfunc_GetOptionsL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x008C94B0 (FUN_008C94B0, func_GetOptions_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `GetOptions` in the
+ * user init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetOptions_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetOptions",
+    &moho::cfunc_GetOptions,
+    nullptr,
+    "<global>",
+    "obj GetOptions()"
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008C9510 (FUN_008C9510, cfunc_GetOptionsL)
+ *
+ * What it does:
+ * Reads one options key string and pushes the current preference value.
+ */
+int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
+{
+  if (state == nullptr || state->m_state == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetOptionsHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject keyArg(state, 1);
+  const char* keyText = lua_tostring(rawState, 1);
+  if (keyText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&keyArg, "string");
+    keyText = "";
+  }
+
+  msvc8::string optionKey{};
+  optionKey.assign_owned(keyText);
+
+  LuaPlus::LuaObject valueObject(state);
+  valueObject.AssignNil(state);
+
+  if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
+    msvc8::string optionValue{};
+    if (preferences->LookupCurrentOption(&optionValue, optionKey)) {
+      valueObject.AssignString(state, optionValue.c_str());
+    }
+  }
+
+  valueObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008C9850 (FUN_008C9850, cfunc_GetPreference)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_GetPreferenceL`.
+ */
+int moho::cfunc_GetPreference(lua_State* const luaContext)
+{
+  return cfunc_GetPreferenceL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x008C9870 (FUN_008C9870, func_GetPreference_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `GetPreference`
+ * in the user init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetPreference_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetPreference",
+    &moho::cfunc_GetPreference,
+    nullptr,
+    "<global>",
+    kGetPreferenceHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008C98D0 (FUN_008C98D0, cfunc_GetPreferenceL)
+ *
+ * What it does:
+ * Resolves one preference key and returns its Lua object value, with optional
+ * default object fallback from arg #2.
+ */
+int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
+{
+  if (state == nullptr || state->m_state == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgRangeWarning, kGetPreferenceHelpText, 1, 2, argumentCount);
+  }
+
+  lua_settop(rawState, 2);
+
+  LuaPlus::LuaStackObject keyArg(state, 1);
+  const char* keyText = lua_tostring(rawState, 1);
+  if (keyText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&keyArg, "string");
+    keyText = "";
+  }
+
+  msvc8::string key;
+  key.assign_owned(keyText);
+
+  LuaPlus::LuaObject preferenceObject(state);
+  preferenceObject.AssignNil(state);
+
+  if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
+    LuaPlus::LuaObject* const preferenceTable = static_cast<LuaPlus::LuaObject*>(preferences->GetPreferenceTable());
+    if (preferenceTable != nullptr) {
+      preferenceObject = preferenceTable->Lookup(key.c_str());
+    }
+  }
+
+  if (preferenceObject.IsNil()) {
+    preferenceObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 2));
+  }
+
+  preferenceObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008C9A50 (FUN_008C9A50, cfunc_SetPreference)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_SetPreferenceL`.
+ */
+int moho::cfunc_SetPreference(lua_State* const luaContext)
+{
+  return cfunc_SetPreferenceL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x008C9A70 (FUN_008C9A70, func_SetPreference_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `SetPreference`
+ * in the user init set.
+ */
+moho::CScrLuaInitForm* moho::func_SetPreference_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetPreference",
+    &moho::cfunc_SetPreference,
+    nullptr,
+    "<global>",
+    kSetPreferenceHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008C9AD0 (FUN_008C9AD0, cfunc_SetPreferenceL)
+ *
+ * What it does:
+ * Reads `(key, value)` from Lua and stores the preference object under `key`.
+ */
+int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
+{
+  if (state == nullptr || state->m_state == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetPreferenceHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaObject valueObject(LuaPlus::LuaStackObject(state, 2));
+
+  LuaPlus::LuaStackObject keyArg(state, 1);
+  const char* keyText = lua_tostring(rawState, 1);
+  if (keyText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&keyArg, "string");
+    keyText = "";
+  }
+
+  msvc8::string key;
+  key.assign_owned(keyText);
+
+  if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
+    preferences->SetObject(key, &valueObject);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x008C9C30 (FUN_008C9C30, cfunc_SavePreferences)
+ *
+ * What it does:
+ * Validates zero-argument call shape and persists current user preferences.
+ */
+int moho::cfunc_SavePreferences(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSavePreferencesHelpText, 0, argumentCount);
+  }
+
+  USER_SavePreferences();
+  return 0;
+}
+
+/**
+ * Address: 0x008C9C70 (FUN_008C9C70, func_SavePreferences_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for `SavePreferences`
+ * in the user init set.
+ */
+moho::CScrLuaInitForm* moho::func_SavePreferences_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SavePreferences",
+    &moho::cfunc_SavePreferences,
+    nullptr,
+    "<global>",
+    kSavePreferencesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BE8BF0 (FUN_00BE8BF0, register_SavePreferences_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to
+ * `func_SavePreferences_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_SavePreferences_LuaFuncDef()
+{
+  return func_SavePreferences_LuaFuncDef();
+}
+
+/**
+ * Address: 0x008CAEA0 (FUN_008CAEA0, cfunc_DebugFacilitiesEnabled)
+ *
+ * What it does:
+ * Lua C callback thunk that unwraps `lua_State*` and forwards to
+ * `cfunc_DebugFacilitiesEnabledL`.
+ */
+int moho::cfunc_DebugFacilitiesEnabled(lua_State* const luaContext)
+{
+  return cfunc_DebugFacilitiesEnabledL(ResolveBindingLuaState(luaContext));
+}
+
+/**
+ * Address: 0x008CAEC0 (FUN_008CAEC0, func_DebugFacilitiesEnabled_LuaFuncDef)
+ *
+ * What it does:
+ * Returns/creates the global Lua binder definition for
+ * `DebugFacilitiesEnabled` in the user init set.
+ */
+moho::CScrLuaInitForm* moho::func_DebugFacilitiesEnabled_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "DebugFacilitiesEnabled",
+    &moho::cfunc_DebugFacilitiesEnabled,
+    nullptr,
+    "<global>",
+    kDebugFacilitiesEnabledHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BE8CE0 (FUN_00BE8CE0, j_func_DebugFacilitiesEnabled_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to
+ * `func_DebugFacilitiesEnabled_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::j_func_DebugFacilitiesEnabled_LuaFuncDef()
+{
+  return func_DebugFacilitiesEnabled_LuaFuncDef();
+}
+
+/**
+ * Address: 0x008CAF20 (FUN_008CAF20, cfunc_DebugFacilitiesEnabledL)
+ *
+ * What it does:
+ * Validates zero-argument call shape and returns whether debug facilities
+ * are enabled.
+ */
+int moho::cfunc_DebugFacilitiesEnabledL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected %d args, but got %d", kDebugFacilitiesEnabledHelpText, 0, argumentCount
+    );
+  }
+
+  lua_pushboolean(rawState, USER_DebugFacilitiesEnabled() ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
 }
 
 namespace
@@ -3693,6 +4616,145 @@ msvc8::string moho::USER_GetSaveGameExt()
 }
 
 /**
+ * Address: 0x008CA3A0 (FUN_008CA3A0)
+ *
+ * What it does:
+ * Returns `<USER_GetAppDocDir()> + "replays\\"`.
+ */
+msvc8::string moho::USER_GetReplayDir()
+{
+  return USER_GetAppDocDir() + ReplayDirName() + "\\";
+}
+
+/**
+ * Address: 0x008CA450 (FUN_008CA450)
+ *
+ * What it does:
+ * Returns `<APP preference prefix> + "Replay"`.
+ */
+msvc8::string moho::USER_GetReplayExt()
+{
+  return APP_GetPreferencePrefix() + ReplayExtName();
+}
+
+/**
+ * Address: 0x008CA470 (FUN_008CA470)
+ *
+ * What it does:
+ * Returns `<APP preference prefix> + "CampaignSave"`.
+ */
+msvc8::string moho::USER_GetCampaignSaveExt()
+{
+  return APP_GetPreferencePrefix() + CampaignSaveExtName();
+}
+
+/**
+ * Address: 0x008CA490 (FUN_008CA490)
+ *
+ * What it does:
+ * Returns `<USER_GetAppDocDir()> + "screenshots\\"` and ensures the
+ * screenshot directory exists.
+ */
+msvc8::string moho::USER_GetScreenshotDir()
+{
+  msvc8::string outDir = USER_GetAppDocDir() + ScreenshotDirName() + "\\";
+  const std::wstring widePath = gpg::STR_Utf8ToWide(outDir.c_str());
+  if (::CreateDirectoryW(widePath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
+    throw std::runtime_error(gpg::STR_Printf("Unable to create directory %s", outDir.c_str()).to_std());
+  }
+  return outDir;
+}
+
+/**
+ * Address: 0x008CA650 (FUN_008CA650, USER_GetSpecialFiles)
+ *
+ * ESpecialFileType, std::string &, std::string &,
+ * std::map<std::string,std::vector<std::string>> &
+ *
+ * What it does:
+ * Resolves the special-file directory/extension pair, ensures the root
+ * folder exists, then groups profile-scoped files by profile directory.
+ */
+void moho::USER_GetSpecialFiles(
+  const ESpecialFileType specialFileType,
+  std::string& outDirectory,
+  std::string& outExtension,
+  std::map<std::string, std::vector<std::string>>& outFilesByProfile
+)
+{
+  switch (specialFileType) {
+    case ESpecialFileType::SaveGame:
+      outDirectory = USER_GetSaveGameDir().to_std();
+      outExtension = USER_GetSaveGameExt().to_std();
+      break;
+    case ESpecialFileType::Replay:
+      outDirectory = USER_GetReplayDir().to_std();
+      outExtension = USER_GetReplayExt().to_std();
+      break;
+    case ESpecialFileType::CampaignSave:
+      outDirectory = USER_GetSaveGameDir().to_std();
+      outExtension = USER_GetCampaignSaveExt().to_std();
+      break;
+    case ESpecialFileType::Screenshot:
+    default:
+      {
+        ESpecialFileType reflectedType = specialFileType;
+        gpg::RRef enumRef{};
+        gpg::RRef_ESpecialFileType(&enumRef, &reflectedType);
+        const msvc8::string lexical = enumRef.GetLexical();
+        throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical.c_str()).to_std());
+      }
+  }
+
+  const std::wstring wideDirectory = gpg::STR_Utf8ToWide(outDirectory.c_str());
+  if (::CreateDirectoryW(wideDirectory.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
+    throw std::runtime_error(gpg::STR_Printf("Unable to create directory %s", outDirectory.c_str()).to_std());
+  }
+
+  const std::wstring profilePattern = gpg::STR_Utf8ToWide((outDirectory + "*").c_str());
+  WIN32_FIND_DATAW profileFindData{};
+  const HANDLE profileFindHandle = ::FindFirstFileW(profilePattern.c_str(), &profileFindData);
+  if (profileFindHandle == INVALID_HANDLE_VALUE) {
+    return;
+  }
+
+  do {
+    if ((profileFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0u) {
+      continue;
+    }
+
+    const std::string profileName = gpg::STR_WideToUtf8(profileFindData.cFileName).to_std();
+    const std::string filePattern = outDirectory + profileName + "\\*." + outExtension;
+    const std::wstring wideFilePattern = gpg::STR_Utf8ToWide(filePattern.c_str());
+
+    WIN32_FIND_DATAW fileFindData{};
+    const HANDLE fileFindHandle = ::FindFirstFileW(wideFilePattern.c_str(), &fileFindData);
+    if (fileFindHandle == INVALID_HANDLE_VALUE) {
+      continue;
+    }
+
+    do {
+      const std::string fileName = gpg::STR_WideToUtf8(fileFindData.cFileName).to_std();
+      outFilesByProfile[profileName].push_back(fileName);
+    } while (::FindNextFileW(fileFindHandle, &fileFindData) != FALSE);
+
+    if (::GetLastError() != ERROR_NO_MORE_FILES) {
+      ::FindClose(fileFindHandle);
+      throw std::runtime_error("Error finding files");
+    }
+
+    ::FindClose(fileFindHandle);
+  } while (::FindNextFileW(profileFindHandle, &profileFindData) != FALSE);
+
+  if (::GetLastError() != ERROR_NO_MORE_FILES) {
+    ::FindClose(profileFindHandle);
+    throw std::runtime_error("Error finding prefs directories");
+  }
+
+  ::FindClose(profileFindHandle);
+}
+
+/**
  * Address: 0x008CAE20 (FUN_008CAE20)
  *
  * What it does:
@@ -4151,6 +5213,77 @@ msvc8::string moho::OPTIONS_GetString(const gpg::StrArg key)
 }
 
 /**
+ * Address: 0x008C6BF0 (FUN_008C6BF0)
+ * Mangled: ?OPTIONS_GetBool@Moho@@YA_NVStrArg@gpg@@@Z
+ *
+ * What it does:
+ * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the value as one
+ * boolean lane; on Lua bridge failure logs a warning and returns `false`.
+ */
+bool moho::OPTIONS_GetBool(const gpg::StrArg key)
+{
+  try {
+    LuaPlus::LuaState* const state = USER_GetLuaState();
+    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
+    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
+    LuaPlus::LuaObject optionValue = getOptionFn(key);
+    return optionValue.GetBoolean();
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
+    return false;
+  }
+}
+
+/**
+ * Address: 0x008C6CF0 (FUN_008C6CF0)
+ * Mangled: ?OPTIONS_Apply@Moho@@YAXXZ
+ *
+ * What it does:
+ * Invokes `/lua/options/optionslogic.lua:Apply()` and discards the return
+ * object. Lua bridge failures are logged without aborting startup flow.
+ */
+void moho::OPTIONS_Apply()
+{
+  try {
+    LuaPlus::LuaState* const state = USER_GetLuaState();
+    LuaPlus::LuaObject optionsModule = SCR_Import(state, kOptionsLogicModulePath);
+    LuaPlus::LuaObject applyFnObject = optionsModule[kApplyMethodName];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> applyFn(applyFnObject);
+    LuaPlus::LuaObject callResult = applyFn();
+    (void)callResult;
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kOptionsApplyLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
+  }
+}
+
+/**
+ * Address: 0x008C6DC0 (FUN_008C6DC0)
+ * Mangled: ?OPTIONS_SetCustomData@Moho@@YAXVStrArg@gpg@@ABVLuaObject@LuaPlus@@1@Z
+ *
+ * What it does:
+ * Invokes `/lua/options/optionslogic.lua:SetCustomData` for one option key
+ * using `(customData, defaultValue)` Lua object lanes.
+ */
+void moho::OPTIONS_SetCustomData(
+  const gpg::StrArg key,
+  const LuaPlus::LuaObject& customData,
+  const LuaPlus::LuaObject& defaultValue
+)
+{
+  try {
+    LuaPlus::LuaState* const state = customData.GetActiveState();
+    LuaPlus::LuaObject optionsModule = SCR_Import(state, kOptionsLogicModulePath);
+    LuaPlus::LuaObject setCustomDataFnObject = optionsModule[kSetCustomDataMethodName];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> setCustomDataFn(setCustomDataFnObject);
+    LuaPlus::LuaObject callResult = setCustomDataFn(key, customData, defaultValue);
+    (void)callResult;
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kOptionsSetCustomDataLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
+  }
+}
+
+/**
  * Address: 0x008C6EC0 (FUN_008C6EC0)
  * Mangled: ?OPTIONS_CreateInitialProfileIfNeeded@Moho@@YAXVStrArg@gpg@@@Z
  *
@@ -4250,7 +5383,7 @@ void moho::SetupPrimaryAdapterSettings()
 
     LuaPlus::LuaObject defaultValue(state);
     defaultValue.AssignString(state, "1024,768,60");
-    OptionsSetCustomData(state, kPrimaryAdapterKey, optionRoot, defaultValue);
+    OPTIONS_SetCustomData(kPrimaryAdapterKey, optionRoot, defaultValue);
     return;
   }
 
@@ -4258,7 +5391,7 @@ void moho::SetupPrimaryAdapterSettings()
 
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignString(state, kCommandLineOverrideModeKey);
-  OptionsSetCustomData(state, kPrimaryAdapterKey, optionRoot, defaultValue);
+  OPTIONS_SetCustomData(kPrimaryAdapterKey, optionRoot, defaultValue);
 }
 
 /**
@@ -4283,7 +5416,7 @@ void moho::SetupSecondaryAdapterSettings(const bool adapterNotCommandLineOverrid
 
     LuaPlus::LuaObject defaultValue(state);
     defaultValue.AssignString(state, kCommandLineOverrideModeKey);
-    OptionsSetCustomData(state, kSecondaryAdapterKey, optionRoot, defaultValue);
+    OPTIONS_SetCustomData(kSecondaryAdapterKey, optionRoot, defaultValue);
     return;
   }
 
@@ -4306,7 +5439,7 @@ void moho::SetupSecondaryAdapterSettings(const bool adapterNotCommandLineOverrid
 
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignString(state, kDisabledModeKey);
-  OptionsSetCustomData(state, kSecondaryAdapterKey, optionRoot, defaultValue);
+  OPTIONS_SetCustomData(kSecondaryAdapterKey, optionRoot, defaultValue);
 }
 
 /**
@@ -4347,7 +5480,7 @@ void moho::CreateFidelityPresets()
 
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignNumber(state, 1.0);
-  OptionsSetCustomData(state, kFidelityPresetsKey, optionRoot, defaultValue);
+  OPTIONS_SetCustomData(kFidelityPresetsKey, optionRoot, defaultValue);
 }
 
 /**
@@ -4379,7 +5512,7 @@ void moho::SetupFidelitySettings()
 
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignNumber(state, 1.0);
-  OptionsSetCustomData(state, kFidelityKey, optionRoot, defaultValue);
+  OPTIONS_SetCustomData(kFidelityKey, optionRoot, defaultValue);
 }
 
 /**
@@ -4412,7 +5545,7 @@ void moho::SetupShadowQualitySettings()
 
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignNumber(state, 1.0);
-  OptionsSetCustomData(state, kShadowQualityKey, optionRoot, defaultValue);
+  OPTIONS_SetCustomData(kShadowQualityKey, optionRoot, defaultValue);
 }
 
 /**
@@ -4452,7 +5585,7 @@ void moho::SetupAntiAliasingSettings()
 
   LuaPlus::LuaObject defaultValue(state);
   defaultValue.AssignNumber(state, 0.0);
-  OptionsSetCustomData(state, kAntiAliasingKey, optionRoot, defaultValue);
+  OPTIONS_SetCustomData(kAntiAliasingKey, optionRoot, defaultValue);
 }
 
 /**
@@ -4469,6 +5602,51 @@ void moho::SetupBasicMovieManager()
   }
 
   gMovieManager = manager;
+}
+
+/**
+ * Address: 0x00874D30 (FUN_00874D30, `Moho::MOV_GetDuration`)
+ *
+ * What it does:
+ * Resolves one movie path through mounted VFS state, parses Sofdec header
+ * metadata, and returns duration in seconds for valid SFD payloads.
+ */
+float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
+{
+  if (gMovieManager == nullptr) {
+    gpg::Warnf("Movie component not initialized.");
+    return 0.0f;
+  }
+
+  const char* const requestedPath = sourcePath != nullptr ? sourcePath : "";
+  FILE_EnsureWaitHandleSet();
+  FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+
+  msvc8::string resolvedPath{};
+  (void)waitHandleSet->mHandle->FindFile(&resolvedPath, requestedPath, nullptr);
+  if (resolvedPath.empty()) {
+    gpg::Warnf("Movie file \"%s\" doesn't exist.", requestedPath);
+    return 0.0f;
+  }
+
+  const gpg::MemBuffer<const char> mappedMovieData = DISK_MemoryMapFile(resolvedPath.c_str());
+  if (mappedMovieData.mBegin == nullptr) {
+    return 0.0f;
+  }
+
+  SofdecHeaderInfoRuntimeView headerInfo{};
+  std::memset(&headerInfo, 0, sizeof(headerInfo));
+  const std::int32_t mappedByteCount = static_cast<std::int32_t>(mappedMovieData.mEnd - mappedMovieData.mBegin);
+  (void)mwPlyGetHdrInf(mappedMovieData.mBegin, mappedByteCount, &headerInfo);
+
+  const bool validType =
+    (headerInfo.streamType == kSofdecHeaderTypeMovie || headerInfo.streamType == kSofdecHeaderTypeMovieAlt);
+  if (validType && headerInfo.headerValid != 0 && headerInfo.frameRateTimes1000 != 0) {
+    return static_cast<float>(headerInfo.frameCount) / (static_cast<float>(headerInfo.frameRateTimes1000) * 0.001f);
+  }
+
+  gpg::Warnf("%s is not a valid SFD file.", requestedPath);
+  return 0.0f;
 }
 
 /**

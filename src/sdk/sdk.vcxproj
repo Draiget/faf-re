@@ -94,19 +94,19 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;$(SolutionDir)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib;wxmsw.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -115,30 +115,30 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;$(SolutionDir)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib;wxmsw.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,7 +146,7 @@
     </Link>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -155,11 +155,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)dependencies\zlib-1.2.3\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -167,13 +167,14 @@
     </Link>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)dependencies\zlib-1.2.3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>zlib.lib</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="gpg\core\algorithms\Cluster.cpp" />
     <ClCompile Include="gpg\core\algorithms\MD5.cpp" />
     <ClCompile Include="gpg\core\containers\ArchiveSerialization.cpp" />
+    <ClCompile Include="gpg\core\containers\ArchiveTokenTypeInfo.cpp" />
     <ClCompile Include="gpg\core\containers\BitArray2D.cpp" />
     <ClCompile Include="gpg\core\containers\ReadArchive.cpp" />
     <ClCompile Include="gpg\core\containers\SerSaveLoadHelper_Box3f.cpp" />
@@ -340,6 +341,9 @@
     <ClCompile Include="moho\ai\CAiPathSplineTypeInfo.cpp" />
     <ClCompile Include="moho\ai\EPathTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ai\ESearchTypeTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\ESiloTypeTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\EEconResourceTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\EFormationdStatusTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAiTarget.cpp" />
     <ClCompile Include="moho\ai\CAiTargetSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiTargetTypeInfo.cpp" />
@@ -356,6 +360,7 @@
     <ClCompile Include="moho\ai\SAiReservedTransportBoneTypeInfo.cpp" />
     <ClCompile Include="moho\ai\SAttachPointSerializer.cpp" />
     <ClCompile Include="moho\ai\SAttachPointTypeInfo.cpp" />
+    <ClCompile Include="moho\ai\SPointVectorTypeInfo.cpp" />
     <ClCompile Include="moho\ai\STransportPickUpInfoSerializer.cpp" />
     <ClCompile Include="moho\ai\STransportPickUpInfoTypeInfo.cpp" />
     <ClCompile Include="moho\ai\SContinueInfoSerializer.cpp" />
@@ -371,12 +376,32 @@
     <ClCompile Include="moho\animation\CAniSkel.cpp" />
     <ClCompile Include="moho\animation\CAniSkelTypeInfo.cpp" />
     <ClCompile Include="moho\animation\IAniManipulator.cpp" />
+    <ClCompile Include="moho\animation\CSlideManipulator.cpp" />
+    <ClCompile Include="moho\animation\CSlaveManipulator.cpp" />
     <ClCompile Include="moho\animation\SAniManipBindingReflection.cpp" />
     <ClCompile Include="moho\animation\CAnimationManipulator.cpp" />
     <ClCompile Include="moho\audio\AudioEngine.cpp" />
+    <ClCompile Include="moho\audio\AudioReflectionHelpers.cpp" />
+    <ClCompile Include="moho\audio\CSndParams.cpp" />
+    <ClCompile Include="moho\audio\CSndParamsTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\CSndVar.cpp" />
+    <ClCompile Include="moho\audio\CSndVarTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\HSoundTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\SAudioRequestSerializer.cpp" />
+    <ClCompile Include="moho\audio\SAudioRequestTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\SParamKeySerializer.cpp" />
+    <ClCompile Include="moho\audio\SParamKeyTypeInfo.cpp" />
     <ClCompile Include="moho\audio\CUserSoundManager.cpp" />
     <ClCompile Include="moho\audio\CSimSoundManager.cpp" />
     <ClCompile Include="moho\audio\ISoundManager.cpp" />
+    <ClCompile Include="moho\audio\SofdecRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecAdxDecodeRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecAdxWavSpsdRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecM2aHuffmanRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecM2aImdctRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecMpaBitReaderRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecMpaFrameRuntime.cpp" />
+    <ClCompile Include="moho\audio\SofdecMpaDecodeRuntime.cpp" />
     <ClCompile Include="moho\app\CScApp.cpp" />
     <ClCompile Include="moho\app\CWaitHandleSet.cpp" />
     <ClCompile Include="moho\app\IWinApp.cpp" />
@@ -393,6 +418,7 @@
     <ClCompile Include="moho\collision\CColPrimitiveSphere3f.cpp" />
     <ClCompile Include="moho\collision\CounterIntelExtractor.cpp" />
     <ClCompile Include="moho\collision\CGeomSolid3.cpp" />
+    <ClCompile Include="moho\render\tess\CTesselator.cpp" />
     <ClCompile Include="moho\collision\IntelExtractor.cpp" />
     <ClCompile Include="moho\collision\RDebugCollision.cpp" />
     <ClCompile Include="moho\collision\RDebugCollisionTypeInfo.cpp" />
@@ -401,6 +427,8 @@
     <ClCompile Include="moho\command\CCommandDbSerHelpers.cpp" />
     <ClCompile Include="moho\command\EUnitCommandTypeTypeInfo.cpp" />
     <ClCompile Include="moho\command\ICommandSink.cpp" />
+    <ClCompile Include="moho\command\SSTICommandConstantData.cpp" />
+    <ClCompile Include="moho\command\SSTICommandVariableData.cpp" />
     <ClCompile Include="moho\console\CConAlias.cpp" />
     <ClCompile Include="moho\console\CConFunc.cpp" />
     <ClCompile Include="moho\console\CConCommand.cpp" />
@@ -409,7 +437,13 @@
     <ClCompile Include="moho\entity\EntityCategoryReflection.cpp" />
     <ClCompile Include="moho\entity\EntityCollisionUpdater.cpp" />
     <ClCompile Include="moho\entity\Entity.cpp" />
+    <ClCompile Include="moho\entity\ELayerTypeInfo.cpp" />
+    <ClCompile Include="moho\entity\EVisibilityModeTypeInfo.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamStartupRegistrations.cpp" />
+    <ClCompile Include="moho\entity\CollisionBeamEntity.cpp" />
+    <ClCompile Include="moho\entity\CollisionBeamEntityConstruct.cpp" />
+    <ClCompile Include="moho\entity\CollisionBeamEntitySaveConstruct.cpp" />
+    <ClCompile Include="moho\entity\CollisionBeamEntitySerializer.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntityLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\entity\EntityLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\entity\REntityBlueprint.cpp" />
@@ -443,6 +477,8 @@
     <ClCompile Include="moho\entity\UserEntity.cpp" />
     <ClCompile Include="moho\path\IPathTraveler.cpp" />
     <ClCompile Include="moho\path\IPathTravelerTypeInfo.cpp" />
+    <ClCompile Include="moho\path\SNamedFootprintTypeInfo.cpp" />
+    <ClCompile Include="moho\path\SNavGoal.cpp" />
     <ClCompile Include="moho\path\RDebugNavPath.cpp" />
     <ClCompile Include="moho\path\RDebugNavPathTypeInfo.cpp" />
     <ClCompile Include="moho\path\PathTables.cpp" />
@@ -451,8 +487,10 @@
     <ClCompile Include="moho\containers\BVIntSetTypeInfo.cpp" />
     <ClCompile Include="moho\containers\BVSet.cpp" />
     <ClCompile Include="moho\containers\BitStorage32.cpp" />
+    <ClCompile Include="moho\containers\SCoordsVec2TypeInfo.cpp" />
     <ClCompile Include="moho\core\Thread.cpp" />
     <ClCompile Include="moho\math\GridPos.cpp" />
+    <ClCompile Include="moho\math\MathReflection.cpp" />
     <ClCompile Include="moho\math\Vector4f.cpp" />
     <ClCompile Include="moho\debug\CPathDebugger.cpp" />
     <ClCompile Include="moho\debug\CPathDebuggerTypeInfo.cpp" />
@@ -489,8 +527,10 @@
     <ClCompile Include="moho\render\SParticleBuffer.cpp" />
     <ClCompile Include="moho\render\CDecalBufferSerializer.cpp" />
     <ClCompile Include="moho\render\CDecalBufferTypeInfo.cpp" />
+    <ClCompile Include="moho\render\CWldTerrainDecal.cpp" />
     <ClCompile Include="moho\render\CWldTerrainDecalTYPETypeInfo.cpp" />
     <ClCompile Include="moho\render\CDecalHandle.cpp" />
+    <ClCompile Include="moho\render\CDecalTypes.cpp" />
     <ClCompile Include="moho\render\CDecalHandleSerializer.cpp" />
     <ClCompile Include="moho\render\CDecalHandleTypeInfo.cpp" />
     <ClCompile Include="moho\render\BoundaryRenderer.cpp" />
@@ -568,6 +608,7 @@
     <ClCompile Include="moho\entity\EntityCategorySetTypeInfo.cpp" />
     <ClCompile Include="moho\entity\EntityCategorySetVectorReflection.cpp" />
     <ClCompile Include="moho\misc\EngineStatsCleanup.cpp" />
+    <ClCompile Include="moho\projectile\Projectile.cpp" />
     <ClCompile Include="moho\projectile\ProjectileLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\projectile\ProjectileSerHelpers.cpp" />
     <ClCompile Include="moho\projectile\ProjectileStartupRegistrations.cpp" />
@@ -579,10 +620,13 @@
     <ClCompile Include="moho\misc\XFileError.cpp" />
     <ClCompile Include="moho\misc\TimeBar.cpp" />
     <ClCompile Include="moho\misc\TypeInfo.cpp" />
+    <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp" />
     <ClCompile Include="moho\misc\StringUtils.cpp" />
     <ClCompile Include="moho\misc\ID3DDeviceResources.cpp" />
     <ClCompile Include="moho\misc\FileWaitHandleSet.cpp" />
     <ClCompile Include="moho\misc\StartupHelpers.cpp" />
+    <ClCompile Include="moho\misc\StrSafeRuntime.cpp" />
+    <ClCompile Include="moho\misc\WinApiImportThunks.cpp" />
     <ClCompile Include="moho\misc\SessionStartup.cpp" />
     <ClCompile Include="moho\misc\CSaveGameRequestImpl.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp" />
@@ -638,6 +682,7 @@
     <ClCompile Include="moho\resource\CAniResourceSkelConstruct.cpp" />
     <ClCompile Include="moho\resource\CAniResourceSkelSaveConstruct.cpp" />
     <ClCompile Include="moho\resource\CAniResourceSkelTypeInfo.cpp" />
+    <ClCompile Include="moho\resource\ResourceFactory.cpp" />
     <ClCompile Include="moho\resource\RScmResource.cpp" />
     <ClCompile Include="moho\resource\RScmResourceTypeInfo.cpp" />
     <ClCompile Include="moho\resource\CParticleTexture.cpp" />
@@ -648,6 +693,7 @@
     <ClCompile Include="moho\render\d3d\CD3DTextureResourceFactory.cpp" />
     <ClCompile Include="moho\resource\IResources.cpp" />
     <ClCompile Include="moho\resource\IResourcesTypeInfo.cpp" />
+    <ClCompile Include="moho\resource\EResourceTypeTypeInfo.cpp" />
     <ClCompile Include="moho\resource\ISimResources.cpp" />
     <ClCompile Include="moho\resource\ISimResourcesTypeInfo.cpp" />
     <ClCompile Include="moho\render\d3d\RD3DTextureResource.cpp" />
@@ -660,11 +706,15 @@
     <ClCompile Include="moho\resource\CResourceWatcher.cpp" />
     <ClCompile Include="moho\resource\ResourceManager.cpp" />
     <ClCompile Include="moho\resource\blueprints\RBeamBlueprint.cpp" />
+    <ClCompile Include="moho\resource\blueprints\RBeamBlueprintConstruct.cpp" />
+    <ClCompile Include="moho\resource\blueprints\RBeamBlueprintSaveConstruct.cpp" />
     <ClCompile Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RBlueprint.cpp" />
     <ClCompile Include="moho\resource\blueprints\REffectBlueprint.cpp" />
     <ClCompile Include="moho\resource\blueprints\REffectBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\REmitterBlueprint.cpp" />
+    <ClCompile Include="moho\resource\blueprints\REmitterBlueprintConstruct.cpp" />
+    <ClCompile Include="moho\resource\blueprints\REmitterBlueprintSaveConstruct.cpp" />
     <ClCompile Include="moho\resource\blueprints\REmitterBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\REmitterCurveTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RMeshBlueprint.cpp" />
@@ -679,6 +729,7 @@
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RPropBlueprint.cpp" />
     <ClCompile Include="moho\resource\blueprints\RPropBlueprintDisplayTypeInfo.cpp" />
+    <ClCompile Include="moho\resource\blueprints\RPropBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprint.cpp" />
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprintConstruct.cpp" />
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprintSaveConstruct.cpp" />
@@ -704,6 +755,7 @@
     <ClCompile Include="moho\misc\ScrDebugHooks.cpp" />
     <ClCompile Include="moho\misc\ScrFileLine.cpp" />
     <ClCompile Include="moho\misc\ScrFileCtrl.cpp" />
+    <ClCompile Include="moho\misc\ScrSourceCtrl.cpp" />
     <ClCompile Include="moho\misc\ScrWatch.cpp" />
     <ClCompile Include="moho\misc\TreeData.cpp" />
     <ClCompile Include="moho\misc\ScrWatchCtrl.cpp" />
@@ -715,7 +767,9 @@
     <ClCompile Include="moho\sim\ArmyUnitSetVectorReflection.cpp" />
     <ClCompile Include="moho\sim\SDelayedSubVizInfoReflection.cpp" />
     <ClCompile Include="moho\sim\CArmyImpl.cpp" />
+    <ClCompile Include="moho\sim\CEconomy.cpp" />
     <ClCompile Include="moho\sim\CArmyLuaFunctionRegistrations.cpp" />
+    <ClCompile Include="moho\sim\CDamageLuaFunctionRegistrations.cpp" />
     <ClCompile Include="moho\sim\CPlatoon.cpp" />
     <ClCompile Include="moho\sim\CCommandLuaFunctionRegistrations.cpp" />
     <ClCompile Include="moho\sim\ManipulatorLuaFunctionThunks.cpp" />
@@ -744,6 +798,8 @@
     <ClCompile Include="moho\sim\ESquadClassTypeInfo.cpp" />
     <ClCompile Include="moho\sim\EGenericIconTypeTypeInfo.cpp" />
     <ClCompile Include="moho\sim\EImpactTypeTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\SFootprintTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\SOCellPosTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CVFSImpl.cpp" />
     <ClCompile Include="moho\sim\InfluenceGridSerializer.cpp" />
     <ClCompile Include="moho\sim\InfluenceGridTypeInfo.cpp" />
@@ -752,9 +808,13 @@
     <ClCompile Include="moho\sim\SThreatSerializer.cpp" />
     <ClCompile Include="moho\sim\SThreatTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CIntelGrid.cpp" />
+    <ClCompile Include="moho\sim\CDamage.cpp" />
+    <ClCompile Include="moho\sim\CDamageEMethodTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\ESpecialFileTypeTypeInfo.cpp" />
     <ClCompile Include="moho\sim\IdPool.cpp" />
     <ClCompile Include="moho\sim\IdPoolTypeInfo.cpp" />
     <ClCompile Include="moho\sim\IdPoolSerializer.cpp" />
+    <ClCompile Include="moho\sim\COGridSerializer.cpp" />
     <ClCompile Include="moho\sim\SMinMaxTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CRandomStream.cpp" />
     <ClCompile Include="moho\sim\CMersenneTwisterTypeInfo.cpp" />
@@ -777,6 +837,7 @@
     <ClCompile Include="moho\sim\RRuleGameRulesImplTypeInfo.cpp" />
     <ClCompile Include="moho\sim\RRuleGameRulesTypeInfo.cpp" />
     <ClCompile Include="moho\sim\RRuleGameRules.cpp" />
+    <ClCompile Include="moho\sim\SRuleFootprintsBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\sim\Sim.cpp" />
     <ClCompile Include="moho\sim\SimArmy.cpp" />
     <ClCompile Include="moho\sim\SimArmySerializer.cpp" />
@@ -785,6 +846,7 @@
     <ClCompile Include="moho\sim\IArmyTypeInfo.cpp" />
     <ClCompile Include="moho\sim\SimDriver.cpp" />
     <ClCompile Include="moho\sim\SSyncFilter.cpp" />
+    <ClCompile Include="moho\sim\SSTIArmyConstantData.cpp" />
     <ClCompile Include="moho\sim\SSTIArmyVariableData.cpp" />
     <ClCompile Include="moho\sim\SConditionTriggerReflection.cpp" />
     <ClCompile Include="moho\sim\SConditionTriggerTypes.cpp" />
@@ -801,7 +863,11 @@
     <ClCompile Include="moho\task\CTaskThreadReflectionBootstrap.cpp" />
     <ClCompile Include="moho\task\CTaskThreadWeakPtrReflection.cpp" />
     <ClCompile Include="moho\task\CWaitForTask.cpp" />
+    <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp" />
     <ClCompile Include="moho\ui\CUIManager.cpp" />
+    <ClCompile Include="moho\ui\EUIStateTypeInfo.cpp" />
+    <ClCompile Include="moho\ui\EScrollTypeTypeInfo.cpp" />
+    <ClCompile Include="moho\ui\EMauiScrollAxisTypeInfo.cpp" />
     <ClCompile Include="moho\ui\EMauiEventTypeTypeInfo.cpp" />
     <ClCompile Include="moho\ui\EMauiKeyCodeTypeInfo.cpp" />
     <ClCompile Include="moho\ui\IUIManager.cpp" />
@@ -821,9 +887,14 @@
     <ClCompile Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTransport.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTransportTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitMoveTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitPodAssist.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitRefuel.cpp" />
     <ClCompile Include="moho\unit\tasks\CFireWeaponTask.cpp" />
     <ClCompile Include="moho\unit\core\CWeaponAttributes.cpp" />
     <ClCompile Include="moho\unit\core\EIntelTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\core\EFireStateTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\core\EJobTypeTypeInfo.cpp" />
     <ClCompile Include="moho\unit\core\EUnitStateTypeInfo.cpp" />
     <ClCompile Include="moho\unit\core\RDebugWeapons.cpp" />
     <ClCompile Include="moho\unit\core\RDebugWeaponsTypeInfo.cpp" />
@@ -861,6 +932,7 @@
     <ClCompile Include="moho\vision\VisionDB.cpp" />
     <ClCompile Include="wm3\Distance3.cpp" />
     <ClCompile Include="wm3\AABB.cpp" />
+    <ClCompile Include="wm3\System.cpp" />
     <ClCompile Include="wm3\Vector2.cpp" />
     <ClCompile Include="wm3\Vector3.cpp" />
   </ItemGroup>
@@ -878,6 +950,7 @@
     <ClInclude Include="gpg\core\algorithms\MD5.h" />
     <ClInclude Include="gpg\core\containers\BitArray2D.h" />
     <ClInclude Include="gpg\core\containers\ArchiveSerialization.h" />
+    <ClInclude Include="gpg\core\containers\ArchiveTokenTypeInfo.h" />
     <ClInclude Include="gpg\core\containers\ByteSpan.h" />
     <ClInclude Include="gpg\core\containers\DList.h" />
     <ClInclude Include="gpg\core\containers\FastVector.h" />
@@ -1022,16 +1095,28 @@
     <ClInclude Include="moho\animation\CAniSkel.h" />
     <ClInclude Include="moho\animation\CAniSkelTypeInfo.h" />
     <ClInclude Include="moho\animation\IAniManipulator.h" />
+    <ClInclude Include="moho\animation\CSlideManipulator.h" />
+    <ClInclude Include="moho\animation\CSlaveManipulator.h" />
     <ClInclude Include="moho\animation\CAnimationManipulator.h" />
     <ClInclude Include="moho\audio\AudioEngine.h" />
+    <ClInclude Include="moho\audio\AudioReflectionHelpers.h" />
     <ClInclude Include="moho\audio\CSndParams.h" />
+    <ClInclude Include="moho\audio\CSndParamsTypeInfo.h" />
     <ClInclude Include="moho\audio\CSndVar.h" />
+    <ClInclude Include="moho\audio\CSndVarTypeInfo.h" />
     <ClInclude Include="moho\audio\CUserSoundManager.h" />
     <ClInclude Include="moho\audio\CSimSoundManager.h" />
     <ClInclude Include="moho\audio\HSound.h" />
+    <ClInclude Include="moho\audio\HSoundTypeInfo.h" />
     <ClInclude Include="moho\audio\IUserSoundManager.h" />
     <ClInclude Include="moho\audio\ISoundManager.h" />
     <ClInclude Include="moho\audio\SAudioRequest.h" />
+    <ClInclude Include="moho\audio\SAudioRequestSerializer.h" />
+    <ClInclude Include="moho\audio\SAudioRequestTypeInfo.h" />
+    <ClInclude Include="moho\audio\SParamKey.h" />
+    <ClInclude Include="moho\audio\SParamKeySerializer.h" />
+    <ClInclude Include="moho\audio\SParamKeyTypeInfo.h" />
+    <ClInclude Include="moho\audio\SofdecRuntime.h" />
     <ClInclude Include="moho\app\CScApp.h" />
     <ClInclude Include="moho\app\CWaitHandleSet.h" />
     <ClInclude Include="moho\app\IWinApp.h" />
@@ -1060,6 +1145,11 @@
     <ClInclude Include="moho\containers\SCoordsVec2.h" />
     <ClInclude Include="moho\entity\EntityDb.h" />
     <ClInclude Include="moho\entity\CollisionBeamStartupRegistrations.h" />
+    <ClInclude Include="moho\entity\CollisionBeamEntity.h" />
+    <ClInclude Include="moho\entity\CollisionBeamEntityConstruct.h" />
+    <ClInclude Include="moho\entity\CollisionBeamEntitySaveConstruct.h" />
+    <ClInclude Include="moho\entity\CollisionBeamEntitySerializer.h" />
+    <ClInclude Include="moho\entity\ECollisionBeamEvent.h" />
     <ClInclude Include="moho\entity\EntityCategoryLookupResolver.h" />
     <ClInclude Include="moho\entity\EntityCategoryReflection.h" />
     <ClInclude Include="moho\entity\EntityCollisionUpdater.h" />
@@ -1125,6 +1215,7 @@
     <ClInclude Include="moho\render\CDecalBuffer.h" />
     <ClInclude Include="moho\render\CDecalBufferSerializer.h" />
     <ClInclude Include="moho\render\CDecalBufferTypeInfo.h" />
+    <ClInclude Include="moho\render\CWldTerrainDecal.h" />
     <ClInclude Include="moho\render\CWldTerrainDecalTYPETypeInfo.h" />
     <ClInclude Include="moho\render\CDecalHandle.h" />
     <ClInclude Include="moho\render\CDecalHandleSerializer.h" />
@@ -1184,11 +1275,15 @@
     <ClInclude Include="moho\resource\RResIdSerializer.h" />
     <ClInclude Include="moho\resource\blueprints\BlueprintConstructSerializationHelpers.h" />
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprint.h" />
+    <ClInclude Include="moho\resource\blueprints\RBeamBlueprintConstruct.h" />
+    <ClInclude Include="moho\resource\blueprints\RBeamBlueprintSaveConstruct.h" />
     <ClInclude Include="moho\resource\blueprints\RBeamBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\REffectBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\REffectBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\REmitterBlueprint.h" />
+    <ClInclude Include="moho\resource\blueprints\REmitterBlueprintConstruct.h" />
+    <ClInclude Include="moho\resource\blueprints\REmitterBlueprintSaveConstruct.h" />
     <ClInclude Include="moho\resource\blueprints\REmitterBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\REmitterCurveTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RMeshBlueprint.h" />
@@ -1203,6 +1298,7 @@
     <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RPropBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\RPropBlueprintDisplayTypeInfo.h" />
+    <ClInclude Include="moho\resource\blueprints\RPropBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprintConstruct.h" />
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprintSaveConstruct.h" />
@@ -1265,8 +1361,10 @@
     <ClInclude Include="moho\path\IOccupationSource.h" />
     <ClInclude Include="moho\path\PathTables.h" />
     <ClInclude Include="moho\path\SNamedFootprint.h" />
+    <ClInclude Include="moho\path\SNavGoal.h" />
     <ClInclude Include="moho\sim\CDebugCanvas.h" />
     <ClInclude Include="moho\sim\COGrid.h" />
+    <ClInclude Include="moho\sim\COGridSerializer.h" />
     <ClInclude Include="moho\sim\CMersenneTwister.h" />
     <ClInclude Include="moho\sim\CMersenneTwisterTypeInfo.h" />
     <ClInclude Include="moho\sim\CMersenneTwisterSerializer.h" />
@@ -1275,6 +1373,7 @@
     <ClInclude Include="moho\sim\CRandomStreamSerializer.h" />
     <ClInclude Include="moho\sim\SDesyncInfo.h" />
     <ClInclude Include="moho\sim\SFootprint.h" />
+    <ClInclude Include="moho\sim\SFootprintTypeInfo.h" />
     <ClInclude Include="moho\sim\SOCellPos.h" />
     <ClInclude Include="moho\sim\SPhysConstants.h" />
     <ClInclude Include="moho\sim\SSTIArmyVariableData.h" />
@@ -1289,6 +1388,8 @@
     <ClInclude Include="moho\ai\CAiAttackerImplSerializer.h" />
     <ClInclude Include="moho\ai\CAiAttackerImplTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiBrain.h" />
+    <ClInclude Include="moho\ai\EEconResourceTypeInfo.h" />
+    <ClInclude Include="moho\ai\EFormationdStatusTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiBrainConstruct.h" />
     <ClInclude Include="moho\ai\CAiBrainSerializer.h" />
     <ClInclude Include="moho\ai\CAiBrainTypeInfo.h" />
@@ -1389,6 +1490,7 @@
     <ClInclude Include="moho\ai\CAiPathSplineTypeInfo.h" />
     <ClInclude Include="moho\ai\EPathTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\ESearchTypeTypeInfo.h" />
+    <ClInclude Include="moho\ai\ESiloTypeTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTargetSerializer.h" />
     <ClInclude Include="moho\ai\CAiTargetTypeInfo.h" />
     <ClInclude Include="moho\ai\CAiTransportCommandOps.h" />
@@ -1420,12 +1522,15 @@
     <ClInclude Include="moho\collision\CCollisionManipulatorTypeInfo.h" />
     <ClInclude Include="moho\collision\CounterIntelExtractor.h" />
     <ClInclude Include="moho\collision\CGeomSolid3.h" />
+    <ClInclude Include="moho\render\tess\CTesselator.h" />
     <ClInclude Include="moho\collision\IntelExtractor.h" />
     <ClInclude Include="moho\collision\RDebugCollision.h" />
     <ClInclude Include="moho\collision\RDebugCollisionTypeInfo.h" />
     <ClInclude Include="moho\command\ICommandSink.h" />
     <ClInclude Include="moho\core\Thread.h" />
     <ClInclude Include="moho\entity\Entity.h" />
+    <ClInclude Include="moho\entity\ELayerTypeInfo.h" />
+    <ClInclude Include="moho\entity\EVisibilityModeTypeInfo.h" />
     <ClInclude Include="moho\entity\SSTIEntityVariableData.h" />
     <ClInclude Include="moho\entity\UserEntity.h" />
     <ClInclude Include="moho\path\IPathTraveler.h" />
@@ -1434,6 +1539,7 @@
     <ClInclude Include="moho\path\RDebugNavPathTypeInfo.h" />
     <ClInclude Include="moho\math\Angle.h" />
     <ClInclude Include="moho\math\GridPos.h" />
+    <ClInclude Include="moho\math\MathReflection.h" />
     <ClInclude Include="moho\math\Vector2f.h" />
     <ClInclude Include="moho\math\Vector3f.h" />
     <ClInclude Include="moho\math\Vector4f.h" />
@@ -1554,6 +1660,7 @@
     <ClInclude Include="moho\resource\ResourceManager.h" />
     <ClInclude Include="moho\resource\RScmResource.h" />
     <ClInclude Include="moho\resource\RScmResourceTypeInfo.h" />
+    <ClInclude Include="moho\resource\EResourceTypeTypeInfo.h" />
     <ClInclude Include="moho\script\CUnitScriptTask.h" />
     <ClInclude Include="moho\script\CUnitScriptTaskSerializer.h" />
     <ClInclude Include="moho\script\CUnitScriptTaskTypeInfo.h" />
@@ -1566,6 +1673,7 @@
     <ClInclude Include="moho\misc\ScrDebugHooks.h" />
     <ClInclude Include="moho\misc\ScrFileLine.h" />
     <ClInclude Include="moho\misc\ScrFileCtrl.h" />
+    <ClInclude Include="moho\misc\ScrSourceCtrl.h" />
     <ClInclude Include="moho\misc\ScrWatch.h" />
     <ClInclude Include="moho\misc\TreeData.h" />
     <ClInclude Include="moho\misc\ScrWatchCtrl.h" />
@@ -1577,6 +1685,7 @@
     <ClInclude Include="moho\sim\SDelayedSubVizInfoReflection.h" />
     <ClInclude Include="moho\sim\CArmyImpl.h" />
     <ClInclude Include="moho\sim\CArmyLuaFunctionRegistrations.h" />
+    <ClInclude Include="moho\sim\CDamageLuaFunctionRegistrations.h" />
     <ClInclude Include="moho\sim\CPlatoon.h" />
     <ClInclude Include="moho\sim\CCommandLuaFunctionRegistrations.h" />
     <ClInclude Include="moho\sim\ManipulatorLuaFunctionThunks.h" />
@@ -1615,6 +1724,9 @@
     <ClInclude Include="moho\sim\SThreatSerializer.h" />
     <ClInclude Include="moho\sim\SThreatTypeInfo.h" />
     <ClInclude Include="moho\sim\CIntelGrid.h" />
+    <ClInclude Include="moho\sim\CDamage.h" />
+    <ClInclude Include="moho\sim\CDamageEMethodTypeInfo.h" />
+    <ClInclude Include="moho\sim\ESpecialFileTypeTypeInfo.h" />
     <ClInclude Include="moho\sim\CWldMap.h" />
     <ClInclude Include="moho\sim\CWldSession.h" />
     <ClInclude Include="moho\sim\CWldSessionLoaderImpl.h" />
@@ -1634,6 +1746,7 @@
     <ClInclude Include="moho\sim\SelectionListener.h" />
     <ClInclude Include="moho\sim\SessionVisibilityQuery.h" />
     <ClInclude Include="moho\sim\Sim.h" />
+    <ClInclude Include="moho\sim\CEconomy.h" />
     <ClInclude Include="moho\sim\SimArmy.h" />
     <ClInclude Include="moho\sim\SimArmySerializer.h" />
     <ClInclude Include="moho\sim\SimArmyTypeInfo.h" />
@@ -1650,7 +1763,11 @@
     <ClInclude Include="moho\task\CTaskThreadWeakPtrReflection.h" />
     <ClInclude Include="moho\task\ScrDiskWatcherTask.h" />
     <ClInclude Include="moho\task\CWaitForTask.h" />
+    <ClInclude Include="moho\terrain\water\LowFidelityWater.h" />
     <ClInclude Include="moho\ui\CUIManager.h" />
+    <ClInclude Include="moho\ui\EUIStateTypeInfo.h" />
+    <ClInclude Include="moho\ui\EScrollTypeTypeInfo.h" />
+    <ClInclude Include="moho\ui\EMauiScrollAxisTypeInfo.h" />
     <ClInclude Include="moho\ui\EMauiEventTypeTypeInfo.h" />
     <ClInclude Include="moho\ui\EMauiKeyCodeTypeInfo.h" />
     <ClInclude Include="moho\ui\IUIManager.h" />
@@ -1680,9 +1797,14 @@
     <ClInclude Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitCallTransport.h" />
     <ClInclude Include="moho\unit\tasks\CUnitCallTransportTypeInfo.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitMoveTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitRefuel.h" />
     <ClInclude Include="moho\unit\tasks\CFireWeaponTask.h" />
     <ClInclude Include="moho\unit\core\CWeaponAttributes.h" />
     <ClInclude Include="moho\unit\core\EIntelTypeInfo.h" />
+    <ClInclude Include="moho\unit\core\EFireStateTypeInfo.h" />
+    <ClInclude Include="moho\unit\core\EJobTypeTypeInfo.h" />
     <ClInclude Include="moho\unit\core\EUnitStateTypeInfo.h" />
     <ClInclude Include="moho\unit\core\RDebugWeapons.h" />
     <ClInclude Include="moho\unit\core\RDebugWeaponsTypeInfo.h" />
@@ -1726,6 +1848,7 @@
     <ClInclude Include="wm3\Quaternion.h" />
     <ClInclude Include="wm3\Segment3.h" />
     <ClInclude Include="wm3\Sphere3.h" />
+    <ClInclude Include="wm3\System.h" />
     <ClInclude Include="wm3\Vector2.h" />
     <ClInclude Include="wm3\Vector3.h" />
     <ClInclude Include="wm3\WideParity.h" />

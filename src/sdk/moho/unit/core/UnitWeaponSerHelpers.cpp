@@ -20,6 +20,40 @@ namespace
   moho::UnitWeaponConstruct gUnitWeaponConstruct{};
   moho::UnitWeaponSerializer gUnitWeaponSerializer{};
 
+  /**
+   * Address: 0x006DD780 (FUN_006DD780, j_Moho::UnitWeapon::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `UnitWeapon::MemberSerialize`.
+   */
+  [[maybe_unused]] void UnitWeaponMemberSerializeThunk(
+    moho::UnitWeapon* const weapon, gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !weapon) {
+      return;
+    }
+
+    weapon->MemberSerialize(*archive);
+  }
+
+  /**
+   * Address: 0x006DE7B0 (FUN_006DE7B0, j_Moho::UnitWeapon::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `UnitWeapon::MemberSerialize`.
+   */
+  [[maybe_unused]] void UnitWeaponMemberSerializeThunkSecondary(
+    moho::UnitWeapon* const weapon, gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive || !weapon) {
+      return;
+    }
+
+    weapon->MemberSerialize(*archive);
+  }
+
   template <typename THelper>
   [[nodiscard]] gpg::SerHelperBase* HelperSelfNode(THelper& helper) noexcept
   {
@@ -155,7 +189,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
-    gpg::RRef*
+    gpg::RRef* const ownerRef
   )
   {
     auto* const weapon = reinterpret_cast<UnitWeapon*>(objectPtr);
@@ -163,7 +197,12 @@ namespace moho
       return;
     }
 
-    weapon->MemberSerialize(*archive);
+    if (ownerRef != nullptr) {
+      weapon->MemberSerialize(*archive);
+      return;
+    }
+
+    UnitWeaponMemberSerializeThunk(weapon, archive);
   }
 
   /**

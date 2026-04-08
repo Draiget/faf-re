@@ -7,6 +7,7 @@
 #include "moho/animation/IAniManipulator.h"
 #include "moho/containers/BitStorage32.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 namespace gpg
 {
@@ -15,6 +16,7 @@ namespace gpg
 
 namespace moho
 {
+  class CScrLuaInitForm;
   class Unit;
 
   using SAniManipBitStorage = SBitStorage32;
@@ -40,6 +42,16 @@ namespace moho
      * animation-resource, playback-rate, and runtime flags.
      */
     CAnimationManipulator();
+
+    /**
+     * Address context:
+     * - constructor lane used by `cfunc_CreateAnimatorL` (`FUN_00640530`).
+     *
+     * What it does:
+     * Builds an animation manipulator bound to one sim/actor owner pair,
+     * optionally stores one goal-motion unit weak ref, and creates Lua userdata.
+     */
+    CAnimationManipulator(Sim* sim, CAniActor* ownerActor, Unit* goalMotionScaleUnit);
 
     /**
      * Address: 0x0063F440 (FUN_0063F440, scalar deleting destructor thunk)
@@ -137,6 +149,349 @@ namespace moho
   using CAnimationManipulatorSetOverwriteMode_LuaFuncDef = ::moho::CScrLuaBinder;
   using CAnimationManipulatorSetDisableOnSignal_LuaFuncDef = ::moho::CScrLuaBinder;
   using CAnimationManipulatorSetDirectionalAnim_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * VFTABLE: 0x00E21770
+   * COL: 0x00E7AD54
+   */
+  template <>
+  class CScrLuaMetatableFactory<CAnimationManipulator> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    /**
+     * Address: 0x00641E10 (FUN_00641E10, ?Create@?$CScrLuaMetatableFactory@VCAnimationManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     *
+     * What it does:
+     * Builds the metatable object used for `CAnimationManipulator` Lua userdata.
+     */
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CAnimationManipulator>) == 0x8,
+    "CScrLuaMetatableFactory<CAnimationManipulator> size must be 0x8"
+  );
+
+  /**
+   * Address: 0x006404B0 (FUN_006404B0, cfunc_CreateAnimator)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_CreateAnimatorL`.
+   */
+  int cfunc_CreateAnimator(lua_State* luaContext);
+
+  /**
+   * Address: 0x006404D0 (FUN_006404D0, func_CreateAnimator_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global `CreateAnimator(unit, [bindGoalUnit])` Lua binder.
+   */
+  CScrLuaInitForm* func_CreateAnimator_LuaFuncDef();
+
+  /**
+   * Address: 0x00640530 (FUN_00640530, cfunc_CreateAnimatorL)
+   *
+   * What it does:
+   * Reads `(unit, [bool])`, creates one animation manipulator, and returns it
+   * as Lua userdata.
+   */
+  int cfunc_CreateAnimatorL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00640A20 (FUN_00640A20, cfunc_CAnimationManipulatorSetRate)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetRateL`.
+   */
+  int cfunc_CAnimationManipulatorSetRate(lua_State* luaContext);
+
+  /**
+   * Address: 0x00640A40 (FUN_00640A40, func_CAnimationManipulatorSetRate_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:SetRate(rate)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetRate_LuaFuncDef();
+
+  /**
+   * Address: 0x00640AA0 (FUN_00640AA0, cfunc_CAnimationManipulatorSetRateL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and updates its playback rate.
+   */
+  int cfunc_CAnimationManipulatorSetRateL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x006408E0 (FUN_006408E0, cfunc_CAnimationManipulatorGetRate)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorGetRateL`.
+   */
+  int cfunc_CAnimationManipulatorGetRate(lua_State* luaContext);
+
+  /**
+   * Address: 0x00640900 (FUN_00640900, func_CAnimationManipulatorGetRate_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:GetRate()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorGetRate_LuaFuncDef();
+
+  /**
+   * Address: 0x00640960 (FUN_00640960, cfunc_CAnimationManipulatorGetRateL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and returns current playback
+   * rate.
+   */
+  int cfunc_CAnimationManipulatorGetRateL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00640BA0 (FUN_00640BA0, cfunc_CAnimationManipulatorGetAnimationFraction)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorGetAnimationFractionL`.
+   */
+  int cfunc_CAnimationManipulatorGetAnimationFraction(lua_State* luaContext);
+
+  /**
+   * Address: 0x00640BC0 (FUN_00640BC0, func_CAnimationManipulatorGetAnimationFraction_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:GetAnimationFraction()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorGetAnimationFraction_LuaFuncDef();
+
+  /**
+   * Address: 0x00640C20 (FUN_00640C20, cfunc_CAnimationManipulatorGetAnimationFractionL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and returns normalized
+   * animation progress.
+   */
+  int cfunc_CAnimationManipulatorGetAnimationFractionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00640D10 (FUN_00640D10, cfunc_CAnimationManipulatorSetAnimationFraction)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetAnimationFractionL`.
+   */
+  int cfunc_CAnimationManipulatorSetAnimationFraction(lua_State* luaContext);
+
+  /**
+   * Address: 0x00640D30 (FUN_00640D30, func_CAnimationManipulatorSetAnimationFraction_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:SetAnimationFraction(fraction)` Lua
+   * binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetAnimationFraction_LuaFuncDef();
+
+  /**
+   * Address: 0x00640D90 (FUN_00640D90, cfunc_CAnimationManipulatorSetAnimationFractionL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua, clamps fraction into `[0, 1]`
+   * and applies the new playback position.
+   */
+  int cfunc_CAnimationManipulatorSetAnimationFractionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00640EB0 (FUN_00640EB0, cfunc_CAnimationManipulatorGetAnimationTime)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorGetAnimationTimeL`.
+   */
+  int cfunc_CAnimationManipulatorGetAnimationTime(lua_State* luaContext);
+
+  /**
+   * Address: 0x00640ED0 (FUN_00640ED0, func_CAnimationManipulatorGetAnimationTime_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:GetAnimationTime()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorGetAnimationTime_LuaFuncDef();
+
+  /**
+   * Address: 0x00640F30 (FUN_00640F30, cfunc_CAnimationManipulatorGetAnimationTimeL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and returns current animation
+   * time in seconds.
+   */
+  int cfunc_CAnimationManipulatorGetAnimationTimeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00640FF0 (FUN_00640FF0, cfunc_CAnimationManipulatorSetAnimationTime)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetAnimationTimeL`.
+   */
+  int cfunc_CAnimationManipulatorSetAnimationTime(lua_State* luaContext);
+
+  /**
+   * Address: 0x00641010 (FUN_00641010, func_CAnimationManipulatorSetAnimationTime_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:SetAnimationTime(fraction)` Lua
+   * binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetAnimationTime_LuaFuncDef();
+
+  /**
+   * Address: 0x00641070 (FUN_00641070, cfunc_CAnimationManipulatorSetAnimationTimeL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and applies the requested
+   * absolute animation time.
+   */
+  int cfunc_CAnimationManipulatorSetAnimationTimeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00641160 (FUN_00641160, cfunc_CAnimationManipulatorGetAnimationDuration)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorGetAnimationDurationL`.
+   */
+  int cfunc_CAnimationManipulatorGetAnimationDuration(lua_State* luaContext);
+
+  /**
+   * Address: 0x00641180 (FUN_00641180, func_CAnimationManipulatorGetAnimationDuration_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:GetAnimationDuration()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorGetAnimationDuration_LuaFuncDef();
+
+  /**
+   * Address: 0x006411E0 (FUN_006411E0, cfunc_CAnimationManipulatorGetAnimationDurationL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and returns clip duration in
+   * seconds.
+   */
+  int cfunc_CAnimationManipulatorGetAnimationDurationL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x006415F0 (FUN_006415F0, cfunc_CAnimationManipulatorSetBoneEnabled)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetBoneEnabledL`.
+   */
+  int cfunc_CAnimationManipulatorSetBoneEnabled(lua_State* luaContext);
+
+  /**
+   * Address: 0x00641610 (FUN_00641610, func_CAnimationManipulatorSetBoneEnabled_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the
+   * `CAnimationManipulator:SetBoneEnabled(bone, value, include_decscendants=true)`
+   * Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetBoneEnabled_LuaFuncDef();
+
+  /**
+   * Address: 0x00641670 (FUN_00641670, cfunc_CAnimationManipulatorSetBoneEnabledL)
+   *
+   * What it does:
+   * Resolves one animation manipulator, one bone selector (name/index), and
+   * enable flags from Lua, then toggles the bone lane.
+   */
+  int cfunc_CAnimationManipulatorSetBoneEnabledL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x006417B0 (FUN_006417B0, cfunc_CAnimationManipulatorSetOverwriteMode)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetOverwriteModeL`.
+   */
+  int cfunc_CAnimationManipulatorSetOverwriteMode(lua_State* luaContext);
+
+  /**
+   * Address: 0x006417D0 (FUN_006417D0, func_CAnimationManipulatorSetOverwriteMode_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:SetOverwriteMode(bool)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetOverwriteMode_LuaFuncDef();
+
+  /**
+   * Address: 0x00641830 (FUN_00641830, cfunc_CAnimationManipulatorSetOverwriteModeL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and updates overwrite-mode
+   * behavior.
+   */
+  int cfunc_CAnimationManipulatorSetOverwriteModeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x006418F0 (FUN_006418F0, cfunc_CAnimationManipulatorSetDisableOnSignal)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetDisableOnSignalL`.
+   */
+  int cfunc_CAnimationManipulatorSetDisableOnSignal(lua_State* luaContext);
+
+  /**
+   * Address: 0x00641910 (FUN_00641910, func_CAnimationManipulatorSetDisableOnSignal_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:SetDisableOnSignal(bool)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetDisableOnSignal_LuaFuncDef();
+
+  /**
+   * Address: 0x00641970 (FUN_00641970, cfunc_CAnimationManipulatorSetDisableOnSignalL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and updates disable-on-signal
+   * behavior.
+   */
+  int cfunc_CAnimationManipulatorSetDisableOnSignalL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00641A30 (FUN_00641A30, cfunc_CAnimationManipulatorSetDirectionalAnim)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAnimationManipulatorSetDirectionalAnimL`.
+   */
+  int cfunc_CAnimationManipulatorSetDirectionalAnim(lua_State* luaContext);
+
+  /**
+   * Address: 0x00641A50 (FUN_00641A50, func_CAnimationManipulatorSetDirectionalAnim_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAnimationManipulator:SetDirectionalAnim(bool)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAnimationManipulatorSetDirectionalAnim_LuaFuncDef();
+
+  /**
+   * Address: 0x00641AB0 (FUN_00641AB0, cfunc_CAnimationManipulatorSetDirectionalAnimL)
+   *
+   * What it does:
+   * Resolves one animation manipulator from Lua and updates directional
+   * animation behavior.
+   */
+  int cfunc_CAnimationManipulatorSetDirectionalAnimL(LuaPlus::LuaState* state);
 
   class CAnimationManipulatorConstruct
   {

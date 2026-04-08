@@ -15,13 +15,16 @@ namespace gpg
 namespace moho
 {
   class Entity;
+  class EntitySetBase;
   struct SEntitySetTemplateUnit;
+  class Prop;
   class Unit;
+  struct CEntityDbIdPoolNode;
 
   struct CEntityDbListHead
   {
-    void* next; // +0x00
-    void* prev; // +0x04
+    CEntityDbListHead* next; // +0x00
+    CEntityDbListHead* prev; // +0x04
   };
   static_assert(sizeof(CEntityDbListHead) == 0x08, "CEntityDbListHead size must be 0x08");
 
@@ -40,9 +43,68 @@ namespace moho
   );
   static_assert(sizeof(CEntityDbAllUnitsNode) == 0x18, "CEntityDbAllUnitsNode size must be 0x18");
 
+  struct CEntityDbIdPoolTreeRuntime
+  {
+    std::uint32_t iteratorProxy; // +0x00
+    CEntityDbIdPoolNode* head;   // +0x04
+    std::uint32_t size;          // +0x08
+  };
+  static_assert(sizeof(CEntityDbIdPoolTreeRuntime) == 0x0C, "CEntityDbIdPoolTreeRuntime size must be 0x0C");
+
+  struct CEntityDbEntityListRuntime
+  {
+    std::uint32_t iteratorProxy; // +0x00
+    CEntityDbListHead* head;     // +0x04
+    std::uint32_t size;          // +0x08
+  };
+  static_assert(sizeof(CEntityDbEntityListRuntime) == 0x0C, "CEntityDbEntityListRuntime size must be 0x0C");
+
+  struct CEntityDbBoundedPropQueueRuntime
+  {
+    std::uint32_t queueProxy; // +0x00
+    std::uint32_t start;      // +0x04
+    std::uint32_t end;        // +0x08
+    std::uint32_t capacity;   // +0x0C
+    std::uint32_t vectorProxy; // +0x10
+    void* storageBegin;       // +0x14
+    void* storageCurrent;     // +0x18
+    void* storageEnd;         // +0x1C
+    std::int32_t lastHandle;  // +0x20
+  };
+  static_assert(
+    sizeof(CEntityDbBoundedPropQueueRuntime) == 0x24, "CEntityDbBoundedPropQueueRuntime size must be 0x24"
+  );
+
   class CEntityDb
   {
   public:
+    /**
+     * Address: 0x00684230 (FUN_00684230, Moho::EntityDB::EntityDB)
+     *
+     * What it does:
+     * Constructs all tree/list sentinel lanes and clears bounded-prop queue
+     * ranges for a fresh EntityDB instance.
+     */
+    CEntityDb();
+
+    /**
+     * Address: 0x006843B0 (FUN_006843B0, Moho::EntityDB::~EntityDB)
+     *
+     * What it does:
+     * Tears down bounded-prop/entity-list/id-pool/all-units lanes and clears
+     * DB-owned runtime tracking maps.
+     */
+    ~CEntityDb();
+
+    /**
+     * Address: 0x00684C30 (FUN_00684C30, Moho::EntityDB::AddBoundedProp)
+     *
+     * What it does:
+     * Inserts one Prop into the bounded reclaim-priority queue and evicts head
+     * entries while queue occupancy is at least 1000.
+     */
+    [[nodiscard]] std::int32_t AddBoundedProp(Prop* prop);
+
     /**
      * Address: 0x00684480 (FUN_00684480, ?DoReserveId@EntityDB@Moho@@AAE?AVEntId@2@I@Z)
      *
@@ -99,6 +161,12 @@ namespace moho
     void RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept;
 
     /**
+     * What it does:
+     * Registers one `EntitySetBase` intrusive node in the DB-owned set registry.
+     */
+    void RegisterEntitySet(EntitySetBase& set) noexcept;
+
+    /**
      * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberSerialize)
      *
      * What it does:
@@ -149,13 +217,23 @@ namespace moho
      */
     void SerSets(gpg::WriteArchive* archive);
 
-  private:
-    CEntityDbAllUnitsNode* mAllUnits;          // +0x00
-    std::uint8_t mIdFamilyPoolsOpaque[0x14]{}; // +0x04 (two map-like trees used by id alloc/find/release paths)
-    CEntityDbListHead mRegisteredEntitySets;   // +0x18 (used by Sim::RegisterEntitySet)
-    std::uint8_t mOpaqueTail[0x30]{};          // +0x20 (remaining unrecovered members)
+  public:
+    std::uint32_t mAllUnitsIteratorProxy;           // +0x00
+    CEntityDbAllUnitsNode* mAllUnits;               // +0x04
+    std::uint32_t mAllUnitsSize;                    // +0x08
+    CEntityDbIdPoolTreeRuntime mIdPoolTree;         // +0x0C
+    CEntityDbListHead mRegisteredEntitySets;        // +0x18
+    CEntityDbEntityListRuntime mEntityList;         // +0x20
+    CEntityDbBoundedPropQueueRuntime mBoundedProps; // +0x2C
   };
 
+  static_assert(offsetof(CEntityDb, mAllUnits) == 0x04, "CEntityDb::mAllUnits offset must be 0x04");
+  static_assert(offsetof(CEntityDb, mIdPoolTree) == 0x0C, "CEntityDb::mIdPoolTree offset must be 0x0C");
+  static_assert(
+    offsetof(CEntityDb, mRegisteredEntitySets) == 0x18, "CEntityDb::mRegisteredEntitySets offset must be 0x18"
+  );
+  static_assert(offsetof(CEntityDb, mEntityList) == 0x20, "CEntityDb::mEntityList offset must be 0x20");
+  static_assert(offsetof(CEntityDb, mBoundedProps) == 0x2C, "CEntityDb::mBoundedProps offset must be 0x2C");
   static_assert(sizeof(CEntityDb) == 0x50, "CEntityDb size must be 0x50");
 
   /**
@@ -182,7 +260,7 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x00688A90 (FUN_00688A90, Moho::EntityDBSerializer::RegisterSerializeFunctions)
+     * Address: 0x00686010 (FUN_00686010, gpg::SerSaveLoadHelper_EntityDB::Init)
      *
      * What it does:
      * Binds `EntityDB` RTTI serializer callbacks.

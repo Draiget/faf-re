@@ -3,21 +3,31 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <new>
+#include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "lua/LuaObject.h"
 #include "moho/animation/CAniPose.h"
+#include "moho/ai/IAiReconDB.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityTransformPayload.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/misc/Stats.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
@@ -31,8 +41,60 @@ namespace gpg
   };
 } // namespace gpg
 
+namespace moho
+{
+  int cfunc_ReconBlipGetBlueprint(lua_State* luaState);
+  int cfunc_ReconBlipGetBlueprintL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipGetSource(lua_State* luaState);
+  int cfunc_ReconBlipGetSourceL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsSeenEver(lua_State* luaState);
+  int cfunc_ReconBlipIsSeenEverL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsSeenNow(lua_State* luaState);
+  int cfunc_ReconBlipIsSeenNowL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsMaybeDead(lua_State* luaState);
+  int cfunc_ReconBlipIsMaybeDeadL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsOnOmni(lua_State* luaState);
+  int cfunc_ReconBlipIsOnOmniL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsOnSonar(lua_State* luaState);
+  int cfunc_ReconBlipIsOnSonarL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsOnRadar(lua_State* luaState);
+  int cfunc_ReconBlipIsOnRadarL(LuaPlus::LuaState* state);
+  int cfunc_ReconBlipIsKnownFake(lua_State* luaState);
+  int cfunc_ReconBlipIsKnownFakeL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_ReconBlipGetBlueprint_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipGetSource_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsSeenEver_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsSeenNow_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsMaybeDead_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsOnOmni_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsOnSonar_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsOnRadar_LuaFuncDef();
+  CScrLuaInitForm* func_ReconBlipIsKnownFake_LuaFuncDef();
+} // namespace moho
+
 namespace
 {
+  constexpr const char* kReconBlipLuaClassName = "ReconBlip";
+  constexpr const char* kReconBlipGetBlueprintName = "GetBlueprint";
+  constexpr const char* kReconBlipGetBlueprintHelpText = "blueprint = ReconBlip:GetBlueprint()";
+  constexpr const char* kReconBlipGetSourceName = "GetSource";
+  constexpr const char* kReconBlipGetSourceHelpText = "unit = ReconBlip:GetSource()";
+  constexpr const char* kReconBlipIsSeenEverName = "IsSeenEver";
+  constexpr const char* kReconBlipIsSeenEverHelpText = "bool = ReconBlip:IsSeenEver()";
+  constexpr const char* kReconBlipIsSeenNowName = "IsSeenNow";
+  constexpr const char* kReconBlipIsSeenNowHelpText = "bool = ReconBlip:IsSeenNow()";
+  constexpr const char* kReconBlipIsMaybeDeadName = "IsMaybeDead";
+  constexpr const char* kReconBlipIsMaybeDeadHelpText = "bool = ReconBlip:IsMaybeDead()";
+  constexpr const char* kReconBlipIsOnOmniName = "IsOnOmni";
+  constexpr const char* kReconBlipIsOnOmniHelpText = "bool = ReconBlip:IsOnOmni()";
+  constexpr const char* kReconBlipIsOnSonarName = "IsOnSonar";
+  constexpr const char* kReconBlipIsOnSonarHelpText = "bool = ReconBlip:IsOnSonar()";
+  constexpr const char* kReconBlipIsOnRadarName = "IsOnRadar";
+  constexpr const char* kReconBlipIsOnRadarHelpText = "bool = ReconBlip:IsOnRadar()";
+  constexpr const char* kReconBlipIsKnownFakeName = "IsKnownFake";
+  constexpr const char* kReconBlipIsKnownFakeHelpText = "bool = ReconBlip:IsKnownFake()";
+  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
+
   constexpr std::uint32_t kUnitCollisionBucketFlags = 0x100u;
   constexpr std::uint32_t kReconEntityFamilyPrefix = 0x300u;
   gpg::RType* gSimType = nullptr;
@@ -67,6 +129,73 @@ namespace
   [[nodiscard]] gpg::RType* ResolveCAniPoseType()
   {
     return CachedType<CAniPose>(gCAniPoseType);
+  }
+
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
+  {
+    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
+  }
+
+  int PushReconFlagFromLuaState(
+    LuaPlus::LuaState* const state, const char* const helpText, const std::uint32_t flagMask
+  )
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 2, argumentCount);
+    }
+
+    const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
+    ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
+
+    const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));
+    CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+    const std::int32_t armyIndex = army->ArmyId;
+    const std::uint32_t reconFlags = blip->mReconDat[armyIndex].mReconFlags;
+    lua_pushboolean(rawState, (reconFlags & flagMask) != 0u ? 1 : 0);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
+  {
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
+    }
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
   }
 
   struct ReflectedObjectDeleter
@@ -252,6 +381,28 @@ namespace
 
 gpg::RType* SPerArmyReconInfo::sType = nullptr;
 gpg::RType* ReconBlip::sType = nullptr;
+gpg::RType* ReconBlip::sPointerType = nullptr;
+
+/**
+ * Address: 0x005C5390 (FUN_005C5390, Moho::InstanceCounter<Moho::ReconBlip>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for ReconBlip
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::ReconBlip>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::ReconBlip).name());
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
 
 gpg::RType* ReconBlip::StaticGetClass()
 {
@@ -259,6 +410,415 @@ gpg::RType* ReconBlip::StaticGetClass()
     sType = gpg::LookupRType(typeid(ReconBlip));
   }
   return sType;
+}
+
+/**
+ * Address: 0x005C6470 (FUN_005C6470, Moho::ReconBlip::GetPointerType)
+ *
+ * What it does:
+ * Lazily resolves and caches the reflection descriptor for `ReconBlip*`.
+ */
+gpg::RType* ReconBlip::GetPointerType()
+{
+  gpg::RType* cached = sPointerType;
+  if (!cached) {
+    cached = gpg::LookupRType(typeid(ReconBlip*));
+    sPointerType = cached;
+  }
+  return cached;
+}
+
+/**
+ * Address: 0x005C29D0 (FUN_005C29D0, cfunc_ReconBlipGetBlueprint)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipGetBlueprintL`.
+ */
+int moho::cfunc_ReconBlipGetBlueprint(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipGetBlueprintL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C2A50 (FUN_005C2A50, cfunc_ReconBlipGetBlueprintL)
+ *
+ * What it does:
+ * Reads one blip object and pushes its blueprint Lua object.
+ */
+int moho::cfunc_ReconBlipGetBlueprintL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetBlueprintHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
+  ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
+  LuaPlus::LuaObject luaBlueprint = blip->GetBlueprint()->GetLuaBlueprint(state);
+  luaBlueprint.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x005C2B30 (FUN_005C2B30, cfunc_ReconBlipGetSource)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipGetSourceL`.
+ */
+int moho::cfunc_ReconBlipGetSource(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipGetSourceL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C2BB0 (jump target from FUN_005C2B30, cfunc_ReconBlipGetSourceL)
+ *
+ * What it does:
+ * Reads one blip object and pushes its source unit, or `nil` when detached.
+ */
+int moho::cfunc_ReconBlipGetSourceL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetSourceHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
+  ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
+  if (Unit* const sourceUnit = blip->GetCreator(); sourceUnit != nullptr) {
+    sourceUnit->mLuaObj.PushStack(state);
+  } else {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+  }
+  return 1;
+}
+
+/**
+ * Address: 0x005C2C90 (FUN_005C2C90, cfunc_ReconBlipIsSeenEver)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsSeenEverL`.
+ */
+int moho::cfunc_ReconBlipIsSeenEver(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsSeenEverL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C2D10 (jump target from FUN_005C2C90, cfunc_ReconBlipIsSeenEverL)
+ *
+ * What it does:
+ * Returns `RECON_LOSEver` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsSeenEverL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsSeenEverHelpText, static_cast<std::uint32_t>(RECON_LOSEver));
+}
+
+/**
+ * Address: 0x005C2E00 (cfunc_ReconBlipIsSeenNow)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsSeenNowL`.
+ */
+int moho::cfunc_ReconBlipIsSeenNow(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsSeenNowL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C2E80 (jump target from 0x005C2E00, cfunc_ReconBlipIsSeenNowL)
+ *
+ * What it does:
+ * Returns `RECON_LOSNow` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsSeenNowL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsSeenNowHelpText, static_cast<std::uint32_t>(RECON_LOSNow));
+}
+
+/**
+ * Address: 0x005C2F70 (FUN_005C2F70, cfunc_ReconBlipIsMaybeDead)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsMaybeDeadL`.
+ */
+int moho::cfunc_ReconBlipIsMaybeDead(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsMaybeDeadL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C2FF0 (jump target from FUN_005C2F70, cfunc_ReconBlipIsMaybeDeadL)
+ *
+ * What it does:
+ * Returns `RECON_MaybeDead` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsMaybeDeadL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsMaybeDeadHelpText, static_cast<std::uint32_t>(RECON_MaybeDead));
+}
+
+/**
+ * Address: 0x005C30E0 (FUN_005C30E0, cfunc_ReconBlipIsOnOmni)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsOnOmniL`.
+ */
+int moho::cfunc_ReconBlipIsOnOmni(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsOnOmniL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C3160 (cfunc_ReconBlipIsOnOmniL)
+ *
+ * What it does:
+ * Returns `RECON_Omni` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsOnOmniL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsOnOmniHelpText, static_cast<std::uint32_t>(RECON_Omni));
+}
+
+/**
+ * Address: 0x005C3250 (FUN_005C3250, cfunc_ReconBlipIsOnSonar)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsOnSonarL`.
+ */
+int moho::cfunc_ReconBlipIsOnSonar(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsOnSonarL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C32D0 (cfunc_ReconBlipIsOnSonarL)
+ *
+ * What it does:
+ * Returns `RECON_Sonar` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsOnSonarL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsOnSonarHelpText, static_cast<std::uint32_t>(RECON_Sonar));
+}
+
+/**
+ * Address: 0x005C33C0 (FUN_005C33C0, cfunc_ReconBlipIsOnRadar)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsOnRadarL`.
+ */
+int moho::cfunc_ReconBlipIsOnRadar(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsOnRadarL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C3440 (cfunc_ReconBlipIsOnRadarL)
+ *
+ * What it does:
+ * Returns `RECON_Radar` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsOnRadarL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsOnRadarHelpText, static_cast<std::uint32_t>(RECON_Radar));
+}
+
+/**
+ * Address: 0x005C3530 (FUN_005C3530, cfunc_ReconBlipIsKnownFake)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ReconBlipIsKnownFakeL`.
+ */
+int moho::cfunc_ReconBlipIsKnownFake(lua_State* const luaContext)
+{
+  return cfunc_ReconBlipIsKnownFakeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005C35B0 (FUN_005C35B0, cfunc_ReconBlipIsKnownFakeL)
+ *
+ * What it does:
+ * Returns `RECON_KnownFake` flag state for `(blip, army)` pair.
+ */
+int moho::cfunc_ReconBlipIsKnownFakeL(LuaPlus::LuaState* const state)
+{
+  return PushReconFlagFromLuaState(state, kReconBlipIsKnownFakeHelpText, static_cast<std::uint32_t>(RECON_KnownFake));
+}
+
+/**
+ * Address: 0x005C29F0 (FUN_005C29F0, func_ReconBlipGetBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:GetBlueprint()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipGetBlueprintName,
+    &moho::cfunc_ReconBlipGetBlueprint,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipGetBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C2B50 (FUN_005C2B50, func_ReconBlipGetSource_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:GetSource()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipGetSourceName,
+    &moho::cfunc_ReconBlipGetSource,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipGetSourceHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C2CB0 (FUN_005C2CB0, func_ReconBlipIsSeenEver_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsSeenEver()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsSeenEverName,
+    &moho::cfunc_ReconBlipIsSeenEver,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsSeenEverHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C2E20 (FUN_005C2E20, func_ReconBlipIsSeenNow_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsSeenNow()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsSeenNowName,
+    &moho::cfunc_ReconBlipIsSeenNow,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsSeenNowHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C2F90 (FUN_005C2F90, func_ReconBlipIsMaybeDead_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsMaybeDead()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsMaybeDeadName,
+    &moho::cfunc_ReconBlipIsMaybeDead,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsMaybeDeadHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C3100 (FUN_005C3100, func_ReconBlipIsOnOmni_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsOnOmni()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsOnOmniName,
+    &moho::cfunc_ReconBlipIsOnOmni,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsOnOmniHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C3270 (FUN_005C3270, func_ReconBlipIsOnSonar_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsOnSonar()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsOnSonarName,
+    &moho::cfunc_ReconBlipIsOnSonar,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsOnSonarHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C33E0 (FUN_005C33E0, func_ReconBlipIsOnRadar_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsOnRadar()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsOnRadarName,
+    &moho::cfunc_ReconBlipIsOnRadar,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsOnRadarHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x005C3550 (FUN_005C3550, func_ReconBlipIsKnownFake_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `ReconBlip:IsKnownFake()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kReconBlipIsKnownFakeName,
+    &moho::cfunc_ReconBlipIsKnownFake,
+    &CScrLuaMetatableFactory<ReconBlip>::Instance(),
+    kReconBlipLuaClassName,
+    kReconBlipIsKnownFakeHelpText
+  );
+  return &binder;
 }
 
 /**
@@ -287,6 +847,19 @@ ReconBlip::ReconBlip(Sim* const sim) :
     mUnitVarDat{},
     mReconDat{}
 {
+}
+
+/**
+ * Address: 0x005C4F50 (FUN_005C4F50, Moho::SPerArmyReconInfo::~SPerArmyReconInfo)
+ *
+ * What it does:
+ * Releases per-army recon shared ownership lanes in binary destruction order.
+ */
+SPerArmyReconInfo::~SPerArmyReconInfo()
+{
+  mPose.release();
+  mPriorPose.release();
+  mMesh.release();
 }
 
 /**
@@ -430,6 +1003,72 @@ const RUnitBlueprint* ReconBlip::GetBlueprint() const
 }
 
 /**
+ * Address: 0x005BF5F0 (FUN_005BF5F0, Moho::ReconBlip::GetTargetPoint)
+ *
+ * What it does:
+ * Resolves one blip target point: source-unit target point plus jam offset
+ * when linked, otherwise root-bone position with blueprint collision-y offset.
+ */
+Wm3::Vec3f ReconBlip::GetTargetPoint(const std::int32_t targetPoint)
+{
+  if (Unit* const sourceUnit = mCreator.GetObjectPtr(); sourceUnit != nullptr) {
+    const Wm3::Vec3f sourceTargetPoint = sourceUnit->GetTargetPoint(targetPoint);
+    return {
+      sourceTargetPoint.x + mJamOffset.x,
+      sourceTargetPoint.y + mJamOffset.y,
+      sourceTargetPoint.z + mJamOffset.z,
+    };
+  }
+
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  const float blueprintLift = blueprint ? (blueprint->mCollisionOffsetY + blueprint->mSizeY * 0.5f) : 0.0f;
+  const VTransform rootTransform = GetBoneWorldTransform(-1);
+  return {
+    rootTransform.pos_.x,
+    rootTransform.pos_.y + blueprintLift,
+    rootTransform.pos_.z,
+  };
+}
+
+/**
+ * Address: 0x005BF4F0 (FUN_005BF4F0, Moho::ReconBlip::PickTargetPointAboveWater)
+ *
+ * What it does:
+ * Selects one above-water target-point lane by delegating to source unit
+ * when linked, otherwise by comparing blip elevation against water level.
+ */
+bool ReconBlip::PickTargetPointAboveWater(std::int32_t& outTargetPoint) const
+{
+  if (Unit* const sourceUnit = GetSourceUnit(); sourceUnit != nullptr) {
+    return sourceUnit->PickTargetPointAboveWater(outTargetPoint);
+  }
+
+  outTargetPoint = -1;
+  const STIMap* const mapData = SimulationRef->mMapData;
+  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+  return GetPositionWm3().y > waterElevation;
+}
+
+/**
+ * Address: 0x005BF570 (FUN_005BF570, Moho::ReconBlip::PickTargetPointBelowWater)
+ *
+ * What it does:
+ * Selects one below-water target-point lane by delegating to source unit
+ * when linked, otherwise by comparing blip elevation against water level.
+ */
+bool ReconBlip::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
+{
+  if (Unit* const sourceUnit = GetSourceUnit(); sourceUnit != nullptr) {
+    return sourceUnit->PickTargetPointBelowWater(outTargetPoint);
+  }
+
+  outTargetPoint = -1;
+  const STIMap* const mapData = SimulationRef->mMapData;
+  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+  return GetPositionWm3().y <= waterElevation;
+}
+
+/**
  * Address: 0x005BF810 (FUN_005BF810)
  *
  * What it does:
@@ -502,7 +1141,125 @@ void ReconBlip::DestroyIfUnused()
 
 Unit* ReconBlip::GetSourceUnit() const noexcept
 {
+  return GetCreator();
+}
+
+/**
+ * Address: 0x00579670 (FUN_00579670, Moho::ReconBlip::GetCreator)
+ *
+ * What it does:
+ * Returns the linked source-unit pointer from `mCreator` or null when this
+ * blip is detached.
+ */
+Unit* ReconBlip::GetCreator() const noexcept
+{
   return mCreator.GetObjectPtr();
+}
+
+/**
+ * Address: 0x005BDF00 (FUN_005BDF00, Moho::ReconBlip::GetFlags)
+ *
+ * What it does:
+ * Returns one army-local recon bitmask by direct army-index lane lookup.
+ */
+EReconFlags ReconBlip::GetFlags(const std::int32_t armyIndex) const
+{
+  return static_cast<EReconFlags>(static_cast<std::int32_t>(mReconDat[armyIndex].mReconFlags));
+}
+
+/**
+ * Address: 0x005BDF10 (FUN_005BDF10, Moho::ReconBlip::GetFlags)
+ *
+ * What it does:
+ * Returns one army-local recon bitmask by owning army object.
+ */
+EReconFlags ReconBlip::GetFlags(CArmyImpl* const army) const
+{
+  return GetFlags(army->ArmyId);
+}
+
+/**
+ * Address: 0x005BDF30 (FUN_005BDF30, Moho::ReconBlip::IsKnownFake)
+ *
+ * What it does:
+ * Returns whether this blip is marked `RECON_KnownFake` for the queried army
+ * lane.
+ */
+bool ReconBlip::IsKnownFake(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_KnownFake)) != 0u;
+}
+
+/**
+ * Address: 0x005BDF50 (FUN_005BDF50, Moho::ReconBlip::IsOnRadar)
+ *
+ * What it does:
+ * Returns whether this blip is currently radar-visible for the queried army
+ * lane.
+ */
+bool ReconBlip::IsOnRadar(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_Radar)) != 0u;
+}
+
+/**
+ * Address: 0x005BDF70 (FUN_005BDF70, Moho::ReconBlip::IsOnSonar)
+ *
+ * What it does:
+ * Returns whether this blip is currently sonar-visible for the queried army
+ * lane.
+ */
+bool ReconBlip::IsOnSonar(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_Sonar)) != 0u;
+}
+
+/**
+ * Address: 0x005BDF90 (FUN_005BDF90, Moho::ReconBlip::IsOnOmni)
+ *
+ * What it does:
+ * Returns whether this blip is currently omni-visible for the queried army
+ * lane.
+ */
+bool ReconBlip::IsOnOmni(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_Omni)) != 0u;
+}
+
+/**
+ * Address: 0x005BDFB0 (FUN_005BDFB0, Moho::ReconBlip::IsSeenEver)
+ *
+ * What it does:
+ * Returns whether this blip has ever been seen (`RECON_LOSEver`) by the
+ * queried army lane.
+ */
+bool ReconBlip::IsSeenEver(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_LOSEver)) != 0u;
+}
+
+/**
+ * Address: 0x005BDFD0 (FUN_005BDFD0, Moho::ReconBlip::IsSeenNow)
+ *
+ * What it does:
+ * Returns whether this blip is currently seen (`RECON_LOSNow`) by the queried
+ * army lane.
+ */
+bool ReconBlip::IsSeenNow(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u;
+}
+
+/**
+ * Address: 0x005BDFF0 (FUN_005BDFF0, Moho::ReconBlip::IsMaybeDead)
+ *
+ * What it does:
+ * Returns whether this blip is marked `RECON_MaybeDead` for the queried army
+ * lane.
+ */
+bool ReconBlip::IsMaybeDead(CArmyImpl* const army) const
+{
+  return (static_cast<std::uint32_t>(GetFlags(army)) & static_cast<std::uint32_t>(RECON_MaybeDead)) != 0u;
 }
 
 bool ReconBlip::IsFake() const noexcept

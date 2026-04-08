@@ -23,11 +23,22 @@ namespace gpg
 
 namespace moho
 {
+  class UnitWeapon;
+
   template <class T>
   struct WeakPtrOwnerLinkOffset
   {
     static constexpr std::uintptr_t value = sizeof(void*);
   };
+
+#ifndef MOHO_WEAKPTR_OWNER_LINK_OFFSET_UNITWEAPON_DEFINED
+#define MOHO_WEAKPTR_OWNER_LINK_OFFSET_UNITWEAPON_DEFINED
+  template <>
+  struct WeakPtrOwnerLinkOffset<UnitWeapon>
+  {
+    static constexpr std::uintptr_t value = 0x14;
+  };
+#endif
 
   /**
    * Recovered intrusive weak-pointer node layout used by Moho reflection helpers.

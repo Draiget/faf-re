@@ -2,8 +2,23 @@
 
 #include <cmath>
 
+#include "lua/LuaObject.h"
+#include "moho/resource/blueprints/RBlueprint.h"
+
 namespace moho
 {
+  gpg::RType* REntityBlueprint::sType = nullptr;
+
+  /**
+   * Address: 0x00511E80 (FUN_00511E80)
+   * Mangled: ??1REntityBlueprint@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Releases strategic-icon weak-pointer lanes, destroys derived entity
+   * string/vector fields, then tears down base blueprint ownership lanes.
+   */
+  REntityBlueprint::~REntityBlueprint() = default;
+
   namespace
   {
     [[nodiscard]] std::uint8_t RoundExtentUpToCellCount(const float extent) noexcept
@@ -73,5 +88,11 @@ namespace moho
   const RUnitBlueprint* REntityBlueprint::IsUnitBlueprint() const
   {
     return nullptr;
+  }
+
+  LuaPlus::LuaObject REntityBlueprint::GetLuaBlueprint(LuaPlus::LuaState* const state) const
+  {
+    const auto* const baseBlueprint = reinterpret_cast<const RBlueprint*>(this);
+    return baseBlueprint->GetLuaBlueprint(state);
   }
 } // namespace moho

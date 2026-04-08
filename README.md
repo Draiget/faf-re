@@ -2,59 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries.
 
-## What This Repo Does
-
-- Reconstructs C++ SDK/game code from FAF binaries, RTTI/vtables, and decompiler output.
-- Restores class layouts, methods, and behavior in `src/sdk/**`.
-- Keeps binary-backed address annotations in source (`Address: 0xXXXXXXXX`) for traceability.
-
-## Build Environment
-
-### Original FAF binary facts
-
-- Binary format: `PE32` (`x86`), Windows GUI subsystem.
-- Original toolchain: `MSVC 8.0` (`Visual Studio 2005`, linker `8.00`).
-- Base address: `0x400000` (relocations stripped, no ASLR).
-- CRT usage: no `MSVCR*` import, likely static CRT (`/MT`).
-
-### Building this repository
-
-Use a Visual Studio developer shell before `msbuild`:
-
-```bat
-%comspec% /k "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_x86.bat"
-```
-
-Build example:
-
-```bat
-msbuild src\sdk\sdk.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
-```
-
-### Boost bootstrap (external dependency)
-
-Use the in-repo patch + bootstrap flow for your external Boost `1.34.1` path:
-
-```bat
-powershell -ExecutionPolicy Bypass -File scripts\bootstrap_boost_1_34_1_required.ps1 -BoostRoot "<your external boost path>"
-```
-
-Details:
-- `dependencies/patches/boost_1_34_1_faf_required.patch`
-- `dependencies/patches/boost_1_34_1_faf_required.md`
-
-## Known Dependencies in FAF
-
-- Boost `1.34.1` (verified via `scripts/detect_boost_patch_version.py` against `1.34.0`/`1.34.1` runtime signatures)
-- LuaPlus `5.0` build `1081` (with local thread-related modifications)
-- wxWidgets `2.4.2` (MSW)
-- Wild Magic `3.8` (now Geometric Tools)
-- [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64)
-- BugSplat
-- CRI Middleware (Sofdec + ADX)
-- DirectX 9/10 (with XACT audio; DX10 path is partial/non-functional in FA)
-
-## Function Coverage (Script-Based, Fast)
+## Recovery Coverage (2026-04-08, `fa_full_2026_03_26`)
 
 Coverage is computed from:
 
@@ -69,34 +17,74 @@ python scripts/recovery_coverage.py --dump-excluded-external-csv decomp/recovery
 python scripts/detect_boost_patch_version.py --mode binary --binary-file bin/external/ForgedAlliance.exe
 ```
 
-Current coverage snapshot (2026-04-02):
+Progress snapshot:
 
-- Total FAF functions: `67,153`
-- Recovered FAF functions in source annotations: `11,433/67,153 (17.03%)`
-- Scoped coverage (`moho+gpg+external`): `4,910/13,217 (37.15%)`
-- Annotated addresses under `src/sdk/**`: `11,719` (`FA: 11,433`, `non-FA: 286`)
+- Total exported functions: `67,164 of 67,164 (100.00% completed)`
+- Recovered so far: `27,190`
+- Pending: `37,912`
+- Blocked: `2,111`
+- Coverage (recovered): `40.48%`
 
-Namespace split:
+By namespace:
 
-- `moho`: `4,030/8,717 (46.23%)`
-- `gpg`: `702/2,172 (32.32%)`
-- `external`: `178/2,328 (7.65%)`
+- `moho`: `5,023/8,717 (57.62%)`
+- `gpg`: `1,350/2,172 (62.15%)`
+- `other`: `11,733/53,936 (21.75%)`
+- `dependencies` (external entries with body evidence): `360/2,328 (15.46%)`
+- `dependencies` not link-proven in built libs (recovery-required): `402/1,063 (37.82%)`
 
-External dependency split:
+By external dependency:
 
-- `wxWidgets`: `88/1,359 (6.48%)`
-- `MSVC STL/CRT`: `28/398 (7.04%)`
-- `WildMagic`: `36/387 (9.30%)`
-- `LuaPlus/Lua`: `26/184 (14.13%)`
+- `wxWidgets`: `1,265/1,359` will be linked (`93.08%`); recovery-required `1/94 (1.06%)`
+- `MSVC STL/CRT`: `0/398` will be linked (`0.00%`); recovery-required `192/398 (48.24%)`
+- `WildMagic`: `0/387` will be linked (`0.00%`); recovery-required `50/387 (12.92%)`
+- `LuaPlus/Lua`: `0/184` will be linked (`0.00%`); recovery-required `159/184 (86.41%)`
 
-Recovery DB snapshot (2026-04-02, `fa_full_2026_03_26`):
+`recovery-required` means non-`external_dependency` completed statuses over functions not link-proven in built libs.
 
-- Exported done: `67,162`
-- Recovered: `19,316`
-- Pending: `46,849`
-- Blocked: `1,024`
-- In progress: `22`
-- Coverage: `28.76%`
+## Patch + Build Quickstart
+
+Use a Visual Studio developer shell before `msbuild`:
+
+```bat
+%comspec% /k "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsamd64_x86.bat"
+```
+
+Patch/bootstrap required external dependencies:
+
+```bat
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap_boost_1_34_1_required.ps1 -BoostRoot "<your external boost path>"
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap_wxwindows_2_4_2_required.ps1 -WxRoot "<your external wxWindows-2.4.2 path>"
+```
+
+Build:
+
+```bat
+msbuild src\sdk\sdk.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
+```
+
+Optional hang-safe build wrapper:
+
+```bat
+powershell -ExecutionPolicy Bypass -File scripts\build_sdk_with_timeout.ps1 -TimeoutMinutes 120 -NoOutputTimeoutMinutes 10
+```
+
+Patch/build details:
+
+- `dependencies/patches/boost_1_34_1_faf_required.md`
+- `dependencies/patches/wxwindows_2_4_2_faf_required.md`
+- `scripts/build_sdk_with_timeout.md`
+
+## Known Dependencies in FAF
+
+- Boost `1.34.1`
+- LuaPlus `5.0` build `1081`
+- wxWidgets `2.4.2` (MSW)
+- Wild Magic `3.8` (now Geometric Tools)
+- [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64)
+- BugSplat
+- CRI Middleware (Sofdec + ADX)
+- DirectX 9/10 (with XACT audio; DX10 path is partial/non-functional in FA)
 
 ## Projects
 

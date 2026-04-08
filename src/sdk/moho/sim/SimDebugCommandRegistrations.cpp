@@ -182,6 +182,12 @@ namespace
     return sAlias;
   }
 
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_AddImpulse_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
   [[nodiscard]] moho::TSimConVar<bool>*& SimConVar_NoDamage_slot()
   {
     static moho::TSimConVar<bool>* sConVar = nullptr;
@@ -417,6 +423,30 @@ namespace
     return sCommand;
   }
 
+  [[nodiscard]] moho::CConAlias*& ConAlias_TrackStats_slot()
+  {
+    static moho::CConAlias* sAlias = nullptr;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_TrackStats_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
+  [[nodiscard]] moho::CConAlias*& ConAlias_DumpUnits_slot()
+  {
+    static moho::CConAlias* sAlias = nullptr;
+    return sAlias;
+  }
+
+  [[nodiscard]] moho::CSimConFunc*& SimConFunc_DumpUnits_slot()
+  {
+    static moho::CSimConFunc* sCommand = nullptr;
+    return sCommand;
+  }
+
   [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetProductionInActive_slot()
   {
     static moho::CConAlias* sAlias = nullptr;
@@ -543,6 +573,7 @@ namespace
       moho::register_ZeroExtraStorage_SimConFuncDef();
       moho::register_DamageUnit_ConAlias();
       moho::register_AddImpulse_ConAliasDef();
+      moho::register_AddImpulse_SimConFuncDef();
       moho::register_WeaponTerrainBlockageTest_ConAliasDef();
       moho::register_WeaponTerrainBlockageTest_SimConVarDef();
       moho::register_dbg_ConAlias();
@@ -586,6 +617,10 @@ namespace
       moho::register_DebugAIStatesOn_SimConFunc();
       moho::register_DebugAIStatesOff_ConAlias();
       moho::register_DebugAIStatesOff_SimConFunc();
+      moho::register_TrackStats_ConAliasDef();
+      moho::register_TrackStats_SimConFuncDef();
+      moho::register_DumpUnits_ConAliasDef();
+      moho::register_DumpUnits_SimConFuncDef();
     }
   };
 
@@ -751,6 +786,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BFB640 (FUN_00BFB640, sub_BFB640)
+   */
+  void cleanup_AddImpulse_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_AddImpulse_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
    * Address: 0x00BD3890 (FUN_00BD3890, register_SallyShears_ConAliasDef)
    *
    * What it does:
@@ -873,6 +919,19 @@ namespace moho
       "DoSimCommand AddImpulse"
     );
     RegisterAtexitCleanup<&cleanup_AddImpulse_ConAlias>();
+  }
+
+  /**
+   * Address: 0x00BD3A80 (FUN_00BD3A80, register_AddImpulse_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `AddImpulse` sim command callback and installs startup
+   * cleanup.
+   */
+  void register_AddImpulse_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::AddImpulse>(SimConFunc_AddImpulse_slot(), "AddImpulse");
+    RegisterAtexitCleanup<&cleanup_AddImpulse_SimConFunc>();
   }
 
   /**
@@ -1099,6 +1158,11 @@ namespace moho
   {
     (void)ConstructAiRunOpponentAISimConVar();
     RegisterAtexitCleanup<&cleanup_AI_RunOpponentAI_SimConVarDef>();
+  }
+
+  CSimConVarBase* GetAI_RunOpponentAI_SimConVarDef()
+  {
+    return &ConstructAiRunOpponentAISimConVar();
   }
 
   /**
@@ -1724,6 +1788,66 @@ namespace moho
   }
 
   /**
+   * Address: 0x00C01390 (FUN_00C01390, cleanup_TrackStats_ConAlias)
+   *
+   * What it does:
+   * Clears startup-owned `TrackStats` alias payload and unregisters command
+   * binding.
+   */
+  void cleanup_TrackStats_ConAlias()
+  {
+    if (CConAlias*& alias = ConAlias_TrackStats_slot(); alias != nullptr) {
+      alias->ShutdownRecovered();
+      delete alias;
+      alias = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00C013E0 (FUN_00C013E0, cleanup_TrackStats_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `TrackStats` sim-command callback object.
+   */
+  void cleanup_TrackStats_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_TrackStats_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00C013F0 (FUN_00C013F0, cleanup_DumpUnits_ConAlias)
+   *
+   * What it does:
+   * Clears startup-owned `DumpUnits` alias payload and unregisters command
+   * binding.
+   */
+  void cleanup_DumpUnits_ConAlias()
+  {
+    if (CConAlias*& alias = ConAlias_DumpUnits_slot(); alias != nullptr) {
+      alias->ShutdownRecovered();
+      delete alias;
+      alias = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00C01440 (FUN_00C01440, cleanup_DumpUnits_SimConFunc)
+   *
+   * What it does:
+   * Destroys startup-owned `DumpUnits` sim-command callback object.
+   */
+  void cleanup_DumpUnits_SimConFunc()
+  {
+    if (CSimConFunc*& command = SimConFunc_DumpUnits_slot(); command != nullptr) {
+      delete command;
+      command = nullptr;
+    }
+  }
+
+  /**
    * Address: 0x00BFE2B0 (FUN_00BFE2B0, sub_BFE2B0)
    */
   void cleanup_DebugSetProductionInActive_ConAlias()
@@ -1869,6 +1993,72 @@ namespace moho
       "DebugAIStatesOn"
     );
     RegisterAtexitCleanup<&cleanup_DebugAIStatesOn_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00BDC350 (FUN_00BDC350, register_TrackStats_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `TrackStats` console alias and installs startup cleanup.
+   */
+  void register_TrackStats_ConAliasDef()
+  {
+    EnsureConAliasRegistration(
+      ConAlias_TrackStats_slot(),
+      "Begin/End tracking stats of selected units.",
+      "TrackStats",
+      "DoSimCommand TrackStats"
+    );
+    RegisterAtexitCleanup<&cleanup_TrackStats_ConAlias>();
+  }
+
+  /**
+   * Address: 0x00BDC380 (FUN_00BDC380, register_TrackStats_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `TrackStats` sim command callback and installs startup
+   * cleanup.
+   */
+  void register_TrackStats_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::TrackStats>(
+      SimConFunc_TrackStats_slot(),
+      "TrackStats"
+    );
+    RegisterAtexitCleanup<&cleanup_TrackStats_SimConFunc>();
+  }
+
+  /**
+   * Address: 0x00BDC3C0 (FUN_00BDC3C0, register_DumpUnits_ConAliasDef)
+   *
+   * What it does:
+   * Registers the `DumpUnits` console alias and installs startup cleanup.
+   */
+  void register_DumpUnits_ConAliasDef()
+  {
+    EnsureConAliasRegistration(
+      ConAlias_DumpUnits_slot(),
+      "Print out units in play",
+      "DumpUnits",
+      "DoSimCommand DumpUnits"
+    );
+    RegisterAtexitCleanup<&cleanup_DumpUnits_ConAlias>();
+  }
+
+  /**
+   * Address: 0x00BDC3F0 (FUN_00BDC3F0, register_DumpUnits_SimConFuncDef)
+   *
+   * What it does:
+   * Registers the `DumpUnits` sim command callback and installs startup
+   * cleanup.
+   */
+  void register_DumpUnits_SimConFuncDef()
+  {
+    EnsureSimConFuncRegistration<&Sim::DumpUnits>(
+      SimConFunc_DumpUnits_slot(),
+      "DumpUnits"
+    );
+    RegisterAtexitCleanup<&cleanup_DumpUnits_SimConFunc>();
   }
 
   /**

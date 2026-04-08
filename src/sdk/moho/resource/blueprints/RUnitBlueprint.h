@@ -3,17 +3,24 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/resource/RResId.h"
 #include "moho/sim/SMinMax.h"
 
+namespace gpg
+{
+  class RType;
+}
+
 namespace moho
 {
   class CRandomStream;
   class RRuleGameRules;
   struct RUnitBlueprint;
+  struct SCoordsVec2;
 
   /**
    * Address: 0x00520590 (FUN_00520590)
@@ -27,6 +34,16 @@ namespace moho
    */
   struct RUnitBlueprintGeneral
   {
+    /**
+     * Address: 0x0051EE10 (FUN_0051EE10)
+     * Mangled: ??0RUnitBlueprintGeneral@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Initializes capability bitmasks and upgrade-id defaults for new unit
+     * blueprint records.
+     */
+    RUnitBlueprintGeneral();
+
     ERuleBPUnitCommandCaps CommandCaps; // +0x00
     ERuleBPUnitToggleCaps ToggleCaps;   // +0x04
     RResId UpgradesTo;                  // +0x08
@@ -414,6 +431,15 @@ namespace moho
    */
   struct RUnitBlueprintAI
   {
+    /**
+     * Address: 0x0051F7D0 (FUN_0051F7D0, ??0RUnitBlueprintAI@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes AI blueprint defaults for guard behavior, refueling, and
+     * transport/beacon metadata.
+     */
+    RUnitBlueprintAI();
+
     float GuardScanRadius;                    // +0x00
     float GuardReturnRadius;                  // +0x04
     float StagingPlatformScanRadius;          // +0x08
@@ -518,6 +544,14 @@ namespace moho
     std::uint8_t pad_014B_014C[0x01];               // +0x14B
     msvc8::string UIMinRangeVisualId;               // +0x14C
     msvc8::string UIMaxRangeVisualId;               // +0x168
+
+    /**
+     * Address: 0x00523F90 (FUN_00523F90, Moho::RUnitBlueprintWeapon::~RUnitBlueprintWeapon)
+     *
+     * What it does:
+     * Releases owned string lanes in reverse declaration order.
+     */
+    ~RUnitBlueprintWeapon();
 
     /**
      * Address: 0x1010E1C0 (FUN_1010E1C0)
@@ -628,6 +662,8 @@ namespace moho
    */
   struct RUnitBlueprint : public REntityBlueprint
   {
+    static gpg::RType* sPointerType;
+
     RUnitBlueprintGeneral General;     // +0x17C
     RUnitBlueprintDisplay Display;     // +0x200
     RUnitBlueprintPhysics Physics;     // +0x278
@@ -649,6 +685,15 @@ namespace moho
     void OnInitBlueprint();
 
     /**
+     * Address: 0x005A1330 (FUN_005A1330, Moho::RUnitBlueprint::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for
+     * `RUnitBlueprint*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
+
+    /**
      * Address: 0x0051E460 (FUN_0051E460)
      * Mangled: ?IsMobile@RUnitBlueprint@Moho@@UBE_NXZ
      *
@@ -665,6 +710,17 @@ namespace moho
      * Returns `this` to mark the entity blueprint as a unit blueprint.
      */
     [[nodiscard]] const RUnitBlueprint* IsUnitBlueprint() const;
+
+    /**
+     * Address: 0x0051EC50 (FUN_0051EC50)
+     * Mangled: ?GetSkirtRect@RUnitBlueprint@Moho@@QBE?AV?$Rect2@M@gpg@@ABUSCoordsVec2@2@@Z
+     *
+     * What it does:
+     * Builds world-space XZ skirt occupancy bounds around `position`, using
+     * explicit skirt offsets/sizes when present and falling back to footprint
+     * extents otherwise.
+     */
+    [[nodiscard]] gpg::Rect2f GetSkirtRect(const SCoordsVec2& position) const;
   };
 
   static_assert(

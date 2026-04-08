@@ -3,9 +3,16 @@
 #include <cmath>
 #include <cstddef>
 #include <new>
+#include <string>
+#include <vector>
 
+#include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/Stream.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/WldSessionInfo.h"
 
@@ -332,6 +339,103 @@ namespace moho
   RWldMapPreviewChunk::~RWldMapPreviewChunk()
   {
     mPreviewName.tidy(true, 0U);
+  }
+
+  /**
+   * Address: 0x008904C0 (FUN_008904C0,
+   * ?Load@RWldMapPreviewChunk@Moho@@QAE_NAAVBinaryReader@gpg@@AAVCBackgroundTaskControl@2@@Z)
+   *
+   * What it does:
+   * Loads optional preview metadata header (version/size/name), then loads the
+   * remaining preview texture payload and resolves runtime texture ownership.
+   */
+  bool RWldMapPreviewChunk::Load(gpg::BinaryReader& reader, CBackgroundTaskControl& loadControl)
+  {
+    constexpr std::uint32_t kPreviewHeaderMagic = 0xBEEFFEEDU;
+    constexpr const char* kPreviewSheetLocation = "_mappreview.dds";
+    constexpr const char* kFallbackPreviewTexture = "/textures/engine/b_fails_to_load.dds";
+
+    gpg::Stream* const stream = reader.stream();
+    std::uint32_t previewChunkVersion = 0U;
+
+    std::uint32_t maybeMagic = 0U;
+    reader.ReadExact(maybeMagic);
+
+    if (maybeMagic == kPreviewHeaderMagic) {
+      reader.ReadExact(previewChunkVersion);
+
+      if (previewChunkVersion >= 1U) {
+        reader.ReadExact(mPreviewSize.x);
+        reader.ReadExact(mPreviewSize.y);
+
+        std::wstring previewNameWide;
+        while (true) {
+          std::uint16_t wideChar = 0U;
+          reader.ReadExact(wideChar);
+          if (wideChar == 0U) {
+            break;
+          }
+          previewNameWide.push_back(static_cast<wchar_t>(wideChar));
+        }
+
+        const msvc8::string previewNameUtf8 = gpg::STR_WideToUtf8(previewNameWide.c_str());
+        mPreviewName.assign_owned(previewNameUtf8.c_str());
+
+        std::uint32_t metadataEntryCount = 0U;
+        reader.ReadExact(metadataEntryCount);
+        for (std::uint32_t i = 0; i < metadataEntryCount; ++i) {
+          std::uint32_t metadataTag = 0U;
+          std::uint32_t metadataValue = 0U;
+          reader.ReadExact(metadataTag);
+          reader.ReadExact(metadataValue);
+        }
+      }
+    } else {
+      stream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginCurr, -4);
+    }
+
+    TickLoadingProgress(loadControl);
+
+    const std::uint64_t payloadStart = stream->VirtTell(gpg::Stream::ModeReceive);
+    const std::uint64_t payloadEnd = stream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginEnd, 0);
+    stream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::int64_t>(payloadStart));
+
+    const std::size_t remainingBytes =
+      payloadEnd >= payloadStart ? static_cast<std::size_t>(payloadEnd - payloadStart) : 0U;
+
+    std::size_t payloadSize = remainingBytes;
+    if (previewChunkVersion >= 2U) {
+      std::uint32_t explicitPayloadSize = 0U;
+      reader.ReadExact(explicitPayloadSize);
+      payloadSize = static_cast<std::size_t>(explicitPayloadSize);
+      if (payloadSize > remainingBytes) {
+        return false;
+      }
+    }
+
+    ID3DDeviceResources::TextureResourceHandle previewTexture{};
+    if (payloadSize != 0U) {
+      std::vector<char> payloadBytes(payloadSize);
+      reader.Read(payloadBytes.data(), payloadBytes.size());
+
+      TickLoadingProgress(loadControl);
+
+      CD3DDevice* const device = D3D_GetDevice();
+      ID3DDeviceResources* const resources = device->GetResources();
+      resources->GetTextureSheet(
+        previewTexture,
+        kPreviewSheetLocation,
+        static_cast<void*>(payloadBytes.data()),
+        payloadBytes.size()
+      );
+    } else {
+      CD3DDevice* const device = D3D_GetDevice();
+      ID3DDeviceResources* const resources = device->GetResources();
+      resources->GetTexture(previewTexture, kFallbackPreviewTexture, 0, true);
+    }
+
+    mPreviewTexture = boost::static_pointer_cast<ID3DTextureSheet>(previewTexture);
+    return mPreviewTexture.get() != nullptr;
   }
 
   /**

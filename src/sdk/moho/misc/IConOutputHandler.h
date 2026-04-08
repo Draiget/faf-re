@@ -43,6 +43,14 @@ namespace moho
    */
   ConOutputHandlerList& CON_GetOutputHandlers();
 
+  /**
+   * Address: 0x00BC38A0 (FUN_00BC38A0, register_sConsoleOutputHandlers)
+   *
+   * What it does:
+   * Registers process-exit teardown for the global console-output-handler list.
+   */
+  void register_sConsoleOutputHandlers();
+
   static_assert(sizeof(IConOutputHandler) == 0x0C, "IConOutputHandler size must be 0x0C");
   static_assert(sizeof(ConOutputHandlerList) == 0x08, "ConOutputHandlerList size must be 0x08");
 } // namespace moho

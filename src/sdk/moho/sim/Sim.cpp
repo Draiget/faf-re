@@ -15,8 +15,10 @@
 #include <exception>
 #include <initializer_list>
 #include <limits>
+#include <map>
 #include <new>
 #include <stdexcept>
+#include <set>
 #include <string>
 #include <string_view>
 #include <typeinfo>
@@ -24,27 +26,42 @@
 #include <vector>
 
 #include <Windows.h>
+#include <intrin.h>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
+#include "moho/ai/CAiBrain.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
+#include "moho/audio/AudioEngine.h"
+#include "moho/audio/CUserSoundManager.h"
+#include "moho/audio/CSimSoundManager.h"
+#include "moho/audio/CSndParams.h"
+#include "moho/audio/HSound.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CCommandDb.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/client/Localization.h"
+#include "moho/console/CConCommand.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/debug/RDebugOverlayClass.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/CollisionBeamEntity.h"
 #include "moho/entity/EntityId.h"
+#include "moho/entity/intel/CIntel.h"
+#include "moho/entity/intel/CIntelPosHandle.h"
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/path/PathTables.h"
@@ -60,28 +77,45 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/SCR_Color.h"
+#include "moho/lua/SCR_FromLua.h"
+#include "moho/lua/SCR_ToLua.h"
+#include "moho/math/MathReflection.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/CSimResources.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
+#include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/projectile/Projectile.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/misc/ScrDebugHooks.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/misc/StartupHelpers.h"
+#include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CArmyStats.h"
+#include "moho/sim/CBackgroundTaskControl.h"
+#include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SPhysConstants.h"
+#include "moho/sim/SpecialFileType.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/ReconBlip.h"
 #include "moho/sim/UserArmy.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTICommandSource.h"
+#include "moho/ui/CUIManager.h"
 #include "moho/unit/core/IUnit.h"
+#include "moho/unit/core/EIntelTypeInfo.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UserUnit.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/CUnitMotion.h"
 
 using namespace moho;
 using EntId = std::int32_t;
@@ -872,8 +906,39 @@ namespace
   constexpr CommandSourceId kInvalidCommandSource = 0xFF;
   constexpr const char* kEndGameHelpText = "Signal the end of the game.  Acts like a permanent pause.";
   constexpr const char* kIsGameOverHelpText = "Return true if the game is over (i.e. EndGame() has been called).";
+  constexpr const char* kEntityAttachToHelpText = "Entity:AttachTo(entity, bone)";
+  constexpr const char* kEntitySetOrientationHelpText = "Entity:SetOrientation(orientation, immediately )";
+  constexpr const char* kEntitySetPositionHelpText = "Entity:SetPosition(vector,[immediate])";
+  constexpr const char* kEntityGetPositionHelpText = "Entity:GetPosition([bone_name])";
+  constexpr const char* kEntityGetPositionXYZHelpText = "Entity:GetPositionXYZ([bone_name])";
+  constexpr const char* kEntityAttachFailureError = "Failed to attach entity %s to %s on bone %d";
+  constexpr const char* kEntityGetCollisionExtentsHelpText = "Entity:GetCollisionExtents()";
+  constexpr const char* kEntityIsIntelEnabledHelpText = "IsIntelEnabled(type)";
+  constexpr const char* kEntityIsIntelEnabledInitWarning = "EnableIntel called before InitIntel";
+  constexpr const char* kEntityEnableIntelHelpText = "EnableIntel(type)";
+  constexpr const char* kEntityEnableIntelInitWarning = "EnableIntel called before InitIntel";
+  constexpr const char* kEntityDisableIntelHelpText = "Intel:DisableIntel(type)";
+  constexpr const char* kEntityDisableIntelInitWarning = "DisableIntel called before InitIntel";
+  constexpr const char* kEntitySetIntelRadiusHelpText = "SetRadius(type,radius)";
+  constexpr const char* kEntitySetIntelRadiusInitWarning = "SetIntelRadius called before InitIntel";
+  constexpr const char* kEntityGetIntelRadiusHelpText = "GetIntelRadius(type)";
+  constexpr const char* kEntityGetIntelRadiusInitWarning = "GetIntelRadius called before InitIntel";
+  constexpr const char* kEntityInitIntelHelpText = "InitIntel(army,type,<radius>)";
+  constexpr const char* kEntityInitIntelRadiusWarning = "Intel type requires a radius > 0.";
+  constexpr const char* kEntityInitIntelUnknownArmyWarning = "Unknown army";
+  constexpr const char* kEntityAddShooterHelpText = "AddShooter(shooter)";
+  constexpr const char* kEntityRemoveShooterHelpText = "RemoveShooter(shooter)";
+  constexpr const char* kCreatePropHelpText = "CreateProp(location,prop_blueprint_id)";
+  constexpr const char* kCreateUnitAtMouseHelpText = "CreateUnitAtMouse";
   constexpr const char* kEntityCreatePropAtBoneHelpText = "Entity:CreatePropAtBone(boneindex,prop_blueprint_id)";
   constexpr const char* kCreateResourceDepositHelpText = "type, x, y, z, size";
+  constexpr const char* kEngineStartSplashScreensHelpText =
+    "EngineStartSplashScreens() - kill current UI and start splash screens";
+  constexpr const char* kEngineStartFrontEndUIHelpText =
+    "EngineStartFrontEndUI() - kill current UI and start main menu from top";
+  constexpr const char* kExitApplicationHelpText = "ExitApplication - request that the application shut down";
+  constexpr const char* kExitGameHelpText = "ExitGame() - Quits the sim, but not the app";
+  constexpr const char* kExecLuaInSimHelpText = "Execute some lua code in the sim";
   constexpr const char* kSimCallbackHelpText =
     "SimCallback(callback[,bool]): Execute a lua function in sim\n"
     "callback = {\n"
@@ -882,26 +947,229 @@ namespace
     "}\n"
     "If bool is specified and true, sends the current selection with the command\n";
   constexpr const char* kGetSelectedUnitsHelpText = "table GetSelectedUnits() - return a table of the currently selected units";
+  constexpr const char* kSelectUnitsHelpText = "Select the specified units";
+  constexpr const char* kAddSelectUnitsHelpText = "Add these units to the currently Selected lists";
+  constexpr const char* kGetUnitCommandFromCommandCapErrorHelpText = "string GetUnitCommandFromCommandCap(string)";
+  constexpr const char* kGetUnitCommandFromCommandCapHelpText =
+    "string GetUnitCommandFromCommandCap(string) - given a RULEUCC type command, return the equivalent UNITCOMMAND command";
   constexpr const char* kUnknownResourceDepositTypeMessage = "unknown resource deposit type: %s";
   constexpr const char* kGetEconomyTotalsHelpText = "table GetEconomyTotals()";
   constexpr const char* kGetEconomyTotalsMissingSessionWarning =
     "Attempt to call GetEconomyTotals before world sessions exists.";
+  constexpr const char* kGetResourceSharingHelpText = "bool GetResourceSharing()";
+  constexpr const char* kGetCurrentUIStateHelpText =
+    "state GetCurrentUIState() - returns 'splash', 'frontend' or 'game' depending on the current state of the ui";
+  constexpr const char* kGetMouseWorldPosUserHelpText = "vector GetMouseWorldPos()";
+  constexpr const char* kGetMouseScreenPosHelpText = "vector GetMouseScreenPos()";
+  constexpr const char* kSetFocusArmyUserHelpText = "SetFocusArmy(armyIndex or -1)";
+  constexpr const char* kGetFocusArmyUserHelpText = "GetFocusArmy()";
+  constexpr const char* kIsObserverHelpText = "IsObserver()";
+  constexpr const char* kGetGameTimeSecondsSimHelpText =
+    "Get the current game time in seconds. The game time is the simulation time, that stops when the game is paused.";
+  constexpr const char* kGetGameTickHelpText =
+    "Get the current game time in ticks. The game time is the simulation time, that stops when the game is paused.";
+  constexpr const char* kGetSystemTimeSecondsOnlyForProfileUseHelpText =
+    "float GetSystemTimeSecondsOnlyForProfileUse() - returns System time in seconds";
+  constexpr const char* kGetGameTimeSecondsUserHelpText = "float GetGameTimeSeconds() - returns game time in seconds";
+  constexpr const char* kGetSystemTimeSecondsHelpText =
+    "float GetSystemTimeSeconds() - returns System time in seconds";
+  constexpr const char* kGetSimRateHelpText = "number GetSimRate()";
+  constexpr const char* kGetArmiesTableHelpText = "armyInfo GetArmiesTable()";
+  constexpr const char* kGetArmyScoreHelpText = "int GetArmyScore(armyIndex)";
+  constexpr const char* kDeleteCommandHelpText = "DeleteCommand(id)";
+  constexpr const char* kGetSpecialFilesHelpText =
+    "table GetSpecialFiles(string type)- returns a table of strings which are the names of files in special locations (currently SaveFile, Replay)";
+  constexpr const char* kGetSpecialFolderHelpText = "string GetSpecialFolder(string type)";
+  constexpr const char* kGetSpecialFilePathHelpText =
+    "string GetSpecialFilePath(string profilename, string filename, string type) - Given the base name of a special file, retuns the complete path";
+  constexpr const char* kRemoveSpecialFileHelpText =
+    "RemoveSpecialFile(string profilename, string basename, string type) - remove a profile based file from the disc";
+  constexpr const char* kGetSpecialFileInfoHelpText =
+    "table GetSpecialFileInfo(string profileName, string basename, string type) - get information on a profile based file, nil if unable to find";
+  constexpr const char* kRestartSessionHelpText = "RestartSession() - Restart the current mission/skirmish/etc";
+  constexpr const char* kGetFrameHelpText = "frame GetFrame(int head) - return the root UI frame for a given head";
+  constexpr const char* kClearFrameHelpText =
+    "ClearFrame(int head) - destroy all controls in frame, nil head will clear all frames";
+  constexpr const char* kGetNumRootFramesHelpText =
+    "int GetNumRootFrames() - returns the current number of root frames (typically one per head";
   constexpr const char* kCallbackPacketMessage = "Callback packet received, exit sync is over";
   constexpr const char* kDiscardedPointerMessage = "Discarded: %p";
   constexpr const char* kRecvPointerMessage = "recv Ptr: %p";
+  constexpr const char* kGetSimTicksPerSecondHelpText = "int GetSimTicksPerSecond()";
+  constexpr const char* kSessionRequestPauseHelpText = "Pause the world simulation.";
+  constexpr const char* kSessionResumeHelpText = "Resume the world simulation.";
+  constexpr const char* kSessionIsPausedHelpText = "Return true iff the session is paused.";
+  constexpr const char* kSessionIsGameOverHelpText = "Return true iff the session has been won or lost yet.";
+  constexpr const char* kSessionGetLocalCommandSourceHelpText =
+    "Return the local command source.  Returns 0 if the local client can't issue commands.";
+  constexpr const char* kSessionIsReplayUserHelpText = "Return true iff the active session is a replay session.";
+  constexpr const char* kSessionIsBeingRecordedHelpText = "Return true iff the active session is a being recorded.";
+  constexpr const char* kSessionIsMultiplayerHelpText = "Return true iff the active session is a multiplayer session.";
+  constexpr const char* kSessionIsObservingAllowedHelpText =
+    "Return true iff observing is allowed in the active session.";
+  constexpr const char* kSessionCanRestartHelpText = "Return true iff the active session can be restarted.";
+  constexpr const char* kSessionIsActiveHelpText = "Return true iff there is a session currently running";
+  constexpr const char* kSessionGetScenarioInfoHelpText =
+    "Return the table of scenario info that was originally passed to the sim on launch.";
+  constexpr const char* kSessionIsPausedNoActiveSessionText = "SessionIsPaused(): no active session.";
+  constexpr const char* kSessionIsGameOverNoActiveSessionText = "SessionIsGameOver(): no active session.";
+  constexpr const char* kSessionGetLocalCommandSourceNoActiveSessionText =
+    "SessionGetLocalCommandSource(): no active session.";
+  constexpr const char* kSessionRequestPauseNoActiveSessionText = "SessionRequestPause(): no active session.";
+  constexpr const char* kSessionResumeNoActiveSessionText = "SessionResume(): no active session.";
+  constexpr const char* kSessionGetScenarioInfoNoActiveSessionText = "no active session.";
+  constexpr const char* kWrongLuaStateText = "wrong lua state.";
+  constexpr const char* kRandomSimHelpText = "Random([[min,] max])";
+  constexpr const char* kSelectedUnitHelpText =
+    "unit = SelectedUnit() -- Returns the currently selected unit. For use at the lua console, so you can call Lua methods on a unit.";
+  constexpr const char* kSimConExecuteHelpText = "SimConExecute('command string') -- Perform a console command";
+  constexpr const char* kParseEntityCategorySimHelpText = "parse a string to generate a new entity category";
+  constexpr const char* kFlushIntelInRectHelpText = "FlushIntelInRect( minX, minZ, maxX, maxZ )";
+  constexpr const char* kEntityCategoryCountAroundPositionHelpText =
+    "Count how many units fit the specified category around a position";
+  constexpr const char* kIsEntityHelpText = "bool = IsEntity(object)";
+  constexpr const char* kIsUnitHelpText = "Unit = IsUnit(entity)";
+  constexpr const char* kIsPropHelpText = "Prop = IsProp(entity)";
+  constexpr const char* kIsBlipHelpText = "Blip = IsBlip(entity)";
+  constexpr const char* kIsProjectileHelpText = "Projectile = IsProjectile(entity)";
+  constexpr const char* kIsCollisionBeamHelpText = "CollisionBeam = IsCollisionBeam(entity)";
+  constexpr const char* kDebugGetSelectionHelpText = "Get DEBUG info for UI selection";
+  constexpr const char* kRandomUserHelpText = "Random([[min,] max])";
+  constexpr const char* kPrintSimHelpText = "Print a log message";
+  constexpr const char* kWorldIsLoadingHelpText = "bool = WorldIsLoading()";
+  constexpr const char* kWorldIsPlayingHelpText = "bool = WorldIsPlaying()";
+  constexpr const char* kGetGameSpeedHelpText = "Return the current game speed";
+  constexpr const char* kSetGameSpeedHelpText = "Set the desired game speed";
+  constexpr const char* kAddToSessionExtraSelectListHelpText = "Add unit to the session extra select list";
+  constexpr const char* kRemoveFromSessionExtraSelectListHelpText = "Remove unit from the session extra select list";
+  constexpr const char* kClearSessionExtraSelectListHelpText = "Clear the session extra select list";
+  constexpr const char* kGetAttachedUnitsListHelpText = "Get a list of units blueprint attached to transports";
+  constexpr const char* kGetAssistingUnitsListHelpText = "Get a list of units assisting me";
+  constexpr const char* kGetArmyAvatarsHelpText = "table GetArmyAvatars() - return a table of avatar units for the army";
+  constexpr const char* kGetIdleEngineersHelpText =
+    "table GetIdleEngineers() - return a table of idle engineer units for the army";
+  constexpr const char* kGetIdleFactoriesHelpText =
+    "table GetIdleFactories() - return a table of idle factory units for the army";
+  constexpr const char* kSyncPlayableRectHelpText = "SyncPlayableRect(region)";
+  constexpr const char* kCurrentTimeHelpText =
+    "Get the current time in seconds, counting from 0 at application start. This is wall-clock time and is unaffected by gameplay.";
+  constexpr const char* kGameTimeUserHelpText =
+    "Get the current game time in seconds. The game time is the simulation time, that stops when the game is paused.";
+  constexpr const char* kGameTickUserHelpText =
+    "Get the current game time in ticks. The game time is the simulation time, that stops when the game is paused.";
+  constexpr const char* kIsAllyUserHelpText = "IsAlly(army1,army2)";
+  constexpr const char* kIsEnemyUserHelpText = "IsEnemy(army1,army2)";
+  constexpr const char* kIsNeutralUserHelpText = "IsNeutral(army1,army2)";
+  constexpr const char* kParseEntityCategoryUserHelpText = "parse a string to generate a new entity category";
+  constexpr const char* kParseEntityCategoryUserNoSessionText = "ParseEntityCategory: no session loaded";
+  constexpr const char* kHasLocalizedVOUserHelpText = "HasLocalizedVO(languageCode)";
+  constexpr const char* kCheatsEnabledHelpText =
+    "Return true iff cheats are enabled.  Logs the cheat attempt no matter what.";
+  constexpr const char* kGetCurrentCommandSourceHelpText = "Return the (1 based) index of the current command source.";
+  constexpr const char* kGetUnitsInRectHelpText = "Return the units inside the given rectangle";
+  constexpr const char* kGetReclaimablesInRectHelpText = "Return the reclamable things inside the given rectangle";
+  constexpr const char* kGetMapSizeHelpText = "sizeX, sizeZ = GetMapSize()";
+  constexpr const char* kGetFocusArmySimHelpText = "GetFocusArmy()";
+  constexpr const char* kAudioSetLanguageUserHelpText = "AudioSetLanguage(name)";
+  constexpr const char* kAudioSetLanguageSimHelpText = "AudioSetLanguage(name)";
+  constexpr const char* kHasLocalizedVOSimHelpText = "HasLocalizedVO(language)";
+  constexpr const char* kSubmitXMLArmyStatsHelpText = "Request that we submit xml army stats to gpg.net.";
   constexpr const char* kSetInvertMidMouseButtonHelpText = "SetInvertMidMouseButton";
+  constexpr const char* kShouldCreateInitialArmyUnitsHelpText = "";
+  constexpr const char* kListArmiesHelpText = "";
+  constexpr const char* kGetArmyBrainHelpText = "army";
+  constexpr const char* kSetArmyStartHelpText = "army, x, z";
+  constexpr const char* kGenerateArmyStartHelpText = "army";
+  constexpr const char* kArmyInitializePrebuiltUnitsHelpText = "army";
+  constexpr const char* kSetIgnoreArmyUnitCapHelpText = "army, flag";
+  constexpr const char* kSetIgnorePlayableRectHelpText = "army, flag";
+  constexpr const char* kIsAllySimHelpText = "IsAlly(army1,army2)";
+  constexpr const char* kIsEnemySimHelpText = "IsEnemy(army1,army2)";
+  constexpr const char* kIsNeutralSimHelpText = "IsNeutral(army1,army2)";
+  constexpr const char* kArmyIsCivilianHelpText = "ArmyIsCivilian(army)";
+  constexpr const char* kSetArmyFactionIndexHelpText = "SetArmyFactionIndex(army,index)";
+  constexpr const char* kOkayToMessWithArmyHelpText =
+    "Return true if the current command source is authorized to mess with the given army.  Or if cheats are enabled.";
+  constexpr const char* kArmyIsOutOfGameHelpText =
+    "ArmyIsOutOfGame(army) -- return true iff the indicated army has been defeated.";
+  constexpr const char* kSetArmyOutOfGameHelpText =
+    "SetArmyOutOfGame(army) -- indicate that the supplied army has been defeated.";
+  constexpr const char* kArmyGetHandicapHelpText = "army";
+  constexpr const char* kSetArmyEconomyHelpText = "army, mass, energy";
+  constexpr const char* kGetArmyUnitCostTotalHelpText = "army";
+  constexpr const char* kGetArmyUnitCapHelpText = "army";
+  constexpr const char* kSetArmyUnitCapHelpText = "army, unitCap";
+  constexpr const char* kSetArmyAIPersonalityHelpText = "SetArmyAIPersonality(army,personality)";
+  constexpr const char* kSetArmyShowScoreHelpText =
+    "SetArmyColor(army, bool) - determines if the user should be able to see the army score";
+  constexpr const char* kSetArmyStatsSyncArmyHelpText = "Set the army index for which to sync army stats (-1 for none)";
+  constexpr const char* kInitializeArmyAIHelpText = "army";
+  constexpr const char* kSetArmyPlansHelpText = "army, plans";
   constexpr const char* kSetArmyColorHelpText = "SetArmyColor(army,r,g,b)";
+  constexpr const char* kSetAlliedVictoryHelpText = "SetAlliedVictory(army,bool)";
+  constexpr const char* kSetAllianceHelpText = "SetAlliance(army1,army2,<Neutral|Enemy|Ally>";
+  constexpr const char* kSetAllianceOneWayHelpText = "SetAllianceOneWay(army1,army2,<Neutral|Enemy|Ally>";
+  constexpr const char* kGetEntityByIdHelpText = "Get entity by entity id";
+  constexpr const char* kGetUnitByIdSimHelpText = "Get entity by entity id";
+  constexpr const char* kGetUnitByIdUserHelpText = "GetUnitById(id)";
+  constexpr const char* kGetTerrainHeightHelpText = "type = GetTerrainHeight(x,z)";
+  constexpr const char* kGetSurfaceHeightHelpText = "type = GetSurfaceHeight(x,z)";
+  constexpr const char* kGetTerrainTypeOffsetHelpText = "type = GetTerrainTypeOffset(x,z)";
+  constexpr const char* kGetTerrainTypeLuaDefHelpText = "type = GetTerrainType(x,z)";
+  constexpr const char* kSetTerrainTypeLuaDefHelpText = "SetTerrainType(x,z,type)";
+  constexpr const char* kSetTerrainTypeRectLuaDefHelpText = "SetTerrainType(rect,type)";
+  constexpr const char* kGetTerrainTypeHelpText = "GetTerrainType( x, z )";
   constexpr const char* kSetTerrainTypeHelpText = "SetTerrainType( x, z, terrainTypeTable )";
   constexpr const char* kSetTerrainTypeRectHelpText = "SetTerrainTypeRect( rect, terrainTypeTable )";
   constexpr const char* kSetPlayableRectHelpText = "SetPlayableRect( minX, minZ, maxX, maxZ )";
+  constexpr const char* kWarpHelpText = "Warp( unit, location, [orientation] )";
+  constexpr const char* kGetUnitBlueprintByNameLuaDefHelpText = "blueprint = GetUnitBlueprintByName(bpName)";
+  constexpr const char* kGetUnitBlueprintByNameHelpText = "GetUnitBlueprintByName(blueprint_name)";
+  constexpr const char* kGenerateRandomOrientationHelpText = "rotation = GenerateRandomOrientation()";
+  constexpr const char* kDrawLineHelpText = "Draw a 3d line from a to b with color c";
+  constexpr const char* kDrawLinePopHelpText =
+    "Draw a 3d line from a to b with color c with a circle at the end of the target line";
+  constexpr const char* kDrawCircleHelpText = "Draw a 3d circle at a with size s and color c";
+  constexpr const char* kPlayLoopHelpText = "handle = PlayLoop(self,sndParams)";
+  constexpr const char* kStopLoopHelpText = "StopLoop(self,handle)";
   constexpr const char* kSetAutoModeHelpText = "See if anyone in the list is auto building";
   constexpr const char* kSetAutoSurfaceModeHelpText = "See if anyone in the list is auto surfacing";
+  constexpr const char* kToggleScriptBitExpectedArgsText = "ToggleScriptBit(units, bit, curState)";
+  constexpr const char* kToggleScriptBitHelpText = "Set the right fire state for the units passed in";
+  constexpr const char* kSetPausedHelpText = "Pause builders in this list";
+  constexpr const char* kValidateUnitsListHelpText = "Validate a list of units ";
   constexpr const char* kSpecFootprintsHelpText = "SpecFootprints { spec } -- define the footprint types for pathfinding";
+  constexpr const char* kRegisterUnitBlueprintHelpText = "UnitBlueprint { spec } - define a type of unit";
+  constexpr const char* kRegisterPropBlueprintHelpText = "PropBlueprint { spec } - define a type of prop";
+  constexpr const char* kRegisterProjectileBlueprintHelpText =
+    "ProjectileBlueprint { spec } - define a type of projectile";
+  constexpr const char* kRegisterMeshBlueprintHelpText = "MeshBlueprint { spec } - define mesh properties";
+  constexpr const char* kRegisterTrailEmitterBlueprintHelpText =
+    "TrailEmitterBlueprint { spec } - define a polytrail emitter";
+  constexpr const char* kRegisterEmitterBlueprintHelpText = "EmitterBlueprint { spec } - define a particle emitter";
+  constexpr const char* kRegisterBeamBlueprintHelpText = "BeamBlueprint { spec } - define a beam effect";
+  constexpr const char* kBlueprintLoaderUpdateProgressHelpText = "";
   constexpr const char* kFormatTimeHelpText =
     "string FormatTime(seconds) - format a string displaying the time specified in seconds";
-  constexpr const char* kGetGameTimeHelpText = "GetGameTime()";
+  constexpr const char* kGetGameTimeHelpText =
+    "string GetGameTime() - returns a formatted string displaying the time the game has been played";
+  constexpr const char* kGetSystemTimeHelpText =
+    "string GetSystemTime() - returns a formatted string displaying the System time";
+  constexpr const char* kRemoveProfileDirectoriesHelpText =
+    "RemoveProfileDirectories(string profile) - Removes the profile directory and all special files";
+  constexpr const char* kCopyCurrentReplayHelpText =
+    "CopyCurrentReplay(string profile, string newFilename) - copy the current replay to another file";
   constexpr const char* kSetOverlayFiltersHelpText = "SetOverlayFilters(list)";
+  constexpr const char* kClearBuildTemplatesHelpText = "clear and disable the build templates.";
+  constexpr const char* kRenderOverlayMilitaryHelpText = "RenderOverlayMilitary(bool)";
+  constexpr const char* kRenderOverlayIntelHelpText = "RenderOverlayIntel(bool)";
+  constexpr const char* kRenderOverlayEconomyHelpText = "RenderOverlayEconomy(bool)";
+  constexpr const char* kTeamColorModeHelpText = "TeamColorMode(bool)";
+  constexpr const char* kEjectSessionClientHelpText =
+    "EjectSessionClient(int clientIndex) -- eject another client from your session";
   constexpr const char* kNoSessionStartedText = "No session started.";
+  constexpr const char* kNoActiveSessionPeriodText = "No active session.";
+  constexpr const char* kUiLayerNotInitializedText = "UI layer has not been initialized.";
   constexpr const char* kNoActiveSessionText = "No active session";
   constexpr const char* kEntityCategoryCountHelpText = "Count how many units fit the specified category";
   constexpr const char* kEntityCategoryContainsUserHelpText = "See if a unit category contains this unit";
@@ -927,15 +1195,302 @@ namespace
   constexpr const char* kDbgCouldBeAnyOfText = "Could be any of:";
   constexpr const char* kUnknownArmyMessage = "Unknown army: %s";
   constexpr const char* kUnexpectedArmyTypeMessage = "Unexpected type for army object";
+  constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
+  constexpr const char* kIncorrectGameObjectTypeError =
+    "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaInvalidBoolWarning = "%s\n  invalid argument %d, use as boolean";
   constexpr const char* kKernel32ModuleName = "kernel32.dll";
   constexpr const char* kVirtualProtectExportName = "VirtualProtect";
+  constexpr std::uint32_t kIntelRadiusMagnitudeMask = 0x7FFFFFFFu;
+  constexpr std::uint32_t kIntelEnabledFlagMask = ~kIntelRadiusMagnitudeMask;
+  constexpr std::size_t kEntityIntelAttributesOffset = 0x128u;
   constexpr std::size_t kDiscardClientSlotCount = 17u;
   constexpr SIZE_T kInvertMidMousePatchSize = 0x9u;
   constexpr std::uintptr_t kLuaCallbackDispatchBlockedFlagEa = 0x011FD23Fu;
   constexpr std::uintptr_t kInvertMidMouseOpcodeXEa = 0x0086E01Fu;
   constexpr std::uintptr_t kInvertMidMouseOpcodeYEa = 0x0086E027u;
+
+  struct EntityIntelAttributeRangesView
+  {
+    std::uint32_t vision;       // +0x00
+    std::uint32_t waterVision;  // +0x04
+    std::uint32_t radar;        // +0x08
+    std::uint32_t sonar;        // +0x0C
+    std::uint32_t omni;         // +0x10
+    std::uint32_t radarStealth; // +0x14
+    std::uint32_t sonarStealth; // +0x18
+    std::uint32_t cloak;        // +0x1C
+  };
+
+  static_assert(sizeof(EntityIntelAttributeRangesView) == 0x20, "EntityIntelAttributeRangesView size must be 0x20");
+  static_assert(
+    offsetof(EntityIntelAttributeRangesView, vision) == 0x00, "EntityIntelAttributeRangesView::vision offset must be 0x00"
+  );
+  static_assert(
+    offsetof(EntityIntelAttributeRangesView, cloak) == 0x1C, "EntityIntelAttributeRangesView::cloak offset must be 0x1C"
+  );
+
+  [[nodiscard]] const EntityIntelAttributeRangesView& GetEntityIntelAttributeRanges(const moho::Entity& entity) noexcept
+  {
+    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(&entity);
+    const auto* const ranges = reinterpret_cast<const EntityIntelAttributeRangesView*>(bytes + kEntityIntelAttributesOffset);
+    return *ranges;
+  }
+
+  [[nodiscard]] EntityIntelAttributeRangesView& GetEntityIntelAttributeRangesMutable(moho::Entity& entity) noexcept
+  {
+    auto* const bytes = reinterpret_cast<std::uint8_t*>(&entity);
+    auto* const ranges = reinterpret_cast<EntityIntelAttributeRangesView*>(bytes + kEntityIntelAttributesOffset);
+    return *ranges;
+  }
+
+  void SetIntelEnabledBit(std::uint32_t& lane, const bool enabled) noexcept
+  {
+    if (enabled) {
+      lane |= kIntelEnabledFlagMask;
+    } else {
+      lane &= kIntelRadiusMagnitudeMask;
+    }
+  }
+
+  void SetEntityAttributeRangePreserveEnabledBit(
+    EntityIntelAttributeRangesView& ranges, const std::int32_t attributeLane, const std::uint32_t radius
+  ) noexcept
+  {
+    const auto setLane = [radius](std::uint32_t& lane) {
+      lane = (lane & kIntelEnabledFlagMask) | (radius & kIntelRadiusMagnitudeMask);
+    };
+
+    switch (attributeLane) {
+    case 0:
+      setLane(ranges.vision);
+      return;
+    case 1:
+      setLane(ranges.waterVision);
+      return;
+    case 2:
+      setLane(ranges.radar);
+      return;
+    case 3:
+      setLane(ranges.sonar);
+      return;
+    case 4:
+      setLane(ranges.omni);
+      return;
+    case 10:
+      setLane(ranges.cloak);
+      return;
+    case 11:
+      setLane(ranges.radarStealth);
+      return;
+    case 12:
+      setLane(ranges.sonarStealth);
+      return;
+    default:
+      return;
+    }
+  }
+
+  void SetEntityIntelEnabledAttributeBit(moho::Entity& entity, const moho::EIntel intelType, const bool enabled) noexcept
+  {
+    EntityIntelAttributeRangesView& ranges = GetEntityIntelAttributeRangesMutable(entity);
+    switch (intelType) {
+    case moho::INTEL_Vision:
+      SetIntelEnabledBit(ranges.vision, enabled);
+      return;
+    case moho::INTEL_WaterVision:
+      SetIntelEnabledBit(ranges.waterVision, enabled);
+      return;
+    case moho::INTEL_Radar:
+      SetIntelEnabledBit(ranges.radar, enabled);
+      return;
+    case moho::INTEL_Sonar:
+      SetIntelEnabledBit(ranges.sonar, enabled);
+      return;
+    case moho::INTEL_Omni:
+      SetIntelEnabledBit(ranges.omni, enabled);
+      return;
+    case moho::INTEL_Cloak:
+      SetIntelEnabledBit(ranges.cloak, enabled);
+      return;
+    case moho::INTEL_RadarStealth:
+      SetIntelEnabledBit(ranges.radarStealth, enabled);
+      return;
+    case moho::INTEL_SonarStealth:
+      SetIntelEnabledBit(ranges.sonarStealth, enabled);
+      return;
+    default:
+      return;
+    }
+  }
+
+  [[nodiscard]] std::uint32_t GetEntityAttributeRangeMagnitude(
+    const EntityIntelAttributeRangesView& ranges, const std::int32_t attributeLane
+  ) noexcept
+  {
+    switch (attributeLane) {
+    case 0:
+      return ranges.vision & kIntelRadiusMagnitudeMask;
+    case 1:
+      return ranges.waterVision & kIntelRadiusMagnitudeMask;
+    case 2:
+      return ranges.radar & kIntelRadiusMagnitudeMask;
+    case 3:
+      return ranges.sonar & kIntelRadiusMagnitudeMask;
+    case 4:
+      return ranges.omni & kIntelRadiusMagnitudeMask;
+    case 10:
+      return ranges.cloak & kIntelRadiusMagnitudeMask;
+    case 11:
+      return ranges.radarStealth & kIntelRadiusMagnitudeMask;
+    case 12:
+      return ranges.sonarStealth & kIntelRadiusMagnitudeMask;
+    default:
+      return 0u;
+    }
+  }
+
+  [[nodiscard]] gpg::RRef MakeEAllianceRef(moho::EAlliance* const allianceType)
+  {
+    gpg::RRef enumRef{};
+    if (allianceType == nullptr) {
+      return enumRef;
+    }
+
+    static gpg::RType* sEAllianceType = nullptr;
+    if (sEAllianceType == nullptr) {
+      sEAllianceType = gpg::LookupRType(typeid(moho::EAlliance));
+    }
+
+    enumRef.mObj = allianceType;
+    enumRef.mType = sEAllianceType;
+    return enumRef;
+  }
+
+  [[nodiscard]] gpg::RRef MakeEIntelRef(moho::EIntel* const intelType)
+  {
+    gpg::RRef enumRef{};
+    if (intelType == nullptr) {
+      return enumRef;
+    }
+
+    static gpg::RType* sEIntelType = nullptr;
+    if (sEIntelType == nullptr) {
+      sEIntelType = gpg::LookupRType(typeid(moho::EIntel));
+    }
+
+    enumRef.mObj = intelType;
+    enumRef.mType = sEIntelType;
+    return enumRef;
+  }
+
+  [[nodiscard]] moho::CIntelPosHandle* ResolveIntelPosHandleForType(
+    moho::CIntel& intelManager, const moho::EIntel intelType
+  ) noexcept
+  {
+    const int intelIndex = static_cast<int>(intelType);
+    if (intelIndex < 0 || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
+      return nullptr;
+    }
+    if (intelIndex >= static_cast<int>(moho::CIntel::kHandleCount)) {
+      return nullptr;
+    }
+
+    return intelManager.mIntelHandles[static_cast<std::size_t>(intelIndex)];
+  }
+
+  [[nodiscard]] const moho::CIntelPosHandle* ResolveIntelPosHandleForType(
+    const moho::CIntel& intelManager, const moho::EIntel intelType
+  ) noexcept
+  {
+    const int intelIndex = static_cast<int>(intelType);
+    if (intelIndex < 0 || intelIndex >= static_cast<int>(moho::INTEL_Jammer)) {
+      return nullptr;
+    }
+    if (intelIndex >= static_cast<int>(moho::CIntel::kHandleCount)) {
+      return nullptr;
+    }
+
+    return intelManager.mIntelHandles[static_cast<std::size_t>(intelIndex)];
+  }
+
+  [[nodiscard]] moho::CIntelToggleState* ResolveIntelToggleStateForType(
+    moho::CIntel& intelManager, const moho::EIntel intelType
+  ) noexcept
+  {
+    const std::array<moho::CIntelToggleState*, 5> toggleLanes = {
+      &intelManager.mJamming,
+      &intelManager.mCloak,
+      &intelManager.mSpoof,
+      &intelManager.mSonarStealth,
+      &intelManager.mRadarStealth,
+    };
+
+    const int toggleIndex = static_cast<int>(intelType) - static_cast<int>(moho::INTEL_Jammer);
+    if (toggleIndex < 0 || toggleIndex >= static_cast<int>(toggleLanes.size())) {
+      return nullptr;
+    }
+
+    return toggleLanes[static_cast<std::size_t>(toggleIndex)];
+  }
+
+  [[nodiscard]] const moho::CIntelToggleState* ResolveIntelToggleStateForType(
+    const moho::CIntel& intelManager, const moho::EIntel intelType
+  ) noexcept
+  {
+    const std::array<const moho::CIntelToggleState*, 5> toggleLanes = {
+      &intelManager.mJamming,
+      &intelManager.mCloak,
+      &intelManager.mSpoof,
+      &intelManager.mSonarStealth,
+      &intelManager.mRadarStealth,
+    };
+
+    const int toggleIndex = static_cast<int>(intelType) - static_cast<int>(moho::INTEL_Jammer);
+    if (toggleIndex < 0 || toggleIndex >= static_cast<int>(toggleLanes.size())) {
+      return nullptr;
+    }
+
+    return toggleLanes[static_cast<std::size_t>(toggleIndex)];
+  }
+
+  void RequeueEntityCoordUpdate(moho::Entity& entity) noexcept
+  {
+    entity.mCoordNode.ListUnlink();
+    entity.mCoordNode.ListLinkBefore(&entity.SimulationRef->mCoordEntities);
+  }
+
+  [[nodiscard]] bool IsIntelEnabledForType(const moho::CIntel& intelManager, const moho::EIntel intelType) noexcept
+  {
+    if (const auto* const handle = ResolveIntelPosHandleForType(intelManager, intelType); handle != nullptr) {
+      return handle->mEnabled != 0u;
+    }
+
+    const moho::CIntelToggleState* const toggleState = ResolveIntelToggleStateForType(intelManager, intelType);
+    if (toggleState == nullptr) {
+      return false;
+    }
+    return toggleState->present != 0u && toggleState->enabled != 0u;
+  }
+
+  [[nodiscard]] gpg::RType* CachedERuleBPUnitCommandCapsType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(moho::ERuleBPUnitCommandCaps));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedEUnitCommandTypeType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(moho::EUnitCommandType));
+    }
+    return sType;
+  }
 
   struct DiscardPatchState
   {
@@ -1027,6 +1582,82 @@ namespace
     return luaContext->l_G->globalUserData;
   }
 
+  [[nodiscard]] bool ParseRectFromLuaArguments(
+    LuaPlus::LuaState* const state,
+    const char* const helpText,
+    gpg::Rect2f& outRect
+  )
+  {
+    if (!state || !state->m_state) {
+      return false;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount < 1 || argumentCount > 4) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", helpText, 1, 4, argumentCount);
+    }
+
+    if (argumentCount == 1) {
+      const LuaPlus::LuaObject rectObject(LuaPlus::LuaStackObject(state, 1));
+      outRect = SCR_FromLuaCopy<gpg::Rect2f>(rectObject);
+      return true;
+    }
+
+    LuaPlus::LuaStackObject x0Arg(state, 1);
+    if (lua_type(rawState, 1) != LUA_TNUMBER) {
+      x0Arg.TypeError("number");
+    }
+    outRect.x0 = static_cast<float>(lua_tonumber(rawState, 1));
+
+    LuaPlus::LuaStackObject z0Arg(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      z0Arg.TypeError("number");
+    }
+    outRect.z0 = static_cast<float>(lua_tonumber(rawState, 2));
+
+    LuaPlus::LuaStackObject x1Arg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      x1Arg.TypeError("number");
+    }
+    outRect.x1 = static_cast<float>(lua_tonumber(rawState, 3));
+
+    LuaPlus::LuaStackObject z1Arg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      z1Arg.TypeError("number");
+    }
+    outRect.z1 = static_cast<float>(lua_tonumber(rawState, 4));
+    return true;
+  }
+
+  [[nodiscard]] bool IsEntityPositionInsideRect(const Entity* const entity, const gpg::Rect2f& rect) noexcept
+  {
+    if (entity == nullptr) {
+      return false;
+    }
+
+    const Wm3::Vec3f& position = entity->GetPositionWm3();
+    return rect.Contains(position.x, position.z);
+  }
+
+  /**
+   * Address: 0x0074B550 (FUN_0074B550)
+   *
+   * What it does:
+   * Receives one concatenated print line from `SCR_ConcatArgsAndCall` and
+   * forwards it into the active sim log lane.
+   */
+  void PrintSimConcatSink(LuaPlus::LuaState* const state, const char* const text)
+  {
+    if (!state || !state->m_state) {
+      return;
+    }
+
+    if (Sim* const sim = ResolveGlobalSim(state->m_state); sim != nullptr) {
+      sim->Printf("%s", text != nullptr ? text : "");
+    }
+  }
+
   [[nodiscard]] RRuleGameRulesImpl* ResolveRulesImpl(LuaPlus::LuaState* const state) noexcept
   {
     if (!state || !state->m_state) {
@@ -1084,10 +1715,44 @@ namespace
     return sSet;
   }
 
+  [[nodiscard]] CScrLuaInitFormSet* FindCoreLuaInitSet() noexcept
+  {
+    for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "core") == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
+  [[nodiscard]] CScrLuaInitFormSet& CoreLuaInitSet()
+  {
+    if (CScrLuaInitFormSet* const set = FindCoreLuaInitSet(); set != nullptr) {
+      return *set;
+    }
+
+    static CScrLuaInitFormSet fallbackSet("core");
+    return fallbackSet;
+  }
+
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
     static CScrLuaInitFormSet sSet("user");
     return sSet;
+  }
+
+  /**
+   * Address: 0x008ADF40 (FUN_008ADF40, func_GetVoiceDir)
+   *
+   * What it does:
+   * Checks whether `/sounds/voice/<language>` exists in the mounted virtual
+   * file-system lane.
+   */
+  [[nodiscard]] bool HasLocalizedVoiceDirectory(const msvc8::string& language)
+  {
+    const msvc8::string voiceDirectory = gpg::STR_Printf("/sounds/voice/%s", language.c_str());
+    return FILE_GetFileInfo(voiceDirectory.c_str(), nullptr, false);
   }
 
   [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const unit) noexcept
@@ -1098,6 +1763,451 @@ namespace
   [[nodiscard]] const IUnit* ResolveIUnitBridge(const UserUnit* const unit) noexcept
   {
     return unit ? reinterpret_cast<const IUnit*>(unit->mIUnitAndScriptBridge) : nullptr;
+  }
+
+  struct UserEntityWeakRefRuntimeView
+  {
+    void* ownerLinkSlot;                          // +0x00
+    UserEntityWeakRefRuntimeView* nextOwnerLink;  // +0x04
+  };
+  static_assert(sizeof(UserEntityWeakRefRuntimeView) == 0x08, "UserEntityWeakRefRuntimeView size must be 0x08");
+  static_assert(
+    offsetof(UserEntityWeakRefRuntimeView, ownerLinkSlot) == 0x00,
+    "UserEntityWeakRefRuntimeView::ownerLinkSlot offset must be 0x00"
+  );
+  static_assert(
+    offsetof(UserEntityWeakRefRuntimeView, nextOwnerLink) == 0x04,
+    "UserEntityWeakRefRuntimeView::nextOwnerLink offset must be 0x04"
+  );
+
+  struct UserEntityWeakSetNodeRuntimeView
+  {
+    UserEntityWeakSetNodeRuntimeView* left;        // +0x00
+    UserEntityWeakSetNodeRuntimeView* parent;      // +0x04
+    UserEntityWeakSetNodeRuntimeView* right;       // +0x08
+    std::uint32_t key;                             // +0x0C
+    UserEntityWeakRefRuntimeView weakEntityLink;   // +0x10
+    std::uint8_t color;                            // +0x18
+    std::uint8_t isNil;                            // +0x19
+    std::uint8_t pad_001A_001B[0x02];
+  };
+  static_assert(sizeof(UserEntityWeakSetNodeRuntimeView) == 0x1C, "UserEntityWeakSetNodeRuntimeView size must be 0x1C");
+  static_assert(
+    offsetof(UserEntityWeakSetNodeRuntimeView, weakEntityLink) == 0x10,
+    "UserEntityWeakSetNodeRuntimeView::weakEntityLink offset must be 0x10"
+  );
+  static_assert(
+    offsetof(UserEntityWeakSetNodeRuntimeView, isNil) == 0x19,
+    "UserEntityWeakSetNodeRuntimeView::isNil offset must be 0x19"
+  );
+
+  struct UserEntityWeakSetRuntimeView
+  {
+    void* allocatorProxy;                           // +0x00
+    UserEntityWeakSetNodeRuntimeView* head;         // +0x04
+    std::uint32_t size;                             // +0x08
+  };
+  static_assert(sizeof(UserEntityWeakSetRuntimeView) == 0x0C, "UserEntityWeakSetRuntimeView size must be 0x0C");
+  static_assert(
+    offsetof(UserEntityWeakSetRuntimeView, head) == 0x04,
+    "UserEntityWeakSetRuntimeView::head offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UserEntityWeakSetRuntimeView, size) == 0x08,
+    "UserEntityWeakSetRuntimeView::size offset must be 0x08"
+  );
+
+  struct UserArmyAvatarVectorRuntimeView
+  {
+    void* allocatorProxy;                            // +0x00
+    UserEntityWeakRefRuntimeView* begin;             // +0x04
+    UserEntityWeakRefRuntimeView* end;               // +0x08
+    UserEntityWeakRefRuntimeView* capacityEnd;       // +0x0C
+  };
+  static_assert(sizeof(UserArmyAvatarVectorRuntimeView) == 0x10, "UserArmyAvatarVectorRuntimeView size must be 0x10");
+  static_assert(
+    offsetof(UserArmyAvatarVectorRuntimeView, begin) == 0x04,
+    "UserArmyAvatarVectorRuntimeView::begin offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UserArmyAvatarVectorRuntimeView, end) == 0x08, "UserArmyAvatarVectorRuntimeView::end offset must be 0x08"
+  );
+
+  struct UserArmyAvatarRuntimeView
+  {
+    std::uint8_t pad_0000_01E8[0x1E8];
+    UserArmyAvatarVectorRuntimeView avatarWeakRefs;  // +0x1E8
+  };
+  static_assert(
+    offsetof(UserArmyAvatarRuntimeView, avatarWeakRefs) == 0x1E8,
+    "UserArmyAvatarRuntimeView::avatarWeakRefs offset must be 0x1E8"
+  );
+
+  struct UserArmyIdleSetsRuntimeView
+  {
+    std::uint8_t pad_0000_01F8[0x1F8];
+    UserEntityWeakSetRuntimeView idleEngineerUnits;  // +0x1F8
+    UserEntityWeakSetRuntimeView idleFactoryUnits;   // +0x204
+  };
+  static_assert(
+    offsetof(UserArmyIdleSetsRuntimeView, idleEngineerUnits) == 0x1F8,
+    "UserArmyIdleSetsRuntimeView::idleEngineerUnits offset must be 0x1F8"
+  );
+  static_assert(
+    offsetof(UserArmyIdleSetsRuntimeView, idleFactoryUnits) == 0x204,
+    "UserArmyIdleSetsRuntimeView::idleFactoryUnits offset must be 0x204"
+  );
+
+  [[nodiscard]] UserArmy* ResolveFocusArmy(CWldSession* const session) noexcept
+  {
+    if (session == nullptr || session->FocusArmy < 0) {
+      return nullptr;
+    }
+
+    const std::size_t focusArmyIndex = static_cast<std::size_t>(session->FocusArmy);
+    if (focusArmyIndex >= session->userArmies.size()) {
+      return nullptr;
+    }
+
+    return session->userArmies[focusArmyIndex];
+  }
+
+  [[nodiscard]] UserEntity* DecodeLinkedUserEntity(const UserEntityWeakRefRuntimeView& weakRef) noexcept
+  {
+    if (weakRef.ownerLinkSlot == nullptr) {
+      return nullptr;
+    }
+
+    constexpr std::uintptr_t kOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
+    const std::uintptr_t rawOwnerLink = reinterpret_cast<std::uintptr_t>(weakRef.ownerLinkSlot);
+    if (rawOwnerLink <= kOwnerLinkOffset) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<UserEntity*>(rawOwnerLink - kOwnerLinkOffset);
+  }
+
+  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetMinNode(
+    UserEntityWeakSetNodeRuntimeView* node,
+    UserEntityWeakSetNodeRuntimeView* const head
+  ) noexcept
+  {
+    while (node != nullptr && node != head && node->left != head) {
+      node = node->left;
+    }
+    return node != nullptr ? node : head;
+  }
+
+  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetFirstNode(const UserEntityWeakSetRuntimeView& set) noexcept
+  {
+    UserEntityWeakSetNodeRuntimeView* const head = set.head;
+    if (head == nullptr || head->isNil == 0u) {
+      return nullptr;
+    }
+
+    UserEntityWeakSetNodeRuntimeView* const root = head->parent;
+    if (root == nullptr || root == head || root->isNil != 0u) {
+      return head;
+    }
+
+    return WeakSetMinNode(root, head);
+  }
+
+  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetNextNode(
+    UserEntityWeakSetNodeRuntimeView* node,
+    UserEntityWeakSetNodeRuntimeView* const head
+  ) noexcept
+  {
+    if (node == nullptr || head == nullptr || node == head) {
+      return head;
+    }
+
+    if (node->right != head) {
+      return WeakSetMinNode(node->right, head);
+    }
+
+    UserEntityWeakSetNodeRuntimeView* parent = node->parent;
+    while (parent != nullptr && parent != head && node == parent->right) {
+      node = parent;
+      parent = parent->parent;
+    }
+    return parent != nullptr ? parent : head;
+  }
+
+  void AppendEntityUnitLuaObject(
+    LuaPlus::LuaObject& resultTable,
+    std::int32_t& luaIndex,
+    UserEntity* const entity
+  )
+  {
+    if (entity == nullptr) {
+      return;
+    }
+
+    UserUnit* const userUnit = entity->IsUserUnit();
+    IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
+    if (iunitBridge == nullptr) {
+      return;
+    }
+
+    LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
+    resultTable.SetObject(luaIndex, unitObject);
+    ++luaIndex;
+  }
+
+  [[nodiscard]] const UserEntityWeakSetRuntimeView* ResolveIdleUnitSetView(
+    const UserArmy* const army,
+    const bool useFactorySet
+  ) noexcept
+  {
+    if (army == nullptr) {
+      return nullptr;
+    }
+
+    const auto* const runtimeView = reinterpret_cast<const UserArmyIdleSetsRuntimeView*>(army);
+    return useFactorySet ? &runtimeView->idleFactoryUnits : &runtimeView->idleEngineerUnits;
+  }
+
+  [[nodiscard]] const UserArmyAvatarVectorRuntimeView& ResolveArmyAvatarVectorView(const UserArmy* const army) noexcept
+  {
+    return reinterpret_cast<const UserArmyAvatarRuntimeView*>(army)->avatarWeakRefs;
+  }
+
+  struct UserUnitAssistTargetRuntimeView
+  {
+    std::uint8_t pad_0000_03C0[0x3C0];
+    UserEntityWeakRefRuntimeView assistTargetLink; // +0x3C0
+  };
+  static_assert(
+    offsetof(UserUnitAssistTargetRuntimeView, assistTargetLink) == 0x3C0,
+    "UserUnitAssistTargetRuntimeView::assistTargetLink offset must be 0x3C0"
+  );
+
+  [[nodiscard]] UserUnit* ResolveAssistTargetUnit(const UserUnit* const unit) noexcept
+  {
+    if (unit == nullptr) {
+      return nullptr;
+    }
+
+    const auto* const runtime = reinterpret_cast<const UserUnitAssistTargetRuntimeView*>(unit);
+    UserEntity* const assistEntity = DecodeLinkedUserEntity(runtime->assistTargetLink);
+    return assistEntity ? assistEntity->IsUserUnit() : nullptr;
+  }
+
+  struct UserUnitScriptBitRuntimeView
+  {
+    std::uint8_t pad_0000_03A8[0x3A8];
+    std::int32_t scriptBitMask; // +0x3A8
+  };
+  static_assert(
+    offsetof(UserUnitScriptBitRuntimeView, scriptBitMask) == 0x3A8,
+    "UserUnitScriptBitRuntimeView::scriptBitMask offset must be 0x3A8"
+  );
+
+  [[nodiscard]] std::int64_t BuildScriptBitMask(const int bitIndex) noexcept
+  {
+    const std::uint32_t bitShift = static_cast<std::uint32_t>(bitIndex);
+    return bitShift < 64u ? static_cast<std::int64_t>(1ull << bitShift) : 0;
+  }
+
+  [[nodiscard]] std::int64_t GetUserUnitScriptBitMask(const UserUnit* const userUnit) noexcept
+  {
+    if (userUnit == nullptr) {
+      return 0;
+    }
+
+    const auto* const view = reinterpret_cast<const UserUnitScriptBitRuntimeView*>(userUnit);
+    return static_cast<std::int64_t>(view->scriptBitMask);
+  }
+
+  struct UserSessionEntityMapNodeView
+  {
+    UserSessionEntityMapNodeView* left;   // +0x00
+    UserSessionEntityMapNodeView* parent; // +0x04
+    UserSessionEntityMapNodeView* right;  // +0x08
+    std::int32_t key;                     // +0x0C
+    UserEntity* value;                    // +0x10
+    std::uint8_t color;                   // +0x14
+    std::uint8_t isNil;                   // +0x15
+    std::uint8_t pad_0016_0017[0x02];
+  };
+  static_assert(
+    offsetof(UserSessionEntityMapNodeView, key) == 0x0C, "UserSessionEntityMapNodeView::key offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(UserSessionEntityMapNodeView, value) == 0x10,
+    "UserSessionEntityMapNodeView::value offset must be 0x10"
+  );
+  static_assert(
+    offsetof(UserSessionEntityMapNodeView, isNil) == 0x15,
+    "UserSessionEntityMapNodeView::isNil offset must be 0x15"
+  );
+  static_assert(sizeof(UserSessionEntityMapNodeView) == 0x18, "UserSessionEntityMapNodeView size must be 0x18");
+
+  struct UserSessionEntityMapView
+  {
+    void* allocatorProxy;                // +0x00
+    UserSessionEntityMapNodeView* head;  // +0x04
+    std::uint32_t size;                  // +0x08
+  };
+  static_assert(
+    offsetof(UserSessionEntityMapView, head) == 0x04, "UserSessionEntityMapView::head offset must be 0x04"
+  );
+  static_assert(
+    offsetof(UserSessionEntityMapView, size) == 0x08, "UserSessionEntityMapView::size offset must be 0x08"
+  );
+  static_assert(sizeof(UserSessionEntityMapView) == 0x0C, "UserSessionEntityMapView size must be 0x0C");
+  static_assert(offsetof(CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
+
+  struct UserUnitLuaObjectRuntimeView
+  {
+    std::uint8_t pad_0000_0170[0x170];
+    LuaPlus::LuaObject luaObject; // +0x170
+  };
+  static_assert(
+    offsetof(UserUnitLuaObjectRuntimeView, luaObject) == 0x170,
+    "UserUnitLuaObjectRuntimeView::luaObject offset must be 0x170"
+  );
+
+  [[nodiscard]] const UserSessionEntityMapView& GetUserSessionEntityMapView(const CWldSession* const session) noexcept
+  {
+    return *reinterpret_cast<const UserSessionEntityMapView*>(
+      reinterpret_cast<const std::uint8_t*>(session) + offsetof(CWldSession, mUnknownOwner44)
+    );
+  }
+
+  [[nodiscard]] const UserSessionEntityMapNodeView*
+  FindUserSessionEntityNode(const UserSessionEntityMapView& map, const std::int32_t entityId) noexcept
+  {
+    const UserSessionEntityMapNodeView* const head = map.head;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    const UserSessionEntityMapNodeView* result = head;
+    const UserSessionEntityMapNodeView* node = head->parent;
+    while (node != nullptr && node != head && node->isNil == 0u) {
+      if (node->key >= entityId) {
+        result = node;
+        node = node->left;
+      } else {
+        node = node->right;
+      }
+    }
+
+    if (result == head || entityId < result->key) {
+      return head;
+    }
+
+    return result;
+  }
+
+  [[nodiscard]] UserEntity*
+  FindUserSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
+  {
+    if (session == nullptr) {
+      return nullptr;
+    }
+
+    const UserSessionEntityMapView& entityMap = GetUserSessionEntityMapView(session);
+    const UserSessionEntityMapNodeView* const node = FindUserSessionEntityNode(entityMap, entityId);
+    if (node == nullptr || node == entityMap.head) {
+      return nullptr;
+    }
+    return node->value;
+  }
+
+  [[nodiscard]] UserUnit* ResolveSelectableTransportAttachmentParent(UserUnit* const unit) noexcept
+  {
+    if (unit == nullptr) {
+      return nullptr;
+    }
+
+    auto* const entity = reinterpret_cast<UserEntity*>(unit);
+    const std::uint32_t attachmentParentRef = entity->mVariableData.mAttachmentParentRef;
+    if (attachmentParentRef == 0u || attachmentParentRef == ToRaw(EEntityIdSentinel::Invalid)) {
+      return nullptr;
+    }
+
+    UserEntity* const attachmentParentEntity = FindUserSessionEntityById(
+      entity->mSession,
+      static_cast<std::int32_t>(attachmentParentRef)
+    );
+    if (attachmentParentEntity == nullptr || !attachmentParentEntity->IsSelectable()) {
+      return nullptr;
+    }
+
+    UserUnit* const attachmentParentUnit = attachmentParentEntity->IsUserUnit();
+    if (attachmentParentUnit == nullptr) {
+      return nullptr;
+    }
+
+    static const msvc8::string kTransportationCategory("TRANSPORTATION");
+    return attachmentParentEntity->IsInCategory(kTransportationCategory) ? attachmentParentUnit : nullptr;
+  }
+
+  void AppendSelectionUnitUnique(msvc8::vector<UserUnit*>& selectionUnits, UserUnit* const unit)
+  {
+    if (unit == nullptr) {
+      return;
+    }
+
+    if (std::find(selectionUnits.begin(), selectionUnits.end(), unit) == selectionUnits.end()) {
+      selectionUnits.push_back(unit);
+    }
+  }
+
+  [[nodiscard]] UserSessionEntityMapNodeView* UserSessionEntityMapMinNode(
+    UserSessionEntityMapNodeView* node,
+    UserSessionEntityMapNodeView* const head
+  ) noexcept
+  {
+    while (node != nullptr && node != head && node->left != head) {
+      node = node->left;
+    }
+    return node != nullptr ? node : head;
+  }
+
+  [[nodiscard]] UserSessionEntityMapNodeView* UserSessionEntityMapFirstNode(const UserSessionEntityMapView& map) noexcept
+  {
+    UserSessionEntityMapNodeView* const head = map.head;
+    if (head == nullptr || head->isNil == 0u) {
+      return nullptr;
+    }
+
+    UserSessionEntityMapNodeView* const root = head->parent;
+    if (root == nullptr || root == head || root->isNil != 0u) {
+      return head;
+    }
+
+    return UserSessionEntityMapMinNode(root, head);
+  }
+
+  [[nodiscard]] UserSessionEntityMapNodeView* UserSessionEntityMapNextNode(
+    UserSessionEntityMapNodeView* node,
+    UserSessionEntityMapNodeView* const head
+  ) noexcept
+  {
+    if (node == nullptr || head == nullptr || node == head) {
+      return head;
+    }
+
+    if (node->right != head) {
+      return UserSessionEntityMapMinNode(node->right, head);
+    }
+
+    UserSessionEntityMapNodeView* parent = node->parent;
+    while (parent != nullptr && parent != head && node == parent->right) {
+      node = parent;
+      parent = parent->parent;
+    }
+
+    return parent != nullptr ? parent : head;
+  }
+
+  [[nodiscard]] const UserUnitLuaObjectRuntimeView& GetUserUnitLuaObjectView(const UserUnit* const userUnit) noexcept
+  {
+    return *reinterpret_cast<const UserUnitLuaObjectRuntimeView*>(userUnit);
   }
 
   [[nodiscard]] LuaPlus::LuaObject GetLuaTableFieldByName(
@@ -1148,6 +2258,67 @@ namespace
 
     lua_settop(rawState, top);
     return out;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCScriptObjectPointerType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = CScriptObject::GetPointerType();
+    }
+    return sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedUserUnitType()
+  {
+    static gpg::RType* sType = nullptr;
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(UserUnit));
+    }
+    return sType;
+  }
+
+  [[nodiscard]] CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
+  {
+    LuaPlus::LuaObject payload(object);
+    if (payload.IsTable()) {
+      payload = GetLuaTableFieldByName(payload, "_c_object");
+    }
+
+    if (!payload.IsUserData()) {
+      return nullptr;
+    }
+
+    const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
+    if (!userDataRef.mObj) {
+      return nullptr;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
+    return static_cast<CScriptObject**>(upcast.mObj);
+  }
+
+  [[nodiscard]] UserUnit* ResolveUserUnitOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+  {
+    CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+    if (scriptObjectSlot == nullptr) {
+      luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
+      return nullptr;
+    }
+
+    CScriptObject* const scriptObject = *scriptObjectSlot;
+    if (scriptObject == nullptr) {
+      return nullptr;
+    }
+
+    const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedUserUnitType());
+    if (!upcast.mObj) {
+      luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
+      return nullptr;
+    }
+
+    return static_cast<UserUnit*>(upcast.mObj);
   }
 
   [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
@@ -1237,6 +2408,66 @@ namespace
     return entity ? entity->BluePrint : nullptr;
   }
 
+  [[nodiscard]] const BVIntSet& CategoryWordRangeAsBVIntSet(const CategoryWordRangeView& range) noexcept
+  {
+    static_assert(
+      offsetof(CategoryWordRangeView, mStartWordIndex) == 0x08,
+      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
+    );
+    return *reinterpret_cast<const BVIntSet*>(&range.mStartWordIndex);
+  }
+
+  /**
+   * Address: 0x00758DB0 (FUN_00758DB0, sub_758DB0)
+   *
+   * What it does:
+   * Copies the active sync-filter `maskB` bitset payload into one temporary
+   * `BVIntSet` used by `cfunc_DebugGetSelectionL`.
+   */
+  void CopyDebugSelectionMaskB(const Sim& sim, BVIntSet& outSelectionIds)
+  {
+    outSelectionIds.mReservedMetaWord = 0u;
+    outSelectionIds.mFirstWordIndex = sim.mSyncFilter.maskB.rawWord;
+    outSelectionIds.mWords.ResetFrom(sim.mSyncFilter.maskB.masks);
+  }
+
+  [[nodiscard]] Entity* ResolveRequiredEntityLuaArg(
+    LuaPlus::LuaState* const state,
+    const char* const helpText
+  )
+  {
+    if (!state || !state->m_state) {
+      return nullptr;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 1, argumentCount);
+    }
+
+    const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+    return SCR_FromLua_Entity(entityObject, state);
+  }
+
+  template <typename TEntityLike>
+  int PushEntityScriptObjectOrNil(LuaPlus::LuaState* const state, TEntityLike* const object)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    if (object == nullptr) {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+      return 1;
+    }
+
+    object->mLuaObj.PushStack(state);
+    return 1;
+  }
+
   template <class THandler>
   void ForEachSelectedUnit(SEntitySetTemplateUnit* const selectedUnits, THandler&& handler)
   {
@@ -1295,6 +2526,16 @@ namespace
   };
 
   static_assert(sizeof(PropCreateTransformWords) == 0x1C, "PropCreateTransformWords size must be 0x1C");
+
+  struct UnitTrackStatsRuntimeView
+  {
+    std::uint8_t pad_0000[0x200];
+    bool trackingEnabled;
+  };
+  static_assert(
+    offsetof(UnitTrackStatsRuntimeView, trackingEnabled) == 0x200,
+    "UnitTrackStatsRuntimeView::trackingEnabled offset must be 0x200"
+  );
 
   bool ParseBoolLiteral(const char* text, bool& outValue)
   {
@@ -1426,6 +2667,110 @@ namespace
     return static_cast<std::uint8_t>(value & 0xFF);
   }
 
+  [[nodiscard]] CmdId ReadLuaCommandIdArg(LuaPlus::LuaState* const state, const int stackIndex)
+  {
+    LuaPlus::LuaStackObject arg(state, stackIndex);
+    if (lua_type(state->m_state, stackIndex) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&arg, "integer");
+    }
+
+    // Binary lane uses an x87 integer-store conversion and consumes the low dword.
+    const std::int64_t truncated = static_cast<std::int64_t>(lua_tonumber(state->m_state, stackIndex));
+    return static_cast<CmdId>(static_cast<std::uint32_t>(truncated));
+  }
+
+  using SpecialFileTypeRuntime = moho::ESpecialFileType;
+
+  [[noreturn]] void ThrowInvalidSpecialFileType(const char* const lexical)
+  {
+    throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical != nullptr ? lexical : "").to_std());
+  }
+
+  [[nodiscard]] bool TryParseSpecialFileType(
+    const char* const lexical,
+    SpecialFileTypeRuntime& outType
+  ) noexcept
+  {
+    if (lexical == nullptr) {
+      return false;
+    }
+
+    const std::string_view text(lexical);
+    if (text == "SaveGame" || text == "SFT_SaveGame") {
+      outType = SpecialFileTypeRuntime::SaveGame;
+      return true;
+    }
+    if (text == "Replay" || text == "SFT_Replay") {
+      outType = SpecialFileTypeRuntime::Replay;
+      return true;
+    }
+    if (text == "Screenshot" || text == "SFT_Screenshot") {
+      outType = SpecialFileTypeRuntime::Screenshot;
+      return true;
+    }
+    if (text == "CampaignSave" || text == "SFT_CampaignSave") {
+      outType = SpecialFileTypeRuntime::CampaignSave;
+      return true;
+    }
+
+    char* end = nullptr;
+    const long numericValue = std::strtol(lexical, &end, 10);
+    if (end != lexical && end != nullptr && *end == '\0' && numericValue >= 0 && numericValue <= 3) {
+      outType = static_cast<SpecialFileTypeRuntime>(numericValue);
+      return true;
+    }
+
+    return false;
+  }
+
+  [[nodiscard]] msvc8::string BuildSpecialFilePathDirectory(const SpecialFileTypeRuntime type)
+  {
+    switch (type) {
+      case SpecialFileTypeRuntime::SaveGame:
+      case SpecialFileTypeRuntime::CampaignSave:
+        return USER_GetSaveGameDir();
+      case SpecialFileTypeRuntime::Replay:
+        return USER_GetReplayDir();
+      case SpecialFileTypeRuntime::Screenshot:
+        return USER_GetScreenshotDir();
+    }
+    return msvc8::string{};
+  }
+
+  [[nodiscard]] msvc8::string BuildSpecialFilePathExtension(const SpecialFileTypeRuntime type)
+  {
+    switch (type) {
+      case SpecialFileTypeRuntime::SaveGame:
+        return USER_GetSaveGameExt();
+      case SpecialFileTypeRuntime::Replay:
+        return USER_GetReplayExt();
+      case SpecialFileTypeRuntime::Screenshot:
+        return msvc8::string("bmp");
+      case SpecialFileTypeRuntime::CampaignSave:
+        return USER_GetCampaignSaveExt();
+    }
+    return msvc8::string{};
+  }
+
+  struct CMauiControlLuaObjectView
+  {
+    std::uint8_t reserved00[0x20];
+    LuaPlus::LuaObject luaObject; // +0x20
+
+    [[nodiscard]] static CMauiControlLuaObjectView* FromControl(CMauiControl* const control) noexcept
+    {
+      return reinterpret_cast<CMauiControlLuaObjectView*>(control);
+    }
+
+    [[nodiscard]] static const CMauiControlLuaObjectView* FromControl(const CMauiControl* const control) noexcept
+    {
+      return reinterpret_cast<const CMauiControlLuaObjectView*>(control);
+    }
+  };
+  static_assert(
+    offsetof(CMauiControlLuaObjectView, luaObject) == 0x20, "CMauiControlLuaObjectView::luaObject offset must be 0x20"
+  );
+
   struct CommandDbMapNodeView
   {
     CommandDbMapNodeView* left;   // +0x00
@@ -1468,6 +2813,125 @@ namespace
     "CCommandDbRuntimeView::pendingReleasedCmdIds offset must be 0xCC0"
   );
   static_assert(sizeof(CCommandDbRuntimeView) == 0xCD0, "CCommandDbRuntimeView size must be 0xCD0");
+
+  struct CommandIssueWeakSetNode
+  {
+    CommandIssueWeakSetNode* left;   // +0x00
+    CommandIssueWeakSetNode* parent; // +0x04
+    CommandIssueWeakSetNode* right;  // +0x08
+    std::uint32_t key;               // +0x0C
+    WeakPtr<UserEntity> value;       // +0x10
+    std::uint8_t color;              // +0x18
+    std::uint8_t isNil;              // +0x19
+    std::uint8_t pad_1A_1B[2];       // +0x1A
+  };
+  static_assert(sizeof(CommandIssueWeakSetNode) == 0x1C, "CommandIssueWeakSetNode size must be 0x1C");
+  static_assert(offsetof(CommandIssueWeakSetNode, key) == 0x0C, "CommandIssueWeakSetNode::key offset must be 0x0C");
+  static_assert(
+    offsetof(CommandIssueWeakSetNode, value) == 0x10, "CommandIssueWeakSetNode::value offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CommandIssueWeakSetNode, isNil) == 0x19, "CommandIssueWeakSetNode::isNil offset must be 0x19"
+  );
+
+  struct CommandIssueWeakSetRuntimeView
+  {
+    void* proxy;                    // +0x00
+    CommandIssueWeakSetNode* head;  // +0x04
+    std::uint32_t size;             // +0x08
+  };
+  static_assert(sizeof(CommandIssueWeakSetRuntimeView) == 0x0C, "CommandIssueWeakSetRuntimeView size must be 0x0C");
+  static_assert(
+    offsetof(CommandIssueWeakSetRuntimeView, head) == 0x04, "CommandIssueWeakSetRuntimeView::head offset must be 0x04"
+  );
+
+  struct CommandIssueUpdateEventRuntimeView
+  {
+    CmdId commandId;                              // +0x00
+    std::uint32_t eventType;                      // +0x04
+    CommandIssueWeakSetRuntimeView entitySet;     // +0x08
+    std::int32_t count;                           // +0x14
+    CAiTarget target;                             // +0x18
+    gpg::fastvector_n<SOCellPos, 2> cells;       // +0x38
+  };
+  static_assert(sizeof(gpg::fastvector_n<SOCellPos, 2>) == 0x18, "gpg::fastvector_n<SOCellPos,2> size must be 0x18");
+  static_assert(
+    offsetof(CommandIssueUpdateEventRuntimeView, commandId) == 0x00,
+    "CommandIssueUpdateEventRuntimeView::commandId offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateEventRuntimeView, eventType) == 0x04,
+    "CommandIssueUpdateEventRuntimeView::eventType offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateEventRuntimeView, entitySet) == 0x08,
+    "CommandIssueUpdateEventRuntimeView::entitySet offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateEventRuntimeView, count) == 0x14,
+    "CommandIssueUpdateEventRuntimeView::count offset must be 0x14"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateEventRuntimeView, target) == 0x18,
+    "CommandIssueUpdateEventRuntimeView::target offset must be 0x18"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateEventRuntimeView, cells) == 0x38,
+    "CommandIssueUpdateEventRuntimeView::cells offset must be 0x38"
+  );
+  static_assert(sizeof(CommandIssueUpdateEventRuntimeView) == 0x50, "CommandIssueUpdateEventRuntimeView size must be 0x50");
+
+  struct CommandIssueUpdateQueueRuntimeView
+  {
+    std::uint32_t proxy;                           // +0x00
+    CommandIssueUpdateEventRuntimeView** slots;    // +0x04
+    std::uint32_t capacity;                        // +0x08
+    std::uint32_t readIndex;                       // +0x0C
+    std::uint32_t count;                           // +0x10
+  };
+  static_assert(sizeof(CommandIssueUpdateQueueRuntimeView) == 0x14, "CommandIssueUpdateQueueRuntimeView size must be 0x14");
+  static_assert(
+    offsetof(CommandIssueUpdateQueueRuntimeView, slots) == 0x04,
+    "CommandIssueUpdateQueueRuntimeView::slots offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateQueueRuntimeView, capacity) == 0x08,
+    "CommandIssueUpdateQueueRuntimeView::capacity offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateQueueRuntimeView, readIndex) == 0x0C,
+    "CommandIssueUpdateQueueRuntimeView::readIndex offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CommandIssueUpdateQueueRuntimeView, count) == 0x10,
+    "CommandIssueUpdateQueueRuntimeView::count offset must be 0x10"
+  );
+
+  struct CommandIssueHelperRuntimeView
+  {
+    std::uint8_t pad_0000_0004[0x04];
+    CmdId commandId;                                // +0x04 (mDat.mCmdId)
+    std::uint8_t pad_0008_00B8[0xB0];
+    CommandIssueUpdateQueueRuntimeView localQueue;  // +0xB8
+  };
+  static_assert(
+    offsetof(CommandIssueHelperRuntimeView, commandId) == 0x04,
+    "CommandIssueHelperRuntimeView::commandId offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CommandIssueHelperRuntimeView, localQueue) == 0xB8,
+    "CommandIssueHelperRuntimeView::localQueue offset must be 0xB8"
+  );
+
+  struct SessionCommandManagerRuntimeView
+  {
+    std::uint8_t pad_0000_0CB4[0xCB4];
+    CommandDbMapStorageView commandIssueMap; // +0x0CB4
+  };
+  static_assert(
+    offsetof(SessionCommandManagerRuntimeView, commandIssueMap) == 0xCB4,
+    "SessionCommandManagerRuntimeView::commandIssueMap offset must be 0xCB4"
+  );
 
   static_assert(
     offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex), "SimSubRes3/BVIntSet offset mismatch"
@@ -1743,11 +3207,12 @@ namespace
    * Address: 0x006E1940 (FUN_006E1940, sub_6E1940)
    *
    * What it does:
-   * Returns the exact command-id node in the command DB map, or the head/sentinel when absent.
+   * Returns the exact command-id node in a command-id map view, or the
+   * head/sentinel when absent.
    */
-  [[nodiscard]] const CommandDbMapNodeView* FindCommandNode(const CCommandDbRuntimeView& commandDb, const CmdId cmdId)
+  [[nodiscard]] const CommandDbMapNodeView* FindCommandNode(const CommandDbMapStorageView& map, const CmdId cmdId)
   {
-    CommandDbMapNodeView* const head = commandDb.map.head;
+    CommandDbMapNodeView* const head = map.head;
     if (!head) {
       return nullptr;
     }
@@ -1771,11 +3236,335 @@ namespace
     return result;
   }
 
+  [[nodiscard]] CommandDbMapNodeView* FindCommandNode(CommandDbMapStorageView& map, const CmdId cmdId)
+  {
+    return const_cast<CommandDbMapNodeView*>(FindCommandNode(static_cast<const CommandDbMapStorageView&>(map), cmdId));
+  }
+
+  [[nodiscard]] const CommandDbMapNodeView* FindCommandNode(const CCommandDbRuntimeView& commandDb, const CmdId cmdId)
+  {
+    return FindCommandNode(commandDb.map, cmdId);
+  }
+
   [[nodiscard]] CommandDbMapNodeView* FindCommandNode(CCommandDbRuntimeView& commandDb, const CmdId cmdId)
   {
-    return const_cast<CommandDbMapNodeView*>(
-      FindCommandNode(static_cast<const CCommandDbRuntimeView&>(commandDb), cmdId)
+    return FindCommandNode(commandDb.map, cmdId);
+  }
+
+  [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelper(CWldSession* const session, const CmdId cmdId)
+  {
+    if (!session || !session->mSessionRes1) {
+      return nullptr;
+    }
+
+    auto* const commandManager = static_cast<SessionCommandManagerRuntimeView*>(session->mSessionRes1);
+    CommandDbMapStorageView& commandIssueMap = commandManager->commandIssueMap;
+
+    CommandDbMapNodeView* const node = FindCommandNode(commandIssueMap, cmdId);
+    if (!node || node == commandIssueMap.head) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<CommandIssueHelperRuntimeView*>(node->value);
+  }
+
+  constexpr std::uint32_t kCommandIssueUpdateEventTypeDecreaseCount = 2u;
+  constexpr std::uint8_t kCommandIssueTreeBlack = 1u;
+  constexpr std::uint32_t kCommandIssueQueueMaxCapacity = 53687091u;
+
+  [[nodiscard]] CommandIssueWeakSetNode* AllocateCommandIssueWeakSetHead()
+  {
+    auto* const head = static_cast<CommandIssueWeakSetNode*>(::operator new(sizeof(CommandIssueWeakSetNode)));
+    head->left = head;
+    head->parent = head;
+    head->right = head;
+    head->key = 0u;
+    head->value.ownerLinkSlot = nullptr;
+    head->value.nextInOwner = nullptr;
+    head->color = kCommandIssueTreeBlack;
+    head->isNil = 1u;
+    head->pad_1A_1B[0] = 0u;
+    head->pad_1A_1B[1] = 0u;
+    return head;
+  }
+
+  void InitializeCommandIssueWeakSetEmpty(CommandIssueWeakSetRuntimeView& set)
+  {
+    set.proxy = nullptr;
+    set.head = AllocateCommandIssueWeakSetHead();
+    set.size = 0u;
+  }
+
+  [[nodiscard]] CommandIssueWeakSetNode*
+  CommandIssueWeakSetMinNode(CommandIssueWeakSetNode* node, CommandIssueWeakSetNode* const head) noexcept
+  {
+    while (node->left != head) {
+      node = node->left;
+    }
+    return node;
+  }
+
+  [[nodiscard]] CommandIssueWeakSetNode*
+  CommandIssueWeakSetMaxNode(CommandIssueWeakSetNode* node, CommandIssueWeakSetNode* const head) noexcept
+  {
+    while (node->right != head) {
+      node = node->right;
+    }
+    return node;
+  }
+
+  void DestroyCommandIssueWeakSetNodes(CommandIssueWeakSetNode* const node, CommandIssueWeakSetNode* const head)
+  {
+    if (node == nullptr || node == head) {
+      return;
+    }
+
+    DestroyCommandIssueWeakSetNodes(node->left, head);
+    DestroyCommandIssueWeakSetNodes(node->right, head);
+    node->value.ResetFromObject(nullptr);
+    ::operator delete(node);
+  }
+
+  void DestroyCommandIssueWeakSet(CommandIssueWeakSetRuntimeView& set)
+  {
+    if (set.head == nullptr) {
+      set.proxy = nullptr;
+      set.size = 0u;
+      return;
+    }
+
+    if (set.head->parent != set.head) {
+      DestroyCommandIssueWeakSetNodes(set.head->parent, set.head);
+    }
+
+    ::operator delete(set.head);
+    set.proxy = nullptr;
+    set.head = nullptr;
+    set.size = 0u;
+  }
+
+  [[nodiscard]] CommandIssueWeakSetNode* CloneCommandIssueWeakSetNode(
+    const CommandIssueWeakSetNode* const sourceNode,
+    const CommandIssueWeakSetNode* const sourceHead,
+    CommandIssueWeakSetNode* const destinationHead,
+    CommandIssueWeakSetNode* const parent
+  )
+  {
+    if (sourceNode == nullptr || sourceNode == sourceHead) {
+      return destinationHead;
+    }
+
+    auto* const destinationNode = static_cast<CommandIssueWeakSetNode*>(::operator new(sizeof(CommandIssueWeakSetNode)));
+    destinationNode->left = destinationHead;
+    destinationNode->parent = parent;
+    destinationNode->right = destinationHead;
+    destinationNode->key = sourceNode->key;
+    destinationNode->value.ownerLinkSlot = nullptr;
+    destinationNode->value.nextInOwner = nullptr;
+    destinationNode->value.ResetFromOwnerLinkSlot(sourceNode->value.ownerLinkSlot);
+    destinationNode->color = sourceNode->color;
+    destinationNode->isNil = sourceNode->isNil;
+    destinationNode->pad_1A_1B[0] = sourceNode->pad_1A_1B[0];
+    destinationNode->pad_1A_1B[1] = sourceNode->pad_1A_1B[1];
+
+    destinationNode->left =
+      CloneCommandIssueWeakSetNode(sourceNode->left, sourceHead, destinationHead, destinationNode);
+    destinationNode->right =
+      CloneCommandIssueWeakSetNode(sourceNode->right, sourceHead, destinationHead, destinationNode);
+    return destinationNode;
+  }
+
+  void CopyCommandIssueWeakSet(
+    CommandIssueWeakSetRuntimeView& destination,
+    const CommandIssueWeakSetRuntimeView& source
+  )
+  {
+    if (&destination == &source) {
+      return;
+    }
+
+    DestroyCommandIssueWeakSet(destination);
+    destination.proxy = source.proxy;
+    if (source.head == nullptr) {
+      destination.head = nullptr;
+      destination.size = 0u;
+      return;
+    }
+
+    destination.head = AllocateCommandIssueWeakSetHead();
+    destination.size = source.size;
+    if (source.head->parent == source.head || source.size == 0u) {
+      destination.head->left = destination.head;
+      destination.head->parent = destination.head;
+      destination.head->right = destination.head;
+      return;
+    }
+
+    destination.head->parent = CloneCommandIssueWeakSetNode(
+      source.head->parent,
+      source.head,
+      destination.head,
+      destination.head
     );
+    destination.head->parent->parent = destination.head;
+    destination.head->left = CommandIssueWeakSetMinNode(destination.head->parent, destination.head);
+    destination.head->right = CommandIssueWeakSetMaxNode(destination.head->parent, destination.head);
+  }
+
+  void InitializeCommandIssueTarget(CAiTarget& target)
+  {
+    target.targetType = EAiTargetType::AITARGET_None;
+    target.targetEntity.ResetFromObject(nullptr);
+    target.position = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+    target.targetPoint = 0;
+    target.targetIsMobile = false;
+  }
+
+  /**
+   * Address: 0x008B3DC0 (FUN_008B3DC0, sub_8B3DC0)
+   *
+   * What it does:
+   * Initializes one command-issue local queue event with command id, event type,
+   * empty weak-set payload, empty target payload, and inline cell-vector lanes.
+   */
+  void InitializeCommandIssueUpdateEvent(
+    CommandIssueUpdateEventRuntimeView& event,
+    const CmdId commandId,
+    const std::uint32_t eventType
+  )
+  {
+    event.commandId = commandId;
+    event.eventType = eventType;
+    InitializeCommandIssueWeakSetEmpty(event.entitySet);
+    event.count = 0;
+    InitializeCommandIssueTarget(event.target);
+    gpg::FastVectorN2InitInlineNoHeader(event.cells);
+  }
+
+  void DestroyCommandIssueUpdateEvent(CommandIssueUpdateEventRuntimeView& event)
+  {
+    event.target.targetEntity.ResetFromObject(nullptr);
+    event.cells.ResetStorageToInline();
+    DestroyCommandIssueWeakSet(event.entitySet);
+  }
+
+  void CopyCommandIssueUpdateEvent(
+    CommandIssueUpdateEventRuntimeView& destination,
+    const CommandIssueUpdateEventRuntimeView& source
+  )
+  {
+    if (&destination == &source) {
+      return;
+    }
+
+    destination.commandId = source.commandId;
+    destination.eventType = source.eventType;
+    CopyCommandIssueWeakSet(destination.entitySet, source.entitySet);
+    destination.count = source.count;
+    destination.target = source.target;
+    destination.target.targetPoint = source.target.targetPoint;
+    destination.cells.ResetStorageToInline();
+    gpg::FastVectorN2RebindAndCopy<SOCellPos>(&destination.cells, &source.cells);
+  }
+
+  [[nodiscard]] CommandIssueUpdateEventRuntimeView* AllocateCommandIssueUpdateSlot()
+  {
+    auto* const storage = static_cast<CommandIssueUpdateEventRuntimeView*>(::operator new(sizeof(CommandIssueUpdateEventRuntimeView)));
+    new (storage) CommandIssueUpdateEventRuntimeView{};
+    InitializeCommandIssueUpdateEvent(*storage, 0, 0u);
+    return storage;
+  }
+
+  void GrowCommandIssueUpdateQueue(CommandIssueUpdateQueueRuntimeView& queue)
+  {
+    const std::uint32_t oldCapacity = queue.capacity;
+    if (oldCapacity == kCommandIssueQueueMaxCapacity) {
+      throw std::bad_alloc();
+    }
+
+    std::uint32_t growth = 1u;
+    std::uint32_t halfCapacity = oldCapacity >> 1u;
+    if (halfCapacity < 8u) {
+      halfCapacity = 8u;
+    }
+    if (oldCapacity <= (kCommandIssueQueueMaxCapacity - halfCapacity)) {
+      growth = halfCapacity;
+    }
+
+    const std::uint32_t newCapacity = oldCapacity + growth;
+    auto** const newSlots = static_cast<CommandIssueUpdateEventRuntimeView**>(
+      ::operator new(sizeof(CommandIssueUpdateEventRuntimeView*) * static_cast<std::size_t>(newCapacity))
+    );
+    std::memset(newSlots, 0, sizeof(CommandIssueUpdateEventRuntimeView*) * static_cast<std::size_t>(newCapacity));
+
+    if (queue.slots != nullptr && oldCapacity != 0u && queue.count != 0u) {
+      for (std::uint32_t offset = 0u; offset < queue.count; ++offset) {
+        std::uint32_t oldIndex = queue.readIndex + offset;
+        if (oldIndex >= oldCapacity) {
+          oldIndex -= oldCapacity;
+        }
+
+        std::uint32_t newIndex = queue.readIndex + offset;
+        if (newIndex >= newCapacity) {
+          newIndex -= newCapacity;
+        }
+
+        newSlots[newIndex] = queue.slots[oldIndex];
+      }
+    }
+
+    ::operator delete(queue.slots);
+    queue.slots = newSlots;
+    queue.capacity = newCapacity;
+  }
+
+  /**
+   * Address: 0x008B4E80 (FUN_008B4E80, sub_8B4E80)
+   *
+   * What it does:
+   * Enqueues one local command-issue update event into the helper ring queue,
+   * growing slot storage and slot-event storage on demand.
+   */
+  void EnqueueCommandIssueUpdateEvent(
+    CommandIssueUpdateQueueRuntimeView& queue,
+    const CommandIssueUpdateEventRuntimeView& event
+  )
+  {
+    if (queue.capacity <= (queue.count + 1u)) {
+      GrowCommandIssueUpdateQueue(queue);
+    }
+
+    std::uint32_t writeIndex = queue.readIndex + queue.count;
+    if (writeIndex >= queue.capacity) {
+      writeIndex -= queue.capacity;
+    }
+
+    if (queue.slots[writeIndex] == nullptr) {
+      queue.slots[writeIndex] = AllocateCommandIssueUpdateSlot();
+    }
+
+    CopyCommandIssueUpdateEvent(*queue.slots[writeIndex], event);
+    ++queue.count;
+  }
+
+  /**
+   * Address: 0x008B49D0 (FUN_008B49D0, sub_8B49D0)
+   *
+   * What it does:
+   * Builds one `DecreaseCommandCount` local update event and appends it into
+   * the command-issue helper's local ring queue.
+   */
+  void QueueCommandIssueDecreaseCountEvent(
+    CommandIssueHelperRuntimeView& commandIssueHelper,
+    const CmdId commandId,
+    const std::int32_t deltaCount
+  )
+  {
+    CommandIssueUpdateEventRuntimeView localEvent{};
+    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeDecreaseCount);
+    localEvent.count = deltaCount;
+    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
+    DestroyCommandIssueUpdateEvent(localEvent);
   }
 
   CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
@@ -1792,20 +3581,67 @@ namespace
     return &it->second;
   }
 
+  struct EntityDbEntityMapView
+  {
+    void* allocatorProxy;           // +0x00
+    CEntityDbAllUnitsNode* head;    // +0x04
+    std::uint32_t size;             // +0x08
+  };
+  static_assert(offsetof(EntityDbEntityMapView, head) == 0x04, "EntityDbEntityMapView::head offset must be 0x04");
+  static_assert(offsetof(EntityDbEntityMapView, size) == 0x08, "EntityDbEntityMapView::size offset must be 0x08");
+  static_assert(sizeof(EntityDbEntityMapView) == 0x0C, "EntityDbEntityMapView size must be 0x0C");
+
+  [[nodiscard]] EntityDbEntityMapView& GetEntityDbEntityMapView(CEntityDb* const entityDb) noexcept
+  {
+    return *reinterpret_cast<EntityDbEntityMapView*>(entityDb);
+  }
+
+  /**
+   * Address: 0x006856C0 (FUN_006856C0, std::map_EntId_Entity::find)
+   *
+   * What it does:
+   * Returns the exact entity-id tree node when present, otherwise the map
+   * sentinel/head node.
+   */
+  [[nodiscard]] CEntityDbAllUnitsNode* FindEntityMapNode(EntityDbEntityMapView& map, const EntId id) noexcept
+  {
+    CEntityDbAllUnitsNode* const head = map.head;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    const std::uint32_t key = static_cast<std::uint32_t>(id);
+    CEntityDbAllUnitsNode* result = head;
+    CEntityDbAllUnitsNode* node = head->parent;
+    while (node != nullptr && node != head && node->isNil == 0u) {
+      if (node->key >= key) {
+        result = node;
+        node = node->left;
+      } else {
+        node = node->right;
+      }
+    }
+
+    if (result == head || key < result->key) {
+      return head;
+    }
+
+    return result;
+  }
+
   Entity* FindEntityById(CEntityDb* entityDb, const EntId id)
   {
     if (!entityDb) {
       return nullptr;
     }
 
-    for (auto it = entityDb->Entities().begin(); it != entityDb->Entities().end(); ++it) {
-      Entity* entity = *it;
-      if (entity && entity->id_ == id) {
-        return entity;
-      }
+    EntityDbEntityMapView& entityMap = GetEntityDbEntityMapView(entityDb);
+    CEntityDbAllUnitsNode* const node = FindEntityMapNode(entityMap, id);
+    if (node == nullptr || node == entityMap.head || node->unitListNode == nullptr) {
+      return nullptr;
     }
 
-    return nullptr;
+    return static_cast<Entity*>(node->unitListNode);
   }
 
   static_assert(sizeof(SEntitySetTemplateUnit) == 0x28, "SEntitySetTemplateUnit size must be 0x28");
@@ -1968,6 +3804,18 @@ namespace
   }
 
   /**
+   * Address: 0x006E1A10 (FUN_006E1A10)
+   *
+   * What it does:
+   * Appends one command id into `CCommandDbRuntimeView::pendingReleasedCmdIds`,
+   * growing vector storage when needed.
+   */
+  void AppendPendingReleasedCommandId(msvc8::vector<CmdId>& pendingReleasedCmdIds, const CmdId cmdId)
+  {
+    pendingReleasedCmdIds.push_back(cmdId);
+  }
+
+  /**
    * Address: 0x006E0EC0 (FUN_006E0EC0, sub_6E0EC0)
    *
    * IDA signature:
@@ -2004,7 +3852,7 @@ namespace
       AsBitSet(retireSlot).Add(static_cast<std::uint32_t>(cmdId) & 0x00FFFFFFu);
     }
 
-    runtime->pendingReleasedCmdIds.push_back(cmdId);
+    AppendPendingReleasedCommandId(runtime->pendingReleasedCmdIds, cmdId);
   }
 
   // 0x00748AA0 resolves unit blueprints from RResId via RRuleGameRules::GetUnitBlueprint.
@@ -2015,6 +3863,55 @@ namespace
     }
 
     return rules->GetUnitBlueprint(blueprintId);
+  }
+
+  /**
+   * Address: 0x006EF150 (FUN_006EF150, func_GetUnitBlueprint)
+   *
+   * What it does:
+   * Resolves one Lua blueprint-id argument into `RUnitBlueprint*`, raising a
+   * typed Lua error for non-string non-nil values.
+   */
+  [[nodiscard]] RUnitBlueprint* ResolveUnitBlueprintFromLuaArgument(
+    LuaPlus::LuaState* const state,
+    const LuaPlus::LuaStackObject& blueprintObject,
+    const char* const functionName
+  )
+  {
+    if (!state || !state->m_state || !blueprintObject.m_state || !blueprintObject.m_state->m_state) {
+      return nullptr;
+    }
+
+    lua_State* const rawState = blueprintObject.m_state->m_state;
+    if (lua_isstring(rawState, blueprintObject.m_stackIndex)) {
+      const char* const blueprintIdText = lua_tostring(rawState, blueprintObject.m_stackIndex);
+      if (blueprintIdText == nullptr) {
+        blueprintObject.TypeError("string");
+      }
+
+      RResId lookupId{};
+      gpg::STR_InitFilename(&lookupId.name, blueprintIdText);
+
+      Sim* const sim = ResolveGlobalSim(state->m_state);
+      if (sim == nullptr || sim->mRules == nullptr) {
+        return nullptr;
+      }
+
+      return sim->mRules->GetUnitBlueprint(lookupId);
+    }
+
+    if (lua_type(rawState, blueprintObject.m_stackIndex) != 0) {
+      const LuaPlus::LuaObject blueprintValue(blueprintObject);
+      const char* const typeName = blueprintValue.TypeName();
+      LuaPlus::LuaState::Error(
+        state,
+        "Invalid blueprint in %s; expected a string but got a %s",
+        functionName != nullptr ? functionName : "",
+        typeName != nullptr ? typeName : ""
+      );
+    }
+
+    return nullptr;
   }
 
   VTransform BuildUnitSpawnTransform(const SCoordsVec2& pos, const float heading)
@@ -2338,6 +4235,37 @@ namespace
     const gpg::RRef casted = gpg::REF_UpcastPtr(source, expected);
     GPG_ASSERT(casted.mObj != nullptr);
     return casted.mObj ? casted.mObj : tracked.object;
+  }
+
+  /**
+   * Address: 0x00744C90 (FUN_00744C90, func_ArchiveWriteLuaObj)
+   *
+   * What it does:
+   * Writes all key/value lanes from one Lua table iterator into archive object
+   * stream as `LuaObject` entries, then writes one trailing nil marker object.
+   */
+  LuaPlus::LuaObject* func_ArchiveWriteLuaObj(gpg::WriteArchive* const archive, LuaPlus::LuaObject* const tableObject)
+  {
+    if (!archive || !tableObject) {
+      return tableObject;
+    }
+
+    gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
+    if (!luaObjectType) {
+      luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
+      LuaPlus::LuaObject::sType = luaObjectType;
+    }
+
+    gpg::RRef nullOwner{};
+    for (LuaPlus::LuaTableIterator iter(tableObject, 1); !iter.m_isDone; iter.Next()) {
+      archive->Write(luaObjectType, &iter.m_keyObj, nullOwner);
+      archive->Write(luaObjectType, &iter.m_valueObj, nullOwner);
+    }
+
+    LuaPlus::LuaObject nilObject{};
+    nilObject.AssignNil(tableObject->m_state);
+    archive->Write(luaObjectType, &nilObject, nullOwner);
+    return tableObject;
   }
 
   void SaveMapDataBestEffort(
@@ -2808,12 +4736,7 @@ namespace
 
   [[nodiscard]] RDebugOverlay* CreateDebugOverlayInstance(gpg::RType& overlayType)
   {
-    if (overlayType.newRefFunc_ == nullptr) {
-      return nullptr;
-    }
-
-    const gpg::RRef overlayRef = overlayType.newRefFunc_();
-    return static_cast<RDebugOverlay*>(overlayRef.mObj);
+    return RDebugOverlay::NewPtr(overlayType);
   }
 
   void LinkDebugOverlayFront(Sim& sim, RDebugOverlay& overlay)
@@ -3818,18 +5741,22 @@ void CDebugCanvas::Clear()
   decals.clear();
 }
 
-// 0x00746280
-std::FILE* Sim::Logf(const char* fmt, ...)
+/**
+ * Address: 0x00746280 (FUN_00746280, ?Logf@Sim@Moho@@QAAXPBDZZ)
+ *
+ * What it does:
+ * Writes one formatted line into the active sim log stream when logging is enabled.
+ */
+void Sim::Logf(const char* fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
 
   if (mLog) {
-    vfprintf(mLog, fmt, args);
+    (void)vfprintf(mLog, fmt, args);
   }
 
   va_end(args);
-  return mLog;
 }
 
 /**
@@ -3885,6 +5812,17 @@ void Sim::PostInitialize(const LuaPlus::LuaObject& launchOptions)
 }
 
 /**
+ * Address: 0x00545A40 (FUN_00545A40, ?GetResources@Sim@Moho@@QBEPBVISimResources@2@XZ)
+ *
+ * What it does:
+ * Returns the currently bound simulation resources interface lane.
+ */
+const ISimResources* Sim::GetResources() const
+{
+  return mSimResources.px;
+}
+
+/**
  * Address: 0x00746720 (FUN_00746720, ?GetDebugCanvas@Sim@Moho@@QAEPAVCDebugCanvas@2@XZ)
  */
 CDebugCanvas* Sim::GetDebugCanvas()
@@ -3895,15 +5833,68 @@ CDebugCanvas* Sim::GetDebugCanvas()
   return mDebugCanvas1.get();
 }
 
-// 0x007466F0
+/**
+ * Address: 0x007467F0 (FUN_007467F0, ?RegisterEntitySet@Sim@Moho@@QAEXPAVEntitySetBase@2@@Z)
+ *
+ * What it does:
+ * Unlinks one entity-set node from its current ring and inserts it into the
+ * sim EntityDB registered-set list.
+ */
+void Sim::RegisterEntitySet(EntitySetBase* const set)
+{
+  if (!set || !mEntityDB) {
+    return;
+  }
+
+  mEntityDB->RegisterEntitySet(*set);
+}
+
+/**
+ * Address: 0x00746820 (FUN_00746820, ?GetParticleBuffer@Sim@Moho@@QAEPAUSParticleBuffer@2@XZ)
+ *
+ * What it does:
+ * Returns the shared particle buffer, allocating and binding it lazily on
+ * first use.
+ */
+SParticleBuffer* Sim::GetParticleBuffer()
+{
+  if (!mParticleBuffer) {
+    mParticleBuffer.reset(new SParticleBuffer());
+  }
+
+  return mParticleBuffer.get();
+}
+
+/**
+ * Address: 0x007466D0 (FUN_007466D0, ?GetCurrentCommandSource@Sim@Moho@@QBEPBUSSTICommandSource@2@XZ)
+ *
+ * What it does:
+ * Returns the current command-source lane, or `nullptr` for sentinel id.
+ */
+const SSTICommandSource* Sim::GetCurrentCommandSource() const
+{
+  const CommandSourceId sourceId = static_cast<CommandSourceId>(mCurCommandSource);
+  if (sourceId == kInvalidCommandSource) {
+    return nullptr;
+  }
+
+  return &mCommandSources[static_cast<std::size_t>(sourceId)];
+}
+
+/**
+ * Address: 0x007466F0 (FUN_007466F0, ?GetCurrentCommandSourceName@Sim@Moho@@QBEPBDXZ)
+ *
+ * What it does:
+ * Returns current command-source name or fallback sentinel text when source id is invalid.
+ */
 const char* Sim::GetCurrentCommandSourceName() const
 {
-  if (mCurCommandSource == kInvalidCommandSource ||
-      static_cast<std::size_t>(mCurCommandSource) >= mCommandSources.size()) {
+  const SSTICommandSource* const source = GetCurrentCommandSource();
+  if (!source) {
     return "???";
   }
 
-  return mCommandSources[mCurCommandSource].mName.c_str();
+  return source->mName.c_str();
 }
 
 LuaPlus::LuaState* Sim::GetLuaState() const noexcept
@@ -3953,7 +5944,13 @@ bool Sim::CheatsEnabled()
   return mCheatsEnabled;
 }
 
-// 0x00747320
+/**
+ * Address: 0x00747320 (FUN_00747320, ?OkayToMessWith@Sim@Moho@@QAE_NPAVSimArmy@2@@Z)
+ *
+ * What it does:
+ * Validates whether current command source may issue actions on one army, with
+ * cheat fallback when source authorization fails.
+ */
 bool Sim::OkayToMessWith(SimArmy* army)
 {
   auto* armyImpl = static_cast<CArmyImpl*>(army);
@@ -3973,13 +5970,24 @@ bool Sim::OkayToMessWith(SimArmy* army)
   return CheatsEnabled();
 }
 
-// 0x00747360
+/**
+ * Address: 0x00747360 (FUN_00747360, ?OkayToMessWith@Sim@Moho@@QAE_NPAVEntity@2@@Z)
+ *
+ * What it does:
+ * Resolves entity owner army and delegates permission checks to army-level policy.
+ */
 bool Sim::OkayToMessWith(Entity* entity)
 {
   return OkayToMessWith(entity ? static_cast<SimArmy*>(entity->ArmyRef) : nullptr);
 }
 
-// 0x007473B0
+/**
+ * Address: 0x007473B0 (FUN_007473B0, ?OkayToMessWith@Sim@Moho@@QAE_NPAVCUnitCommand@2@@Z)
+ *
+ * What it does:
+ * Checks each command unit-set entry against command-source permissions and
+ * requires cheats for unusable or unauthorized entries.
+ */
 bool Sim::OkayToMessWith(CUnitCommand* cmd)
 {
   if (!cmd) {
@@ -4228,6 +6236,11 @@ Unit* Sim::CreateUnit(const SUnitConstructionParams& params, const bool doCallba
     params.mArmy->ArmyId
   );
   return nullptr;
+}
+
+Unit* Sim::CreateUnitForScript(const SUnitConstructionParams& params, const bool doCallback)
+{
+  return CreateUnit(params, doCallback);
 }
 
 /**
@@ -5049,6 +7062,127 @@ int Sim::DebugAIStatesOff(
 }
 
 /**
+ * Address: 0x0075ED00 (FUN_0075ED00, Moho::Sim::TrackStats)
+ *
+ * What it does:
+ * Parses `TrackStats <true|false|reset>` and either toggles selected-unit
+ * tracking for the focus army or clears `RealTimeStats` for all armies.
+ */
+int Sim::TrackStats(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+
+  if (sim == nullptr || commandArgs == nullptr || commandArgs->size() < 2) {
+    const char* const commandName =
+      (commandArgs != nullptr && !commandArgs->empty()) ? commandArgs->front().c_str() : "TrackStats";
+    if (sim != nullptr) {
+      sim->Printf("usage: %s <true|false|reset>", commandName);
+    }
+    return 0;
+  }
+
+  const std::string& mode = (*commandArgs)[1];
+  if (mode != "reset") {
+    const bool enableTracking = (mode == "true");
+    ForEachSelectedUnit(selectedUnits, [focusArmy, enableTracking](Unit& unit) {
+      if (unit.ArmyRef != focusArmy) {
+        return;
+      }
+
+      auto* const trackStatsView = reinterpret_cast<UnitTrackStatsRuntimeView*>(&unit);
+      trackStatsView->trackingEnabled = enableTracking;
+    });
+    return 0;
+  }
+
+  for (CArmyImpl* const army : sim->mArmiesList) {
+    if (army == nullptr) {
+      continue;
+    }
+
+    CArmyStats* const armyStats = army->GetArmyStats();
+    if (armyStats != nullptr) {
+      armyStats->Delete("RealTimeStats");
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0075EE50 (FUN_0075EE50, Moho::Sim::DumpUnits)
+ *
+ * What it does:
+ * Aggregates live units by blueprint owner pointer, sorts by descending
+ * population, and logs one `"<blueprintId> <count>"` line per entry.
+ */
+int Sim::DumpUnits(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)commandArgs;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  if (sim == nullptr || sim->mEntityDB == nullptr) {
+    return 0;
+  }
+
+  struct DumpUnitsCountEntry
+  {
+    const RUnitBlueprint* blueprint = nullptr;
+    int count = 0;
+  };
+
+  std::vector<DumpUnitsCountEntry> counts;
+  CEntityDb* const entityDb = sim->mEntityDB;
+  CEntityDbAllUnitsNode* node = entityDb->AllUnitsEnd(0u);
+  CEntityDbAllUnitsNode* const end = entityDb->AllUnitsEnd();
+  while (node != end) {
+    Unit* const unit = CEntityDb::UnitFromAllUnitsNode(node);
+    node = CEntityDb::NextAllUnitsNode(node);
+    if (unit == nullptr) {
+      continue;
+    }
+
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    auto found = std::find_if(counts.begin(), counts.end(), [blueprint](const DumpUnitsCountEntry& entry) {
+      return entry.blueprint == blueprint;
+    });
+    if (found == counts.end()) {
+      counts.push_back(DumpUnitsCountEntry{blueprint, 1});
+    } else {
+      ++found->count;
+    }
+  }
+
+  std::stable_sort(counts.begin(), counts.end(), [](const DumpUnitsCountEntry& lhs, const DumpUnitsCountEntry& rhs) {
+    return lhs.count > rhs.count;
+  });
+
+  for (const DumpUnitsCountEntry& entry : counts) {
+    if (entry.blueprint == nullptr) {
+      continue;
+    }
+
+    gpg::Logf("%s %i", entry.blueprint->mBlueprintId.c_str(), entry.count);
+  }
+
+  return 0;
+}
+
+/**
  * Address: 0x0064BB80 (FUN_0064BB80, Moho::Sim::SallyShears)
  *
  * What it does:
@@ -5169,6 +7303,48 @@ int Sim::ZeroExtraStorage(
   storage->amounts[0] = 0.0f;
   storage->amounts[1] = 0.0f;
   ApplyEconStorageDelta(*storage, 1);
+  return 0;
+}
+
+/**
+ * Address: 0x0064BF00 (FUN_0064BF00, Moho::Sim::AddImpulse)
+ *
+ * What it does:
+ * Parses three impulse components, applies the impulse to each selected
+ * unit's motion controller, and forces each selected unit into `LAYER_Air`.
+ */
+int Sim::AddImpulse(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+  (void)focusArmy;
+
+  if (sim == nullptr || commandArgs == nullptr || commandArgs->size() < 4u) {
+    if (sim != nullptr) {
+      const int got = commandArgs != nullptr ? static_cast<int>(commandArgs->size()) : 0;
+      sim->Printf("Insufficient args: got %i, expected %i", got, 4);
+    }
+    return 0;
+  }
+
+  const Wm3::Vector3f impulse{
+    static_cast<float>(std::atof(commandArgs->at(1).c_str())),
+    static_cast<float>(std::atof(commandArgs->at(2).c_str())),
+    static_cast<float>(std::atof(commandArgs->at(3).c_str()))
+  };
+
+  ForEachSelectedUnit(selectedUnits, [&impulse](Unit& unit) {
+    if (unit.UnitMotion != nullptr) {
+      unit.UnitMotion->AddRecoilImpulse(impulse);
+    }
+    unit.SetCurrentLayer(LAYER_Air);
+  });
+
   return 0;
 }
 
@@ -5453,6 +7629,104 @@ int Sim::AddLightParticle(
 }
 
 /**
+ * Address: 0x00734F50 (FUN_00734F50, Moho::Sim::Log)
+ *
+ * What it does:
+ * Joins command args #1..N with spaces and logs the resulting text via
+ * `gpg::Logf("%s", ...)`.
+ */
+int Sim::Log(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)sim;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  std::string joined;
+  if (commandArgs != nullptr && commandArgs->size() > 1u) {
+    joined = commandArgs->at(1);
+    for (std::size_t i = 2u; i < commandArgs->size(); ++i) {
+      joined.push_back(' ');
+      joined += commandArgs->at(i);
+    }
+  }
+
+  gpg::Logf("%s", joined.c_str());
+  return 0;
+}
+
+/**
+ * Address: 0x00734FF0 (FUN_00734FF0, Moho::Sim::SimWarn)
+ *
+ * What it does:
+ * Joins command args #1..N with spaces and warns using `gpg::Warnf("%s", ...)`.
+ */
+int Sim::SimWarn(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)sim;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  std::string joined;
+  if (commandArgs != nullptr && commandArgs->size() > 1u) {
+    joined = commandArgs->at(1);
+    for (std::size_t i = 2u; i < commandArgs->size(); ++i) {
+      joined.push_back(' ');
+      joined += commandArgs->at(i);
+    }
+  }
+
+  gpg::Warnf("%s", joined.c_str());
+  return 0;
+}
+
+/**
+ * Address: 0x00735090 (FUN_00735090, Moho::Sim::SimError)
+ *
+ * What it does:
+ * Joins command args #1..N with spaces and terminates with
+ * `gpg::Die("%s", ...)`.
+ */
+[[noreturn]] int Sim::SimError(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)sim;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  std::string joined;
+  if (commandArgs != nullptr && commandArgs->size() > 1u) {
+    joined = commandArgs->at(1);
+    for (std::size_t i = 2u; i < commandArgs->size(); ++i) {
+      joined.push_back(' ');
+      joined += commandArgs->at(i);
+    }
+  }
+
+  gpg::Die("%s", joined.c_str());
+  std::abort();
+}
+
+/**
  * Address: 0x00699D20 (FUN_00699D20, Moho::Sim::sim_Gravity)
  *
  * Moho::Sim *, std::vector<msvc8::string> *
@@ -5505,6 +7779,120 @@ int Sim::sim_Gravity(
 
   sim->Printf("usage: %s [new-value]", commandArgs->front().c_str());
   sim->Printf("    where new-value is in ogrids/(second^2)");
+  return 0;
+}
+
+/**
+ * Address: 0x00735110 (FUN_00735110, Moho::Sim::SimAssert)
+ *
+ * What it does:
+ * No-op debug command callback lane.
+ */
+int Sim::SimAssert(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)sim;
+  (void)commandArgs;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+  return 0;
+}
+
+/**
+ * Address: 0x00735120 (FUN_00735120, Moho::Sim::SimCrash)
+ *
+ * What it does:
+ * Triggers an intentional null-write crash for debug fault testing.
+ */
+int Sim::SimCrash(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)sim;
+  (void)commandArgs;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  *reinterpret_cast<volatile std::uint32_t*>(0) = 0u;
+  return 0;
+}
+
+/**
+ * Address: 0x0074B610 (FUN_0074B610, Moho::Sim::sim_DebugCrash)
+ *
+ * What it does:
+ * Triggers an intentional null-write crash for debug fault testing.
+ */
+int Sim::sim_DebugCrash(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)sim;
+  (void)commandArgs;
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  *reinterpret_cast<volatile std::uint32_t*>(0) = 0u;
+  return 0;
+}
+
+/**
+ * Address: 0x0074B3F0 (FUN_0074B3F0, Moho::Sim::ScenarioMethod)
+ *
+ * What it does:
+ * Looks up one scenario callback in `ScenarioInfo.Env` using command arg #1
+ * and invokes it if present; warns when the callback is undefined.
+ */
+int Sim::ScenarioMethod(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  if (commandArgs == nullptr) {
+    return 0;
+  }
+
+  const int argumentCount = static_cast<int>(commandArgs->size());
+  if (argumentCount < 2 || sim == nullptr || sim->mLuaState == nullptr) {
+    return argumentCount;
+  }
+
+  const std::string& methodName = commandArgs->at(1);
+  LuaPlus::LuaObject globals = sim->mLuaState->GetGlobals();
+  LuaPlus::LuaObject scenarioInfoObject = globals["ScenarioInfo"];
+  LuaPlus::LuaObject scenarioEnvObject = scenarioInfoObject["Env"];
+  LuaPlus::LuaObject scenarioMethodObject = scenarioEnvObject[methodName.c_str()];
+
+  if (scenarioMethodObject) {
+    LuaPlus::LuaFunction scenarioMethodFunction(scenarioMethodObject);
+    scenarioMethodFunction.Call();
+  } else {
+    gpg::Warnf("ScenarioMethod '%s' not defined", methodName.c_str());
+  }
+
   return 0;
 }
 
@@ -5563,6 +7951,45 @@ int Sim::SimLua(
   sim->Printf("%s", commandText.c_str());
   (void)SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
   clearSelectedUnitGlobal();
+  return 0;
+}
+
+/**
+ * Address: 0x0075D860 (FUN_0075D860, Moho::Sim::DebugMoveCamera)
+ *
+ * What it does:
+ * Builds and executes `DebugMoveCamera(x0,y0,x1,y1)` in Sim Lua from command
+ * args #1..#4.
+ */
+int Sim::DebugMoveCamera(
+  Sim* const sim,
+  CSimConCommand::ParsedCommandArgs* const commandArgs,
+  Wm3::Vector3f* const worldPos,
+  CArmyImpl* const focusArmy,
+  SEntitySetTemplateUnit* const selectedUnits
+)
+{
+  (void)worldPos;
+  (void)focusArmy;
+  (void)selectedUnits;
+
+  if (sim == nullptr) {
+    return 0;
+  }
+
+  if (commandArgs == nullptr || commandArgs->size() < 5u) {
+    sim->Printf("usage: DebugMoveCamera x0 y0 x1 y1");
+    return 0;
+  }
+
+  const msvc8::string commandText = gpg::STR_Printf(
+    "DebugMoveCamera(%s,%s,%s,%s)",
+    commandArgs->at(1).c_str(),
+    commandArgs->at(2).c_str(),
+    commandArgs->at(3).c_str(),
+    commandArgs->at(4).c_str()
+  );
+  (void)SCR_LuaDoString(commandText.c_str(), sim->mLuaState);
   return 0;
 }
 
@@ -5840,10 +8267,26 @@ void Sim::SaveState(gpg::WriteArchive* const archive)
   archive->EndSection(false);
 }
 
-// 0x0074B100
+/**
+ * Address: 0x0074B100 (FUN_0074B100, ?EndGame@Sim@Moho@@UAEXXZ)
+ *
+ * What it does:
+ * Marks the sim as ended.
+ */
 void Sim::EndGame()
 {
   mGameEnded = true;
+}
+
+/**
+ * Address: 0x005859B0 (FUN_005859B0, Moho::Sim::ArmyCount)
+ *
+ * What it does:
+ * Returns the number of army slots in the sim army list.
+ */
+int Sim::ArmyCount() const
+{
+  return static_cast<int>(mArmiesList.size());
 }
 
 /**
@@ -6048,6 +8491,196 @@ int moho::cfunc_SpecFootprints(lua_State* const luaContext)
   return cfunc_SpecFootprintsL(ResolveBindingState(luaContext));
 }
 
+namespace
+{
+  struct LuaBlueprintTlsStateView
+  {
+    void* reserved00;                    // +0x00
+    moho::RRuleGameRulesImpl* rules;     // +0x04
+  };
+
+  static_assert(
+    offsetof(LuaBlueprintTlsStateView, rules) == 0x04,
+    "LuaBlueprintTlsStateView::rules offset must be 0x04"
+  );
+
+  [[nodiscard]] LuaBlueprintTlsStateView* ResolveLuaBlueprintTlsState() noexcept
+  {
+#if defined(_M_IX86)
+    void** const tlsPointerArray = reinterpret_cast<void**>(__readfsdword(0x2Cu));
+    if (tlsPointerArray == nullptr) {
+      return nullptr;
+    }
+    return static_cast<LuaBlueprintTlsStateView*>(tlsPointerArray[0]);
+#else
+    return nullptr;
+#endif
+  }
+
+  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* const state) noexcept
+  {
+    LuaBlueprintTlsStateView* const tlsState = ResolveLuaBlueprintTlsState();
+    if (tlsState != nullptr && tlsState->rules != nullptr) {
+      return tlsState->rules;
+    }
+    return ResolveRulesImpl(state);
+  }
+
+  [[nodiscard]] moho::RUnitBlueprint*
+  func_CreateRUnitBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+
+  [[nodiscard]] moho::RPropBlueprint*
+  func_CreateRPropBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+
+  [[nodiscard]] moho::RProjectileBlueprint*
+  func_CreateRProjectileBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+
+  void func_RegisterBlueprint(moho::RBlueprint* blueprint, moho::RRuleGameRulesImpl* rules, const char* categoryName);
+
+  int func_RegisterMeshBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+  int func_RegisterTrailEmitterBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+  int func_RegisterEmitterBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+  int func_RegisterBeamBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+
+  /**
+   * Address: 0x00528B90 (FUN_00528B90)
+   *
+   * What it does:
+   * Fast-path helper that registers one unit blueprint from an already-cast
+   * Lua state into the rules unit-blueprint map and category lookup.
+   */
+  int RegisterUnitBlueprintFromState(LuaPlus::LuaState* const state)
+  {
+    RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+    RUnitBlueprint* const blueprint = func_CreateRUnitBlueprint(state, &rules->mUnitBlueprints);
+    func_RegisterBlueprint(reinterpret_cast<RBlueprint*>(blueprint), rules, "ALLUNITS");
+    return 0;
+  }
+
+  /**
+   * Address: 0x00528C60 (FUN_00528C60)
+   *
+   * What it does:
+   * Fast-path helper that registers one prop blueprint from an already-cast
+   * Lua state and updates category lookup lanes.
+   */
+  int RegisterPropBlueprintFromState(LuaPlus::LuaState* const state)
+  {
+    RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+    RPropBlueprint* const blueprint = func_CreateRPropBlueprint(state, &rules->mPropBlueprints);
+    func_RegisterBlueprint(reinterpret_cast<RBlueprint*>(blueprint), rules, nullptr);
+    return 0;
+  }
+
+  /**
+   * Address: 0x00528D30 (FUN_00528D30)
+   *
+   * What it does:
+   * Fast-path helper that registers one projectile blueprint from an already-cast
+   * Lua state into the projectile map and category lookup.
+   */
+  int RegisterProjectileBlueprintFromState(LuaPlus::LuaState* const state)
+  {
+    RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+    RProjectileBlueprint* const blueprint = func_CreateRProjectileBlueprint(state, &rules->mProjectileBlueprints);
+    func_RegisterBlueprint(reinterpret_cast<RBlueprint*>(blueprint), rules, "ALLPROJECTILES");
+    return 0;
+  }
+} // namespace
+
+/**
+ * Address: 0x00528AF0 (FUN_00528AF0, cfunc_RegisterUnitBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and forwards unit-blueprint registration into
+ * the fast-path helper lane.
+ */
+int moho::cfunc_RegisterUnitBlueprint(lua_State* const luaContext)
+{
+  return RegisterUnitBlueprintFromState(LuaPlus::LuaState::CastState(luaContext));
+}
+
+/**
+ * Address: 0x00528BC0 (FUN_00528BC0, cfunc_RegisterPropBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and forwards prop-blueprint registration into
+ * the fast-path helper lane.
+ */
+int moho::cfunc_RegisterPropBlueprint(lua_State* const luaContext)
+{
+  return RegisterPropBlueprintFromState(LuaPlus::LuaState::CastState(luaContext));
+}
+
+/**
+ * Address: 0x00528C90 (FUN_00528C90, cfunc_RegisterProjectileBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and forwards projectile-blueprint registration
+ * into the fast-path helper lane.
+ */
+int moho::cfunc_RegisterProjectileBlueprint(lua_State* const luaContext)
+{
+  return RegisterProjectileBlueprintFromState(LuaPlus::LuaState::CastState(luaContext));
+}
+
+/**
+ * Address: 0x00528D60 (FUN_00528D60, cfunc_RegisterMeshBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and dispatches mesh-blueprint registration into
+ * the rules mesh map lane.
+ */
+int moho::cfunc_RegisterMeshBlueprint(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+  (void)func_RegisterMeshBlueprint(state, &rules->mMeshBlueprints);
+  return 0;
+}
+
+/**
+ * Address: 0x00528E20 (FUN_00528E20, cfunc_RegisterTrailEmitterBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and dispatches trail-emitter blueprint
+ * registration into the rules trail map lane.
+ */
+int moho::cfunc_RegisterTrailEmitterBlueprint(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+  return func_RegisterTrailEmitterBlueprint(state, &rules->mTrailBlueprints);
+}
+
+/**
+ * Address: 0x00528ED0 (FUN_00528ED0, cfunc_RegisterEmitterBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and dispatches emitter blueprint registration
+ * into the rules emitter map lane.
+ */
+int moho::cfunc_RegisterEmitterBlueprint(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+  return func_RegisterEmitterBlueprint(state, &rules->mEmitterBlueprints);
+}
+
+/**
+ * Address: 0x00528F80 (FUN_00528F80, cfunc_RegisterBeamBlueprint)
+ *
+ * What it does:
+ * Casts the raw callback state and dispatches beam blueprint registration into
+ * the rules beam map lane.
+ */
+int moho::cfunc_RegisterBeamBlueprint(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
+  return func_RegisterBeamBlueprint(state, &rules->mBeamBlueprints);
+}
+
 /**
  * Address: 0x005284F0 (FUN_005284F0, func_SpecFootprints_LuaFuncDef)
  *
@@ -6063,6 +8696,623 @@ moho::CScrLuaInitForm* moho::func_SpecFootprints_LuaFuncDef()
     nullptr,
     "<global>",
     kSpecFootprintsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528B30 (FUN_00528B30, func_RegisterUnitBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterUnitBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterUnitBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterUnitBlueprint",
+    &moho::cfunc_RegisterUnitBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterUnitBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528C00 (FUN_00528C00, func_RegisterPropBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterPropBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterPropBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterPropBlueprint",
+    &moho::cfunc_RegisterPropBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterPropBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528CD0 (FUN_00528CD0, func_RegisterProjectileBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterProjectileBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterProjectileBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterProjectileBlueprint",
+    &moho::cfunc_RegisterProjectileBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterProjectileBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528D90 (FUN_00528D90, func_RegisterMeshBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterMeshBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterMeshBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterMeshBlueprint",
+    &moho::cfunc_RegisterMeshBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterMeshBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528E50 (FUN_00528E50, func_RegisterTrailEmitterBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterTrailEmitterBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterTrailEmitterBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterTrailEmitterBlueprint",
+    &moho::cfunc_RegisterTrailEmitterBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterTrailEmitterBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528F00 (FUN_00528F00, func_RegisterEmitterBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterEmitterBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterEmitterBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterEmitterBlueprint",
+    &moho::cfunc_RegisterEmitterBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterEmitterBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00528FB0 (FUN_00528FB0, func_RegisterBeamBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `RegisterBeamBlueprint`.
+ */
+moho::CScrLuaInitForm* moho::func_RegisterBeamBlueprint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "RegisterBeamBlueprint",
+    &moho::cfunc_RegisterBeamBlueprint,
+    nullptr,
+    "<global>",
+    kRegisterBeamBlueprintHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00529030 (FUN_00529030, cfunc_BlueprintLoaderUpdateProgress)
+ *
+ * What it does:
+ * Casts the Lua callback state and ticks the current background-load progress
+ * control stored in the worker TLS lane when present.
+ */
+int moho::cfunc_BlueprintLoaderUpdateProgress(lua_State* const luaContext)
+{
+  (void)LuaPlus::LuaState::CastState(luaContext);
+
+#if defined(_M_IX86)
+  struct LoaderTlsStateView
+  {
+    void* reserved00;                             // +0x00
+    void* reserved04;                             // +0x04
+    moho::CBackgroundTaskControl* loadControl;   // +0x08
+  };
+  static_assert(
+    offsetof(LoaderTlsStateView, loadControl) == 0x08,
+    "LoaderTlsStateView::loadControl offset must be 0x08"
+  );
+
+  void** const tlsPointerArray = reinterpret_cast<void**>(__readfsdword(0x2Cu));
+  if (tlsPointerArray != nullptr) {
+    const auto* const tlsState = static_cast<const LoaderTlsStateView*>(tlsPointerArray[0]);
+    if (tlsState != nullptr && tlsState->loadControl != nullptr && tlsState->loadControl->mHandle != nullptr) {
+      tlsState->loadControl->mHandle->UpdateLoadingProgress();
+    }
+  }
+#endif
+
+  return 0;
+}
+
+/**
+ * Address: 0x00529060 (FUN_00529060, func_BlueprintLoaderUpdateProgress_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the core-Lua binder definition for `BlueprintLoaderUpdateProgress`.
+ */
+moho::CScrLuaInitForm* moho::func_BlueprintLoaderUpdateProgress_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    CoreLuaInitSet(),
+    "BlueprintLoaderUpdateProgress",
+    &moho::cfunc_BlueprintLoaderUpdateProgress,
+    nullptr,
+    "<global>",
+    kBlueprintLoaderUpdateProgressHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00BC8E50 (FUN_00BC8E50, register_RegisterUnitBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterUnitBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_RegisterUnitBlueprint_LuaFuncDef()
+{
+  return func_RegisterUnitBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8E60 (FUN_00BC8E60, register_RegisterPropBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterPropBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_RegisterPropBlueprint_LuaFuncDef()
+{
+  return func_RegisterPropBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8E70 (FUN_00BC8E70, register_RegisterProjectileBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterProjectileBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_RegisterProjectileBlueprint_LuaFuncDef()
+{
+  return func_RegisterProjectileBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8E80 (FUN_00BC8E80, register_RegisterMeshBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterMeshBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_RegisterMeshBlueprint_LuaFuncDef()
+{
+  return func_RegisterMeshBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8E90 (FUN_00BC8E90, register_RegisterTrailEmitterBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterTrailEmitterBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_RegisterTrailEmitterBlueprint_LuaFuncDef()
+{
+  return func_RegisterTrailEmitterBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8EA0 (FUN_00BC8EA0, register_RegisterEmitterBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterEmitterBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::register_RegisterEmitterBlueprint_LuaFuncDef()
+{
+  return func_RegisterEmitterBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8EB0 (FUN_00BC8EB0, j_func_RegisterBeamBlueprint_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_RegisterBeamBlueprint_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::j_func_RegisterBeamBlueprint_LuaFuncDef()
+{
+  return func_RegisterBeamBlueprint_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC8EC0 (FUN_00BC8EC0, j_func_BlueprintLoaderUpdateProgress_LuaFuncDef)
+ *
+ * What it does:
+ * Startup thunk that forwards registration to `func_BlueprintLoaderUpdateProgress_LuaFuncDef`.
+ */
+moho::CScrLuaInitForm* moho::j_func_BlueprintLoaderUpdateProgress_LuaFuncDef()
+{
+  return func_BlueprintLoaderUpdateProgress_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00758F90 (FUN_00758F90, cfunc_RandomSim)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_RandomSimL`.
+ */
+int moho::cfunc_RandomSim(lua_State* const luaContext)
+{
+  return cfunc_RandomSimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00758FB0 (FUN_00758FB0, func_RandomSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global `Random`.
+ */
+moho::CScrLuaInitForm* moho::func_RandomSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "Random",
+    &moho::cfunc_RandomSim,
+    nullptr,
+    "<global>",
+    kRandomSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00759010 (FUN_00759010, cfunc_RandomSimL)
+ *
+ * What it does:
+ * Produces one random float or integer range sample from the active sim
+ * random stream for `Random([[min,] max])`.
+ */
+int moho::cfunc_RandomSimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount > 2) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kRandomSimHelpText,
+      0,
+      2,
+      argumentCount
+    );
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  if (!sim) {
+    LuaPlus::LuaState::Error(state, "Random(): can only be called as part of the sim.");
+  }
+
+  if (argumentCount == 0) {
+    const double value = static_cast<double>(sim->mRngState->twister.NextUInt32()) * 2.3283064e-10;
+    lua_pushnumber(rawState, value);
+    return 1;
+  }
+
+  if (argumentCount == 1) {
+    const int maxValue = LuaPlus::LuaStackObject(state, 1).GetInteger();
+    const std::uint32_t randomValue = sim->mRngState->twister.NextUInt32();
+    const std::uint32_t scaledValue = static_cast<std::uint32_t>(
+      (static_cast<std::uint64_t>(static_cast<std::uint32_t>(maxValue)) * static_cast<std::uint64_t>(randomValue)) >>
+      32u
+    );
+    const int result = static_cast<int>(scaledValue + 1u);
+    lua_pushnumber(rawState, static_cast<float>(result));
+    return 1;
+  }
+
+  const int minValue = LuaPlus::LuaStackObject(state, 1).GetInteger();
+  const int maxValue = LuaPlus::LuaStackObject(state, 2).GetInteger();
+  const std::uint32_t randomValue = sim->mRngState->twister.NextUInt32();
+  const std::uint32_t span = (static_cast<std::uint32_t>(maxValue) + 1u) - static_cast<std::uint32_t>(minValue);
+  const std::uint32_t scaledOffset =
+    static_cast<std::uint32_t>((static_cast<std::uint64_t>(span) * static_cast<std::uint64_t>(randomValue)) >> 32u);
+  const int result = static_cast<int>(static_cast<std::uint32_t>(minValue) + scaledOffset);
+  lua_pushnumber(rawState, static_cast<float>(result));
+  return 1;
+}
+
+/**
+ * Address: 0x007593D0 (FUN_007593D0, cfunc_SelectedUnit)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_SelectedUnitL`.
+ */
+int moho::cfunc_SelectedUnit(lua_State* const luaContext)
+{
+  return cfunc_SelectedUnitL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007593F0 (FUN_007593F0, func_SelectedUnit_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the sim-lane global Lua binder for `SelectedUnit()`.
+ */
+moho::CScrLuaInitForm* moho::func_SelectedUnit_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SelectedUnit",
+    &moho::cfunc_SelectedUnit,
+    nullptr,
+    "<global>",
+    kSelectedUnitHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00759450 (FUN_00759450, cfunc_SelectedUnitL)
+ *
+ * What it does:
+ * Pushes the current `__selected_unit` global value.
+ */
+int moho::cfunc_SelectedUnitL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject selectedUnit = state->GetGlobals()["__selected_unit"];
+  selectedUnit.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x007594C0 (FUN_007594C0, cfunc_SimConExecute)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_SimConExecuteL`.
+ */
+int moho::cfunc_SimConExecute(lua_State* const luaContext)
+{
+  return cfunc_SimConExecuteL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007594E0 (FUN_007594E0, func_SimConExecute_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SimConExecute`.
+ */
+moho::CScrLuaInitForm* moho::func_SimConExecute_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SimConExecute",
+    &moho::cfunc_SimConExecute,
+    nullptr,
+    "<global>",
+    kSimConExecuteHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00759540 (FUN_00759540, cfunc_SimConExecuteL)
+ *
+ * What it does:
+ * Reads one console command string and executes it.
+ */
+int moho::cfunc_SimConExecuteL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSimConExecuteHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject commandArg(state, 1);
+  const char* commandText = lua_tostring(rawState, 1);
+  if (!commandText) {
+    commandArg.TypeError("string");
+    commandText = "";
+  }
+
+  CON_Execute(commandText);
+  return 0;
+}
+
+/**
+ * Address: 0x00759810 (FUN_00759810, cfunc_ParseEntityCategorySim)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_ParseEntityCategorySimL`.
+ */
+int moho::cfunc_ParseEntityCategorySim(lua_State* const luaContext)
+{
+  return cfunc_ParseEntityCategorySimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00759830 (FUN_00759830, func_ParseEntityCategorySim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the sim-lane global Lua binder for `ParseEntityCategory`.
+ */
+moho::CScrLuaInitForm* moho::func_ParseEntityCategorySim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ParseEntityCategory",
+    &moho::cfunc_ParseEntityCategorySim,
+    nullptr,
+    "<global>",
+    kParseEntityCategorySimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00759890 (FUN_00759890, cfunc_ParseEntityCategorySimL)
+ *
+ * What it does:
+ * Parses one category expression string and returns a new entity-category
+ * userdata object.
+ */
+int moho::cfunc_ParseEntityCategorySimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kParseEntityCategorySimHelpText, 1, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  RRuleGameRulesImpl* const rules = sim ? static_cast<RRuleGameRulesImpl*>(sim->mRules) : nullptr;
+  if (!rules) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionText);
+  }
+
+  LuaPlus::LuaStackObject categoryTextArg(state, 1);
+  const char* categoryText = lua_tostring(rawState, 1);
+  if (!categoryText) {
+    categoryTextArg.TypeError("string");
+    categoryText = "";
+  }
+
+  const CategoryWordRangeView parsedCategory = rules->ParseEntityCategory(categoryText);
+
+  EntityCategorySet category{};
+  category.mBitsHeader = reinterpret_cast<BVSetBitsHeader*>(static_cast<std::uintptr_t>(parsedCategory.mWordUniverseHandle));
+  category.mFlags = parsedCategory.mReserved04;
+  category.mBits = CategoryWordRangeAsBVIntSet(parsedCategory);
+
+  LuaPlus::LuaObject out;
+  (void)func_NewEntityCategory(state, &out, &category);
+  out.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008B9B80 (FUN_008B9B80, cfunc_ParseEntityCategoryUserL)
+ *
+ * What it does:
+ * Parses one category expression string and returns a new entity-category
+ * userdata object.
+ */
+int moho::cfunc_ParseEntityCategoryUserL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kParseEntityCategoryUserHelpText, 1, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  RRuleGameRulesImpl* const rules = session ? session->mRules : nullptr;
+  if (!rules) {
+    LuaPlus::LuaState::Error(state, kParseEntityCategoryUserNoSessionText);
+  }
+
+  LuaPlus::LuaStackObject categoryTextArg(state, 1);
+  const char* categoryText = lua_tostring(rawState, 1);
+  if (!categoryText) {
+    categoryTextArg.TypeError("string");
+    categoryText = "";
+  }
+
+  const CategoryWordRangeView parsedCategory = rules->ParseEntityCategory(categoryText);
+
+  EntityCategorySet category{};
+  category.mBitsHeader = reinterpret_cast<BVSetBitsHeader*>(static_cast<std::uintptr_t>(parsedCategory.mWordUniverseHandle));
+  category.mFlags = parsedCategory.mReserved04;
+  category.mBits = CategoryWordRangeAsBVIntSet(parsedCategory);
+
+  LuaPlus::LuaObject out;
+  (void)func_NewEntityCategory(state, &out, &category);
+  out.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008B9B00 (FUN_008B9B00, cfunc_ParseEntityCategoryUser)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_ParseEntityCategoryUserL`.
+ */
+int moho::cfunc_ParseEntityCategoryUser(lua_State* const luaContext)
+{
+  return cfunc_ParseEntityCategoryUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008B9B20 (FUN_008B9B20, func_ParseEntityCategoryUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ParseEntityCategory`.
+ */
+moho::CScrLuaInitForm* moho::func_ParseEntityCategoryUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ParseEntityCategory",
+    &moho::cfunc_ParseEntityCategoryUser,
+    nullptr,
+    "<global>",
+    kParseEntityCategoryUserHelpText
   );
   return &binder;
 }
@@ -6128,6 +9378,82 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryContainsSim_LuaFuncDef()
     kEntityCategoryContainsUserHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x00759BD0 (FUN_00759BD0, cfunc_EntityCategoryFilterDownSim)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_EntityCategoryFilterDownSimL`.
+ */
+int moho::cfunc_EntityCategoryFilterDownSim(lua_State* const luaContext)
+{
+  return cfunc_EntityCategoryFilterDownSimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00759BF0 (FUN_00759BF0, func_EntityCategoryFilterDownSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `EntityCategoryFilterDown`.
+ */
+moho::CScrLuaInitForm* moho::func_EntityCategoryFilterDownSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "EntityCategoryFilterDown",
+    &moho::cfunc_EntityCategoryFilterDownSim,
+    nullptr,
+    "<global>",
+    kEntityCategoryFilterDownUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00759C50 (FUN_00759C50, cfunc_EntityCategoryFilterDownSimL)
+ *
+ * What it does:
+ * Filters arg#2 values into a result table by keeping entries whose resolved
+ * entity blueprint category bit is present in arg#1 category set.
+ */
+int moho::cfunc_EntityCategoryFilterDownSimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityCategoryFilterDownUserHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
+
+  const LuaPlus::LuaObject sourceListObject(LuaPlus::LuaStackObject(state, 2));
+  if (!sourceListObject.IsTable()) {
+    LuaPlus::LuaState::Error(state, kEntityCategoryCountInvalidTableText);
+  }
+
+  RRuleGameRulesImpl* const rules = ResolveRulesImpl(state);
+  LuaPlus::LuaObject resultObject(state);
+  resultObject.AssignNewTable(state, 0, 0u);
+
+  int resultIndex = 1;
+  const int sourceCount = sourceListObject.GetCount();
+  for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
+    const LuaPlus::LuaObject valueObject = sourceListObject[sourceIndex];
+    const REntityBlueprint* const blueprint = ResolveEntityCategoryCountBlueprint(valueObject, rules);
+    if (categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+      resultObject.Insert(resultIndex, valueObject);
+      ++resultIndex;
+    }
+  }
+
+  resultObject.PushStack(state);
+  return 1;
 }
 
 /**
@@ -6200,6 +9526,1638 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryCount_LuaFuncDef()
     kEntityCategoryCountHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x0075A1D0 (FUN_0075A1D0, cfunc_EntityCategoryCountAroundPosition)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to
+ * `cfunc_EntityCategoryCountAroundPositionL`.
+ */
+int moho::cfunc_EntityCategoryCountAroundPosition(lua_State* const luaContext)
+{
+  return cfunc_EntityCategoryCountAroundPositionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075A1F0 (FUN_0075A1F0, func_EntityCategoryCountAroundPosition_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for
+ * `EntityCategoryCountAroundPosition`.
+ */
+moho::CScrLuaInitForm* moho::func_EntityCategoryCountAroundPosition_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "EntityCategoryCountAroundPosition",
+    &moho::cfunc_EntityCategoryCountAroundPosition,
+    nullptr,
+    "<global>",
+    kEntityCategoryCountAroundPositionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075A250 (FUN_0075A250, cfunc_EntityCategoryCountAroundPositionL)
+ *
+ * What it does:
+ * Counts table entries whose entity category matches arg#1 and whose
+ * horizontal distance from arg#3 is within arg#4.
+ */
+int moho::cfunc_EntityCategoryCountAroundPositionL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(
+      state,
+      kLuaExpectedArgsWarning,
+      kEntityCategoryCountAroundPositionHelpText,
+      4,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
+  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
+
+  const LuaPlus::LuaObject sourceListObject(LuaPlus::LuaStackObject(state, 2));
+  if (!sourceListObject.IsTable()) {
+    LuaPlus::LuaState::Error(state, kEntityCategoryCountInvalidTableText);
+  }
+
+  const LuaPlus::LuaObject centerObject(LuaPlus::LuaStackObject(state, 3));
+  const Wm3::Vec3f center = SCR_FromLuaCopy<Wm3::Vector3<float>>(centerObject);
+
+  LuaPlus::LuaStackObject radiusArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    radiusArg.TypeError("number");
+  }
+
+  const float radius = static_cast<float>(lua_tonumber(rawState, 4));
+  const float radiusSquared = radius * radius;
+
+  int categoryCount = 0;
+  const int sourceCount = sourceListObject.GetCount();
+  for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
+    const LuaPlus::LuaObject valueObject = sourceListObject[sourceIndex];
+    Entity* const entity = SCR_FromLuaNoError_Entity(valueObject);
+    if (entity == nullptr || entity->BluePrint == nullptr || categorySet == nullptr) {
+      continue;
+    }
+
+    const Wm3::Vec3f& entityPosition = entity->GetPositionWm3();
+    const float deltaX = center.x - entityPosition.x;
+    const float deltaZ = center.z - entityPosition.z;
+    const float distanceSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
+    if (radiusSquared > distanceSquared && categorySet->Bits().Contains(entity->BluePrint->mCategoryBitIndex)) {
+      ++categoryCount;
+    }
+  }
+
+  lua_pushnumber(rawState, static_cast<float>(categoryCount));
+  return 1;
+}
+
+/**
+ * Address: 0x0075B940 (FUN_0075B940, cfunc_Warp)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_WarpL`.
+ */
+int moho::cfunc_Warp(lua_State* const luaContext)
+{
+  return cfunc_WarpL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075B9C0 (FUN_0075B9C0, cfunc_WarpL)
+ *
+ * What it does:
+ * Reads `(entity, location [, orientation])` and warps the entity to
+ * `location`; when arg#3 is absent/nil, preserves current entity orientation.
+ */
+int moho::cfunc_WarpL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kWarpHelpText,
+      2,
+      3,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  const LuaPlus::LuaObject locationObject(LuaPlus::LuaStackObject(state, 2));
+  const Wm3::Vec3f location = SCR_FromLuaCopy<Wm3::Vec3f>(locationObject);
+
+  VTransform transform = entity->GetTransformWm3();
+  transform.pos_ = location;
+
+  lua_settop(rawState, 3);
+  if (lua_type(rawState, 3) != LUA_TNIL) {
+    const LuaPlus::LuaObject orientationObject(LuaPlus::LuaStackObject(state, 3));
+    const LuaPlus::LuaObject xObject = orientationObject[1];
+    const LuaPlus::LuaObject yObject = orientationObject[2];
+    const LuaPlus::LuaObject zObject = orientationObject[3];
+    const LuaPlus::LuaObject wObject = orientationObject[4];
+
+    transform.orient_.x = static_cast<float>(xObject.GetNumber());
+    transform.orient_.y = static_cast<float>(yObject.GetNumber());
+    transform.orient_.z = static_cast<float>(zObject.GetNumber());
+    transform.orient_.w = static_cast<float>(wObject.GetNumber());
+  }
+
+  entity->Warp(transform);
+  return 0;
+}
+
+/**
+ * Address: 0x0075B960 (FUN_0075B960, func_Warp_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `Warp`.
+ */
+moho::CScrLuaInitForm* moho::func_Warp_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "Warp",
+    &moho::cfunc_Warp,
+    nullptr,
+    "<global>",
+    kWarpHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E2A0 (FUN_0075E2A0, cfunc_DebugGetSelection)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_DebugGetSelectionL`.
+ */
+int moho::cfunc_DebugGetSelection(lua_State* const luaContext)
+{
+  return cfunc_DebugGetSelectionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075E2C0 (FUN_0075E2C0, func_DebugGetSelection_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `DebugGetSelection`.
+ */
+moho::CScrLuaInitForm* moho::func_DebugGetSelection_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "DebugGetSelection",
+    &moho::cfunc_DebugGetSelection,
+    nullptr,
+    "<global>",
+    kDebugGetSelectionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E320 (FUN_0075E320, cfunc_DebugGetSelectionL)
+ *
+ * What it does:
+ * Returns a Lua table of script objects for ids in the active debug-selection
+ * sync filter (`Sim::mSyncFilter.maskB`).
+ */
+int moho::cfunc_DebugGetSelectionL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDebugGetSelectionHelpText, 0, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  BVIntSet selectedEntityIds{};
+  CopyDebugSelectionMaskB(*sim, selectedEntityIds);
+
+  LuaPlus::LuaObject selectionTable(state);
+  selectionTable.AssignNewTable(state, 0, 0);
+
+  std::int32_t tableIndex = 0;
+  for (unsigned int nextEntityId = selectedEntityIds.GetNext(static_cast<unsigned int>(-1));
+       nextEntityId != selectedEntityIds.Max();
+       nextEntityId = selectedEntityIds.GetNext(nextEntityId))
+  {
+    Entity* const entity = FindEntityById(sim->mEntityDB, static_cast<EntId>(nextEntityId));
+    if (entity == nullptr || entity->mLuaObj.IsNil()) {
+      continue;
+    }
+
+    LuaPlus::LuaObject entityObject(entity->mLuaObj);
+    ++tableIndex;
+    selectionTable.SetObject(tableIndex, entityObject);
+  }
+
+  selectionTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075E4E0 (FUN_0075E4E0, cfunc_IsEntity)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsEntityL`.
+ */
+int moho::cfunc_IsEntity(lua_State* const luaContext)
+{
+  return cfunc_IsEntityL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075E500 (FUN_0075E500, func_IsEntity_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsEntity`.
+ */
+moho::CScrLuaInitForm* moho::func_IsEntity_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsEntity",
+    &moho::cfunc_IsEntity,
+    nullptr,
+    "<global>",
+    kIsEntityHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E560 (FUN_0075E560, cfunc_IsEntityL)
+ *
+ * What it does:
+ * Returns true when arg#1 resolves to an entity userdata object.
+ */
+int moho::cfunc_IsEntityL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsEntityHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject objectArg(LuaPlus::LuaStackObject(state, 1));
+  const Entity* const entity = SCR_FromLuaNoError_Entity(objectArg);
+  lua_pushboolean(rawState, entity ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x0075E620 (FUN_0075E620, cfunc_IsUnit)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsUnitL`.
+ */
+int moho::cfunc_IsUnit(lua_State* const luaContext)
+{
+  return cfunc_IsUnitL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075E640 (FUN_0075E640, func_IsUnit_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsUnit`.
+ */
+moho::CScrLuaInitForm* moho::func_IsUnit_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsUnit",
+    &moho::cfunc_IsUnit,
+    nullptr,
+    "<global>",
+    kIsUnitHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E6A0 (FUN_0075E6A0, cfunc_IsUnitL)
+ *
+ * What it does:
+ * Returns arg#1 as unit Lua object when the entity is a unit; otherwise nil.
+ */
+int moho::cfunc_IsUnitL(LuaPlus::LuaState* const state)
+{
+  Entity* const entity = ResolveRequiredEntityLuaArg(state, kIsUnitHelpText);
+  Unit* const unit = entity ? entity->IsUnit() : nullptr;
+  return PushEntityScriptObjectOrNil(state, unit);
+}
+
+/**
+ * Address: 0x0075E780 (FUN_0075E780, cfunc_IsProp)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsPropL`.
+ */
+int moho::cfunc_IsProp(lua_State* const luaContext)
+{
+  return cfunc_IsPropL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075E7A0 (FUN_0075E7A0, func_IsProp_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsProp`.
+ */
+moho::CScrLuaInitForm* moho::func_IsProp_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsProp",
+    &moho::cfunc_IsProp,
+    nullptr,
+    "<global>",
+    kIsPropHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E800 (FUN_0075E800, cfunc_IsPropL)
+ *
+ * What it does:
+ * Returns arg#1 as prop Lua object when the entity is a prop; otherwise nil.
+ */
+int moho::cfunc_IsPropL(LuaPlus::LuaState* const state)
+{
+  Entity* const entity = ResolveRequiredEntityLuaArg(state, kIsPropHelpText);
+  Prop* const prop = entity ? entity->IsProp() : nullptr;
+  return PushEntityScriptObjectOrNil(state, prop);
+}
+
+/**
+ * Address: 0x0075E8E0 (FUN_0075E8E0, cfunc_IsBlip)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsBlipL`.
+ */
+int moho::cfunc_IsBlip(lua_State* const luaContext)
+{
+  return cfunc_IsBlipL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075E900 (FUN_0075E900, func_IsBlip_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsBlip`.
+ */
+moho::CScrLuaInitForm* moho::func_IsBlip_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsBlip",
+    &moho::cfunc_IsBlip,
+    nullptr,
+    "<global>",
+    kIsBlipHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E960 (FUN_0075E960, cfunc_IsBlipL)
+ *
+ * What it does:
+ * Returns arg#1 as recon-blip Lua object when the entity is a blip;
+ * otherwise nil.
+ */
+int moho::cfunc_IsBlipL(LuaPlus::LuaState* const state)
+{
+  Entity* const entity = ResolveRequiredEntityLuaArg(state, kIsBlipHelpText);
+  ReconBlip* const blip = entity ? entity->IsReconBlip() : nullptr;
+  return PushEntityScriptObjectOrNil(state, blip);
+}
+
+/**
+ * Address: 0x0075EA40 (FUN_0075EA40, cfunc_IsProjectile)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsProjectileL`.
+ */
+int moho::cfunc_IsProjectile(lua_State* const luaContext)
+{
+  return cfunc_IsProjectileL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075EA60 (FUN_0075EA60, func_IsProjectile_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsProjectile`.
+ */
+moho::CScrLuaInitForm* moho::func_IsProjectile_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsProjectile",
+    &moho::cfunc_IsProjectile,
+    nullptr,
+    "<global>",
+    kIsProjectileHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075EAC0 (FUN_0075EAC0, cfunc_IsProjectileL)
+ *
+ * What it does:
+ * Returns arg#1 as projectile Lua object when the entity is a projectile;
+ * otherwise nil.
+ */
+int moho::cfunc_IsProjectileL(LuaPlus::LuaState* const state)
+{
+  Entity* const entity = ResolveRequiredEntityLuaArg(state, kIsProjectileHelpText);
+  Projectile* const projectile = entity ? entity->IsProjectile() : nullptr;
+  return PushEntityScriptObjectOrNil(state, projectile);
+}
+
+/**
+ * Address: 0x0075EBA0 (FUN_0075EBA0, cfunc_IsCollisionBeam)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsCollisionBeamL`.
+ */
+int moho::cfunc_IsCollisionBeam(lua_State* const luaContext)
+{
+  return cfunc_IsCollisionBeamL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075EBC0 (FUN_0075EBC0, func_IsCollisionBeam_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsCollisionBeam`.
+ */
+moho::CScrLuaInitForm* moho::func_IsCollisionBeam_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsCollisionBeam",
+    &moho::cfunc_IsCollisionBeam,
+    nullptr,
+    "<global>",
+    kIsCollisionBeamHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075EC20 (FUN_0075EC20, cfunc_IsCollisionBeamL)
+ *
+ * What it does:
+ * Returns arg#1 as collision-beam Lua object when the entity is a collision
+ * beam; otherwise nil.
+ */
+int moho::cfunc_IsCollisionBeamL(LuaPlus::LuaState* const state)
+{
+  Entity* const entity = ResolveRequiredEntityLuaArg(state, kIsCollisionBeamHelpText);
+  CollisionBeamEntity* const collisionBeam = entity ? entity->IsCollisionBeam() : nullptr;
+  return PushEntityScriptObjectOrNil(state, collisionBeam);
+}
+
+/**
+ * Address: 0x00840840 (FUN_00840840, cfunc_GetUnitCommandFromCommandCap)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to
+ * `cfunc_GetUnitCommandFromCommandCapL`.
+ */
+int moho::cfunc_GetUnitCommandFromCommandCap(lua_State* const luaContext)
+{
+  return cfunc_GetUnitCommandFromCommandCapL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00840860 (FUN_00840860, func_GetUnitCommandFromCommandCap_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for
+ * `GetUnitCommandFromCommandCap`.
+ */
+moho::CScrLuaInitForm* moho::func_GetUnitCommandFromCommandCap_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetUnitCommandFromCommandCap",
+    &moho::cfunc_GetUnitCommandFromCommandCap,
+    nullptr,
+    "<global>",
+    kGetUnitCommandFromCommandCapHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008408C0 (FUN_008408C0, cfunc_GetUnitCommandFromCommandCapL)
+ *
+ * What it does:
+ * Converts one `RULEUCC` lexical token to its corresponding `UNITCOMMAND`
+ * lexical token and returns it as a Lua string.
+ */
+int moho::cfunc_GetUnitCommandFromCommandCapL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitCommandFromCommandCapErrorHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject commandCapArg(state, 1);
+  const char* const commandCapLexical = lua_tostring(rawState, 1);
+  if (commandCapLexical == nullptr) {
+    commandCapArg.TypeError("string");
+  }
+
+  ERuleBPUnitCommandCaps commandCap = RULEUCC_None;
+  gpg::RRef commandCapRef(&commandCap, CachedERuleBPUnitCommandCapsType());
+  (void)commandCapRef.SetLexical(commandCapLexical);
+
+  EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
+  if (commandCap > RULEUCC_Tactical) {
+    if (commandCap > RULEUCC_Pause) {
+      if (commandCap > RULEUCC_Reclaim) {
+        if (commandCap == RULEUCC_SpecialAction) {
+          commandType = EUnitCommandType::UNITCOMMAND_SpecialAction;
+        }
+      } else {
+        switch (commandCap) {
+        case RULEUCC_Reclaim:
+          commandType = EUnitCommandType::UNITCOMMAND_Reclaim;
+          break;
+        case RULEUCC_Overcharge:
+          commandType = EUnitCommandType::UNITCOMMAND_OverCharge;
+          break;
+        case RULEUCC_Dive:
+          commandType = EUnitCommandType::UNITCOMMAND_Dive;
+          break;
+        default:
+          commandType = EUnitCommandType::UNITCOMMAND_None;
+          break;
+        }
+      }
+    } else {
+      if (commandCap == RULEUCC_Pause) {
+        commandType = EUnitCommandType::UNITCOMMAND_Pause;
+      } else if (commandCap > RULEUCC_SiloBuildTactical) {
+        if (commandCap == RULEUCC_SiloBuildNuke) {
+          commandType = EUnitCommandType::UNITCOMMAND_BuildSiloNuke;
+        } else if (commandCap == RULEUCC_Sacrifice) {
+          commandType = EUnitCommandType::UNITCOMMAND_Sacrifice;
+        }
+      } else {
+        switch (commandCap) {
+        case RULEUCC_SiloBuildTactical:
+          commandType = EUnitCommandType::UNITCOMMAND_BuildSiloTactical;
+          break;
+        case RULEUCC_Teleport:
+          commandType = EUnitCommandType::UNITCOMMAND_Teleport;
+          break;
+        case RULEUCC_Ferry:
+          commandType = EUnitCommandType::UNITCOMMAND_Ferry;
+          break;
+        default:
+          commandType = EUnitCommandType::UNITCOMMAND_None;
+          break;
+        }
+      }
+    }
+  } else if (commandCap == RULEUCC_Tactical) {
+    commandType = EUnitCommandType::UNITCOMMAND_Tactical;
+  } else if (commandCap > RULEUCC_Repair) {
+    if (commandCap > RULEUCC_CallTransport) {
+      if (commandCap == RULEUCC_Nuke) {
+        commandType = EUnitCommandType::UNITCOMMAND_Nuke;
+      }
+    } else {
+      switch (commandCap) {
+      case RULEUCC_CallTransport:
+        commandType = EUnitCommandType::UNITCOMMAND_TransportLoadUnits;
+        break;
+      case RULEUCC_Capture:
+        commandType = EUnitCommandType::UNITCOMMAND_Capture;
+        break;
+      case RULEUCC_Transport:
+        commandType = EUnitCommandType::UNITCOMMAND_TransportUnloadUnits;
+        break;
+      default:
+        commandType = EUnitCommandType::UNITCOMMAND_None;
+        break;
+      }
+    }
+  } else if (commandCap == RULEUCC_Repair) {
+    commandType = EUnitCommandType::UNITCOMMAND_Repair;
+  } else {
+    switch (commandCap) {
+    case RULEUCC_Move:
+      commandType = EUnitCommandType::UNITCOMMAND_Move;
+      break;
+    case RULEUCC_Stop:
+      commandType = EUnitCommandType::UNITCOMMAND_Stop;
+      break;
+    case RULEUCC_Attack:
+      commandType = EUnitCommandType::UNITCOMMAND_Attack;
+      break;
+    case RULEUCC_Guard:
+      commandType = EUnitCommandType::UNITCOMMAND_Guard;
+      break;
+    case RULEUCC_Patrol:
+      commandType = EUnitCommandType::UNITCOMMAND_Patrol;
+      break;
+    default:
+      commandType = EUnitCommandType::UNITCOMMAND_None;
+      break;
+    }
+  }
+
+  gpg::RRef commandTypeRef(&commandType, CachedEUnitCommandTypeType());
+  const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
+  lua_pushstring(rawState, commandTypeLexical.c_str());
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x0088D970 (FUN_0088D970, cfunc_EjectSessionClientL)
+ *
+ * What it does:
+ * Validates one client index argument and ejects the selected non-local
+ * client from the active session.
+ */
+int moho::cfunc_EjectSessionClientL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEjectSessionClientHelpText, 1, argumentCount);
+  }
+
+  auto* const simDriver = dynamic_cast<CSimDriver*>(SIM_GetActiveDriver());
+  if (simDriver == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
+  }
+
+  IClientManager* const clientManager = simDriver->GetClientManager();
+  if (clientManager == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
+  }
+
+  LuaPlus::LuaStackObject clientIndexArg{};
+  clientIndexArg.m_state = state;
+  clientIndexArg.m_stackIndex = 1;
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&clientIndexArg, "integer");
+  }
+
+  const int clientIndex = static_cast<int>(lua_tonumber(rawState, 1));
+  const int clientCount = static_cast<int>(clientManager->NumberOfClients());
+  if (clientIndex < 1 || clientIndex > clientCount) {
+    LuaPlus::LuaState::Error(state, "Invalid client index %d, must be >= 1 and <= %d", clientIndex, clientCount);
+  }
+
+  IClient* const targetClient = clientManager->GetClient(clientIndex - 1);
+  if (targetClient == nullptr) {
+    LuaPlus::LuaState::Error(state, "Invalid client index %d, must be >= 1 and <= %d", clientIndex, clientCount);
+  }
+
+  if (targetClient == clientManager->GetLocalClient()) {
+    LuaPlus::LuaState::Error(state, "Can't eject ourselves!");
+  }
+
+  targetClient->Eject();
+  return 0;
+}
+
+/**
+ * Address: 0x0088D8F0 (FUN_0088D8F0, cfunc_EjectSessionClient)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_EjectSessionClientL`.
+ */
+int moho::cfunc_EjectSessionClient(lua_State* const luaContext)
+{
+  return cfunc_EjectSessionClientL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0088D910 (FUN_0088D910, func_EjectSessionClient_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `EjectSessionClient`.
+ */
+moho::CScrLuaInitForm* moho::func_EjectSessionClient_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "EjectSessionClient",
+    &moho::cfunc_EjectSessionClient,
+    nullptr,
+    "<global>",
+    kEjectSessionClientHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0088DF50 (FUN_0088DF50, cfunc_WorldIsLoadingL)
+ *
+ * What it does:
+ * Returns whether the current world frame action is loading or preload.
+ */
+int moho::cfunc_WorldIsLoadingL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kWorldIsLoadingHelpText, 0, argumentCount);
+  }
+
+  const EWldFrameAction frameAction = WLD_GetFrameAction();
+  lua_pushboolean(
+    state->m_state,
+    frameAction == EWldFrameAction::Loading || frameAction == EWldFrameAction::Preload
+  );
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0088DED0 (FUN_0088DED0, cfunc_WorldIsLoading)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_WorldIsLoadingL`.
+ */
+int moho::cfunc_WorldIsLoading(lua_State* const luaContext)
+{
+  return cfunc_WorldIsLoadingL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0088DEF0 (FUN_0088DEF0, func_WorldIsLoading_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `WorldIsLoading`.
+ */
+moho::CScrLuaInitForm* moho::func_WorldIsLoading_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "WorldIsLoading",
+    &moho::cfunc_WorldIsLoading,
+    nullptr,
+    "<global>",
+    kWorldIsLoadingHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0088E030 (FUN_0088E030, cfunc_WorldIsPlayingL)
+ *
+ * What it does:
+ * Returns whether the current world frame action is actively playing.
+ */
+int moho::cfunc_WorldIsPlayingL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kWorldIsPlayingHelpText, 0, argumentCount);
+  }
+
+  lua_pushboolean(state->m_state, WLD_GetFrameAction() == EWldFrameAction::Playing);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0088DFB0 (FUN_0088DFB0, cfunc_WorldIsPlaying)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_WorldIsPlayingL`.
+ */
+int moho::cfunc_WorldIsPlaying(lua_State* const luaContext)
+{
+  return cfunc_WorldIsPlayingL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0088DFD0 (FUN_0088DFD0, func_WorldIsPlaying_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `WorldIsPlaying`.
+ */
+moho::CScrLuaInitForm* moho::func_WorldIsPlaying_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "WorldIsPlaying",
+    &moho::cfunc_WorldIsPlaying,
+    nullptr,
+    "<global>",
+    kWorldIsPlayingHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0088E260 (FUN_0088E260, cfunc_GetGameSpeedL)
+ *
+ * What it does:
+ * Returns the current requested sim speed from the active client manager.
+ */
+int moho::cfunc_GetGameSpeedL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetGameSpeedHelpText, 0, argumentCount);
+  }
+
+  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  if (activeDriver == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
+  }
+
+  CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+  lua_pushnumber(state->m_state, static_cast<float>(clientManager->GetSimRateRequested()));
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0088E1E0 (FUN_0088E1E0, cfunc_GetGameSpeed)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_GetGameSpeedL`.
+ */
+int moho::cfunc_GetGameSpeed(lua_State* const luaContext)
+{
+  return cfunc_GetGameSpeedL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0088E200 (FUN_0088E200, func_GetGameSpeed_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetGameSpeed`.
+ */
+moho::CScrLuaInitForm* moho::func_GetGameSpeed_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetGameSpeed",
+    &moho::cfunc_GetGameSpeed,
+    nullptr,
+    "<global>",
+    kGetGameSpeedHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0088E360 (FUN_0088E360, cfunc_SetGameSpeedL)
+ *
+ * What it does:
+ * Validates one requested speed and forwards it to the active client manager.
+ */
+int moho::cfunc_SetGameSpeedL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetGameSpeedHelpText, 1, argumentCount);
+  }
+
+  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  if (activeDriver == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionPeriodText);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session != nullptr && (session->IsReplay || session->GetFocusUserArmy() != nullptr || !session->IsMultiplayer)) {
+    CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+    LuaPlus::LuaStackObject speedArg(state, 1);
+    if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&speedArg, "integer");
+    }
+
+    const int requestedSpeed = static_cast<int>(lua_tonumber(state->m_state, 1));
+    clientManager->SetSimRate(requestedSpeed);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0088E2E0 (FUN_0088E2E0, cfunc_SetGameSpeed)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_SetGameSpeedL`.
+ */
+int moho::cfunc_SetGameSpeed(lua_State* const luaContext)
+{
+  return cfunc_SetGameSpeedL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0088E300 (FUN_0088E300, func_SetGameSpeed_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetGameSpeed`.
+ */
+moho::CScrLuaInitForm* moho::func_SetGameSpeed_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetGameSpeed",
+    &moho::cfunc_SetGameSpeed,
+    nullptr,
+    "<global>",
+    kSetGameSpeedHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BDEC0 (FUN_008BDEC0, cfunc_AddToSessionExtraSelectListL)
+ *
+ * What it does:
+ * Reads one user-unit Lua object and adds it to world-session extra selection.
+ */
+int moho::cfunc_AddToSessionExtraSelectListL(LuaPlus::LuaState* const state)
+{
+  if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAddToSessionExtraSelectListHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
+    UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+    session->AddToExtraSelectList(userEntity);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x008BDE40 (FUN_008BDE40, cfunc_AddToSessionExtraSelectList)
+ *
+ * What it does:
+ * Unwraps Lua callback state and dispatches to
+ * `cfunc_AddToSessionExtraSelectListL`.
+ */
+int moho::cfunc_AddToSessionExtraSelectList(lua_State* const luaContext)
+{
+  return cfunc_AddToSessionExtraSelectListL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BDE60 (FUN_008BDE60, func_AddToSessionExtraSelectList_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for
+ * `AddToSessionExtraSelectList`.
+ */
+moho::CScrLuaInitForm* moho::func_AddToSessionExtraSelectList_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "AddToSessionExtraSelectList",
+    &moho::cfunc_AddToSessionExtraSelectList,
+    nullptr,
+    "<global>",
+    kAddToSessionExtraSelectListHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BDFF0 (FUN_008BDFF0, cfunc_RemoveFromSessionExtraSelectListL)
+ *
+ * What it does:
+ * Reads one user-unit Lua object and removes it from world-session extra
+ * selection.
+ */
+int moho::cfunc_RemoveFromSessionExtraSelectListL(LuaPlus::LuaState* const state)
+{
+  if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRemoveFromSessionExtraSelectListHelpText, 1, argumentCount);
+    }
+
+    LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
+    UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
+    UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+    session->RemoveFromExtraSelectList(userEntity);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x008BDF70 (FUN_008BDF70, cfunc_RemoveFromSessionExtraSelectList)
+ *
+ * What it does:
+ * Unwraps Lua callback state and dispatches to
+ * `cfunc_RemoveFromSessionExtraSelectListL`.
+ */
+int moho::cfunc_RemoveFromSessionExtraSelectList(lua_State* const luaContext)
+{
+  return cfunc_RemoveFromSessionExtraSelectListL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BDF90 (FUN_008BDF90, func_RemoveFromSessionExtraSelectList_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for
+ * `RemoveFromSessionExtraSelectList`.
+ */
+moho::CScrLuaInitForm* moho::func_RemoveFromSessionExtraSelectList_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RemoveFromSessionExtraSelectList",
+    &moho::cfunc_RemoveFromSessionExtraSelectList,
+    nullptr,
+    "<global>",
+    kRemoveFromSessionExtraSelectListHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE0D0 (FUN_008BE0D0, cfunc_ClearSessionExtraSelectList)
+ *
+ * What it does:
+ * Validates zero-argument call shape and clears the active session extra
+ * selection set when a world session exists.
+ */
+int moho::cfunc_ClearSessionExtraSelectList(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  CWldSession* const activeSession = WLD_GetActiveSession();
+  if (activeSession == nullptr) {
+    return 0;
+  }
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kClearSessionExtraSelectListHelpText, 0, argumentCount);
+  }
+
+  activeSession->ClearExtraSelectList();
+  return 0;
+}
+
+/**
+ * Address: 0x008BE120 (FUN_008BE120, func_ClearSessionExtraSelectList_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for
+ * `ClearSessionExtraSelectList`.
+ */
+moho::CScrLuaInitForm* moho::func_ClearSessionExtraSelectList_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ClearSessionExtraSelectList",
+    &moho::cfunc_ClearSessionExtraSelectList,
+    nullptr,
+    "<global>",
+    kClearSessionExtraSelectListHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE1C0 (FUN_008BE1C0, cfunc_CurrentTime)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_CurrentTimeL`.
+ */
+int moho::cfunc_CurrentTime(lua_State* const luaContext)
+{
+  return cfunc_CurrentTimeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE1E0 (FUN_008BE1E0, func_CurrentTime_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `CurrentTime`.
+ */
+moho::CScrLuaInitForm* moho::func_CurrentTime_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "CurrentTime",
+    &moho::cfunc_CurrentTime,
+    nullptr,
+    "<global>",
+    kCurrentTimeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE240 (FUN_008BE240, cfunc_CurrentTimeL)
+ *
+ * What it does:
+ * Validates zero-argument call shape and returns wall-clock elapsed seconds.
+ */
+int moho::cfunc_CurrentTimeL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCurrentTimeHelpText, 0, argumentCount);
+  }
+
+  lua_pushnumber(rawState, gpg::time::GetSystemTimer().ElapsedSeconds());
+  return 1;
+}
+
+/**
+ * Address: 0x008BE2A0 (FUN_008BE2A0, cfunc_GameTime)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_GameTimeL`.
+ */
+int moho::cfunc_GameTime(lua_State* const luaContext)
+{
+  return cfunc_GameTimeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE2C0 (FUN_008BE2C0, func_GameTime_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GameTime`.
+ */
+moho::CScrLuaInitForm* moho::func_GameTime_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GameTime",
+    &moho::cfunc_GameTime,
+    nullptr,
+    "<global>",
+    kGameTimeUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE320 (FUN_008BE320, cfunc_GameTimeL)
+ *
+ * What it does:
+ * Returns current game time in seconds from the active world session.
+ */
+int moho::cfunc_GameTimeL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGameTimeUserHelpText, 0, argumentCount);
+  }
+
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionText);
+  }
+
+  const float gameTimeSeconds = (static_cast<float>(session->mGameTick) + session->mTimeSinceLastTick) * 0.1f;
+  lua_pushnumber(rawState, gameTimeSeconds);
+  return 1;
+}
+
+/**
+ * Address: 0x008BE3A0 (FUN_008BE3A0, cfunc_GameTick)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_GameTickL`.
+ */
+int moho::cfunc_GameTick(lua_State* const luaContext)
+{
+  return cfunc_GameTickL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE3C0 (FUN_008BE3C0, func_GameTick_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GameTick`.
+ */
+moho::CScrLuaInitForm* moho::func_GameTick_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GameTick",
+    &moho::cfunc_GameTick,
+    nullptr,
+    "<global>",
+    kGameTickUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE420 (FUN_008BE420, cfunc_GameTickL)
+ *
+ * What it does:
+ * Returns current game time in ticks from the active world session.
+ */
+int moho::cfunc_GameTickL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGameTickUserHelpText, 0, argumentCount);
+  }
+
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionText);
+  }
+
+  lua_pushnumber(rawState, static_cast<float>(session->mGameTick));
+  return 1;
+}
+
+/**
+ * Address: 0x008BE490 (FUN_008BE490, cfunc_IsAllyUser)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsAllyUserL`.
+ */
+int moho::cfunc_IsAllyUser(lua_State* const luaContext)
+{
+  return cfunc_IsAllyUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE4B0 (FUN_008BE4B0, func_IsAllyUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for global `IsAlly`.
+ */
+moho::CScrLuaInitForm* moho::func_IsAllyUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IsAlly",
+    &moho::cfunc_IsAllyUser,
+    nullptr,
+    "<global>",
+    kIsAllyUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE510 (FUN_008BE510, cfunc_IsAllyUserL)
+ *
+ * What it does:
+ * Resolves `(army1, army2)` and returns whether army1 treats army2 as ally.
+ */
+int moho::cfunc_IsAllyUserL(LuaPlus::LuaState* const state)
+{
+  if (!WLD_GetActiveSession()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsAllyUserHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  UserArmy* const firstArmy = USER_ResolveArmyFromLuaState(state, firstArmyObject);
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  UserArmy* const secondArmy = USER_ResolveArmyFromLuaState(state, secondArmyObject);
+
+  const bool isAlly = firstArmy != nullptr && secondArmy != nullptr && firstArmy->IsAlly(secondArmy->mArmyIndex);
+  lua_pushboolean(rawState, isAlly ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x008BE5D0 (FUN_008BE5D0, cfunc_IsEnemyUser)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsEnemyUserL`.
+ */
+int moho::cfunc_IsEnemyUser(lua_State* const luaContext)
+{
+  return cfunc_IsEnemyUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE5F0 (FUN_008BE5F0, func_IsEnemyUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for global `IsEnemy`.
+ */
+moho::CScrLuaInitForm* moho::func_IsEnemyUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IsEnemy",
+    &moho::cfunc_IsEnemyUser,
+    nullptr,
+    "<global>",
+    kIsEnemyUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE650 (FUN_008BE650, cfunc_IsEnemyUserL)
+ *
+ * What it does:
+ * Resolves `(army1, army2)` and returns whether army1 treats army2 as enemy.
+ */
+int moho::cfunc_IsEnemyUserL(LuaPlus::LuaState* const state)
+{
+  if (!WLD_GetActiveSession()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsEnemyUserHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  UserArmy* const firstArmy = USER_ResolveArmyFromLuaState(state, firstArmyObject);
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  UserArmy* const secondArmy = USER_ResolveArmyFromLuaState(state, secondArmyObject);
+
+  const bool isEnemy = firstArmy != nullptr && secondArmy != nullptr &&
+    firstArmy->mVarDat.mEnemies.Contains(secondArmy->mArmyIndex);
+  lua_pushboolean(rawState, isEnemy ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x008BE710 (FUN_008BE710, cfunc_IsNeutral)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_IsNeutralL`.
+ */
+int moho::cfunc_IsNeutral(lua_State* const luaContext)
+{
+  return cfunc_IsNeutralL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE730 (FUN_008BE730, func_IsNeutral_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for global `IsNeutral`.
+ */
+moho::CScrLuaInitForm* moho::func_IsNeutral_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IsNeutral",
+    &moho::cfunc_IsNeutral,
+    nullptr,
+    "<global>",
+    kIsNeutralUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE790 (FUN_008BE790, cfunc_IsNeutralL)
+ *
+ * What it does:
+ * Resolves `(army1, army2)` and returns whether army1 treats army2 as neutral.
+ */
+int moho::cfunc_IsNeutralL(LuaPlus::LuaState* const state)
+{
+  if (!WLD_GetActiveSession()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsNeutralUserHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  UserArmy* const firstArmy = USER_ResolveArmyFromLuaState(state, firstArmyObject);
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  UserArmy* const secondArmy = USER_ResolveArmyFromLuaState(state, secondArmyObject);
+
+  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr &&
+    firstArmy->mVarDat.mNeutrals.Contains(secondArmy->mArmyIndex);
+  lua_pushboolean(rawState, isNeutral ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x008BE8D0 (FUN_008BE8D0, cfunc_SyncPlayableRectL)
+ *
+ * What it does:
+ * Reads one rect table and synchronizes active-session playable bounds +
+ * user-entity visibility against that rectangle.
+ */
+int moho::cfunc_SyncPlayableRectL(LuaPlus::LuaState* const state)
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || state == nullptr || state->m_state == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSyncPlayableRectHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject rectObject(LuaPlus::LuaStackObject(state, 1));
+  const gpg::Rect2i playableRect = SCR_FromLuaCopy<gpg::Rect2<int>>(rectObject);
+  session->SyncPlayableRect(playableRect);
+  return 0;
+}
+
+/**
+ * Address: 0x008BE850 (FUN_008BE850, cfunc_SyncPlayableRect)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_SyncPlayableRectL`.
+ */
+int moho::cfunc_SyncPlayableRect(lua_State* const luaContext)
+{
+  return cfunc_SyncPlayableRectL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE870 (FUN_008BE870, func_SyncPlayableRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SyncPlayableRect`.
+ */
+moho::CScrLuaInitForm* moho::func_SyncPlayableRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SyncPlayableRect",
+    &moho::cfunc_SyncPlayableRect,
+    nullptr,
+    "<global>",
+    kSyncPlayableRectHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BE980 (FUN_008BE980, cfunc_RandomUser)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_RandomUserL`.
+ */
+int moho::cfunc_RandomUser(lua_State* const luaContext)
+{
+  return cfunc_RandomUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BE9A0 (FUN_008BE9A0, func_RandomUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for global `Random`.
+ */
+moho::CScrLuaInitForm* moho::func_RandomUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "Random",
+    &moho::cfunc_RandomUser,
+    nullptr,
+    "<global>",
+    kRandomUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BEA00 (FUN_008BEA00, cfunc_RandomUserL)
+ *
+ * What it does:
+ * Produces one random float or integer range sample from the process-wide
+ * random stream for `Random([[min,] max])`.
+ */
+int moho::cfunc_RandomUserL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount > 2) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kRandomUserHelpText,
+      0,
+      2,
+      argumentCount
+    );
+  }
+
+  boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+  if (argumentCount == 0) {
+    const double value = static_cast<double>(math_GlobalRandomStream.twister.NextUInt32()) * 2.3283064e-10;
+    lua_pushnumber(rawState, value);
+    return 1;
+  }
+
+  if (argumentCount == 1) {
+    const int maxValue = LuaPlus::LuaStackObject(state, 1).GetInteger();
+    const std::uint32_t randomValue = math_GlobalRandomStream.twister.NextUInt32();
+    const std::uint32_t scaledValue = static_cast<std::uint32_t>(
+      (static_cast<std::uint64_t>(static_cast<std::uint32_t>(maxValue)) * static_cast<std::uint64_t>(randomValue)) >>
+      32u
+    );
+    const int result = static_cast<int>(scaledValue + 1u);
+    lua_pushnumber(rawState, static_cast<float>(result));
+    return 1;
+  }
+
+  const int minValue = LuaPlus::LuaStackObject(state, 1).GetInteger();
+  const int maxValue = LuaPlus::LuaStackObject(state, 2).GetInteger();
+  const std::uint32_t randomValue = math_GlobalRandomStream.twister.NextUInt32();
+  const std::uint32_t span = (static_cast<std::uint32_t>(maxValue) + 1u) - static_cast<std::uint32_t>(minValue);
+  const std::uint32_t scaledOffset =
+    static_cast<std::uint32_t>((static_cast<std::uint64_t>(span) * static_cast<std::uint64_t>(randomValue)) >> 32u);
+  const int result = static_cast<int>(static_cast<std::uint32_t>(minValue) + scaledOffset);
+  lua_pushnumber(rawState, static_cast<float>(result));
+  return 1;
 }
 
 /**
@@ -6436,6 +11394,65 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryFilterOut_LuaFuncDef()
     kEntityCategoryFilterOutHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x008BA540 (FUN_008BA540, cfunc_ExecLuaInSim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and dispatches to `cfunc_ExecLuaInSimL`.
+ */
+int moho::cfunc_ExecLuaInSim(lua_State* const luaContext)
+{
+  return cfunc_ExecLuaInSimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BA560 (FUN_008BA560, func_ExecLuaInSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ExecLuaInSim`.
+ */
+moho::CScrLuaInitForm* moho::func_ExecLuaInSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ExecLuaInSim",
+    &moho::cfunc_ExecLuaInSim,
+    nullptr,
+    "<global>",
+    kExecLuaInSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BA5C0 (FUN_008BA5C0, cfunc_ExecLuaInSimL)
+ *
+ * What it does:
+ * Reads `(functionName,args)` from Lua and forwards one
+ * `ExecuteLuaInSim(functionName,args)` request through the active sim driver.
+ */
+int moho::cfunc_ExecLuaInSimL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kExecLuaInSimHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject functionNameArg(state, 1);
+  const char* functionNameText = lua_tostring(state->m_state, 1);
+  if (!functionNameText) {
+    LuaPlus::LuaStackObject::TypeError(&functionNameArg, "string");
+    functionNameText = "";
+  }
+
+  const std::string functionName(functionNameText);
+  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+    LuaPlus::LuaObject callbackArgs(LuaPlus::LuaStackObject(state, 2));
+    activeDriver->ExecuteLuaInSim(functionName.c_str(), callbackArgs);
+  }
+  return 0;
 }
 
 /**
@@ -6695,6 +11712,712 @@ moho::CScrLuaInitForm* moho::func_SetAutoSurfaceMode_LuaFuncDef()
 }
 
 /**
+ * Address: 0x008BBE60 (FUN_008BBE60, cfunc_ToggleScriptBitL)
+ *
+ * What it does:
+ * Reads `(unitTable, bit, currentState)` and emits `ToggleScriptBit`
+ * info-pairs for live units whose toggle-cap lane exposes that bit and whose
+ * current script-bit value matches `currentState`.
+ */
+int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kToggleScriptBitExpectedArgsText, 3, argumentCount);
+  }
+
+  LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
+
+  LuaPlus::LuaStackObject bitArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    bitArg.TypeError("integer");
+  }
+  const int bitIndex = static_cast<int>(lua_tonumber(rawState, 2));
+
+  LuaPlus::LuaStackObject currentStateArg(state, 3);
+  const bool currentState = currentStateArg.GetBoolean();
+
+  char bitText[0x10]{};
+  std::snprintf(bitText, sizeof(bitText), "%d", bitIndex);
+
+  if (unitListObject.IsTable()) {
+    const int unitCount = unitListObject.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      LuaPlus::LuaObject valueObject = unitListObject[unitIndex];
+      UserUnit* const userUnit = SCR_FromLua_UserUnit(valueObject, state);
+      IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
+      if (!iunitBridge || iunitBridge->IsDead()) {
+        continue;
+      }
+
+      const std::uint32_t toggleCapMask = 1u << (static_cast<std::uint32_t>(bitIndex) & 0x1Fu);
+      if ((iunitBridge->GetAttributes().toggleCapsMask & toggleCapMask) == 0u) {
+        continue;
+      }
+
+      const bool scriptBitStateMatches =
+        (GetUserUnitScriptBitMask(userUnit) & BuildScriptBitMask(bitIndex)) != 0;
+      if (scriptBitStateMatches != currentState) {
+        continue;
+      }
+
+      if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+        const auto entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(iunitBridge->GetEntityId()));
+        activeDriver->ProcessInfoPair(reinterpret_cast<void*>(entityIdWord), "ToggleScriptBit", bitText);
+      }
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x008BBDE0 (FUN_008BBDE0, cfunc_ToggleScriptBit)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and dispatches to `cfunc_ToggleScriptBitL`.
+ */
+int moho::cfunc_ToggleScriptBit(lua_State* const luaContext)
+{
+  return cfunc_ToggleScriptBitL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BBE00 (FUN_008BBE00, func_ToggleScriptBit_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `ToggleScriptBit`.
+ */
+moho::CScrLuaInitForm* moho::func_ToggleScriptBit_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ToggleScriptBit",
+    &moho::cfunc_ToggleScriptBit,
+    nullptr,
+    "<global>",
+    kToggleScriptBitHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BC100 (FUN_008BC100, cfunc_SetPausedL)
+ *
+ * What it does:
+ * Reads `(unitTable, paused)` and emits one `SetPaused` info-pair per live
+ * user-unit entry while callback dispatch remains enabled.
+ */
+int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
+{
+  if (IsLuaCallbackDispatchBlocked()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetPausedHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaStackObject pausedArg(state, 2);
+  const bool paused = pausedArg.GetBoolean();
+
+  if (unitListObject.IsTable()) {
+    const int unitCount = unitListObject.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      LuaPlus::LuaObject valueObject = unitListObject[unitIndex];
+      UserUnit* const userUnit = SCR_FromLua_UserUnit(valueObject, state);
+      IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
+      if (!iunitBridge || iunitBridge->IsDead()) {
+        continue;
+      }
+
+      if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+        const auto entityIdWord = static_cast<std::uintptr_t>(static_cast<std::uint32_t>(iunitBridge->GetEntityId()));
+        activeDriver->ProcessInfoPair(
+          reinterpret_cast<void*>(entityIdWord),
+          "SetPaused",
+          paused ? "true" : "false"
+        );
+      }
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x008BC080 (FUN_008BC080, cfunc_SetPaused)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and dispatches to `cfunc_SetPausedL`.
+ */
+int moho::cfunc_SetPaused(lua_State* const luaContext)
+{
+  return cfunc_SetPausedL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BC0A0 (FUN_008BC0A0, func_SetPaused_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `SetPaused`.
+ */
+moho::CScrLuaInitForm* moho::func_SetPaused_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetPaused",
+    &moho::cfunc_SetPaused,
+    nullptr,
+    "<global>",
+    kSetPausedHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BC280 (FUN_008BC280, cfunc_GetAttachedUnitsList)
+ *
+ * What it does:
+ * Unwraps Lua callback state and dispatches to `cfunc_GetAttachedUnitsListL`.
+ */
+int moho::cfunc_GetAttachedUnitsList(lua_State* const luaContext)
+{
+  return cfunc_GetAttachedUnitsListL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BC2A0 (FUN_008BC2A0, func_GetAttachedUnitsList_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `GetAttachedUnitsList`.
+ */
+moho::CScrLuaInitForm* moho::func_GetAttachedUnitsList_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetAttachedUnitsList",
+    &moho::cfunc_GetAttachedUnitsList,
+    nullptr,
+    "<global>",
+    kGetAttachedUnitsListHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BC300 (FUN_008BC300, cfunc_GetAttachedUnitsListL)
+ *
+ * What it does:
+ * Builds one Lua table containing alive attached user-unit script objects for
+ * each source unit in the input table.
+ */
+int moho::cfunc_GetAttachedUnitsListL(LuaPlus::LuaState* const state)
+{
+  if (!WLD_GetActiveSession() || state == nullptr || state->m_state == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetAttachedUnitsListHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaObject resultObject(state);
+  resultObject.AssignNewTable(state, 0, 0);
+
+  if (unitListObject.IsTable()) {
+    int resultIndex = 1;
+    const int unitCount = unitListObject.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject sourceUnitObject = unitListObject[unitIndex];
+      UserUnit* const sourceUnit = SCR_FromLua_UserUnit(sourceUnitObject, state);
+      IUnit* const sourceUnitBridge = ResolveIUnitBridge(sourceUnit);
+      if (sourceUnitBridge == nullptr || sourceUnitBridge->IsDead()) {
+        continue;
+      }
+
+      UserEntity* const sourceEntity = reinterpret_cast<UserEntity*>(sourceUnit);
+      CWldSession* const session = sourceEntity->mSession;
+      if (session == nullptr) {
+        continue;
+      }
+
+      const SSTIInlineUIntVector& attachedIdList = sourceEntity->mVariableData.mAuxValueVector;
+      if (attachedIdList.mBegin == nullptr || attachedIdList.mEnd == nullptr || attachedIdList.mEnd < attachedIdList.mBegin) {
+        continue;
+      }
+
+      for (const std::uint32_t* attachedIdIt = attachedIdList.mBegin; attachedIdIt < attachedIdList.mEnd; ++attachedIdIt) {
+        UserEntity* const attachedEntity = FindUserSessionEntityById(session, static_cast<std::int32_t>(*attachedIdIt));
+        if (attachedEntity == nullptr || attachedEntity->mVariableData.mIsDead != 0u) {
+          continue;
+        }
+
+        UserUnit* const attachedUnit = attachedEntity->IsUserUnit();
+        IUnit* const attachedUnitBridge = ResolveIUnitBridge(attachedUnit);
+        if (attachedUnitBridge == nullptr) {
+          continue;
+        }
+
+        LuaPlus::LuaObject attachedUnitObject = attachedUnitBridge->GetLuaObject();
+        resultObject.SetObject(resultIndex, attachedUnitObject);
+        ++resultIndex;
+      }
+    }
+  }
+
+  resultObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BC5F0 (FUN_008BC5F0, cfunc_ValidateUnitsListL)
+ *
+ * What it does:
+ * Filters one input unit table down to alive, non-destroy-queued unit Lua
+ * objects and returns the filtered table.
+ */
+int moho::cfunc_ValidateUnitsListL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  if (!WLD_GetActiveSession()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kValidateUnitsListHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaObject resultObject(state);
+  resultObject.AssignNewTable(state, 0, 0);
+
+  if (unitListObject.IsTable()) {
+    const int unitCount = unitListObject.GetCount();
+    int resultIndex = 1;
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      LuaPlus::LuaObject unitObject = unitListObject[unitIndex];
+      UserUnit* const userUnit = ResolveUserUnitOptional(unitObject, state);
+      IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
+      if (!iunitBridge || iunitBridge->IsDead() || iunitBridge->DestroyQueued()) {
+        continue;
+      }
+
+      LuaPlus::LuaObject unitLuaObject = iunitBridge->GetLuaObject();
+      resultObject.SetObject(resultIndex, unitLuaObject);
+      ++resultIndex;
+    }
+  }
+
+  resultObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BC570 (FUN_008BC570, cfunc_ValidateUnitsList)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and dispatches to
+ * `cfunc_ValidateUnitsListL`.
+ */
+int moho::cfunc_ValidateUnitsList(lua_State* const luaContext)
+{
+  return cfunc_ValidateUnitsListL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BC590 (FUN_008BC590, func_ValidateUnitsList_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `ValidateUnitsList`.
+ */
+moho::CScrLuaInitForm* moho::func_ValidateUnitsList_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ValidateUnitsList",
+    &moho::cfunc_ValidateUnitsList,
+    nullptr,
+    "<global>",
+    kValidateUnitsListHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BC7A0 (FUN_008BC7A0, cfunc_GetAssistingUnitsList)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_GetAssistingUnitsListL`.
+ */
+int moho::cfunc_GetAssistingUnitsList(lua_State* const luaContext)
+{
+  return cfunc_GetAssistingUnitsListL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BC7C0 (FUN_008BC7C0, func_GetAssistingUnitsList_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `GetAssistingUnitsList`.
+ */
+moho::CScrLuaInitForm* moho::func_GetAssistingUnitsList_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetAssistingUnitsList",
+    &moho::cfunc_GetAssistingUnitsList,
+    nullptr,
+    "<global>",
+    kGetAssistingUnitsListHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BC820 (FUN_008BC820, cfunc_GetAssistingUnitsListL)
+ *
+ * What it does:
+ * Returns one Lua array of focused-army pod units that are assisting one of
+ * the input units (or the unit itself when matching POD filters).
+ */
+int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || session->mRules == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetAssistingUnitsListHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaObject resultTable(state);
+  resultTable.AssignNewTable(state, 0, 0u);
+
+  const CategoryWordRangeView* const podStagingCategoryRange = session->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
+  const CategoryWordRangeView* const podCategoryRange = session->mRules->GetEntityCategory("POD");
+  const EntityCategorySet* const podStagingCategory =
+    podStagingCategoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(podStagingCategoryRange) : nullptr;
+  const EntityCategorySet* const podCategory =
+    podCategoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(podCategoryRange) : nullptr;
+  const UserArmy* const focusArmy = session->GetFocusUserArmy();
+  if (!sourceUnitsObject.IsTable() || podCategory == nullptr || focusArmy == nullptr) {
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  std::set<UserUnit*> emittedUnits{};
+  std::int32_t resultIndex = 1;
+  const UserSessionEntityMapView& entityMap = GetUserSessionEntityMapView(session);
+
+  const int sourceCount = sourceUnitsObject.GetCount();
+  for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
+    const LuaPlus::LuaObject sourceObject = sourceUnitsObject[sourceIndex];
+    UserUnit* const sourceUnit = ResolveUserUnitOptional(sourceObject, state);
+    IUnit* const sourceBridge = ResolveIUnitBridge(sourceUnit);
+    if (sourceBridge == nullptr || sourceBridge->IsDead() || sourceUnit->IsBeingBuilt()) {
+      continue;
+    }
+
+    const REntityBlueprint* const sourceBlueprint = sourceBridge->GetBlueprint();
+    const bool sourceIsPodStaging =
+      (podStagingCategory != nullptr) && (sourceBlueprint != nullptr)
+      && EntityCategory::HasBlueprint(sourceBlueprint, podStagingCategory);
+    const bool sourceIsPod =
+      (sourceBlueprint != nullptr) && EntityCategory::HasBlueprint(sourceBlueprint, podCategory);
+    if (!sourceIsPodStaging && !sourceIsPod) {
+      continue;
+    }
+
+    for (UserSessionEntityMapNodeView* node = UserSessionEntityMapFirstNode(entityMap);
+         node != nullptr && node != entityMap.head;
+         node = UserSessionEntityMapNextNode(node, entityMap.head)) {
+      UserEntity* const entity = node->value;
+      if (entity == nullptr) {
+        continue;
+      }
+
+      UserUnit* const candidateUnit = entity->IsUserUnit();
+      IUnit* const candidateBridge = ResolveIUnitBridge(candidateUnit);
+      if (candidateBridge == nullptr || candidateBridge->IsDead() || candidateUnit->IsBeingBuilt()) {
+        continue;
+      }
+
+      UserEntity* const candidateEntity = reinterpret_cast<UserEntity*>(candidateUnit);
+      if (candidateEntity->mArmy != focusArmy) {
+        continue;
+      }
+
+      const REntityBlueprint* const candidateBlueprint = candidateBridge->GetBlueprint();
+      if (candidateBlueprint == nullptr || !EntityCategory::HasBlueprint(candidateBlueprint, podCategory)) {
+        continue;
+      }
+
+      const UserUnit* const assistTarget = ResolveAssistTargetUnit(candidateUnit);
+      if (candidateUnit != sourceUnit && assistTarget != sourceUnit) {
+        continue;
+      }
+
+      if (!emittedUnits.insert(candidateUnit).second) {
+        continue;
+      }
+
+      LuaPlus::LuaObject unitObject = candidateBridge->GetLuaObject();
+      resultTable.SetObject(resultIndex, unitObject);
+      ++resultIndex;
+    }
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BCC30 (FUN_008BCC30, cfunc_GetArmyAvatars)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetArmyAvatarsL`.
+ */
+int moho::cfunc_GetArmyAvatars(lua_State* const luaContext)
+{
+  return cfunc_GetArmyAvatarsL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BCC50 (FUN_008BCC50, func_GetArmyAvatars_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `GetArmyAvatars`.
+ */
+moho::CScrLuaInitForm* moho::func_GetArmyAvatars_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetArmyAvatars",
+    &moho::cfunc_GetArmyAvatars,
+    nullptr,
+    "<global>",
+    kGetArmyAvatarsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BCCB0 (FUN_008BCCB0, cfunc_GetArmyAvatarsL)
+ *
+ * What it does:
+ * Returns one Lua array of focus-army avatar unit script objects.
+ */
+int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  UserArmy* const focusArmy = ResolveFocusArmy(session);
+  if (focusArmy == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmyAvatarsHelpText, 0, argumentCount);
+  }
+
+  const UserArmyAvatarVectorRuntimeView& avatarRefs = ResolveArmyAvatarVectorView(focusArmy);
+  if (avatarRefs.begin == nullptr || avatarRefs.end == nullptr || avatarRefs.end <= avatarRefs.begin) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  const int tableCapacity = static_cast<int>(avatarRefs.end - avatarRefs.begin);
+  LuaPlus::LuaObject resultTable(state);
+  resultTable.AssignNewTable(state, tableCapacity, 0u);
+
+  std::int32_t luaIndex = 1;
+  for (const UserEntityWeakRefRuntimeView* weakRef = avatarRefs.begin; weakRef < avatarRefs.end; ++weakRef) {
+    AppendEntityUnitLuaObject(resultTable, luaIndex, DecodeLinkedUserEntity(*weakRef));
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BCE70 (FUN_008BCE70, cfunc_GetIdleEngineers)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetIdleEngineersL`.
+ */
+int moho::cfunc_GetIdleEngineers(lua_State* const luaContext)
+{
+  return cfunc_GetIdleEngineersL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BCE90 (FUN_008BCE90, func_GetIdleEngineers_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `GetIdleEngineers`.
+ */
+moho::CScrLuaInitForm* moho::func_GetIdleEngineers_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetIdleEngineers",
+    &moho::cfunc_GetIdleEngineers,
+    nullptr,
+    "<global>",
+    kGetIdleEngineersHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BCEF0 (FUN_008BCEF0, cfunc_GetIdleEngineersL)
+ *
+ * What it does:
+ * Returns one Lua array of focus-army idle engineer unit script objects.
+ */
+int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  UserArmy* const focusArmy = ResolveFocusArmy(session);
+  if (focusArmy == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetIdleEngineersHelpText, 0, argumentCount);
+  }
+
+  const UserEntityWeakSetRuntimeView* const idleSet = ResolveIdleUnitSetView(focusArmy, false);
+  if (idleSet == nullptr || idleSet->head == nullptr || idleSet->size == 0u) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject resultTable(state);
+  resultTable.AssignNewTable(state, static_cast<int>(idleSet->size), 0u);
+
+  std::int32_t luaIndex = 1;
+  for (UserEntityWeakSetNodeRuntimeView* node = WeakSetFirstNode(*idleSet);
+       node != nullptr && node != idleSet->head;
+       node = WeakSetNextNode(node, idleSet->head)) {
+    AppendEntityUnitLuaObject(resultTable, luaIndex, DecodeLinkedUserEntity(node->weakEntityLink));
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BD100 (FUN_008BD100, cfunc_GetIdleFactories)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetIdleFactoriesL`.
+ */
+int moho::cfunc_GetIdleFactories(lua_State* const luaContext)
+{
+  return cfunc_GetIdleFactoriesL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BD120 (FUN_008BD120, func_GetIdleFactories_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `GetIdleFactories`.
+ */
+moho::CScrLuaInitForm* moho::func_GetIdleFactories_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetIdleFactories",
+    &moho::cfunc_GetIdleFactories,
+    nullptr,
+    "<global>",
+    kGetIdleFactoriesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BD180 (FUN_008BD180, cfunc_GetIdleFactoriesL)
+ *
+ * What it does:
+ * Returns one Lua array of focus-army idle factory unit script objects.
+ */
+int moho::cfunc_GetIdleFactoriesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  UserArmy* const focusArmy = ResolveFocusArmy(session);
+  if (focusArmy == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetIdleFactoriesHelpText, 0, argumentCount);
+  }
+
+  const UserEntityWeakSetRuntimeView* const idleSet = ResolveIdleUnitSetView(focusArmy, true);
+  if (idleSet == nullptr || idleSet->head == nullptr || idleSet->size == 0u) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject resultTable(state);
+  resultTable.AssignNewTable(state, static_cast<int>(idleSet->size), 0u);
+
+  std::int32_t luaIndex = 1;
+  for (UserEntityWeakSetNodeRuntimeView* node = WeakSetFirstNode(*idleSet);
+       node != nullptr && node != idleSet->head;
+       node = WeakSetNextNode(node, idleSet->head)) {
+    AppendEntityUnitLuaObject(resultTable, luaIndex, DecodeLinkedUserEntity(node->weakEntityLink));
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
  * Address: 0x008BD680 (FUN_008BD680, cfunc_GetSelectedUnitsL)
  *
  * What it does:
@@ -6772,6 +12495,591 @@ moho::CScrLuaInitForm* moho::func_GetSelectedUnits_LuaFuncDef()
     kGetSelectedUnitsHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x008BD870 (FUN_008BD870, cfunc_SelectUnits)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SelectUnitsL`.
+ */
+int moho::cfunc_SelectUnits(lua_State* const luaContext)
+{
+  return cfunc_SelectUnitsL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BD890 (FUN_008BD890, func_SelectUnits_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `SelectUnits`.
+ */
+moho::CScrLuaInitForm* moho::func_SelectUnits_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SelectUnits",
+    &moho::cfunc_SelectUnits,
+    nullptr,
+    "<global>",
+    kSelectUnitsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BD8F0 (FUN_008BD8F0, cfunc_SelectUnitsL)
+ *
+ * What it does:
+ * Builds one validated selection set from Lua input units, applies it to the
+ * world session, and returns a Lua array of accepted unit objects.
+ */
+int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSelectUnitsHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaObject resultTable(state);
+  resultTable.AssignNewTable(state, 0, 0u);
+
+  msvc8::vector<UserUnit*> selectionUnits{};
+  std::int32_t resultIndex = 1;
+  if (sourceUnitsObject.IsTable()) {
+    const int unitCount = sourceUnitsObject.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject unitObject = sourceUnitsObject[unitIndex];
+      UserUnit* const userUnit = ResolveUserUnitOptional(unitObject, state);
+      IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
+      if (!iunitBridge || iunitBridge->IsDead() || iunitBridge->DestroyQueued()) {
+        continue;
+      }
+
+      UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+      if (userEntity != nullptr && userEntity->IsSelectable()) {
+        AppendSelectionUnitUnique(selectionUnits, userUnit);
+      } else if (UserUnit* const attachmentParent = ResolveSelectableTransportAttachmentParent(userUnit);
+                 attachmentParent != nullptr) {
+        AppendSelectionUnitUnique(selectionUnits, attachmentParent);
+      }
+
+      LuaPlus::LuaObject selectedUnitObject = iunitBridge->GetLuaObject();
+      resultTable.SetObject(resultIndex, selectedUnitObject);
+      ++resultIndex;
+    }
+  }
+
+  session->SetSelectionUnits(selectionUnits);
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x008BDC30 (FUN_008BDC30, cfunc_AddSelectUnits)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_AddSelectUnitsL`.
+ */
+int moho::cfunc_AddSelectUnits(lua_State* const luaContext)
+{
+  return cfunc_AddSelectUnitsL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008BDC50 (FUN_008BDC50, func_AddSelectUnits_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the user-lane Lua binder definition for `AddSelectUnits`.
+ */
+moho::CScrLuaInitForm* moho::func_AddSelectUnits_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "AddSelectUnits",
+    &moho::cfunc_AddSelectUnits,
+    nullptr,
+    "<global>",
+    kAddSelectUnitsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008BDCB0 (FUN_008BDCB0, cfunc_AddSelectUnitsL)
+ *
+ * What it does:
+ * Adds validated selectable units from Lua input to current selection and
+ * applies the merged set back into the world session.
+ */
+int moho::cfunc_AddSelectUnitsL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAddSelectUnitsHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
+  msvc8::vector<UserUnit*> mergedSelection{};
+  session->GetSelectionUnits(mergedSelection);
+
+  if (sourceUnitsObject.IsTable()) {
+    const int unitCount = sourceUnitsObject.GetCount();
+    for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
+      const LuaPlus::LuaObject unitObject = sourceUnitsObject[unitIndex];
+      UserUnit* const userUnit = ResolveUserUnitOptional(unitObject, state);
+      UserEntity* const userEntity = reinterpret_cast<UserEntity*>(userUnit);
+      if (userEntity == nullptr || !userEntity->IsSelectable()) {
+        continue;
+      }
+      AppendSelectionUnitUnique(mergedSelection, userUnit);
+    }
+  }
+
+  session->SetSelectionUnits(mergedSelection);
+  return 0;
+}
+
+/**
+ * Address: 0x0083F000 (FUN_0083F000, func_EngineStartSplashScreens)
+ *
+ * What it does:
+ * Casts Lua callback state, validates zero args, and starts splash-screen UI.
+ */
+int moho::func_EngineStartSplashScreens(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEngineStartSplashScreensHelpText, 0, argumentCount);
+  }
+
+  UI_StartSplashScreens();
+  return 0;
+}
+
+/**
+ * Address: 0x0083F040 (FUN_0083F040, func_EngineStartSplashScreens_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `EngineStartSplashScreens`.
+ */
+moho::CScrLuaInitForm* moho::func_EngineStartSplashScreens_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "EngineStartSplashScreens",
+    &moho::func_EngineStartSplashScreens,
+    nullptr,
+    "<global>",
+    kEngineStartSplashScreensHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F0E0 (FUN_0083F0E0, cfunc_EngineStartFrontEndUI)
+ *
+ * What it does:
+ * Casts Lua callback state, validates zero args, and starts front-end UI.
+ */
+int moho::cfunc_EngineStartFrontEndUI(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEngineStartFrontEndUIHelpText, 0, argumentCount);
+  }
+
+  UI_StartFrontEnd();
+  return 0;
+}
+
+/**
+ * Address: 0x0083F120 (FUN_0083F120, func_EngineStartFrontEndUI_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `EngineStartFrontEndUI`.
+ */
+moho::CScrLuaInitForm* moho::func_EngineStartFrontEndUI_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "EngineStartFrontEndUI",
+    &moho::cfunc_EngineStartFrontEndUI,
+    nullptr,
+    "<global>",
+    kEngineStartFrontEndUIHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F1C0 (FUN_0083F1C0, cfunc_ExitApplication)
+ *
+ * What it does:
+ * Casts Lua callback state, validates zero args, and requests app shutdown.
+ */
+int moho::cfunc_ExitApplication(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kExitApplicationHelpText, 0, argumentCount);
+  }
+
+  wxTheApp->ExitMainLoop();
+  return 0;
+}
+
+/**
+ * Address: 0x0083F210 (FUN_0083F210, func_ExitApplication_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ExitApplication`.
+ */
+moho::CScrLuaInitForm* moho::func_ExitApplication_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ExitApplication",
+    &moho::cfunc_ExitApplication,
+    nullptr,
+    "<global>",
+    kExitApplicationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F2B0 (FUN_0083F2B0, cfunc_ExitGame)
+ *
+ * What it does:
+ * Casts Lua callback state, validates zero args, and requests sim exit.
+ */
+int moho::cfunc_ExitGame(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kExitGameHelpText, 0, argumentCount);
+  }
+
+  if (WLD_GetFrameAction() != EWldFrameAction::Inactive) {
+    WLD_SetFrameAction(EWldFrameAction::Exit);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0083F300 (FUN_0083F300, func_ExitGame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ExitGame`.
+ */
+moho::CScrLuaInitForm* moho::func_ExitGame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ExitGame",
+    &moho::cfunc_ExitGame,
+    nullptr,
+    "<global>",
+    kExitGameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F3A0 (FUN_0083F3A0, cfunc_RestartSession)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_RestartSessionL`.
+ */
+int moho::cfunc_RestartSession(lua_State* const luaContext)
+{
+  return cfunc_RestartSessionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083F3C0 (FUN_0083F3C0, func_RestartSession_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `RestartSession`.
+ */
+moho::CScrLuaInitForm* moho::func_RestartSession_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RestartSession",
+    &moho::cfunc_RestartSession,
+    nullptr,
+    "<global>",
+    kRestartSessionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F420 (FUN_0083F420, cfunc_RestartSessionL)
+ *
+ * What it does:
+ * Validates zero arguments and requests world-frame action `CreateSession`
+ * when restart prerequisites are present.
+ */
+int moho::cfunc_RestartSessionL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRestartSessionHelpText, 0, argumentCount);
+  }
+
+  if (WLD_GetFrameAction() != EWldFrameAction::Inactive) {
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session != nullptr && session->mLaunchInfo.get() != nullptr) {
+      WLD_SetFrameAction(EWldFrameAction::CreateSession);
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0083F470 (FUN_0083F470, cfunc_GetFrame)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetFrameL`.
+ */
+int moho::cfunc_GetFrame(lua_State* const luaContext)
+{
+  return cfunc_GetFrameL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083F490 (FUN_0083F490, func_GetFrame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetFrame`.
+ */
+moho::CScrLuaInitForm* moho::func_GetFrame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetFrame",
+    &moho::cfunc_GetFrame,
+    nullptr,
+    "<global>",
+    kGetFrameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F4F0 (FUN_0083F4F0, cfunc_GetFrameL)
+ *
+ * What it does:
+ * Resolves one root UI frame index and pushes the corresponding Lua frame
+ * object when it belongs to the same root Lua state.
+ */
+int moho::cfunc_GetFrameL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetFrameHelpText, 1, argumentCount);
+  }
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  if (uiManager == nullptr || !uiManager->HasFrames()) {
+    LuaPlus::LuaState::Error(state, kUiLayerNotInitializedText);
+    return 1;
+  }
+
+  LuaPlus::LuaStackObject headArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    headArg.TypeError("number");
+  }
+
+  const int frameHead = static_cast<int>(lua_tonumber(rawState, 1));
+  if (frameHead < 0 || static_cast<std::size_t>(frameHead) >= uiManager->mFrames.Size()) {
+    return 0;
+  }
+
+  CMauiFrame* const frame = uiManager->mFrames[static_cast<std::size_t>(frameHead)].get();
+  if (frame == nullptr) {
+    return 0;
+  }
+
+  const CMauiControlLuaObjectView* const frameView = CMauiControlLuaObjectView::FromControl(frame);
+  if (frameView->luaObject.m_state != state->m_rootState) {
+    return 0;
+  }
+
+  frameView->luaObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0083F5D0 (FUN_0083F5D0, cfunc_ClearFrame)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_ClearFrameL`.
+ */
+int moho::cfunc_ClearFrame(lua_State* const luaContext)
+{
+  return cfunc_ClearFrameL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083F5F0 (FUN_0083F5F0, func_ClearFrame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ClearFrame`.
+ */
+moho::CScrLuaInitForm* moho::func_ClearFrame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ClearFrame",
+    &moho::cfunc_ClearFrame,
+    nullptr,
+    "<global>",
+    kClearFrameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F650 (FUN_0083F650, cfunc_ClearFrameL)
+ *
+ * What it does:
+ * Clears one frame by index or all frames when the optional argument is nil.
+ */
+int moho::cfunc_ClearFrameL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount >= 2) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kClearFrameHelpText,
+      0,
+      1,
+      argumentCount
+    );
+  }
+
+  lua_settop(rawState, 1);
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  if (uiManager == nullptr || !uiManager->HasFrames()) {
+    LuaPlus::LuaState::Error(state, kUiLayerNotInitializedText);
+    return 0;
+  }
+
+  int frameHead = -1;
+  if (lua_type(rawState, 1) != LUA_TNIL) {
+    LuaPlus::LuaStackObject headArg(state, 1);
+    frameHead = static_cast<int>(headArg.ToNumber());
+  }
+
+  uiManager->ClearChildren(frameHead);
+  return 0;
+}
+
+/**
+ * Address: 0x0083F700 (FUN_0083F700, cfunc_GetNumRootFrames)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetNumRootFramesL`.
+ */
+int moho::cfunc_GetNumRootFrames(lua_State* const luaContext)
+{
+  return cfunc_GetNumRootFramesL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083F720 (FUN_0083F720, func_GetNumRootFrames_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetNumRootFrames`.
+ */
+moho::CScrLuaInitForm* moho::func_GetNumRootFrames_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetNumRootFrames",
+    &moho::cfunc_GetNumRootFrames,
+    nullptr,
+    "<global>",
+    kGetNumRootFramesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083F780 (FUN_0083F780, cfunc_GetNumRootFramesL)
+ *
+ * What it does:
+ * Pushes the current root-frame count as a Lua number.
+ */
+int moho::cfunc_GetNumRootFramesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetNumRootFramesHelpText, 0, argumentCount);
+  }
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  if (uiManager != nullptr && uiManager->HasFrames()) {
+    lua_pushnumber(rawState, static_cast<float>(uiManager->mFrames.Size()));
+    (void)lua_gettop(rawState);
+  } else {
+    LuaPlus::LuaState::Error(state, kUiLayerNotInitializedText);
+  }
+
+  return 1;
 }
 
 /**
@@ -6880,6 +13188,1211 @@ moho::CScrLuaInitForm* moho::func_GetEconomyTotals_LuaFuncDef()
 }
 
 /**
+ * Address: 0x0083FED0 (FUN_0083FED0, cfunc_GetResourceSharing)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetResourceSharingL`.
+ */
+int moho::cfunc_GetResourceSharing(lua_State* const luaContext)
+{
+  return cfunc_GetResourceSharingL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0083FEF0 (FUN_0083FEF0, func_GetResourceSharing_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetResourceSharing`.
+ */
+moho::CScrLuaInitForm* moho::func_GetResourceSharing_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetResourceSharing",
+    &moho::cfunc_GetResourceSharing,
+    nullptr,
+    "<global>",
+    kGetResourceSharingHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0083FF50 (FUN_0083FF50, cfunc_GetResourceSharingL)
+ *
+ * What it does:
+ * Pushes whether the focused user army has resource sharing enabled.
+ */
+int moho::cfunc_GetResourceSharingL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetResourceSharingHelpText, 0, argumentCount);
+  }
+
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    gpg::Warnf(kGetEconomyTotalsMissingSessionWarning);
+    return 0;
+  }
+
+  bool isResourceSharingEnabled = false;
+  const int focusArmyIndex = session->FocusArmy;
+  if (focusArmyIndex >= 0) {
+    const std::size_t armyIndex = static_cast<std::size_t>(focusArmyIndex);
+    if (armyIndex < session->userArmies.size()) {
+      const UserArmy* const focusedArmy = session->userArmies[armyIndex];
+      if (focusedArmy != nullptr && focusedArmy->mVarDat.mIsResourceSharingEnabled != 0u) {
+        isResourceSharingEnabled = true;
+      }
+    }
+  }
+
+  lua_pushboolean(rawState, isResourceSharingEnabled ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x008420A0 (FUN_008420A0, cfunc_GetCurrentUIState)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetCurrentUIStateL`.
+ */
+int moho::cfunc_GetCurrentUIState(lua_State* const luaContext)
+{
+  return cfunc_GetCurrentUIStateL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008420C0 (FUN_008420C0, func_GetCurrentUIState_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetCurrentUIState`.
+ */
+moho::CScrLuaInitForm* moho::func_GetCurrentUIState_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetCurrentUIState",
+    &moho::cfunc_GetCurrentUIState,
+    nullptr,
+    "<global>",
+    kGetCurrentUIStateHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00842120 (FUN_00842120, cfunc_GetCurrentUIStateL)
+ *
+ * What it does:
+ * Pushes current UI-state lexical value (`splash`, `frontend`, or `game`).
+ */
+int moho::cfunc_GetCurrentUIStateL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCurrentUIStateHelpText, 0, argumentCount);
+  }
+
+  gpg::RRef currentUiStateRef{};
+  gpg::RRef::CurrentUIState(&currentUiStateRef);
+  const msvc8::string lexical = currentUiStateRef.GetLexical();
+  lua_pushstring(rawState, lexical.c_str());
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x0083FFE0 (FUN_0083FFE0, cfunc_GetSimTicksPerSecond)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSimTicksPerSecondL`.
+ */
+int moho::cfunc_GetSimTicksPerSecond(lua_State* const luaContext)
+{
+  return cfunc_GetSimTicksPerSecondL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00840000 (FUN_00840000, func_GetSimTicksPerSecond_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSimTicksPerSecond`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSimTicksPerSecond_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSimTicksPerSecond",
+    &moho::cfunc_GetSimTicksPerSecond,
+    nullptr,
+    "<global>",
+    kGetSimTicksPerSecondHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00840060 (FUN_00840060, cfunc_GetSimTicksPerSecondL)
+ *
+ * What it does:
+ * Pushes fixed simulation ticks-per-second (10.0) as a Lua number.
+ */
+int moho::cfunc_GetSimTicksPerSecondL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSimTicksPerSecondHelpText, 0, argumentCount);
+  }
+
+  lua_pushnumber(rawState, 10.0);
+  return 1;
+}
+
+/**
+ * Address: 0x00897780 (FUN_00897780, cfunc_SessionRequestPause)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionRequestPauseL`.
+ */
+int moho::cfunc_SessionRequestPause(lua_State* const luaContext)
+{
+  return cfunc_SessionRequestPauseL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008977A0 (FUN_008977A0, func_SessionRequestPause_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionRequestPause`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionRequestPause_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionRequestPause",
+    &moho::cfunc_SessionRequestPause,
+    nullptr,
+    "<global>",
+    kSessionRequestPauseHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00897800 (FUN_00897800, cfunc_SessionRequestPauseL)
+ *
+ * What it does:
+ * Requests world-session pause from Lua after validating active session.
+ */
+int moho::cfunc_SessionRequestPauseL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionRequestPauseHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionRequestPauseNoActiveSessionText);
+  }
+
+  session->RequestPause();
+  return 0;
+}
+
+/**
+ * Address: 0x00897850 (FUN_00897850, cfunc_SessionResume)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionResumeL`.
+ */
+int moho::cfunc_SessionResume(lua_State* const luaContext)
+{
+  return cfunc_SessionResumeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00897870 (FUN_00897870, func_SessionResume_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionResume`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionResume_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionResume",
+    &moho::cfunc_SessionResume,
+    nullptr,
+    "<global>",
+    kSessionResumeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008978D0 (FUN_008978D0, cfunc_SessionResumeL)
+ *
+ * What it does:
+ * Requests world-session resume from Lua after validating active session.
+ */
+int moho::cfunc_SessionResumeL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionResumeHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionResumeNoActiveSessionText);
+  }
+
+  session->Resume();
+  return 0;
+}
+
+/**
+ * Address: 0x00897920 (FUN_00897920, cfunc_SessionIsPaused)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionIsPausedL`.
+ */
+int moho::cfunc_SessionIsPaused(lua_State* const luaContext)
+{
+  return cfunc_SessionIsPausedL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00897940 (FUN_00897940, func_SessionIsPaused_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsPaused`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsPaused_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsPaused",
+    &moho::cfunc_SessionIsPaused,
+    nullptr,
+    "<global>",
+    kSessionIsPausedHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008979A0 (FUN_008979A0, cfunc_SessionIsPausedL)
+ *
+ * What it does:
+ * Pushes pause state from replay/requested/non-local session lanes.
+ */
+int moho::cfunc_SessionIsPausedL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionIsPausedNoActiveSessionText);
+  }
+
+  std::uint8_t isPaused = 0;
+  if (session->IsReplay) {
+    isPaused = session->mReplayIsPaused;
+  } else if (session->mRequestingPauseState != 0u) {
+    isPaused = session->mRequestingPause;
+  } else {
+    isPaused = session->mSessionPauseStateA;
+  }
+
+  lua_pushboolean(state->m_state, isPaused != 0u ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00897A00 (FUN_00897A00, cfunc_SessionIsGameOver)
+ *
+ * What it does:
+ * Pushes whether the active world-session game-over flag is set.
+ */
+int moho::cfunc_SessionIsGameOver(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionIsGameOverNoActiveSessionText);
+  }
+
+  lua_pushboolean(state->m_state, session->IsGameOver != 0u ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00897A50 (FUN_00897A50, func_SessionIsGameOver_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsGameOver`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsGameOver_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsGameOver",
+    &moho::cfunc_SessionIsGameOver,
+    nullptr,
+    "<global>",
+    kSessionIsGameOverHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00897C70 (FUN_00897C70, cfunc_SessionGetLocalCommandSource)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_SessionGetLocalCommandSourceL`.
+ */
+int moho::cfunc_SessionGetLocalCommandSource(lua_State* const luaContext)
+{
+  return cfunc_SessionGetLocalCommandSourceL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00897C90 (FUN_00897C90, func_SessionGetLocalCommandSource_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionGetLocalCommandSource`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionGetLocalCommandSource_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionGetLocalCommandSource",
+    &moho::cfunc_SessionGetLocalCommandSource,
+    nullptr,
+    "<global>",
+    kSessionGetLocalCommandSourceHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00897CF0 (FUN_00897CF0, cfunc_SessionGetLocalCommandSourceL)
+ *
+ * What it does:
+ * Returns one-based local command-source id (`0` when unavailable).
+ */
+int moho::cfunc_SessionGetLocalCommandSourceL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionGetLocalCommandSourceHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetLocalCommandSourceNoActiveSessionText);
+  }
+
+  int localCommandSource = session->ourCmdSource;
+  if (localCommandSource == static_cast<int>(kInvalidCommandSource)) {
+    localCommandSource = 0;
+  } else {
+    ++localCommandSource;
+  }
+
+  lua_pushnumber(rawState, static_cast<float>(localCommandSource));
+  return 1;
+}
+
+/**
+ * Address: 0x00897D70 (FUN_00897D70, cfunc_SessionIsReplayUser)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionIsReplayUserL`.
+ */
+int moho::cfunc_SessionIsReplayUser(lua_State* const luaContext)
+{
+  return cfunc_SessionIsReplayUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00897D90 (FUN_00897D90, func_SessionIsReplayUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsReplay`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsReplayUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsReplay",
+    &moho::cfunc_SessionIsReplayUser,
+    nullptr,
+    "<global>",
+    kSessionIsReplayUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00897DF0 (FUN_00897DF0, cfunc_SessionIsReplayUserL)
+ *
+ * What it does:
+ * Pushes whether the active world-session is replay-backed.
+ */
+int moho::cfunc_SessionIsReplayUserL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionIsReplayUserHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+  }
+
+  lua_pushboolean(rawState, session->IsReplay ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00897E60 (FUN_00897E60, cfunc_SessionIsBeingRecorded)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_SessionIsBeingRecordedL`.
+ */
+int moho::cfunc_SessionIsBeingRecorded(lua_State* const luaContext)
+{
+  return cfunc_SessionIsBeingRecordedL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00897E80 (FUN_00897E80, func_SessionIsBeingRecorded_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsBeingRecorded`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsBeingRecorded_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsBeingRecorded",
+    &moho::cfunc_SessionIsBeingRecorded,
+    nullptr,
+    "<global>",
+    kSessionIsBeingRecordedHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00897EE0 (FUN_00897EE0, cfunc_SessionIsBeingRecordedL)
+ *
+ * What it does:
+ * Pushes whether the active world-session is currently being recorded.
+ */
+int moho::cfunc_SessionIsBeingRecordedL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionIsBeingRecordedHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+  }
+
+  lua_pushboolean(rawState, session->IsBeingRecorded ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00897F50 (FUN_00897F50, cfunc_SessionIsMultiplayer)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionIsMultiplayerL`.
+ */
+int moho::cfunc_SessionIsMultiplayer(lua_State* const luaContext)
+{
+  return cfunc_SessionIsMultiplayerL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00897F70 (FUN_00897F70, func_SessionIsMultiplayer_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsMultiplayer`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsMultiplayer_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsMultiplayer",
+    &moho::cfunc_SessionIsMultiplayer,
+    nullptr,
+    "<global>",
+    kSessionIsMultiplayerHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00897FD0 (FUN_00897FD0, cfunc_SessionIsMultiplayerL)
+ *
+ * What it does:
+ * Pushes whether the active world-session is multiplayer.
+ */
+int moho::cfunc_SessionIsMultiplayerL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionIsMultiplayerHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+  }
+
+  lua_pushboolean(rawState, session->IsMultiplayer ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00898040 (FUN_00898040, cfunc_SessionIsObservingAllowed)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_SessionIsObservingAllowedL`.
+ */
+int moho::cfunc_SessionIsObservingAllowed(lua_State* const luaContext)
+{
+  return cfunc_SessionIsObservingAllowedL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00898060 (FUN_00898060, func_SessionIsObservingAllowed_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsObservingAllowed`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsObservingAllowed_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsObservingAllowed",
+    &moho::cfunc_SessionIsObservingAllowed,
+    nullptr,
+    "<global>",
+    kSessionIsObservingAllowedHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008980C0 (FUN_008980C0, cfunc_SessionIsObservingAllowedL)
+ *
+ * What it does:
+ * Pushes whether observing is enabled for the active world-session.
+ */
+int moho::cfunc_SessionIsObservingAllowedL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionIsObservingAllowedHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+  }
+
+  lua_pushboolean(rawState, session->IsObservingAllowed ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00898130 (FUN_00898130, cfunc_SessionCanRestart)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionCanRestartL`.
+ */
+int moho::cfunc_SessionCanRestart(lua_State* const luaContext)
+{
+  return cfunc_SessionCanRestartL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00898150 (FUN_00898150, func_SessionCanRestart_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionCanRestart`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionCanRestart_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionCanRestart",
+    &moho::cfunc_SessionCanRestart,
+    nullptr,
+    "<global>",
+    kSessionCanRestartHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008981B0 (FUN_008981B0, cfunc_SessionCanRestartL)
+ *
+ * What it does:
+ * Pushes whether restart launch metadata exists for the active session.
+ */
+int moho::cfunc_SessionCanRestartL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionCanRestartHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+  }
+
+  lua_pushboolean(rawState, session->mLaunchInfo.get() != nullptr ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00898220 (FUN_00898220, cfunc_SessionIsActive)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionIsActiveL`.
+ */
+int moho::cfunc_SessionIsActive(lua_State* const luaContext)
+{
+  return cfunc_SessionIsActiveL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00898240 (FUN_00898240, func_SessionIsActive_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionIsActive`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsActive_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionIsActive",
+    &moho::cfunc_SessionIsActive,
+    nullptr,
+    "<global>",
+    kSessionIsActiveHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008982A0 (FUN_008982A0, cfunc_SessionIsActiveL)
+ *
+ * What it does:
+ * Pushes whether any world-session is currently active.
+ */
+int moho::cfunc_SessionIsActiveL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionIsActiveHelpText, 0, argumentCount);
+  }
+
+  lua_pushboolean(rawState, WLD_GetActiveSession() != nullptr ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x008982F0 (FUN_008982F0, cfunc_SessionGetScenarioInfo)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_SessionGetScenarioInfoL`.
+ */
+int moho::cfunc_SessionGetScenarioInfo(lua_State* const luaContext)
+{
+  return cfunc_SessionGetScenarioInfoL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00898310 (FUN_00898310, func_SessionGetScenarioInfo_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionGetScenarioInfo`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionGetScenarioInfo_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionGetScenarioInfo",
+    &moho::cfunc_SessionGetScenarioInfo,
+    nullptr,
+    "<global>",
+    kSessionGetScenarioInfoHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00898370 (FUN_00898370, cfunc_SessionGetScenarioInfoL)
+ *
+ * What it does:
+ * Validates user-lua state ownership and pushes the active session
+ * `ScenarioInfo` table.
+ */
+int moho::cfunc_SessionGetScenarioInfoL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionGetScenarioInfoHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+  }
+
+  if (state->m_rootState != session->mState) {
+    LuaPlus::LuaState::Error(state, kWrongLuaStateText);
+  }
+
+  session->mScenarioInfo.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00842BB0 (FUN_00842BB0, cfunc_GetMouseWorldPos)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetMouseWorldPosL`.
+ */
+int moho::cfunc_GetMouseWorldPos(lua_State* const luaContext)
+{
+  return cfunc_GetMouseWorldPosL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00842BD0 (FUN_00842BD0, func_GetMouseWorldPosUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetMouseWorldPos`.
+ */
+moho::CScrLuaInitForm* moho::func_GetMouseWorldPosUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetMouseWorldPos",
+    &moho::cfunc_GetMouseWorldPos,
+    nullptr,
+    "<global>",
+    kGetMouseWorldPosUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00842C30 (FUN_00842C30, cfunc_GetMouseWorldPosL)
+ *
+ * What it does:
+ * Pushes current world-space mouse position as one Lua vector.
+ */
+int moho::cfunc_GetMouseWorldPosL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetMouseWorldPosUserHelpText, 0, argumentCount);
+  }
+
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  const LuaPlus::LuaObject worldPositionObject = SCR_ToLua<Wm3::Vector3<float>>(state, session->CursorWorldPos);
+  worldPositionObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00842D10 (FUN_00842D10, cfunc_GetMouseScreenPos)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetMouseScreenPosL`.
+ */
+int moho::cfunc_GetMouseScreenPos(lua_State* const luaContext)
+{
+  return cfunc_GetMouseScreenPosL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00842D30 (FUN_00842D30, func_GetMouseScreenPos_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetMouseScreenPos`.
+ */
+moho::CScrLuaInitForm* moho::func_GetMouseScreenPos_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetMouseScreenPos",
+    &moho::cfunc_GetMouseScreenPos,
+    nullptr,
+    "<global>",
+    kGetMouseScreenPosHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00842D90 (FUN_00842D90, cfunc_GetMouseScreenPosL)
+ *
+ * What it does:
+ * Pushes current screen-space mouse position as one Lua vector.
+ */
+int moho::cfunc_GetMouseScreenPosL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetMouseScreenPosHelpText, 0, argumentCount);
+  }
+
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  const LuaPlus::LuaObject screenPositionObject = SCR_ToLua<Wm3::Vector2<float>>(state, session->CursorScreenPos);
+  screenPositionObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00842E60 (FUN_00842E60, cfunc_SetFocusArmyUser)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SetFocusArmyUserL`.
+ */
+int moho::cfunc_SetFocusArmyUser(lua_State* const luaContext)
+{
+  return cfunc_SetFocusArmyUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00842E80 (FUN_00842E80, func_SetFocusArmyUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetFocusArmy`.
+ */
+moho::CScrLuaInitForm* moho::func_SetFocusArmyUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetFocusArmy",
+    &moho::cfunc_SetFocusArmyUser,
+    nullptr,
+    "<global>",
+    kSetFocusArmyUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00842EE0 (FUN_00842EE0, cfunc_SetFocusArmyUserL)
+ *
+ * What it does:
+ * Validates one-based army index input and requests focus-army update.
+ */
+int moho::cfunc_SetFocusArmyUserL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetFocusArmyUserHelpText, 1, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  LuaPlus::LuaStackObject indexArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&indexArg, "integer");
+  }
+
+  int focusArmyIndex = static_cast<int>(lua_tonumber(rawState, 1));
+  if (focusArmyIndex != -1) {
+    const int maxArmyIndexOneBased = static_cast<int>(session->userArmies.size());
+    if (focusArmyIndex < 1 || focusArmyIndex > maxArmyIndexOneBased) {
+      LuaPlus::LuaState::Error(
+        state,
+        "Invalid army index of %d; must be between 1 and %d inclusive.",
+        focusArmyIndex,
+        maxArmyIndexOneBased
+      );
+    }
+
+    --focusArmyIndex;
+  }
+
+  session->RequestFocusArmy(focusArmyIndex);
+  return 0;
+}
+
+/**
+ * Address: 0x00842FD0 (FUN_00842FD0, cfunc_GetFocusArmyUser)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetFocusArmyUserL`.
+ */
+int moho::cfunc_GetFocusArmyUser(lua_State* const luaContext)
+{
+  return cfunc_GetFocusArmyUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00842FF0 (FUN_00842FF0, func_GetFocusArmyUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetFocusArmy`.
+ */
+moho::CScrLuaInitForm* moho::func_GetFocusArmyUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetFocusArmy",
+    &moho::cfunc_GetFocusArmyUser,
+    nullptr,
+    "<global>",
+    kGetFocusArmyUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843050 (FUN_00843050, cfunc_GetFocusArmyUserL)
+ *
+ * What it does:
+ * Pushes the focused army as a one-based Lua index (`-1` when unset).
+ */
+int moho::cfunc_GetFocusArmyUserL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetFocusArmyUserHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  int focusArmy = session->FocusArmy;
+  if (focusArmy != -1) {
+    ++focusArmy;
+  }
+
+  lua_pushnumber(rawState, static_cast<float>(focusArmy));
+  return 1;
+}
+
+/**
+ * Address: 0x008430D0 (FUN_008430D0, cfunc_IsObserver)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_IsObserverL`.
+ */
+int moho::cfunc_IsObserver(lua_State* const luaContext)
+{
+  return cfunc_IsObserverL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008430F0 (FUN_008430F0, func_IsObserver_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsObserver`.
+ */
+moho::CScrLuaInitForm* moho::func_IsObserver_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "IsObserver",
+    &moho::cfunc_IsObserver,
+    nullptr,
+    "<global>",
+    kIsObserverHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843150 (FUN_00843150, cfunc_IsObserverL)
+ *
+ * What it does:
+ * Pushes whether the active focus army has no owning `UserArmy` entry.
+ */
+int moho::cfunc_IsObserverL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsObserverHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  UserArmy* focusArmy = nullptr;
+  const int focusArmyIndex = session->FocusArmy;
+  if (focusArmyIndex >= 0) {
+    focusArmy = session->userArmies[static_cast<std::size_t>(focusArmyIndex)];
+  }
+
+  lua_pushboolean(rawState, focusArmy == nullptr);
+  return 1;
+}
+
+/**
+ * Address: 0x008431D0 (FUN_008431D0, cfunc_GetGameTime)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetGameTimeL`.
+ */
+int moho::cfunc_GetGameTime(lua_State* const luaContext)
+{
+  return cfunc_GetGameTimeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008431F0 (FUN_008431F0, func_GetGameTime_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetGameTime`.
+ */
+moho::CScrLuaInitForm* moho::func_GetGameTime_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetGameTime",
+    &moho::cfunc_GetGameTime,
+    nullptr,
+    "<global>",
+    kGetGameTimeHelpText
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x00843250 (FUN_00843250, cfunc_GetGameTimeL)
  *
  * What it does:
@@ -6928,6 +14441,200 @@ int moho::cfunc_GetGameTimeL(LuaPlus::LuaState* const state)
   );
 
   lua_pushstring(rawState, formatted);
+  return 1;
+}
+
+/**
+ * Address: 0x00843380 (FUN_00843380, cfunc_GetGameTimeSecondsUser)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetGameTimeSecondsUserL`.
+ */
+int moho::cfunc_GetGameTimeSecondsUser(lua_State* const luaContext)
+{
+  return cfunc_GetGameTimeSecondsUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008433A0 (FUN_008433A0, func_GetGameTimeSecondsUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetGameTimeSeconds`.
+ */
+moho::CScrLuaInitForm* moho::func_GetGameTimeSecondsUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetGameTimeSeconds",
+    &moho::cfunc_GetGameTimeSecondsUser,
+    nullptr,
+    "<global>",
+    kGetGameTimeSecondsUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843400 (FUN_00843400, cfunc_GetGameTimeSecondsUserL)
+ *
+ * What it does:
+ * Pushes active-session elapsed game time in seconds as a Lua number.
+ */
+int moho::cfunc_GetGameTimeSecondsUserL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetGameTimeSecondsUserHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoActiveSessionText);
+  }
+
+  const float gameTimeSeconds = (static_cast<float>(session->mGameTick) + session->mTimeSinceLastTick) * 0.1f;
+  lua_pushnumber(rawState, gameTimeSeconds);
+  return 1;
+}
+
+/**
+ * Address: 0x00843480 (FUN_00843480, cfunc_GetSystemTime)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSystemTimeL`.
+ */
+int moho::cfunc_GetSystemTime(lua_State* const luaContext)
+{
+  return cfunc_GetSystemTimeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008434A0 (FUN_008434A0, func_GetSystemTime_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSystemTime`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSystemTime_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSystemTime",
+    &moho::cfunc_GetSystemTime,
+    nullptr,
+    "<global>",
+    kGetSystemTimeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843500 (FUN_00843500, cfunc_GetSystemTimeL)
+ *
+ * What it does:
+ * Formats process-system elapsed seconds as `HH:MM:SS` and returns one Lua
+ * string result.
+ */
+int moho::cfunc_GetSystemTimeL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSystemTimeHelpText, 0, argumentCount);
+  }
+
+  const auto totalSeconds = static_cast<long long>(gpg::time::GetSystemTimer().ElapsedSeconds());
+  const bool isNegative = totalSeconds < 0;
+  const unsigned long long absoluteSeconds = isNegative
+    ? static_cast<unsigned long long>(-(totalSeconds + 1)) + 1ULL
+    : static_cast<unsigned long long>(totalSeconds);
+  const int hours = static_cast<int>((absoluteSeconds / 3600ULL) % 24ULL);
+  const int minutes = static_cast<int>((absoluteSeconds / 60ULL) % 60ULL);
+  const int seconds = static_cast<int>(absoluteSeconds % 60ULL);
+
+  char formatted[16]{};
+  std::snprintf(
+    formatted,
+    sizeof(formatted),
+    isNegative ? "-%02d:%02d:%02d" : "%02d:%02d:%02d",
+    hours,
+    minutes,
+    seconds
+  );
+
+  lua_pushstring(rawState, formatted);
+  return 1;
+}
+
+/**
+ * Address: 0x008435F4 (FUN_008435F4)
+ *
+ * What it does:
+ * Normalizes Lua callback entry calling convention and forwards to
+ * `cfunc_GetSystemTimeSecondsL`.
+ */
+static int cfunc_GetSystemTimeSecondsDispatch(lua_State* const luaContext)
+{
+  return moho::cfunc_GetSystemTimeSecondsL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008435F0 (FUN_008435F0, cfunc_GetSystemTimeSeconds)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSystemTimeSecondsL`.
+ */
+int moho::cfunc_GetSystemTimeSeconds(lua_State* const luaContext)
+{
+  return cfunc_GetSystemTimeSecondsDispatch(luaContext);
+}
+
+/**
+ * Address: 0x00843610 (FUN_00843610, func_GetSystemTimeSeconds_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSystemTimeSeconds`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSystemTimeSeconds_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSystemTimeSeconds",
+    &moho::cfunc_GetSystemTimeSeconds,
+    nullptr,
+    "<global>",
+    kGetSystemTimeSecondsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843670 (FUN_00843670, cfunc_GetSystemTimeSecondsL)
+ *
+ * What it does:
+ * Pushes process-system elapsed time in seconds as a Lua number.
+ */
+int moho::cfunc_GetSystemTimeSecondsL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSystemTimeSecondsHelpText, 0, argumentCount);
+  }
+
+  lua_pushnumber(rawState, gpg::time::GetSystemTimer().ElapsedSeconds());
   return 1;
 }
 
@@ -7013,6 +14720,953 @@ moho::CScrLuaInitForm* moho::func_FormatTime_LuaFuncDef()
 }
 
 /**
+ * Address: 0x008438A0 (FUN_008438A0, cfunc_GetSimRate)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSimRateL`.
+ */
+int moho::cfunc_GetSimRate(lua_State* const luaContext)
+{
+  return cfunc_GetSimRateL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008438C0 (FUN_008438C0, func_GetSimRate_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSimRate`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSimRate_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSimRate",
+    &moho::cfunc_GetSimRate,
+    nullptr,
+    "<global>",
+    kGetSimRateHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843920 (FUN_00843920, cfunc_GetSimRateL)
+ *
+ * What it does:
+ * Pushes the current client-manager simulation rate as a Lua number.
+ */
+int moho::cfunc_GetSimRateL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSimRateHelpText, 0, argumentCount);
+  }
+
+  if (!WLD_GetActiveSession()) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+  lua_pushnumber(rawState, static_cast<float>(clientManager->GetSimRate()));
+  return 1;
+}
+
+/**
+ * Address: 0x008439A0 (FUN_008439A0, cfunc_GetArmiesTable)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetArmiesTableL`.
+ */
+int moho::cfunc_GetArmiesTable(lua_State* const luaContext)
+{
+  return cfunc_GetArmiesTableL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008439C0 (FUN_008439C0, func_GetArmiesTable_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetArmiesTable`.
+ */
+moho::CScrLuaInitForm* moho::func_GetArmiesTable_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetArmiesTable",
+    &moho::cfunc_GetArmiesTable,
+    nullptr,
+    "<global>",
+    kGetArmiesTableHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843A20 (FUN_00843A20, cfunc_GetArmiesTableL)
+ *
+ * What it does:
+ * Builds and returns one Lua table describing session armies and command
+ * source authorization lanes.
+ */
+int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmiesTableHelpText, 0, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  const msvc8::vector<UserArmy*>& armies = session->userArmies;
+  const std::size_t armyCount = armies.size();
+
+  LuaPlus::LuaObject result(state);
+  result.AssignNewTable(state, 0, 0u);
+  result.SetInteger("numArmies", static_cast<std::int32_t>(armyCount));
+
+  int focusArmy = session->FocusArmy;
+  if (focusArmy != -1) {
+    ++focusArmy;
+  }
+  result.SetInteger("focusArmy", focusArmy);
+
+  LuaPlus::LuaObject armiesTable(state);
+  armiesTable.AssignNewTable(state, static_cast<int>(armyCount), 0u);
+
+  for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
+    UserArmy* const army = armies[armyIndex];
+
+    LuaPlus::LuaObject armyEntry(state);
+    armyEntry.AssignNewTable(state, 0, 0u);
+    armyEntry.SetString("name", army->mArmyName.c_str());
+    armyEntry.SetString("nickname", army->mPlayerName.c_str());
+    armyEntry.SetInteger("faction", army->mVarDat.mFaction);
+
+    const LuaPlus::LuaObject playerColor = SCR_EncodeColor(state, army->mVarDat.mPlayerColorBgra);
+    armyEntry.SetObject("color", playerColor);
+
+    const LuaPlus::LuaObject iconColor = SCR_EncodeColor(state, army->mVarDat.mArmyColorBgra);
+    armyEntry.SetObject("iconColor", iconColor);
+
+    armyEntry.SetBoolean("showScore", army->mVarDat.mShowScore != 0u);
+    armyEntry.SetBoolean("civilian", army->mIsCivilian != 0u);
+    armyEntry.SetBoolean("human", gpg::STR_CompareNoCase(army->mVarDat.mArmyType.c_str(), "human") == 0);
+    armyEntry.SetBoolean("outOfGame", army->mVarDat.mIsOutOfGame != 0u);
+
+    LuaPlus::LuaObject authorizedCommandSources(state);
+    authorizedCommandSources.AssignNewTable(state, 0, 0u);
+    const Set& validSources = army->mVarDat.mValidCommandSources;
+    int luaSourceIndex = 1;
+    const std::size_t usedWords = static_cast<std::size_t>(validSources.items_end - validSources.items_begin);
+    for (std::size_t wordIndex = 0; wordIndex < usedWords; ++wordIndex) {
+      const std::uint32_t wordBits = validSources.items_begin[wordIndex];
+      if (wordBits == 0u) {
+        continue;
+      }
+
+      for (std::uint32_t bit = 0; bit < 32u; ++bit) {
+        if ((wordBits & (1u << bit)) == 0u) {
+          continue;
+        }
+        const std::uint32_t sourceId =
+          static_cast<std::uint32_t>((validSources.baseWordIndex + static_cast<std::int32_t>(wordIndex)) * 32u + bit);
+        authorizedCommandSources.SetInteger(luaSourceIndex++, static_cast<std::int32_t>(sourceId + 1u));
+      }
+    }
+
+    armyEntry.SetObject("authorizedCommandSources", authorizedCommandSources);
+    armiesTable.SetObject(static_cast<std::int32_t>(armyIndex + 1u), armyEntry);
+  }
+
+  result.SetObject("armiesTable", armiesTable);
+  result.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00843E50 (FUN_00843E50, cfunc_GetArmyScore)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetArmyScoreL`.
+ */
+int moho::cfunc_GetArmyScore(lua_State* const luaContext)
+{
+  return cfunc_GetArmyScoreL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00843E70 (FUN_00843E70, func_GetArmyScore_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetArmyScore`.
+ */
+moho::CScrLuaInitForm* moho::func_GetArmyScore_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetArmyScore",
+    &moho::cfunc_GetArmyScore,
+    nullptr,
+    "<global>",
+    kGetArmyScoreHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843ED0 (FUN_00843ED0, cfunc_GetArmyScoreL)
+ *
+ * What it does:
+ * Validates one argument and active-session precondition for the
+ * `GetArmyScore` global Lua callback lane.
+ */
+int moho::cfunc_GetArmyScoreL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmyScoreHelpText, 1, argumentCount);
+  }
+
+  if (WLD_GetActiveSession() == nullptr) {
+    LuaPlus::LuaState::Error(state, kNoSessionStartedText);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x00843F20 (FUN_00843F20, cfunc_DeleteCommand)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_DeleteCommandL`.
+ */
+int moho::cfunc_DeleteCommand(lua_State* const luaContext)
+{
+  return cfunc_DeleteCommandL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00843F40 (FUN_00843F40, func_DeleteCommand_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `DeleteCommand`.
+ */
+moho::CScrLuaInitForm* moho::func_DeleteCommand_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "DeleteCommand",
+    &moho::cfunc_DeleteCommand,
+    nullptr,
+    "<global>",
+    kDeleteCommandHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00843FA0 (FUN_00843FA0, cfunc_DeleteCommandL)
+ *
+ * What it does:
+ * Looks up one command issue helper by Lua command id and marshals one
+ * `DecreaseCommandCount` request through the active sim driver, then records
+ * one local helper queue update for the same command id/count delta.
+ */
+int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDeleteCommandHelpText, 1, argumentCount);
+  }
+
+  const CmdId commandId = ReadLuaCommandIdArg(state, 1);
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (!session) {
+    LuaPlus::LuaState::Error(state, "No active session!");
+    return 0;
+  }
+
+  CommandIssueHelperRuntimeView* const commandIssue = FindCommandIssueHelper(session, commandId);
+  if (!commandIssue) {
+    return 0;
+  }
+
+  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+    activeDriver->DecreaseCommandCount(commandIssue->commandId, 1);
+    QueueCommandIssueDecreaseCountEvent(*commandIssue, commandId, 1);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x008440A0 (FUN_008440A0, cfunc_GetSpecialFiles)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFilesL`.
+ */
+int moho::cfunc_GetSpecialFiles(lua_State* const luaContext)
+{
+  return cfunc_GetSpecialFilesL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008440C0 (FUN_008440C0, func_GetSpecialFiles_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSpecialFiles`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSpecialFiles_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSpecialFiles",
+    &moho::cfunc_GetSpecialFiles,
+    nullptr,
+    "<global>",
+    kGetSpecialFilesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00844120 (FUN_00844120, cfunc_GetSpecialFilesL)
+ *
+ * What it does:
+ * Resolves one special-file type and returns a Lua table containing grouped
+ * profile file basenames plus directory/extension metadata.
+ */
+int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSpecialFilesHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject typeArg(state, 1);
+  const char* const specialFileTypeLexical = lua_tostring(rawState, 1);
+  if (specialFileTypeLexical == nullptr) {
+    typeArg.TypeError("string");
+  }
+
+  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  std::string directory{};
+  std::string extension{};
+  std::map<std::string, std::vector<std::string>> filesByProfile{};
+  USER_GetSpecialFiles(specialFileType, directory, extension, filesByProfile);
+
+  LuaPlus::LuaObject filesTable(state);
+  filesTable.AssignNewTable(state, 0, 0);
+
+  for (const auto& [profileName, profileFiles] : filesByProfile) {
+    LuaPlus::LuaObject profileTable(state);
+    profileTable.AssignNewTable(state, 0, 0);
+
+    std::int32_t fileIndex = 1;
+    for (const std::string& fileNameWithExtension : profileFiles) {
+      const msvc8::string baseFileName = FILE_Base(fileNameWithExtension.c_str(), true);
+      profileTable.SetString(fileIndex, baseFileName.c_str());
+      ++fileIndex;
+    }
+
+    filesTable.SetObject(profileName.c_str(), profileTable);
+  }
+
+  LuaPlus::LuaObject result(state);
+  result.AssignNewTable(state, 0, 0);
+  result.SetObject("files", filesTable);
+  result.SetString("directory", directory.c_str());
+  result.SetString("extension", extension.c_str());
+  result.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00844540 (FUN_00844540, cfunc_GetSpecialFilePath)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFilePathL`.
+ */
+int moho::cfunc_GetSpecialFilePath(lua_State* const luaContext)
+{
+  return cfunc_GetSpecialFilePathL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00844560 (FUN_00844560, func_GetSpecialFilePath_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSpecialFilePath`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSpecialFilePath_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSpecialFilePath",
+    &moho::cfunc_GetSpecialFilePath,
+    nullptr,
+    "<global>",
+    kGetSpecialFilePathHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008445C0 (FUN_008445C0, cfunc_GetSpecialFilePathL)
+ *
+ * What it does:
+ * Resolves `(profile, filename, specialType)` and pushes one absolute
+ * user-special-file path (`directory\\profile\\filename.extension`).
+ */
+int moho::cfunc_GetSpecialFilePathL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSpecialFilePathHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject profileArg(state, 1);
+  const char* const profileName = lua_tostring(rawState, 1);
+  if (profileName == nullptr) {
+    profileArg.TypeError("string");
+  }
+
+  const LuaPlus::LuaStackObject fileNameArg(state, 2);
+  const char* const fileName = lua_tostring(rawState, 2);
+  if (fileName == nullptr) {
+    fileNameArg.TypeError("string");
+  }
+
+  const LuaPlus::LuaStackObject typeArg(state, 3);
+  const char* const specialFileTypeLexical = lua_tostring(rawState, 3);
+  if (specialFileTypeLexical == nullptr) {
+    typeArg.TypeError("string");
+  }
+
+  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  const msvc8::string directory = BuildSpecialFilePathDirectory(specialFileType);
+  const msvc8::string extension = BuildSpecialFilePathExtension(specialFileType);
+  const msvc8::string fullPath = directory + "\\" + profileName + "\\" + fileName + "." + extension;
+
+  lua_pushstring(rawState, fullPath.c_str());
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x00844C30 (FUN_00844C30, cfunc_GetSpecialFolder)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFolderL`.
+ */
+int moho::cfunc_GetSpecialFolder(lua_State* const luaContext)
+{
+  return cfunc_GetSpecialFolderL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00844C50 (FUN_00844C50, func_GetSpecialFolder_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSpecialFolder`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSpecialFolder_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSpecialFolder",
+    &moho::cfunc_GetSpecialFolder,
+    nullptr,
+    "<global>",
+    kGetSpecialFolderHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00844CB0 (FUN_00844CB0, cfunc_GetSpecialFolderL)
+ *
+ * What it does:
+ * Resolves one special-file type and pushes the matching root folder path.
+ */
+int moho::cfunc_GetSpecialFolderL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSpecialFolderHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject typeArg(state, 1);
+  const char* const specialFileTypeLexical = lua_tostring(rawState, 1);
+  if (specialFileTypeLexical == nullptr) {
+    typeArg.TypeError("string");
+  }
+
+  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  const msvc8::string directory = BuildSpecialFilePathDirectory(specialFileType);
+  lua_pushstring(rawState, directory.c_str());
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x00844F10 (FUN_00844F10, cfunc_RemoveSpecialFile)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_RemoveSpecialFileL`.
+ */
+int moho::cfunc_RemoveSpecialFile(lua_State* const luaContext)
+{
+  return cfunc_RemoveSpecialFileL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00844F30 (FUN_00844F30, func_RemoveSpecialFile_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `RemoveSpecialFile`.
+ */
+moho::CScrLuaInitForm* moho::func_RemoveSpecialFile_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RemoveSpecialFile",
+    &moho::cfunc_RemoveSpecialFile,
+    nullptr,
+    "<global>",
+    kRemoveSpecialFileHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00844F90 (FUN_00844F90, cfunc_RemoveSpecialFileL)
+ *
+ * What it does:
+ * Builds one profile-scoped special-file path and recycles it from disk.
+ */
+int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRemoveSpecialFileHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject typeArg(state, 3);
+  const char* const specialFileTypeLexical = lua_tostring(rawState, 3);
+  if (specialFileTypeLexical == nullptr) {
+    typeArg.TypeError("string");
+  }
+
+  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  msvc8::string directory;
+  msvc8::string extension;
+  switch (specialFileType) {
+    case SpecialFileTypeRuntime::SaveGame:
+      directory = USER_GetSaveGameDir();
+      extension = USER_GetSaveGameExt();
+      break;
+    case SpecialFileTypeRuntime::Replay:
+      directory = USER_GetReplayDir();
+      extension = USER_GetReplayExt();
+      break;
+    case SpecialFileTypeRuntime::CampaignSave:
+      directory = USER_GetSaveGameDir();
+      extension = USER_GetCampaignSaveExt();
+      break;
+    case SpecialFileTypeRuntime::Screenshot:
+    default:
+      ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  const LuaPlus::LuaStackObject profileArg(state, 1);
+  const char* const profileName = lua_tostring(rawState, 1);
+  if (profileName == nullptr) {
+    profileArg.TypeError("string");
+  }
+
+  const LuaPlus::LuaStackObject baseNameArg(state, 2);
+  const char* const baseName = lua_tostring(rawState, 2);
+  if (baseName == nullptr) {
+    baseNameArg.TypeError("string");
+  }
+
+  const msvc8::string fullPath = directory + profileName + "\\" + baseName + "." + extension;
+  DISK_Recycle(fullPath.c_str());
+  return 0;
+}
+
+/**
+ * Address: 0x00845540 (FUN_00845540, cfunc_GetSpecialFileInfo)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFileInfoL`.
+ */
+int moho::cfunc_GetSpecialFileInfo(lua_State* const luaContext)
+{
+  return cfunc_GetSpecialFileInfoL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00845560 (FUN_00845560, func_GetSpecialFileInfo_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetSpecialFileInfo`.
+ */
+moho::CScrLuaInitForm* moho::func_GetSpecialFileInfo_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetSpecialFileInfo",
+    &moho::cfunc_GetSpecialFileInfo,
+    nullptr,
+    "<global>",
+    kGetSpecialFileInfoHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008455C0 (FUN_008455C0, cfunc_GetSpecialFileInfoL)
+ *
+ * What it does:
+ * Returns metadata table for one profile-scoped special file, or `nil` when
+ * the file does not exist.
+ */
+int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSpecialFileInfoHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject typeArg(state, 3);
+  const char* const specialFileTypeLexical = lua_tostring(rawState, 3);
+  if (specialFileTypeLexical == nullptr) {
+    typeArg.TypeError("string");
+  }
+
+  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  msvc8::string directory;
+  msvc8::string extension;
+  switch (specialFileType) {
+    case SpecialFileTypeRuntime::SaveGame:
+      directory = USER_GetSaveGameDir();
+      extension = USER_GetSaveGameExt();
+      break;
+    case SpecialFileTypeRuntime::Replay:
+      directory = USER_GetReplayDir();
+      extension = USER_GetReplayExt();
+      break;
+    case SpecialFileTypeRuntime::CampaignSave:
+      directory = USER_GetSaveGameDir();
+      extension = USER_GetCampaignSaveExt();
+      break;
+    case SpecialFileTypeRuntime::Screenshot:
+    default:
+      ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  }
+
+  const LuaPlus::LuaStackObject profileArg(state, 1);
+  const char* const profileName = lua_tostring(rawState, 1);
+  if (profileName == nullptr) {
+    profileArg.TypeError("string");
+  }
+
+  const LuaPlus::LuaStackObject baseNameArg(state, 2);
+  const char* const baseName = lua_tostring(rawState, 2);
+  if (baseName == nullptr) {
+    baseNameArg.TypeError("string");
+  }
+
+  const msvc8::string fullPath = directory + profileName + "\\" + baseName + "." + extension;
+  const std::wstring widePath = gpg::STR_Utf8ToWide(fullPath.c_str());
+
+  WIN32_FILE_ATTRIBUTE_DATA attributeData{};
+  if (::GetFileAttributesExW(widePath.c_str(), GetFileExInfoStandard, &attributeData) == FALSE) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject fileInfo(state);
+  fileInfo.AssignNewTable(state, 0, 0u);
+  fileInfo.SetBoolean("IsFolder", (attributeData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0u);
+  fileInfo.SetBoolean("ReadOnly", (attributeData.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0u);
+  fileInfo.SetInteger("SizeBytes", static_cast<std::int32_t>(attributeData.nFileSizeLow));
+
+  ULARGE_INTEGER writeTimeStamp{};
+  writeTimeStamp.LowPart = attributeData.ftLastWriteTime.dwLowDateTime;
+  writeTimeStamp.HighPart = attributeData.ftLastWriteTime.dwHighDateTime;
+  const msvc8::string stampText = gpg::STR_Printf("%016llx", static_cast<unsigned long long>(writeTimeStamp.QuadPart));
+  fileInfo.SetString("TimeStamp", stampText.c_str());
+
+  FILETIME localWriteFileTime{};
+  SYSTEMTIME localWriteTime{};
+  (void)::FileTimeToLocalFileTime(&attributeData.ftLastWriteTime, &localWriteFileTime);
+  (void)::FileTimeToSystemTime(&localWriteFileTime, &localWriteTime);
+
+  LuaPlus::LuaObject writeTimeTable(state);
+  writeTimeTable.AssignNewTable(state, 0, 0u);
+  writeTimeTable.SetInteger("year", static_cast<std::int32_t>(localWriteTime.wYear));
+  writeTimeTable.SetInteger("month", static_cast<std::int32_t>(localWriteTime.wMonth));
+  writeTimeTable.SetInteger("mday", static_cast<std::int32_t>(localWriteTime.wDay));
+  writeTimeTable.SetInteger("wday", static_cast<std::int32_t>(localWriteTime.wDayOfWeek));
+  writeTimeTable.SetInteger("hour", static_cast<std::int32_t>(localWriteTime.wHour));
+  writeTimeTable.SetInteger("minute", static_cast<std::int32_t>(localWriteTime.wMinute));
+  writeTimeTable.SetInteger("second", static_cast<std::int32_t>(localWriteTime.wSecond));
+  fileInfo.SetObject("WriteTime", writeTimeTable);
+
+  fileInfo.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00845DF0 (FUN_00845DF0, cfunc_RemoveProfileDirectories)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_RemoveProfileDirectoriesL`.
+ */
+int moho::cfunc_RemoveProfileDirectories(lua_State* const luaContext)
+{
+  return cfunc_RemoveProfileDirectoriesL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00845E10 (FUN_00845E10, func_RemoveProfileDirectories_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `RemoveProfileDirectories`.
+ */
+moho::CScrLuaInitForm* moho::func_RemoveProfileDirectories_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RemoveProfileDirectories",
+    &moho::cfunc_RemoveProfileDirectories,
+    nullptr,
+    "<global>",
+    kRemoveProfileDirectoriesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00845E70 (FUN_00845E70, cfunc_RemoveProfileDirectoriesL)
+ *
+ * What it does:
+ * Recycles replay/save profile-scoped directories and companion lanes for one
+ * profile string.
+ */
+int moho::cfunc_RemoveProfileDirectoriesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRemoveProfileDirectoriesHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject profileArg(state, 1);
+  const char* const profileName = lua_tostring(state->m_state, 1);
+  if (profileName == nullptr) {
+    profileArg.TypeError("string");
+  }
+
+  // Binary lane calls replay/save directory helpers twice each before recycling.
+  const msvc8::string replayProfilePathA = USER_GetReplayDir() + profileName;
+  const msvc8::string saveProfilePathA = USER_GetSaveGameDir() + profileName;
+  const msvc8::string replayProfilePathB = USER_GetReplayDir() + profileName;
+  const msvc8::string saveProfilePathB = USER_GetSaveGameDir() + profileName;
+
+  DISK_Recycle(replayProfilePathA.c_str());
+  DISK_Recycle(saveProfilePathA.c_str());
+  DISK_Recycle(replayProfilePathB.c_str());
+  DISK_Recycle(saveProfilePathB.c_str());
+  return 0;
+}
+
+/**
+ * Address: 0x00846200 (FUN_00846200, cfunc_CopyCurrentReplay)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_CopyCurrentReplayL`.
+ */
+int moho::cfunc_CopyCurrentReplay(lua_State* const luaContext)
+{
+  return cfunc_CopyCurrentReplayL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00846220 (FUN_00846220, func_CopyCurrentReplay_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `CopyCurrentReplay`.
+ */
+moho::CScrLuaInitForm* moho::func_CopyCurrentReplay_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "CopyCurrentReplay",
+    &moho::cfunc_CopyCurrentReplay,
+    nullptr,
+    "<global>",
+    kCopyCurrentReplayHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00846280 (FUN_00846280, cfunc_CopyCurrentReplayL)
+ *
+ * What it does:
+ * Copies the localized `LastGame` replay from one profile lane to a new replay
+ * filename in that profile.
+ */
+int moho::cfunc_CopyCurrentReplayL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCopyCurrentReplayHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject profileArg(state, 1);
+  const char* const profileName = lua_tostring(state->m_state, 1);
+  if (profileName == nullptr) {
+    profileArg.TypeError("string");
+  }
+
+  const LuaPlus::LuaStackObject filenameArg(state, 2);
+  const char* const newFilename = lua_tostring(state->m_state, 2);
+  if (newFilename == nullptr) {
+    filenameArg.TypeError("string");
+  }
+
+  const msvc8::string replayDirectory = USER_GetReplayDir();
+  const msvc8::string replayExtension = USER_GetReplayExt();
+  const msvc8::string localizedLastGame = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+  const msvc8::string replayPrefix = replayDirectory + profileName + "\\";
+
+  const msvc8::string sourcePath = replayPrefix + localizedLastGame + "." + replayExtension;
+  const msvc8::string destinationPath = replayPrefix + newFilename + "." + replayExtension;
+
+  const std::wstring destinationWide = gpg::STR_Utf8ToWide(destinationPath.c_str());
+  const std::wstring sourceWide = gpg::STR_Utf8ToWide(sourcePath.c_str());
+  if (::CopyFileW(sourceWide.c_str(), destinationWide.c_str(), FALSE) == FALSE) {
+    const msvc8::string lastError = WIN_GetLastError();
+    gpg::Logf("Unable to copy replay file: %s", lastError.c_str());
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x00846F70 (FUN_00846F70, cfunc_SetOverlayFilters)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetOverlayFiltersL`.
+ */
+int moho::cfunc_SetOverlayFilters(lua_State* const luaContext)
+{
+  return cfunc_SetOverlayFiltersL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00846F90 (FUN_00846F90, func_SetOverlayFilters_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetOverlayFilters`.
+ */
+moho::CScrLuaInitForm* moho::func_SetOverlayFilters_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SetOverlayFilters",
+    &moho::cfunc_SetOverlayFilters,
+    nullptr,
+    "<global>",
+    kSetOverlayFiltersHelpText
+  );
+  return &binder;
+}
+
+/**
  * Address: 0x00846FF0 (FUN_00846FF0, cfunc_SetOverlayFiltersL)
  *
  * What it does:
@@ -7049,6 +15703,295 @@ int moho::cfunc_SetOverlayFiltersL(LuaPlus::LuaState* const state)
 
   session->mOverlayFilters = std::move(parsedFilters);
   return 0;
+}
+
+/**
+ * Address: 0x00847A20 (FUN_00847A20, cfunc_ClearBuildTemplates)
+ *
+ * What it does:
+ * Clears user-session build-template state when a world session is active.
+ */
+int moho::cfunc_ClearBuildTemplates(lua_State* const luaContext)
+{
+  (void)LuaPlus::LuaState::CastState(luaContext);
+  if (CWldSession* const session = WLD_GetActiveSession()) {
+    session->ClearBuildTemplates();
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x00847A50 (FUN_00847A50, func_ClearBuildTemplates_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global user-Lua binder definition for `ClearBuildTemplates`.
+ */
+moho::CScrLuaInitForm* moho::func_ClearBuildTemplates_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "ClearBuildTemplates",
+    &moho::cfunc_ClearBuildTemplates,
+    nullptr,
+    "<global>",
+    kClearBuildTemplatesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00847AD0 (FUN_00847AD0, cfunc_RenderOverlayMilitary)
+ *
+ * What it does:
+ * Retains legacy `RenderOverlayMilitary(bool)` argument validation and emits a
+ * deprecation warning.
+ */
+int moho::cfunc_RenderOverlayMilitary(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRenderOverlayMilitaryHelpText, 1, argumentCount);
+  }
+  gpg::Warnf("RenderOverlayMilitary is deprecated");
+  return 0;
+}
+
+/**
+ * Address: 0x00847B20 (FUN_00847B20, func_RenderOverlayMilitary_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global user-Lua binder definition for `RenderOverlayMilitary`.
+ */
+moho::CScrLuaInitForm* moho::func_RenderOverlayMilitary_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RenderOverlayMilitary",
+    &moho::cfunc_RenderOverlayMilitary,
+    nullptr,
+    "<global>",
+    kRenderOverlayMilitaryHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00847BC0 (FUN_00847BC0, cfunc_RenderOverlayIntel)
+ *
+ * What it does:
+ * Retains legacy `RenderOverlayIntel(bool)` argument validation and emits a
+ * deprecation warning.
+ */
+int moho::cfunc_RenderOverlayIntel(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRenderOverlayIntelHelpText, 1, argumentCount);
+  }
+  gpg::Warnf("RenderOverlayIntel is deprecated");
+  return 0;
+}
+
+/**
+ * Address: 0x00847C10 (FUN_00847C10, func_RenderOverlayIntel_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global user-Lua binder definition for `RenderOverlayIntel`.
+ */
+moho::CScrLuaInitForm* moho::func_RenderOverlayIntel_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RenderOverlayIntel",
+    &moho::cfunc_RenderOverlayIntel,
+    nullptr,
+    "<global>",
+    kRenderOverlayIntelHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00847CB0 (FUN_00847CB0, cfunc_RenderOverlayEconomy)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_RenderOverlayEconomyL`.
+ */
+int moho::cfunc_RenderOverlayEconomy(lua_State* const luaContext)
+{
+  return cfunc_RenderOverlayEconomyL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00847CD0 (FUN_00847CD0, func_RenderOverlayEconomy_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global user-Lua binder definition for
+ * `RenderOverlayEconomy`.
+ */
+moho::CScrLuaInitForm* moho::func_RenderOverlayEconomy_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "RenderOverlayEconomy",
+    &moho::cfunc_RenderOverlayEconomy,
+    nullptr,
+    "<global>",
+    kRenderOverlayEconomyHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00847D30 (FUN_00847D30, cfunc_RenderOverlayEconomyL)
+ *
+ * What it does:
+ * Reads one Lua bool and updates the active user session economy-overlay flag.
+ */
+int moho::cfunc_RenderOverlayEconomyL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kRenderOverlayEconomyHelpText, 1, argumentCount);
+  }
+
+  if (CWldSession* const session = WLD_GetActiveSession()) {
+    const LuaPlus::LuaStackObject enabledArg(state, 1);
+    session->DisplayEconomyOverlay = enabledArg.GetBoolean();
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x00847D90 (FUN_00847D90, cfunc_TeamColorMode)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_TeamColorModeL`.
+ */
+int moho::cfunc_TeamColorMode(lua_State* const luaContext)
+{
+  return cfunc_TeamColorModeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00847DB0 (FUN_00847DB0, func_TeamColorMode_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global user-Lua binder definition for `TeamColorMode`.
+ */
+moho::CScrLuaInitForm* moho::func_TeamColorMode_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "TeamColorMode",
+    &moho::cfunc_TeamColorMode,
+    nullptr,
+    "<global>",
+    kTeamColorModeHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00847E10 (FUN_00847E10, cfunc_TeamColorModeL)
+ *
+ * What it does:
+ * Validates one Lua bool and updates the active user session team-color mode.
+ */
+int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kTeamColorModeHelpText, 1, argumentCount);
+  }
+
+  if (CWldSession* const session = WLD_GetActiveSession()) {
+    const LuaPlus::LuaStackObject modeArg(state, 1);
+    if (lua_type(state->m_state, 1) != LUA_TBOOLEAN) {
+      modeArg.TypeError("bool");
+    }
+    session->mTeamColorMode = modeArg.GetBoolean();
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x00847E70 (FUN_00847E70, cfunc_GetUnitByIdUser)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetUnitByIdUserL`.
+ */
+int moho::cfunc_GetUnitByIdUser(lua_State* const luaContext)
+{
+  return cfunc_GetUnitByIdUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00847E90 (FUN_00847E90, func_GetUnitByIdUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global user-Lua binder definition for `GetUnitById`.
+ */
+moho::CScrLuaInitForm* moho::func_GetUnitByIdUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "GetUnitById",
+    &moho::cfunc_GetUnitByIdUser,
+    nullptr,
+    "<global>",
+    kGetUnitByIdUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00847EF0 (FUN_00847EF0, cfunc_GetUnitByIdUserL)
+ *
+ * What it does:
+ * Resolves one entity id through user-session map lanes and returns the
+ * matching user-unit Lua object, or `nil` when no unit is found.
+ */
+int moho::cfunc_GetUnitByIdUserL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitByIdUserHelpText, 1, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  const LuaPlus::LuaStackObject entityIdArg(state, 1);
+  const char* entityIdText = lua_tostring(rawState, 1);
+  if (entityIdText == nullptr) {
+    entityIdArg.TypeError("string");
+    entityIdText = "";
+  }
+
+  const std::int32_t entityId = std::atoi(entityIdText);
+  UserEntity* const entity = FindUserSessionEntityById(session, entityId);
+  UserUnit* const userUnit = entity ? entity->IsUserUnit() : nullptr;
+  if (userUnit == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  GetUserUnitLuaObjectView(userUnit).luaObject.PushStack(state);
+  return 1;
 }
 
 /**
@@ -7094,6 +16037,145 @@ int moho::cfunc_SetInvertMidMouseButton(lua_State* const luaContext)
   const bool invertMiddleMouse = lua_toboolean(luaContext, 1) != 0;
   PatchMiddleMouseScrubOpcode(invertMiddleMouse);
   return 0;
+}
+
+/**
+ * Address: 0x0074B570 (FUN_0074B570, cfunc_printSim)
+ *
+ * What it does:
+ * Concatenates Lua print arguments and emits one line into sim print/log
+ * output.
+ */
+int moho::cfunc_printSim(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  SCR_ConcatArgsAndCall(state, '\t', &PrintSimConcatSink);
+  return 0;
+}
+
+/**
+ * Address: 0x0074B590 (FUN_0074B590, func_printSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `print(...)` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_printSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(SimLuaInitSet(), "print", &moho::cfunc_printSim, nullptr, "<global>", kPrintSimHelpText);
+  return &binder;
+}
+
+/**
+ * Address: 0x0074B620 (FUN_0074B620, cfunc_CheatsEnabled)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_CheatsEnabledL`.
+ */
+int moho::cfunc_CheatsEnabled(lua_State* const luaContext)
+{
+  return cfunc_CheatsEnabledL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0074B640 (FUN_0074B640, func_CheatsEnabled_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `CheatsEnabled()` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_CheatsEnabled_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "CheatsEnabled",
+    &moho::cfunc_CheatsEnabled,
+    nullptr,
+    "<global>",
+    kCheatsEnabledHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0074B6A0 (FUN_0074B6A0, cfunc_CheatsEnabledL)
+ *
+ * What it does:
+ * Validates no Lua args and returns `Sim::CheatsEnabled()` as a boolean.
+ */
+int moho::cfunc_CheatsEnabledL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCheatsEnabledHelpText, 0, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(state->m_state);
+  const bool cheatsEnabled = sim != nullptr && sim->CheatsEnabled();
+  lua_pushboolean(state->m_state, cheatsEnabled ? 1 : 0);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0074B710 (FUN_0074B710, cfunc_GetCurrentCommandSource)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to
+ * `cfunc_GetCurrentCommandSourceL`.
+ */
+int moho::cfunc_GetCurrentCommandSource(lua_State* const luaContext)
+{
+  return cfunc_GetCurrentCommandSourceL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0074B730 (FUN_0074B730, func_GetCurrentCommandSource_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetCurrentCommandSource()` Lua binder in the sim init
+ * set.
+ */
+moho::CScrLuaInitForm* moho::func_GetCurrentCommandSource_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetCurrentCommandSource",
+    &moho::cfunc_GetCurrentCommandSource,
+    nullptr,
+    "<global>",
+    kGetCurrentCommandSourceHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0074B790 (FUN_0074B790, cfunc_GetCurrentCommandSourceL)
+ *
+ * What it does:
+ * Returns the current command source index as 1-based Lua number, or nil
+ * when no source is active.
+ */
+int moho::cfunc_GetCurrentCommandSourceL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCurrentCommandSourceHelpText, 0, argumentCount);
+  }
+
+  const Sim* const sim = ResolveGlobalSim(state->m_state);
+  const SSTICommandSource* const source = sim != nullptr ? sim->GetCurrentCommandSource() : nullptr;
+  if (source == nullptr) {
+    lua_pushnil(state->m_state);
+    (void)lua_gettop(state->m_state);
+    return 1;
+  }
+
+  lua_pushnumber(state->m_state, static_cast<float>(source->mIndex + 1u));
+  (void)lua_gettop(state->m_state);
+  return 1;
 }
 
 /**
@@ -7169,6 +16251,772 @@ int moho::cfunc_IsGameOver(lua_State* const luaContext)
 }
 
 /**
+ * Address: 0x0075A5A0 (FUN_0075A5A0, func_GenerateRandomOrientation_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GenerateRandomOrientation()` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GenerateRandomOrientation_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GenerateRandomOrientation",
+    &moho::cfunc_GenerateRandomOrientation,
+    nullptr,
+    "<global>",
+    kGenerateRandomOrientationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075A580 (FUN_0075A580, cfunc_GenerateRandomOrientation)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GenerateRandomOrientationL`.
+ */
+int moho::cfunc_GenerateRandomOrientation(lua_State* const luaContext)
+{
+  return cfunc_GenerateRandomOrientationL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075A600 (FUN_0075A600, cfunc_GenerateRandomOrientationL)
+ *
+ * What it does:
+ * Samples four Gaussian random lanes, normalizes one quaternion, and returns
+ * it as a Lua quaternion object.
+ */
+int moho::cfunc_GenerateRandomOrientationL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGenerateRandomOrientationHelpText, 0, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  CRandomStream* const random = sim->mRngState;
+
+  Wm3::Quaternionf orientation{};
+  orientation.y = random->FRandGaussian();
+  orientation.z = random->FRandGaussian();
+  orientation.w = random->FRandGaussian();
+  orientation.x = random->FRandGaussian();
+
+  const float magnitude = std::sqrt(
+    (orientation.x * orientation.x) + (orientation.y * orientation.y) + (orientation.z * orientation.z) +
+    (orientation.w * orientation.w)
+  );
+  if (magnitude <= 1.0e-6f) {
+    orientation = Wm3::Quaternionf{};
+  } else {
+    const float inverseMagnitude = 1.0f / magnitude;
+    orientation.x *= inverseMagnitude;
+    orientation.y *= inverseMagnitude;
+    orientation.z *= inverseMagnitude;
+    orientation.w *= inverseMagnitude;
+  }
+
+  LuaPlus::LuaObject rotationObject = SCR_ToLua<Wm3::Quaternionf>(state, orientation);
+  rotationObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075A770 (FUN_0075A770, cfunc_GetGameTimeSecondsSim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetGameTimeSecondsSimL`.
+ */
+int moho::cfunc_GetGameTimeSecondsSim(lua_State* const luaContext)
+{
+  return cfunc_GetGameTimeSecondsSimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075A790 (FUN_0075A790, func_GetGameTimeSecondsSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetGameTimeSeconds()` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetGameTimeSecondsSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetGameTimeSeconds",
+    &moho::cfunc_GetGameTimeSecondsSim,
+    nullptr,
+    "<global>",
+    kGetGameTimeSecondsSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075A7F0 (FUN_0075A7F0, cfunc_GetGameTimeSecondsSimL)
+ *
+ * What it does:
+ * Validates no Lua args and returns simulation time in seconds.
+ */
+int moho::cfunc_GetGameTimeSecondsSimL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetGameTimeSecondsSimHelpText, 0, argumentCount);
+  }
+
+  const Sim* const sim = ResolveGlobalSim(state->m_state);
+  lua_pushnumber(state->m_state, static_cast<float>(sim->mCurTick) * 0.1f);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075A860 (FUN_0075A860, cfunc_GetGameTick)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetGameTickL`.
+ */
+int moho::cfunc_GetGameTick(lua_State* const luaContext)
+{
+  return cfunc_GetGameTickL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075A880 (FUN_0075A880, func_GetGameTick_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetGameTick()` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetGameTick_LuaFuncDef()
+{
+  static CScrLuaBinder
+    binder(SimLuaInitSet(), "GetGameTick", &moho::cfunc_GetGameTick, nullptr, "<global>", kGetGameTickHelpText);
+  return &binder;
+}
+
+/**
+ * Address: 0x0075A8E0 (FUN_0075A8E0, cfunc_GetGameTickL)
+ *
+ * What it does:
+ * Validates no Lua args and returns simulation tick count.
+ */
+int moho::cfunc_GetGameTickL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetGameTickHelpText, 0, argumentCount);
+  }
+
+  const Sim* const sim = ResolveGlobalSim(state->m_state);
+  lua_pushnumber(state->m_state, static_cast<float>(sim->mCurTick));
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075A950 (FUN_0075A950, cfunc_GetSystemTimeSecondsOnlyForProfileUse)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_GetSystemTimeSecondsOnlyForProfileUseL`.
+ */
+int moho::cfunc_GetSystemTimeSecondsOnlyForProfileUse(lua_State* const luaContext)
+{
+  return cfunc_GetSystemTimeSecondsOnlyForProfileUseL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075A970 (FUN_0075A970, func_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetSystemTimeSecondsOnlyForProfileUse()` Lua binder in
+ * the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_GetSystemTimeSecondsOnlyForProfileUse_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetSystemTimeSecondsOnlyForProfileUse",
+    &moho::cfunc_GetSystemTimeSecondsOnlyForProfileUse,
+    nullptr,
+    "<global>",
+    kGetSystemTimeSecondsOnlyForProfileUseHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075A9D0 (FUN_0075A9D0, cfunc_GetSystemTimeSecondsOnlyForProfileUseL)
+ *
+ * What it does:
+ * Validates no Lua args and returns system timer elapsed seconds.
+ */
+int moho::cfunc_GetSystemTimeSecondsOnlyForProfileUseL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(
+      state,
+      kLuaExpectedArgsWarning,
+      kGetSystemTimeSecondsOnlyForProfileUseHelpText,
+      0,
+      argumentCount
+    );
+  }
+
+  lua_pushnumber(state->m_state, gpg::time::GetSystemTimer().ElapsedSeconds());
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075AE00 (FUN_0075AE00, cfunc_GetUnitsInRect)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetUnitsInRectL`.
+ */
+int moho::cfunc_GetUnitsInRect(lua_State* const luaContext)
+{
+  return cfunc_GetUnitsInRectL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075AE20 (FUN_0075AE20, func_GetUnitsInRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetUnitsInRect(...)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetUnitsInRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetUnitsInRect",
+    &moho::cfunc_GetUnitsInRect,
+    nullptr,
+    "<global>",
+    kGetUnitsInRectHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075AE80 (FUN_0075AE80, cfunc_GetUnitsInRectL)
+ *
+ * What it does:
+ * Reads one rectangle (`rect` or `x0,z0,x1,z1`) and returns a Lua table of
+ * unit objects inside the query rectangle.
+ */
+int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  gpg::Rect2f queryRect{};
+  if (!ParseRectFromLuaArguments(state, kGetUnitsInRectHelpText, queryRect)) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  Sim* const sim = ResolveGlobalSim(rawState);
+  CEntityDb* const entityDb = sim ? sim->mEntityDB : nullptr;
+  if (entityDb == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  std::vector<Unit*> unitsInRect{};
+  for (Entity* const entity : entityDb->Entities()) {
+    if (entity == nullptr || !IsEntityPositionInsideRect(entity, queryRect)) {
+      continue;
+    }
+
+    Unit* const unit = entity->IsUnit();
+    if (unit != nullptr) {
+      unitsInRect.push_back(unit);
+    }
+  }
+
+  if (unitsInRect.empty()) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject resultTable{};
+  resultTable.AssignNewTable(state, static_cast<int>(unitsInRect.size()), 0);
+  int luaIndex = 1;
+  for (Unit* const unit : unitsInRect) {
+    const LuaPlus::LuaObject unitObject = unit->GetLuaObject();
+    resultTable.SetObject(luaIndex, unitObject);
+    ++luaIndex;
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075B200 (FUN_0075B200, cfunc_GetReclaimablesInRect)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_GetReclaimablesInRectL`.
+ */
+int moho::cfunc_GetReclaimablesInRect(lua_State* const luaContext)
+{
+  return cfunc_GetReclaimablesInRectL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075B220 (FUN_0075B220, func_GetReclaimablesInRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetReclaimablesInRect(...)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetReclaimablesInRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetReclaimablesInRect",
+    &moho::cfunc_GetReclaimablesInRect,
+    nullptr,
+    "<global>",
+    kGetReclaimablesInRectHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075B280 (FUN_0075B280, cfunc_GetReclaimablesInRectL)
+ *
+ * What it does:
+ * Reads one rectangle (`rect` or `x0,z0,x1,z1`) and returns a Lua table of
+ * reclaimable entity objects (units/props) inside the query rectangle.
+ */
+int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  gpg::Rect2f queryRect{};
+  if (!ParseRectFromLuaArguments(state, kGetReclaimablesInRectHelpText, queryRect)) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  Sim* const sim = ResolveGlobalSim(rawState);
+  CEntityDb* const entityDb = sim ? sim->mEntityDB : nullptr;
+  if (entityDb == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  std::vector<Entity*> reclaimablesInRect{};
+  for (Entity* const entity : entityDb->Entities()) {
+    if (entity == nullptr || !IsEntityPositionInsideRect(entity, queryRect)) {
+      continue;
+    }
+
+    if (entity->IsUnit() == nullptr && entity->IsProp() == nullptr) {
+      continue;
+    }
+
+    reclaimablesInRect.push_back(entity);
+  }
+
+  if (reclaimablesInRect.empty()) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject resultTable{};
+  resultTable.AssignNewTable(state, static_cast<int>(reclaimablesInRect.size()), 0);
+  int luaIndex = 1;
+  for (Entity* const entity : reclaimablesInRect) {
+    const LuaPlus::LuaObject entityObject = entity->mLuaObj;
+    resultTable.SetObject(luaIndex, entityObject);
+    ++luaIndex;
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075BBE0 (FUN_0075BBE0, cfunc_GetMapSize)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetMapSizeL`.
+ */
+int moho::cfunc_GetMapSize(lua_State* const luaContext)
+{
+  return cfunc_GetMapSizeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075BC00 (FUN_0075BC00, func_GetMapSize_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetMapSize()` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetMapSize_LuaFuncDef()
+{
+  static CScrLuaBinder
+    binder(SimLuaInitSet(), "GetMapSize", &moho::cfunc_GetMapSize, nullptr, "<global>", kGetMapSizeHelpText);
+  return &binder;
+}
+
+/**
+ * Address: 0x0075BC60 (FUN_0075BC60, cfunc_GetMapSizeL)
+ *
+ * What it does:
+ * Validates no Lua args and returns map width/height extents in terrain grid
+ * coordinates.
+ */
+int moho::cfunc_GetMapSizeL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetMapSizeHelpText, 0, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(state->m_state);
+  STIMap* const map = sim->mMapData;
+  CHeightField* const field = map->mHeightField.get();
+  lua_pushnumber(state->m_state, static_cast<float>(field->width - 1));
+  (void)lua_gettop(state->m_state);
+  lua_pushnumber(state->m_state, static_cast<float>(field->height - 1));
+  (void)lua_gettop(state->m_state);
+  return 2;
+}
+
+/**
+ * Address: 0x0075BD10 (FUN_0075BD10, func_GetTerrainHeight_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetTerrainHeight(x,z)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetTerrainHeight_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetTerrainHeight",
+    &moho::cfunc_GetTerrainHeight,
+    nullptr,
+    "<global>",
+    kGetTerrainHeightHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075BCF0 (FUN_0075BCF0, cfunc_GetTerrainHeight)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetTerrainHeightL`.
+ */
+int moho::cfunc_GetTerrainHeight(lua_State* const luaContext)
+{
+  return cfunc_GetTerrainHeightL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075BD70 (FUN_0075BD70, cfunc_GetTerrainHeightL)
+ *
+ * What it does:
+ * Reads `(x, z)` and returns terrain elevation sampled from map heightfield.
+ */
+int moho::cfunc_GetTerrainHeightL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetTerrainHeightHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject xArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&xArg, "number");
+  }
+  const float x = static_cast<float>(lua_tonumber(rawState, 1));
+
+  LuaPlus::LuaStackObject zArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&zArg, "number");
+  }
+  const float z = static_cast<float>(lua_tonumber(rawState, 2));
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  STIMap* const map = sim ? sim->mMapData : nullptr;
+  CHeightField* const field = map ? map->mHeightField.get() : nullptr;
+  const float terrainHeight = field ? field->GetElevation(x, z) : 0.0f;
+  lua_pushnumber(rawState, terrainHeight);
+  return 1;
+}
+
+/**
+ * Address: 0x0075BE90 (FUN_0075BE90, func_GetSurfaceHeight_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetSurfaceHeight(x,z)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetSurfaceHeight_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetSurfaceHeight",
+    &moho::cfunc_GetSurfaceHeight,
+    nullptr,
+    "<global>",
+    kGetSurfaceHeightHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075BE70 (FUN_0075BE70, cfunc_GetSurfaceHeight)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetSurfaceHeightL`.
+ */
+int moho::cfunc_GetSurfaceHeight(lua_State* const luaContext)
+{
+  return cfunc_GetSurfaceHeightL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075BEF0 (FUN_0075BEF0, cfunc_GetSurfaceHeightL)
+ *
+ * What it does:
+ * Reads `(x, z)` and returns max(terrainHeight, waterElevation) when water is
+ * enabled, otherwise terrain height.
+ */
+int moho::cfunc_GetSurfaceHeightL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetSurfaceHeightHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject xArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&xArg, "number");
+  }
+  const float x = static_cast<float>(lua_tonumber(rawState, 1));
+
+  LuaPlus::LuaStackObject zArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&zArg, "number");
+  }
+  const float z = static_cast<float>(lua_tonumber(rawState, 2));
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  STIMap* const map = sim ? sim->mMapData : nullptr;
+  CHeightField* const field = map ? map->mHeightField.get() : nullptr;
+
+  float surfaceHeight = field ? field->GetElevation(x, z) : 0.0f;
+  if (map && map->mWaterEnabled != 0u && map->mWaterElevation > surfaceHeight) {
+    surfaceHeight = map->mWaterElevation;
+  }
+
+  lua_pushnumber(rawState, surfaceHeight);
+  return 1;
+}
+
+/**
+ * Address: 0x0075C050 (FUN_0075C050, func_GetTerrainTypeOffset_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetTerrainTypeOffset(x,z)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetTerrainTypeOffset_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetTerrainTypeOffset",
+    &moho::cfunc_GetTerrainTypeOffset,
+    nullptr,
+    "<global>",
+    kGetTerrainTypeOffsetHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075C030 (FUN_0075C030, cfunc_GetTerrainTypeOffset)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetTerrainTypeOffsetL`.
+ */
+int moho::cfunc_GetTerrainTypeOffset(lua_State* const luaContext)
+{
+  return cfunc_GetTerrainTypeOffsetL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075C0B0 (FUN_0075C0B0, cfunc_GetTerrainTypeOffsetL)
+ *
+ * What it does:
+ * Reads `(x, z)` and returns terrain texture offset value at map position.
+ */
+int moho::cfunc_GetTerrainTypeOffsetL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetTerrainTypeOffsetHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject xArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&xArg, "number");
+  }
+  const float x = static_cast<float>(lua_tonumber(rawState, 1));
+
+  LuaPlus::LuaStackObject zArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&zArg, "number");
+  }
+  const float z = static_cast<float>(lua_tonumber(rawState, 2));
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  STIMap* const map = sim ? sim->mMapData : nullptr;
+  const float terrainTypeOffset = map ? map->GetTerrainTypeOffset(x, z) : 0.0f;
+  lua_pushnumber(rawState, terrainTypeOffset);
+  return 1;
+}
+
+/**
+ * Address: 0x0075C1D0 (FUN_0075C1D0, func_GetTerrainType_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetTerrainType(x,z)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetTerrainType_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetTerrainType",
+    &moho::cfunc_GetTerrainType,
+    nullptr,
+    "<global>",
+    kGetTerrainTypeLuaDefHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075C1B0 (FUN_0075C1B0, cfunc_GetTerrainType)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetTerrainTypeL`.
+ */
+int moho::cfunc_GetTerrainType(lua_State* const luaContext)
+{
+  return cfunc_GetTerrainTypeL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075C230 (FUN_0075C230, cfunc_GetTerrainTypeL)
+ *
+ * What it does:
+ * Reads `(x, z)` from Lua, queries terrain type from `Sim::mMapData`, and
+ * returns the terrain-type Lua table.
+ */
+int moho::cfunc_GetTerrainTypeL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetTerrainTypeHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject xArg{};
+  xArg.m_state = state;
+  xArg.m_stackIndex = 1;
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&xArg, "integer");
+  }
+  const std::uint32_t x = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+
+  LuaPlus::LuaStackObject zArg{};
+  zArg.m_state = state;
+  zArg.m_stackIndex = 2;
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&zArg, "integer");
+  }
+  const std::uint32_t z = static_cast<std::uint32_t>(lua_tonumber(rawState, 2));
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  STIMap* const map = sim ? sim->mMapData : nullptr;
+  if (!map) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject terrainType = map->GetTerrainType(x, z);
+  terrainType.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075C3D0 (FUN_0075C3D0, func_SetTerrainType_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `SetTerrainType(x,z,type)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_SetTerrainType_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetTerrainType",
+    &moho::cfunc_SetTerrainType,
+    nullptr,
+    "<global>",
+    kSetTerrainTypeLuaDefHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075C3B0 (FUN_0075C3B0, cfunc_SetTerrainType)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetTerrainTypeL`.
+ */
+int moho::cfunc_SetTerrainType(lua_State* const luaContext)
+{
+  return cfunc_SetTerrainTypeL(ResolveBindingState(luaContext));
+}
+
+/**
  * Address: 0x0075C430 (FUN_0075C430, cfunc_SetTerrainTypeL)
  *
  * What it does:
@@ -7223,6 +17071,36 @@ int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
 
   map->SetTerrainType(x, z, terrainType);
   return 0;
+}
+
+/**
+ * Address: 0x0075C5F0 (FUN_0075C5F0, func_SetTerrainTypeRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `SetTerrainTypeRect(rect,type)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_SetTerrainTypeRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetTerrainTypeRect",
+    &moho::cfunc_SetTerrainTypeRect,
+    nullptr,
+    "<global>",
+    kSetTerrainTypeRectLuaDefHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075C5D0 (FUN_0075C5D0, cfunc_SetTerrainTypeRect)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetTerrainTypeRectL`.
+ */
+int moho::cfunc_SetTerrainTypeRect(lua_State* const luaContext)
+{
+  return cfunc_SetTerrainTypeRectL(ResolveBindingState(luaContext));
 }
 
 /**
@@ -7368,6 +17246,1780 @@ int moho::cfunc_SetPlayableRectL(LuaPlus::LuaState* const state)
 int moho::cfunc_SetPlayableRect(lua_State* const luaContext)
 {
   return cfunc_SetPlayableRectL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075C9D0 (FUN_0075C9D0, cfunc_FlushIntelInRect)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_FlushIntelInRectL`.
+ */
+int moho::cfunc_FlushIntelInRect(lua_State* const luaContext)
+{
+  return cfunc_FlushIntelInRectL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075C9F0 (FUN_0075C9F0, func_FlushIntelInRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `FlushIntelInRect(minX,minZ,maxX,maxZ)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_FlushIntelInRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "FlushIntelInRect",
+    &moho::cfunc_FlushIntelInRect,
+    nullptr,
+    "<global>",
+    kFlushIntelInRectHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075CA50 (FUN_0075CA50, cfunc_FlushIntelInRectL)
+ *
+ * What it does:
+ * Flushes recon blips inside one rectangle for every active army recon db.
+ */
+int moho::cfunc_FlushIntelInRectL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kFlushIntelInRectHelpText, 4, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject maxZArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    maxZArg.TypeError("integer");
+  }
+  const std::int32_t maxZ = static_cast<std::int32_t>(lua_tonumber(rawState, 4));
+
+  LuaPlus::LuaStackObject maxXArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    maxXArg.TypeError("integer");
+  }
+  const std::int32_t maxX = static_cast<std::int32_t>(lua_tonumber(rawState, 3));
+
+  LuaPlus::LuaStackObject minZArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    minZArg.TypeError("integer");
+  }
+  const std::int32_t minZ = static_cast<std::int32_t>(lua_tonumber(rawState, 2));
+
+  LuaPlus::LuaStackObject minXArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    minXArg.TypeError("integer");
+  }
+  const std::int32_t minX = static_cast<std::int32_t>(lua_tonumber(rawState, 1));
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  if (!sim) {
+    return 0;
+  }
+
+  gpg::Rect2i rect{};
+  rect.x0 = minX;
+  rect.z0 = minZ;
+  rect.x1 = maxX;
+  rect.z1 = maxZ;
+
+  for (CArmyImpl* const army : sim->mArmiesList) {
+    if (!army) {
+      continue;
+    }
+
+    CAiReconDBImpl* const reconDb = army->GetReconDB();
+    if (reconDb) {
+      reconDb->ReconFlushBlipsInRect(rect);
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0075D970 (FUN_0075D970, cfunc_SetArmyStatsSyncArmy)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_SetArmyStatsSyncArmyL`.
+ */
+int moho::cfunc_SetArmyStatsSyncArmy(lua_State* const luaContext)
+{
+  return cfunc_SetArmyStatsSyncArmyL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075D990 (FUN_0075D990, func_SetArmyStatsSyncArmy_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `SetArmyStatsSyncArmy(army)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyStatsSyncArmy_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyStatsSyncArmy",
+    &moho::cfunc_SetArmyStatsSyncArmy,
+    nullptr,
+    "<global>",
+    kSetArmyStatsSyncArmyHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075D9F0 (FUN_0075D9F0, cfunc_SetArmyStatsSyncArmyL)
+ *
+ * What it does:
+ * Reads one integer and stores it in `Sim::mSyncArmy`.
+ */
+int moho::cfunc_SetArmyStatsSyncArmyL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyStatsSyncArmyHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject armyArg(state, 1);
+  if (lua_type(rawState, 1) != LUA_TNUMBER) {
+    armyArg.TypeError("integer");
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  if (sim) {
+    sim->mSyncArmy = static_cast<std::int32_t>(lua_tonumber(rawState, 1));
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0075CC40 (FUN_0075CC40, func_GetUnitBlueprintByName_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetUnitBlueprintByName(bpName)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_GetUnitBlueprintByName_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetUnitBlueprintByName",
+    &moho::cfunc_GetUnitBlueprintByName,
+    nullptr,
+    "<global>",
+    kGetUnitBlueprintByNameLuaDefHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075CC20 (FUN_0075CC20, cfunc_GetUnitBlueprintByName)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetUnitBlueprintByNameL`.
+ */
+int moho::cfunc_GetUnitBlueprintByName(lua_State* const luaContext)
+{
+  return cfunc_GetUnitBlueprintByNameL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075CCA0 (FUN_0075CCA0, cfunc_GetUnitBlueprintByNameL)
+ *
+ * What it does:
+ * Reads one unit blueprint id string, resolves it via `Sim::mRules`, and
+ * returns the blueprint Lua object (or `nil` when unresolved).
+ */
+int moho::cfunc_GetUnitBlueprintByNameL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitBlueprintByNameHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject blueprintArg{};
+  blueprintArg.m_state = state;
+  blueprintArg.m_stackIndex = 1;
+  const char* const blueprintName = lua_tostring(rawState, 1);
+  if (blueprintName == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&blueprintArg, "string");
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  RRuleGameRules* const rules = sim ? sim->mRules : nullptr;
+  const RUnitBlueprint* blueprint = nullptr;
+  if (rules != nullptr) {
+    RResId resourceId{};
+    gpg::STR_InitFilename(&resourceId.name, blueprintName);
+    blueprint = rules->GetUnitBlueprint(resourceId);
+  }
+
+  if (blueprint != nullptr) {
+    LuaPlus::LuaObject luaBlueprint = blueprint->GetLuaBlueprint(state);
+    luaBlueprint.PushStack(state);
+  } else {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+  }
+  return 1;
+}
+
+/**
+ * Address: 0x0075DBA0 (FUN_0075DBA0, func_DrawLine_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `DrawLine(a,b,c)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_DrawLine_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "DrawLine",
+    &moho::cfunc_DrawLine,
+    nullptr,
+    "<global>",
+    kDrawLineHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075DB80 (FUN_0075DB80, cfunc_DrawLine)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_DrawLineL`.
+ */
+int moho::cfunc_DrawLine(lua_State* const luaContext)
+{
+  return cfunc_DrawLineL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075DC00 (FUN_0075DC00, cfunc_DrawLineL)
+ *
+ * What it does:
+ * Reads `(startVec3, endVec3, color)` from Lua and emits one debug line
+ * segment on the current sim debug canvas.
+ */
+int moho::cfunc_DrawLineL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDrawLineHelpText, 3, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  CDebugCanvas* const debugCanvas = sim ? sim->GetDebugCanvas() : nullptr;
+  if (!debugCanvas) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 3));
+  LuaPlus::LuaObject endObject(LuaPlus::LuaStackObject(state, 2));
+  LuaPlus::LuaObject startObject(LuaPlus::LuaStackObject(state, 1));
+
+  SDebugLine line{};
+  line.p0 = SCR_FromLuaCopy<Wm3::Vector3f>(startObject);
+  line.p1 = SCR_FromLuaCopy<Wm3::Vector3f>(endObject);
+  line.depth0 = static_cast<std::int32_t>(SCR_DecodeColor(state, colorObject));
+  line.depth1 = line.depth0;
+
+  debugCanvas->DebugDrawLine(line);
+  return 0;
+}
+
+/**
+ * Address: 0x0075DDA0 (FUN_0075DDA0, cfunc_DrawLinePop)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_DrawLinePopL`.
+ */
+int moho::cfunc_DrawLinePop(lua_State* const luaContext)
+{
+  return cfunc_DrawLinePopL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075DDC0 (FUN_0075DDC0, func_DrawLinePop_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `DrawLinePop(a,b,c)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_DrawLinePop_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "DrawLinePop",
+    &moho::cfunc_DrawLinePop,
+    nullptr,
+    "<global>",
+    kDrawLinePopHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075DE20 (FUN_0075DE20, cfunc_DrawLinePopL)
+ *
+ * What it does:
+ * Reads `(startVec3, endVec3, color)`, draws the line, and emits one
+ * wire-circle "pop" marker just past the line end.
+ */
+int moho::cfunc_DrawLinePopL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDrawLinePopHelpText, 3, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  CDebugCanvas* const debugCanvas = sim ? sim->GetDebugCanvas() : nullptr;
+  if (!debugCanvas) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject startObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaObject endObject(LuaPlus::LuaStackObject(state, 2));
+  LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 3));
+
+  const Wm3::Vector3f start = SCR_FromLuaCopy<Wm3::Vector3f>(startObject);
+  const Wm3::Vector3f end = SCR_FromLuaCopy<Wm3::Vector3f>(endObject);
+  const std::uint32_t color = SCR_DecodeColor(state, colorObject);
+
+  Wm3::Vector3f lineDirection{};
+  lineDirection.x = start.x - end.x;
+  lineDirection.y = start.y - end.y;
+  lineDirection.z = start.z - end.z;
+
+  const float directionLengthSquared =
+    (lineDirection.x * lineDirection.x) + (lineDirection.y * lineDirection.y) + (lineDirection.z * lineDirection.z);
+  if (directionLengthSquared > 0.0f) {
+    const float scale = 2.0f / std::sqrt(directionLengthSquared);
+    lineDirection.x *= scale;
+    lineDirection.y *= scale;
+    lineDirection.z *= scale;
+  } else {
+    lineDirection.x = 0.0f;
+    lineDirection.y = 0.0f;
+    lineDirection.z = 0.0f;
+  }
+
+  SDebugLine line{};
+  line.p0 = start;
+  line.p1 = end;
+  line.depth0 = static_cast<std::int32_t>(color);
+  line.depth1 = line.depth0;
+  debugCanvas->DebugDrawLine(line);
+
+  Wm3::Vector3f popCenter{};
+  popCenter.x = end.x + lineDirection.x;
+  popCenter.y = end.y + lineDirection.y;
+  popCenter.z = end.z + lineDirection.z;
+
+  const Wm3::Vector3f upAxis(0.0f, 1.0f, 0.0f);
+  debugCanvas->AddWireCircle(upAxis, popCenter, 1.0f, color, 8u);
+  return 0;
+}
+
+/**
+ * Address: 0x0075E0D0 (FUN_0075E0D0, func_DrawCircle_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `DrawCircle(a,s,c)` Lua binder.
+ */
+moho::CScrLuaInitForm* moho::func_DrawCircle_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "DrawCircle",
+    &moho::cfunc_DrawCircle,
+    nullptr,
+    "<global>",
+    kDrawCircleHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075E0B0 (FUN_0075E0B0, cfunc_DrawCircle)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_DrawCircleL`.
+ */
+int moho::cfunc_DrawCircle(lua_State* const luaContext)
+{
+  return cfunc_DrawCircleL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075E130 (FUN_0075E130, cfunc_DrawCircleL)
+ *
+ * What it does:
+ * Reads `(centerVec3, sizeNumber, color)` from Lua and emits one wireframe
+ * debug circle on the current sim debug canvas.
+ */
+int moho::cfunc_DrawCircleL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDrawCircleHelpText, 3, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  CDebugCanvas* const debugCanvas = sim ? sim->GetDebugCanvas() : nullptr;
+  if (!debugCanvas) {
+    return 0;
+  }
+
+  LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 3));
+  LuaPlus::LuaObject centerObject(LuaPlus::LuaStackObject(state, 1));
+  LuaPlus::LuaStackObject sizeArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&sizeArg, "number");
+  }
+
+  const float size = static_cast<float>(lua_tonumber(rawState, 2));
+  const std::uint32_t color = SCR_DecodeColor(state, colorObject);
+  const Wm3::Vector3f center = SCR_FromLuaCopy<Wm3::Vector3f>(centerObject);
+  const Wm3::Vector3f upAxis(0.0f, 1.0f, 0.0f);
+  debugCanvas->AddWireCircle(upAxis, center, size, color, 8u);
+  return 0;
+}
+
+/**
+ * Address: 0x0068BD90 (FUN_0068BD90, cfunc_EntityAttachTo)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntityAttachToL`.
+ */
+int moho::cfunc_EntityAttachTo(lua_State* const luaContext)
+{
+  return cfunc_EntityAttachToL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068BE10 (FUN_0068BE10, cfunc_EntityAttachToL)
+ *
+ * What it does:
+ * Reads `(selfEntity, parentEntity, parentBone)` and applies one attach-info
+ * payload through `Entity::AttachTo`.
+ */
+int moho::cfunc_EntityAttachToL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityAttachToHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject childObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const childEntity = SCR_FromLua_Entity(childObject, state);
+
+  const LuaPlus::LuaObject parentObject(LuaPlus::LuaStackObject(state, 2));
+  Entity* const parentEntity = SCR_FromLua_Entity(parentObject, state);
+
+  LuaPlus::LuaStackObject parentBoneArg(state, 3);
+  const int parentBoneIndex = ENTSCR_ResolveBoneIndex(parentEntity, parentBoneArg, true);
+
+  SEntAttachInfo attachInfo = SEntAttachInfo::MakeDetached();
+  attachInfo.TargetWeakLink().ResetFromObject(parentEntity);
+  attachInfo.mParentBoneIndex = parentBoneIndex;
+  attachInfo.mChildBoneIndex = 0;
+  attachInfo.mRelativeOrientX = 1.0f;
+  attachInfo.mRelativeOrientY = 0.0f;
+  attachInfo.mRelativeOrientZ = 0.0f;
+  attachInfo.mRelativeOrientW = 0.0f;
+  attachInfo.mRelativePosX = 0.0f;
+  attachInfo.mRelativePosY = 0.0f;
+  attachInfo.mRelativePosZ = 0.0f;
+
+  const bool didAttach = childEntity->AttachTo(attachInfo);
+  attachInfo.TargetWeakLink().UnlinkFromOwnerChain();
+
+  if (!didAttach) {
+    const char* const parentName = ResolveBlueprintIdCString(parentEntity);
+    const char* const childName = ResolveBlueprintIdCString(childEntity);
+    LuaPlus::LuaState::Error(
+      state,
+      kEntityAttachFailureError,
+      childName ? childName : "",
+      parentName ? parentName : "",
+      parentBoneIndex
+    );
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0068BDB0 (FUN_0068BDB0, func_EntityAttachTo_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:AttachTo()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityAttachTo_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "AttachTo",
+    &moho::cfunc_EntityAttachTo,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityAttachToHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068F660 (FUN_0068F660, cfunc_EntitySetOrientation)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntitySetOrientationL`.
+ */
+int moho::cfunc_EntitySetOrientation(lua_State* const luaContext)
+{
+  return cfunc_EntitySetOrientationL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068F6E0 (FUN_0068F6E0, cfunc_EntitySetOrientationL)
+ *
+ * What it does:
+ * Reads `(entity, orientation, immediate)`, writes pending orientation while
+ * preserving current position, then optionally commits coords immediately.
+ */
+int moho::cfunc_EntitySetOrientationL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntitySetOrientationHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  LuaPlus::LuaObject orientationObject(LuaPlus::LuaStackObject(state, 2));
+  Wm3::Quatf orientation{};
+  SCR_FromLuaCopy<Wm3::Quaternion<float>>(&orientationObject, &orientation);
+
+  LuaPlus::LuaStackObject immediateArg(state, 3);
+  const bool immediate = immediateArg.GetBoolean();
+
+  VTransform transform = entity->GetTransformWm3();
+  transform.orient_ = orientation;
+  entity->SetPendingTransform(transform, 1.0f);
+  if (immediate) {
+    entity->AdvanceCoords();
+    entity->AdvanceCoords();
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0068F680 (FUN_0068F680, func_EntitySetOrientation_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:SetOrientation()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntitySetOrientation_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetOrientation",
+    &moho::cfunc_EntitySetOrientation,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntitySetOrientationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068FA10 (FUN_0068FA10, cfunc_EntitySetPosition)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntitySetPositionL`.
+ */
+int moho::cfunc_EntitySetPosition(lua_State* const luaContext)
+{
+  return cfunc_EntitySetPositionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068FA90 (FUN_0068FA90, cfunc_EntitySetPositionL)
+ *
+ * What it does:
+ * Reads `(entity, position[, immediate])`, writes pending position while
+ * preserving current orientation, then optionally commits coords immediately.
+ */
+int moho::cfunc_EntitySetPositionL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kEntitySetPositionHelpText,
+      2,
+      3,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  VTransform transform = entity->GetTransformWm3();
+  const LuaPlus::LuaObject positionObject(LuaPlus::LuaStackObject(state, 2));
+  transform.pos_ = SCR_FromLuaCopy<Wm3::Vec3f>(positionObject);
+  entity->SetPendingTransform(transform, 1.0f);
+
+  LuaPlus::LuaStackObject immediateArg(state, 3);
+  if (immediateArg.GetBoolean()) {
+    entity->AdvanceCoords();
+    entity->AdvanceCoords();
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0068FA30 (FUN_0068FA30, func_EntitySetPosition_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:SetPosition()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntitySetPosition_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetPosition",
+    &moho::cfunc_EntitySetPosition,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntitySetPositionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068FC10 (FUN_0068FC10, cfunc_EntityGetPosition)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntityGetPositionL`.
+ */
+int moho::cfunc_EntityGetPosition(lua_State* const luaContext)
+{
+  return cfunc_EntityGetPositionL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068FC90 (FUN_0068FC90, cfunc_EntityGetPositionL)
+ *
+ * What it does:
+ * Reads `(entity[, boneName])` and returns one Lua vector table for the entity
+ * world position or one resolved bone world position.
+ */
+int moho::cfunc_EntityGetPositionL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 2) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kEntityGetPositionHelpText,
+      1,
+      2,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLuaNoError_Entity(entityObject);
+  if (!entity) {
+    const Wm3::Vec3f zeroPosition(0.0f, 0.0f, 0.0f);
+    const LuaPlus::LuaObject zeroObject = SCR_ToLua<Wm3::Vector3<float>>(state, zeroPosition);
+    zeroObject.PushStack(state);
+    return 1;
+  }
+
+  if (lua_gettop(rawState) > 1) {
+    LuaPlus::LuaStackObject boneArg(state, 2);
+    const int boneIndex = ENTSCR_ResolveBoneIndex(entity, boneArg, false);
+    const Wm3::Vec3f position = entity->GetBoneWorldTransform(boneIndex).pos_;
+    const LuaPlus::LuaObject positionObject = SCR_ToLua<Wm3::Vector3<float>>(state, position);
+    positionObject.PushStack(state);
+    return 1;
+  }
+
+  const Wm3::Vec3f position = entity->GetTransformWm3().pos_;
+  LuaPlus::LuaObject& cachedPositionObject = entity->mLuaPositionCache;
+  if (cachedPositionObject.IsTable()) {
+    cachedPositionObject.SetNumber(1, position.x);
+    cachedPositionObject.SetNumber(2, position.y);
+    cachedPositionObject.SetNumber(3, position.z);
+  } else {
+    const LuaPlus::LuaObject positionObject = SCR_ToLua<Wm3::Vector3<float>>(state, position);
+    cachedPositionObject = positionObject;
+  }
+
+  cachedPositionObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0068FC30 (FUN_0068FC30, func_EntityGetPosition_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:GetPosition()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityGetPosition_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetPosition",
+    &moho::cfunc_EntityGetPosition,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityGetPositionHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068FEE0 (FUN_0068FEE0, cfunc_EntityGetPositionXYZ)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_EntityGetPositionXYZL`.
+ */
+int moho::cfunc_EntityGetPositionXYZ(lua_State* const luaContext)
+{
+  return cfunc_EntityGetPositionXYZL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068FF60 (FUN_0068FF60, cfunc_EntityGetPositionXYZL)
+ *
+ * What it does:
+ * Reads `(entity[, boneName])` and returns three Lua numbers `(x, y, z)` for
+ * entity world position or resolved bone world position.
+ */
+int moho::cfunc_EntityGetPositionXYZL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 2) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kEntityGetPositionXYZHelpText,
+      1,
+      2,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  Wm3::Vec3f position{};
+  if (lua_gettop(rawState) <= 1) {
+    position = entity->GetTransformWm3().pos_;
+  } else {
+    LuaPlus::LuaStackObject boneArg(state, 2);
+    const int boneIndex = ENTSCR_ResolveBoneIndex(entity, boneArg, false);
+    position = entity->GetBoneWorldTransform(boneIndex).pos_;
+  }
+
+  lua_pushnumber(rawState, position.x);
+  lua_pushnumber(rawState, position.y);
+  lua_pushnumber(rawState, position.z);
+  return 3;
+}
+
+/**
+ * Address: 0x0068FF00 (FUN_0068FF00, func_EntityGetPositionXYZ_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:GetPositionXYZ()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityGetPositionXYZ_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetPositionXYZ",
+    &moho::cfunc_EntityGetPositionXYZ,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityGetPositionXYZHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068CA80 (FUN_0068CA80, cfunc_EntityGetCollisionExtentsL)
+ *
+ * What it does:
+ * Reads one entity Lua object and returns one table containing `Min` and `Max`
+ * vector entries when collision extents are available.
+ */
+int moho::cfunc_EntityGetCollisionExtentsL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityGetCollisionExtentsHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+  EntityCollisionUpdater* const collisionShape = entity->CollisionExtents;
+
+  LuaPlus::LuaObject resultObject(state);
+  if (collisionShape) {
+    EntityCollisionBoundsScratch scratchBounds{};
+    const EntityCollisionBoundsView* const bounds = collisionShape->GetBoundingBox(&scratchBounds);
+
+    resultObject.AssignNewTable(state, 0, 0u);
+
+    Wm3::Vector3f minBounds{};
+    minBounds.x = bounds->minX;
+    minBounds.y = bounds->minY;
+    minBounds.z = bounds->minZ;
+    const LuaPlus::LuaObject minObject = SCR_ToLua<Wm3::Vector3<float>>(state, minBounds);
+    resultObject.SetObject("Min", minObject);
+
+    Wm3::Vector3f maxBounds{};
+    maxBounds.x = bounds->maxX;
+    maxBounds.y = bounds->maxY;
+    maxBounds.z = bounds->maxZ;
+    const LuaPlus::LuaObject maxObject = SCR_ToLua<Wm3::Vector3<float>>(state, maxBounds);
+    resultObject.SetObject("Max", maxObject);
+  }
+
+  resultObject.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0068DE80 (FUN_0068DE80, cfunc_EntityIsIntelEnabled)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_EntityIsIntelEnabledL`.
+ */
+int moho::cfunc_EntityIsIntelEnabled(lua_State* const luaContext)
+{
+  return cfunc_EntityIsIntelEnabledL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068DEA0 (FUN_0068DEA0, func_EntityIsIntelEnabled_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:IsIntelEnabled()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityIsIntelEnabled_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsIntelEnabled",
+    &moho::cfunc_EntityIsIntelEnabled,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityIsIntelEnabledHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068DF00 (FUN_0068DF00, cfunc_EntityIsIntelEnabledL)
+ *
+ * What it does:
+ * Reads `(entity, intelType)`, validates intel initialization, and returns one
+ * Lua boolean indicating whether the selected intel lane is currently enabled.
+ */
+int moho::cfunc_EntityIsIntelEnabledL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityIsIntelEnabledHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  EIntel intelType = INTEL_None;
+  gpg::RRef enumRef = MakeEIntelRef(&intelType);
+  const LuaPlus::LuaStackObject intelTypeArg(state, 2);
+  const char* const intelTypeName = lua_tostring(rawState, 2);
+  if (intelTypeName == nullptr) {
+    intelTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, intelTypeName, enumRef);
+
+  if (entity->mIntelManager == nullptr) {
+    LuaPlus::LuaState::Error(state, kEntityIsIntelEnabledInitWarning);
+  }
+
+  const bool enabled = entity->mIntelManager ? IsIntelEnabledForType(*entity->mIntelManager, intelType) : false;
+  lua_pushboolean(rawState, enabled ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x0068E050 (FUN_0068E050, cfunc_EntityEnableIntel)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntityEnableIntelL`.
+ */
+int moho::cfunc_EntityEnableIntel(lua_State* const luaContext)
+{
+  return cfunc_EntityEnableIntelL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068E070 (FUN_0068E070, func_EntityEnableIntel_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:EnableIntel()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityEnableIntel_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "EnableIntel",
+    &moho::cfunc_EntityEnableIntel,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityEnableIntelHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068E0D0 (FUN_0068E0D0, cfunc_EntityEnableIntelL)
+ *
+ * What it does:
+ * Reads `(entity, intelType)`, enables that intel lane, and requeues the
+ * entity into sim coord updates.
+ */
+int moho::cfunc_EntityEnableIntelL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityEnableIntelHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  EIntel intelType = INTEL_None;
+  gpg::RRef enumRef = MakeEIntelRef(&intelType);
+  const LuaPlus::LuaStackObject intelTypeArg(state, 2);
+  const char* const intelTypeName = lua_tostring(rawState, 2);
+  if (intelTypeName == nullptr) {
+    intelTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, intelTypeName, enumRef);
+
+  if (entity->mIntelManager == nullptr) {
+    LuaPlus::LuaState::Error(state, kEntityEnableIntelInitWarning);
+  }
+
+  if (CIntel* const intelManager = entity->mIntelManager; intelManager != nullptr) {
+    if (CIntelPosHandle* const handle = ResolveIntelPosHandleForType(*intelManager, intelType); handle != nullptr) {
+      if (handle->mEnabled == 0u) {
+        handle->mEnabled = 1u;
+        handle->AddViz();
+      }
+    } else if (CIntelToggleState* const toggleState = ResolveIntelToggleStateForType(*intelManager, intelType);
+               toggleState != nullptr && toggleState->present != 0u) {
+      toggleState->enabled = 1u;
+    }
+  }
+
+  SetEntityIntelEnabledAttributeBit(*entity, intelType, true);
+  RequeueEntityCoordUpdate(*entity);
+  return 0;
+}
+
+/**
+ * Address: 0x0068E2F0 (FUN_0068E2F0, cfunc_EntityDisableIntel)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_EntityDisableIntelL`.
+ */
+int moho::cfunc_EntityDisableIntel(lua_State* const luaContext)
+{
+  return cfunc_EntityDisableIntelL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068E310 (FUN_0068E310, func_EntityDisableIntel_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:DisableIntel()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityDisableIntel_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "DisableIntel",
+    &moho::cfunc_EntityDisableIntel,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityDisableIntelHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068E370 (FUN_0068E370, cfunc_EntityDisableIntelL)
+ *
+ * What it does:
+ * Reads `(entity, intelType)`, disables that intel lane, and requeues the
+ * entity into sim coord updates.
+ */
+int moho::cfunc_EntityDisableIntelL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityDisableIntelHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  EIntel intelType = INTEL_None;
+  gpg::RRef enumRef = MakeEIntelRef(&intelType);
+  const LuaPlus::LuaStackObject intelTypeArg(state, 2);
+  const char* const intelTypeName = lua_tostring(rawState, 2);
+  if (intelTypeName == nullptr) {
+    intelTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, intelTypeName, enumRef);
+
+  if (entity->mIntelManager == nullptr) {
+    LuaPlus::LuaState::Error(state, kEntityDisableIntelInitWarning);
+  }
+
+  if (CIntel* const intelManager = entity->mIntelManager; intelManager != nullptr) {
+    if (CIntelPosHandle* const handle = ResolveIntelPosHandleForType(*intelManager, intelType); handle != nullptr) {
+      if (handle->mEnabled != 0u) {
+        handle->SubViz();
+        handle->mEnabled = 0u;
+      }
+    } else if (CIntelToggleState* const toggleState = ResolveIntelToggleStateForType(*intelManager, intelType);
+               toggleState != nullptr && toggleState->present != 0u) {
+      toggleState->enabled = 0u;
+    }
+  }
+
+  SetEntityIntelEnabledAttributeBit(*entity, intelType, false);
+  RequeueEntityCoordUpdate(*entity);
+  return 0;
+}
+
+/**
+ * Address: 0x0068E590 (FUN_0068E590, cfunc_EntitySetIntelRadius)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_EntitySetIntelRadiusL`.
+ */
+int moho::cfunc_EntitySetIntelRadius(lua_State* const luaContext)
+{
+  return cfunc_EntitySetIntelRadiusL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068E5B0 (FUN_0068E5B0, func_EntitySetIntelRadius_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:SetIntelRadius()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntitySetIntelRadius_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetIntelRadius",
+    &moho::cfunc_EntitySetIntelRadius,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntitySetIntelRadiusHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068E610 (FUN_0068E610, cfunc_EntitySetIntelRadiusL)
+ *
+ * What it does:
+ * Reads `(entity, intelType, radius)`, updates intel handle radius and synced
+ * intel-attribute radius, then requeues coord updates.
+ */
+int moho::cfunc_EntitySetIntelRadiusL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntitySetIntelRadiusHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  EIntel intelType = INTEL_None;
+  gpg::RRef enumRef = MakeEIntelRef(&intelType);
+  const LuaPlus::LuaStackObject intelTypeArg(state, 2);
+  const char* const intelTypeName = lua_tostring(rawState, 2);
+  if (intelTypeName == nullptr) {
+    intelTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, intelTypeName, enumRef);
+
+  LuaPlus::LuaStackObject radiusArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&radiusArg, "integer");
+  }
+
+  const int inputRadius = static_cast<int>(lua_tonumber(rawState, 3));
+  const int newRadius = inputRadius > 0 ? inputRadius : 0;
+
+  if (entity->mIntelManager == nullptr) {
+    LuaPlus::LuaState::Error(state, kEntitySetIntelRadiusInitWarning);
+  }
+
+  if (CIntel* const intelManager = entity->mIntelManager; intelManager != nullptr) {
+    if (CIntelPosHandle* const handle = ResolveIntelPosHandleForType(*intelManager, intelType); handle != nullptr) {
+      handle->ChangeRadius(newRadius);
+    }
+  }
+
+  const int attributeLane = static_cast<int>(intelType) - 1;
+  if (attributeLane >= 0 && attributeLane <= 12) {
+    SetEntityAttributeRangePreserveEnabledBit(
+      GetEntityIntelAttributeRangesMutable(*entity), attributeLane, static_cast<std::uint32_t>(newRadius)
+    );
+  }
+
+  RequeueEntityCoordUpdate(*entity);
+  return 0;
+}
+
+/**
+ * Address: 0x0068E7D0 (FUN_0068E7D0, cfunc_EntityGetIntelRadius)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_EntityGetIntelRadiusL`.
+ */
+int moho::cfunc_EntityGetIntelRadius(lua_State* const luaContext)
+{
+  return cfunc_EntityGetIntelRadiusL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068E7F0 (FUN_0068E7F0, func_EntityGetIntelRadius_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:GetIntelRadius()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityGetIntelRadius_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetIntelRadius",
+    &moho::cfunc_EntityGetIntelRadius,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityGetIntelRadiusHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068E850 (FUN_0068E850, cfunc_EntityGetIntelRadiusL)
+ *
+ * What it does:
+ * Reads `(entity, intelType)`, validates intel initialization, and returns
+ * the selected intel radius as one Lua number.
+ */
+int moho::cfunc_EntityGetIntelRadiusL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityGetIntelRadiusHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  EIntel intelType = INTEL_None;
+  gpg::RRef enumRef = MakeEIntelRef(&intelType);
+  const LuaPlus::LuaStackObject intelTypeArg(state, 2);
+  const char* const intelTypeName = lua_tostring(rawState, 2);
+  if (intelTypeName == nullptr) {
+    intelTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, intelTypeName, enumRef);
+
+  if (entity->mIntelManager == nullptr) {
+    LuaPlus::LuaState::Error(state, kEntityGetIntelRadiusInitWarning);
+  }
+
+  const std::int32_t attributeLane = static_cast<std::int32_t>(intelType) - 1;
+  std::uint32_t radius = 0u;
+  if (attributeLane >= 0 && attributeLane <= 12) {
+    const auto& ranges = GetEntityIntelAttributeRanges(*entity);
+    radius = GetEntityAttributeRangeMagnitude(ranges, attributeLane);
+  }
+
+  lua_pushnumber(rawState, static_cast<float>(radius));
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x0068E9A0 (FUN_0068E9A0, cfunc_EntityInitIntel)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntityInitIntelL`.
+ */
+int moho::cfunc_EntityInitIntel(lua_State* const luaContext)
+{
+  return cfunc_EntityInitIntelL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068E9C0 (FUN_0068E9C0, func_EntityInitIntel_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:InitIntel()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityInitIntel_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "InitIntel",
+    &moho::cfunc_EntityInitIntel,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityInitIntelHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068EA20 (FUN_0068EA20, cfunc_EntityInitIntelL)
+ *
+ * What it does:
+ * Reads `(entity, army, intelType[, radius])`, initializes/updates one intel
+ * lane, refreshes handle positions, and requeues coord updates.
+ */
+int moho::cfunc_EntityInitIntelL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 3 || argumentCount > 4) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kEntityInitIntelHelpText,
+      3,
+      4,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  if (!army) {
+    LuaPlus::LuaState::Error(state, kEntityInitIntelUnknownArmyWarning);
+    return 0;
+  }
+  CAiReconDBImpl* const reconDb = army->GetReconDB();
+
+  EIntel intelType = INTEL_None;
+  gpg::RRef enumRef = MakeEIntelRef(&intelType);
+  const LuaPlus::LuaStackObject intelTypeArg(state, 3);
+  const char* const intelTypeName = lua_tostring(rawState, 3);
+  if (intelTypeName == nullptr) {
+    intelTypeArg.TypeError("string");
+  }
+  SCR_GetEnum(state, intelTypeName, enumRef);
+
+  int radius = 0;
+  if (argumentCount == 4) {
+    LuaPlus::LuaStackObject radiusArg(state, 4);
+    if (lua_type(rawState, 4) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&radiusArg, "integer");
+    }
+
+    radius = static_cast<int>(lua_tonumber(rawState, 4));
+    if (static_cast<int>(intelType) > static_cast<int>(INTEL_None)
+        && static_cast<int>(intelType) <= static_cast<int>(INTEL_CloakField) && radius == 0) {
+      LuaPlus::LuaState::Error(state, kEntityInitIntelRadiusWarning);
+    }
+  }
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  CIntel* intelManager = entity->mIntelManager;
+  if (intelManager != nullptr) {
+    intelManager->InitIntel(static_cast<std::int32_t>(intelType), static_cast<std::uint32_t>(radius), reconDb, sim);
+  } else {
+    auto* const createdIntelManager = new CIntel();
+    createdIntelManager->InitIntel(static_cast<std::int32_t>(intelType), static_cast<std::uint32_t>(radius), reconDb, sim);
+    entity->mIntelManager = createdIntelManager;
+    intelManager = createdIntelManager;
+  }
+
+  const std::int32_t currentTick = sim->mCurTick;
+  const Wm3::Vec3f position = entity->GetTransformWm3().pos_;
+  for (std::size_t index = 0; index < CIntel::kHandleCount; ++index) {
+    CIntelPosHandle* const handle = intelManager->mIntelHandles[index];
+    if (handle != nullptr) {
+      handle->UpdatePos(currentTick, position);
+    }
+  }
+
+  const std::int32_t attributeLane = static_cast<std::int32_t>(intelType) - 1;
+  if (attributeLane >= 0 && attributeLane <= 12) {
+    SetEntityAttributeRangePreserveEnabledBit(
+      GetEntityIntelAttributeRangesMutable(*entity), attributeLane, static_cast<std::uint32_t>(radius)
+    );
+  }
+
+  RequeueEntityCoordUpdate(*entity);
+  return 0;
+}
+
+/**
+ * Address: 0x0068ED50 (FUN_0068ED50, cfunc_EntityAddShooter)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntityAddShooterL`.
+ */
+int moho::cfunc_EntityAddShooter(lua_State* const luaContext)
+{
+  return cfunc_EntityAddShooterL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068ED70 (FUN_0068ED70, func_EntityAddShooter_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:AddShooter()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityAddShooter_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "AddShooter",
+    &moho::cfunc_EntityAddShooter,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityAddShooterHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068EDD0 (FUN_0068EDD0, cfunc_EntityAddShooterL)
+ *
+ * What it does:
+ * Reads `(entity, shooter)` and inserts `shooter` into the entity shooter set.
+ */
+int moho::cfunc_EntityAddShooterL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityAddShooterHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  const LuaPlus::LuaObject shooterObject(LuaPlus::LuaStackObject(state, 2));
+  Entity* const shooter = SCR_FromLua_Entity(shooterObject, state);
+  if (shooter != nullptr) {
+    (void)entity->mShooters.Add(shooter);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0068EEC0 (FUN_0068EEC0, cfunc_EntityRemoveShooter)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_EntityRemoveShooterL`.
+ */
+int moho::cfunc_EntityRemoveShooter(lua_State* const luaContext)
+{
+  return cfunc_EntityRemoveShooterL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0068EEE0 (FUN_0068EEE0, func_EntityRemoveShooter_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `Entity:RemoveShooter()` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_EntityRemoveShooter_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "RemoveShooter",
+    &moho::cfunc_EntityRemoveShooter,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    "Entity",
+    kEntityRemoveShooterHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0068EF40 (FUN_0068EF40, cfunc_EntityRemoveShooterL)
+ *
+ * What it does:
+ * Reads `(entity, shooter)` and removes `shooter` from the entity shooter set.
+ */
+int moho::cfunc_EntityRemoveShooterL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEntityRemoveShooterHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
+  Entity* const entity = SCR_FromLua_Entity(entityObject, state);
+
+  const LuaPlus::LuaObject shooterObject(LuaPlus::LuaStackObject(state, 2));
+  Entity* const shooter = SCR_FromLua_Entity(shooterObject, state);
+  if (shooter != nullptr) {
+    (void)entity->mShooters.Remove(shooter);
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x006FC3B0 (FUN_006FC3B0, cfunc_CreateProp)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_CreatePropL`.
+ */
+int moho::cfunc_CreateProp(lua_State* const luaContext)
+{
+  return cfunc_CreatePropL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x006FC430 (FUN_006FC430, cfunc_CreatePropL)
+ *
+ * What it does:
+ * Reads `(location, prop_blueprint_id)`, creates one prop in sim space, and
+ * returns the created prop Lua object.
+ */
+int moho::cfunc_CreatePropL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreatePropHelpText, 2, argumentCount);
+  }
+
+  LuaPlus::LuaObject locationObject(LuaPlus::LuaStackObject(state, 1));
+  const Wm3::Vec3f location = SCR_FromLuaCopy<Wm3::Vec3f>(locationObject);
+
+  LuaPlus::LuaStackObject blueprintArg(state, 2);
+  const char* const blueprintId = lua_tostring(rawState, 2);
+  if (!blueprintId) {
+    LuaPlus::LuaStackObject::TypeError(&blueprintArg, "string");
+  }
+
+  VTransform transform{};
+  transform.pos_ = location;
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  const RPropBlueprint* const blueprint = ResolvePropBlueprintById(sim ? sim->mRules : nullptr, blueprintId);
+  Prop* const prop = CreatePropFromBlueprintResolved(sim, transform, blueprint);
+  if (!prop) {
+    LuaPlus::LuaState::Error(state, "Unable to create prop '%s'", blueprintId ? blueprintId : "");
+  }
+
+  prop->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x006FC3D0 (FUN_006FC3D0, func_CreateProp_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `CreateProp`.
+ */
+moho::CScrLuaInitForm* moho::func_CreateProp_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "CreateProp",
+    &moho::cfunc_CreateProp,
+    nullptr,
+    "<global>",
+    kCreatePropHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007B5170 (FUN_007B5170, cfunc_CreateUnitAtMouse)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_CreateUnitAtMouseL`.
+ */
+int moho::cfunc_CreateUnitAtMouse(lua_State* const luaContext)
+{
+  return cfunc_CreateUnitAtMouseL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007B5190 (FUN_007B5190, func_CreateUnitAtMouse_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `CreateUnitAtMouse`.
+ */
+moho::CScrLuaInitForm* moho::func_CreateUnitAtMouse_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "CreateUnitAtMouse",
+    &moho::cfunc_CreateUnitAtMouse,
+    nullptr,
+    "<global>",
+    kCreateUnitAtMouseHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007B51E0 (FUN_007B51E0, cfunc_CreateUnitAtMouseL)
+ *
+ * What it does:
+ * Reads `(blueprintId, armyIndex, offsetX, offsetZ, rotation)`, resolves one
+ * unit blueprint, snaps non-mobile units to footprint-aligned map cells, and
+ * submits one create-unit command through the active sim driver.
+ */
+int moho::cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 5) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateUnitAtMouseHelpText, 5, argumentCount);
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    LuaPlus::LuaState::Error(state, "No active session.");
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject blueprintArg(state, 1);
+  const char* const blueprintText = lua_tostring(rawState, 1);
+  if (!blueprintText) {
+    LuaPlus::LuaStackObject::TypeError(&blueprintArg, "string");
+  }
+
+  RResId lookupId{};
+  gpg::STR_InitFilename(&lookupId.name, blueprintText ? blueprintText : "");
+
+  RUnitBlueprint* const blueprint = session->mRules ? session->mRules->GetUnitBlueprint(lookupId) : nullptr;
+  if (!blueprint) {
+    LuaPlus::LuaState::Error(state, "Unknown unit kind: %s", blueprintText ? blueprintText : "");
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject armyIndexArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&armyIndexArg, "integer");
+  }
+  const int armyIndex = static_cast<int>(lua_tonumber(rawState, 2));
+
+  const int armyCount = static_cast<int>(session->userArmies.size());
+  if (armyIndex < 0 || armyIndex >= armyCount) {
+    LuaPlus::LuaState::Error(
+      state,
+      "Invalid army index, must be >= 0 and < %d but got %d.",
+      armyCount,
+      armyIndex
+    );
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject offsetZArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&offsetZArg, "number");
+  }
+  const float offsetZ = static_cast<float>(lua_tonumber(rawState, 4));
+
+  LuaPlus::LuaStackObject offsetXArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&offsetXArg, "number");
+  }
+  const float offsetX = static_cast<float>(lua_tonumber(rawState, 3));
+
+  SCoordsVec2 spawnPos{};
+  spawnPos.x = session->CursorWorldPos.x + offsetX;
+  spawnPos.z = session->CursorWorldPos.z + offsetZ;
+
+  LuaPlus::LuaStackObject rotationArg(state, 5);
+  if (lua_type(rawState, 5) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject::TypeError(&rotationArg, "number");
+  }
+  const float rotation = static_cast<float>(lua_tonumber(rawState, 5));
+
+  if (!blueprint->IsMobile()) {
+    Sim* const sim = ResolveGlobalSim(rawState);
+    STIMap* const map = sim ? sim->mMapData : nullptr;
+    if (map != nullptr) {
+      const float anchorZ = spawnPos.z - (static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f);
+      const float anchorX = spawnPos.x - (static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f);
+
+      SOCellPos anchorCell{};
+      anchorCell.x = static_cast<std::int16_t>(static_cast<int>(anchorX));
+      anchorCell.z = static_cast<std::int16_t>(static_cast<int>(anchorZ));
+
+      const Wm3::Vector3f alignedPos = COORDS_ToWorldPos(
+        map,
+        anchorCell,
+        static_cast<ELayer>(blueprint->mFootprint.mOccupancyCaps),
+        static_cast<int>(blueprint->mFootprint.mSizeX),
+        static_cast<int>(blueprint->mFootprint.mSizeZ)
+      );
+      spawnPos.x = alignedPos.x;
+      spawnPos.z = alignedPos.z;
+    }
+  }
+
+  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  if (activeDriver != nullptr) {
+    RResId createId{};
+    gpg::STR_CopyFilename(&createId.name, &blueprint->mBlueprintId);
+    activeDriver->CreateUnit(static_cast<std::uint32_t>(armyIndex), createId, spawnPos, rotation);
+  }
+
+  return 0;
 }
 
 /**
@@ -7693,6 +19345,17 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
 }
 
 /**
+ * Address: 0x0074B110 (FUN_0074B110, ?SIM_FromLuaState@Moho@@YAPAVSim@1@PAVLuaState@LuaPlus@@@Z)
+ *
+ * What it does:
+ * Returns the global Sim pointer carried on the Lua state's global user-data.
+ */
+Sim* moho::SIM_FromLuaState(LuaPlus::LuaState* const state)
+{
+  return ResolveGlobalSim(state->m_state);
+}
+
+/**
  * Address: 0x00707D60 (FUN_00707D60, ?ARMY_FromLuaState@Moho@@YAPAVSimArmy@1@PAVLuaState@LuaPlus@@VLuaObject@4@@Z)
  *
  * What it does:
@@ -7700,7 +19363,7 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
  */
 CArmyImpl* moho::ARMY_FromLuaState(LuaPlus::LuaState* const state, const LuaPlus::LuaObject& armyObject)
 {
-  Sim* const sim = (state && state->m_state) ? ResolveGlobalSim(state->m_state) : nullptr;
+  Sim* const sim = SIM_FromLuaState(state);
   if (!sim) {
     return nullptr;
   }
@@ -7750,7 +19413,7 @@ CArmyImpl* moho::ARMY_FromLuaState(LuaPlus::LuaState* const state, const LuaPlus
  */
 int moho::ARMY_IndexFromLuaState(LuaPlus::LuaState* const state, const LuaPlus::LuaObject& armyObject)
 {
-  Sim* const sim = (state && state->m_state) ? ResolveGlobalSim(state->m_state) : nullptr;
+  Sim* const sim = SIM_FromLuaState(state);
   if (!sim) {
     return -1;
   }
@@ -7783,6 +19446,1617 @@ int moho::ARMY_IndexFromLuaState(LuaPlus::LuaState* const state, const LuaPlus::
   }
 
   return -1;
+}
+
+/**
+ * Address: 0x007080B0 (FUN_007080B0, cfunc_ShouldCreateInitialArmyUnits)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_ShouldCreateInitialArmyUnitsL`.
+ */
+int moho::cfunc_ShouldCreateInitialArmyUnits(lua_State* const luaContext)
+{
+  return cfunc_ShouldCreateInitialArmyUnitsL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007080D0 (FUN_007080D0, func_ShouldCreateInitialArmyUnits_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ShouldCreateInitialArmyUnits`.
+ */
+moho::CScrLuaInitForm* moho::func_ShouldCreateInitialArmyUnits_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ShouldCreateInitialArmyUnits",
+    &moho::cfunc_ShouldCreateInitialArmyUnits,
+    nullptr,
+    "<global>",
+    kShouldCreateInitialArmyUnitsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708130 (FUN_00708130, cfunc_ShouldCreateInitialArmyUnitsL)
+ *
+ * What it does:
+ * Returns one Lua boolean indicating whether startup should spawn initial army
+ * units (disabled by `/noinitialunits`).
+ */
+int moho::cfunc_ShouldCreateInitialArmyUnitsL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kShouldCreateInitialArmyUnitsHelpText, 0, argumentCount);
+  }
+
+  const bool disableInitialUnits = CFG_GetArgOption("/noinitialunits", 0u, nullptr);
+  lua_pushboolean(state->m_state, !disableInitialUnits);
+  return 1;
+}
+
+/**
+ * Address: 0x007081A0 (FUN_007081A0, cfunc_ListArmies)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_ListArmiesL`.
+ */
+int moho::cfunc_ListArmies(lua_State* const luaContext)
+{
+  return cfunc_ListArmiesL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007081C0 (FUN_007081C0, func_ListArmies_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ListArmies`.
+ */
+moho::CScrLuaInitForm* moho::func_ListArmies_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ListArmies",
+    &moho::cfunc_ListArmies,
+    nullptr,
+    "<global>",
+    kListArmiesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708220 (FUN_00708220, cfunc_ListArmiesL)
+ *
+ * What it does:
+ * Returns one Lua array table containing army names in simulation order.
+ */
+int moho::cfunc_ListArmiesL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kListArmiesHelpText, 0, argumentCount);
+  }
+
+  Sim* const sim = SIM_FromLuaState(state);
+  LuaPlus::LuaObject armiesTable(state);
+  armiesTable.AssignNewTable(state, 0, 0u);
+
+  if (sim != nullptr) {
+    for (std::size_t armyIndex = 0; armyIndex < sim->mArmiesList.size(); ++armyIndex) {
+      CArmyImpl* const army = sim->mArmiesList[armyIndex];
+      const char* const armyName = (army && army->ArmyName.c_str()) ? army->ArmyName.c_str() : "";
+      armiesTable.SetString(static_cast<std::int32_t>(armyIndex + 1u), armyName);
+    }
+  }
+
+  armiesTable.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00708310 (FUN_00708310, cfunc_GetArmyBrain)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetArmyBrainL`.
+ */
+int moho::cfunc_GetArmyBrain(lua_State* const luaContext)
+{
+  return cfunc_GetArmyBrainL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708330 (FUN_00708330, func_GetArmyBrain_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetArmyBrain`.
+ */
+moho::CScrLuaInitForm* moho::func_GetArmyBrain_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetArmyBrain",
+    &moho::cfunc_GetArmyBrain,
+    nullptr,
+    "<global>",
+    kGetArmyBrainHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708390 (FUN_00708390, cfunc_GetArmyBrainL)
+ *
+ * What it does:
+ * Resolves one army selector and pushes that army brain Lua object.
+ */
+int moho::cfunc_GetArmyBrainL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmyBrainHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  CScriptObject* const brainScriptObject = reinterpret_cast<CScriptObject*>(army->GetArmyBrain());
+  brainScriptObject->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00708460 (FUN_00708460, cfunc_SetArmyStart)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyStartL`.
+ */
+int moho::cfunc_SetArmyStart(lua_State* const luaContext)
+{
+  return cfunc_SetArmyStartL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708480 (FUN_00708480, func_SetArmyStart_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyStart`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyStart_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyStart",
+    &moho::cfunc_SetArmyStart,
+    nullptr,
+    "<global>",
+    kSetArmyStartHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007084E0 (FUN_007084E0, cfunc_SetArmyStartL)
+ *
+ * What it does:
+ * Reads `(army, x, z)` from Lua and forwards one start-position vector to
+ * `CArmyImpl::SetArmyStart`.
+ */
+int moho::cfunc_SetArmyStartL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyStartHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+  LuaPlus::LuaStackObject xArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    xArg.TypeError("number");
+  }
+
+  LuaPlus::LuaStackObject zArg(state, 3);
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    zArg.TypeError("number");
+  }
+
+  Wm3::Vector2f startPosition{};
+  startPosition.x = static_cast<float>(lua_tonumber(state->m_state, 2));
+  startPosition.y = static_cast<float>(lua_tonumber(state->m_state, 3));
+  army->SetArmyStart(startPosition);
+  return 0;
+}
+
+/**
+ * Address: 0x007085E0 (FUN_007085E0, cfunc_GenerateArmyStart)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GenerateArmyStartL`.
+ */
+int moho::cfunc_GenerateArmyStart(lua_State* const luaContext)
+{
+  return cfunc_GenerateArmyStartL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708600 (FUN_00708600, func_GenerateArmyStart_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GenerateArmyStart`.
+ */
+moho::CScrLuaInitForm* moho::func_GenerateArmyStart_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GenerateArmyStart",
+    &moho::cfunc_GenerateArmyStart,
+    nullptr,
+    "<global>",
+    kGenerateArmyStartHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708660 (FUN_00708660, cfunc_GenerateArmyStartL)
+ *
+ * What it does:
+ * Reads one army selector and forwards start generation to `CArmyImpl`.
+ */
+int moho::cfunc_GenerateArmyStartL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGenerateArmyStartHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  army->GenerateArmyStart();
+  return 0;
+}
+
+/**
+ * Address: 0x00708970 (FUN_00708970, cfunc_ArmyInitializePrebuiltUnits)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_ArmyInitializePrebuiltUnitsL`.
+ */
+int moho::cfunc_ArmyInitializePrebuiltUnits(lua_State* const luaContext)
+{
+  return cfunc_ArmyInitializePrebuiltUnitsL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708990 (FUN_00708990, func_ArmyInitializePrebuiltUnits_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ArmyInitializePrebuiltUnits`.
+ */
+moho::CScrLuaInitForm* moho::func_ArmyInitializePrebuiltUnits_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ArmyInitializePrebuiltUnits",
+    &moho::cfunc_ArmyInitializePrebuiltUnits,
+    nullptr,
+    "<global>",
+    kArmyInitializePrebuiltUnitsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007089F0 (FUN_007089F0, cfunc_ArmyInitializePrebuiltUnitsL)
+ *
+ * What it does:
+ * Reads one army selector and runs `OnSpawnPreBuiltUnits` on that army's
+ * brain script object.
+ */
+int moho::cfunc_ArmyInitializePrebuiltUnitsL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kArmyInitializePrebuiltUnitsHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  CAiBrain* const brain = army->GetArmyBrain();
+  reinterpret_cast<CScriptObject*>(brain)->OnSpawnPreBuiltUnits();
+  return 0;
+}
+
+/**
+ * Address: 0x007090A0 (FUN_007090A0, cfunc_SetIgnoreArmyUnitCap)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_SetIgnoreArmyUnitCapL`.
+ */
+int moho::cfunc_SetIgnoreArmyUnitCap(lua_State* const luaContext)
+{
+  return cfunc_SetIgnoreArmyUnitCapL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007090C0 (FUN_007090C0, func_SetIgnoreArmyUnitCap_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetIgnoreArmyUnitCap`.
+ */
+moho::CScrLuaInitForm* moho::func_SetIgnoreArmyUnitCap_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetIgnoreArmyUnitCap",
+    &moho::cfunc_SetIgnoreArmyUnitCap,
+    nullptr,
+    "<global>",
+    kSetIgnoreArmyUnitCapHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709120 (FUN_00709120, cfunc_SetIgnoreArmyUnitCapL)
+ *
+ * What it does:
+ * Reads `(army, flag)` from Lua and updates unit-cap ignore mode through the
+ * army interface.
+ */
+int moho::cfunc_SetIgnoreArmyUnitCapL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetIgnoreArmyUnitCapHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  LuaPlus::LuaStackObject flagArg(state, 2);
+  const bool useUnitCap = flagArg.GetBoolean();
+  army->SetUseUnitCap(useUnitCap);
+  return 0;
+}
+
+/**
+ * Address: 0x007091B0 (FUN_007091B0, cfunc_SetIgnorePlayableRect)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_SetIgnorePlayableRectL`.
+ */
+int moho::cfunc_SetIgnorePlayableRect(lua_State* const luaContext)
+{
+  return cfunc_SetIgnorePlayableRectL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007091D0 (FUN_007091D0, func_SetIgnorePlayableRect_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetIgnorePlayableRect`.
+ */
+moho::CScrLuaInitForm* moho::func_SetIgnorePlayableRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetIgnorePlayableRect",
+    &moho::cfunc_SetIgnorePlayableRect,
+    nullptr,
+    "<global>",
+    kSetIgnorePlayableRectHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709230 (FUN_00709230, cfunc_SetIgnorePlayableRectL)
+ *
+ * What it does:
+ * Reads `(army, flag)` from Lua and updates playable-rect ignore mode through
+ * the army interface.
+ */
+int moho::cfunc_SetIgnorePlayableRectL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetIgnorePlayableRectHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  LuaPlus::LuaStackObject flagArg(state, 2);
+  const bool ignorePlayableRect = flagArg.GetBoolean();
+  army->SetIgnorePlayableRect(ignorePlayableRect);
+  return 0;
+}
+
+/**
+ * Address: 0x007099C0 (FUN_007099C0, cfunc_IsAllySim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_IsAllySimL`.
+ */
+int moho::cfunc_IsAllySim(lua_State* const luaContext)
+{
+  return cfunc_IsAllySimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007099E0 (FUN_007099E0, func_IsAllySim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsAlly`.
+ */
+moho::CScrLuaInitForm* moho::func_IsAllySim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsAlly",
+    &moho::cfunc_IsAllySim,
+    nullptr,
+    "<global>",
+    kIsAllySimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709A40 (FUN_00709A40, cfunc_IsAllySimL)
+ *
+ * What it does:
+ * Reads `(army1, army2)` and returns whether army1 treats army2 as allied.
+ */
+int moho::cfunc_IsAllySimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsAllySimHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const firstArmy = ARMY_FromLuaState(state, firstArmyObject);
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
+
+  const bool isAlly = firstArmy != nullptr && secondArmy != nullptr &&
+    firstArmy->Allies.Contains(static_cast<std::uint32_t>(secondArmy->ArmyId));
+  lua_pushboolean(rawState, isAlly ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00709AF0 (FUN_00709AF0, cfunc_IsEnemySim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_IsEnemySimL`.
+ */
+int moho::cfunc_IsEnemySim(lua_State* const luaContext)
+{
+  return cfunc_IsEnemySimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00709B10 (FUN_00709B10, func_IsEnemySim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsEnemy`.
+ */
+moho::CScrLuaInitForm* moho::func_IsEnemySim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsEnemy",
+    &moho::cfunc_IsEnemySim,
+    nullptr,
+    "<global>",
+    kIsEnemySimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709B70 (FUN_00709B70, cfunc_IsEnemySimL)
+ *
+ * What it does:
+ * Reads `(army1, army2)` and returns whether army1 treats army2 as enemy.
+ */
+int moho::cfunc_IsEnemySimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsEnemySimHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const firstArmy = ARMY_FromLuaState(state, firstArmyObject);
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
+
+  const bool isEnemy = firstArmy != nullptr && secondArmy != nullptr &&
+    firstArmy->Enemies.Contains(static_cast<std::uint32_t>(secondArmy->ArmyId));
+  lua_pushboolean(rawState, isEnemy ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00709C20 (FUN_00709C20, cfunc_IsNeutralSim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_IsNeutralSimL`.
+ */
+int moho::cfunc_IsNeutralSim(lua_State* const luaContext)
+{
+  return cfunc_IsNeutralSimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00709C40 (FUN_00709C40, func_IsNeutralSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `IsNeutral`.
+ */
+moho::CScrLuaInitForm* moho::func_IsNeutralSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "IsNeutral",
+    &moho::cfunc_IsNeutralSim,
+    nullptr,
+    "<global>",
+    kIsNeutralSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709CA0 (FUN_00709CA0, cfunc_IsNeutralSimL)
+ *
+ * What it does:
+ * Reads `(army1, army2)` and returns whether army1 treats army2 as neutral.
+ */
+int moho::cfunc_IsNeutralSimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsNeutralSimHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const firstArmy = ARMY_FromLuaState(state, firstArmyObject);
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
+
+  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr &&
+    firstArmy->Neutrals.Contains(static_cast<std::uint32_t>(secondArmy->ArmyId));
+  lua_pushboolean(rawState, isNeutral ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00709D50 (FUN_00709D50, cfunc_ArmyIsCivilian)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_ArmyIsCivilianL`.
+ */
+int moho::cfunc_ArmyIsCivilian(lua_State* const luaContext)
+{
+  return cfunc_ArmyIsCivilianL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00709D70 (FUN_00709D70, func_ArmyIsCivilian_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ArmyIsCivilian`.
+ */
+moho::CScrLuaInitForm* moho::func_ArmyIsCivilian_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ArmyIsCivilian",
+    &moho::cfunc_ArmyIsCivilian,
+    nullptr,
+    "<global>",
+    kArmyIsCivilianHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709DD0 (FUN_00709DD0, cfunc_ArmyIsCivilianL)
+ *
+ * What it does:
+ * Returns whether the selected army is civilian.
+ */
+int moho::cfunc_ArmyIsCivilianL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kArmyIsCivilianHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  lua_pushboolean(rawState, (army != nullptr && army->IsCivilian != 0u) ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x00709FB0 (FUN_00709FB0, cfunc_SetArmyFactionIndex)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyFactionIndexL`.
+ */
+int moho::cfunc_SetArmyFactionIndex(lua_State* const luaContext)
+{
+  return cfunc_SetArmyFactionIndexL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00709FD0 (FUN_00709FD0, func_SetArmyFactionIndex_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyFactionIndex`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyFactionIndex_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyFactionIndex",
+    &moho::cfunc_SetArmyFactionIndex,
+    nullptr,
+    "<global>",
+    kSetArmyFactionIndexHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0070A030 (FUN_0070A030, cfunc_SetArmyFactionIndexL)
+ *
+ * What it does:
+ * Reads `(army, index)` and updates the army faction index lane.
+ */
+int moho::cfunc_SetArmyFactionIndexL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyFactionIndexHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+  LuaPlus::LuaStackObject factionArg(state, 2);
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    factionArg.TypeError("integer");
+  }
+
+  if (army != nullptr) {
+    army->FactionIndex = static_cast<std::int32_t>(lua_tonumber(rawState, 2));
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0070A920 (FUN_0070A920, cfunc_OkayToMessWithArmy)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_OkayToMessWithArmyL`.
+ */
+int moho::cfunc_OkayToMessWithArmy(lua_State* const luaContext)
+{
+  return cfunc_OkayToMessWithArmyL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0070A940 (FUN_0070A940, func_OkayToMessWithArmy_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `OkayToMessWithArmy`.
+ */
+moho::CScrLuaInitForm* moho::func_OkayToMessWithArmy_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "OkayToMessWithArmy",
+    &moho::cfunc_OkayToMessWithArmy,
+    nullptr,
+    "<global>",
+    kOkayToMessWithArmyHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0070A9A0 (FUN_0070A9A0, cfunc_OkayToMessWithArmyL)
+ *
+ * What it does:
+ * Returns true when current command source is valid for that army or cheats
+ * are enabled.
+ */
+int moho::cfunc_OkayToMessWithArmyL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kOkayToMessWithArmyHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+  bool allowed = false;
+  if (army != nullptr && army->IsOutOfGame == 0u) {
+    Sim* const sim = army->GetSim();
+    if (sim != nullptr) {
+      const int commandSource = sim->mCurCommandSource;
+      allowed = commandSource != static_cast<int>(kInvalidCommandSource) &&
+        army->MohoSetValidCommandSources.Contains(static_cast<std::uint32_t>(commandSource));
+      if (!allowed) {
+        allowed = sim->CheatsEnabled();
+      }
+    }
+  }
+
+  lua_pushboolean(rawState, allowed ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x0070AA60 (FUN_0070AA60, cfunc_ArmyIsOutOfGame)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_ArmyIsOutOfGameL`.
+ */
+int moho::cfunc_ArmyIsOutOfGame(lua_State* const luaContext)
+{
+  return cfunc_ArmyIsOutOfGameL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0070AA80 (FUN_0070AA80, func_ArmyIsOutOfGame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ArmyIsOutOfGame`.
+ */
+moho::CScrLuaInitForm* moho::func_ArmyIsOutOfGame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ArmyIsOutOfGame",
+    &moho::cfunc_ArmyIsOutOfGame,
+    nullptr,
+    "<global>",
+    kArmyIsOutOfGameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0070AAE0 (FUN_0070AAE0, cfunc_ArmyIsOutOfGameL)
+ *
+ * What it does:
+ * Returns whether the selected army has been marked out-of-game.
+ */
+int moho::cfunc_ArmyIsOutOfGameL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kArmyIsOutOfGameHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  lua_pushboolean(rawState, (army != nullptr && army->IsOutOfGame != 0u) ? 1 : 0);
+  return 1;
+}
+
+/**
+ * Address: 0x0070AB60 (FUN_0070AB60, cfunc_SetArmyOutOfGame)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyOutOfGameL`.
+ */
+int moho::cfunc_SetArmyOutOfGame(lua_State* const luaContext)
+{
+  return cfunc_SetArmyOutOfGameL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0070AB80 (FUN_0070AB80, func_SetArmyOutOfGame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyOutOfGame`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyOutOfGame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyOutOfGame",
+    &moho::cfunc_SetArmyOutOfGame,
+    nullptr,
+    "<global>",
+    kSetArmyOutOfGameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0070ABE0 (FUN_0070ABE0, cfunc_SetArmyOutOfGameL)
+ *
+ * What it does:
+ * Marks one selected army as out-of-game.
+ */
+int moho::cfunc_SetArmyOutOfGameL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyOutOfGameHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  if (army != nullptr) {
+    army->IsOutOfGame = 1u;
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x00709590 (FUN_00709590, cfunc_SetAlliance)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetAllianceL`.
+ */
+int moho::cfunc_SetAlliance(lua_State* const luaContext)
+{
+  return cfunc_SetAllianceL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007095B0 (FUN_007095B0, func_SetAlliance_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetAlliance`.
+ */
+moho::CScrLuaInitForm* moho::func_SetAlliance_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetAlliance",
+    &moho::cfunc_SetAlliance,
+    nullptr,
+    "<global>",
+    kSetAllianceHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709610 (FUN_00709610, cfunc_SetAllianceL)
+ *
+ * What it does:
+ * Reads `(army1, army2, relation)` and writes symmetric alliance relation
+ * lanes on both armies.
+ */
+int moho::cfunc_SetAllianceL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAllianceHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const firstArmy = ARMY_FromLuaState(state, firstArmyObject);
+
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
+
+  EAlliance alliance = ALLIANCE_Neutral;
+  gpg::RRef enumRef = MakeEAllianceRef(&alliance);
+  const LuaPlus::LuaStackObject allianceArg(state, 3);
+  const char* allianceText = lua_tostring(rawState, 3);
+  if (allianceText == nullptr) {
+    allianceArg.TypeError("string");
+    allianceText = "";
+  }
+  SCR_GetEnum(state, allianceText, enumRef);
+
+  const std::uint32_t secondArmyId = secondArmy ? static_cast<std::uint32_t>(secondArmy->ArmyId) : 0u;
+  firstArmy->SetAlliance(secondArmyId, static_cast<int>(alliance));
+
+  const std::uint32_t firstArmyId = firstArmy ? static_cast<std::uint32_t>(firstArmy->ArmyId) : 0u;
+  secondArmy->SetAlliance(firstArmyId, static_cast<int>(alliance));
+  return 0;
+}
+
+/**
+ * Address: 0x00709720 (FUN_00709720, cfunc_SetAllianceOneWay)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetAllianceOneWayL`.
+ */
+int moho::cfunc_SetAllianceOneWay(lua_State* const luaContext)
+{
+  return cfunc_SetAllianceOneWayL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00709740 (FUN_00709740, func_SetAllianceOneWay_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetAllianceOneWay`.
+ */
+moho::CScrLuaInitForm* moho::func_SetAllianceOneWay_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetAllianceOneWay",
+    &moho::cfunc_SetAllianceOneWay,
+    nullptr,
+    "<global>",
+    kSetAllianceOneWayHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007097A0 (FUN_007097A0, cfunc_SetAllianceOneWayL)
+ *
+ * What it does:
+ * Reads `(army1, army2, relation)` and writes one-way alliance relation on
+ * the first army only.
+ */
+int moho::cfunc_SetAllianceOneWayL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAllianceOneWayHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject firstArmyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const firstArmy = ARMY_FromLuaState(state, firstArmyObject);
+
+  const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
+  CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
+
+  EAlliance alliance = ALLIANCE_Neutral;
+  gpg::RRef enumRef = MakeEAllianceRef(&alliance);
+  const LuaPlus::LuaStackObject allianceArg(state, 3);
+  const char* allianceText = lua_tostring(rawState, 3);
+  if (allianceText == nullptr) {
+    allianceArg.TypeError("string");
+    allianceText = "";
+  }
+  SCR_GetEnum(state, allianceText, enumRef);
+
+  const std::uint32_t secondArmyId = secondArmy ? static_cast<std::uint32_t>(secondArmy->ArmyId) : 0u;
+  firstArmy->SetAlliance(secondArmyId, static_cast<int>(alliance));
+  return 0;
+}
+
+/**
+ * Address: 0x007098A0 (FUN_007098A0, cfunc_SetAlliedVictory)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetAlliedVictoryL`.
+ */
+int moho::cfunc_SetAlliedVictory(lua_State* const luaContext)
+{
+  return cfunc_SetAlliedVictoryL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007098C0 (FUN_007098C0, func_SetAlliedVictory_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetAlliedVictory`.
+ */
+moho::CScrLuaInitForm* moho::func_SetAlliedVictory_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetAlliedVictory",
+    &moho::cfunc_SetAlliedVictory,
+    nullptr,
+    "<global>",
+    kSetAlliedVictoryHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00709920 (FUN_00709920, cfunc_SetAlliedVictoryL)
+ *
+ * What it does:
+ * Reads `(army, enabled)` and updates `RequestingAlliedVictory` on that army's
+ * brain script object.
+ */
+int moho::cfunc_SetAlliedVictoryL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAlliedVictoryHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  CAiBrain* const brain = army ? army->GetArmyBrain() : nullptr;
+  if (brain == nullptr) {
+    return 0;
+  }
+
+  const LuaPlus::LuaStackObject enabledArg(state, 2);
+  brain->mLuaObj.SetBoolean("RequestingAlliedVictory", enabledArg.GetBoolean());
+  return 0;
+}
+
+/**
+ * Address: 0x00708A70 (FUN_00708A70, cfunc_ArmyGetHandicap)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_ArmyGetHandicapL`.
+ */
+int moho::cfunc_ArmyGetHandicap(lua_State* const luaContext)
+{
+  return cfunc_ArmyGetHandicapL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708A90 (FUN_00708A90, func_ArmyGetHandicap_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `ArmyGetHandicap`.
+ */
+moho::CScrLuaInitForm* moho::func_ArmyGetHandicap_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "ArmyGetHandicap",
+    &moho::cfunc_ArmyGetHandicap,
+    nullptr,
+    "<global>",
+    kArmyGetHandicapHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708AF0 (FUN_00708AF0, cfunc_ArmyGetHandicapL)
+ *
+ * What it does:
+ * Resolves one army selector and returns configured handicap or zero.
+ */
+int moho::cfunc_ArmyGetHandicapL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kArmyGetHandicapHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  float handicap = 0.0f;
+  if (army->HasHandicap != 0.0f) {
+    handicap = army->Handicap;
+  }
+  lua_pushnumber(state->m_state, handicap);
+  return 1;
+}
+
+/**
+ * Address: 0x00708B90 (FUN_00708B90, cfunc_SetArmyEconomy)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyEconomyL`.
+ */
+int moho::cfunc_SetArmyEconomy(lua_State* const luaContext)
+{
+  return cfunc_SetArmyEconomyL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708BB0 (FUN_00708BB0, func_SetArmyEconomy_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyEconomy`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyEconomy_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyEconomy",
+    &moho::cfunc_SetArmyEconomy,
+    nullptr,
+    "<global>",
+    kSetArmyEconomyHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708C10 (FUN_00708C10, cfunc_SetArmyEconomyL)
+ *
+ * What it does:
+ * Reads `(army, mass, energy)` and adds those deltas to the army stored
+ * economy pair.
+ */
+int moho::cfunc_SetArmyEconomyL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyEconomyHelpText, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  CSimArmyEconomyInfo* const economyInfo = army ? army->GetEconomy() : nullptr;
+  if (!economyInfo) {
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject massArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    massArg.TypeError("number");
+  }
+  const float massDelta = static_cast<float>(lua_tonumber(state->m_state, 2));
+
+  LuaPlus::LuaStackObject energyArg(state, 3);
+  if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
+    energyArg.TypeError("number");
+  }
+  const float energyDelta = static_cast<float>(lua_tonumber(state->m_state, 3));
+
+  economyInfo->economy.mStored.MASS += massDelta;
+  economyInfo->economy.mStored.ENERGY += energyDelta;
+  return 0;
+}
+
+/**
+ * Address: 0x00708D60 (FUN_00708D60, cfunc_GetArmyUnitCostTotal)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetArmyUnitCostTotalL`.
+ */
+int moho::cfunc_GetArmyUnitCostTotal(lua_State* const luaContext)
+{
+  return cfunc_GetArmyUnitCostTotalL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708D80 (FUN_00708D80, func_GetArmyUnitCostTotal_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetArmyUnitCostTotal`.
+ */
+moho::CScrLuaInitForm* moho::func_GetArmyUnitCostTotal_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetArmyUnitCostTotal",
+    &moho::cfunc_GetArmyUnitCostTotal,
+    nullptr,
+    "<global>",
+    kGetArmyUnitCostTotalHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708DE0 (FUN_00708DE0, cfunc_GetArmyUnitCostTotalL)
+ *
+ * What it does:
+ * Resolves one army selector and returns the army total unit cost as a Lua
+ * number.
+ */
+int moho::cfunc_GetArmyUnitCostTotalL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmyUnitCostTotalHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  lua_pushnumber(state->m_state, army ? army->GetArmyUnitCostTotal() : 0.0f);
+  return 1;
+}
+
+/**
+ * Address: 0x00708E60 (FUN_00708E60, cfunc_GetArmyUnitCap)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetArmyUnitCapL`.
+ */
+int moho::cfunc_GetArmyUnitCap(lua_State* const luaContext)
+{
+  return cfunc_GetArmyUnitCapL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708E80 (FUN_00708E80, func_GetArmyUnitCap_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetArmyUnitCap`.
+ */
+moho::CScrLuaInitForm* moho::func_GetArmyUnitCap_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetArmyUnitCap",
+    &moho::cfunc_GetArmyUnitCap,
+    nullptr,
+    "<global>",
+    kGetArmyUnitCapHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708EE0 (FUN_00708EE0, cfunc_GetArmyUnitCapL)
+ *
+ * What it does:
+ * Resolves one army selector and returns that army's unit-cap value as a Lua
+ * number.
+ */
+int moho::cfunc_GetArmyUnitCapL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmyUnitCapHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  lua_pushnumber(state->m_state, army->GetUnitCap());
+  return 1;
+}
+
+/**
+ * Address: 0x00708F70 (FUN_00708F70, cfunc_SetArmyUnitCap)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyUnitCapL`.
+ */
+int moho::cfunc_SetArmyUnitCap(lua_State* const luaContext)
+{
+  return cfunc_SetArmyUnitCapL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708F90 (FUN_00708F90, func_SetArmyUnitCap_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyUnitCap`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyUnitCap_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyUnitCap",
+    &moho::cfunc_SetArmyUnitCap,
+    nullptr,
+    "<global>",
+    kSetArmyUnitCapHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708FF0 (FUN_00708FF0, cfunc_SetArmyUnitCapL)
+ *
+ * What it does:
+ * Reads `(army, unitCap)` from Lua and updates that army's unit-cap lane.
+ */
+int moho::cfunc_SetArmyUnitCapL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyUnitCapHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+  LuaPlus::LuaStackObject unitCapArg(state, 2);
+  if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
+    unitCapArg.TypeError("number");
+  }
+
+  const float unitCap = static_cast<float>(lua_tonumber(state->m_state, 2));
+  army->SetUnitCap(unitCap);
+  return 0;
+}
+
+/**
+ * Address: 0x0070A180 (FUN_0070A180, cfunc_SetArmyAIPersonalityL)
+ *
+ * What it does:
+ * Reads `(army, personality)` from Lua and updates the army personality lane.
+ */
+int moho::cfunc_SetArmyAIPersonalityL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyAIPersonalityHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  if (!army) {
+    return 0;
+  }
+
+  LuaPlus::LuaStackObject personalityArg(state, 2);
+  const char* personalityName = lua_tostring(state->m_state, 2);
+  if (!personalityName) {
+    LuaPlus::LuaStackObject::TypeError(&personalityArg, "string");
+    personalityName = "";
+  }
+
+  if (personalityName[0] != '\0') {
+    army->ArmyTypeText.assign(personalityName, 0U, msvc8::string::npos);
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0070A100 (FUN_0070A100, cfunc_SetArmyAIPersonality)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyAIPersonalityL`.
+ */
+int moho::cfunc_SetArmyAIPersonality(lua_State* const luaContext)
+{
+  return cfunc_SetArmyAIPersonalityL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0070A120 (FUN_0070A120, func_SetArmyAIPersonality_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyAIPersonality`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyAIPersonality_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyAIPersonality",
+    &moho::cfunc_SetArmyAIPersonality,
+    nullptr,
+    "<global>",
+    kSetArmyAIPersonalityHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0070A5E0 (FUN_0070A5E0, cfunc_SetArmyShowScore)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyShowScoreL`.
+ */
+int moho::cfunc_SetArmyShowScore(lua_State* const luaContext)
+{
+  return cfunc_SetArmyShowScoreL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0070A600 (FUN_0070A600, func_SetArmyShowScore_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyShowScore`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyShowScore_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyShowScore",
+    &moho::cfunc_SetArmyShowScore,
+    nullptr,
+    "<global>",
+    kSetArmyShowScoreHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0070A660 (FUN_0070A660, cfunc_SetArmyShowScoreL)
+ *
+ * What it does:
+ * Reads `(army, showScore)` and stores score visibility in the army runtime
+ * variable lane.
+ */
+int moho::cfunc_SetArmyShowScoreL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyShowScoreHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+
+  LuaPlus::LuaStackObject showScoreArg(state, 2);
+  const bool showScore = showScoreArg.GetBoolean();
+  if (army != nullptr) {
+    army->ShowScoreFlag = showScore ? 1u : 0u;
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x007086D0 (FUN_007086D0, cfunc_SetArmyPlans)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyPlansL`.
+ */
+int moho::cfunc_SetArmyPlans(lua_State* const luaContext)
+{
+  return cfunc_SetArmyPlansL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708750 (FUN_00708750, cfunc_SetArmyPlansL)
+ *
+ * What it does:
+ * Reads `(army, plans)` from Lua and forwards the plans string to
+ * `CArmyImpl::SetArmyPlans`.
+ */
+int moho::cfunc_SetArmyPlansL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetArmyPlansHelpText, 2, argumentCount);
+  }
+
+  const char* plansText = "";
+  if (lua_isstring(state->m_state, 2)) {
+    const LuaPlus::LuaStackObject plansArg(state, 2);
+    plansText = lua_tostring(state->m_state, 2);
+    if (plansText == nullptr) {
+      plansArg.TypeError("string");
+    }
+  }
+
+  const msvc8::string plansValue(plansText ? plansText : "");
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  army->SetArmyPlans(plansValue);
+  return 0;
+}
+
+/**
+ * Address: 0x007086F0 (FUN_007086F0, func_SetArmyPlans_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SetArmyPlans`.
+ */
+moho::CScrLuaInitForm* moho::func_SetArmyPlans_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SetArmyPlans",
+    &moho::cfunc_SetArmyPlans,
+    nullptr,
+    "<global>",
+    kSetArmyPlansHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00708870 (FUN_00708870, cfunc_InitializeArmyAI)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_InitializeArmyAIL`.
+ */
+int moho::cfunc_InitializeArmyAI(lua_State* const luaContext)
+{
+  return cfunc_InitializeArmyAIL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00708890 (FUN_00708890, func_InitializeArmyAI_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `InitializeArmyAI`.
+ */
+moho::CScrLuaInitForm* moho::func_InitializeArmyAI_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "InitializeArmyAI",
+    &moho::cfunc_InitializeArmyAI,
+    nullptr,
+    "<global>",
+    kInitializeArmyAIHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007088F0 (FUN_007088F0, cfunc_InitializeArmyAIL)
+ *
+ * What it does:
+ * Resolves one army selector and invokes `CAiBrain::Initialize` on that army
+ * brain object.
+ */
+int moho::cfunc_InitializeArmyAIL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kInitializeArmyAIHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
+  CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
+  CAiBrain* const brain = army ? army->GetArmyBrain() : nullptr;
+  if (brain != nullptr) {
+    brain->Initialize();
+  }
+  return 0;
 }
 
 /**
@@ -7886,6 +21160,145 @@ moho::CScrLuaInitForm* moho::func_IsGameOver_LuaFuncDef()
 }
 
 /**
+ * Address: 0x0074B9F0 (FUN_0074B9F0, cfunc_GetEntityById)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetEntityByIdL`.
+ */
+int moho::cfunc_GetEntityById(lua_State* const luaContext)
+{
+  return cfunc_GetEntityByIdL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0074BA10 (FUN_0074BA10, func_GetEntityById_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetEntityById`.
+ */
+moho::CScrLuaInitForm* moho::func_GetEntityById_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetEntityById",
+    &moho::cfunc_GetEntityById,
+    nullptr,
+    "<global>",
+    kGetEntityByIdHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0074BA70 (FUN_0074BA70, cfunc_GetEntityByIdL)
+ *
+ * What it does:
+ * Resolves one string entity-id argument and returns matching entity Lua
+ * object (or nil).
+ */
+int moho::cfunc_GetEntityByIdL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetEntityByIdHelpText, 1, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  const LuaPlus::LuaStackObject entityIdArg(state, 1);
+  const char* entityIdText = lua_tostring(rawState, 1);
+  if (entityIdText == nullptr) {
+    entityIdArg.TypeError("string");
+    entityIdText = "";
+  }
+
+  const EntId entityId = static_cast<EntId>(std::atoi(entityIdText));
+  Entity* const entity = FindEntityById(sim ? sim->mEntityDB : nullptr, entityId);
+  if (entity == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  entity->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0074BB40 (FUN_0074BB40, cfunc_GetUnitByIdSim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetUnitByIdSimL`.
+ */
+int moho::cfunc_GetUnitByIdSim(lua_State* const luaContext)
+{
+  return cfunc_GetUnitByIdSimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0074BB60 (FUN_0074BB60, func_GetUnitByIdSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetUnitById`.
+ */
+moho::CScrLuaInitForm* moho::func_GetUnitByIdSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetUnitById",
+    &moho::cfunc_GetUnitByIdSim,
+    nullptr,
+    "<global>",
+    kGetUnitByIdSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0074BBC0 (FUN_0074BBC0, cfunc_GetUnitByIdSimL)
+ *
+ * What it does:
+ * Resolves one string entity-id argument and returns the matching unit Lua
+ * object when that id is a unit (or nil).
+ */
+int moho::cfunc_GetUnitByIdSimL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitByIdSimHelpText, 1, argumentCount);
+  }
+
+  Sim* const sim = lua_getglobaluserdata(rawState);
+  const LuaPlus::LuaStackObject entityIdArg(state, 1);
+  const char* entityIdText = lua_tostring(rawState, 1);
+  if (entityIdText == nullptr) {
+    entityIdArg.TypeError("string");
+    entityIdText = "";
+  }
+
+  const EntId entityId = static_cast<EntId>(std::atoi(entityIdText));
+  Entity* const entity = FindEntityById(sim ? sim->mEntityDB : nullptr, entityId);
+  Unit* const unit = entity ? entity->IsUnit() : nullptr;
+  if (unit == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  unit->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
  * Address: 0x0075C7D0 (FUN_0075C7D0, func_SetPlayableRect_LuaFuncDef)
  *
  * What it does:
@@ -7902,6 +21315,432 @@ moho::CScrLuaInitForm* moho::func_SetPlayableRect_LuaFuncDef()
     kSetPlayableRectHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x0075CDD0 (FUN_0075CDD0, cfunc_GetFocusArmySim)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetFocusArmySimL`.
+ */
+int moho::cfunc_GetFocusArmySim(lua_State* const luaContext)
+{
+  return cfunc_GetFocusArmySimL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0075CDF0 (FUN_0075CDF0, func_GetFocusArmySim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `GetFocusArmy()` Lua binder for sim state.
+ */
+moho::CScrLuaInitForm* moho::func_GetFocusArmySim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "GetFocusArmy",
+    &moho::cfunc_GetFocusArmySim,
+    nullptr,
+    "<global>",
+    kGetFocusArmySimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075CE50 (FUN_0075CE50, cfunc_GetFocusArmySimL)
+ *
+ * What it does:
+ * Validates no Lua args and returns current focused army index (1-based, or
+ * `-1` when unset).
+ */
+int moho::cfunc_GetFocusArmySimL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetFocusArmySimHelpText, 0, argumentCount);
+  }
+
+  Sim* const sim = ResolveGlobalSim(state->m_state);
+  int focusArmy = sim->mSyncFilter.focusArmy;
+  if (focusArmy != -1) {
+    ++focusArmy;
+  }
+
+  lua_pushnumber(state->m_state, static_cast<float>(focusArmy));
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x0075CEC0 (FUN_0075CEC0, cfunc_AudioSetLanguageSim)
+ *
+ * What it does:
+ * Validates `AudioSetLanguage(name)` argument count for sim Lua lane.
+ */
+int moho::cfunc_AudioSetLanguageSim(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAudioSetLanguageSimHelpText, 1, argumentCount);
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0075CF00 (FUN_0075CF00, func_AudioSetLanguageSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `AudioSetLanguage(name)` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_AudioSetLanguageSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "AudioSetLanguage",
+    &moho::cfunc_AudioSetLanguageSim,
+    nullptr,
+    "<global>",
+    kAudioSetLanguageSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008ADFF0 (FUN_008ADFF0, cfunc_AudioSetLanguageUser)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_AudioSetLanguageUserL`.
+ */
+int moho::cfunc_AudioSetLanguageUser(lua_State* const luaContext)
+{
+  return cfunc_AudioSetLanguageUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008AE010 (FUN_008AE010, func_AudioSetLanguageUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes user-lane global `AudioSetLanguage(name)` Lua binder definition.
+ */
+moho::CScrLuaInitForm* moho::func_AudioSetLanguageUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "AudioSetLanguage",
+    &moho::cfunc_AudioSetLanguageUser,
+    nullptr,
+    "<global>",
+    kAudioSetLanguageUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008AE070 (FUN_008AE070, cfunc_AudioSetLanguageUserL)
+ *
+ * What it does:
+ * Validates one language code, then rebuilds localized voice/tutorial engines
+ * when the normalized language tag changes and localized VO data exists.
+ */
+int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAudioSetLanguageUserHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject languageArg(state, 1);
+  const char* languageText = lua_tostring(state->m_state, 1);
+  if (languageText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&languageArg, "string");
+    languageText = "";
+  }
+
+  const msvc8::string normalizedLanguage = gpg::STR_ToLower(languageText);
+  CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
+  if (userSound == nullptr) {
+    return 0;
+  }
+
+  if (normalizedLanguage == userSound->mLanguageTag || !HasLocalizedVoiceDirectory(normalizedLanguage)) {
+    return 0;
+  }
+
+  msvc8::string localizedRootPath = gpg::STR_Printf("/sounds/voice/%s", normalizedLanguage.c_str());
+  if (AudioEngine* const voiceEngine = userSound->mTutorialEngine.get(); voiceEngine != nullptr) {
+    voiceEngine->Shutdown();
+  }
+  userSound->mTutorialEngine = AudioEngine::Create(localizedRootPath.c_str());
+
+  localizedRootPath.append("/tutorials");
+  if (AudioEngine* const tutorialEngine = userSound->mAmbientEngine.get(); tutorialEngine != nullptr) {
+    tutorialEngine->Shutdown();
+  }
+  userSound->mAmbientEngine = AudioEngine::Create(localizedRootPath.c_str());
+
+  userSound->mLanguageTag.assign(normalizedLanguage, 0u, msvc8::string::npos);
+  return 0;
+}
+
+/**
+ * Address: 0x008AE300 (FUN_008AE300, cfunc_HasLocalizedVOUserL)
+ *
+ * What it does:
+ * Returns whether the requested localized voice directory exists.
+ */
+int moho::cfunc_HasLocalizedVOUserL(LuaPlus::LuaState* const state)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kHasLocalizedVOUserHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaStackObject languageArg(state, 1);
+  const char* languageText = lua_tostring(state->m_state, 1);
+  if (languageText == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&languageArg, "string");
+    languageText = "";
+  }
+
+  const msvc8::string language(languageText);
+  lua_pushboolean(state->m_state, HasLocalizedVoiceDirectory(language) ? 1 : 0);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+/**
+ * Address: 0x008AE280 (FUN_008AE280, cfunc_HasLocalizedVOUser)
+ *
+ * What it does:
+ * Unwraps Lua callback state and forwards to `cfunc_HasLocalizedVOUserL`.
+ */
+int moho::cfunc_HasLocalizedVOUser(lua_State* const luaContext)
+{
+  return cfunc_HasLocalizedVOUserL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x008AE2A0 (FUN_008AE2A0, func_HasLocalizedVOUser_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `HasLocalizedVO`.
+ */
+moho::CScrLuaInitForm* moho::func_HasLocalizedVOUser_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "HasLocalizedVO",
+    &moho::cfunc_HasLocalizedVOUser,
+    nullptr,
+    "<global>",
+    kHasLocalizedVOUserHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075CF90 (FUN_0075CF90, cfunc_HasLocalizedVOSim)
+ *
+ * What it does:
+ * Validates `HasLocalizedVO(language)` argument count on the sim Lua lane.
+ */
+int moho::cfunc_HasLocalizedVOSim(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kHasLocalizedVOSimHelpText, 1, argumentCount);
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0075CFD0 (FUN_0075CFD0, func_HasLocalizedVOSim_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `HasLocalizedVO(language)` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_HasLocalizedVOSim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "HasLocalizedVO",
+    &moho::cfunc_HasLocalizedVOSim,
+    nullptr,
+    "<global>",
+    kHasLocalizedVOSimHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0075DA80 (FUN_0075DA80, cfunc_SubmitXMLArmyStats)
+ *
+ * What it does:
+ * Validates no args and raises the sim-side XML army-stats submit request
+ * flag.
+ */
+int moho::cfunc_SubmitXMLArmyStats(lua_State* const luaContext)
+{
+  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSubmitXMLArmyStatsHelpText, 0, argumentCount);
+  }
+
+  if (Sim* const sim = ResolveGlobalSim(state->m_state); sim != nullptr) {
+    sim->mRequestXMLArmyStatsSubmit = true;
+  }
+  return 0;
+}
+
+/**
+ * Address: 0x0075DAD0 (FUN_0075DAD0, func_SubmitXMLArmyStats_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `SubmitXMLArmyStats()` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_SubmitXMLArmyStats_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SubmitXMLArmyStats",
+    &moho::cfunc_SubmitXMLArmyStats,
+    nullptr,
+    "<global>",
+    kSubmitXMLArmyStatsHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00761570 (FUN_00761570, cfunc_PlayLoop)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_PlayLoopL`.
+ */
+int moho::cfunc_PlayLoop(lua_State* const luaContext)
+{
+  return cfunc_PlayLoopL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00761590 (FUN_00761590, func_PlayLoop_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `PlayLoop(sndParams)` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_PlayLoop_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "PlayLoop",
+    &moho::cfunc_PlayLoop,
+    nullptr,
+    "<global>",
+    kPlayLoopHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007615F0 (FUN_007615F0, cfunc_PlayLoopL)
+ *
+ * What it does:
+ * Builds one `HSound` loop handle from `CSndParams`, queues it in sim sound
+ * manager, binds Lua userdata, and returns the handle object.
+ */
+int moho::cfunc_PlayLoopL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPlayLoopHelpText, 1, argumentCount);
+  }
+
+  LuaPlus::LuaObject sndParamsObject(LuaPlus::LuaStackObject(state, 1));
+  CSndParams* const sndParams = *func_GetCObj_CSndParams(sndParamsObject);
+  HSound* const sound = new HSound(sndParams);
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  if (sim != nullptr && sim->mSoundManager != nullptr) {
+    (void)sim->mSoundManager->AddLoop(sound);
+  }
+
+  func_CreateLuaHSoundObject(state, sound);
+  sound->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x00761700 (FUN_00761700, cfunc_StopLoop)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_StopLoopL`.
+ */
+int moho::cfunc_StopLoop(lua_State* const luaContext)
+{
+  return cfunc_StopLoopL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00761720 (FUN_00761720, func_StopLoop_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global `StopLoop(handle)` Lua binder in the sim init set.
+ */
+moho::CScrLuaInitForm* moho::func_StopLoop_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "StopLoop",
+    &moho::cfunc_StopLoop,
+    nullptr,
+    "<global>",
+    kStopLoopHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x00761780 (FUN_00761780, cfunc_StopLoopL)
+ *
+ * What it does:
+ * Resolves one `HSound` loop handle and either requests stop on sim sound
+ * manager or destroys the unbound handle when no manager exists.
+ */
+int moho::cfunc_StopLoopL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kStopLoopHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject soundObject(LuaPlus::LuaStackObject(state, 1));
+  HSound* const sound = SCR_FromLua_HSound(soundObject, state);
+
+  Sim* const sim = ResolveGlobalSim(rawState);
+  if (sim != nullptr && sim->mSoundManager != nullptr) {
+    (void)sim->mSoundManager->StopLoop(sound);
+    return 0;
+  }
+
+  if (sound != nullptr) {
+    (void)sound->Destroy(1);
+  }
+
+  return 0;
 }
 
 gpg::RType* Sim::sType = nullptr;

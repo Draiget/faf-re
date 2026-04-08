@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/script/CScriptObject.h"
 
@@ -35,6 +36,20 @@ namespace moho
      * zeroes runtime decal-visibility bookkeeping.
      */
     CDecalHandle();
+
+    /**
+     * Address: 0x00778980 (FUN_00778980, Moho::CDecalHandle::CDecalHandle)
+     *
+     * What it does:
+     * Binds one script-visible decal-handle object, copies decal payload, and
+     * seeds per-handle visibility/runtime tick lanes.
+     */
+    CDecalHandle(
+      LuaPlus::LuaState* state,
+      std::uint32_t objectId,
+      const SDecalInfo& info,
+      std::uint32_t createdAtTick
+    );
 
     /**
      * Address: 0x007788B0 (FUN_007788B0, Moho::CDecalHandle::GetClass)
@@ -70,6 +85,25 @@ namespace moho
     std::uint8_t mPadD1[0x03];
     std::uint32_t mCreatedAtTick;         // +0xD4
   };
+
+  template <>
+  class CScrLuaMetatableFactory<CDecalHandle> final : public CScrLuaObjectFactory
+  {
+  public:
+    static CScrLuaMetatableFactory& Instance();
+
+  protected:
+    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
+
+  private:
+    CScrLuaMetatableFactory();
+    static CScrLuaMetatableFactory sInstance;
+  };
+
+  static_assert(
+    sizeof(CScrLuaMetatableFactory<CDecalHandle>) == 0x08,
+    "CScrLuaMetatableFactory<CDecalHandle> size must be 0x08"
+  );
 
   /**
    * VFTABLE: 0x00E267D4

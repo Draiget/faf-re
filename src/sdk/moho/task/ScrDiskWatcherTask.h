@@ -20,6 +20,31 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC5F60 (FUN_00BC5F60, ScrDiskWatcherTask startup type-info registration)
+   *
+   * What it does:
+   * Registers `ScrDiskWatcherTask` reflected type descriptor and schedules
+   * type-info cleanup at process exit.
+   */
+  void register_ScrDiskWatcherTaskTypeInfo();
+
+  /**
+   * Address: 0x00BC5F80 (FUN_00BC5F80, ScrDiskWatcherTask startup save-construct registration)
+   *
+   * What it does:
+   * Registers save-construct callback helper for `ScrDiskWatcherTask`.
+   */
+  void register_ScrDiskWatcherTaskSaveConstruct();
+
+  /**
+   * Address: 0x00BC5FB0 (FUN_00BC5FB0, ScrDiskWatcherTask startup construct registration)
+   *
+   * What it does:
+   * Registers construct/delete callback helper for `ScrDiskWatcherTask`.
+   */
+  void register_ScrDiskWatcherTaskConstruct();
+
   class ScrDiskWatcherTask : public CTask
   {
   public:

@@ -5,6 +5,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/SCR_Color.h"
 #include "moho/ui/CUIManager.h"
 
 moho::CUIManager* moho::g_UIManager = nullptr;
@@ -12,11 +13,13 @@ moho::CUIManager* moho::g_UIManager = nullptr;
 namespace
 {
   template <typename TCall>
-  bool StartUIMainEntry(
-    const moho::EUIState stateValue, const char* const entryPointName, TCall&& callEntryPoint
+  bool StartUIMainEntryWithState(
+    LuaPlus::LuaState* const state,
+    const moho::EUIState stateValue,
+    const char* const entryPointName,
+    TCall&& callEntryPoint
   )
   {
-    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
     moho::IUIManager* const uiManager = moho::UI_GetManager();
     if (state == nullptr || uiManager == nullptr) {
       return false;
@@ -52,6 +55,17 @@ namespace
       gpg::Warnf("Error running '/lua/ui/uimain.lua:%s'.", entryPointName != nullptr ? entryPointName : "");
       return false;
     }
+  }
+
+  template <typename TCall>
+  bool StartUIMainEntry(const moho::EUIState stateValue, const char* const entryPointName, TCall&& callEntryPoint)
+  {
+    return StartUIMainEntryWithState(
+      moho::USER_GetLuaState(),
+      stateValue,
+      entryPointName,
+      static_cast<TCall&&>(callEntryPoint)
+    );
   }
 } // namespace
 
@@ -189,6 +203,164 @@ bool moho::UI_StartJoinLobbyUI(
       );
     }
   );
+}
+
+/**
+ * Address: 0x0083D240 (FUN_0083D240, func_StartGameUI)
+ *
+ * What it does:
+ * Rebinds UI to the provided Lua state and runs
+ * `/lua/ui/uimain.lua:StartGameUI()`.
+ */
+bool moho::UI_StartGameUI(LuaPlus::LuaState* const state)
+{
+  return StartUIMainEntryWithState(state, UIS_game, "StartGameUI", [](const LuaPlus::LuaFunction<void>& entryPointFn) {
+    entryPointFn();
+  });
+}
+
+/**
+ * Address: 0x0083D340 (FUN_0083D340, Moho::ShowEscapeDialog)
+ *
+ * What it does:
+ * Imports `uimain.lua`, resolves `ShowEscapeDialog`, and dispatches one bool
+ * argument to the Lua callback.
+ */
+bool moho::ShowEscapeDialog(const bool showDialog)
+{
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return true;
+  }
+
+  const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+  const LuaPlus::LuaObject showEscapeDialogObj = uiMainModule["ShowEscapeDialog"];
+  LuaPlus::LuaFunction<bool> showEscapeDialogFn(showEscapeDialogObj);
+  (void)showEscapeDialogFn(showDialog);
+  return true;
+}
+
+/**
+ * Address: 0x0083D420 (FUN_0083D420, func_UpdateDisconnectDialogCallback)
+ *
+ * What it does:
+ * Imports `uimain.lua`, resolves `UpdateDisconnectDialog`, and invokes the
+ * callback with no parameters.
+ */
+bool moho::UI_UpdateDisconnectDialogCallback()
+{
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return true;
+  }
+
+  const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+  const LuaPlus::LuaObject updateDisconnectDialogObj = uiMainModule["UpdateDisconnectDialog"];
+  LuaPlus::LuaFunction<void> updateDisconnectDialogFn(updateDisconnectDialogObj);
+  updateDisconnectDialogFn();
+  return true;
+}
+
+/**
+ * Address: 0x0083DF90 (FUN_0083DF90, ?UI_StartCommandMode@Moho@@YAXABUUICommandModeData@1@@Z)
+ *
+ * What it does:
+ * Invokes `/lua/ui/game/commandmode.lua:StartCommandMode(modeName, payload)`.
+ */
+void moho::UI_StartCommandMode(const UICommandModeData& commandModeData)
+{
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  try {
+    const LuaPlus::LuaObject commandModeModule = SCR_Import(state, "/lua/ui/game/commandmode.lua");
+    const LuaPlus::LuaObject startCommandModeObj = commandModeModule["StartCommandMode"];
+    LuaPlus::LuaFunction<void> startCommandModeFn(startCommandModeObj);
+    startCommandModeFn(commandModeData.mMode.c_str(), commandModeData.mPayload);
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/game/commandmode.lua:StartCommandMode':\n%s",
+      exception.what() != nullptr ? exception.what() : ""
+    );
+  } catch (...) {
+    gpg::Warnf("Error running '/lua/ui/game/commandmode.lua:StartCommandMode'.");
+  }
+}
+
+/**
+ * Address: 0x0083E080 (FUN_0083E080, ?UI_EndCommandMode@Moho@@YAXXZ)
+ *
+ * What it does:
+ * Invokes `/lua/ui/game/commandmode.lua:EndCommandMode()` through the active
+ * UI Lua state.
+ */
+void moho::UI_EndCommandMode()
+{
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  try {
+    const LuaPlus::LuaObject commandModeModule = SCR_Import(state, "/lua/ui/game/commandmode.lua");
+    const LuaPlus::LuaObject endCommandModeObj = commandModeModule["EndCommandMode"];
+    LuaPlus::LuaFunction<bool> endCommandModeFn(endCommandModeObj);
+    (void)endCommandModeFn();
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/game/commandmode.lua:EndCommandMode': %s",
+      exception.what() != nullptr ? exception.what() : ""
+    );
+  }
+}
+
+/**
+ * Address: 0x0083ECF0 (FUN_0083ECF0, func_StartCursorText)
+ *
+ * What it does:
+ * Invokes `/lua/ui/uimain.lua:StartCursorText(x, y, text, color, duration, anchorToCursor)`.
+ */
+void moho::UI_StartCursorText(
+  const SMauiMousePos& screenPos,
+  const char* const text,
+  const std::uint32_t colorValue,
+  const float durationSeconds,
+  const bool anchorToCursor
+)
+{
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  try {
+    const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+    const LuaPlus::LuaObject startCursorTextObj = uiMainModule["StartCursorText"];
+    LuaPlus::LuaFunction<void> startCursorTextFn(startCursorTextObj);
+    const LuaPlus::LuaObject encodedColor = SCR_EncodeColor(state, colorValue);
+    startCursorTextFn(
+      screenPos.x,
+      screenPos.y,
+      text != nullptr ? text : "",
+      encodedColor,
+      durationSeconds,
+      anchorToCursor
+    );
+  } catch (const std::exception& exception) {
+    gpg::Warnf(
+      "Error running '/lua/ui/uimain.lua:StartCursorText':\n%s",
+      exception.what() != nullptr ? exception.what() : ""
+    );
+  } catch (...) {
+    gpg::Warnf("Error running '/lua/ui/uimain.lua:StartCursorText'.");
+  }
 }
 
 /**

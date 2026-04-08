@@ -1153,6 +1153,19 @@ gpg::mem_hook_t gpg::GetMemHook()
     return gMemHook;
 }
 
+extern "C" void* __cdecl malloc_0(std::uint32_t size);
+
+/**
+ * Address: 0x00957A70 (FUN_00957A70, malloc)
+ *
+ * What it does:
+ * CRT thunk wrapper that forwards directly to `malloc_0`.
+ */
+extern "C" void* __cdecl malloc(size_t size)
+{
+    return malloc_0(static_cast<std::uint32_t>(size));
+}
+
 /**
  * Address: 0x00958B20 (FUN_00958B20, malloc_0)
  *

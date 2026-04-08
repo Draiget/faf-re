@@ -5,7 +5,9 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/sim/SConditionTriggerTypes.h"
 
 namespace
 {
@@ -86,6 +88,32 @@ namespace
     }
 
     moho::ArmyBlueprintStatNode* parent = node->parent;
+    while (parent != nullptr && parent->isNil == 0u && node == parent->right) {
+      node = parent;
+      parent = parent->parent;
+    }
+    return (parent != nullptr) ? parent : head;
+  }
+
+  [[nodiscard]] const moho::ArmyBlueprintStatNode*
+  NextBlueprintNode(const moho::ArmyBlueprintStatNode* node, const moho::ArmyBlueprintStatNode* head)
+  {
+    if (node == nullptr || head == nullptr) {
+      return head;
+    }
+    if (node->isNil != 0u) {
+      return node->parent;
+    }
+
+    if (node->right != nullptr && node->right->isNil == 0u) {
+      node = node->right;
+      while (node->left != nullptr && node->left->isNil == 0u) {
+        node = node->left;
+      }
+      return node;
+    }
+
+    const moho::ArmyBlueprintStatNode* parent = node->parent;
     while (parent != nullptr && parent->isNil == 0u && node == parent->right) {
       node = parent;
       parent = parent->parent;
@@ -429,10 +457,11 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::ArmyAuxListNode* CreateAuxListSentinel()
+  [[nodiscard]] moho::ArmyTriggerNode* CreateTriggerListSentinel()
   {
-    auto* const head = new moho::ArmyAuxListNode{};
-    head->ListResetLinks();
+    auto* const head = new moho::ArmyTriggerNode{};
+    head->next = head;
+    head->prev = head;
     return head;
   }
 } // namespace
@@ -518,6 +547,35 @@ namespace moho
     }
 
     outObject->SetObject("Blueprints", &blueprints);
+  }
+
+  /**
+   * Address: 0x0070B580 (FUN_0070B580, Moho::CArmyStatItem::SumCategory)
+   */
+  float CArmyStatItem::SumCategory(const EntityCategorySet* const categorySet) const
+  {
+    if (categorySet == nullptr || categorySet->mBitsHeader == nullptr) {
+      return 0.0f;
+    }
+
+    const ArmyBlueprintStatNode* const head = mBlueprintStats.head;
+    if (head == nullptr) {
+      return 0.0f;
+    }
+
+    float total = 0.0f;
+    for (const ArmyBlueprintStatNode* node = head->left; node != head; node = NextBlueprintNode(node, head)) {
+      const ArmyBlueprintNameView* const blueprintView = node->blueprintName;
+      if (blueprintView == nullptr) {
+        continue;
+      }
+
+      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprintView->mBlueprintOrdinal))) {
+        total += node->value;
+      }
+    }
+
+    return total;
   }
 
   /**
@@ -650,7 +708,7 @@ namespace moho
   CArmyStats::CArmyStats(CAiBrain* ownerArmy)
     : mOwnerArmy(ownerArmy)
     , mNameIndex{}
-    , mAuxHead(CreateAuxListSentinel())
+    , mAuxHead(CreateTriggerListSentinel())
     , mAuxSize(0)
   {
     mNameIndex.meta0 = 0;
@@ -745,6 +803,129 @@ namespace moho
   }
 
   /**
+   * Address: 0x0070B860 (FUN_0070B860, Moho::CArmyStats::GetStat)
+   */
+  CArmyStatItem* CArmyStats::GetStat(const char* statPath)
+  {
+    const msvc8::string key(statPath);
+    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&mNameIndex, key)) {
+      return foundNode->value;
+    }
+
+    CArmyStatItem* const item = TraverseTables(statPath, false);
+    if (item == nullptr) {
+      return nullptr;
+    }
+
+    item->Release(0);
+    InsertOrAssignNameIndexNode(&mNameIndex, key, item);
+    return item;
+  }
+
+  /**
+   * Address: 0x0070BAB0 (FUN_0070BAB0, Moho::CArmyStats::GetTrigger)
+   */
+  boost::shared_ptr<STrigger>* CArmyStats::GetTrigger(boost::shared_ptr<STrigger>* outTrigger, const char* triggerName)
+  {
+    ArmyTriggerNode* const head = mAuxHead;
+    for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
+      if (_stricmp(node->trigger->mName.c_str(), triggerName) == 0) {
+        *outTrigger = node->trigger;
+        return outTrigger;
+      }
+    }
+
+    outTrigger->reset();
+    return outTrigger;
+  }
+
+  /**
+   * Address: 0x0070BCA0 (FUN_0070BCA0, Moho::CArmyStats::SetArmyStatsTrigger)
+   */
+  void CArmyStats::SetArmyStatsTrigger(
+    const EntityCategorySet* const categorySet,
+    CArmyStats* const armyStats,
+    const char* const triggerName,
+    const char* const statPath,
+    const ETriggerOperator triggerOperator,
+    const float triggerValue
+  )
+  {
+    boost::shared_ptr<STrigger> trigger;
+    armyStats->GetTrigger(&trigger, triggerName);
+    if (!trigger) {
+      gpg::Warnf("Trigger %s does not exist.", triggerName);
+      return;
+    }
+
+    CArmyStatItem* const statItem = armyStats->GetStat(statPath);
+    if (statItem == nullptr) {
+      gpg::Warnf("ArmyStatItem %s does not exist.", statPath);
+      return;
+    }
+
+    SCondition condition{};
+    condition.mItem = statItem;
+    condition.mCat = *categorySet;
+    condition.mVal = triggerValue;
+    condition.mOp = triggerOperator;
+
+    gpg::FastVectorRuntimeInsertRange(trigger->mConditions, trigger->mConditions.end, &condition, &condition + 1);
+  }
+
+  /**
+   * Address: 0x0070BB40 (FUN_0070BB40, sub_70BB40)
+   */
+  void CArmyStats::EnsureTriggerExists(const char* const triggerName)
+  {
+    if (mAuxHead == nullptr) {
+      mAuxHead = CreateTriggerListSentinel();
+      mAuxSize = 0u;
+    }
+
+    boost::shared_ptr<STrigger> trigger;
+    GetTrigger(&trigger, triggerName);
+    if (trigger) {
+      return;
+    }
+
+    boost::shared_ptr<STrigger> created{new STrigger()};
+    created->mName = triggerName ? triggerName : "";
+
+    ArmyTriggerNode* const head = mAuxHead;
+    auto* const node = new ArmyTriggerNode{};
+    node->trigger = created;
+    node->next = head;
+    node->prev = head->prev;
+    head->prev->next = node;
+    head->prev = node;
+    ++mAuxSize;
+  }
+
+  /**
+   * Address: 0x0070BE50 (FUN_0070BE50, Moho::CArmyStats::RemoveArmyStatsTrigger)
+   */
+  void CArmyStats::RemoveArmyStatsTrigger(const char* const triggerName)
+  {
+    ArmyTriggerNode* const head = mAuxHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
+      if (node->trigger && _stricmp(node->trigger->mName.c_str(), triggerName) == 0) {
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+        delete node;
+        if (mAuxSize > 0u) {
+          --mAuxSize;
+        }
+        return;
+      }
+    }
+  }
+
+  /**
    * Address: 0x00704FD0 (FUN_00704FD0, sub_704FD0)
    */
   CArmyStatItem* CArmyStats::GetStringItemCached(const gpg::StrArg statPath)
@@ -794,7 +975,19 @@ namespace moho
 
   void CArmyStats::DestroyAuxList()
   {
-    delete mAuxHead;
+    ArmyTriggerNode* const head = mAuxHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    ArmyTriggerNode* node = head->next;
+    while (node != head) {
+      ArmyTriggerNode* const next = node->next;
+      delete node;
+      node = next;
+    }
+
+    delete head;
     mAuxHead = nullptr;
     mAuxSize = 0;
   }

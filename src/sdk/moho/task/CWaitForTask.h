@@ -137,4 +137,20 @@ namespace moho
   static_assert(sizeof(CWaitForTaskConstruct) == 0x14, "CWaitForTaskConstruct size must be 0x14");
   static_assert(sizeof(CWaitForTaskSerializer) == 0x14, "CWaitForTaskSerializer size must be 0x14");
   static_assert(sizeof(CWaitForTaskTypeInfo) == 0x64, "CWaitForTaskTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00BC62E0 (FUN_00BC62E0, register_CWaitForTaskSerializer)
+   *
+   * What it does:
+   * Initializes startup serializer callback lanes for `CWaitForTask` and
+   * schedules intrusive helper cleanup at process exit.
+   */
+  void register_CWaitForTaskSerializer();
+
+  /**
+   * What it does:
+   * Unlinks static serializer helper node from the intrusive helper list and
+   * restores self-links.
+   */
+  gpg::SerHelperBase* cleanup_CWaitForTaskSerializer();
 } // namespace moho

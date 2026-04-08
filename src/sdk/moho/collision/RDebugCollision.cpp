@@ -97,8 +97,7 @@ namespace
   [[nodiscard]] TypeInfo& GetRDebugCollisionTypeInfo() noexcept
   {
     if (!gRDebugCollisionTypeInfoConstructed) {
-      auto* const typeInfo = new (gRDebugCollisionTypeInfoStorage) TypeInfo();
-      gpg::PreRegisterRType(typeid(moho::RDebugCollision), typeInfo);
+      (void)new (gRDebugCollisionTypeInfoStorage) TypeInfo();
       gRDebugCollisionTypeInfoConstructed = true;
     }
 
@@ -165,6 +164,15 @@ namespace moho
       (void)entity->CollisionExtents->GetBox();
       (void)entity->CollisionExtents->GetSphere();
     }
+  }
+
+  /**
+   * Address: 0x0064C2B0 (FUN_0064C2B0, Moho::RDebugCollisionTypeInfo::RDebugCollisionTypeInfo)
+   */
+  RDebugCollisionTypeInfo::RDebugCollisionTypeInfo()
+    : RDebugOverlayClass()
+  {
+    gpg::PreRegisterRType(typeid(RDebugCollision), this);
   }
 
   /**

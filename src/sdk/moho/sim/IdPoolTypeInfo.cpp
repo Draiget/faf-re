@@ -1,5 +1,6 @@
 #include "moho/sim/IdPoolTypeInfo.h"
 
+#include <cstdlib>
 #include <new>
 #include <typeinfo>
 
@@ -7,6 +8,11 @@
 #include "moho/sim/IdPool.h"
 
 #pragma init_seg(lib)
+
+namespace moho
+{
+  void register_IdPoolTypeInfo();
+}
 
 namespace
 {
@@ -37,10 +43,45 @@ namespace
     pool.mSubRes2.Reset();
     pool.mReleasedLows.mWords.ResetStorageToInline();
   }
+
+  /**
+   * Address: 0x00BEE000 (FUN_00BEE000, ??1IdPoolTypeInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Process-exit cleanup for global `IdPoolTypeInfo` dynamic field/base lanes.
+   */
+  void cleanup_IdPoolTypeInfo()
+  {
+    gIdPoolTypeInfo.fields_.clear();
+    gIdPoolTypeInfo.bases_.clear();
+  }
+
+  struct IdPoolTypeInfoRegistration
+  {
+    IdPoolTypeInfoRegistration()
+    {
+      moho::register_IdPoolTypeInfo();
+    }
+  };
+
+  IdPoolTypeInfoRegistration gIdPoolTypeInfoRegistration;
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BC2D80 (FUN_00BC2D80, register_IdPoolTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `IdPoolTypeInfo` storage and registers process-exit
+   * teardown.
+   */
+  void register_IdPoolTypeInfo()
+  {
+    (void)gIdPoolTypeInfo;
+    (void)std::atexit(&cleanup_IdPoolTypeInfo);
+  }
+
   /**
    * Address: 0x004037C0 (FUN_004037C0, Moho::IdPoolTypeInfo::IdPoolTypeInfo)
    */

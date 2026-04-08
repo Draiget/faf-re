@@ -64,6 +64,8 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x0067C2D0 (FUN_0067C2D0, gpg::SerSaveLoadHelper_SEntAttach::Init)
+     *
      * What it does:
      * Binds load/save callbacks into reflected RTTI for `SEntAttachInfo`.
      */
@@ -141,6 +143,8 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x0067C3B0 (FUN_0067C3B0, gpg::SerSaveLoadHelper_PositionHistory::Init)
+     *
      * What it does:
      * Binds load/save callbacks into reflected RTTI for `PositionHistory`.
      */
@@ -224,6 +228,8 @@ namespace moho
     static void Construct(gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result);
 
     /**
+     * Address: 0x0067C500 (FUN_0067C500, gpg::SerSaveConstructHelper_Entity::Init)
+     *
      * What it does:
      * Binds save-construct callback into reflected RTTI for `Entity`.
      */
@@ -267,6 +273,8 @@ namespace moho
     static void Deconstruct(void* objectPtr);
 
     /**
+     * Address: 0x0067C580 (FUN_0067C580, gpg::SerConstructHelper_Entity::Init)
+     *
      * What it does:
      * Binds construct/delete callbacks into reflected RTTI for `Entity`.
      */
@@ -347,6 +355,28 @@ namespace
   [[nodiscard]] gpg::RType* ResolveVTransformType()
   {
     return ResolveCachedType<moho::VTransform>(gVTransformType);
+  }
+
+  /**
+   * Address: 0x0067F000 (FUN_0067F000, gpg::RType::AddField_VTransform_0x150PendingCoords)
+   *
+   * What it does:
+   * Adds the reflected `VTransform` field named `PendingCoords` at offset `0x150`.
+   */
+  gpg::RField* AddPendingCoordsField(gpg::RType* const owner)
+  {
+    GPG_ASSERT(owner != nullptr);
+    if (owner == nullptr) {
+      return nullptr;
+    }
+
+    GPG_ASSERT(!owner->initFinished_);
+    gpg::RField field{};
+    field.mName = "PendingCoords";
+    field.mType = ResolveVTransformType();
+    field.mOffset = 0x150;
+    owner->fields_.push_back(field);
+    return &owner->fields_.back();
   }
 
   [[nodiscard]] moho::SEntAttachInfoTypeInfo& AcquireSEntAttachInfoTypeInfo()
@@ -567,12 +597,15 @@ namespace moho
     attachInfo->MemberSerialize(archive);
   }
 
+  /**
+   * Address: 0x0067C2D0 (FUN_0067C2D0, gpg::SerSaveLoadHelper_SEntAttach::Init)
+   */
   void SEntAttachInfoSerializer::RegisterSerializeFunctions()
   {
     gpg::RType* const type = ResolveSEntAttachInfoType();
     GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
     type->serSaveFunc_ = mSerialize;
   }
@@ -637,12 +670,15 @@ namespace moho
     history->MemberSerialize(archive);
   }
 
+  /**
+   * Address: 0x0067C3B0 (FUN_0067C3B0, gpg::SerSaveLoadHelper_PositionHistory::Init)
+   */
   void PositionHistorySerializer::RegisterSerializeFunctions()
   {
     gpg::RType* const type = ResolvePositionHistoryType();
     GPG_ASSERT(type != nullptr);
-    GPG_ASSERT(type->serLoadFunc_ == nullptr || type->serLoadFunc_ == mDeserialize);
-    GPG_ASSERT(type->serSaveFunc_ == nullptr || type->serSaveFunc_ == mSerialize);
+    GPG_ASSERT(type->serLoadFunc_ == nullptr);
+    GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serLoadFunc_ = mDeserialize;
     type->serSaveFunc_ = mSerialize;
   }
@@ -712,7 +748,7 @@ namespace moho
     AddBase_CScriptObjectVariant1(this);
     gpg::RType::Init();
     AddBase_CTaskVariant1(this);
-    fields_.push_back(gpg::RField{"PendingCoords", ResolveVTransformType(), 0x150, 1, "Pending position and orientation"});
+    (void)AddPendingCoordsField(this);
     Finish();
   }
 
@@ -735,6 +771,12 @@ namespace moho
     entity->MemberSaveConstructArgs(*archive, version, ownerRef, *result);
   }
 
+  /**
+   * Address: 0x0067C500 (FUN_0067C500, gpg::SerSaveConstructHelper_Entity::Init)
+   *
+   * What it does:
+   * Resolves `Entity` RTTI and binds save-construct callback lane.
+   */
   void EntitySaveConstruct::RegisterSaveConstructArgsFunction()
   {
     gpg::RType* const type = ResolveEntityType();
@@ -772,6 +814,12 @@ namespace moho
     deletingDtor(objectPtr, 1);
   }
 
+  /**
+   * Address: 0x0067C580 (FUN_0067C580, gpg::SerConstructHelper_Entity::Init)
+   *
+   * What it does:
+   * Resolves `Entity` RTTI and binds construct/delete callback lanes.
+   */
   void EntityConstruct::RegisterConstructFunction()
   {
     gpg::RType* const type = ResolveEntityType();

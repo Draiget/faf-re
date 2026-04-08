@@ -181,6 +181,13 @@ namespace moho
   gpg::RType* ManyToOneListener_ECollisionBeamEvent::sType = nullptr;
   gpg::RType* CAcquireTargetTask::sType = nullptr;
 
+  /**
+   * Address: 0x005DCC20 (FUN_005DCC20, Moho::InstanceCounter<Moho::CAcquireTargetTask>::GetStatItem)
+   *
+   * What it does:
+   * Lazily resolves and caches the engine stat slot used for acquire-target
+   * task instance counting (`Instance Counts_<type-name-without-underscores>`).
+   */
   template <>
   StatItem* InstanceCounter<CAcquireTargetTask>::GetStatItem()
   {
@@ -189,12 +196,8 @@ namespace moho
       return sEngineStat_InstanceCounts_CAcquireTargetTask;
     }
 
-    std::string statName = BuildInstanceCounterStatPath(typeid(CAcquireTargetTask).name());
+    const std::string statName = BuildInstanceCounterStatPath(typeid(CAcquireTargetTask).name());
     moho::EngineStats* const engineStats = moho::GetEngineStats();
-    if (!engineStats) {
-      return nullptr;
-    }
-
     sEngineStat_InstanceCounts_CAcquireTargetTask = engineStats->GetItem(statName.c_str(), true);
     return sEngineStat_InstanceCounts_CAcquireTargetTask;
   }

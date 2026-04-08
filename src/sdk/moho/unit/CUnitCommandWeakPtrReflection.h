@@ -45,6 +45,27 @@ namespace moho
   static_assert(sizeof(RWeakPtrType<CUnitCommand>) == 0x68, "RWeakPtrType<CUnitCommand> size must be 0x68");
 
   /**
+   * Address: 0x005DB610 (FUN_005DB610, std::vector_WeakPtr_CUnitCommand::cpy)
+   *
+   * What it does:
+   * Copies one legacy `vector<WeakPtr<CUnitCommand>>` payload into destination
+   * storage using the VC8 vector copy semantics.
+   */
+  [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>>* CopyWeakPtrCUnitCommandVector(
+    const msvc8::vector<WeakPtr<CUnitCommand>>& source,
+    msvc8::vector<WeakPtr<CUnitCommand>>& destination
+  );
+
+  /**
+   * Address: 0x005A2270 (FUN_005A2270, Moho::WeakPtr_CUnitCommand::destruct_range)
+   *
+   * What it does:
+   * Unlinks one contiguous `WeakPtr<CUnitCommand>` range from owner intrusive
+   * chains before storage is destroyed or overwritten.
+   */
+  void DetachWeakPtrCUnitCommandRange(WeakPtr<CUnitCommand>* begin, WeakPtr<CUnitCommand>* end);
+
+  /**
    * Address: 0x006EBE50 (FUN_006EBE50, sub_6EBE50)
    *
    * What it does:

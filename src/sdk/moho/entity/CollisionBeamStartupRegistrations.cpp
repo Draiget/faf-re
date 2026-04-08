@@ -5,6 +5,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/String.h"
 #include "moho/console/CConCommand.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
 
@@ -24,12 +25,62 @@ namespace moho
 
 namespace
 {
+  gpg::RType* gCollisionBeamEventType = nullptr;
+
+  [[nodiscard]] gpg::RType* LookupCollisionBeamEventType()
+  {
+    if (gCollisionBeamEventType == nullptr) {
+      gCollisionBeamEventType = gpg::LookupRType(typeid(moho::ECollisionBeamEvent));
+    }
+    return gCollisionBeamEventType;
+  }
+
+  [[nodiscard]] const char* GetCollisionBeamEventTypeName()
+  {
+    const gpg::RType* const type = LookupCollisionBeamEventType();
+    return type ? type->GetName() : "ECollisionBeamEvent";
+  }
+
+  msvc8::string gManyToOneBroadcasterCollisionBeamEventTypeName;
+  bool gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered = false;
+
+  msvc8::string gManyToOneListenerCollisionBeamEventTypeName;
+  bool gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered = false;
+
+  void cleanup_ManyToOneBroadcasterCollisionBeamEventTypeName()
+  {
+    gManyToOneBroadcasterCollisionBeamEventTypeName = msvc8::string{};
+    gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered = false;
+  }
+
+  void cleanup_ManyToOneListenerCollisionBeamEventTypeName()
+  {
+    gManyToOneListenerCollisionBeamEventTypeName = msvc8::string{};
+    gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered = false;
+  }
+
   class RManyToOneBroadcasterCollisionBeamEventTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00674740 (FUN_00674740, Moho::RManyBroadcasterRType_ECollisionBeamEvent::GetName)
+     *
+     * What it does:
+     * Lazily caches the lexical reflection name for the collision-beam
+     * many-to-one broadcaster type descriptor.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "ManyToOneBroadcaster<ECollisionBeamEvent>";
+      if (gManyToOneBroadcasterCollisionBeamEventTypeName.empty()) {
+        gManyToOneBroadcasterCollisionBeamEventTypeName =
+          gpg::STR_Printf("ManyToOneBroadcaster<%s>", GetCollisionBeamEventTypeName());
+        if (!gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered) {
+          gManyToOneBroadcasterCollisionBeamEventTypeNameCleanupRegistered = true;
+          (void)std::atexit(&cleanup_ManyToOneBroadcasterCollisionBeamEventTypeName);
+        }
+      }
+
+      return gManyToOneBroadcasterCollisionBeamEventTypeName.c_str();
     }
 
     void Init() override
@@ -43,9 +94,25 @@ namespace
   class RManyToOneListenerCollisionBeamEventTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00674800 (FUN_00674800, Moho::RManyListenerRType_ECollisionBeamEvent::GetName)
+     *
+     * What it does:
+     * Lazily caches the lexical reflection name for the collision-beam many-
+     * to-one listener type descriptor.
+     */
     [[nodiscard]] const char* GetName() const override
     {
-      return "ManyToOneListener<ECollisionBeamEvent>";
+      if (gManyToOneListenerCollisionBeamEventTypeName.empty()) {
+        gManyToOneListenerCollisionBeamEventTypeName =
+          gpg::STR_Printf("ManyToOneListener<%s>", GetCollisionBeamEventTypeName());
+        if (!gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered) {
+          gManyToOneListenerCollisionBeamEventTypeNameCleanupRegistered = true;
+          (void)std::atexit(&cleanup_ManyToOneListenerCollisionBeamEventTypeName);
+        }
+      }
+
+      return gManyToOneListenerCollisionBeamEventTypeName.c_str();
     }
 
     void Init() override
@@ -211,9 +278,19 @@ namespace moho
     Finish();
   }
 
-  void ECollisionBeamEventTypeInfo::AddEnums(gpg::REnumType* const)
+  /**
+   * Address: 0x00672D80 (FUN_00672D80, Moho::ECollisionBeamEventTypeInfo::AddEnums)
+   */
+  void ECollisionBeamEventTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
   {
-    // Enumerator set is still pending deeper behavior evidence.
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->mPrefix = "COLLISIONBEAMEVENT_";
+    typeInfo->AddEnum(typeInfo->StripPrefix("COLLISIONBEAMEVENT_HitTarget"), CollisionBeamEvent_HitTarget);
+    typeInfo->AddEnum(typeInfo->StripPrefix("COLLISIONBEAMEVENT_MissTarget"), CollisionBeamEvent_MissTarget);
+    typeInfo->AddEnum(typeInfo->StripPrefix("COLLISIONBEAMEVENT_Irrelavent"), CollisionBeamEvent_Irrelavent);
   }
 
   /**

@@ -55,6 +55,26 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Builds an empty sync publication packet. The recovered `SSyncData` runtime
+ * view keeps unknown retail lanes in typed padding blocks while preserving the
+ * same constructor-side zero-init behavior for the modeled fields.
+ */
+SSyncData::SSyncData()
+  : mCurBeat(0)
+  , pad_0004_0138{}
+  , mNewUnits()
+  , pad_0144_0188{}
+  , mPublishedCommandDescriptors()
+  , mPublishedCommandPackets()
+  , mPendingCommandEventRemovals()
+  , mPendingReleasedCommandIds()
+  , pad_01C8_02B8{}
+{}
+
 void SSyncData::QueuePendingCommandEventRemoval(const CmdId commandId)
 {
   mPendingCommandEventRemovals.push_back(commandId);
@@ -246,6 +266,21 @@ CSimDriver::~CSimDriver()
 
   delete mSim;
   mSim = nullptr;
+}
+
+/**
+ * Address: 0x0073B910 (FUN_0073B910, Moho::CSimDriver::dtr)
+ *
+ * What it does:
+ * Runs destructor logic and conditionally frees object storage.
+ */
+CSimDriver* CSimDriver::DestroyWithDeleteFlag(const std::uint8_t deleteFlag)
+{
+  this->~CSimDriver();
+  if ((deleteFlag & 0x1u) != 0u) {
+    ::operator delete(static_cast<void*>(this));
+  }
+  return this;
 }
 
 void CSimDriver::JoinAndDeleteThread(boost::thread*& thread)
@@ -664,24 +699,28 @@ double CSimDriver::GetSimSpeed()
  * Address: 0x0073C660 (FUN_0073C660), ISTIDriver slot 17
  * Marshals CMDST_RequestPause and reports command-cookie result.
  */
-void CSimDriver::RequestPause()
+void CSimDriver::RequestPause(std::int32_t* const outCommandCookie)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->RequestPause();
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  if (outCommandCookie != nullptr) {
+    *outCommandCookie = mCommandCookie;
+  }
 }
 
 /**
  * Address: 0x0073C700 (FUN_0073C700), ISTIDriver slot 18
  * Marshals CMDST_Resume and reports command-cookie result.
  */
-void CSimDriver::Resume()
+void CSimDriver::Resume(std::int32_t* const outCommandCookie)
 {
   boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
   mMarshaller->Resume();
   MarkFirstConnectionActivityLocked();
-  ForwardCommandResultLocked();
+  if (outCommandCookie != nullptr) {
+    *outCommandCookie = mCommandCookie;
+  }
 }
 
 /**

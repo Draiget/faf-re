@@ -14,6 +14,74 @@ namespace
   alignas(CAiNavigatorAirSerializer) unsigned char gCAiNavigatorAirSerializerStorage[sizeof(CAiNavigatorAirSerializer)] = {};
   bool gCAiNavigatorAirSerializerConstructed = false;
 
+  /**
+   * Address: 0x005A7F30 (FUN_005A7F30, j_Moho::CAiNavigatorAir::MemberDeserialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiNavigatorAir::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CAiNavigatorAirMemberDeserializeThunk(
+    moho::CAiNavigatorAir* const navigator, gpg::ReadArchive* const archive
+  )
+  {
+    if (!navigator) {
+      return;
+    }
+
+    moho::CAiNavigatorAir::MemberDeserialize(navigator, archive);
+  }
+
+  /**
+   * Address: 0x005A7F40 (FUN_005A7F40, j_Moho::CAiNavigatorAir::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `CAiNavigatorAir::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiNavigatorAirMemberSerializeThunk(
+    const moho::CAiNavigatorAir* const navigator, gpg::WriteArchive* const archive
+  )
+  {
+    if (!navigator) {
+      return;
+    }
+
+    moho::CAiNavigatorAir::MemberSerialize(navigator, archive);
+  }
+
+  /**
+   * Address: 0x005A8950 (FUN_005A8950, j_Moho::CAiNavigatorAir::MemberDeserialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiNavigatorAir::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CAiNavigatorAirMemberDeserializeThunkSecondary(
+    moho::CAiNavigatorAir* const navigator, gpg::ReadArchive* const archive
+  )
+  {
+    if (!navigator) {
+      return;
+    }
+
+    moho::CAiNavigatorAir::MemberDeserialize(navigator, archive);
+  }
+
+  /**
+   * Address: 0x005A8960 (FUN_005A8960, j_Moho::CAiNavigatorAir::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `CAiNavigatorAir::MemberSerialize`.
+   */
+  [[maybe_unused]] void CAiNavigatorAirMemberSerializeThunkSecondary(
+    const moho::CAiNavigatorAir* const navigator, gpg::WriteArchive* const archive
+  )
+  {
+    if (!navigator) {
+      return;
+    }
+
+    moho::CAiNavigatorAir::MemberSerialize(navigator, archive);
+  }
+
   [[nodiscard]] CAiNavigatorAirSerializer* AcquireCAiNavigatorAirSerializer()
   {
     if (!gCAiNavigatorAirSerializerConstructed) {
@@ -91,13 +159,16 @@ void CAiNavigatorAirSerializer::Deserialize(
   gpg::ReadArchive* const archive,
   const int objectPtr,
   const int,
-  gpg::RRef* const
+  gpg::RRef* const ownerRef
 )
 {
-  CAiNavigatorAir::MemberDeserialize(
-    reinterpret_cast<CAiNavigatorAir*>(static_cast<std::uintptr_t>(objectPtr)),
-    archive
-  );
+  auto* const navigator = reinterpret_cast<CAiNavigatorAir*>(static_cast<std::uintptr_t>(objectPtr));
+  if (ownerRef != nullptr) {
+    CAiNavigatorAir::MemberDeserialize(navigator, archive);
+    return;
+  }
+
+  CAiNavigatorAirMemberDeserializeThunk(navigator, archive);
 }
 
 /**
@@ -107,13 +178,16 @@ void CAiNavigatorAirSerializer::Serialize(
   gpg::WriteArchive* const archive,
   const int objectPtr,
   const int,
-  gpg::RRef* const
+  gpg::RRef* const ownerRef
 )
 {
-  CAiNavigatorAir::MemberSerialize(
-    reinterpret_cast<const CAiNavigatorAir*>(static_cast<std::uintptr_t>(objectPtr)),
-    archive
-  );
+  const auto* const navigator = reinterpret_cast<const CAiNavigatorAir*>(static_cast<std::uintptr_t>(objectPtr));
+  if (ownerRef != nullptr) {
+    CAiNavigatorAir::MemberSerialize(navigator, archive);
+    return;
+  }
+
+  CAiNavigatorAirMemberSerializeThunk(navigator, archive);
 }
 
 /**

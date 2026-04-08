@@ -54,11 +54,13 @@ namespace gpg
     {
     public:
         /**
+         * Address: 0x00937E80 (FUN_00937E80, gpg::LogTarget::~LogTarget)
          * Address: 0x00937ED0 (FUN_00937ED0)
          * Demangled: gpg::LogTarget deleting dtor thunk
          *
          * What it does:
-         * Unregisters the target from global logging dispatch if currently attached.
+         * Removes this target from global logging dispatch when attached,
+         * covering both complete-destructor and deleting-thunk lanes.
          */
         virtual ~LogTarget();
 
@@ -90,7 +92,21 @@ namespace gpg
         explicit LogTarget(bool autoRegister);
 
     private:
+        /**
+         * Address: 0x00937DB0 (FUN_00937DB0, gpg::LogTarget::Install)
+         *
+         * What it does:
+         * Validates detached state, initializes global logging singleton,
+         * and registers this target in the global target ring.
+         */
         void Attach();
+
+        /**
+         * Address: 0x00937E00 (FUN_00937E00, gpg::LogTarget::Uninstall)
+         *
+         * What it does:
+         * Removes this target from the global target ring when currently attached.
+         */
         void Detach();
 
         LogTargetNode* mNode{};
@@ -325,9 +341,41 @@ namespace gpg
         ThreadState* lastTls{};
 
         /**
-         * Dispatch formatted message to targets with TLS snapshot.
+         * Address: 0x00936770 (FUN_00936770, struct_LogContext::~struct_LogContext)
+         *
+         * What it does:
+         * Detaches and destroys all registered target nodes, clears current-thread
+         * TSS state, and leaves the intrusive target ring in sentinel form.
          */
-        void Dispatch(int level, const msvc8::string& msg);
+        ~LogContext();
+
+        /**
+         * Address: 0x009364A0 (FUN_009364A0, struct_LogContext::AddTarget)
+         *
+         * What it does:
+         * Asserts detached target state, allocates one intrusive target node,
+         * and appends it into the global log-target ring.
+         */
+        void AddTarget(LogTarget* target);
+
+        /**
+         * Address: 0x00936570 (FUN_00936570, struct_LogContext::RemoveTarget)
+         *
+         * What it does:
+         * Detaches one target node from the global log-target ring, or marks
+         * pending removal when dispatch is currently inside that target.
+         */
+        void RemoveTarget(LogTarget* target);
+
+        /**
+         * Address: 0x00937640 (FUN_00937640, gpg::LogContext::push)
+         *
+         * What it does:
+         * Captures one thread-local context snapshot and dispatches the message
+         * to each registered log target, honoring one-shot flush and pending
+         * detach flags.
+         */
+        void Dispatch(LogSeverity level, const msvc8::string& msg);
     };
 
     /**
@@ -416,6 +464,14 @@ namespace gpg
      * Enables bounded in-memory log history with a maximum retained message count.
      */
     void EnableLogHistory(int maxEntries);
+
+    /**
+     * Address: 0x008E4F20 (FUN_008E4F20, gpg::ReplayLogHistory)
+     *
+     * What it does:
+     * Replays retained log-history entries into a caller-supplied target.
+     */
+    bool ReplayLogHistory(LogTarget* target);
 
     /**
      * What it does:

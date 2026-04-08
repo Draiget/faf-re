@@ -49,6 +49,22 @@ namespace Wm3
         Extent{T(0), T(0), T(0)}
     {}
 
+    /**
+     * Address: 0x004FFDF0 (FUN_004FFDF0, Wm3::Box3f::Box3f)
+     *
+     * What it does:
+     * Copy-constructs center, axis, and extent lanes from another box.
+     */
+    constexpr Box3(const Box3& other) noexcept
+      : Center{other.Center[0], other.Center[1], other.Center[2]},
+        Axis{
+          {other.Axis[0][0], other.Axis[0][1], other.Axis[0][2]},
+          {other.Axis[1][0], other.Axis[1][1], other.Axis[1][2]},
+          {other.Axis[2][0], other.Axis[2][1], other.Axis[2][2]},
+        },
+        Extent{other.Extent[0], other.Extent[1], other.Extent[2]}
+    {}
+
     /** Construct from center, 3 axes (assumed orthonormal), and extents */
     constexpr Box3(
       const Vector3<T>& c,

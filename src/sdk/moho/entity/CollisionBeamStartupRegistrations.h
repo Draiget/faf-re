@@ -38,7 +38,7 @@ namespace moho
     void Init() override;
 
     /**
-     * Address lane: ECollisionBeamEventTypeInfo::Init helper call.
+     * Address: 0x00672D80 (FUN_00672D80, Moho::ECollisionBeamEventTypeInfo::AddEnums)
      *
      * What it does:
      * Registers enumerator literals for the reflected enum when available.

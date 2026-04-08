@@ -25,6 +25,40 @@ namespace
   unsigned char gIAiCommandDispatchImplSerializerStorage[sizeof(IAiCommandDispatchImplSerializer)] = {};
   bool gIAiCommandDispatchImplSerializerConstructed = false;
 
+  /**
+   * Address: 0x00599A40 (FUN_00599A40, j_Moho::IAiCommandDispatchImpl::MemberSerialize)
+   *
+   * What it does:
+   * Thin forwarding thunk to `IAiCommandDispatchImpl::MemberSerialize`.
+   */
+  [[maybe_unused]] void IAiCommandDispatchImplMemberSerializeThunk(
+    const moho::IAiCommandDispatchImpl* const object, gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive) {
+      return;
+    }
+
+    moho::IAiCommandDispatchImpl::MemberSerialize(object, archive);
+  }
+
+  /**
+   * Address: 0x00599C70 (FUN_00599C70, j_Moho::IAiCommandDispatchImpl::MemberSerialize_0)
+   *
+   * What it does:
+   * Secondary forwarding thunk to `IAiCommandDispatchImpl::MemberSerialize`.
+   */
+  [[maybe_unused]] void IAiCommandDispatchImplMemberSerializeThunkSecondary(
+    const moho::IAiCommandDispatchImpl* const object, gpg::WriteArchive* const archive
+  )
+  {
+    if (!archive) {
+      return;
+    }
+
+    moho::IAiCommandDispatchImpl::MemberSerialize(object, archive);
+  }
+
   [[nodiscard]] IAiCommandDispatchImplSerializer* AcquireIAiCommandDispatchImplSerializer()
   {
     if (!gIAiCommandDispatchImplSerializerConstructed) {
@@ -134,13 +168,16 @@ void IAiCommandDispatchImplSerializer::Serialize(
   gpg::WriteArchive* const archive,
   const int objectPtr,
   const int,
-  gpg::RRef* const
+  gpg::RRef* const ownerRef
 )
 {
-  IAiCommandDispatchImpl::MemberSerialize(
-    reinterpret_cast<const IAiCommandDispatchImpl*>(static_cast<std::uintptr_t>(objectPtr)),
-    archive
-  );
+  const auto* const object = reinterpret_cast<const IAiCommandDispatchImpl*>(static_cast<std::uintptr_t>(objectPtr));
+  if (ownerRef != nullptr) {
+    IAiCommandDispatchImpl::MemberSerialize(object, archive);
+    return;
+  }
+
+  IAiCommandDispatchImplMemberSerializeThunk(object, archive);
 }
 
 /**

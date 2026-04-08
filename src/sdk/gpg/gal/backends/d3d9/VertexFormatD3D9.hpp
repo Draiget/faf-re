@@ -20,6 +20,14 @@ namespace gpg::gal
          */
         virtual ~VertexFormatD3D9();
 
+        /**
+         * Address: 0x0094AD60 (FUN_0094AD60, gpg::gal::VertexFormatD3D9::GetDeclaration)
+         *
+         * What it does:
+         * Returns the retained D3D9 vertex-declaration handle and throws when unset.
+         */
+        void* GetDeclaration();
+
     public:
         std::uint32_t formatCode_;                    // +0x04
         void* elementArrayProxy_;                     // +0x08

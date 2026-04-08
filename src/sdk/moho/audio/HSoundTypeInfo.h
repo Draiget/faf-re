@@ -12,6 +12,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004E1360 (FUN_004E1360, Moho::HSoundTypeInfo::HSoundTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters `HSound` reflection type metadata.
+     */
+    HSoundTypeInfo();
+
+    /**
      * Address: 0x004E1400 (FUN_004E1400, Moho::HSoundTypeInfo::dtr)
      * Slot: 2
      */
@@ -46,6 +54,21 @@ namespace moho
     static void AddBase_CScriptEvent(gpg::RType* typeInfo);
   };
 
+  /**
+   * Address: 0x00BF10B0 (FUN_00BF10B0, cleanup_HSoundTypeInfo)
+   *
+   * What it does:
+   * Releases process-exit `HSoundTypeInfo` field/base vector storage.
+   */
+  void cleanup_HSoundTypeInfo();
+
+  /**
+   * Address: 0x00BC6AB0 (FUN_00BC6AB0, register_HSoundTypeInfo)
+   *
+   * What it does:
+   * Forces `HSoundTypeInfo` startup construction and installs `atexit` cleanup.
+   */
+  int register_HSoundTypeInfo();
+
   static_assert(sizeof(HSoundTypeInfo) == 0x64, "HSoundTypeInfo size must be 0x64");
 } // namespace moho
-

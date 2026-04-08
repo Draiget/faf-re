@@ -324,6 +324,21 @@ bool BVIntSet::Contains(const unsigned int val) const
 }
 
 /**
+ * Address: 0x006D3090 (FUN_006D3090, Moho::BVIntSet::Get)
+ *
+ * What it does:
+ * Returns `{this, val}` when the bit exists; otherwise returns `{this, Max()}`.
+ */
+BVIntSetIndex BVIntSet::Get(const unsigned int val) const
+{
+  const unsigned int relativeWord = (val >> kWordShift) - mFirstWordIndex;
+  const std::size_t wordCount = static_cast<std::size_t>(mWords.end_ - mWords.start_);
+  const unsigned int resolvedValue =
+    (relativeWord < wordCount && ((mWords.start_[relativeWord] >> (val & kWordBitMask)) & 1u) != 0u) ? val : Max();
+  return MakeBVIntSetIndex(const_cast<BVIntSet*>(this), resolvedValue);
+}
+
+/**
  * Address: 0x004017B0 (FUN_004017B0)
  * Address: 0x100014C0
  *

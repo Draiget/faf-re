@@ -285,6 +285,97 @@ namespace
   moho::EngineStats* EngineStatsSlot<0x10B4D0Cu>::value = nullptr;
 
   template <>
+  struct EngineStatsSlot<0x10A7464u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7464u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7494u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7494u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A74C0u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A74C0u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A765Cu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A765Cu>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A766Cu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A766Cu>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A767Cu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A767Cu>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A77A4u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A77A4u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A67B8u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A67B8u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A66C4u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A66C4u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A9B54u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9B54u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A9B74u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9B74u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A9BE8u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9BE8u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A9BFCu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9BFCu>::value = nullptr;
+
+  template <>
   struct EngineStatsSlot<0x10A7804u>
   {
     static moho::EngineStats* value;
@@ -788,6 +879,104 @@ namespace
   };
   moho::EngineStats* EngineStatsSlot<0x10AA3C0u>::value = nullptr;
 
+  template <>
+  struct EngineStatsSlot<0x10A7AE0u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7AE0u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7AF0u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7AF0u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7BB4u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7BB4u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7BE8u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7BE8u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7C00u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7C00u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7C24u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7C24u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7CACu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7CACu>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7D34u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7D34u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7D44u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7D44u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7D54u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7D54u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7D5Cu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7D5Cu>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A7E74u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A7E74u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A809Cu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A809Cu>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A8710u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A8710u>::value = nullptr;
+
   template <typename T>
   void DestroySingletonSlot(T*& slot) noexcept
   {
@@ -858,6 +1047,27 @@ namespace
       (void)moho::register_EngineStatsCleanupSlotVariant109();
       (void)moho::register_EngineStatsCleanupSlotVariant110();
       (void)moho::register_EngineStatsCleanupSlotVariant111();
+      (void)moho::register_EngineStatsCleanupSlotVariant112();
+      (void)moho::register_EngineStatsCleanupSlotVariant113();
+      (void)moho::register_EngineStatsCleanupSlotVariant114();
+      (void)moho::register_EngineStatsCleanupSlotVariant115();
+      (void)moho::register_EngineStatsCleanupSlotVariant116();
+      (void)moho::register_EngineStatsCleanupSlotVariant117();
+      (void)moho::register_EngineStatsCleanupSlotVariant118();
+      (void)moho::register_EngineStatsCleanupSlotVariant119();
+      (void)moho::register_EngineStatsCleanupSlotVariant120();
+      (void)moho::register_EngineStatsCleanupSlotVariant121();
+      (void)moho::register_EngineStatsCleanupSlotVariant122();
+      (void)moho::register_EngineStatsCleanupSlotVariant123();
+      (void)moho::register_EngineStatsCleanupSlotVariant124();
+      (void)moho::register_EngineStatsCleanupSlotVariant125();
+      (void)moho::register_EngineStatsCleanupSlotVariant126();
+      (void)moho::register_EngineStatsCleanupSlotVariant127();
+      (void)moho::register_EngineStatsCleanupSlotVariant128();
+      (void)moho::register_EngineStatsCleanupSlotVariant129();
+      (void)moho::register_EngineStatsCleanupSlotVariant130();
+      (void)moho::register_EngineStatsCleanupSlotVariant131();
+      (void)moho::register_EngineStatsCleanupSlotVariant132();
       (void)moho::register_EngineStatsCleanupSlotVariant11();
       (void)moho::register_EngineStatsCleanupSlotVariant12();
       (void)moho::register_EngineStatsCleanupSlotVariant13();
@@ -3561,5 +3771,608 @@ namespace moho
   int register_EngineStatsCleanupSlotVariant111()
   {
     return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant111>();
+  }
+
+  /**
+   * Address: 0x00BEF600 (FUN_00BEF600)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7C00`.
+   */
+  void cleanup_EngineStatsSlotVariant112()
+  {
+    CleanupEngineStatsSlot<0x10A7C00u>();
+  }
+
+  /**
+   * Address: 0x00BC46A0 (FUN_00BC46A0)
+   *
+   * What it does:
+   * Registers the `dword_10A7C00` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant112()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant112>();
+  }
+
+  /**
+   * Address: 0x00BEF620 (FUN_00BEF620)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7C24`.
+   */
+  void cleanup_EngineStatsSlotVariant113()
+  {
+    CleanupEngineStatsSlot<0x10A7C24u>();
+  }
+
+  /**
+   * Address: 0x00BC4770 (FUN_00BC4770)
+   *
+   * What it does:
+   * Registers the `dword_10A7C24` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant113()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant113>();
+  }
+
+  /**
+   * Address: 0x00BEF700 (FUN_00BEF700)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7CAC`.
+   */
+  void cleanup_EngineStatsSlotVariant114()
+  {
+    CleanupEngineStatsSlot<0x10A7CACu>();
+  }
+
+  /**
+   * Address: 0x00BC48E0 (FUN_00BC48E0)
+   *
+   * What it does:
+   * Registers the `dword_10A7CAC` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant114()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant114>();
+  }
+
+  /**
+   * Address: 0x00BEF7B0 (FUN_00BEF7B0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7D34`.
+   */
+  void cleanup_EngineStatsSlotVariant115()
+  {
+    CleanupEngineStatsSlot<0x10A7D34u>();
+  }
+
+  /**
+   * Address: 0x00BC49B0 (FUN_00BC49B0)
+   *
+   * What it does:
+   * Registers the `dword_10A7D34` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant115()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant115>();
+  }
+
+  /**
+   * Address: 0x00BEF860 (FUN_00BEF860)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7D44`.
+   */
+  void cleanup_EngineStatsSlotVariant116()
+  {
+    CleanupEngineStatsSlot<0x10A7D44u>();
+  }
+
+  /**
+   * Address: 0x00BC4A80 (FUN_00BC4A80)
+   *
+   * What it does:
+   * Registers the `dword_10A7D44` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant116()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant116>();
+  }
+
+  /**
+   * Address: 0x00BEF880 (FUN_00BEF880)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7D54`.
+   */
+  void cleanup_EngineStatsSlotVariant117()
+  {
+    CleanupEngineStatsSlot<0x10A7D54u>();
+  }
+
+  /**
+   * Address: 0x00BC4B50 (FUN_00BC4B50)
+   *
+   * What it does:
+   * Registers the `dword_10A7D54` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant117()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant117>();
+  }
+
+  /**
+   * Address: 0x00BEF8A0 (FUN_00BEF8A0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7D5C`.
+   */
+  void cleanup_EngineStatsSlotVariant118()
+  {
+    CleanupEngineStatsSlot<0x10A7D5Cu>();
+  }
+
+  /**
+   * Address: 0x00BC4B60 (FUN_00BC4B60)
+   *
+   * What it does:
+   * Registers the `dword_10A7D5C` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant118()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant118>();
+  }
+
+  /**
+   * Address: 0x00BEFD30 (FUN_00BEFD30)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7E74`.
+   */
+  void cleanup_EngineStatsSlotVariant119()
+  {
+    CleanupEngineStatsSlot<0x10A7E74u>();
+  }
+
+  /**
+   * Address: 0x00BC5170 (FUN_00BC5170)
+   *
+   * What it does:
+   * Registers the `dword_10A7E74` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant119()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant119>();
+  }
+
+  /**
+   * Address: 0x00BEFD50 (FUN_00BEFD50)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A809C`.
+   */
+  void cleanup_EngineStatsSlotVariant120()
+  {
+    CleanupEngineStatsSlot<0x10A809Cu>();
+  }
+
+  /**
+   * Address: 0x00BC5240 (FUN_00BC5240)
+   *
+   * What it does:
+   * Registers the `dword_10A809C` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant120()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant120>();
+  }
+
+  /**
+   * Address: 0x00BF0010 (FUN_00BF0010)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A8710`.
+   */
+  void cleanup_EngineStatsSlotVariant121()
+  {
+    CleanupEngineStatsSlot<0x10A8710u>();
+  }
+
+  /**
+   * Address: 0x00BC5520 (FUN_00BC5520)
+   *
+   * What it does:
+   * Registers the `dword_10A8710` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant121()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant121>();
+  }
+
+  /**
+   * Address: 0x00BEF520 (FUN_00BEF520)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7AE0`.
+   */
+  void cleanup_EngineStatsSlotVariant122()
+  {
+    CleanupEngineStatsSlot<0x10A7AE0u>();
+  }
+
+  /**
+   * Address: 0x00BC44D0 (FUN_00BC44D0)
+   *
+   * What it does:
+   * Registers the `dword_10A7AE0` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant122()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant122>();
+  }
+
+  /**
+   * Address: 0x00BEF540 (FUN_00BEF540)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7AF0`.
+   */
+  void cleanup_EngineStatsSlotVariant123()
+  {
+    CleanupEngineStatsSlot<0x10A7AF0u>();
+  }
+
+  /**
+   * Address: 0x00BC44E0 (FUN_00BC44E0)
+   *
+   * What it does:
+   * Registers the `dword_10A7AF0` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant123()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant123>();
+  }
+
+  /**
+   * Address: 0x00BEF560 (FUN_00BEF560)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7BB4`.
+   */
+  void cleanup_EngineStatsSlotVariant124()
+  {
+    CleanupEngineStatsSlot<0x10A7BB4u>();
+  }
+
+  /**
+   * Address: 0x00BC45B0 (FUN_00BC45B0)
+   *
+   * What it does:
+   * Registers the `dword_10A7BB4` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant124()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant124>();
+  }
+
+  /**
+   * Address: 0x00BEF580 (FUN_00BEF580)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A7BE8`.
+   */
+  void cleanup_EngineStatsSlotVariant125()
+  {
+    CleanupEngineStatsSlot<0x10A7BE8u>();
+  }
+
+  /**
+   * Address: 0x00BC4680 (FUN_00BC4680)
+   *
+   * What it does:
+   * Registers the `dword_10A7BE8` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant125()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant125>();
+  }
+
+  /**
+   * Address: 0x00BEE7B0 (FUN_00BEE7B0, sub_BEE7B0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_0`
+   * (`dword_10A7464`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant126()
+  {
+    CleanupEngineStatsSlot<0x10A7464u>();
+  }
+
+  /**
+   * Address: 0x00BC33C0 (FUN_00BC33C0, register_engine_stats_0)
+   *
+   * What it does:
+   * Registers the `engine_stats_0` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant126()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant126>();
+  }
+
+  /**
+   * Address: 0x00BEE7D0 (FUN_00BEE7D0, sub_BEE7D0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_1`
+   * (`dword_10A7494`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant127()
+  {
+    CleanupEngineStatsSlot<0x10A7494u>();
+  }
+
+  /**
+   * Address: 0x00BC33D0 (FUN_00BC33D0, register_engine_stats_1)
+   *
+   * What it does:
+   * Registers the `engine_stats_1` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant127()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant127>();
+  }
+
+  /**
+   * Address: 0x00BEE8B0 (FUN_00BEE8B0, sub_BEE8B0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_2`
+   * (`dword_10A74C0`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant128()
+  {
+    CleanupEngineStatsSlot<0x10A74C0u>();
+  }
+
+  /**
+   * Address: 0x00BC3560 (FUN_00BC3560, register_engine_stats_2)
+   *
+   * What it does:
+   * Registers the `engine_stats_2` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant128()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant128>();
+  }
+
+  /**
+   * Address: 0x00BEE8D0 (FUN_00BEE8D0, sub_BEE8D0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_3`
+   * (`dword_10A765C`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant129()
+  {
+    CleanupEngineStatsSlot<0x10A765Cu>();
+  }
+
+  /**
+   * Address: 0x00BC35D0 (FUN_00BC35D0, register_engine_stats_3)
+   *
+   * What it does:
+   * Registers the `engine_stats_3` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant129()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant129>();
+  }
+
+  /**
+   * Address: 0x00BEEA90 (FUN_00BEEA90, sub_BEEA90)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_4`
+   * (`dword_10A766C`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant130()
+  {
+    CleanupEngineStatsSlot<0x10A766Cu>();
+  }
+
+  /**
+   * Address: 0x00BC3780 (FUN_00BC3780, register_engine_stats_4)
+   *
+   * What it does:
+   * Registers the `engine_stats_4` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant130()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant130>();
+  }
+
+  /**
+   * Address: 0x00BEEAB0 (FUN_00BEEAB0, sub_BEEAB0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_5`
+   * (`dword_10A767C`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant131()
+  {
+    CleanupEngineStatsSlot<0x10A767Cu>();
+  }
+
+  /**
+   * Address: 0x00BC37F0 (FUN_00BC37F0, register_engine_stats_5)
+   *
+   * What it does:
+   * Registers the `engine_stats_5` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant131()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant131>();
+  }
+
+  /**
+   * Address: 0x00BEEAD0 (FUN_00BEEAD0, sub_BEEAD0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `engine_stats_6`
+   * (`dword_10A77A4`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant132()
+  {
+    CleanupEngineStatsSlot<0x10A77A4u>();
+  }
+
+  /**
+   * Address: 0x00BC3880 (FUN_00BC3880, register_engine_stats_6)
+   *
+   * What it does:
+   * Registers the `engine_stats_6` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant132()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant132>();
+  }
+
+  /**
+   * Address: 0x00BEE290 (FUN_00BEE290, sub_BEE290)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `sEngineStats`
+   * (`dword_10A67B8`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant133()
+  {
+    CleanupEngineStatsSlot<0x10A67B8u>();
+  }
+
+  /**
+   * Address: 0x00BC2FB0 (FUN_00BC2FB0, register_engine_stats)
+   *
+   * What it does:
+   * Registers the `sEngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant133()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant133>();
+  }
+
+  /**
+   * Address: 0x00BEE0C0 (FUN_00BEE0C0, sub_BEE0C0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `enginestats`
+   * (`dword_10A66C4`).
+   */
+  void cleanup_EngineStatsCleanupSlotVariant134()
+  {
+    CleanupEngineStatsSlot<0x10A66C4u>();
+  }
+
+  /**
+   * Address: 0x00BC2EC0 (FUN_00BC2EC0, register_enginestats)
+   *
+   * What it does:
+   * Registers the `enginestats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant134()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsCleanupSlotVariant134>();
+  }
+
+  /**
+   * Address: 0x00BF1800 (FUN_00BF1800, sub_BF1800)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9B54`.
+   */
+  void cleanup_EngineStatsSlotVariant135()
+  {
+    CleanupEngineStatsSlot<0x10A9B54u>();
+  }
+
+  /**
+   * Address: 0x00BC71B0 (FUN_00BC71B0, sub_BC71B0)
+   *
+   * What it does:
+   * Registers the `dword_10A9B54` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant135()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant135>();
+  }
+
+  /**
+   * Address: 0x00BF1820 (FUN_00BF1820, sub_BF1820)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9B74`.
+   */
+  void cleanup_EngineStatsSlotVariant136()
+  {
+    CleanupEngineStatsSlot<0x10A9B74u>();
+  }
+
+  /**
+   * Address: 0x00BC71C0 (FUN_00BC71C0, sub_BC71C0)
+   *
+   * What it does:
+   * Registers the `dword_10A9B74` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant136()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant136>();
+  }
+
+  /**
+   * Address: 0x00BF1890 (FUN_00BF1890, sub_BF1890)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9BE8`.
+   */
+  void cleanup_EngineStatsSlotVariant137()
+  {
+    CleanupEngineStatsSlot<0x10A9BE8u>();
+  }
+
+  /**
+   * Address: 0x00BC7300 (FUN_00BC7300, sub_BC7300)
+   *
+   * What it does:
+   * Registers the `dword_10A9BE8` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant137()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant137>();
+  }
+
+  /**
+   * Address: 0x00BF1990 (FUN_00BF1990, sub_BF1990)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9BFC`.
+   */
+  void cleanup_EngineStatsSlotVariant138()
+  {
+    CleanupEngineStatsSlot<0x10A9BFCu>();
+  }
+
+  /**
+   * Address: 0x00BC7430 (FUN_00BC7430, sub_BC7430)
+   *
+   * What it does:
+   * Registers the `dword_10A9BFC` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant138()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant138>();
   }
 } // namespace moho

@@ -203,6 +203,8 @@ namespace
   gpg::RType* gVector3fType = nullptr;
   gpg::RType* gCPathPointType = nullptr;
   gpg::RType* gFastVectorCPathPointType = nullptr;
+  msvc8::string gFastVectorCPathPointTypeName{};
+  bool gFastVectorCPathPointTypeNameCleanupRegistered = false;
   gpg::RType* gPathSplineTypeType = nullptr;
   gpg::RType* gPathSplineContinuationType = nullptr;
   EngineStats* gRecoveredAiPathSplineStartupStatsSlot = nullptr;
@@ -608,6 +610,19 @@ namespace
     AcquireFastVectorCPathPointType()->~FastVectorCPathPointTypeInfo();
     gFastVectorCPathPointTypeConstructed = false;
     gFastVectorCPathPointType = nullptr;
+  }
+
+  /**
+   * Address: 0x00BF7570 (FUN_00BF7570, cleanup_FastVectorCPathPointTypeName)
+   *
+   * What it does:
+   * Clears cached lexical type-name storage for
+   * `gpg::RFastVectorType_CPathPoint::GetName`.
+   */
+  void cleanup_FastVectorCPathPointTypeName()
+  {
+    gFastVectorCPathPointTypeName.clear();
+    gFastVectorCPathPointTypeNameCleanupRegistered = false;
   }
 
   /**
@@ -1067,9 +1082,26 @@ void EPathPointStateTypeInfo::Init()
   Finish();
 }
 
+/**
+ * Address: 0x005B4950 (FUN_005B4950, gpg::RFastVectorType_CPathPoint::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected `fastvector<CPathPoint>` type name
+ * from the resolved `CPathPoint` element RTTI lane.
+ */
 const char* FastVectorCPathPointTypeInfo::GetName() const
 {
-  return "fastvector<CPathPoint>";
+  if (gFastVectorCPathPointTypeName.empty()) {
+    const gpg::RType* const elementType = ResolveCPathPointType();
+    const char* const elementName = elementType ? elementType->GetName() : "CPathPoint";
+    gFastVectorCPathPointTypeName = gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "CPathPoint");
+    if (!gFastVectorCPathPointTypeNameCleanupRegistered) {
+      gFastVectorCPathPointTypeNameCleanupRegistered = true;
+      (void)std::atexit(&cleanup_FastVectorCPathPointTypeName);
+    }
+  }
+
+  return gFastVectorCPathPointTypeName.c_str();
 }
 
 msvc8::string FastVectorCPathPointTypeInfo::GetLexical(const gpg::RRef& ref) const

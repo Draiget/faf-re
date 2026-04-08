@@ -114,6 +114,8 @@ namespace moho
     static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
+     * Address: 0x0069EC80 (FUN_0069EC80, gpg::SerSaveLoadHelper_Projectile::Init)
+     *
      * What it does:
      * Binds load/save callbacks into reflected RTTI for `Projectile`.
      */

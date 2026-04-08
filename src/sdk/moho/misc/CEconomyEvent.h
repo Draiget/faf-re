@@ -256,6 +256,14 @@ namespace moho
   int cfunc_CreateEconomyEventL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00775650 (FUN_00775650, func_CreateEconomyEvent_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `CreateEconomyEvent`.
+   */
+  CScrLuaInitForm* func_CreateEconomyEvent_LuaFuncDef();
+
+  /**
    * Address: 0x00775910 (FUN_00775910, cfunc_RemoveEconomyEvent)
    */
   int cfunc_RemoveEconomyEvent(lua_State* luaContext);
@@ -266,6 +274,14 @@ namespace moho
   int cfunc_RemoveEconomyEventL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00775930 (FUN_00775930, func_RemoveEconomyEvent_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `RemoveEconomyEvent`.
+   */
+  CScrLuaInitForm* func_RemoveEconomyEvent_LuaFuncDef();
+
+  /**
    * Address: 0x00775A40 (FUN_00775A40, cfunc_EconomyEventIsDone)
    */
   int cfunc_EconomyEventIsDone(lua_State* luaContext);
@@ -274,6 +290,14 @@ namespace moho
    * Address: 0x00775AC0 (FUN_00775AC0, cfunc_EconomyEventIsDoneL)
    */
   int cfunc_EconomyEventIsDoneL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00775A60 (FUN_00775A60, func_EconomyEventIsDone_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `EconomyEventIsDone`.
+   */
+  CScrLuaInitForm* func_EconomyEventIsDone_LuaFuncDef();
 
   /**
    * Address: 0x00775EC0 (FUN_00775EC0, func_GetCEconomyEvent)
@@ -302,3 +326,15 @@ namespace moho
   static_assert(sizeof(CEconomyEventSerializer) == 0x14, "CEconomyEventSerializer size must be 0x14");
   static_assert(sizeof(CEconomyEventTypeInfo) == 0x64, "CEconomyEventTypeInfo size must be 0x64");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x005D1C70 (FUN_005D1C70, gpg::RRef_CEconRequest)
+   *
+   * What it does:
+   * Builds a typed reflection reference for `CEconRequest*`, upgrading to the
+   * dynamic derived type and applying base-offset adjustment when needed.
+   */
+  gpg::RRef* RRef_CEconRequest(gpg::RRef* outRef, moho::CEconRequest* value);
+} // namespace gpg

@@ -14,8 +14,8 @@ namespace moho
 
   /**
    * Address context:
-   * - 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Entity::Add)
-   * - 0x005E8960 (FUN_005E8960, Moho::EntitySetTemplate_Unit::Contains)
+   * - 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Unit::Add)
+   * - 0x005E8960 (FUN_005E8960, Moho::EntitySetTemplate_Unit::Remove)
    * - 0x00700A00 (FUN_00700A00)
    * - 0x00700E20 (FUN_00700E20)
    * - 0x00700E70 (FUN_00700E70)
@@ -45,7 +45,22 @@ namespace moho
     void AppendUniqueEntity(Entity* entity);
 
     [[nodiscard]] bool ContainsUnit(const Unit* unit) const noexcept;
+    /**
+     * Address: 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Unit::Add)
+     *
+     * What it does:
+     * Binary-searches one insertion point by entity id, inserts the unit lane
+     * (including null-lane sentinel behavior), and reports whether insertion
+     * occurred.
+     */
     [[nodiscard]] bool AddUnit(Unit* unit);
+    /**
+     * Address: 0x005E8960 (FUN_005E8960, Moho::EntitySetTemplate_Unit::Remove)
+     *
+     * What it does:
+     * Binary-searches one unit lane by `Entity::id_`, removes one exact unit
+     * pointer match when present, and compacts trailing slots.
+     */
     [[nodiscard]] bool RemoveUnit(Unit* unit);
 
     /**

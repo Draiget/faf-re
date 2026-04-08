@@ -24,12 +24,58 @@ namespace gpg
   class RFastVectorType<moho::CountedPtr_CParticleTexture> final : public gpg::RType, public gpg::RIndexed
   {
   public:
+    /**
+     * Address: 0x0065ACE0 (FUN_0065ACE0, gpg::RFastVectorType_CountedPtr_CParticleTexture::dtr)
+     */
+    ~RFastVectorType() override;
     [[nodiscard]] const char* GetName() const override;
+    /**
+     * Address: 0x00659F20 (FUN_00659F20, gpg::RFastVectorType_CountedPtr_CParticleTexture::GetLexical)
+     *
+     * What it does:
+     * Returns base lexical text plus reflected vector size for one
+     * `fastvector<CountedPtr<CParticleTexture>>` instance.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    /**
+     * Address: 0x00659FB0 (FUN_00659FB0, gpg::RFastVectorType_CountedPtr_CParticleTexture::IsIndexed)
+     *
+     * What it does:
+     * Returns this indexed-interface lane for
+     * `fastvector<CountedPtr<CParticleTexture>>` reflection.
+     */
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+    /**
+     * Address: 0x00659F00 (FUN_00659F00, gpg::RFastVectorType_CountedPtr_CParticleTexture::Init)
+     *
+     * What it does:
+     * Configures reflected element size/version and binds counted-pointer
+     * fastvector serializer callbacks.
+     */
     void Init() override;
+    /**
+     * Address: 0x0065A020 (FUN_0065A020, gpg::RFastVectorType_CountedPtr_CParticleTexture::SubscriptIndex)
+     *
+     * What it does:
+     * Builds one reflected element reference for
+     * `fastvector<CountedPtr<CParticleTexture>>[ind]`.
+     */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+    /**
+     * Address: 0x00659FC0 (FUN_00659FC0, gpg::RFastVectorType_CountedPtr_CParticleTexture::GetCount)
+     *
+     * What it does:
+     * Returns runtime element count for one reflected
+     * `fastvector<CountedPtr<CParticleTexture>>`.
+     */
     size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x00659FD0 (FUN_00659FD0, gpg::RFastVectorType_CountedPtr_CParticleTexture::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `fastvector<CountedPtr<CParticleTexture>>` and
+     * default-fills new lanes.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
@@ -163,6 +209,13 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, owner);
   }
 
+  /**
+   * Address: 0x0065A4C0 (FUN_0065A4C0, gpg::RFastVectorType_CountedPtr_CParticleTexture::SerLoad)
+   *
+   * What it does:
+   * Loads one reflected `fastvector<CountedPtr<CParticleTexture>>` payload
+   * from archive count + lanes.
+   */
   void LoadFastVectorCountedPtrCParticleTexture(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
@@ -184,6 +237,13 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0065A570 (FUN_0065A570, gpg::RFastVectorType_CountedPtr_CParticleTexture::SerSave)
+   *
+   * What it does:
+   * Saves one reflected `fastvector<CountedPtr<CParticleTexture>>` payload as
+   * archive count + lanes.
+   */
   void SaveFastVectorCountedPtrCParticleTexture(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
     if (!archive || objectPtr == 0) {
@@ -272,17 +332,26 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x0065AC80 (FUN_0065AC80, Moho::RCountedPtrType_CParticleTexture::dtr)
+   *
+   * What it does:
+   * Releases dynamic reflection field/base lanes and resets object vtable to
+   * `gpg::RObject` during teardown.
    */
   RCountedPtrType<moho::CParticleTexture>::~RCountedPtrType() = default;
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659BC0 (FUN_00659BC0, Moho::RCountedPtrType_CParticleTexture::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches `CountedPtr<element>` reflection text using the
+   * resolved particle-texture type name.
    */
   const char* RCountedPtrType<moho::CParticleTexture>::GetName() const
   {
     if (gCountedPtrCParticleTextureTypeName.empty()) {
-      const char* const pointeeName = CachedCParticleTextureType() ? CachedCParticleTextureType()->GetName() : "CParticleTexture";
+      gpg::RType* const pointeeType = CachedCParticleTextureType();
+      const char* const pointeeName = pointeeType ? pointeeType->GetName() : "CParticleTexture";
       gCountedPtrCParticleTextureTypeName = gpg::STR_Printf("CountedPtr<%s>", pointeeName ? pointeeName : "CParticleTexture");
       if (!gCountedPtrCParticleTextureTypeNameCleanupRegistered) {
         gCountedPtrCParticleTextureTypeNameCleanupRegistered = true;
@@ -294,7 +363,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659C80 (FUN_00659C80, Moho::RCountedPtrType_CParticleTexture::GetLexical)
+   *
+   * What it does:
+   * Returns `"NULL"` for empty counted pointers; otherwise returns bracketed
+   * pointee lexical text for the texture object.
    */
   msvc8::string RCountedPtrType<moho::CParticleTexture>::GetLexical(const gpg::RRef& ref) const
   {
@@ -309,7 +382,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659E00 (FUN_00659E00, Moho::RCountedPtrType_CParticleTexture::IsIndexed)
+   *
+   * What it does:
+   * Returns this indexed-interface lane for counted-pointer reflection.
    */
   const gpg::RIndexed* RCountedPtrType<moho::CParticleTexture>::IsIndexed() const
   {
@@ -317,7 +393,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659E10 (FUN_00659E10, Moho::RCountedPtrType_CParticleTexture::IsPointer)
+   *
+   * What it does:
+   * Returns this pointer/indexed interface lane for counted-pointer reflection.
    */
   const gpg::RIndexed* RCountedPtrType<moho::CParticleTexture>::IsPointer() const
   {
@@ -325,7 +404,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659C60 (FUN_00659C60, Moho::RCountedPtrType_CParticleTexture::Init)
+   *
+   * What it does:
+   * Configures reflected counted-pointer size/version and binds serializer
+   * callbacks.
    */
   void RCountedPtrType<moho::CParticleTexture>::Init()
   {
@@ -336,7 +419,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659E30 (FUN_00659E30, Moho::RCountedPtrType_CParticleTexture::SubscriptIndex)
+   *
+   * What it does:
+   * Builds one reflected pointer reference to the counted texture lane.
    */
   gpg::RRef RCountedPtrType<moho::CParticleTexture>::SubscriptIndex(void* obj, const int) const
   {
@@ -345,7 +431,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x00659E20 (FUN_00659E20, Moho::RCountedPtrType_CParticleTexture::GetCount)
+   *
+   * What it does:
+   * Returns `1` when counted pointer stores a texture; otherwise returns `0`.
    */
   size_t RCountedPtrType<moho::CParticleTexture>::GetCount(void* obj) const
   {
@@ -354,7 +443,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x0065A430 (FUN_0065A430, Moho::RCountedPtrType_CParticleTexture::SerLoad)
+   *
+   * What it does:
+   * Loads one counted-pointer texture lane through shared-pointer archive path.
    */
   void RCountedPtrType<moho::CParticleTexture>::SerLoad(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -362,7 +454,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x0065AAD0 family
+   * Address: 0x0065A490 (FUN_0065A490, Moho::RCountedPtrType_CParticleTexture::SerSave)
+   *
+   * What it does:
+   * Saves one counted-pointer texture lane through shared-pointer archive path.
    */
   void RCountedPtrType<moho::CParticleTexture>::SerSave(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -457,13 +552,26 @@ namespace moho
 namespace gpg
 {
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x0065ACE0 (FUN_0065ACE0, gpg::RFastVectorType_CountedPtr_CParticleTexture::dtr)
+   *
+   * What it does:
+   * Releases reflection field/base lanes for counted-pointer fastvector
+   * descriptor teardown.
+   */
+  RFastVectorType<moho::CountedPtr_CParticleTexture>::~RFastVectorType() = default;
+
+  /**
+   * Address: 0x00659E60 (FUN_00659E60, gpg::RFastVectorType_CountedPtr_CParticleTexture::GetName)
+   *
+   * What it does:
+   * Lazily builds and caches `fastvector<element>` reflection text using the
+   * resolved counted-particle-texture type name.
    */
   const char* RFastVectorType<moho::CountedPtr_CParticleTexture>::GetName() const
   {
     if (gCountedPtrFastVectorTypeName.empty()) {
-      const char* const elementName =
-        CachedCountedPtrCParticleTextureType() ? CachedCountedPtrCParticleTextureType()->GetName() : "CountedPtr<CParticleTexture>";
+      gpg::RType* const elementType = CachedCountedPtrCParticleTextureType();
+      const char* const elementName = elementType ? elementType->GetName() : "CountedPtr<CParticleTexture>";
       gCountedPtrFastVectorTypeName =
         gpg::STR_Printf("fastvector<%s>", elementName ? elementName : "CountedPtr<CParticleTexture>");
       if (!gCountedPtrFastVectorTypeNameCleanupRegistered) {
@@ -476,7 +584,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x00659F20 (FUN_00659F20, gpg::RFastVectorType_CountedPtr_CParticleTexture::GetLexical)
+   *
+   * What it does:
+   * Returns base lexical text plus reflected vector size for one
+   * `fastvector<CountedPtr<CParticleTexture>>` instance.
    */
   msvc8::string RFastVectorType<moho::CountedPtr_CParticleTexture>::GetLexical(const gpg::RRef& ref) const
   {
@@ -485,7 +597,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x00659FB0 (FUN_00659FB0, gpg::RFastVectorType_CountedPtr_CParticleTexture::IsIndexed)
+   *
+   * What it does:
+   * Returns this indexed-interface lane for
+   * `fastvector<CountedPtr<CParticleTexture>>` reflection.
    */
   const gpg::RIndexed* RFastVectorType<moho::CountedPtr_CParticleTexture>::IsIndexed() const
   {
@@ -493,7 +609,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x00659F00 (FUN_00659F00, gpg::RFastVectorType_CountedPtr_CParticleTexture::Init)
+   *
+   * What it does:
+   * Configures reflected element size/version and binds counted-pointer
+   * fastvector serializer callbacks.
    */
   void RFastVectorType<moho::CountedPtr_CParticleTexture>::Init()
   {
@@ -504,7 +624,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x0065A020 (FUN_0065A020, gpg::RFastVectorType_CountedPtr_CParticleTexture::SubscriptIndex)
+   *
+   * What it does:
+   * Builds one reflected element reference for
+   * `fastvector<CountedPtr<CParticleTexture>>[ind]`.
    */
   gpg::RRef RFastVectorType<moho::CountedPtr_CParticleTexture>::SubscriptIndex(void* obj, const int ind) const
   {
@@ -525,7 +649,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x00659FC0 (FUN_00659FC0, gpg::RFastVectorType_CountedPtr_CParticleTexture::GetCount)
+   *
+   * What it does:
+   * Returns runtime element count for one reflected
+   * `fastvector<CountedPtr<CParticleTexture>>`.
    */
   size_t RFastVectorType<moho::CountedPtr_CParticleTexture>::GetCount(void* obj) const
   {
@@ -542,7 +670,11 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0065AB40 family
+   * Address: 0x00659FD0 (FUN_00659FD0, gpg::RFastVectorType_CountedPtr_CParticleTexture::SetCount)
+   *
+   * What it does:
+   * Resizes one reflected `fastvector<CountedPtr<CParticleTexture>>` and
+   * default-fills new lanes.
    */
   void RFastVectorType<moho::CountedPtr_CParticleTexture>::SetCount(void* obj, const int count) const
   {

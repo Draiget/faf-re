@@ -150,6 +150,16 @@ namespace moho
     );
 
     /**
+     * Address: 0x007DCA40 (FUN_007DCA40,
+     * ??0MeshLOD@Moho@@QAE@V?$shared_ptr@VRScmResource@Moho@@@boost@@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+     *
+     * What it does:
+     * Initializes one runtime LOD from pre-resolved resource/material shared
+     * pointers without blueprint-load side effects.
+     */
+    MeshLOD(boost::shared_ptr<RScmResource> resource, boost::shared_ptr<MeshMaterial> material);
+
+    /**
      * Address: 0x007DCD60 (FUN_007DCD60, ??1MeshLOD@Moho@@UAE@XZ)
      */
     virtual ~MeshLOD();
@@ -209,6 +219,15 @@ namespace moho
     Mesh(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> material);
 
     /**
+     * Address: 0x007DD750 (FUN_007DD750,
+     * ??0Mesh@Moho@@QAE@V?$shared_ptr@VRScmResource@Moho@@@boost@@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
+     *
+     * What it does:
+     * Initializes a mesh with one pre-resolved resource/material LOD lane.
+     */
+    Mesh(boost::shared_ptr<RScmResource> resource, boost::shared_ptr<MeshMaterial> material);
+
+    /**
      * Address: 0x007DD880 (FUN_007DD880, ??1Mesh@Moho@@UAE@XZ)
      */
     virtual ~Mesh();
@@ -242,6 +261,15 @@ namespace moho
      * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@ABVRMeshBlueprintLOD@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
     MeshLOD* CreateLOD(const RMeshBlueprintLOD& blueprintLod, boost::shared_ptr<MeshMaterial> material);
+
+    /**
+     * Address: 0x007DDE50 (FUN_007DDE50,
+     * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@V?$shared_ptr@VRScmResource@Moho@@@boost@@V?$shared_ptr@VMeshMaterial@Moho@@@5@@Z)
+     *
+     * What it does:
+     * Adds one direct resource/material-backed mesh LOD entry.
+     */
+    MeshLOD* CreateLOD(boost::shared_ptr<RScmResource> resource, boost::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DD950 (FUN_007DD950, ?GetResource@Mesh@Moho@@QBE?AV?$shared_ptr@VRScmResource@Moho@@@boost@@H@Z)
@@ -333,6 +361,23 @@ namespace moho
      * marks stance/bounds state dirty when transform data changed.
      */
     void SetStance(const VTransform& startTransform, const VTransform& endTransform);
+
+    /**
+     * Address: 0x007DEA30 (FUN_007DEA30,
+     * ?SetStance@MeshInstance@Moho@@QAEXABVVTransform@2@0V?$shared_ptr@VCAniPose@Moho@@@boost@@1@Z)
+     *
+     * What it does:
+     * Applies one pose-aware stance update lane for static-pose meshes:
+     * updates pose handles, refreshes interpolation markers, and conditionally
+     * updates transform/bounds state.
+     */
+    void SetStance(
+      const VTransform& startTransform,
+      const VTransform& endTransform,
+      bool forceRefresh,
+      boost::shared_ptr<CAniPose> startPoseArg,
+      boost::shared_ptr<CAniPose> endPoseArg
+    );
 
     /**
      * Address: 0x007DEC80 (FUN_007DEC80, ?UpdateInterpolatedFields@MeshInstance@Moho@@ABEXXZ)

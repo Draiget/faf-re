@@ -61,6 +61,16 @@ namespace moho
     SSyncFilterMaskBlock maskB;         // +0x50
 
     /**
+     * Address: 0x0073B980 (FUN_0073B980)
+     * Mangled: ??1struct_SimDriverSubObj1@@QAE@@Z
+     *
+     * What it does:
+     * Rebinds both fast mask vectors back to inline storage before the
+     * compiler-generated member teardown continues with `geoCams`.
+     */
+    ~SSyncFilter();
+
+    /**
      * Address: 0x0073DD10 (FUN_0073DD10)
      *
      * What it does:

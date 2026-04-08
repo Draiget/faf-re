@@ -13,10 +13,15 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "moho/ai/IAiTransport.h"
+#include "moho/ai/CAiTarget.h"
+#include "moho/math/MathReflection.h"
 #include "moho/ai/CAiPathSpline.h"
+#include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/SPhysBody.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -43,6 +48,52 @@ namespace moho
     constexpr float kFuelTickScale = 0.1f;
     constexpr float kFuelDrainTicksPerSecond = 10.0f;
     constexpr float kFuelRefuelDoneThreshold = 0.99f;
+    constexpr float kCommonMoveNearStopSpeedScale = 0.080000006f;
+    constexpr float kLayerTransitionTickScale = 10.0f;
+    constexpr float kHeightWordScale = 0.0078125f;
+    constexpr float kAirTargetMinimumElevationScale = 0.5f;
+    constexpr float kMoveToQuatUnitTolerance = 0.01f;
+    constexpr EUnitMotionState kUnitMotionStateNone = static_cast<EUnitMotionState>(0);
+    constexpr EUnitMotionState kUnitMotionStateBallistic = static_cast<EUnitMotionState>(2);
+    constexpr EUnitMotionHorzEvent kUnitMotionHorzEventCruising = static_cast<EUnitMotionHorzEvent>(0);
+    constexpr EUnitMotionHorzEvent kUnitMotionHorzEventTopSpeed = static_cast<EUnitMotionHorzEvent>(1);
+    constexpr EUnitMotionHorzEvent kUnitMotionHorzEventStopping = static_cast<EUnitMotionHorzEvent>(2);
+    constexpr EUnitMotionHorzEvent kUnitMotionHorzEventStopped = static_cast<EUnitMotionHorzEvent>(3);
+    constexpr EUnitMotionCarrierEvent kUnitMotionCarrierEventRelativeHeight = static_cast<EUnitMotionCarrierEvent>(1);
+    constexpr Wm3::Quaternionf kWingedOrientationQuarterTurnRotation{0.0f, 0.70710677f, 0.0f, 0.70710677f};
+    constexpr const char* kUnitMotionScriptStateNames[] = {
+      "None",
+      "Attached",
+      "Ballistic",
+      "Crashed",
+      "ArmyPool",
+    };
+    constexpr const char* kUnitMotionScriptHorzEventNames[] = {
+      "Cruise",
+      "TopSpeed",
+      "Stopping",
+      "Stopped",
+      "Top",
+      "Bottom",
+      "Up",
+      "Down",
+    };
+    constexpr const char* kUnitMotionScriptVertEventNames[] = {
+      "Top",
+      "Bottom",
+      "Up",
+      "Down",
+      "Hover",
+      "Straight",
+      "Turn",
+      "SharpTurn",
+    };
+    constexpr std::size_t kUnitMotionScriptStateNameCount =
+      sizeof(kUnitMotionScriptStateNames) / sizeof(kUnitMotionScriptStateNames[0]);
+    constexpr std::size_t kUnitMotionScriptHorzEventNameCount =
+      sizeof(kUnitMotionScriptHorzEventNames) / sizeof(kUnitMotionScriptHorzEventNames[0]);
+    constexpr std::size_t kUnitMotionScriptVertEventNameCount =
+      sizeof(kUnitMotionScriptVertEventNames) / sizeof(kUnitMotionScriptVertEventNames[0]);
     constexpr std::uint64_t kVerticalMotionStateMask =
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown)) |
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
@@ -57,6 +108,36 @@ namespace moho
       "UnitRecoilOrientationRuntimeView::mCurrentOrientation offset must be 0xA4"
     );
 
+    struct CUnitMotionRaisedPlatformCandidatesRuntimeView
+    {
+      WeakPtr<Unit>* mBegin;
+      WeakPtr<Unit>* mEnd;
+      WeakPtr<Unit>* mCapacityEnd;
+    };
+    static_assert(
+      sizeof(CUnitMotionRaisedPlatformCandidatesRuntimeView) == 0x0C,
+      "CUnitMotionRaisedPlatformCandidatesRuntimeView size must be 0x0C"
+    );
+    static_assert(
+      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mBegin) == 0x00,
+      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mBegin offset must be 0x00"
+    );
+    static_assert(
+      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mEnd) == 0x04,
+      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mEnd offset must be 0x04"
+    );
+    static_assert(
+      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mCapacityEnd) == 0x08,
+      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mCapacityEnd offset must be 0x08"
+    );
+
+    [[nodiscard]] CUnitMotionRaisedPlatformCandidatesRuntimeView&
+    AsRaisedPlatformCandidatesRuntimeView(CUnitMotion& motion) noexcept
+    {
+      auto* const base = reinterpret_cast<std::uint8_t*>(&motion);
+      return *reinterpret_cast<CUnitMotionRaisedPlatformCandidatesRuntimeView*>(base + offsetof(CUnitMotion, mPad178));
+    }
+
     [[nodiscard]] Wm3::Vector3f SetVectorLength(const Wm3::Vector3f& direction, const float targetLength) noexcept
     {
       Wm3::Vector3f out = direction;
@@ -70,10 +151,66 @@ namespace moho
       return out;
     }
 
+    [[nodiscard]] Wm3::Vector3f ForwardVectorFromOrientation(const moho::Vector4f& orientation) noexcept
+    {
+      Wm3::Vector3f out{};
+      out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
+      out.y = ((orientation.w * orientation.z) - (orientation.x * orientation.y)) * 2.0f;
+      out.z = 1.0f - (((orientation.z * orientation.z) + (orientation.y * orientation.y)) * 2.0f);
+      return out;
+    }
+
+    [[nodiscard]] const char* UnitMotionStateToScriptString(const EUnitMotionState state) noexcept
+    {
+      const auto stateIndex = static_cast<std::int32_t>(state);
+      if (stateIndex < 0) {
+        return "";
+      }
+
+      const auto stateOffset = static_cast<std::size_t>(stateIndex);
+      if (stateOffset >= kUnitMotionScriptStateNameCount) {
+        return "";
+      }
+      return kUnitMotionScriptStateNames[stateOffset];
+    }
+
+    [[nodiscard]] const char* UnitMotionHorzEventToScriptString(const EUnitMotionHorzEvent event) noexcept
+    {
+      const auto eventIndex = static_cast<std::int32_t>(event);
+      if (eventIndex < 0) {
+        return "";
+      }
+
+      const auto eventOffset = static_cast<std::size_t>(eventIndex);
+      if (eventOffset >= kUnitMotionScriptHorzEventNameCount) {
+        return "";
+      }
+      return kUnitMotionScriptHorzEventNames[eventOffset];
+    }
+
+    [[nodiscard]] const char* UnitMotionVertEventToScriptString(const EUnitMotionVertEvent event) noexcept
+    {
+      const auto eventIndex = static_cast<std::int32_t>(event);
+      if (eventIndex < 0) {
+        return "";
+      }
+
+      const auto eventOffset = static_cast<std::size_t>(eventIndex);
+      if (eventOffset >= kUnitMotionScriptVertEventNameCount) {
+        return "";
+      }
+      return kUnitMotionScriptVertEventNames[eventOffset];
+    }
+
     [[nodiscard]] bool IsVector3fBinaryZero(const Wm3::Vector3f& value) noexcept
     {
       static constexpr Wm3::Vector3f kZeroVector{};
       return std::memcmp(&value, &kZeroVector, sizeof(Wm3::Vector3f)) == 0;
+    }
+
+    [[nodiscard]] bool IsValidVector3f(const Wm3::Vector3f& value) noexcept
+    {
+      return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
     }
 
     [[nodiscard]] bool HasQueuedHeadCommand(const CUnitCommandQueue* const commandQueue) noexcept
@@ -85,6 +222,37 @@ namespace moho
       const WeakPtr<CUnitCommand>* const begin = commandQueue->mCommandVec.begin();
       const WeakPtr<CUnitCommand>* const end = commandQueue->mCommandVec.end();
       return begin != nullptr && begin != end && begin->HasValue();
+    }
+
+    [[nodiscard]] Wm3::Vector3f RotateByQuaternion(
+      const Wm3::Vector3f& vector,
+      const Wm3::Quaternionf& quaternion
+    ) noexcept
+    {
+      Wm3::Vector3f out{};
+      Wm3::MultiplyQuaternionVector(&out, vector, quaternion);
+      return out;
+    }
+
+    [[nodiscard]] float SampleSnapElevation(
+      Unit* const unit,
+      Wm3::Vector3f& samplePoint,
+      const STIMap& map,
+      const bool includeWaterFloor
+    ) noexcept
+    {
+      const CHeightField* const heightField = map.GetHeightField();
+      float sampledElevation = heightField ? heightField->GetElevation(samplePoint.x, samplePoint.z) : samplePoint.y;
+
+      if (includeWaterFloor && map.mWaterEnabled != 0u && map.mWaterElevation > sampledElevation) {
+        sampledElevation = map.mWaterElevation;
+      }
+
+      if (unit != nullptr) {
+        sampledElevation += unit->DistanceToOccupiedRect(&samplePoint);
+      }
+
+      return sampledElevation;
     }
 
     [[nodiscard]] gpg::RRef MakeCUnitMotionRef(CUnitMotion* const value) noexcept
@@ -259,8 +427,8 @@ namespace moho
 
     void ClearMaintenanceCost(Unit* const unit) noexcept
     {
-      unit->MaintainenceCostEnergy = 0.0f;
-      unit->MaintainenceCostMass = 0.0f;
+      unit->SharedEconomyRateEnergy = 0.0f;
+      unit->SharedEconomyRateMass = 0.0f;
     }
   } // namespace
 
@@ -347,7 +515,7 @@ namespace moho
     ReadTypedValue(*archive, motion->mVectorF0, ownerRef);
     ReadTypedValue(*archive, motion->mForce, ownerRef);
     ReadTypedValue(*archive, motion->mVector108, ownerRef);
-    ReadTypedValue(*archive, motion->mUnknownWeakUnit, ownerRef);
+    ReadTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
 
     archive->ReadFloat(&motion->mUnknownFloat11C);
 
@@ -433,7 +601,7 @@ namespace moho
     WriteTypedValue(*archive, motion->mVectorF0, ownerRef);
     WriteTypedValue(*archive, motion->mForce, ownerRef);
     WriteTypedValue(*archive, motion->mVector108, ownerRef);
-    WriteTypedValue(*archive, motion->mUnknownWeakUnit, ownerRef);
+    WriteTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
 
     archive->WriteFloat(motion->mUnknownFloat11C);
 
@@ -447,6 +615,31 @@ namespace moho
     );
 
     WriteTypedValue(*archive, motion->mRepairConsumption, ownerRef);
+  }
+
+  /**
+   * Address: 0x006B83F0 (FUN_006B83F0)
+   * Mangled: ?ReCalcCurTargetElevation@CUnitMotion@Moho@@AAEXABV?$Vector3@M@Wm3@@@Z
+   *
+   * What it does:
+   * Samples map elevation at one target point and clamps upward to water level
+   * when water is enabled.
+   */
+  void CUnitMotion::ReCalcCurTargetElevation(const Wm3::Vector3f& targetPosition)
+  {
+    STIMap* const mapData = mUnit->SimulationRef->mMapData;
+    const CHeightField* const heightField = mapData->GetHeightField();
+
+    float targetElevation = 0.0f;
+    if (heightField != nullptr) {
+      targetElevation = heightField->GetElevation(targetPosition.x, targetPosition.z);
+    }
+
+    if (mapData->mWaterEnabled != 0u && mapData->mWaterElevation > targetElevation) {
+      targetElevation = mapData->mWaterElevation;
+    }
+
+    mTargetElevation = targetElevation;
   }
 
   /**
@@ -480,6 +673,32 @@ namespace moho
     mStateWordB0 = 0;
     mNextWaypoint = nullptr;
     mFollowingWaypoint = nullptr;
+  }
+
+  /**
+   * Address: 0x006B8590 (FUN_006B8590)
+   * Mangled: ?SetFacing@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
+   *
+   * What it does:
+   * Copies and normalizes one requested facing vector into formation-facing.
+   */
+  void CUnitMotion::SetFacing(const Wm3::Vector3f& facing)
+  {
+    mFormationVec = facing;
+    Wm3::Vector3f::Normalize(&mFormationVec);
+  }
+
+  /**
+   * Address: 0x006C35B0 (FUN_006C35B0, ?SetSplineData@CUnitMotion@Moho@@QAEXPBVCPathPoint@2@0@Z)
+   * Mangled: ?SetSplineData@CUnitMotion@Moho@@QAEXPBVCPathPoint@2@0@Z
+   *
+   * What it does:
+   * Stores current and look-ahead spline waypoint lanes for movement steering.
+   */
+  void CUnitMotion::SetSplineData(const CPathPoint* const nextWaypoint, const CPathPoint* const followingWaypoint)
+  {
+    mNextWaypoint = const_cast<CPathPoint*>(nextWaypoint);
+    mFollowingWaypoint = const_cast<CPathPoint*>(followingWaypoint);
   }
 
   /**
@@ -587,6 +806,120 @@ namespace moho
   }
 
   /**
+   * Address: 0x006B8920 (FUN_006B8920, ?SetNewTargetLayer@CUnitMotion@Moho@@QAEXW4ELayer@2@@Z)
+   * Mangled: ?SetNewTargetLayer@CUnitMotion@Moho@@QAEXW4ELayer@2@@Z
+   *
+   * What it does:
+   * Applies sub<->water vertical-transition side effects and writes one new
+   * target layer lane.
+   */
+  void CUnitMotion::SetNewTargetLayer(const ELayer newLayer)
+  {
+    Unit* const unit = mUnit;
+    const ELayer oldLayer = unit->mCurrentLayer;
+
+    if (oldLayer == LAYER_Sub) {
+      if (newLayer == LAYER_Water) {
+        unit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
+
+        const EUnitMotionVertEvent previousEvent = mVertEvent;
+        if (previousEvent != UMVE_Up) {
+          const char* oldEventName = UnitMotionVertEventToScriptString(previousEvent);
+          const char* newEventName = UnitMotionVertEventToScriptString(UMVE_Up);
+          mVertEvent = UMVE_Up;
+          unit->CallbackStr("OnMotionVertEventChange", &newEventName, &oldEventName);
+          mLayer = LAYER_Water;
+          return;
+        }
+      }
+    } else if (oldLayer == LAYER_Water && newLayer == LAYER_Sub) {
+      unit->UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
+      SetMotionVertEvent(UMVE_Down);
+    }
+
+    mLayer = newLayer;
+  }
+
+  /**
+   * Address: 0x006B92E0 (FUN_006B92E0, ?MoveTo@CUnitMotion@Moho@@AAEXAAVVTransform@2@M@Z)
+   * Mangled: ?MoveTo@CUnitMotion@Moho@@AAEXAAVVTransform@2@M@Z
+   *
+   * What it does:
+   * Normalizes one pending orientation quaternion, warns on invalid move
+   * payload lanes, writes pending transform, and emits one sim move log line.
+   */
+  void CUnitMotion::MoveTo(VTransform& transform, const float timeStep)
+  {
+    transform.orient_.Normalize();
+
+    const float pendingVelocityScale = 1.0f / timeStep;
+    const float orientationNormDelta = std::fabs(Wm3::Quaternionf::LengthSq(transform.orient_) - 1.0f);
+    if (!IsValidVector3f(transform.pos_) || orientationNormDelta >= kMoveToQuatUnitTolerance) {
+      gpg::Logf(
+        "Unit %s is attempting to move to an invalid coord",
+        mUnit->GetBlueprint()->mBlueprintId.c_str()
+      );
+    }
+
+    Entity& entity = *static_cast<Entity*>(mUnit);
+    entity.SetPendingTransform(transform, pendingVelocityScale);
+    mUnit->SimulationRef->Logf(
+      "  MoveTo(<%7.2f,%7.2f,%7.2f>)\n",
+      transform.pos_.x,
+      transform.pos_.y,
+      transform.pos_.z
+    );
+  }
+
+  /**
+   * Address: 0x006B93D0 (FUN_006B93D0, ?Warp@CUnitMotion@Moho@@QAEXABVVTransform@2@@Z)
+   *
+   * What it does:
+   * Writes immediate transform warp through owning unit/entity lanes, updates
+   * current target/elevation collision paths, and forces land-collision
+   * processing when the owner is on land layer.
+   */
+  void CUnitMotion::Warp(const VTransform& transform)
+  {
+    if (mUnit == nullptr) {
+      return;
+    }
+
+    Entity& entity = *static_cast<Entity*>(mUnit);
+    entity.SetPendingTransform(transform, 1.0f);
+    entity.AdvanceCoords();
+    entity.AdvanceCoords();
+
+    const Wm3::Vector3f zeroSteering{};
+    SetTarget(transform.pos_, zeroSteering, LAYER_None);
+    ReCalcCurTargetElevation(transform.pos_);
+    FindIntersectingRaisedPlatform();
+
+    if (mUnit->mCurrentLayer == LAYER_Land) {
+      mProcessSurfaceCollision = true;
+    }
+  }
+
+  /**
+   * Address: 0x006B9460 (FUN_006B9460)
+   * Mangled: ?SetImmediateVelocity@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@ABV?$Quaternion@M@4@@Z
+   *
+   * What it does:
+   * Resolves owner physics-body state and overwrites velocity/orientation lanes.
+   */
+  void CUnitMotion::SetImmediateVelocity(const Wm3::Vector3f& velocity, const Wm3::Quaternionf& orientation)
+  {
+    Entity& entity = *static_cast<Entity*>(mUnit);
+    SPhysBody* const body = entity.GetPhysBody(false);
+    if (body == nullptr) {
+      return;
+    }
+
+    body->mVelocity = velocity;
+    body->mOrientation = orientation;
+  }
+
+  /**
    * Address: 0x006B89B0 (FUN_006B89B0, ?AddRecoilImpulse@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
    *
    * What it does:
@@ -612,6 +945,147 @@ namespace moho
     mRecoilImpulse.x += (impulse.x - alignedImpulse.x) * kRecoilImpulseBlendFactor;
     mRecoilImpulse.y += (impulse.y - alignedImpulse.y) * kRecoilImpulseBlendFactor;
     mRecoilImpulse.z += (impulse.z - alignedImpulse.z) * kRecoilImpulseBlendFactor;
+  }
+
+  /**
+   * Address: 0x006B8F30 (FUN_006B8F30)
+   * Mangled: ?SetMotionHorzEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionHorzEvent@2@@Z
+   *
+   * What it does:
+   * Updates horizontal-motion event lane, emits callback, and refreshes intel
+   * when entering the stopped event.
+   */
+  void CUnitMotion::SetMotionHorzEvent(const EUnitMotionHorzEvent event)
+  {
+    const EUnitMotionHorzEvent previousEvent = mHorzEvent;
+    if (previousEvent == event) {
+      return;
+    }
+
+    const char* oldEventName = UnitMotionHorzEventToScriptString(previousEvent);
+    const char* newEventName = UnitMotionHorzEventToScriptString(event);
+    mHorzEvent = event;
+
+    mUnit->CallbackStr("OnMotionHorzEventChange", &newEventName, &oldEventName);
+    if (mHorzEvent == kUnitMotionHorzEventStopped) {
+      Entity& entity = *static_cast<Entity*>(mUnit);
+      entity.UpdateIntel();
+    }
+  }
+
+  /**
+   * Address: 0x006B8F70 (FUN_006B8F70)
+   * Mangled: ?SetMotionVertEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionVertEvent@2@@Z
+   *
+   * What it does:
+   * Updates vertical-motion event lane and emits change callback text.
+   */
+  void CUnitMotion::SetMotionVertEvent(const EUnitMotionVertEvent event)
+  {
+    const EUnitMotionVertEvent previousEvent = mVertEvent;
+    if (previousEvent == event) {
+      return;
+    }
+
+    const char* oldEventName = UnitMotionVertEventToScriptString(previousEvent);
+    const char* newEventName = UnitMotionVertEventToScriptString(event);
+    mVertEvent = event;
+    mUnit->CallbackStr("OnMotionVertEventChange", &newEventName, &oldEventName);
+  }
+
+  /**
+   * Address: 0x006B8FB0 (FUN_006B8FB0)
+   * Mangled: ?SetMotionTurnEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionTurnEvent@2@@Z
+   *
+   * What it does:
+   * Current binary implementation is a no-op lane.
+   */
+  void CUnitMotion::SetMotionTurnEvent(const EUnitMotionTurnEvent event)
+  {
+    (void)event;
+  }
+
+  /**
+   * Address: 0x006B8FF0 (FUN_006B8FF0)
+   * Mangled: ?SetMotionState@CUnitMotion@Moho@@AAEXW4EUnitMotionState@2@@Z
+   *
+   * What it does:
+   * Updates motion-state lane and emits `OnMotionStateChange` callback text.
+   */
+  void CUnitMotion::SetMotionState(const EUnitMotionState state)
+  {
+    const EUnitMotionState previousState = mMotionState;
+    if (previousState == state) {
+      return;
+    }
+
+    const char* oldStateName = UnitMotionStateToScriptString(previousState);
+    const char* newStateName = UnitMotionStateToScriptString(state);
+    mMotionState = state;
+    mUnit->CallbackStr("OnMotionStateChange", &newStateName, &oldStateName);
+  }
+
+  /**
+   * Address: 0x006B9570 (FUN_006B9570, ?NotifyDetached@CUnitMotion@Moho@@QAEXPAVEntity@2@_N@Z)
+   * Mangled: ?NotifyDetached@CUnitMotion@Moho@@QAEXPAVEntity@2@_N@Z
+   *
+   * What it does:
+   * Computes one detach-forward impulse from parent orientation, retargets unit
+   * motion, updates motion/layer script callbacks, and re-enables surface
+   * collision processing.
+   */
+  void CUnitMotion::NotifyDetached(Entity* const detachedFromEntity, const bool skipBallistic)
+  {
+    const Wm3::Vector3f detachForward = ForwardVectorFromOrientation(detachedFromEntity->Orientation);
+
+    Unit* const unit = mUnit;
+    const Wm3::Vector3f unitPosition = unit->GetPosition();
+
+    const Wm3::Vector3f newTarget{
+      unitPosition.x - detachForward.x,
+      unitPosition.y - detachForward.y,
+      unitPosition.z - detachForward.z,
+    };
+
+    const Wm3::Vector3f zeroSteering{};
+    SetTarget(newTarget, zeroSteering, LAYER_None);
+
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    if (blueprint && blueprint->Air.CanFly == 0u && !skipBallistic) {
+      const EUnitMotionState previousState = mMotionState;
+      if (previousState != kUnitMotionStateBallistic) {
+        const char* newStateName = UnitMotionStateToScriptString(kUnitMotionStateBallistic);
+        const char* oldStateName = UnitMotionStateToScriptString(previousState);
+        mMotionState = kUnitMotionStateBallistic;
+        unit->CallbackStr("OnMotionStateChange", &newStateName, &oldStateName);
+      }
+    } else {
+      const EUnitMotionState previousState = mMotionState;
+      if (previousState != kUnitMotionStateNone) {
+        const char* newStateName = UnitMotionStateToScriptString(kUnitMotionStateNone);
+        const char* oldStateName = UnitMotionStateToScriptString(previousState);
+        mMotionState = kUnitMotionStateNone;
+        unit->CallbackStr("OnMotionStateChange", &newStateName, &oldStateName);
+      }
+
+      if (skipBallistic) {
+        mProcessSurfaceCollision = true;
+        return;
+      }
+    }
+
+    const ELayer oldLayer = unit->mCurrentLayer;
+    unit->mCurrentLayer = LAYER_Air;
+    if (oldLayer != LAYER_Air) {
+      const char* newLayerName = Entity::LayerToString(LAYER_Air);
+      const char* oldLayerName =
+        (static_cast<std::uint32_t>(oldLayer) > static_cast<std::uint32_t>(LAYER_Orbit))
+          ? ""
+          : Entity::LayerToString(oldLayer);
+      unit->CallbackStr("OnLayerChange", &newLayerName, &oldLayerName);
+    }
+
+    mProcessSurfaceCollision = true;
   }
 
   /**
@@ -667,6 +1141,701 @@ namespace moho
   }
 
   /**
+   * Address: 0x006B9840 (FUN_006B9840, ?IsMoving@CUnitMotion@Moho@@QBE_NXZ)
+   * Mangled: ?IsMoving@CUnitMotion@Moho@@QBE_NXZ
+   *
+   * What it does:
+   * Returns true from physics-body speed for flying units, otherwise from
+   * spline waypoint presence.
+   */
+  bool CUnitMotion::IsMoving() const
+  {
+    if (mUnit->GetBlueprint()->Air.CanFly != 0u) {
+      SPhysBody* const body = static_cast<Entity*>(mUnit)->GetPhysBody(false);
+      const float speed = std::sqrt(
+        (body->mVelocity.x * body->mVelocity.x) +
+        (body->mVelocity.y * body->mVelocity.y) +
+        (body->mVelocity.z * body->mVelocity.z)
+      );
+      return speed > 0.001f;
+    }
+
+    return mNextWaypoint != nullptr;
+  }
+
+  /**
+   * Address: 0x006B98C0 (FUN_006B98C0, ?IsOnValidLayer@CUnitMotion@Moho@@QBE_NXZ)
+   * Mangled: ?IsOnValidLayer@CUnitMotion@Moho@@QBE_NXZ
+   *
+   * What it does:
+   * Validates the owner unit's current layer against blueprint motion type.
+   */
+  bool CUnitMotion::IsOnValidLayer() const
+  {
+    const ERuleBPUnitMovementType motionType = mUnit->GetBlueprint()->Physics.MotionType;
+    switch (mUnit->mCurrentLayer) {
+      case LAYER_Land:
+        return motionType == RULEUMT_Land || motionType == RULEUMT_AmphibiousFloating || motionType == RULEUMT_Amphibious
+               || motionType == RULEUMT_Biped || motionType == RULEUMT_Hover;
+      case LAYER_Seabed:
+        return motionType == RULEUMT_Amphibious;
+      case LAYER_Sub:
+        return motionType == RULEUMT_SurfacingSub;
+      case LAYER_Water:
+        return motionType == RULEUMT_Water || motionType == RULEUMT_AmphibiousFloating
+               || motionType == RULEUMT_SurfacingSub || motionType == RULEUMT_Hover;
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Address: 0x006BC8E0 (FUN_006BC8E0, ?GetElevation@CUnitMotion@Moho@@ABEMXZ)
+   * Mangled: ?GetElevation@CUnitMotion@Moho@@ABEMXZ
+   *
+   * What it does:
+   * Resolves current air-path elevation from carrier-mode and relative-height
+   * lanes using the owner's elevation attribute.
+   */
+  float CUnitMotion::GetElevation() const
+  {
+    constexpr float kCarrierRelativeHeightScale = 0.25f;
+
+    const float ownerElevation = mUnit->GetAttributes().spawnElevationOffset;
+    if (mCarrierEvent != kUnitMotionCarrierEventRelativeHeight) {
+      return ownerElevation + mRandomElevation;
+    }
+
+    if (mHeight == std::numeric_limits<float>::infinity()) {
+      return ownerElevation * kCarrierRelativeHeightScale;
+    }
+
+    if (mHeight <= mUnit->GetPosition().y) {
+      return ownerElevation * kCarrierRelativeHeightScale;
+    }
+
+    return mHeight - mTargetElevation;
+  }
+
+  /**
+   * Address: 0x006BC950 (FUN_006BC950, ?CalcWingedLift@CUnitMotion@Moho@@ABEMMM@Z)
+   * Mangled: ?CalcWingedLift@CUnitMotion@Moho@@ABEMMM@Z
+   *
+   * What it does:
+   * Converts wing-factor input into vertical lift with carrier/elevation-aware
+   * low-lift bias and max-lift clamp behavior.
+   */
+  float CUnitMotion::CalcWingedLift(const float maxLift, const float wingFactor) const
+  {
+    const float targetElevation = GetElevation();
+    const float lift = (wingFactor - 0.5f) * mUnit->GetBlueprint()->Air.LiftFactor;
+
+    if (lift <= 0.0f) {
+      const float halfTargetElevation = targetElevation * 0.5f;
+      if (halfTargetElevation > mCurElevation) {
+        return halfTargetElevation - mCurElevation;
+      }
+    } else if (maxLift <= lift) {
+      return maxLift;
+    }
+
+    return lift;
+  }
+
+  /**
+   * Address: 0x006BC820 (FUN_006BC820, ?ShouldHoverInsteadOfLand@CUnitMotion@Moho@@ABE_NXZ)
+   * Mangled: ?ShouldHoverInsteadOfLand@CUnitMotion@Moho@@ABE_NXZ
+   *
+   * What it does:
+   * Returns true when transport-hover constraints require remaining airborne
+   * rather than landing.
+   */
+  bool CUnitMotion::ShouldHoverInsteadOfLand() const
+  {
+    if (mUnit->GetBlueprint()->Air.TransportHoverHeight <= 0.0f) {
+      return false;
+    }
+
+    if (mUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+      return true;
+    }
+
+    IAiTransport* const transport = mUnit->AiTransport;
+    if (transport == nullptr) {
+      return false;
+    }
+
+    const EntitySetTemplate<Unit> loadedUnits = transport->TransportGetLoadedUnits(false);
+    return loadedUnits.begin() != loadedUnits.end();
+  }
+
+  /**
+   * Address: 0x006C2A40 (FUN_006C2A40, ?ProcessCommonMotionState@CUnitMotion@Moho@@AAEX_N@Z)
+   * Mangled: ?ProcessCommonMotionState@CUnitMotion@Moho@@AAEX_N@Z
+   *
+   * What it does:
+   * Updates horizontal movement event state from move-success and speed/target
+   * proximity checks.
+   */
+  void CUnitMotion::ProcessCommonMotionState(const bool moveSucceeded)
+  {
+    if (!moveSucceeded) {
+      if (mHorzEvent != kUnitMotionHorzEventStopped) {
+        SetMotionHorzEvent(kUnitMotionHorzEventStopped);
+      }
+      return;
+    }
+
+    Unit* const unit = mUnit;
+    const float speed = std::sqrt(
+      (mVelocity.x * mVelocity.x) +
+      (mVelocity.y * mVelocity.y) +
+      (mVelocity.z * mVelocity.z)
+    );
+
+    if (speed > unit->mInfoCache.mFormationTopSpeed * kCommonMoveNearStopSpeedScale) {
+      SetMotionHorzEvent(kUnitMotionHorzEventTopSpeed);
+      return;
+    }
+
+    const Wm3::Vector3f position = unit->GetPosition();
+    const float deltaX = mTargetPosition.x - position.x;
+    const float deltaZ = mTargetPosition.z - position.z;
+    const float targetDistance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
+    const float maxSpeed = unit->GetBlueprint()->Physics.MaxSpeed;
+    const bool isNearTarget = (unit->GetAttributes().moveSpeedMult * maxSpeed) > targetDistance;
+    const bool hasPendingStopWaypoint = (mNextWaypoint != nullptr && mNextWaypoint->mState == PPS_1);
+
+    if (mHorzEvent != kUnitMotionHorzEventStopped && (isNearTarget || hasPendingStopWaypoint)) {
+      SetMotionHorzEvent(kUnitMotionHorzEventStopping);
+    } else {
+      SetMotionHorzEvent(kUnitMotionHorzEventCruising);
+    }
+  }
+
+  /**
+   * Address: 0x006C2F00 (FUN_006C2F00, ?FindIntersectingRaisedPlatform@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+   * Mangled: ?FindIntersectingRaisedPlatform@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z
+   *
+   * What it does:
+   * Scans nearby weak unit candidates and keeps the closest alive unit whose
+   * blueprint defines raised platforms.
+   */
+  void CUnitMotion::FindIntersectingRaisedPlatform()
+  {
+    mRaisedPlatformUnit.ResetFromObject(nullptr);
+
+    CUnitMotionRaisedPlatformCandidatesRuntimeView& candidates = AsRaisedPlatformCandidatesRuntimeView(*this);
+    if (candidates.mBegin == nullptr || candidates.mEnd == nullptr || candidates.mEnd < candidates.mBegin || mUnit == nullptr) {
+      return;
+    }
+
+    const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
+    float nearestDistanceSq = std::numeric_limits<float>::infinity();
+
+    for (WeakPtr<Unit>* candidate = candidates.mBegin; candidate != candidates.mEnd; ++candidate) {
+      Unit* const platformUnit = candidate->GetObjectPtr();
+      if (platformUnit == nullptr || platformUnit->IsDead()) {
+        continue;
+      }
+
+      const RUnitBlueprint* const platformBlueprint = platformUnit->GetBlueprint();
+      if (platformBlueprint == nullptr || platformBlueprint->Physics.RaisedPlatforms.empty()) {
+        continue;
+      }
+
+      const Wm3::Vector3f platformPosition = platformUnit->GetPosition();
+      const float deltaX = ownerPosition.x - platformPosition.x;
+      const float deltaY = ownerPosition.y - platformPosition.y;
+      const float deltaZ = ownerPosition.z - platformPosition.z;
+      const float distanceSq = (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+      if (distanceSq < nearestDistanceSq) {
+        nearestDistanceSq = distanceSq;
+        mRaisedPlatformUnit.ResetFromObject(platformUnit);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x006C3220 (FUN_006C3220, ?HandleDivingAndSurfacing@CUnitMotion@Moho@@AAE_NXZ)
+   * Mangled: ?HandleDivingAndSurfacing@CUnitMotion@Moho@@AAE_NXZ
+   *
+   * What it does:
+   * Applies per-tick dive/surface depth updates for moving up/down states and
+   * finalizes the layer transition when the depth limit is reached.
+   */
+  bool CUnitMotion::HandleDivingAndSurfacing()
+  {
+    constexpr float kNoWaterElevation = -10000.0f;
+    constexpr float kSurfaceClearance = 0.25f;
+    constexpr float kDiveSpeedScale = 0.1f;
+    constexpr float kDiveSpeedMinFactor = 0.1f;
+    constexpr float kDiveCurveHalfPoint = 0.5f;
+    constexpr float kPi = 3.1415927f;
+
+    if (mUnit == nullptr) {
+      return false;
+    }
+
+    float diveDepthLimit = mUnit->GetAttributes().spawnElevationOffset;
+    if (diveDepthLimit == 0.0f) {
+      return false;
+    }
+
+    const bool movingUp = mUnit->IsUnitState(UNITSTATE_MovingUp);
+    const bool movingDown = mUnit->IsUnitState(UNITSTATE_MovingDown);
+    if (!movingUp && !movingDown) {
+      mDivingSpeed = 0.0f;
+      return false;
+    }
+
+    STIMap* const mapData = mUnit->SimulationRef->mMapData;
+    const CHeightField* const heightField = mapData ? mapData->GetHeightField() : nullptr;
+    const Wm3::Vector3f unitPosition = mUnit->GetPosition();
+    const float terrainElevation =
+      heightField ? heightField->GetElevation(unitPosition.x, unitPosition.z) : unitPosition.y;
+    const float waterElevation = (mapData && mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : kNoWaterElevation;
+
+    float surfaceDepthLimit = (terrainElevation + kSurfaceClearance) - waterElevation;
+    if (surfaceDepthLimit > 0.0f) {
+      surfaceDepthLimit = 0.0f;
+    }
+    if (surfaceDepthLimit > diveDepthLimit) {
+      diveDepthLimit = surfaceDepthLimit;
+    }
+
+    float depthPhase = std::fabs(mSubElevation / diveDepthLimit);
+    const float baseDiveSpeed = mUnit->GetBlueprint()->Physics.DiveSurfaceSpeed * kDiveSpeedScale;
+    if (depthPhase > kDiveCurveHalfPoint) {
+      depthPhase = 1.0f - depthPhase;
+    }
+
+    const float minDiveSpeed = baseDiveSpeed * kDiveSpeedMinFactor;
+    const float curveDiveSpeed = std::sin(depthPhase * kPi) * baseDiveSpeed;
+    mDivingSpeed = std::max(minDiveSpeed, curveDiveSpeed);
+
+    if (movingUp) {
+      float newSubElevation = mSubElevation + mDivingSpeed;
+      if (newSubElevation > 0.0f) {
+        newSubElevation = 0.0f;
+      }
+      mSubElevation = newSubElevation;
+      if (newSubElevation == 0.0f) {
+        mUnit->SetCurrentLayer(mLayer);
+        mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
+        SetMotionVertEvent(UMVE_None);
+      }
+      return true;
+    }
+
+    if (movingDown) {
+      const float newSubElevation = mSubElevation - mDivingSpeed;
+      if (newSubElevation > diveDepthLimit) {
+        mSubElevation = newSubElevation;
+      } else {
+        mSubElevation = diveDepthLimit;
+        mUnit->SetCurrentLayer(mLayer);
+        mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
+        SetMotionVertEvent(UMVE_Top);
+      }
+      return true;
+    }
+
+    return true;
+  }
+
+  /**
+   * Address: 0x006C3070 (FUN_006C3070, ?TransitionBetweenLayers@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+   * Mangled: ?TransitionBetweenLayers@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z
+   *
+   * What it does:
+   * Linearly blends position and shortest-path-normalized orientation between
+   * cached layer-transition endpoints, then advances transition tick progress.
+   */
+  void CUnitMotion::TransitionBetweenLayers(VTransform& transform)
+  {
+    const float transitionDurationTicks = mUnit->GetBlueprint()->Physics.LayerTransitionDuration * kLayerTransitionTickScale;
+    const float transitionProgress = mUnknownFloat11C / transitionDurationTicks;
+
+    transform.pos_.x = mLastTrans.pos_.x + ((mCurTrans.pos_.x - mLastTrans.pos_.x) * transitionProgress);
+    transform.pos_.y = mLastTrans.pos_.y + ((mCurTrans.pos_.y - mLastTrans.pos_.y) * transitionProgress);
+    transform.pos_.z = mLastTrans.pos_.z + ((mCurTrans.pos_.z - mLastTrans.pos_.z) * transitionProgress);
+    transform.orient_ = Wm3::Quaternionf::Nlerp(mLastTrans.orient_, mCurTrans.orient_, transitionProgress);
+
+    mUnknownFloat11C += 1.0f;
+    mProcessSurfaceCollision = false;
+    if (mUnknownFloat11C >= transitionDurationTicks) {
+      mUnknownFloat11C = 0.0f;
+    }
+  }
+
+  /**
+   * Address: 0x006BCA10 (FUN_006BCA10, ?CalcAirMovementDampingFactor@CUnitMotion@Moho@@AAEMABV?$Vector3@M@Wm3@@@Z)
+   * Mangled: ?CalcAirMovementDampingFactor@CUnitMotion@Moho@@AAEMABV?$Vector3@M@Wm3@@@Z
+   *
+   * What it does:
+   * Returns air movement damping from control-vector speed, formation top-speed
+   * cache, and air blueprint KMove/KMoveDamping coefficients.
+   */
+  float CUnitMotion::CalcAirMovementDampingFactor(const Wm3::Vector3f& movementVector)
+  {
+    if (mUnit->IsInCategory("TARGETCHASER")) {
+      return 1.0f;
+    }
+
+    const RUnitBlueprintAir& airBlueprint = mUnit->GetBlueprint()->Air;
+    const float kMove = airBlueprint.KMove;
+    const float topSpeed = mUnit->mInfoCache.mFormationTopSpeed;
+
+    float clampedSpeed = std::sqrt(
+      (movementVector.x * movementVector.x) +
+      (movementVector.y * movementVector.y) +
+      (movementVector.z * movementVector.z)
+    );
+    if (clampedSpeed > topSpeed) {
+      clampedSpeed = topSpeed;
+    }
+
+    float dampingDenominator = 1.0f;
+    if (clampedSpeed > 1.0f) {
+      dampingDenominator = clampedSpeed;
+    }
+
+    if (topSpeed <= dampingDenominator) {
+      return kMove;
+    }
+
+    float movementDamping = topSpeed / dampingDenominator;
+    if (movementDamping > airBlueprint.KMoveDamping) {
+      movementDamping = airBlueprint.KMoveDamping;
+    }
+
+    return movementDamping;
+  }
+
+  /**
+   * Address: 0x006BCB90 (FUN_006BCB90, ?CalcDesiredTargetElevation@CUnitMotion@Moho@@ABEMABVCAiTarget@2@ABV?$Vector3@M@Wm3@@@Z)
+   * Mangled: ?CalcDesiredTargetElevation@CUnitMotion@Moho@@ABEMABVCAiTarget@2@ABV?$Vector3@M@Wm3@@@Z
+   *
+   * What it does:
+   * Samples desired target elevation from target entity state and map
+   * elevation, then returns relative Y-offset from the owner unit position.
+   */
+  float CUnitMotion::CalcDesiredTargetElevation(const CAiTarget& target, const Wm3::Vector3f& offsetFromUnit) const
+  {
+    const Unit* const ownerUnit = mUnit;
+    const RUnitBlueprint* const ownerBlueprint = ownerUnit->GetBlueprint();
+    const RUnitBlueprintPhysics& ownerPhysics = ownerBlueprint->Physics;
+    const STIMap* const mapData = ownerUnit->SimulationRef->mMapData;
+    const CHeightField* const heightField = mapData->GetHeightField();
+
+    const Wm3::Vector3f ownerPosition = ownerUnit->GetPosition();
+    const Wm3::Vector3f samplePosition{
+      ownerPosition.x + offsetFromUnit.x,
+      ownerPosition.y + offsetFromUnit.y,
+      ownerPosition.z + offsetFromUnit.z,
+    };
+    const std::int32_t sampleX = static_cast<std::int32_t>(samplePosition.x);
+    const std::int32_t sampleZ = static_cast<std::int32_t>(samplePosition.z);
+
+    const float sampledElevation = (ownerBlueprint->Air.FlyInWater != 0u)
+                                     ? (static_cast<float>(heightField->GetHeightAt(sampleX, sampleZ)) * kHeightWordScale)
+                                     : heightField->GetElevation(static_cast<float>(sampleX), static_cast<float>(sampleZ));
+
+    if (Entity* const targetEntity = target.GetEntity();
+        targetEntity != nullptr && targetEntity->mCurrentLayer == LAYER_Air) {
+      float targetElevation = 0.0f;
+      if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
+        targetElevation = targetUnit->GetBlueprint()->Physics.Elevation + sampledElevation;
+      } else {
+        targetElevation = const_cast<CAiTarget&>(target).GetTargetPosGun(false).y;
+      }
+
+      const float minTargetElevation = (ownerPhysics.Elevation * kAirTargetMinimumElevationScale) + sampledElevation;
+      if (targetElevation < minTargetElevation) {
+        targetElevation = minTargetElevation;
+      }
+      return targetElevation - ownerUnit->GetPosition().y;
+    }
+
+    if (Entity* const targetEntity = target.GetEntity();
+        targetEntity != nullptr && targetEntity->mCurrentLayer == LAYER_Air) {
+      return 0.0f;
+    }
+
+    const float desiredOwnerElevation =
+      (static_cast<std::int32_t>(mCombatState) == 1) ? ownerPhysics.AttackElevation : ownerPhysics.Elevation;
+    return (sampledElevation + desiredOwnerElevation) - ownerUnit->GetPosition().y;
+  }
+
+  /**
+   * Address: 0x006BD7B0 (FUN_006BD7B0, Moho::CUnitMotion::CalcWingedOrientation)
+   *
+   * What it does:
+   * Builds the winged-air force vector and orthogonal basis from the unit's
+   * current motion inputs, then updates the accumulated wing orientation bias.
+   */
+  void CUnitMotion::CalcWingedOrientation(
+    const Wm3::Vector3f& referenceVector,
+    const Wm3::Vector3f& controlVector,
+    const Wm3::Vector3f& primaryVector,
+    const Wm3::Vector3f& fallbackVector,
+    VAxes3& outAxes,
+    Wm3::Vector3f& outForce,
+    float& wingOri
+  )
+  {
+    constexpr std::int32_t kAirCombatStateNone = 0;
+    constexpr std::int32_t kAirCombatStateCombat = 1;
+    constexpr std::int32_t kAirCombatStateNormalTurn = 2;
+    constexpr std::int32_t kAirCombatStateCombatTurn = 3;
+
+    Unit* const unit = mUnit;
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    const RUnitBlueprintPhysics& physics = blueprint->Physics;
+    const RUnitBlueprintAir& air = blueprint->Air;
+    const VTransform& transform = unit->GetTransform();
+    const std::int32_t combatState = static_cast<std::int32_t>(mCombatState);
+
+    const float currentOrientationY =
+      1.0f - (((transform.orient_.w * transform.orient_.w) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+
+    outAxes.vX = {1.0f, 0.0f, 0.0f};
+    outAxes.vY = {0.0f, 1.0f, 0.0f};
+    outAxes.vZ = {0.0f, 0.0f, 1.0f};
+
+    const float planarSpeed = std::sqrt((controlVector.z * controlVector.z) + (controlVector.x * controlVector.x));
+    const float limitedSpeed = std::min(planarSpeed, unit->mInfoCache.mFormationTopSpeed);
+    const bool isBelowStartTurnDistance = air.StartTurnDistance > limitedSpeed;
+    const bool isGuarding = unit->IsUnitState(UNITSTATE_Guarding);
+
+    Wm3::Vector3f selectedVector{};
+    if (!isBelowStartTurnDistance || isGuarding || combatState != kAirCombatStateNone) {
+      selectedVector = primaryVector;
+
+      outForce.x = referenceVector.x * limitedSpeed;
+      outForce.y = referenceVector.y * limitedSpeed;
+      outForce.z = referenceVector.z * limitedSpeed;
+
+      if (combatState <= kAirCombatStateNormalTurn) {
+        const float alignment =
+          (primaryVector.x * referenceVector.x) +
+          (primaryVector.y * referenceVector.y) +
+          (primaryVector.z * referenceVector.z);
+
+        float forceScale = 0.5f;
+        if (alignment > 0.5f) {
+          forceScale = alignment;
+        }
+
+        if (isGuarding && isBelowStartTurnDistance) {
+          float guardScale = limitedSpeed / air.StartTurnDistance;
+          if (guardScale > 0.5f) {
+            guardScale = 0.5f;
+          }
+
+          if (guardScale <= forceScale) {
+            forceScale = guardScale;
+          }
+        }
+
+        outForce.x *= forceScale;
+        outForce.y *= forceScale;
+        outForce.z *= forceScale;
+      }
+    } else {
+      selectedVector = fallbackVector;
+    }
+
+    outForce.y = CalcWingedLift(controlVector.y, currentOrientationY);
+
+    Wm3::Vector3f selectedPlanarVector{};
+    const float selectedPlanarLength = std::sqrt((selectedVector.z * selectedVector.z) + (selectedVector.x * selectedVector.x));
+    if (selectedPlanarLength > 0.0f) {
+      const float inverseLength = 1.0f / selectedPlanarLength;
+      selectedPlanarVector.x = selectedVector.x * inverseLength;
+      selectedPlanarVector.z = selectedVector.z * inverseLength;
+    }
+
+    const Wm3::Vector3f referenceVectorQuarterTurn = RotateByQuaternion(referenceVector, kWingedOrientationQuarterTurnRotation);
+    const float turnSign =
+      ((referenceVectorQuarterTurn.z * selectedVector.z) +
+       (referenceVectorQuarterTurn.y * selectedVector.y) +
+       (referenceVectorQuarterTurn.x * selectedVector.x)) >= 0.0f
+        ? 1.0f
+        : -1.0f;
+
+    float turnDelta = std::atan2(selectedPlanarVector.x, selectedPlanarVector.z) - std::atan2(referenceVector.x, referenceVector.z);
+    if (turnDelta <= 3.1415927f) {
+      if (turnDelta < -3.1415927f) {
+        turnDelta += 6.2831855f;
+      }
+    } else {
+      turnDelta -= 6.2831855f;
+    }
+
+    const float maxTurnSpeed = (combatState == kAirCombatStateCombatTurn) ? air.CombatTurnSpeed : air.TurnSpeed;
+    const float maxTurnDelta = maxTurnSpeed * 0.1f;
+    if (turnDelta > maxTurnDelta) {
+      turnDelta = maxTurnDelta;
+    }
+    if (turnDelta < -maxTurnDelta) {
+      turnDelta = -maxTurnDelta;
+    }
+
+    const float halfTurnAngle = turnDelta * 5.0f;
+    const Wm3::Quaternionf turnQuaternion{
+      0.0f,
+      std::cos(halfTurnAngle),
+      0.0f,
+      std::sin(halfTurnAngle),
+    };
+
+    Wm3::Vector3f rotatedSelectedVector = selectedVector;
+    const Wm3::Vector3f turnVector = RotateByQuaternion(selectedVector, turnQuaternion);
+    rotatedSelectedVector.x = turnVector.x;
+    rotatedSelectedVector.z = turnVector.z;
+    Wm3::Vector3f::Normalize(&rotatedSelectedVector);
+
+    const float turnScaleLimit = isBelowStartTurnDistance ? 0.5f : 1.0f;
+    float turnScale = limitedSpeed / air.StartTurnDistance;
+    if (turnScale > turnScaleLimit) {
+      turnScale = turnScaleLimit;
+    }
+
+    float bankFactor = air.BankFactor;
+    float forwardAlignment =
+      (rotatedSelectedVector.x * referenceVector.x) +
+      (rotatedSelectedVector.y * referenceVector.y) +
+      (rotatedSelectedVector.z * referenceVector.z);
+
+    if (combatState == kAirCombatStateNormalTurn) {
+      const float alignmentSquared = forwardAlignment * forwardAlignment;
+      forwardAlignment = alignmentSquared * alignmentSquared * alignmentSquared * alignmentSquared;
+      bankFactor = air.BankFactor * 10.0f;
+    }
+
+    if (forwardAlignment < 0.0f) {
+      forwardAlignment = 0.0f;
+    }
+
+    const float wingBlend = 1.0f - forwardAlignment;
+    const float elevationScale =
+      unit->IsUnitState(UNITSTATE_MovingDown) ? (mCurElevation / physics.Elevation) : 1.0f;
+    const float wingOrientationBias = ((elevationScale * wingBlend) * bankFactor) * turnScale * turnSign;
+    const float wingProjectionScale = rotatedSelectedVector.y * turnScale;
+
+    const Wm3::Vector3f wingProjection{
+      selectedPlanarVector.x * wingProjectionScale,
+      selectedPlanarVector.y * wingProjectionScale,
+      selectedPlanarVector.z * wingProjectionScale,
+    };
+
+    const Wm3::Vector3f wingAxis = RotateByQuaternion(rotatedSelectedVector, kWingedOrientationQuarterTurnRotation);
+    Wm3::Vector3f wingUpVector{
+      (wingAxis.y * wingOrientationBias) + 1.0f - wingProjection.y,
+      (wingOrientationBias * wingAxis.x) - wingProjection.x,
+      (wingOrientationBias * wingAxis.z) - wingProjection.z,
+    };
+
+    Wm3::Vector3f::Normalize(&wingUpVector);
+    outAxes.vY = wingUpVector;
+    outAxes.vZ = rotatedSelectedVector;
+
+    if (combatState == kAirCombatStateCombatTurn) {
+      wingOri += air.TightTurnMultiplier * wingBlend;
+    } else if (combatState == kAirCombatStateCombat || combatState == kAirCombatStateNormalTurn) {
+      wingOri += wingBlend;
+    }
+  }
+
+  /**
+   * Address: 0x006C1610 (FUN_006C1610, ?SnapToGround@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z)
+   * Mangled: ?SnapToGround@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z
+   *
+   * What it does:
+   * Samples four terrain/raised-platform points under one oriented footprint,
+   * recenters Y to their average, applies stand/sink correction, then tilts
+   * orientation to the recovered ground normal.
+   */
+  VTransform CUnitMotion::SnapToGround(const VTransform& sourceTransform)
+  {
+    VTransform snapped = sourceTransform;
+
+    Unit* const unit = mUnit;
+    if (unit == nullptr) {
+      return snapped;
+    }
+
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    Sim* const sim = unit->SimulationRef;
+    STIMap* const mapData = sim ? sim->mMapData : nullptr;
+    if (blueprint == nullptr || mapData == nullptr) {
+      return snapped;
+    }
+
+    const float halfSizeX = blueprint->mSizeX * 0.5f;
+    const float halfSizeZ = blueprint->mSizeZ * 0.5f;
+
+    Wm3::Vector3f frontRight = snapped.pos_ + RotateByQuaternion({halfSizeX, 0.0f, halfSizeZ}, snapped.orient_);
+    Wm3::Vector3f frontLeft = snapped.pos_ + RotateByQuaternion({-halfSizeX, 0.0f, halfSizeZ}, snapped.orient_);
+    Wm3::Vector3f backLeft = snapped.pos_ + RotateByQuaternion({-halfSizeX, 0.0f, -halfSizeZ}, snapped.orient_);
+    Wm3::Vector3f backRight = snapped.pos_ + RotateByQuaternion({halfSizeX, 0.0f, -halfSizeZ}, snapped.orient_);
+
+    const bool hoverMotion = blueprint->Physics.MotionType == RULEUMT_Hover;
+    frontRight.y = SampleSnapElevation(unit, frontRight, *mapData, hoverMotion);
+    frontLeft.y = SampleSnapElevation(unit, frontLeft, *mapData, hoverMotion);
+    backLeft.y = SampleSnapElevation(unit, backLeft, *mapData, hoverMotion);
+    backRight.y = SampleSnapElevation(unit, backRight, *mapData, hoverMotion);
+
+    snapped.pos_.y = (frontRight.y + frontLeft.y + backLeft.y + backRight.y) * 0.25f;
+
+    Wm3::Vector3f surfaceNormal{};
+    if (blueprint->Physics.StandUpright != 0u) {
+      surfaceNormal = {0.0f, 1.0f, 0.0f};
+    } else {
+      const float deltaDiagonalY0 = backRight.y - frontLeft.y;
+      const float deltaDiagonalY1 = backLeft.y - frontRight.y;
+      surfaceNormal.x =
+        (deltaDiagonalY0 * (backLeft.z - frontRight.z)) - ((backRight.z - frontLeft.z) * deltaDiagonalY1);
+      surfaceNormal.y =
+        ((backRight.z - frontLeft.z) * (backLeft.x - frontRight.x)) -
+        ((backLeft.z - frontRight.z) * (backRight.x - frontLeft.x));
+      surfaceNormal.z =
+        (deltaDiagonalY1 * (backRight.x - frontLeft.x)) - (deltaDiagonalY0 * (backLeft.x - frontRight.x));
+    }
+
+    if (blueprint->Physics.StandUpright != 0u || blueprint->Physics.SinkLower != 0u) {
+      const CHeightField* const heightField = mapData->GetHeightField();
+      const float centerElevation =
+        heightField ? heightField->GetElevation(snapped.pos_.x, snapped.pos_.z) : snapped.pos_.y;
+
+      float minElevation = std::min(backRight.y, backLeft.y);
+      minElevation = std::min(minElevation, std::min(frontLeft.y, frontRight.y));
+      minElevation = std::min(minElevation, centerElevation);
+
+      float maxElevation = std::max(backRight.y, backLeft.y);
+      maxElevation = std::max(maxElevation, std::max(frontLeft.y, frontRight.y));
+      maxElevation = std::max(maxElevation, centerElevation);
+
+      snapped.pos_.y -= (maxElevation - minElevation) * 0.25f;
+    }
+
+    if (hoverMotion) {
+      snapped.pos_.y += unit->GetAttributes().spawnElevationOffset;
+      CUnitMotion* const unitMotion = unit->UnitMotion;
+      if (unitMotion != nullptr) {
+        surfaceNormal.x += unitMotion->mVectorC0.x + unitMotion->mVectorD8.x;
+        surfaceNormal.y += unitMotion->mVectorC0.y + unitMotion->mVectorD8.y;
+        surfaceNormal.z += unitMotion->mVectorC0.z + unitMotion->mVectorD8.z;
+      }
+    }
+
+    COORDS_Tilt(&snapped.orient_, surfaceNormal);
+    return snapped;
+  }
+
+  /**
    * Address: 0x006B9940 (FUN_006B9940, ?ProcessFuelLevels@CUnitMotion@Moho@@AAEXXZ)
    *
    * What it does:
@@ -718,8 +1887,8 @@ namespace moho
             CSimArmyEconomyInfo* const economy = unit->ArmyRef ? unit->ArmyRef->GetEconomy() : nullptr;
             ReplaceEconomyRequestPointer(mEconomyRequest, CreateEconomyRequest(mRepairConsumption, economy));
 
-            unit->MaintainenceCostEnergy = mRepairConsumption.energy;
-            unit->MaintainenceCostMass = mRepairConsumption.mass;
+            unit->SharedEconomyRateEnergy = mRepairConsumption.energy;
+            unit->SharedEconomyRateMass = mRepairConsumption.mass;
           }
         }
       } else {

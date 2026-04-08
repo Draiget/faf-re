@@ -4,7 +4,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiBrain.h"
@@ -12,6 +16,7 @@
 #include "moho/console/CVarAccess.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/math/Vector2f.h"
+#include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimConVarBase.h"
@@ -26,6 +31,56 @@ using namespace moho;
 namespace
 {
   using UnitVector = gpg::core::FastVectorN<Unit*, 10>;
+
+  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
+  {
+    std::string path("Instance Counts_");
+    if (!rawTypeName) {
+      return path;
+    }
+
+    for (const char* it = rawTypeName; *it != '\0'; ++it) {
+      if (*it != '_') {
+        path.push_back(*it);
+      }
+    }
+    return path;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveTaskType()
+  {
+    if (!CTask::sType) {
+      CTask::sType = gpg::LookupRType(typeid(CTask));
+    }
+    return CTask::sType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveVector3fType()
+  {
+    static gpg::RType* cachedType = nullptr;
+    if (!cachedType) {
+      cachedType = gpg::LookupRType(typeid(Wm3::Vector3f));
+    }
+    return cachedType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveELayerType()
+  {
+    static gpg::RType* cachedType = nullptr;
+    if (!cachedType) {
+      cachedType = gpg::LookupRType(typeid(ELayer));
+    }
+    return cachedType;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveSCollisionInfoType()
+  {
+    static gpg::RType* cachedType = nullptr;
+    if (!cachedType) {
+      cachedType = gpg::LookupRType(typeid(SCollisionInfo));
+    }
+    return cachedType;
+  }
 
   [[nodiscard]] bool IsAtPosition(const Unit* unit, const Wm3::Vector3f& target, const float tolerance) noexcept
   {
@@ -840,6 +895,27 @@ namespace
 gpg::RType* CAiSteeringImpl::sType = nullptr;
 
 /**
+ * Address: 0x005D3F20 (FUN_005D3F20, Moho::InstanceCounter<Moho::CAiSteeringImpl>::GetStatItem)
+ *
+ * What it does:
+ * Lazily resolves and caches the engine stat slot used for CAiSteeringImpl
+ * instance counting (`Instance Counts_<type-name-without-underscores>`).
+ */
+template <>
+moho::StatItem* moho::InstanceCounter<moho::CAiSteeringImpl>::GetStatItem()
+{
+  static moho::StatItem* sStatItem = nullptr;
+  if (sStatItem) {
+    return sStatItem;
+  }
+
+  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CAiSteeringImpl).name());
+  moho::EngineStats* const engineStats = moho::GetEngineStats();
+  sStatItem = engineStats->GetItem(statPath.c_str(), true);
+  return sStatItem;
+}
+
+/**
  * Address: 0x005D2670 (FUN_005D2670, reflection default-construct path)
  */
 CAiSteeringImpl::CAiSteeringImpl()
@@ -897,6 +973,158 @@ CAiSteeringImpl::~CAiSteeringImpl()
     mPath = nullptr;
   }
   ResetCollisionInfo(mCollisionInfo);
+}
+
+/**
+ * Address: 0x005D48E0 (FUN_005D48E0, Moho::CAiSteeringImpl::MemberDeserialize)
+ *
+ * What it does:
+ * Loads steering runtime fields from one archive lane in serializer order.
+ */
+void CAiSteeringImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+
+  gpg::RType* const taskType = ResolveTaskType();
+  GPG_ASSERT(taskType != nullptr);
+  if (!taskType) {
+    return;
+  }
+  archive->Read(taskType, static_cast<CTask*>(this), ownerRef);
+
+  CAiPathSpline* loadedPath = nullptr;
+  archive->ReadPointerOwned_CAiPathSpline(&loadedPath, &ownerRef);
+  CAiPathSpline* const previousPath = mPath;
+  mPath = loadedPath;
+  if (previousPath) {
+    previousPath->~CAiPathSpline();
+  }
+
+  archive->ReadPointer_Unit(&mOwnerUnit, &ownerRef);
+  archive->ReadUInt(reinterpret_cast<unsigned int*>(&mWaypointCount));
+
+  gpg::RType* const vector3Type = ResolveVector3fType();
+  GPG_ASSERT(vector3Type != nullptr);
+  if (!vector3Type) {
+    return;
+  }
+
+  Wm3::Vector3f overflowWaypointSink = Wm3::Vector3f::Zero();
+  const std::uint32_t waypointCount = static_cast<std::uint32_t>(mWaypointCount);
+  for (std::uint32_t index = 0; index < waypointCount; ++index) {
+    void* const waypointTarget =
+      (index < 4u) ? static_cast<void*>(&mWaypoints[index]) : static_cast<void*>(&overflowWaypointSink);
+    archive->Read(vector3Type, waypointTarget, ownerRef);
+  }
+
+  archive->ReadUInt(reinterpret_cast<unsigned int*>(&mCurrentWaypointIndex));
+
+  gpg::RType* const layerType = ResolveELayerType();
+  GPG_ASSERT(layerType != nullptr);
+  if (!layerType) {
+    return;
+  }
+  archive->Read(layerType, &mMovementLayer, ownerRef);
+
+  archive->ReadPointer_CUnitMotion(&mUnitMotion, &ownerRef);
+
+  gpg::RType* const collisionInfoType = ResolveSCollisionInfoType();
+  GPG_ASSERT(collisionInfoType != nullptr);
+  if (!collisionInfoType) {
+    return;
+  }
+  archive->Read(collisionInfoType, &mCollisionInfo, ownerRef);
+
+  archive->Read(vector3Type, &mCollisionAvoidTarget, ownerRef);
+  archive->Read(vector3Type, &mDestination, ownerRef);
+
+  bool flag = false;
+  archive->ReadBool(&flag);
+  mNeedsWaypointRefresh = static_cast<std::uint8_t>(flag ? 1u : 0u);
+  archive->ReadBool(&flag);
+  mTopSpeedFromCalc1 = static_cast<std::uint8_t>(flag ? 1u : 0u);
+  archive->ReadBool(&flag);
+  mTopSpeedFromCalc2 = static_cast<std::uint8_t>(flag ? 1u : 0u);
+  archive->ReadBool(&flag);
+  mForceTopSpeed = static_cast<std::uint8_t>(flag ? 1u : 0u);
+  archive->ReadBool(&flag);
+  mPausedForStateTransition = static_cast<std::uint8_t>(flag ? 1u : 0u);
+}
+
+/**
+ * Address: 0x005D4B50 (FUN_005D4B50, Moho::CAiSteeringImpl::MemberSerialize)
+ *
+ * What it does:
+ * Writes steering runtime fields into one write-archive lane in the same order
+ * as `MemberDeserialize`.
+ */
+void CAiSteeringImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+
+  gpg::RType* const taskType = ResolveTaskType();
+  GPG_ASSERT(taskType != nullptr);
+  if (!taskType) {
+    return;
+  }
+  archive->Write(taskType, static_cast<const CTask*>(this), ownerRef);
+
+  gpg::RRef pathRef{};
+  gpg::RRef_CAiPathSpline(&pathRef, mPath);
+  gpg::WriteRawPointer(archive, pathRef, gpg::TrackedPointerState::Owned, ownerRef);
+
+  gpg::RRef unitRef{};
+  gpg::RRef_Unit(&unitRef, mOwnerUnit);
+  gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+  archive->WriteUInt(static_cast<unsigned int>(mWaypointCount));
+
+  gpg::RType* const vector3Type = ResolveVector3fType();
+  GPG_ASSERT(vector3Type != nullptr);
+  if (!vector3Type) {
+    return;
+  }
+
+  const std::uint32_t waypointCount = static_cast<std::uint32_t>(mWaypointCount);
+  for (std::uint32_t index = 0; index < waypointCount; ++index) {
+    archive->Write(vector3Type, &mWaypoints[index], ownerRef);
+  }
+
+  archive->WriteUInt(static_cast<unsigned int>(mCurrentWaypointIndex));
+
+  gpg::RType* const layerType = ResolveELayerType();
+  GPG_ASSERT(layerType != nullptr);
+  if (!layerType) {
+    return;
+  }
+  archive->Write(layerType, &mMovementLayer, ownerRef);
+
+  gpg::RRef motionRef{};
+  gpg::RRef_CUnitMotion(&motionRef, mUnitMotion);
+  gpg::WriteRawPointer(archive, motionRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+  gpg::RType* const collisionInfoType = ResolveSCollisionInfoType();
+  GPG_ASSERT(collisionInfoType != nullptr);
+  if (!collisionInfoType) {
+    return;
+  }
+  archive->Write(collisionInfoType, &mCollisionInfo, ownerRef);
+  archive->Write(vector3Type, &mCollisionAvoidTarget, ownerRef);
+  archive->Write(vector3Type, &mDestination, ownerRef);
+
+  archive->WriteBool(mNeedsWaypointRefresh != 0u);
+  archive->WriteBool(mTopSpeedFromCalc1 != 0u);
+  archive->WriteBool(mTopSpeedFromCalc2 != 0u);
+  archive->WriteBool(mForceTopSpeed != 0u);
+  archive->WriteBool(mPausedForStateTransition != 0u);
 }
 
 /**

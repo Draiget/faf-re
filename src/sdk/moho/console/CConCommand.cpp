@@ -23,10 +23,15 @@
 #include "moho/core/Thread.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/SCR_String.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/IConOutputHandler.h"
+#include "moho/misc/Stats.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/render/RCamManager.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/sim/CWldSession.h"
@@ -38,12 +43,28 @@
 
 using namespace moho;
 
+namespace moho
+{
+  void WIN_AppRequestExit();
+  void WIN_ToggleLogDialog();
+  void WIN_ShowLogDialog();
+  void CON_WxInputBox(void* commandArgs);
+  extern bool sPathDebuggerEnabled;
+}
+
+namespace moho
+{
+  [[nodiscard]] msvc8::string ToString(const Wm3::Vec3f& value);
+}
+
 bool moho::con_TestVarBool = false;
 int moho::con_TestVar = 0;
 std::uint8_t moho::con_TestVarUByte = 0;
 float moho::con_TestVarFloat = 0.0f;
 msvc8::string moho::con_TestVarStr;
+bool moho::snd_ExtraDoWorkCalls = false;
 int moho::recon_debug = 0;
+bool moho::sPathDebuggerEnabled = false;
 
 namespace
 {
@@ -53,10 +74,18 @@ namespace
   constexpr const char* kConExecuteSaveHelpText =
     "ConExecuteSave('command string') -- Perform a console command, saved to stack";
   constexpr const char* kNoSessionLocToken = "<LOC _No_session>";
+  constexpr const char* kUIRenameSelectionRequiredLocToken =
+    "<LOC Engine0024>You must have a unit selected to rename.";
+  constexpr const char* kUIRenameSingleSelectionLocToken =
+    "<LOC Engine0025>You may only name one unit at a time, please limit your selection to one unit.";
   constexpr const char* kUIMakeSelectionSetUsageText =
     "USAGE: UI_MakeSelectionSet [name] - create a named selection set based on the current selection";
   constexpr const char* kUIApplySelectionSetUsageText =
     "USAGE: UI_ApplySelectionSet [name] - apply a named selections et";
+  constexpr const char* kPathDebuggerModulePath = "/lua/debug/pathdebugger.lua";
+  constexpr const char* kPathDebuggerLoadErrorText = "failed to load \"/lua/debug/pathdebugger.lua\" module";
+  constexpr const char* kPathDebuggerCreateUiMethodName = "CreateUI";
+  constexpr const char* kPathDebuggerDestroyUiMethodName = "DestroyUI";
 
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
 
@@ -91,6 +120,40 @@ namespace
     msvc8::string* end;
     msvc8::string* cap;
   };
+
+  struct CameraImplDumpRuntimeView
+  {
+    std::uint8_t mUnknown00To343[0x344]{};
+    float mFarPitch = 0.0f; // +0x344
+    std::uint8_t mUnknown348To34B[0x4]{};
+    float mHeading = 0.0f; // +0x34C
+    std::uint8_t mUnknown350To353[0x4]{};
+    float mTargetZoom = 0.0f; // +0x354
+    std::uint8_t mUnknown358To37F[0x28]{};
+    Wm3::Vec3f mTargetLocation{}; // +0x380
+
+    [[nodiscard]] static const CameraImplDumpRuntimeView* FromCamera(const moho::CameraImpl* const camera) noexcept
+    {
+      return reinterpret_cast<const CameraImplDumpRuntimeView*>(camera);
+    }
+  };
+
+  static_assert(
+    offsetof(CameraImplDumpRuntimeView, mFarPitch) == 0x344,
+    "CameraImplDumpRuntimeView::mFarPitch offset must be 0x344"
+  );
+  static_assert(
+    offsetof(CameraImplDumpRuntimeView, mHeading) == 0x34C,
+    "CameraImplDumpRuntimeView::mHeading offset must be 0x34C"
+  );
+  static_assert(
+    offsetof(CameraImplDumpRuntimeView, mTargetZoom) == 0x354,
+    "CameraImplDumpRuntimeView::mTargetZoom offset must be 0x354"
+  );
+  static_assert(
+    offsetof(CameraImplDumpRuntimeView, mTargetLocation) == 0x380,
+    "CameraImplDumpRuntimeView::mTargetLocation offset must be 0x380"
+  );
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
@@ -152,6 +215,44 @@ namespace
   [[nodiscard]] const STIMap* ResolveTerrainMapForTeleport(const CWldSession* const session) noexcept
   {
     return reinterpret_cast<const STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+  }
+
+  void PrintLocalizedConsoleLine(const char* const locToken)
+  {
+    const msvc8::string localizedText = Loc(USER_GetLuaState(), locToken != nullptr ? locToken : "");
+    CON_Printf("%s", localizedText.c_str());
+  }
+
+  /**
+   * Address: 0x0083EAF0 (FUN_0083EAF0)
+   *
+   * What it does:
+   * Imports `/lua/ui/game/rename.lua` and invokes
+   * `ShowRenameDialog(currentName)` while in `UIS_game`.
+   */
+  void ShowRenameDialogLua(const char* const currentName)
+  {
+    if (sUIState != UIS_game) {
+      return;
+    }
+
+    CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+    LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
+    if (state == nullptr) {
+      return;
+    }
+
+    try {
+      LuaPlus::LuaObject renameModule = SCR_Import(state, "/lua/ui/game/rename.lua");
+      LuaPlus::LuaObject showRenameDialogObject = renameModule["ShowRenameDialog"];
+      LuaPlus::LuaFunction<void> showRenameDialogFn(showRenameDialogObject);
+      showRenameDialogFn(currentName != nullptr ? currentName : "");
+    } catch (const std::exception& exception) {
+      gpg::Warnf(
+        "Error running '/lua/ui/game/rename.lua: %s",
+        exception.what() != nullptr ? exception.what() : ""
+      );
+    }
   }
 
   /**
@@ -1185,6 +1286,53 @@ void moho::CON_ListCommands(void* const commandArgs)
 }
 
 /**
+ * Address: 0x004D3FC0 (FUN_004D3FC0, Moho::CON_GetVersion)
+ *
+ * What it does:
+ * Prints the current engine-version string to console output.
+ */
+void moho::CON_GetVersion(void* const commandArgs)
+{
+  (void)commandArgs;
+  const msvc8::string engineVersion = moho::GetEngineVersion();
+  CON_Printf("%s", engineVersion.c_str());
+}
+
+/**
+ * Address: 0x004CDC90 (FUN_004CDC90, Moho::CON_LUADOC)
+ *
+ * What it does:
+ * Iterates all registered Lua init-form sets and dumps their binder docs.
+ */
+void moho::CON_LUADOC(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  for (CScrLuaInitFormSet* initSet = CScrLuaInitFormSet::sSets; initSet != nullptr; initSet = initSet->mNextSet) {
+    initSet->DumpDocs();
+  }
+}
+
+/**
+ * Address: 0x008C6740 (FUN_008C6740, Moho::Con_LUA)
+ *
+ * What it does:
+ * Joins command tokens from index 1 into one Lua chunk, echoes it to console,
+ * and executes it in the user Lua state.
+ */
+void moho::CON_LUA(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 2u) {
+    return;
+  }
+
+  const msvc8::string scriptText = JoinConCommandTokens(args, 1u);
+  CON_Printf("%s", scriptText.c_str());
+  (void)SCR_LuaDoString(scriptText.c_str(), USER_GetLuaState());
+}
+
+/**
  * Address: 0x0047A670 (FUN_0047A670, Moho::CON_Log)
  *
  * What it does:
@@ -1256,6 +1404,180 @@ void moho::CON_Debug_Throw(void* const commandArgs)
 {
   (void)commandArgs;
   throw std::exception("Hope you really wanted to do this...");
+}
+
+/**
+ * Address: 0x00500AF0 (FUN_00500AF0, Moho::CON_p4_Edit)
+ *
+ * What it does:
+ * Emits one no-support line when called with a filespec argument; otherwise
+ * prints command usage.
+ */
+void moho::CON_p4_Edit(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  const msvc8::string* const commandToken = args.At(0u);
+  GPG_ASSERT(commandToken != nullptr);
+
+  if (commandToken != nullptr && args.Count() >= 2u) {
+    CON_Printf("No P4 support in this build.");
+    return;
+  }
+
+  CON_Printf("usage: %s <filespec>", commandToken->c_str());
+}
+
+/**
+ * Address: 0x00500B60 (FUN_00500B60, Moho::CON_p4_IsOpenedForEdit)
+ *
+ * What it does:
+ * Emits one no-support line when called with a filespec argument; otherwise
+ * prints command usage.
+ */
+void moho::CON_p4_IsOpenedForEdit(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  const msvc8::string* const commandToken = args.At(0u);
+  GPG_ASSERT(commandToken != nullptr);
+
+  if (commandToken != nullptr && args.Count() >= 2u) {
+    CON_Printf("No P4 support in this build.");
+    return;
+  }
+
+  CON_Printf("usage: %s <filespec> [user]", commandToken->c_str());
+}
+
+/**
+ * Address: 0x007AE040 (FUN_007AE040, Moho::CON_DumpCamera)
+ *
+ * What it does:
+ * Logs active world-camera target position, heading/far-pitch orientation,
+ * and target zoom.
+ */
+void moho::CON_DumpCamera(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  RCamManager* const cameraManager = CAM_GetManager();
+  CameraImpl* const camera = cameraManager != nullptr ? cameraManager->GetCamera("WorldCamera") : nullptr;
+  if (camera == nullptr) {
+    return;
+  }
+
+  gpg::Logf("Camera:");
+
+  const CameraImplDumpRuntimeView* const cameraView = CameraImplDumpRuntimeView::FromCamera(camera);
+  const msvc8::string targetPositionText = moho::ToString(cameraView->mTargetLocation);
+  gpg::Logf("  TargetPos: %s", targetPositionText.c_str());
+  gpg::Logf("  Orientation: %f, %f, 0.0", cameraView->mHeading, cameraView->mFarPitch);
+  gpg::Logf("  Zoom: %f", cameraView->mTargetZoom);
+}
+
+/**
+ * Address: 0x00834610 (FUN_00834610, Moho::CON_UI_SetSkin)
+ *
+ * What it does:
+ * Imports `uiutil.lua` and invokes `SetCurrentSkin(name)` when a second
+ * command token is present.
+ */
+void moho::CON_UI_SetSkin(void* const commandArgs)
+{
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 2u) {
+    return;
+  }
+
+  LuaPlus::LuaObject uiUtilModule = SCR_Import(state, "/lua/ui/uiutil.lua");
+  LuaPlus::LuaObject setCurrentSkinObject = uiUtilModule["SetCurrentSkin"];
+  LuaPlus::LuaFunction<void> setCurrentSkin(setCurrentSkinObject);
+
+  const msvc8::string* const skinToken = args.At(1);
+  setCurrentSkin(skinToken != nullptr ? skinToken->c_str() : "");
+}
+
+/**
+ * Address: 0x00834700 (FUN_00834700, Moho::UI_RotateSkin)
+ *
+ * What it does:
+ * Imports `uiutil.lua` and invokes `RotateSkin(direction)` where `direction`
+ * defaults to `"+"` when no argument token is provided.
+ */
+void moho::UI_RotateSkin(void* const commandArgs)
+{
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  LuaPlus::LuaObject uiUtilModule = SCR_Import(state, "/lua/ui/uiutil.lua");
+  LuaPlus::LuaObject rotateSkinObject = uiUtilModule["RotateSkin"];
+  LuaPlus::LuaFunction<void> rotateSkin(rotateSkinObject);
+
+  msvc8::string direction("+");
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (const msvc8::string* const argDirection = args.At(1); argDirection != nullptr) {
+    direction.assign_owned(argDirection->c_str());
+  }
+
+  rotateSkin(direction.c_str());
+}
+
+/**
+ * Address: 0x00834860 (FUN_00834860, Moho::UI_RotateLayout)
+ *
+ * What it does:
+ * Imports `uiutil.lua` and invokes `RotateLayout(direction)` where
+ * `direction` defaults to `"+"` when no argument token is provided.
+ */
+void moho::UI_RotateLayout(void* const commandArgs)
+{
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  LuaPlus::LuaObject uiUtilModule = SCR_Import(state, "/lua/ui/uiutil.lua");
+  LuaPlus::LuaObject rotateLayoutObject = uiUtilModule["RotateLayout"];
+  LuaPlus::LuaFunction<void> rotateLayout(rotateLayoutObject);
+
+  msvc8::string direction("+");
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (const msvc8::string* const argDirection = args.At(1); argDirection != nullptr) {
+    direction.assign_owned(argDirection->c_str());
+  }
+
+  rotateLayout(direction.c_str());
+}
+
+/**
+ * Address: 0x008349D0 (FUN_008349D0, Moho::CON_UI_ToggleGamePanels)
+ *
+ * What it does:
+ * Imports `gamemain.lua` and invokes `HideGameUI()` with no arguments.
+ */
+void moho::CON_UI_ToggleGamePanels(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  LuaPlus::LuaObject gameMainModule = SCR_Import(state, "/lua/ui/game/gamemain.lua");
+  LuaPlus::LuaObject hideGameUiObject = gameMainModule["HideGameUI"];
+  LuaPlus::LuaFunction<void> hideGameUi(hideGameUiObject);
+  hideGameUi();
 }
 
 /**
@@ -1331,6 +1653,114 @@ void moho::UI_ApplySelectionSet(void* const commandArgs)
 }
 
 /**
+ * Address: 0x00834DA0 (FUN_00834DA0, Moho::CON_UI_CreateHead1Map)
+ *
+ * What it does:
+ * Imports `multihead.lua` and invokes `CreateSecondView()`.
+ */
+void moho::CON_UI_CreateHead1Map(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  LuaPlus::LuaObject multiHeadModule = SCR_Import(state, "/lua/ui/game/multihead.lua");
+  LuaPlus::LuaObject createSecondViewObject = multiHeadModule["CreateSecondView"];
+  LuaPlus::LuaFunction<void> createSecondView(createSecondViewObject);
+  createSecondView();
+}
+
+/**
+ * Address: 0x00834E50 (FUN_00834E50, Moho::SetFocusArmy)
+ *
+ * What it does:
+ * Parses one focus-army index argument and requests focus update on active
+ * world session; otherwise prints syntax/no-session feedback.
+ */
+void moho::SetFocusArmy(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() == 2u) {
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session != nullptr) {
+      session->RequestFocusArmy(ParseIntToken(args.At(1)));
+      return;
+    }
+
+    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    CON_Printf("%s", noSessionText.c_str());
+    return;
+  }
+
+  const msvc8::string* const commandNameToken = args.At(0);
+  const char* const commandName = commandNameToken != nullptr ? commandNameToken->c_str() : "SetFocusArmy";
+  CON_Printf("syntax: %s <zero based army index or -1>", commandName);
+}
+
+/**
+ * Address: 0x00835370 (FUN_00835370, Moho::UI_Lua)
+ *
+ * What it does:
+ * Joins command tokens from index 1 and executes the Lua text in the active
+ * UI manager state.
+ */
+void moho::UI_Lua(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 2u) {
+    return;
+  }
+
+  const msvc8::string scriptText = JoinConCommandTokens(args, 1u);
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  if (uiManager != nullptr && uiManager->mLuaState != nullptr) {
+    (void)SCR_LuaDoString(scriptText.c_str(), uiManager->mLuaState);
+  }
+}
+
+/**
+ * Address: 0x00835830 (FUN_00835830, Moho::UI_ShowRenameDialog)
+ *
+ * What it does:
+ * Validates world-session selection constraints, prints localized console
+ * feedback for invalid selection states, and opens rename dialog for one
+ * selected user-unit.
+ */
+void moho::UI_ShowRenameDialog()
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    PrintLocalizedConsoleLine(kNoSessionLocToken);
+    return;
+  }
+
+  if (session->mSelection.mSize == 0u) {
+    PrintLocalizedConsoleLine(kUIRenameSelectionRequiredLocToken);
+    return;
+  }
+
+  if (session->mSelection.mSize > 1u) {
+    PrintLocalizedConsoleLine(kUIRenameSingleSelectionLocToken);
+    return;
+  }
+
+  msvc8::vector<UserUnit*> selectedUnits;
+  session->GetSelectionUnits(selectedUnits);
+
+  UserUnit* const selectedUnit = selectedUnits.size() != 0u ? selectedUnits[0] : nullptr;
+  if (selectedUnit == nullptr) {
+    PrintLocalizedConsoleLine(kUIRenameSelectionRequiredLocToken);
+    return;
+  }
+
+  ShowRenameDialogLua(selectedUnit->GetCustomName());
+}
+
+/**
  * Address: 0x007B5A40 (FUN_007B5A40, Moho::CON_PopupCreateUnitMenu)
  *
  * What it does:
@@ -1357,6 +1787,74 @@ void moho::CON_PopupCreateUnitMenu(void* const commandArgs)
   LuaPlus::LuaObject createDialogObject = moduleObject["CreateDialog"];
   LuaPlus::LuaFunction<> createDialogFunction(createDialogObject);
   createDialogFunction(session->CursorScreenPos.x, session->CursorScreenPos.y);
+}
+
+/**
+ * Address: 0x007B60F0 (FUN_007B60F0, Moho::CON_PathDebug)
+ *
+ * What it does:
+ * Imports path debugger UI module and toggles between `CreateUI` and
+ * `DestroyUI` based on persisted enable state.
+ */
+void moho::CON_PathDebug(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  LuaPlus::LuaState* const state = uiManager->mLuaState;
+
+  LuaPlus::LuaObject moduleObject = SCR_Import(state, kPathDebuggerModulePath);
+  if (!moduleObject.IsTable()) {
+    LuaPlus::LuaState::Error(state, kPathDebuggerLoadErrorText);
+  }
+
+  const char* const methodName =
+    sPathDebuggerEnabled ? kPathDebuggerDestroyUiMethodName : kPathDebuggerCreateUiMethodName;
+  LuaPlus::LuaObject methodObject = moduleObject[methodName];
+  LuaPlus::LuaFunction<> methodFunction(methodObject);
+  methodFunction();
+
+  sPathDebuggerEnabled = !sPathDebuggerEnabled;
+}
+
+/**
+ * Address: 0x00833E50 (FUN_00833E50, Moho::CON_DebugGenerateBuildTemplateFromSelection)
+ *
+ * What it does:
+ * Generates build templates from current selection when a world session is
+ * active; otherwise prints localized "no session" feedback.
+ */
+void moho::CON_DebugGenerateBuildTemplateFromSelection(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    (void)session;
+    gpg::Warnf("CON_DebugGenerateBuildTemplateFromSelection: generation path is not recovered yet.");
+    return;
+  }
+
+  PrintLocalizedConsoleLine(kNoSessionLocToken);
+}
+
+/**
+ * Address: 0x00833EF0 (FUN_00833EF0, Moho::CON_DebugClearBuildTemplates)
+ *
+ * What it does:
+ * Clears build-template state when a world session is active; otherwise prints
+ * localized "no session" feedback.
+ */
+void moho::CON_DebugClearBuildTemplates(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    (void)session;
+    gpg::Warnf("CON_DebugClearBuildTemplates: clear path is not recovered yet.");
+    return;
+  }
+
+  PrintLocalizedConsoleLine(kNoSessionLocToken);
 }
 
 /**
@@ -1648,6 +2146,58 @@ moho::CScrLuaInitForm* moho::func_ConExecuteSave_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00BC38B0 (FUN_00BC38B0, register_ConExecute_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_ConExecute_LuaFuncDef()
+{
+  return func_ConExecute_LuaFuncDef();
+}
+
+/**
+ * Address: 0x00BC38C0 (FUN_00BC38C0, register_ConExecuteSave_LuaFuncDef)
+ */
+moho::CScrLuaInitForm* moho::register_ConExecuteSave_LuaFuncDef()
+{
+  return func_ConExecuteSave_LuaFuncDef();
+}
+
+namespace
+{
+  /**
+   * Address: 0x00BEEAF0 (FUN_00BEEAF0, sub_BEEAF0)
+   *
+   * What it does:
+   * Destroys and releases saved-console-command string storage and resets
+   * vector pointer lanes to null.
+   */
+  void cleanup_console_command_buffer()
+  {
+    msvc8::vector_runtime_view<msvc8::string>& commandsView = msvc8::AsVectorRuntimeView(gSavedConsoleCommands);
+    if (commandsView.begin != nullptr) {
+      for (msvc8::string* cursor = commandsView.begin; cursor != commandsView.end; ++cursor) {
+        cursor->~string();
+      }
+      ::operator delete(static_cast<void*>(commandsView.begin));
+    }
+
+    commandsView.begin = nullptr;
+    commandsView.end = nullptr;
+    commandsView.capacityEnd = nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x00BC3890 (FUN_00BC3890, register_console_command_buffer)
+ *
+ * What it does:
+ * Registers process-exit cleanup for saved console-command history storage.
+ */
+void moho::register_console_command_buffer()
+{
+  (void)std::atexit(&cleanup_console_command_buffer);
+}
+
+/**
  * Address: 0x0041F9C0 (FUN_0041F9C0, sub_41F9C0)
  * Address: 0x1001ED50 (FUN_1001ED50)
  *
@@ -1776,9 +2326,17 @@ namespace
   constexpr const char* kConsoleStartupD3DNoPureDeviceDescription = "Disable D3D pure device usage.";
   constexpr const char* kConsoleStartupD3DForceDirect3DDebugDescription = "Enable D3D debug runtime usage.";
   constexpr const char* kConsoleStartupD3DWindowsCursorDescription = "Use the Windows cursor in D3D mode.";
+  constexpr const char* kConsoleStartupSndExtraDoWorkCallsDescription = "Enable extra audio-engine do-work calls.";
   constexpr const char* kConsoleStartupConEchoDescription = "Echo command arguments to console output.";
   constexpr const char* kConsoleStartupConListCommandsDescription = "List all registered console commands.";
+  constexpr const char* kConsoleStartupConLuaDocDescription = "Dump Lua API binder docs.";
+  constexpr const char* kConsoleStartupConLuaDescription = "Execute one Lua command line in the user Lua state.";
+  constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
+  constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
+  constexpr const char* kConsoleStartupConClearStatsDescription = "Clear a selected engine stats subtree.";
+  constexpr const char* kConsoleStartupConBeginLoggingStatsDescription = "Begin engine stats logging.";
+  constexpr const char* kConsoleStartupConEndLoggingStatsDescription = "End engine stats logging.";
   constexpr const char* kConsoleStartupConD3DAntiAliasingSamplesDescription = "Set D3D anti-aliasing sample count.";
   constexpr const char* kConsoleStartupConRenMipSkipLevelsDescription = "Set D3D texture mip-skip levels.";
   constexpr const char* kConsoleStartupConDumpPreloadedTexturesDescription =
@@ -1789,10 +2347,28 @@ namespace
   constexpr const char* kConsoleStartupConDebugAssertDescription = "Invoke debug assert command callback.";
   constexpr const char* kConsoleStartupConDebugCrashDescription = "Force an intentional debug crash.";
   constexpr const char* kConsoleStartupConDebugThrowDescription = "Throw one debug exception.";
+  constexpr const char* kConsoleStartupConDebugGenerateBuildTemplateDescription =
+    "Generate build templates from current selection.";
+  constexpr const char* kConsoleStartupConDebugClearBuildTemplatesDescription =
+    "Clear all generated build templates.";
+  constexpr const char* kConsoleStartupConP4EditDescription = "Perforce edit bridge command (unsupported in this build).";
+  constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
+    "Perforce opened-for-edit query command (unsupported in this build).";
+  constexpr const char* kConsoleStartupConExitDescription = "Exit the application.";
+  constexpr const char* kConsoleStartupConWinToggleLogDialogDescription = "Toggle the log dialog.";
+  constexpr const char* kConsoleStartupConWinShowLogDialogDescription = "Show the log dialog.";
+  constexpr const char* kConsoleStartupConWxInputBoxDescription = "Open the wx input box.";
   constexpr const char* kConsoleStartupReconDebugDescription = "Army index for recon debug rendering output.";
 
   CConFunc gCConFunc_CON_Echo{};
   CConFunc gCConFunc_CON_ListCommands{};
+  CConFunc gCConFunc_PrintStats{};
+  CConFunc gCConFunc_ClearStats{};
+  CConFunc gCConFunc_BeginLoggingStats{};
+  CConFunc gCConFunc_EndLoggingStats{};
+  CConFunc gCConFunc_LUADOC{};
+  CConFunc gCConFunc_LUA{};
+  CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
   CConFunc gCConFunc_d3d_AntiAliasingSamples{};
   CConFunc gCConFunc_ren_MipSkipLevels{};
@@ -1803,6 +2379,14 @@ namespace
   CConFunc gCConFunc_Debug_Assert{};
   CConFunc gCConFunc_Debug_Crash{};
   CConFunc gCConFunc_Debug_Throw{};
+  CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection{};
+  CConFunc gCConFunc_DebugClearBuildTemplates{};
+  CConFunc gCConFunc_p4_Edit{};
+  CConFunc gCConFunc_p4_IsOpenedForEdit{};
+  CConFunc gCConFunc_exit{};
+  CConFunc gCConFunc_WIN_ToggleLogDialog{};
+  CConFunc gCConFunc_WIN_ShowLogDialog{};
+  CConFunc gCConFunc_WxInputBox{};
 
   TConVar<bool> gTConVar_con_TestVarBool(
     "con_TestVarBool",
@@ -1866,6 +2450,11 @@ namespace
     kConsoleStartupD3DWindowsCursorDescription,
     &moho::d3d_WindowsCursor
   );
+  TConVar<bool> gTConVar_snd_ExtraDoWorkCalls(
+    "snd_ExtraDoWorkCalls",
+    kConsoleStartupSndExtraDoWorkCallsDescription,
+    &moho::snd_ExtraDoWorkCalls
+  );
 
   template <typename TCommand>
   void CleanupStartupConCommand(TCommand& command) noexcept
@@ -1895,6 +2484,262 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BF1C20 (FUN_00BF1C20, ??1CConFunc_p4_Edit@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `p4_Edit`.
+   */
+  void cleanup_CConFunc_p4_Edit()
+  {
+    CleanupStartupConCommand(gCConFunc_p4_Edit);
+  }
+
+  /**
+   * Address: 0x00BC76F0 (FUN_00BC76F0, register_CConFunc_p4_Edit)
+   *
+   * What it does:
+   * Registers startup console callback for `p4_Edit`.
+   */
+  void register_CConFunc_p4_Edit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_p4_Edit,
+      kConsoleStartupConP4EditDescription,
+      "p4_Edit",
+      &moho::CON_p4_Edit,
+      &cleanup_CConFunc_p4_Edit
+    );
+  }
+
+  /**
+   * Address: 0x00BF1C50 (FUN_00BF1C50, ??1CConFunc_p4_IsOpenedForEdit@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `p4_IsOpenedForEdit`.
+   */
+  void cleanup_CConFunc_p4_IsOpenedForEdit()
+  {
+    CleanupStartupConCommand(gCConFunc_p4_IsOpenedForEdit);
+  }
+
+  /**
+   * Address: 0x00BC7730 (FUN_00BC7730, register_CConFunc_p4_IsOpenedForEdit)
+   *
+   * What it does:
+   * Registers startup console callback for `p4_IsOpenedForEdit`.
+   */
+  void register_CConFunc_p4_IsOpenedForEdit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_p4_IsOpenedForEdit,
+      kConsoleStartupConP4IsOpenedForEditDescription,
+      "p4_IsOpenedForEdit",
+      &moho::CON_p4_IsOpenedForEdit,
+      &cleanup_CConFunc_p4_IsOpenedForEdit
+    );
+  }
+
+  void cleanup_CConFunc_exit()
+  {
+    CleanupStartupConCommand(gCConFunc_exit);
+  }
+
+  void cleanup_CConFunc_WIN_ToggleLogDialog()
+  {
+    CleanupStartupConCommand(gCConFunc_WIN_ToggleLogDialog);
+  }
+
+  void cleanup_CConFunc_WIN_ShowLogDialog()
+  {
+    CleanupStartupConCommand(gCConFunc_WIN_ShowLogDialog);
+  }
+
+  void cleanup_CConFunc_WxInputBox()
+  {
+    CleanupStartupConCommand(gCConFunc_WxInputBox);
+  }
+
+  /**
+   * Address: 0x00BC7270 (FUN_00BC7270, register_CConFunc_exit)
+   *
+   * What it does:
+   * Registers the startup console command that exits the application.
+   */
+  void register_CConFunc_exit()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_exit,
+      kConsoleStartupConExitDescription,
+      "exit",
+      reinterpret_cast<CConFunc::Callback>(&WIN_AppRequestExit),
+      &cleanup_CConFunc_exit
+    );
+  }
+
+  /**
+   * Address: 0x00BC7360 (FUN_00BC7360, register_CConFunc_WIN_ToggleLogDialog)
+   *
+   * What it does:
+   * Registers the startup console command that toggles the log dialog.
+   */
+  void register_CConFunc_WIN_ToggleLogDialog()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WIN_ToggleLogDialog,
+      kConsoleStartupConWinToggleLogDialogDescription,
+      "WIN_ToggleLogDialog",
+      reinterpret_cast<CConFunc::Callback>(&WIN_ToggleLogDialog),
+      &cleanup_CConFunc_WIN_ToggleLogDialog
+    );
+  }
+
+  /**
+   * Address: 0x00BC73A0 (FUN_00BC73A0, register_CConFunc_WIN_ShowLogDialog)
+   *
+   * What it does:
+   * Registers the startup console command that shows the log dialog.
+   */
+  void register_CConFunc_WIN_ShowLogDialog()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WIN_ShowLogDialog,
+      kConsoleStartupConWinShowLogDialogDescription,
+      "WIN_ShowLogDialog",
+      reinterpret_cast<CConFunc::Callback>(&WIN_ShowLogDialog),
+      &cleanup_CConFunc_WIN_ShowLogDialog
+    );
+  }
+
+  /**
+   * Address: 0x00BC73F0 (FUN_00BC73F0, register_CConFunc_WxInputBox)
+   *
+   * What it does:
+   * Registers the startup console command that opens the wx input box.
+   */
+  void register_CConFunc_WxInputBox()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_WxInputBox,
+      kConsoleStartupConWxInputBoxDescription,
+      "WxInputBox",
+      reinterpret_cast<CConFunc::Callback>(&CON_WxInputBox),
+      &cleanup_CConFunc_WxInputBox
+    );
+  }
+
+  /**
+   * Address: 0x00BEE7F0 (FUN_00BEE7F0, ??1CConFunc_PrintStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `PrintStats`.
+   */
+  void cleanup_CConFunc_PrintStats()
+  {
+    CleanupStartupConCommand(gCConFunc_PrintStats);
+  }
+
+  /**
+   * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
+   *
+   * What it does:
+   * Registers startup console callback for `PrintStats`.
+   */
+  void register_CConFunc_PrintStats()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_PrintStats,
+      kConsoleStartupConPrintStatsDescription,
+      "PrintStats",
+      &moho::CON_PrintStats,
+      &cleanup_CConFunc_PrintStats
+    );
+  }
+
+  /**
+   * Address: 0x00BEE820 (FUN_00BEE820, ??1CConFunc_ClearStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ClearStats`.
+   */
+  void cleanup_CConFunc_ClearStats()
+  {
+    CleanupStartupConCommand(gCConFunc_ClearStats);
+  }
+
+  /**
+   * Address: 0x00BC3480 (FUN_00BC3480, register_CConFunc_ClearStats)
+   *
+   * What it does:
+   * Registers startup console callback for `ClearStats`.
+   */
+  void register_CConFunc_ClearStats()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ClearStats,
+      kConsoleStartupConClearStatsDescription,
+      "ClearStats",
+      &moho::CON_ClearStats,
+      &cleanup_CConFunc_ClearStats
+    );
+  }
+
+  /**
+   * Address: 0x00BEE850 (FUN_00BEE850, ??1CConFunc_BeginLoggingStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `BeginLoggingStats`.
+   */
+  void cleanup_CConFunc_BeginLoggingStats()
+  {
+    CleanupStartupConCommand(gCConFunc_BeginLoggingStats);
+  }
+
+  /**
+   * Address: 0x00BC34C0 (FUN_00BC34C0, register_CConFunc_BeginLoggingStats)
+   *
+   * What it does:
+   * Registers startup console callback for `BeginLoggingStats`.
+   */
+  void register_CConFunc_BeginLoggingStats()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_BeginLoggingStats,
+      kConsoleStartupConBeginLoggingStatsDescription,
+      "BeginLoggingStats",
+      &moho::CON_BeginLoggingStats,
+      &cleanup_CConFunc_BeginLoggingStats
+    );
+  }
+
+  /**
+   * Address: 0x00BEE880 (FUN_00BEE880, ??1CConFunc_EndLoggingStats@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `EndLoggingStats`.
+   */
+  void cleanup_CConFunc_EndLoggingStats()
+  {
+    CleanupStartupConCommand(gCConFunc_EndLoggingStats);
+  }
+
+  /**
+   * Address: 0x00BC3500 (FUN_00BC3500, register_CConFunc_EndLoggingStats)
+   *
+   * What it does:
+   * Registers startup console callback for `EndLoggingStats`.
+   */
+  void register_CConFunc_EndLoggingStats()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_EndLoggingStats,
+      kConsoleStartupConEndLoggingStatsDescription,
+      "EndLoggingStats",
+      &moho::CON_EndLoggingStats,
+      &cleanup_CConFunc_EndLoggingStats
+    );
+  }
+
   /**
    * Address: 0x00BEEC10 (FUN_00BEEC10, ??1CConFunc_CON_Echo@Moho@@QAE@@Z)
    *
@@ -1948,6 +2793,90 @@ namespace moho
       "CON_ListCommands",
       &moho::CON_ListCommands,
       &cleanup_CConFunc_CON_ListCommands
+    );
+  }
+
+  /**
+   * Address: 0x00BF0C90 (FUN_00BF0C90, ??1CConFunc_LUADOC@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `LUADOC`.
+   */
+  void cleanup_CConFunc_LUADOC()
+  {
+    CleanupStartupConCommand(gCConFunc_LUADOC);
+  }
+
+  /**
+   * Address: 0x00BC6450 (FUN_00BC6450, register_CConFunc_LUADOC)
+   *
+   * What it does:
+   * Registers startup console callback for `LUADOC`.
+   */
+  void register_CConFunc_LUADOC()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_LUADOC,
+      kConsoleStartupConLuaDocDescription,
+      "LUADOC",
+      &moho::CON_LUADOC,
+      &cleanup_CConFunc_LUADOC
+    );
+  }
+
+  /**
+   * Address: 0x00C08820 (FUN_00C08820, ??1CConFunc_LUA@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `LUA`.
+   */
+  void cleanup_CConFunc_LUA()
+  {
+    CleanupStartupConCommand(gCConFunc_LUA);
+  }
+
+  /**
+   * Address: 0x00BE8A20 (FUN_00BE8A20, register_CConFunc_LUA)
+   *
+   * What it does:
+   * Registers startup console callback for `LUA`.
+   */
+  void register_CConFunc_LUA()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_LUA,
+      kConsoleStartupConLuaDescription,
+      "LUA",
+      &moho::CON_LUA,
+      &cleanup_CConFunc_LUA
+    );
+  }
+
+  /**
+   * Address: 0x00BF0D10 (FUN_00BF0D10, ??1CConFunc_GetVersion@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `GetVersion`.
+   */
+  void cleanup_CConFunc_GetVersion()
+  {
+    CleanupStartupConCommand(gCConFunc_GetVersion);
+  }
+
+  /**
+   * Address: 0x00BC6630 (FUN_00BC6630, register_CConFunc_GetVersion)
+   *
+   * What it does:
+   * Registers startup console callback for `GetVersion`.
+   */
+  void register_CConFunc_GetVersion()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_GetVersion,
+      kConsoleStartupConGetVersionDescription,
+      "GetVersion",
+      &moho::CON_GetVersion,
+      &cleanup_CConFunc_GetVersion
     );
   }
 
@@ -2312,6 +3241,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x00BF0D80 (FUN_00BF0D80, ??1TConVar_snd_ExtraDoWorkCalls@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `snd_ExtraDoWorkCalls`.
+   */
+  void cleanup_TConVar_snd_ExtraDoWorkCalls()
+  {
+    CleanupStartupConCommand(gTConVar_snd_ExtraDoWorkCalls);
+  }
+
+  /**
+   * Address: 0x00BC6780 (FUN_00BC6780, register_TConVar_snd_ExtraDoWorkCalls)
+   *
+   * What it does:
+   * Registers startup convar for `snd_ExtraDoWorkCalls`.
+   */
+  void register_TConVar_snd_ExtraDoWorkCalls()
+  {
+    RegisterStartupConVar(gTConVar_snd_ExtraDoWorkCalls, &cleanup_TConVar_snd_ExtraDoWorkCalls);
+  }
+
+  /**
    * Address: 0x00BEF0E0 (FUN_00BEF0E0, ??1CConFunc_d3d_AntiAliasingSamples@Moho@@QAE@@Z)
    *
    * What it does:
@@ -2392,6 +3343,62 @@ namespace moho
       "DumpPreloadedTextures",
       &CON_DumpPreloadedTextures,
       &cleanup_CConFunc_DumpPreloadedTextures
+    );
+  }
+
+  /**
+   * Address: 0x00C061F0 (FUN_00C061F0, ??1CConFunc_DebugGenerateBuildTemplateFromSelection@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `DebugGenerateBuildTemplateFromSelection`.
+   */
+  void cleanup_CConFunc_DebugGenerateBuildTemplateFromSelection()
+  {
+    CleanupStartupConCommand(gCConFunc_DebugGenerateBuildTemplateFromSelection);
+  }
+
+  /**
+   * Address: 0x00BE40B0 (FUN_00BE40B0, register_CConFunc_DebugGenerateBuildTemplateFromSelection)
+   *
+   * What it does:
+   * Registers startup console callback for `DebugGenerateBuildTemplateFromSelection`.
+   */
+  void register_CConFunc_DebugGenerateBuildTemplateFromSelection()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_DebugGenerateBuildTemplateFromSelection,
+      kConsoleStartupConDebugGenerateBuildTemplateDescription,
+      "DebugGenerateBuildTemplateFromSelection",
+      &CON_DebugGenerateBuildTemplateFromSelection,
+      &cleanup_CConFunc_DebugGenerateBuildTemplateFromSelection
+    );
+  }
+
+  /**
+   * Address: 0x00C06220 (FUN_00C06220, ??1CConFunc_DebugClearBuildTemplates@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `DebugClearBuildTemplates`.
+   */
+  void cleanup_CConFunc_DebugClearBuildTemplates()
+  {
+    CleanupStartupConCommand(gCConFunc_DebugClearBuildTemplates);
+  }
+
+  /**
+   * Address: 0x00BE40F0 (FUN_00BE40F0, register_CConFunc_DebugClearBuildTemplates)
+   *
+   * What it does:
+   * Registers startup console callback for `DebugClearBuildTemplates`.
+   */
+  void register_CConFunc_DebugClearBuildTemplates()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_DebugClearBuildTemplates,
+      kConsoleStartupConDebugClearBuildTemplatesDescription,
+      "DebugClearBuildTemplates",
+      &CON_DebugClearBuildTemplates,
+      &cleanup_CConFunc_DebugClearBuildTemplates
     );
   }
 
@@ -2588,7 +3595,10 @@ namespace
     {
       moho::register_CConFunc_CON_Echo();
       moho::register_CConFunc_CON_ListCommands();
+      moho::register_CConFunc_GetVersion();
       moho::register_CConFunc_CON_ExecuteLastCommand();
+      moho::register_console_command_buffer();
+      moho::register_sConsoleOutputHandlers();
       moho::register_TConVar_con_TestVarBool();
       moho::register_TConVar_con_TestVar();
       moho::register_ConVar_con_TestVarUByte();
@@ -2604,6 +3614,7 @@ namespace
       moho::register_TConVar_d3d_NoPureDevice();
       moho::register_TConVar_d3d_ForceDirect3DDebugEnabled();
       moho::register_TConVar_d3d_WindowsCursor();
+      moho::register_TConVar_snd_ExtraDoWorkCalls();
       moho::register_CConFunc_d3d_AntiAliasingSamples();
       moho::register_CConFunc_ren_MipSkipLevels();
       moho::register_CConFunc_DumpPreloadedTextures();
@@ -2616,7 +3627,17 @@ namespace
   {
     ConsoleStartupRegistrationsDebug()
     {
+      moho::register_CConFunc_LUADOC();
+      moho::register_CConFunc_LUA();
+      moho::register_CConFunc_PrintStats();
+      moho::register_CConFunc_ClearStats();
+      moho::register_CConFunc_BeginLoggingStats();
+      moho::register_CConFunc_EndLoggingStats();
+      moho::register_CConFunc_p4_Edit();
+      moho::register_CConFunc_p4_IsOpenedForEdit();
       moho::register_CConFunc_Log();
+      moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
+      moho::register_CConFunc_DebugClearBuildTemplates();
       moho::register_CConFunc_Debug_Warn();
       moho::register_CConFunc_Debug_Error();
       moho::register_CConFunc_Debug_Assert();
@@ -2627,4 +3648,17 @@ namespace
   };
 
   [[maybe_unused]] ConsoleStartupRegistrationsDebug gConsoleStartupRegistrationsDebug;
+
+  struct ConsoleStartupRegistrationsWindow
+  {
+    ConsoleStartupRegistrationsWindow()
+    {
+      moho::register_CConFunc_exit();
+      moho::register_CConFunc_WIN_ToggleLogDialog();
+      moho::register_CConFunc_WIN_ShowLogDialog();
+      moho::register_CConFunc_WxInputBox();
+    }
+  };
+
+  [[maybe_unused]] ConsoleStartupRegistrationsWindow gConsoleStartupRegistrationsWindow;
 } // namespace

@@ -56,9 +56,12 @@ namespace moho
   CTaskStage* WIN_GetBeforeWaitStage();
 
   /**
-   * Address: 0x004F2420
+   * Address: 0x004F2420 (FUN_004F2420, Moho::WIN_GetWaitHandleSet)
    *
-   * @return
+   * What it does:
+   * Returns one process-lifetime wait-handle set singleton used by the main
+   * message/event wait lanes.
+   *
    */
   CWaitHandleSet* WIN_GetWaitHandleSet();
 
@@ -138,6 +141,17 @@ namespace moho
   void PLAT_CreateGameLogForReport();
 
   /**
+   * Address: 0x0047A4F0 (FUN_0047A4F0)
+   * Mangled:
+   * ?LOG_GetRecentLines@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z
+   *
+   * What it does:
+   * Returns UTF-8 text containing recent log-history lines for crash/report
+   * output flows.
+   */
+  msvc8::string LOG_GetRecentLines(std::uint32_t maxLines);
+
+  /**
    * Address: 0x004A22B0 (FUN_004A22B0)
    * Mangled: ?PLAT_GetCallStack@Moho@@YAIPAXIPAI@Z
    *
@@ -215,6 +229,17 @@ namespace moho
   std::uint32_t PLAT_GetRegistryValue(const char* keyPath, void* outData, std::uint32_t maxDataBytes);
 
   /**
+   * Address: 0x004F25D0 (FUN_004F25D0)
+   * Mangled:
+   * ?WIN_GetClipboardText@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+   *
+   * What it does:
+   * Reads UTF-16 clipboard text from `CF_UNICODETEXT`, converts it to UTF-8,
+   * and returns empty text when clipboard ownership/data is unavailable.
+   */
+  msvc8::string WIN_GetClipboardText();
+
+  /**
    * Address: 0x004F2800 (FUN_004F2800, ?WIN_OkBox@Moho@@YAXVStrArg@gpg@@0@Z)
    *
    * What it does:
@@ -282,6 +307,74 @@ namespace moho
    * Destroys and clears active splash-screen state.
    */
   void WINX_ExitSplash();
+
+  /**
+   * Address: 0x00BC7260 (FUN_00BC7260, register_wxAppFactory)
+   *
+   * What it does:
+   * Replays the bootstrap app-factory registration lane used by the process
+   * startup initializer.
+   */
+  void register_wxAppFactory();
+
+  /**
+   * Address: 0x00BC7240 (FUN_00BC7240, register_wakeupTimer)
+   *
+   * What it does:
+   * Restores the wakeup timer duration lane to the process-default infinity
+   * value used at startup.
+   */
+  void register_wakeupTimer();
+
+  /**
+   * Address: 0x00BC7230 (FUN_00BC7230, register_startTime)
+   *
+   * What it does:
+   * Re-initializes the shared wakeup timer baseline used by the main loop.
+   */
+  void register_startTime();
+
+  /**
+   * Address: 0x00BC7310 (FUN_00BC7310, wxNewEventType init)
+   *
+   * What it does:
+   * Allocates and stores the process-wide custom wx event type token used by
+   * this bootstrap lane.
+   */
+  int register_WinAppEventType();
+
+  /**
+   * Address: 0x00BC7320 (FUN_00BC7320, register_managedWindowsCleanup)
+   *
+   * What it does:
+   * Installs process-exit cleanup for the managed-dialog slot vector storage.
+   */
+  int register_managedWindowsCleanup();
+
+  /**
+   * Address: 0x00BC7330 (FUN_00BC7330, register_managedFramesCleanup)
+   *
+   * What it does:
+   * Installs process-exit cleanup for the managed-frame slot vector storage.
+   */
+  int register_managedFramesCleanup();
+
+  /**
+   * Address: 0x00BC7340 (FUN_00BC7340, register_winLogTarget)
+   *
+   * What it does:
+   * Touches the global log-target owner during startup so the source-side
+   * lifetime model stays aligned with the recovered binary lane.
+   */
+  void register_winLogTarget();
+
+  /**
+   * Address: 0x00BC73E0 (FUN_00BC73E0, register_splashScreen)
+   *
+   * What it does:
+   * Installs splash-screen process-exit cleanup for the startup lane.
+   */
+  void register_splashScreen();
 
   /**
    * Recovered helper used by startup/shutdown ownership handoff.

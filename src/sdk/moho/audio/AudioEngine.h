@@ -19,7 +19,11 @@ namespace moho
   class IXACTSoundBank
   {
   public:
-    virtual std::int32_t __stdcall Reserved00() = 0; // +0x00
+    /**
+     * VTable slot 0 (+0x00).
+     */
+    virtual std::uint16_t __stdcall GetCueIndex(const char* cueName) = 0;
+
     virtual std::int32_t __stdcall Reserved04() = 0; // +0x04
     virtual std::int32_t __stdcall Reserved08() = 0; // +0x08
 
@@ -264,7 +268,7 @@ namespace moho
     std::uint8_t mNoSound;             // +0x28
     std::uint8_t mReserved29[0x03];    // +0x29
     std::uint32_t mSpeakerConfiguration; // +0x2C
-    std::uint32_t mReserved30;         // +0x30
+    void* mAudioRuntimeModule;         // +0x30 (`HMODULE`)
     std::uint32_t mLookAheadTimeMs;    // +0x34
     const void* mGlobalSettingsStart;  // +0x38
     std::uint32_t mGlobalSettingsLength; // +0x3C
@@ -274,6 +278,16 @@ namespace moho
     std::uint8_t mReserved54[0x04];    // +0x54
     std::uint8_t mAudition;            // +0x58
     std::uint8_t mReserved59[0x07];    // +0x59
+
+    /**
+     * Address: 0x004D9250 (FUN_004D9250, ??1struct_SoundConfig@@QAE@@Z)
+     * Mangled: ??1struct_SoundConfig@@QAE@@Z
+     *
+     * What it does:
+     * Tears down engine implementation lanes, unloads optional runtime module,
+     * and releases shared engine ownership slots.
+     */
+    ~SoundConfiguration();
 
     [[nodiscard]] std::uint32_t EngineCount() const;
     [[nodiscard]] AudioEngineImpl* EngineImplAt(std::uint32_t index) const;
@@ -334,6 +348,10 @@ namespace moho
   static_assert(
     offsetof(SoundConfiguration, mSpeakerConfiguration) == 0x2C,
     "SoundConfiguration::mSpeakerConfiguration offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(SoundConfiguration, mAudioRuntimeModule) == 0x30,
+    "SoundConfiguration::mAudioRuntimeModule offset must be 0x30"
   );
   static_assert(
     offsetof(SoundConfiguration, mLookAheadTimeMs) == 0x34,
@@ -425,6 +443,37 @@ namespace moho
     Play(std::uint16_t bankId, IXACTCue** outCue, AudioEngine* engine, std::uint16_t cueId, std::int32_t preloadOnly);
 
     /**
+     * Address: 0x004D9BD0 (FUN_004D9BD0)
+     *
+     * gpg::StrArg bankName, std::uint16_t* outBankId
+     *
+     * What it does:
+     * Finds one loaded sound-bank index by case-insensitive bank name.
+     */
+    bool GetBankIndex(gpg::StrArg bankName, std::uint16_t* outBankId);
+
+    /**
+     * Address: 0x004D9C40 (FUN_004D9C40)
+     *
+     * gpg::StrArg cueName, std::uint16_t bankId, std::uint16_t* outCueId
+     *
+     * What it does:
+     * Resolves one cue index from one loaded sound bank.
+     */
+    bool GetCueIndex(gpg::StrArg cueName, std::uint16_t bankId, std::uint16_t* outCueId);
+
+    /**
+     * Address: 0x004D9C90 (FUN_004D9C90, ?SetPaused@AudioEngine@Moho@@QAEXVStrArg@gpg@@_N@Z)
+     *
+     * gpg::StrArg category, bool paused
+     *
+     * What it does:
+     * Pauses or unpauses one named sound category and updates the paused
+     * category tracking map on success.
+     */
+    void SetPaused(gpg::StrArg category, bool paused);
+
+    /**
      * Address: 0x004D9DB0 (FUN_004D9DB0)
      *
      * gpg::StrArg, float
@@ -477,6 +526,57 @@ namespace moho
   extern SoundConfiguration* sSoundConfiguration;
 
   /**
+   * Address: 0x004D9140 (FUN_004D9140, ?SND_FindEngine@Moho@@...)
+   *
+   * gpg::StrArg
+   *
+   * What it does:
+   * Finds one loaded `AudioEngine` that owns a bank matching the supplied
+   * bank name.
+   */
+  boost::shared_ptr<AudioEngine> SND_FindEngine(gpg::StrArg bankName);
+
+  /**
+   * Address: 0x004D9040 (FUN_004D9040, ?SND_GetGlobalVarIndex@Moho@@...)
+   *
+   * gpg::StrArg variableName, std::uint16_t* outVarIndex
+   *
+   * What it does:
+   * Resolves one global XACT variable index from the active primary engine.
+   */
+  bool SND_GetGlobalVarIndex(gpg::StrArg variableName, std::uint16_t* outVarIndex);
+
+  /**
+   * Address: 0x004D9090 (FUN_004D9090, ?SND_GetGlobalFloat@Moho@@...)
+   *
+   * std::uint16_t varIndex
+   *
+   * What it does:
+   * Reads one global XACT variable value from the active primary engine.
+   */
+  float SND_GetGlobalFloat(std::uint16_t varIndex);
+
+  /**
+   * Address: 0x004D90E0 (FUN_004D90E0, ?SND_SetGlobalFloat@Moho@@...)
+   *
+   * std::uint16_t varIndex, float value
+   *
+   * What it does:
+   * Writes one global XACT variable value on the active primary engine.
+   */
+  void SND_SetGlobalFloat(std::uint16_t varIndex, float value);
+
+  /**
+   * Address: 0x004E0150 (FUN_004E0150, ?SND_GetVariableName@Moho@@...)
+   *
+   * int variableId
+   *
+   * What it does:
+   * Returns the registered name for one global sound variable id.
+   */
+  msvc8::string SND_GetVariableName(int variableId);
+
+  /**
    * Address: 0x004D8810 (FUN_004D8810, func_HandleSoundEvent)
    *
    * What it does:
@@ -484,6 +584,24 @@ namespace moho
    * changes, GUI connection state, and wavebank preparation failures.
    */
   void __stdcall func_HandleSoundEvent(const std::uint8_t* eventData);
+
+  /**
+   * Address: 0x004D8EE0 (FUN_004D8EE0, ?SND_Shutdown@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Destroys the process-global sound configuration singleton and clears the
+   * global pointer.
+   */
+  void SND_Shutdown();
+
+  /**
+   * Address: 0x004D8F10 (FUN_004D8F10, ?SND_Enabled@Moho@@YA_NXZ)
+   *
+   * What it does:
+   * Returns true when sound configuration has at least one loaded engine and
+   * no global no-sound override is active.
+   */
+  bool SND_Enabled();
 
   /**
    * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)

@@ -11,6 +11,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/ai/CAiPathNavigator.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -21,6 +22,15 @@
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
+
+namespace moho
+{
+  class RBroadcasterRType_NavPath final : public gpg::RType
+  {
+  public:
+    [[nodiscard]] const char* GetName() const override;
+  };
+} // namespace moho
 
 namespace
 {
@@ -57,6 +67,23 @@ namespace
   gpg::RType* gSearchType = nullptr;
   gpg::RType* gRect2iListType = nullptr;
   gpg::RType* gMotionType = nullptr;
+  msvc8::string gBroadcasterNavPathTypeName{};
+  std::uint32_t gBroadcasterNavPathTypeNameInitGuard = 0u;
+
+  [[nodiscard]] gpg::RType* CachedNavPathType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::SNavPath));
+    }
+    return cached;
+  }
+
+  void cleanup_BroadcasterNavPathTypeName()
+  {
+    gBroadcasterNavPathTypeName.clear();
+    gBroadcasterNavPathTypeNameInitGuard = 0u;
+  }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
   {
@@ -263,6 +290,28 @@ namespace
   }
 
 } // namespace
+
+/**
+ * Address: 0x007635C0 (FUN_007635C0, Moho::RBroadcasterRType_NavPath::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected lexical type label
+ * `Broadcaster<NavPath>` from runtime RTTI metadata.
+ */
+const char* moho::RBroadcasterRType_NavPath::GetName() const
+{
+  if ((gBroadcasterNavPathTypeNameInitGuard & 1u) == 0u) {
+    gBroadcasterNavPathTypeNameInitGuard |= 1u;
+
+    gpg::RType* const valueType = CachedNavPathType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "NavPath";
+    gBroadcasterNavPathTypeName =
+      gpg::STR_Printf("Broadcaster<%s>", valueTypeName ? valueTypeName : "NavPath");
+    (void)std::atexit(&cleanup_BroadcasterNavPathTypeName);
+  }
+
+  return gBroadcasterNavPathTypeName.c_str();
+}
 
 gpg::RType* CAiPathFinder::sType = nullptr;
 

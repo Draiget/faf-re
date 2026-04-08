@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
@@ -76,4 +77,83 @@ namespace moho
   };
 
   static_assert(sizeof(EImpactTypeTypeInfo) == 0x78, "EImpactTypeTypeInfo size must be 0x78");
+
+  class EImpactTypePrimitiveSerializer
+  {
+  public:
+    /**
+     * Address: 0x0050A990 (FUN_0050A990, PrimitiveSerHelper<EImpactType>::Deserialize)
+     *
+     * What it does:
+     * Deserializes one `EImpactType` lane from archive storage.
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0050A9B0 (FUN_0050A9B0, PrimitiveSerHelper<EImpactType>::Serialize)
+     *
+     * What it does:
+     * Serializes one `EImpactType` lane into archive storage.
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0050A6D0 (FUN_0050A6D0, gpg::PrimitiveSerHelper<Moho::EImpactType,int>::Init)
+     *
+     * What it does:
+     * Binds primitive enum load/save callbacks onto reflected `EImpactType`.
+     */
+    virtual void RegisterSerializeFunctions();
+
+  public:
+    gpg::SerHelperBase* mHelperNext;
+    gpg::SerHelperBase* mHelperPrev;
+    gpg::RType::load_func_t mDeserialize;
+    gpg::RType::save_func_t mSerialize;
+  };
+
+  static_assert(
+    offsetof(EImpactTypePrimitiveSerializer, mHelperNext) == 0x04,
+    "EImpactTypePrimitiveSerializer::mHelperNext offset must be 0x04"
+  );
+  static_assert(
+    offsetof(EImpactTypePrimitiveSerializer, mHelperPrev) == 0x08,
+    "EImpactTypePrimitiveSerializer::mHelperPrev offset must be 0x08"
+  );
+  static_assert(
+    offsetof(EImpactTypePrimitiveSerializer, mDeserialize) == 0x0C,
+    "EImpactTypePrimitiveSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(EImpactTypePrimitiveSerializer, mSerialize) == 0x10,
+    "EImpactTypePrimitiveSerializer::mSerialize offset must be 0x10"
+  );
+  static_assert(sizeof(EImpactTypePrimitiveSerializer) == 0x14, "EImpactTypePrimitiveSerializer size must be 0x14");
+
+  /**
+   * Address: 0x00509ED0 (FUN_00509ED0, preregister_EImpactTypeTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters startup-owned RTTI descriptor storage for
+   * `EImpactType`.
+   */
+  [[nodiscard]] gpg::REnumType* preregister_EImpactTypeTypeInfo();
+
+  /**
+   * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
+   *
+   * What it does:
+   * Runs `EImpactType` typeinfo preregistration and installs process-exit
+   * cleanup.
+   */
+  int register_EImpactTypeTypeInfo();
+
+  /**
+   * Address: 0x00BC7A90 (FUN_00BC7A90, register_EImpactTypePrimitiveSerializer)
+   *
+   * What it does:
+   * Initializes startup primitive serializer helper links/callbacks for
+   * `EImpactType` and installs process-exit cleanup.
+   */
+  int register_EImpactTypePrimitiveSerializer();
 } // namespace moho

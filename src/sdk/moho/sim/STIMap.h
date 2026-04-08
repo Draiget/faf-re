@@ -268,6 +268,17 @@ namespace moho
     SMinMax<std::uint16_t> GetTierBoundsUWord(std::int32_t tier, std::int32_t x, std::int32_t z) const;
 
     /**
+     * Address: 0x0080B9D0 (FUN_0080B9D0, Moho::CHeightField::GetTierMaxError)
+     *
+     * int tier, int x, int z
+     *
+     * What it does:
+     * Returns tier-grid stored max error at `(x,z)` scaled into world units.
+     */
+    [[nodiscard]]
+    float GetTierMaxError(std::int32_t tier, std::int32_t x, std::int32_t z) const;
+
+    /**
      * Address: 0x00475DF0 (FUN_00475DF0)
      *
      * int x, int z, int tier
@@ -740,6 +751,16 @@ namespace moho
      */
     [[nodiscard]]
     float GetSurface(const Wm3::Vec3f& position) const;
+
+    /**
+     * Address: 0x0062CA60 (FUN_0062CA60, Moho::STIMap::IsWithin)
+     *
+     * What it does:
+     * Returns whether a circle at `position` with `border` radius fits either
+     * the whole terrain bounds or the playable-rect bounds.
+     */
+    [[nodiscard]]
+    bool IsWithin(const Wm3::Vec3f& position, float border, bool wholeMap) const;
 
     [[nodiscard]] CHeightField* GetHeightField() const noexcept;
     [[nodiscard]] bool IsWaterEnabled() const noexcept;

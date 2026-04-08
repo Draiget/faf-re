@@ -91,4 +91,13 @@ namespace moho
   };
 
   static_assert(sizeof(RWeakPtrType<CTaskThread>) == 0x68, "RWeakPtrType<CTaskThread> size must be 0x68");
+
+  /**
+   * Address: 0x00BC3120 (FUN_00BC3120, register_RWeakPtrType_CTaskThread)
+   *
+   * What it does:
+   * Materializes the startup weak-pointer reflection descriptor for
+   * `WeakPtr<CTaskThread>` and registers process-exit teardown.
+   */
+  void register_RWeakPtrType_CTaskThread();
 } // namespace moho

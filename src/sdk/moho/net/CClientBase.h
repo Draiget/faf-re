@@ -140,8 +140,13 @@ namespace moho
     int32_t GetSimRate() override;
 
     /**
-     * Address: 0x0053BE30 (FUN_0053BE30)
+     * Address: 0x0053BE50 (FUN_0053BE50, Moho::CClientBase::~CClientBase)
+     * Address: 0x0053BE30 (FUN_0053BE30, dtor thunk)
      * Slot: 13
+     *
+     * What it does:
+     * Destroys client runtime members (bitsets, pipe stream, ack/eject vectors,
+     * nickname storage) and restores base `IClient` teardown semantics.
      */
     virtual ~CClientBase();
 

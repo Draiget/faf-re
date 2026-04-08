@@ -44,10 +44,7 @@ namespace
   class SPerArmyReconInfoVectorTypeRuntime final : public gpg::RType, public gpg::RIndexed
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "vector<SPerArmyReconInfo>";
-    }
+    [[nodiscard]] const char* GetName() const override;
 
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
@@ -112,6 +109,8 @@ namespace
   bool gSPerArmyReconInfoTypeInfoConstructed = false;
   alignas(SPerArmyReconInfoVectorTypeRuntime) unsigned char gSPerArmyReconInfoVectorTypeStorage[sizeof(SPerArmyReconInfoVectorTypeRuntime)];
   bool gSPerArmyReconInfoVectorTypeConstructed = false;
+  msvc8::string gSPerArmyReconInfoVectorTypeName;
+  bool gSPerArmyReconInfoVectorTypeNameCleanupRegistered = false;
 
   [[nodiscard]] moho::ReconBlipTypeInfo* AcquireReconBlipTypeInfo()
   {
@@ -157,6 +156,34 @@ namespace
 
     AcquireReconBlipTypeInfo()->~ReconBlipTypeInfo();
     gReconBlipTypeInfoConstructed = false;
+  }
+
+  void cleanup_SPerArmyReconInfoVectorTypeName()
+  {
+    gSPerArmyReconInfoVectorTypeName = msvc8::string{};
+    gSPerArmyReconInfoVectorTypeNameCleanupRegistered = false;
+  }
+
+  /**
+   * Address: 0x005C3E50 (FUN_005C3E50, gpg::RVectorType_SPerArmyReconInfo::GetName)
+   *
+   * What it does:
+   * Lazily formats and caches the reflected type label for
+   * `vector<SPerArmyReconInfo>` using the registered element RTTI name.
+   */
+  const char* SPerArmyReconInfoVectorTypeRuntime::GetName() const
+  {
+    if (gSPerArmyReconInfoVectorTypeName.empty()) {
+      gpg::RType* const valueType = ResolveSPerArmyReconInfoType();
+      const char* const valueTypeName = valueType ? valueType->GetName() : "SPerArmyReconInfo";
+      gSPerArmyReconInfoVectorTypeName = gpg::STR_Printf("vector<%s>", valueTypeName ? valueTypeName : "SPerArmyReconInfo");
+      if (!gSPerArmyReconInfoVectorTypeNameCleanupRegistered) {
+        gSPerArmyReconInfoVectorTypeNameCleanupRegistered = true;
+        (void)std::atexit(&cleanup_SPerArmyReconInfoVectorTypeName);
+      }
+    }
+
+    return gSPerArmyReconInfoVectorTypeName.c_str();
   }
 
   struct ReconBlipTypeInfoBootstrap

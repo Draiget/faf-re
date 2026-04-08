@@ -49,6 +49,14 @@ namespace gpg::gal
          */
         virtual HRESULT Unlock();
 
+        /**
+         * Address: 0x008F5190 (FUN_008F5190, gpg::gal::IndexBufferD3D9::GetBuffer)
+         *
+         * What it does:
+         * Returns the retained D3D9 index-buffer handle and throws when unset.
+         */
+        void* GetBuffer();
+
     public:
         IndexBufferContext context_{};        // +0x04
         void* d3dIndexBuffer_ = nullptr;      // +0x14

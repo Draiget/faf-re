@@ -11,6 +11,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/unit/EUnitMotionEnums.h"
+#include "wm3/Quaternion.h"
 
 namespace gpg
 {
@@ -20,16 +21,21 @@ namespace gpg
 namespace moho
 {
   struct CPathPoint;
+  class CAiTarget;
+  class Entity;
   enum ELayer : std::int32_t;
   enum EUnitMotionVertEvent : std::int32_t
   {
     UMVE_None = 0,
     UMVE_Top = 1,
-    UMVE_Unknown2 = 2,
-    UMVE_Unknown3 = 3,
+    UMVE_Up = 2,
+    UMVE_Down = 3,
     UMVE_Hover = 4,
+    UMVE_Unknown2 = UMVE_Up,
+    UMVE_Unknown3 = UMVE_Down,
   };
   class Unit;
+  struct VAxes3;
 
   /**
    * Steering-facing ABI surface used by CAiSteeringImpl.
@@ -92,12 +98,46 @@ namespace moho
     void SetTarget(const Wm3::Vector3f& target);
 
     /**
+     * Address: 0x006B8590 (FUN_006B8590, ?SetFacing@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Normalizes one requested facing vector and stores it as formation-facing.
+     */
+    void SetFacing(const Wm3::Vector3f& facing);
+
+    /**
+     * Address: 0x006C35B0 (FUN_006C35B0, ?SetSplineData@CUnitMotion@Moho@@QAEXPBVCPathPoint@2@0@Z)
+     *
+     * What it does:
+     * Stores current and look-ahead spline path waypoint pointers.
+     */
+    void SetSplineData(const CPathPoint* nextWaypoint, const CPathPoint* followingWaypoint);
+
+    /**
      * Address: 0x006B85E0 (FUN_006B85E0, ?SetTarget@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@0W4ELayer@2@@Z)
      *
      * What it does:
      * Sets motion target with explicit steering vector and destination layer.
      */
     void SetTarget(const Wm3::Vector3f& target, const Wm3::Vector3f& steeringVector, ELayer layer);
+
+    /**
+     * Address: 0x006B8920 (FUN_006B8920, ?SetNewTargetLayer@CUnitMotion@Moho@@QAEXW4ELayer@2@@Z)
+     *
+     * What it does:
+     * Applies layer-transition side effects for sub<->water transitions, then
+     * commits one new target layer lane.
+     */
+    void SetNewTargetLayer(ELayer newLayer);
+
+    /**
+     * Address: 0x006B93D0 (FUN_006B93D0, ?Warp@CUnitMotion@Moho@@QAEXABVVTransform@2@@Z)
+     *
+     * What it does:
+     * Applies immediate transform warp to owning unit, retargets motion lanes
+     * to the new position, and re-arms surface-collision processing for land.
+     */
+    void Warp(const VTransform& transform);
 
     /**
      * Address: 0x006B89B0 (FUN_006B89B0, ?AddRecoilImpulse@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
@@ -109,6 +149,26 @@ namespace moho
     void AddRecoilImpulse(const Wm3::Vector3f& impulse);
 
     /**
+     * Address: 0x006B9460 (FUN_006B9460, ?SetImmediateVelocity@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@ABV?$Quaternion@M@4@@Z)
+     *
+     * What it does:
+     * Writes one immediate velocity + orientation payload into the owner's
+     * physics-body runtime state.
+     */
+    void SetImmediateVelocity(const Wm3::Vector3f& velocity, const Wm3::Quaternionf& orientation);
+
+    /**
+     * Address: 0x006B9570 (FUN_006B9570, ?NotifyDetached@CUnitMotion@Moho@@QAEXPAVEntity@2@_N@Z)
+     *
+     * Moho::Entity *, bool
+     *
+     * What it does:
+     * Rebuilds post-detach target/motion state from detach-parent orientation,
+     * then optionally forces air-layer + ballistic transition callbacks.
+     */
+    void NotifyDetached(Entity* detachedFromEntity, bool skipBallistic);
+
+    /**
      * Address: 0x006B9730 (FUN_006B9730, ?AtTarget@CUnitMotion@Moho@@QBE_NXZ)
      *
      * What it does:
@@ -118,6 +178,33 @@ namespace moho
     bool AtTarget() const;
 
     /**
+     * Address: 0x006B98C0 (FUN_006B98C0, ?IsOnValidLayer@CUnitMotion@Moho@@QBE_NXZ)
+     *
+     * What it does:
+     * Returns true when the owner unit's current layer is compatible with the
+     * blueprint movement type.
+     */
+    [[nodiscard]] bool IsOnValidLayer() const;
+
+    /**
+     * Address: 0x006B9840 (FUN_006B9840, ?IsMoving@CUnitMotion@Moho@@QBE_NXZ)
+     *
+     * What it does:
+     * Returns movement activity from air-body speed magnitude or spline
+     * waypoint presence for non-air paths.
+     */
+    [[nodiscard]] bool IsMoving() const;
+
+    /**
+     * Address: 0x006C1610 (FUN_006C1610, ?SnapToGround@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z)
+     *
+     * What it does:
+     * Snaps one transform onto sampled terrain/raised-platform points under
+     * the unit footprint and tilts orientation to the computed surface normal.
+     */
+    [[nodiscard]] VTransform SnapToGround(const VTransform& sourceTransform);
+
+    /**
      * Address: 0x006B9940 (FUN_006B9940, ?ProcessFuelLevels@CUnitMotion@Moho@@AAEXXZ)
      *
      * What it does:
@@ -125,6 +212,157 @@ namespace moho
      * request bookkeeping while in top/hover motion states.
      */
     void ProcessFuelLevels();
+
+  private:
+    /**
+     * Address: 0x006B83F0 (FUN_006B83F0, ?ReCalcCurTargetElevation@CUnitMotion@Moho@@AAEXABV?$Vector3@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Samples map elevation at one target XY lane and stores terrain/water-clamped
+     * target elevation.
+     */
+    void ReCalcCurTargetElevation(const Wm3::Vector3f& targetPosition);
+
+    /**
+     * Address: 0x006B8F30 (FUN_006B8F30, ?SetMotionHorzEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionHorzEvent@2@@Z)
+     *
+     * What it does:
+     * Updates horizontal event lane, emits script callback, and refreshes intel
+     * when entering stopped motion.
+     */
+    void SetMotionHorzEvent(EUnitMotionHorzEvent event);
+
+    /**
+     * Address: 0x006B8F70 (FUN_006B8F70, ?SetMotionVertEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionVertEvent@2@@Z)
+     *
+     * What it does:
+     * Updates vertical event lane and emits vertical-motion script callback.
+     */
+    void SetMotionVertEvent(EUnitMotionVertEvent event);
+
+    /**
+     * Address: 0x006B8FB0 (FUN_006B8FB0, ?SetMotionTurnEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionTurnEvent@2@@Z)
+     *
+     * What it does:
+     * Current binary build keeps this lane as a no-op.
+     */
+    void SetMotionTurnEvent(EUnitMotionTurnEvent event);
+
+    /**
+     * Address: 0x006B8FF0 (FUN_006B8FF0, ?SetMotionState@CUnitMotion@Moho@@AAEXW4EUnitMotionState@2@@Z)
+     *
+     * What it does:
+     * Updates motion-state lane and emits state-change script callback.
+     */
+    void SetMotionState(EUnitMotionState state);
+
+    /**
+     * Address: 0x006B92E0 (FUN_006B92E0, ?MoveTo@CUnitMotion@Moho@@AAEXAAVVTransform@2@M@Z)
+     *
+     * What it does:
+     * Normalizes one pending transform quaternion, validates target lanes, and
+     * commits the move request into owning `Entity` pending-transform state.
+     */
+    void MoveTo(VTransform& transform, float timeStep);
+
+    /**
+     * Address: 0x006BCA10 (FUN_006BCA10, ?CalcAirMovementDampingFactor@CUnitMotion@Moho@@AAEMABV?$Vector3@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Computes one air-control damping factor from desired movement magnitude,
+     * formation top-speed cache, and air blueprint damping coefficients.
+     */
+    [[nodiscard]] float CalcAirMovementDampingFactor(const Wm3::Vector3f& movementVector);
+
+    /**
+     * Address: 0x006BCB90 (FUN_006BCB90, ?CalcDesiredTargetElevation@CUnitMotion@Moho@@ABEMABVCAiTarget@2@ABV?$Vector3@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Computes desired vertical target offset from target entity/layer state,
+     * local offset vector, and unit air-combat elevation rules.
+     */
+    [[nodiscard]] float
+    CalcDesiredTargetElevation(const CAiTarget& target, const Wm3::Vector3f& offsetFromUnit) const;
+
+    /**
+     * Address: 0x006BC950 (FUN_006BC950, ?CalcWingedLift@CUnitMotion@Moho@@ABEMMM@Z)
+     *
+     * What it does:
+     * Computes winged-air vertical lift from target elevation delta and air
+     * blueprint lift factor.
+     */
+    [[nodiscard]] float CalcWingedLift(float maxLift, float wingFactor) const;
+
+    /**
+     * Address: 0x006BC8E0 (FUN_006BC8E0, ?GetElevation@CUnitMotion@Moho@@ABEMXZ)
+     *
+     * What it does:
+     * Resolves current air-move elevation target from carrier state, absolute
+     * height lane, and owner elevation attributes.
+     */
+    [[nodiscard]] float GetElevation() const;
+
+    /**
+     * Address: 0x006BC820 (FUN_006BC820, ?ShouldHoverInsteadOfLand@CUnitMotion@Moho@@ABE_NXZ)
+     *
+     * What it does:
+     * Returns true when transport/hover constraints require this air unit to
+     * stay hovering instead of committing to landing.
+     */
+    [[nodiscard]] bool ShouldHoverInsteadOfLand() const;
+
+    /**
+     * Address: 0x006C3070 (FUN_006C3070, ?TransitionBetweenLayers@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+     *
+     * What it does:
+     * Interpolates transform position/orientation between stored layer-change
+     * endpoints and advances transition progress tick state.
+     */
+    void TransitionBetweenLayers(VTransform& transform);
+
+    /**
+     * Address: 0x006C2A40 (FUN_006C2A40, ?ProcessCommonMotionState@CUnitMotion@Moho@@AAEX_N@Z)
+     *
+     * What it does:
+     * Updates horizontal motion-event state from move-success and speed/target
+     * proximity heuristics.
+     */
+    void ProcessCommonMotionState(bool moveSucceeded);
+
+    /**
+     * Address: 0x006C2F00 (FUN_006C2F00, ?FindIntersectingRaisedPlatform@CUnitMotion@Moho@@AAEXAAVVTransform@2@@Z)
+     *
+     * What it does:
+     * Selects the nearest non-dead nearby unit that exposes raised platforms
+     * in its blueprint physics and stores it as the active platform candidate.
+     */
+    void FindIntersectingRaisedPlatform();
+
+    /**
+     * Address: 0x006C3220 (FUN_006C3220, ?HandleDivingAndSurfacing@CUnitMotion@Moho@@AAE_NXZ)
+     *
+     * What it does:
+     * Updates submerge/surface depth while moving up/down and commits layer +
+     * vertical-event transitions when crossing the dive targets.
+     */
+    [[nodiscard]] bool HandleDivingAndSurfacing();
+
+    /**
+     * Address: 0x006BD7B0 (FUN_006BD7B0, Moho::CUnitMotion::CalcWingedOrientation)
+     *
+     * What it does:
+     * Rebuilds winged-air steering axes, force, and wing-orientation bias from
+     * the current air-combat state and motion inputs.
+     */
+    void CalcWingedOrientation(
+      const Wm3::Vector3f& referenceVector,
+      const Wm3::Vector3f& controlVector,
+      const Wm3::Vector3f& primaryVector,
+      const Wm3::Vector3f& fallbackVector,
+      VAxes3& outAxes,
+      Wm3::Vector3f& outForce,
+      float& wingOri
+    );
 
   public:
     Unit* mUnit;                    // +0x00
@@ -174,7 +412,7 @@ namespace moho
     Wm3::Vector3f mVectorF0;              // +0xF0
     Wm3::Vector3f mForce;                 // +0xFC
     Wm3::Vector3f mVector108;             // +0x108
-    WeakPtr<Unit> mUnknownWeakUnit;       // +0x114
+    WeakPtr<Unit> mRaisedPlatformUnit;    // +0x114
     float mUnknownFloat11C;               // +0x11C
     VTransform mLastTrans;                // +0x120
     VTransform mCurTrans;                 // +0x13C
@@ -225,7 +463,7 @@ namespace moho
   );
   static_assert(offsetof(CUnitMotion, mStateWordB0) == 0xB0, "CUnitMotion::mStateWordB0 offset must be 0xB0");
   static_assert(
-    offsetof(CUnitMotion, mUnknownWeakUnit) == 0x114, "CUnitMotion::mUnknownWeakUnit offset must be 0x114"
+    offsetof(CUnitMotion, mRaisedPlatformUnit) == 0x114, "CUnitMotion::mRaisedPlatformUnit offset must be 0x114"
   );
   static_assert(offsetof(CUnitMotion, mLastTrans) == 0x120, "CUnitMotion::mLastTrans offset must be 0x120");
   static_assert(offsetof(CUnitMotion, mCurTrans) == 0x13C, "CUnitMotion::mCurTrans offset must be 0x13C");

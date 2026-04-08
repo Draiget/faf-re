@@ -93,6 +93,14 @@ namespace moho
   CScrLuaInitForm* func_CreatePrefetchSet_LuaFuncDef();
 
   /**
+   * Address: 0x00BC59D0 (FUN_00BC59D0, register_CreatePrefetchSet_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_CreatePrefetchSet_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CreatePrefetchSet_LuaFuncDef();
+
+  /**
    * Address: 0x004A5810 (FUN_004A5810, cfunc_CPrefetchSetUpdate)
    */
   int cfunc_CPrefetchSetUpdate(lua_State* luaContext);
@@ -108,6 +116,14 @@ namespace moho
   CScrLuaInitForm* func_CPrefetchSetUpdate_LuaFuncDef();
 
   /**
+   * Address: 0x00BC5A00 (FUN_00BC5A00, register_CPrefetchSetUpdate_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_CPrefetchSetUpdate_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CPrefetchSetUpdate_LuaFuncDef();
+
+  /**
    * Address: 0x004A5950 (FUN_004A5950, cfunc_CPrefetchSetReset)
    */
   int cfunc_CPrefetchSetReset(lua_State* luaContext);
@@ -121,4 +137,30 @@ namespace moho
    * Address: 0x004A5970 (FUN_004A5970, func_CPrefetchSetReset_LuaFuncDef)
    */
   CScrLuaInitForm* func_CPrefetchSetReset_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC5A10 (FUN_00BC5A10, register_CPrefetchSetReset_LuaFuncDef)
+   *
+   * What it does:
+   * Startup thunk that forwards to `func_CPrefetchSetReset_LuaFuncDef`.
+   */
+  CScrLuaInitForm* register_CPrefetchSetReset_LuaFuncDef();
+
+  /**
+   * Address: 0x00BC5A40 (FUN_00BC5A40, sub_BC5A40)
+   *
+   * What it does:
+   * Allocates one Lua metatable-factory index and stores it in
+   * `CScrLuaMetatableFactory<CPrefetchSet>::sInstance`.
+   */
+  int register_CScrLuaMetatableFactory_CPrefetchSet_Index();
+
+  /**
+   * Address: 0x00BC59E0 (FUN_00BC59E0, sub_BC59E0)
+   *
+   * What it does:
+   * Saves current `core` Lua-init form chain head and relinks it to the
+   * recovered CPrefetchSet startup anchor lane.
+   */
+  CScrLuaInitForm* register_core_CoreInits_mForms_CPrefetchSetAnchor();
 } // namespace moho
