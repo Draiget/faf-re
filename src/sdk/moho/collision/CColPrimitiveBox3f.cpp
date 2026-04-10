@@ -479,6 +479,15 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x004FEFF0 (FUN_004FEFF0, Moho::DColPrimBoxTypeInfo::DColPrimBoxTypeInfo)
+   */
+  DColPrimBoxTypeInfo::DColPrimBoxTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CColPrimitive<Wm3::Box3f>), this);
+  }
+
+  /**
    * Address: 0x004FF080 (FUN_004FF080, Moho::DColPrimBoxTypeInfo::dtr)
    */
   DColPrimBoxTypeInfo::~DColPrimBoxTypeInfo() = default;
@@ -567,7 +576,6 @@ namespace moho
     if (!gDColPrimBoxTypeInfoConstructed) {
       new (gDColPrimBoxTypeInfoStorage) DColPrimBoxTypeInfo();
       gDColPrimBoxTypeInfoConstructed = true;
-      gpg::PreRegisterRType(typeid(CColPrimitive<Wm3::Box3f>), reinterpret_cast<gpg::RType*>(gDColPrimBoxTypeInfoStorage));
     }
 
     (void)std::atexit(&cleanup_DColPrimBoxTypeInfo_atexit);

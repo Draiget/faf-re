@@ -60,17 +60,12 @@ namespace
 
   [[nodiscard]] SAiNavigatorGoal BuildSingleCellGoal(const std::int32_t cellX, const std::int32_t cellZ) noexcept
   {
-    return {
-      cellX,
-      cellZ,
-      cellX + 1,
-      cellZ + 1,
-      0,
-      0,
-      0,
-      0,
-      0,
-    };
+    SAiNavigatorGoal goal{};
+    goal.minX = cellX;
+    goal.minZ = cellZ;
+    goal.maxX = cellX + 1;
+    goal.maxZ = cellZ + 1;
+    return goal;
   }
 
   [[nodiscard]] SOCellPos TargetWorldToCell(const Wm3::Vector3f& worldPos, const SFootprint& footprint) noexcept
@@ -186,8 +181,10 @@ CAiNavigatorLand::CAiNavigatorLand()
   : CAiNavigatorImpl()
   , mPathNavigator(nullptr)
   , mDestinationUnit{}
-  , mGoal{0, 0, 1, 1, 0, 0, 0, 0, 0}
-{}
+  , mGoal{}
+{
+  mGoal = BuildSingleCellGoal(0, 0);
+}
 
 /**
  * Address: 0x005A3AC0 (FUN_005A3AC0, unit ctor)
@@ -196,7 +193,7 @@ CAiNavigatorLand::CAiNavigatorLand(Unit* const unit)
   : CAiNavigatorImpl(unit)
   , mPathNavigator(nullptr)
   , mDestinationUnit{}
-  , mGoal{0, 0, 0, 0, 0, 0, 0, 0, 0}
+  , mGoal{}
 {
   if (unit) {
     unit->GetBlueprint();

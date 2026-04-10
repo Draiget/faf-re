@@ -2,7 +2,7 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries.
 
-## Recovery Coverage (2026-04-09, `fa_full_2026_03_26`)
+## Recovery Coverage (2026-04-10, `fa_full_2026_03_26`)
 
 Coverage is computed from:
 
@@ -27,29 +27,32 @@ python skills/fa-recovery-iteration/scripts/recovered_progress.py bulk-mark --na
 
 Progress snapshot:
 
-- Total functions: `67,166`
-- Recovered so far: `27,769`
-- Pending: `37,316`
-- Blocked: `2,135`
-- In progress: `8`
-- **Coverage (of recovered functions): `41.34%`**
+- Total FAF functions (IDA index): `67,153`
+- Recovered so far (`completed`): `28,620`
+- Pending: `36,493`
+- Blocked: `2,117`
+- In progress: `0`
+- **Coverage (of recovered functions): `42.61%`**
 
-By namespace:
+Namespace families:
 
-- `moho`: `5,042/8,717 (57.84%)`
-- `gpg`: `1,370/2,172 (63.08%)`
-- `other`: `12,266/53,936 (22.74%)`
-- `dependencies` (external entries with body evidence): `370/2,328 (15.89%)`
-- `dependencies` not link-proven in built libs (recovery-required): `417/1,068 (39.04%)`
+- `moho`: `5,105/8,717 (58.56%)`
+- `gpg`: `1,392/2,172 (64.09%)`
+- `external`: `378/2,328 (16.24%)`
 
-By external dependency:
+External dependency split:
 
-- `wxWidgets`: `1,260/1,359` will be linked (`92.72%`); recovery-required `6/99 (6.06%)`
-- `MSVC STL/CRT`: `0/398` will be linked (`0.00%`); recovery-required `202/398 (50.75%)`
-- `WildMagic`: `0/387` will be linked (`0.00%`); recovery-required `50/387 (12.92%)`
-- `LuaPlus/Lua`: `0/184` will be linked (`0.00%`); recovery-required `159/184 (86.41%)`
+- `wxWidgets`: `124/1,359 (9.12%)`
+- `MSVC STL/CRT`: `49/398 (12.31%)`
+- `WildMagic`: `52/387 (13.44%)`
+- `LuaPlus/Lua`: `153/184 (83.15%)`
 
-`recovery-required` means non-`external_dependency` completed statuses over functions not link-proven in built libs.
+External dependency status (progress):
+
+- `wxWidgets`: `1,260/1,359 (92.72%)`
+- `MSVC STL/CRT`: `0/398 (0.00%)`
+- `WildMagic`: `0/387 (0.00%)`
+- `LuaPlus/Lua`: `0/184 (0.00%)`
 
 ## Patch + Build Quickstart
 
@@ -70,7 +73,10 @@ Build:
 
 ```bat
 msbuild src\sdk\sdk.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
+msbuild faf.sln /t:sdk /p:Configuration=Debug /p:Platform=x86
 ```
+
+Both commands are validated in a VS developer shell; expected result is `0 Error(s)` (warnings remain).
 
 Optional hang-safe build wrapper:
 
