@@ -45,6 +45,18 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x005E4740 (FUN_005E4740, ??0IAiTransportTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters `IAiTransport` RTTI so lookup resolves to this type helper.
+ */
+IAiTransportTypeInfo::IAiTransportTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(IAiTransport), this);
+}
+
+/**
  * Address: 0x005E47D0 (FUN_005E47D0, scalar deleting thunk)
  */
 IAiTransportTypeInfo::~IAiTransportTypeInfo() = default;
@@ -88,8 +100,6 @@ void IAiTransportTypeInfo::Init()
  */
 int moho::register_IAiTransportTypeInfo()
 {
-  auto* const type = AcquireIAiTransportTypeInfo();
-  gpg::PreRegisterRType(typeid(IAiTransport), type);
-  IAiTransport::sType = type;
+  (void)AcquireIAiTransportTypeInfo();
   return std::atexit(&cleanup_IAiTransportTypeInfo);
 }

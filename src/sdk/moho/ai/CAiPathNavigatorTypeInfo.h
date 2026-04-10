@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005AFA70 (FUN_005AFA70, ??0CAiPathNavigatorTypeInfo@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Preregisters `CAiPathNavigator` RTTI for this type-info helper.
+     */
+    CAiPathNavigatorTypeInfo();
+
+    /**
      * Address: 0x005AFB30 (FUN_005AFB30, scalar deleting thunk)
      *
      * VFTable SLOT: 2

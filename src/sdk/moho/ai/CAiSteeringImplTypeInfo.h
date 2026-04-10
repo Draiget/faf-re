@@ -14,6 +14,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005D21E0 (FUN_005D21E0, ??0CAiSteeringImplTypeInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Preregisters `CAiSteeringImpl` RTTI so lookup resolves to this type
+     * helper.
+     */
+    CAiSteeringImplTypeInfo();
+
+    /**
      * Address: 0x005D22A0 (FUN_005D22A0, scalar deleting thunk)
      *
      * VFTable SLOT: 2
@@ -40,7 +49,7 @@ namespace moho
    * Address: 0x00BCE480 (FUN_00BCE480, register_CAiSteeringImplTypeInfo)
    *
    * What it does:
-   * Registers the `CAiSteeringImpl` RTTI type-info object and installs
+   * Constructs startup-owned `CAiSteeringImplTypeInfo` storage and installs
    * process-exit cleanup.
    */
   int register_CAiSteeringImplTypeInfo();

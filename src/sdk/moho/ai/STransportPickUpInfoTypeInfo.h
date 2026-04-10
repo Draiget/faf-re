@@ -13,6 +13,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E4520 (FUN_005E4520, ??0STransportPickUpInfoTypeInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Preregisters `STransportPickUpInfo` RTTI so lookup resolves to this
+     * type helper.
+     */
+    STransportPickUpInfoTypeInfo();
+
+    /**
      * Address: 0x005E45B0 (FUN_005E45B0, scalar deleting thunk)
      *
      * VFTable SLOT: 2
@@ -45,4 +54,3 @@ namespace moho
 
   static_assert(sizeof(STransportPickUpInfoTypeInfo) == 0x64, "STransportPickUpInfoTypeInfo size must be 0x64");
 } // namespace moho
-

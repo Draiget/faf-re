@@ -17,8 +17,7 @@ namespace
   [[nodiscard]] STransportPickUpInfoTypeInfo* AcquireSTransportPickUpInfoTypeInfo()
   {
     if (!gSTransportPickUpInfoTypeInfoConstructed) {
-      auto* const type = new (gSTransportPickUpInfoTypeInfoStorage) STransportPickUpInfoTypeInfo();
-      gpg::PreRegisterRType(typeid(STransportPickUpInfo), type);
+      new (gSTransportPickUpInfoTypeInfoStorage) STransportPickUpInfoTypeInfo();
       gSTransportPickUpInfoTypeInfoConstructed = true;
     }
 
@@ -35,6 +34,19 @@ namespace
     gSTransportPickUpInfoTypeInfoConstructed = false;
   }
 } // namespace
+
+/**
+ * Address: 0x005E4520 (FUN_005E4520, ??0STransportPickUpInfoTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters `STransportPickUpInfo` RTTI so lookup resolves to this type
+ * helper.
+ */
+STransportPickUpInfoTypeInfo::STransportPickUpInfoTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(STransportPickUpInfo), this);
+}
 
 /**
  * Address: 0x005E45B0 (FUN_005E45B0, scalar deleting thunk)
@@ -71,4 +83,3 @@ int moho::register_STransportPickUpInfoTypeInfo()
   (void)AcquireSTransportPickUpInfoTypeInfo();
   return std::atexit(&cleanup_STransportPickUpInfoTypeInfo);
 }
-

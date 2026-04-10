@@ -7,6 +7,8 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/Entity.h"
+#include "moho/misc/Stats.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
 #include "wm3/Vector3.h"
 
@@ -104,18 +106,29 @@ namespace moho
   static_assert(offsetof(SPerArmyReconInfo, mMaybeDead) == 0x30, "SPerArmyReconInfo::mMaybeDead offset must be 0x30");
 
   /**
-   * `SSTIUnitConstantData` subobject slice used by ReconBlip.
+   * Constant unit data slice stored on a `ReconBlip` for `CreateInterface` dispatch.
    *
-   * `mFake` lives at +0x0C in this 0x10-byte block.
+   * Binary layout is identical to `SSTIUnitConstantData` and `SCreateUnitConstantData`;
+   * named separately here to tie the ownership to the recon blip copy path.
+   *
+   * Evidence:
+   * - `ReconBlip::CreateInterface` (0x005BEE90): copies mBuildStateTag, mStatsRoot, mFake
+   *   into a `SCreateUnitParams::mConstDat` packet and pushes to `SSyncData::mNewUnits`.
    */
   struct SReconBlipUnitConstData
   {
-    std::uint8_t mOpaque00_0B[0x0C];
-    std::uint8_t mFake;           // +0x0C
-    std::uint8_t mPad0D_0F[0x03]; // +0x0D
+    std::uint8_t mBuildStateTag = 0;                    // +0x00
+    std::uint8_t mPad01[3] = {};                        // +0x01
+    boost::shared_ptr<Stats<StatItem>> mStatsRoot{};    // +0x04
+    std::uint8_t mFake = 0;                             // +0x0C
+    std::uint8_t mPad0D[3] = {};                        // +0x0D
   };
 
   static_assert(sizeof(SReconBlipUnitConstData) == 0x10, "SReconBlipUnitConstData size must be 0x10");
+  static_assert(
+    offsetof(SReconBlipUnitConstData, mStatsRoot) == 0x04,
+    "SReconBlipUnitConstData::mStatsRoot offset must be 0x04"
+  );
   static_assert(
     offsetof(SReconBlipUnitConstData, mFake) == 0x0C, "SReconBlipUnitConstData::mFake offset must be 0x0C"
   );
@@ -216,6 +229,17 @@ namespace moho
       const gpg::RRef& ownerRef,
       gpg::SerConstructResult& result
     );
+
+    /**
+     * Address: 0x005BEE90 (FUN_005BEE90)
+     * Mangled: ?CreateInterface@ReconBlip@Moho@@MAEXPAUSSyncData@2@@Z
+     *
+     * What it does:
+     * Copies constant-data from this blip (mUnitConstDat) into a
+     * `SCreateUnitParams` packet and appends it to `syncData->mNewUnits`,
+     * then marks `mInterfaceCreated = 1`.
+     */
+    void CreateInterface(SSyncData* syncData) override;
 
     /**
      * Address: 0x005BDE90 (FUN_005BDE90)

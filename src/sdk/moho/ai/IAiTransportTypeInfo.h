@@ -14,6 +14,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E4740 (FUN_005E4740, ??0IAiTransportTypeInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Preregisters `IAiTransport` RTTI so lookup resolves to this type
+     * helper.
+     */
+    IAiTransportTypeInfo();
+
+    /**
      * Address: 0x005E47D0 (FUN_005E47D0, scalar deleting thunk)
      *
      * VFTable SLOT: 2

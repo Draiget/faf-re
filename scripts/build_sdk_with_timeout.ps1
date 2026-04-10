@@ -5,6 +5,7 @@ param(
   [string]$Platform = "x86",
   [int]$TimeoutMinutes = 120,
   [int]$NoOutputTimeoutMinutes = 10,
+  [int]$HeartbeatSeconds = 30,
   [int]$PollSeconds = 2,
   [int]$MaxCpuCount = 1,
   [string]$LogPath = "msbuild_sdk_timeout.log",
@@ -23,6 +24,10 @@ if ($NoOutputTimeoutMinutes -lt 0) {
 
 if ($PollSeconds -lt 1) {
   throw "PollSeconds must be >= 1."
+}
+
+if ($HeartbeatSeconds -lt 0) {
+  throw "HeartbeatSeconds must be >= 0. Use 0 to disable heartbeat output."
 }
 
 if ($MaxCpuCount -lt 1) {
@@ -117,12 +122,32 @@ function Stop-BuildProcessTree([int]$RootPid, [datetime]$BuildStartTime) {
   }
 }
 
+function Get-BuildProcesses([datetime]$BuildStartTime) {
+  $result = @()
+  foreach ($name in @("cl", "c1xx", "link", "msbuild", "mspdbsrv", "cvtres", "rc")) {
+    $result += Get-Process -Name $name -ErrorAction SilentlyContinue |
+      Where-Object {
+        try {
+          $_.StartTime -ge $BuildStartTime
+        } catch {
+          $false
+        }
+      }
+  }
+  return $result
+}
+
 Write-Host "Running build with timeouts"
 Write-Host "  Total timeout: $TimeoutMinutes minute(s)"
 if ($NoOutputTimeoutMinutes -gt 0) {
-  Write-Host "  No-output timeout: $NoOutputTimeoutMinutes minute(s)"
+  Write-Host "  No-activity timeout: $NoOutputTimeoutMinutes minute(s) (output or compiler CPU progress)"
 } else {
-  Write-Host "  No-output timeout: disabled"
+  Write-Host "  No-activity timeout: disabled"
+}
+if ($HeartbeatSeconds -gt 0) {
+  Write-Host "  Heartbeat: every $HeartbeatSeconds second(s)"
+} else {
+  Write-Host "  Heartbeat: disabled"
 }
 Write-Host "Command: msbuild $solutionPath /t:$Target /p:Configuration=$Configuration /p:Platform=$Platform /m:$MaxCpuCount /nr:false /nodeReuse:false"
 Write-Host "Log: $logFilePath"
@@ -140,33 +165,64 @@ $proc = Start-Process `
 $lastStdoutLength = Get-FileLength $stdoutPath
 $lastStderrLength = Get-FileLength $stderrPath
 $lastOutputAt = Get-Date
+$lastActivityAt = $lastOutputAt
+$lastCpuSeconds = 0.0
+$lastHeartbeatAt = $startTime
 $timeoutReason = ""
 
 while (-not $proc.HasExited) {
   Start-Sleep -Seconds $PollSeconds
 
+  $now = Get-Date
   $stdoutLength = Get-FileLength $stdoutPath
   $stderrLength = Get-FileLength $stderrPath
   if (($stdoutLength -ne $lastStdoutLength) -or ($stderrLength -ne $lastStderrLength)) {
     $lastStdoutLength = $stdoutLength
     $lastStderrLength = $stderrLength
-    $lastOutputAt = Get-Date
+    $lastOutputAt = $now
+    $lastActivityAt = $now
   }
 
-  $now = Get-Date
+  $buildProcesses = Get-BuildProcesses -BuildStartTime $startTime
+  $cpuSeconds = 0.0
+  if ($buildProcesses.Count -gt 0) {
+    $cpuMeasure = $buildProcesses | Measure-Object -Property CPU -Sum
+    if ($null -ne $cpuMeasure.Sum) {
+      $cpuSeconds = [double]$cpuMeasure.Sum
+    }
+  }
+
+  if ($cpuSeconds -gt ($lastCpuSeconds + 0.01)) {
+    $lastActivityAt = $now
+  }
+  $lastCpuSeconds = $cpuSeconds
+
+  if (($HeartbeatSeconds -gt 0) -and ($now -ge $lastHeartbeatAt.AddSeconds($HeartbeatSeconds))) {
+    $elapsedMinutes = [Math]::Round(($now - $startTime).TotalMinutes, 1)
+    $idleMinutes = [Math]::Round(($now - $lastActivityAt).TotalMinutes, 1)
+    $sinceOutputMinutes = [Math]::Round(($now - $lastOutputAt).TotalMinutes, 1)
+    Write-Host ("[heartbeat] elapsed={0}m idle={1}m since-output={2}m active-procs={3} cpu-seconds={4:N1}" -f `
+      $elapsedMinutes, `
+      $idleMinutes, `
+      $sinceOutputMinutes, `
+      $buildProcesses.Count, `
+      $cpuSeconds)
+    $lastHeartbeatAt = $now
+  }
+
   if ($now -ge $absoluteTimeoutAt) {
     $timeoutReason = "total"
     break
   }
-  if (($NoOutputTimeoutMinutes -gt 0) -and ($now -ge $lastOutputAt.AddMinutes($NoOutputTimeoutMinutes))) {
-    $timeoutReason = "no_output"
+  if (($NoOutputTimeoutMinutes -gt 0) -and ($now -ge $lastActivityAt.AddMinutes($NoOutputTimeoutMinutes))) {
+    $timeoutReason = "no_activity"
     break
   }
 }
 
 if (-not [string]::IsNullOrWhiteSpace($timeoutReason)) {
-  if ($timeoutReason -eq "no_output") {
-    Write-Warning "Build produced no output for $NoOutputTimeoutMinutes minute(s). Killing process tree for PID $($proc.Id)..."
+  if ($timeoutReason -eq "no_activity") {
+    Write-Warning "Build produced no activity for $NoOutputTimeoutMinutes minute(s). Killing process tree for PID $($proc.Id)..."
   } else {
     Write-Warning "Build exceeded total timeout ($TimeoutMinutes minute(s)). Killing process tree for PID $($proc.Id)..."
   }

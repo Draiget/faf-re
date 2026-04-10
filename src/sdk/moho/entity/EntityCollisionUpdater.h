@@ -201,6 +201,20 @@ namespace moho
      */
     virtual bool PointInShape(const Wm3::Vec3f* point) const;
 
+    /**
+     * Address: 0x00676A40 (FUN_00676A40, Moho::CColPrimitiveBase::Collide)
+     * Mangled: ?Collide@CColPrimitiveBase@Moho@@QAE_NPAVCColPrimitiveBase@2@PAUCollisionResult@2@@Z
+     *
+     * with, CollisionResult*
+     *
+     * What it does:
+     * Dispatches shape-vs-shape collision: queries `with->GetBox()` or
+     * `with->GetSphere()` to determine shape type, then calls the matching
+     * `CollideBox`/`CollideSphere` virtual on `this` with the extracted shape
+     * pointer.  Asserts if `with` has neither box nor sphere shape.
+     */
+    bool Collide(const EntityCollisionUpdater* with, CollisionPairResult* outResult) const;
+
   protected:
     ~EntityCollisionUpdater() = default;
   };

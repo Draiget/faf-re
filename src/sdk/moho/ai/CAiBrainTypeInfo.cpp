@@ -65,6 +65,18 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x00579B20 (FUN_00579B20, ??0CAiBrainTypeInfo@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Preregisters `CAiBrain` RTTI for this type-info helper.
+ */
+CAiBrainTypeInfo::CAiBrainTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(CAiBrain), this);
+}
+
+/**
  * Address: 0x00579BB0 (FUN_00579BB0, scalar deleting thunk)
  */
 CAiBrainTypeInfo::~CAiBrainTypeInfo() = default;

@@ -37,7 +37,7 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x005D86A0 (??0CAcquireTargetTaskTypeInfo@Moho@@QAE@@Z)
+   * Address: 0x005D86A0 (FUN_005D86A0, ??0CAcquireTargetTaskTypeInfo@Moho@@QAE@@Z)
    */
   CAcquireTargetTaskTypeInfo::CAcquireTargetTaskTypeInfo()
     : gpg::RType()

@@ -38,7 +38,27 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005990B0 (FUN_005990B0, ??0IAiCommandDispatchImpl@Moho@@AAE@XZ)
+     *
+     * What it does:
+     * Initializes base command-task/listener lanes and clears dispatch state
+     * with no bound command queue.
+     */
+    IAiCommandDispatchImpl();
+
+    /**
+     * Address: 0x00598D00 (FUN_00598D00, ??0IAiCommandDispatchImpl@Moho@@QAE@PAVUnit@1@PAVCTaskThread@1@PAW4EAiResult@1@@Z)
+     *
+     * What it does:
+     * Binds this dispatch task to one unit, creates one task-thread lane on
+     * the simulation task stage, and links this object as queue-status
+     * listener into the unit command queue broadcaster ring.
+     */
+    explicit IAiCommandDispatchImpl(Unit* unit);
+
+    /**
      * Address: 0x005990F0 (FUN_005990F0, scalar deleting thunk)
+     * Address: 0x00598DD0 (FUN_00598DD0, ??1IAiCommandDispatchImpl@Moho@@QAE@@Z)
      *
      * VFTable SLOT: 0
      */

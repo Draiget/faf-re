@@ -37,6 +37,14 @@ namespace moho
   class RListenerRType_EAiAttackerEvent final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005DF8C0 (FUN_005DF8C0, moho::RListenerRType_EAiAttackerEvent::RListenerRType_EAiAttackerEvent)
+     *
+     * What it does:
+     * Pre-registers `Listener<EAiAttackerEvent>` RTTI during object construction.
+     */
+    RListenerRType_EAiAttackerEvent();
+
     [[nodiscard]] const char* GetName() const override;
 
     void Init() override
@@ -297,6 +305,18 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x005DF8C0 (FUN_005DF8C0, moho::RListenerRType_EAiAttackerEvent::RListenerRType_EAiAttackerEvent)
+ *
+ * What it does:
+ * Pre-registers `Listener<EAiAttackerEvent>` RTTI during object construction.
+ */
+moho::RListenerRType_EAiAttackerEvent::RListenerRType_EAiAttackerEvent()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(moho::Listener<moho::EAiAttackerEvent>), this);
+}
+
+/**
  * Address: 0x005DB790 (FUN_005DB790, Moho::RBroadcasterRType_EAiAttackerEvent::GetName)
  *
  * What it does:
@@ -518,8 +538,7 @@ int moho::register_RBroadcasterRType_EAiAttackerEvent()
  */
 int moho::register_RListenerRType_EAiAttackerEvent()
 {
-  auto* const type = AcquireListenerAttackerType();
-  gpg::PreRegisterRType(typeid(moho::Listener<moho::EAiAttackerEvent>), type);
+  (void)AcquireListenerAttackerType();
   return std::atexit(&cleanup_RListenerRType_EAiAttackerEvent);
 }
 
