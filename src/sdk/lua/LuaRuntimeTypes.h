@@ -282,14 +282,6 @@ union GCObject
 	lua_State th;
 };
 
-inline moho::Sim* lua_getglobaluserdata(lua_State* const state)
-{
-	if (state == nullptr || state->l_G == nullptr) {
-		return nullptr;
-	}
-	return state->l_G->globalUserData;
-}
-
 #if INTPTR_MAX == INT32_MAX
 static_assert(offsetof(lua_State, l_G) == 0x10, "lua_State::l_G must be at +0x10 (x86)");
 static_assert(offsetof(lua_State, _gt) == 0x30, "lua_State::_gt must be at +0x30 (x86)");

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <typeinfo>
 
 #include "gpg/core/algorithms/MD5.h"
@@ -24,21 +25,136 @@
 
 namespace gpg
 {
+  class RMapType_uint_int final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00718C70 (FUN_00718C70, gpg::RMapType_uint_int::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00718D50 (FUN_00718D50, gpg::RMapType_uint_int::GetLexical)
+     *
+     * What it does:
+     * Formats inherited map lexical text with current element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x00718D30 (FUN_00718D30, gpg::RMapType_uint_int::Init)
+     *
+     * What it does:
+     * Initializes map reflection metadata and binds typed archive callbacks.
+     */
+    void Init() override;
+  };
+
+  class RMapType_uint_InfluenceMapEntry final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00718FE0 (FUN_00718FE0, gpg::RMapType_uint_InfluenceMapEntry::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x007190C0 (FUN_007190C0, gpg::RMapType_uint_InfluenceMapEntry::GetLexical)
+     *
+     * What it does:
+     * Formats inherited map lexical text with current element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x007190A0 (FUN_007190A0, gpg::RMapType_uint_InfluenceMapEntry::Init)
+     *
+     * What it does:
+     * Initializes map reflection metadata and binds typed archive callbacks.
+     */
+    void Init() override;
+  };
+
   class RVectorType_InfluenceGrid final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00718DE0 (FUN_00718DE0, gpg::RVectorType_InfluenceGrid::GetName)
+     */
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00718EA0 (FUN_00718EA0, gpg::RVectorType_InfluenceGrid::GetLexical)
+     *
+     * What it does:
+     * Formats inherited vector lexical text with current `InfluenceGrid` count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 
   class RVectorType_SThreat final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00719150 (FUN_00719150, gpg::RVectorType_SThreat::GetName)
+     */
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00719210 (FUN_00719210, gpg::RVectorType_SThreat::GetLexical)
+     *
+     * What it does:
+     * Formats inherited vector lexical text with current `SThreat` count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 } // namespace gpg
 
 namespace
 {
+  using UIntIntMap = std::map<std::uint32_t, int>;
+  using UIntInfluenceMapEntryMap = std::map<std::uint32_t, moho::InfluenceMapEntry>;
+
+  struct LegacyMapRuntimeView
+  {
+    void* allocProxy;
+    void* head;
+    std::uint32_t size;
+  };
+
+  template <class TValue>
+  [[nodiscard]] std::size_t CountLegacyVectorElements(const void* const object) noexcept
+  {
+    if (object == nullptr) {
+      return 0u;
+    }
+
+    const auto* const vector = static_cast<const msvc8::vector<TValue>*>(object);
+    return vector->size();
+  }
+
+  [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
+  {
+    if (object == nullptr) {
+      return 0u;
+    }
+
+    const auto* const mapView = static_cast<const LegacyMapRuntimeView*>(object);
+    return mapView->size;
+  }
+
+  template <class TObject>
+  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
+
+  template <class TObject>
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
+
   [[nodiscard]] float DecayThreatLane(const float value, const float decay) noexcept
   {
     if (value <= 0.0f) {
@@ -153,6 +269,10 @@ namespace
 
   msvc8::string gInfluenceGridVectorTypeName{};
   std::uint32_t gInfluenceGridVectorTypeNameInitGuard = 0u;
+  msvc8::string gMapUintIntTypeName{};
+  std::uint32_t gMapUintIntTypeNameInitGuard = 0u;
+  msvc8::string gMapUintInfluenceMapEntryTypeName{};
+  std::uint32_t gMapUintInfluenceMapEntryTypeNameInitGuard = 0u;
   msvc8::string gSThreatVectorTypeName{};
   std::uint32_t gSThreatVectorTypeNameInitGuard = 0u;
 
@@ -176,6 +296,43 @@ namespace
     return type;
   }
 
+  [[nodiscard]] gpg::RType* CachedUIntType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(unsigned int));
+      if (!type) {
+        type = gpg::REF_FindTypeNamed("unsigned int");
+      }
+      if (!type) {
+        type = gpg::REF_FindTypeNamed("uint");
+      }
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedIntType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(int));
+      if (!type) {
+        type = gpg::REF_FindTypeNamed("int");
+      }
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedInfluenceMapEntryType()
+  {
+    gpg::RType* type = moho::InfluenceMapEntry::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::InfluenceMapEntry));
+      moho::InfluenceMapEntry::sType = type;
+    }
+    return type;
+  }
+
   void cleanup_InfluenceGridVectorTypeName()
   {
     gInfluenceGridVectorTypeName.clear();
@@ -187,7 +344,236 @@ namespace
     gSThreatVectorTypeName.clear();
     gSThreatVectorTypeNameInitGuard = 0u;
   }
+
+  void cleanup_MapUintIntTypeName()
+  {
+    gMapUintIntTypeName.clear();
+    gMapUintIntTypeNameInitGuard = 0u;
+  }
+
+  void cleanup_MapUintInfluenceMapEntryTypeName()
+  {
+    gMapUintInfluenceMapEntryTypeName.clear();
+    gMapUintInfluenceMapEntryTypeNameInitGuard = 0u;
+  }
+
+  /**
+   * Address: 0x0071A220 (FUN_0071A220)
+   *
+   * What it does:
+   * Loads one `map<unsigned int,int>` payload from archive lanes.
+   */
+  void LoadUIntIntMap(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    auto* const mapObject = PointerFromArchiveInt<UIntIntMap>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(mapObject != nullptr);
+    if (!archive || !mapObject) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    mapObject->clear();
+    for (unsigned int i = 0; i < count; ++i) {
+      unsigned int key = 0;
+      int value = 0;
+      archive->ReadUInt(&key);
+      archive->ReadInt(&value);
+      (*mapObject)[key] = value;
+    }
+  }
+
+  /**
+   * Address: 0x0071A2D0 (FUN_0071A2D0)
+   *
+   * What it does:
+   * Saves one `map<unsigned int,int>` payload into archive lanes.
+   */
+  void SaveUIntIntMap(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef*)
+  {
+    const auto* const mapObject = ConstPointerFromArchiveInt<UIntIntMap>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(mapObject != nullptr);
+    if (!archive || !mapObject) {
+      return;
+    }
+
+    archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
+    for (auto it = mapObject->begin(); it != mapObject->end(); ++it) {
+      archive->WriteUInt(it->first);
+      archive->WriteInt(it->second);
+    }
+  }
+
+  /**
+   * Address: 0x0071A530 (FUN_0071A530)
+   *
+   * What it does:
+   * Loads one `map<unsigned int,InfluenceMapEntry>` payload from archive lanes.
+   */
+  void LoadUIntInfluenceMapEntryMap(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+  {
+    auto* const mapObject = PointerFromArchiveInt<UIntInfluenceMapEntryMap>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(mapObject != nullptr);
+    if (!archive || !mapObject) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    mapObject->clear();
+    gpg::RType* const valueType = CachedInfluenceMapEntryType();
+    GPG_ASSERT(valueType != nullptr);
+    if (!valueType) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      unsigned int key = 0;
+      moho::InfluenceMapEntry value{};
+      archive->ReadUInt(&key);
+      archive->Read(valueType, &value, owner);
+      (*mapObject)[key] = value;
+    }
+  }
+
+  /**
+   * Address: 0x0071A670 (FUN_0071A670)
+   *
+   * What it does:
+   * Saves one `map<unsigned int,InfluenceMapEntry>` payload into archive lanes.
+   */
+  void SaveUIntInfluenceMapEntryMap(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const mapObject = ConstPointerFromArchiveInt<UIntInfluenceMapEntryMap>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(mapObject != nullptr);
+    if (!archive || !mapObject) {
+      return;
+    }
+
+    archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
+
+    gpg::RType* const valueType = CachedInfluenceMapEntryType();
+    GPG_ASSERT(valueType != nullptr);
+    if (!valueType) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (auto it = mapObject->begin(); it != mapObject->end(); ++it) {
+      archive->WriteUInt(it->first);
+      archive->Write(valueType, &(it->second), owner);
+    }
+  }
 } // namespace
+
+/**
+ * Address: 0x00718C70 (FUN_00718C70, gpg::RMapType_uint_int::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected type label `map<unsigned int,int>`.
+ */
+const char* gpg::RMapType_uint_int::GetName() const
+{
+  if ((gMapUintIntTypeNameInitGuard & 1u) == 0u) {
+    gMapUintIntTypeNameInitGuard |= 1u;
+
+    const gpg::RType* const keyType = CachedUIntType();
+    const gpg::RType* const valueType = CachedIntType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "int";
+    const char* const keyTypeName = keyType ? keyType->GetName() : "unsigned int";
+    gMapUintIntTypeName = gpg::STR_Printf("map<%s,%s>", keyTypeName, valueTypeName);
+    (void)std::atexit(&cleanup_MapUintIntTypeName);
+  }
+
+  return gMapUintIntTypeName.c_str();
+}
+
+/**
+ * Address: 0x00718D50 (FUN_00718D50, gpg::RMapType_uint_int::GetLexical)
+ *
+ * What it does:
+ * Formats inherited map lexical text with current element count.
+ */
+msvc8::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements(ref.mObj)));
+}
+
+/**
+ * Address: 0x00718D30 (FUN_00718D30, gpg::RMapType_uint_int::Init)
+ *
+ * What it does:
+ * Initializes map reflection metadata and binds typed archive callbacks.
+ */
+void gpg::RMapType_uint_int::Init()
+{
+  size_ = 0x0C;
+  version_ = 1;
+  serLoadFunc_ = &LoadUIntIntMap;
+  serSaveFunc_ = &SaveUIntIntMap;
+}
+
+/**
+ * Address: 0x00718FE0 (FUN_00718FE0, gpg::RMapType_uint_InfluenceMapEntry::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected type label
+ * `map<unsigned int,InfluenceMapEntry>`.
+ */
+const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
+{
+  if ((gMapUintInfluenceMapEntryTypeNameInitGuard & 1u) == 0u) {
+    gMapUintInfluenceMapEntryTypeNameInitGuard |= 1u;
+
+    const gpg::RType* const keyType = CachedUIntType();
+    const gpg::RType* const valueType = CachedInfluenceMapEntryType();
+    const char* const valueTypeName = valueType ? valueType->GetName() : "InfluenceMapEntry";
+    const char* const keyTypeName = keyType ? keyType->GetName() : "unsigned int";
+    gMapUintInfluenceMapEntryTypeName = gpg::STR_Printf("map<%s,%s>", keyTypeName, valueTypeName);
+    (void)std::atexit(&cleanup_MapUintInfluenceMapEntryTypeName);
+  }
+
+  return gMapUintInfluenceMapEntryTypeName.c_str();
+}
+
+/**
+ * Address: 0x007190C0 (FUN_007190C0, gpg::RMapType_uint_InfluenceMapEntry::GetLexical)
+ *
+ * What it does:
+ * Formats inherited map lexical text with current element count.
+ */
+msvc8::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements(ref.mObj)));
+}
+
+/**
+ * Address: 0x007190A0 (FUN_007190A0, gpg::RMapType_uint_InfluenceMapEntry::Init)
+ *
+ * What it does:
+ * Initializes map reflection metadata and binds typed archive callbacks.
+ */
+void gpg::RMapType_uint_InfluenceMapEntry::Init()
+{
+  size_ = 0x0C;
+  version_ = 1;
+  serLoadFunc_ = &LoadUIntInfluenceMapEntryMap;
+  serSaveFunc_ = &SaveUIntInfluenceMapEntryMap;
+}
 
 /**
  * Address: 0x00718DE0 (FUN_00718DE0, gpg::RVectorType_InfluenceGrid::GetName)
@@ -211,6 +597,22 @@ const char* gpg::RVectorType_InfluenceGrid::GetName() const
 }
 
 /**
+ * Address: 0x00718EA0 (FUN_00718EA0, gpg::RVectorType_InfluenceGrid::GetLexical)
+ *
+ * What it does:
+ * Formats inherited vector lexical text with current `InfluenceGrid` count.
+ */
+msvc8::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf(
+    "%s, size=%d",
+    base.c_str(),
+    static_cast<int>(CountLegacyVectorElements<moho::InfluenceGrid>(ref.mObj))
+  );
+}
+
+/**
  * Address: 0x00719150 (FUN_00719150, gpg::RVectorType_SThreat::GetName)
  *
  * What it does:
@@ -229,6 +631,18 @@ const char* gpg::RVectorType_SThreat::GetName() const
   }
 
   return gSThreatVectorTypeName.c_str();
+}
+
+/**
+ * Address: 0x00719210 (FUN_00719210, gpg::RVectorType_SThreat::GetLexical)
+ *
+ * What it does:
+ * Formats inherited vector lexical text with current `SThreat` count.
+ */
+msvc8::string gpg::RVectorType_SThreat::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyVectorElements<moho::SThreat>(ref.mObj)));
 }
 
 namespace moho

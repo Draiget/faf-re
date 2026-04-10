@@ -106,10 +106,42 @@ namespace moho
     void GetArmyStartPos(Wm3::Vector2f& outStartPosition) override;
     /** Address: 0x006FDF30 (FUN_006FDF30, Moho::CArmyImpl::SetAlliance) */
     void SetAlliance(std::uint32_t armyId, int relationIndex) override;
+
+    /**
+     * Address: 0x006FDEE0 (FUN_006FDEE0, Moho::CArmyImpl::SetCanSee)
+     *
+     * What it does:
+     * Updates ally-visibility flag from current focused-army sync filter.
+     */
+    void SetCanSee(std::int32_t focusArmyIndex);
+
+    /**
+     * Address: 0x006FFF70 (FUN_006FFF70, Moho::CArmyImpl::RenderDebugPlayableRect)
+     *
+     * What it does:
+     * Emits playable-rect debug contour lines when debug convar is enabled.
+     */
+    void RenderDebugPlayableRect();
+
+    /**
+     * Address: 0x00700820 (FUN_00700820, Moho::CArmyImpl::CleanUpPlatoons)
+     *
+     * What it does:
+     * Removes idle/empty platoons and dispatches platoon destroy script hooks.
+     */
+    void CleanUpPlatoons();
+
     /** Address: 0x00700FC0 (FUN_00700FC0, Moho::CArmyImpl::OnCommandSourceTerminated) */
     void OnCommandSourceTerminated(std::uint32_t sourceId) override;
-    /** Address: 0x006FFD70 (FUN_006FFD70, Moho::CArmyImpl::OnTick) */
-    virtual void OnTick() override = 0;
+
+    /**
+     * Address: 0x006FFD70 (FUN_006FFD70, Moho::CArmyImpl::OnTick)
+     *
+     * What it does:
+     * Executes this army's per-tick update path (visibility, AI tasks, and
+     * debug/stat refresh lanes).
+     */
+    void OnTick() override;
     /** Address: 0x00700080 (FUN_00700080, Moho::CArmyImpl::CopyConstantDataToUserArmy) */
     UserArmy* CopyConstantDataToUserArmy(UserArmy* outUserArmy) override;
     /** Address: 0x00700240 (FUN_00700240, Moho::CArmyImpl::CopyArmyVariableData) */
@@ -129,25 +161,42 @@ namespace moho
     /** Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList) */
     void GetPlatoonsList(ArmyPool& outPool) override;
     /** Address: 0x00700410 (FUN_00700410, Moho::CArmyImpl::MakePlatoon) */
-    virtual CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) override = 0;
+    virtual CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) override;
     /** Address: 0x00700470 (FUN_00700470, Moho::CArmyImpl::GetPlatoonByName) */
-    virtual CPlatoon* GetPlatoonByName(const char* platoonName) override = 0;
+    CPlatoon* GetPlatoonByName(const char* platoonName) override;
     /** Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor) */
-    virtual CPlatoon* GetPlatoonFor(int queryArg, ESquadClass* outSquadClass) override = 0;
-    /** Address: 0x007005F0 (FUN_007005F0, Moho::CArmyImpl::DisbandPlatoonUniquelyNamed) */
-    virtual void DisbandPlatoonUniquelyNamed(const char* platoonName) override = 0;
-    /** Address: 0x00700540 (FUN_00700540, Moho::CArmyImpl::DisbandPlatoon) */
-    virtual void DisbandPlatoon(CPlatoon* platoon) override = 0;
-    /** Address: 0x007006C0 (FUN_007006C0, Moho::CArmyImpl::Func9) */
-    virtual void Func9(int arg) override = 0;
+    CPlatoon* GetPlatoonFor(int queryArg, ESquadClass* outSquadClass) override;
+    /**
+     * Address: 0x007005F0 (FUN_007005F0, Moho::CArmyImpl::DisbandPlatoonUniquelyNamed)
+     *
+     * What it does:
+     * Removes one uniquely-named platoon from this army and destroys it.
+     */
+    void DisbandPlatoonUniquelyNamed(const char* platoonName) override;
+
+    /**
+     * Address: 0x00700540 (FUN_00700540, Moho::CArmyImpl::DisbandPlatoon)
+     *
+     * What it does:
+     * Removes one platoon pointer from this army and destroys it.
+     */
+    void DisbandPlatoon(CPlatoon* platoon) override;
+    /**
+     * Address: 0x007006C0 (FUN_007006C0, Moho::CArmyImpl::AssignUnitsToPlatoon)
+     *
+     * What it does:
+     * Removes all provided units from their current platoons, then appends
+     * that unit set into the unassigned squad of the named platoon.
+     */
+    void AssignUnitsToPlatoon(const SEntitySetTemplateUnit* units, const char* platoonName) override;
     /** Address: 0x00700700 (FUN_00700700, Moho::CArmyImpl::RemoveFromPlatoon) */
-    virtual void RemoveFromPlatoon(void* unit) override = 0;
+    void RemoveFromPlatoon(Unit* unit) override;
     /** Address: 0x00700730 (FUN_00700730, Moho::CArmyImpl::RemoveUnitsFromPlatoons) */
-    virtual void RemoveUnitsFromPlatoons(const void* units) override = 0;
+    void RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* units) override;
     /** Address: 0x00700770 (FUN_00700770, Moho::CArmyImpl::GetNumPlatoonsTemplateNamed) */
-    virtual int GetNumPlatoonsTemplateNamed(const char* templateName) override = 0;
+    int GetNumPlatoonsTemplateNamed(const char* templateName) override;
     /** Address: 0x007007C0 (FUN_007007C0, Moho::CArmyImpl::GetNumPlatoonWithPlan) */
-    virtual int GetNumPlatoonWithPlan(const char* planName) override = 0;
+    int GetNumPlatoonWithPlan(const char* planName) override;
     /** Address: 0x00700A00 (FUN_00700A00, Moho::CArmyImpl::CountUnitsInBoundsXZ) */
     int CountUnitsInBoundsXZ(
       const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const SEntitySetTemplateUnit& unitSet
@@ -159,7 +208,7 @@ namespace moho
     /** Address: 0x00700E70 (FUN_00700E70, Moho::CArmyImpl::ConsumeUnitFromCategorySet) */
     bool ConsumeUnitFromCategorySet(Unit* unit) override;
     /** Address: 0x00700EB0 (FUN_00700EB0, Moho::CArmyImpl::GetUnits) */
-    virtual void* GetUnits(void* outUnits, void* filterBuckets) override = 0;
+    void* GetUnits(void* outUnits, void* filterBuckets) override;
     /** Address: 0x006FE090 (FUN_006FE090, Moho::CArmyImpl::GetAlliedArmies) */
     msvc8::vector<CArmyImpl*>* GetAlliedArmies(msvc8::vector<CArmyImpl*>* outArmyList) override;
     /** Address: 0x006FDD00 (FUN_006FDD00, Moho::CArmyImpl::GetUnitCap) */
@@ -175,9 +224,9 @@ namespace moho
     /** Address: 0x006FDED0 (FUN_006FDED0, Moho::CArmyImpl::UseWholeMap) */
     bool UseWholeMap() override;
     /** Address: 0x006FE1B0 (FUN_006FE1B0, Moho::CArmyImpl::AddBuildRestriction) */
-    virtual void AddBuildRestriction(void* restriction) override = 0;
+    void AddBuildRestriction(void* restriction) override;
     /** Address: 0x006FE220 (FUN_006FE220, Moho::CArmyImpl::RemoveBuildRestriction) */
-    virtual void RemoveBuildRestriction(void* restriction) override = 0;
+    void RemoveBuildRestriction(void* restriction) override;
     /** Address: 0x006FE290 (FUN_006FE290, Moho::CArmyImpl::SetNoRushTimer) */
     void SetNoRushTimer(float seconds) override;
     /** Address: 0x006FE2B0 (FUN_006FE2B0, Moho::CArmyImpl::SetNoRushRadius) */

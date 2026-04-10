@@ -2,6 +2,7 @@
 
 #include "moho/ai/CAiTarget.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/script/CScriptEvent.h"
 
 namespace
@@ -11,13 +12,12 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
-    static moho::CScrLuaInitFormSet set("core");
-    return set;
-  }
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("core"); set != nullptr) {
+      return *set;
+    }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
+    static moho::CScrLuaInitFormSet fallbackSet("core");
+    return fallbackSet;
   }
 
   [[nodiscard]] Wm3::Vec3f ReadVector3FromLuaObject(const LuaPlus::LuaObject& object) noexcept
@@ -58,7 +58,7 @@ namespace moho
    */
   int cfunc_AITarget(lua_State* const luaContext)
   {
-    return cfunc_AITargetL(ResolveBindingState(luaContext));
+    return cfunc_AITargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

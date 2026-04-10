@@ -7,6 +7,9 @@
 #include <new>
 
 #include "moho/app/WxAppRuntime.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
+#include "moho/misc/TimeBar.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "Sim.h"
@@ -17,6 +20,7 @@ namespace
 {
   bool gSimInterlocked = false;
   ISTIDriver* gActiveSimDriver = nullptr;
+  StatItem* gEngineStatSimSync = nullptr;
 
   boost::mutex& DriverMutexRef(SDriverMutex& lockCell)
   {
@@ -53,6 +57,23 @@ namespace
 
     return static_cast<int>(std::lround(sample));
   }
+
+  void AddElapsedMicrosecondsToStat(StatItem* const statItem, const std::int64_t elapsedMicroseconds)
+  {
+    if (statItem == nullptr) {
+      return;
+    }
+
+    (void)::InterlockedExchangeAdd(
+      reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits),
+      static_cast<long>(elapsedMicroseconds)
+    );
+  }
+
+  bool IsZeroDigest(const gpg::MD5Digest& digest)
+  {
+    return digest.vals[0] == 0 && digest.vals[1] == 0 && digest.vals[2] == 0 && digest.vals[3] == 0;
+  }
 } // namespace
 
 /**
@@ -72,7 +93,11 @@ SSyncData::SSyncData()
   , mPublishedCommandPackets()
   , mPendingCommandEventRemovals()
   , mPendingReleasedCommandIds()
-  , pad_01C8_02B8{}
+  , pad_01C8_0250{}
+  , mPausedBy(-1)
+  , pad_0254_0270{}
+  , mGameOver(false)
+  , pad_0271_02B8{}
 {}
 
 void SSyncData::QueuePendingCommandEventRemoval(const CmdId commandId)
@@ -361,24 +386,53 @@ void CSimDriver::ForwardCommandResultLocked()
  * Address: 0x0073DAD0 (FUN_0073DAD0)
  *
  * What it does:
- * Copies pending filter state into active state and queues one sync packet.
+ * Unlocks the driver mutex, runs one `Sim::Sync` publish pass, relocks,
+ * verifies historical checksums when available, and enqueues the sync packet.
  */
-void CSimDriver::FinalizeSyncDispatchLocked(const int32_t beatToDispatch)
+void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 {
   mActiveSyncFilter.CopyFrom(mPendingSyncFilter);
 
-  if (!mSim) {
-    return;
+  lock.unlock();
+
+  CTimeBarSection timebar("Sim - Sync");
+  if (gEngineStatSimSync == nullptr) {
+    gEngineStatSimSync = GetEngineStats()->GetItem3("Sim_Sync");
+    if (gEngineStatSimSync != nullptr) {
+      (void)gEngineStatSimSync->Release(1);
+    }
   }
 
-  // Sim::Sync (0x007474B0) is partially lifted; keep a defensive beat-only
-  // fallback packet so queue/event flow remains stable during wider recovery.
+  gpg::time::Timer syncTimer;
   SSyncData* syncData = nullptr;
   mSim->Sync(mActiveSyncFilter, syncData);
-  if (!syncData) {
-    syncData = new SSyncData{};
-    syncData->mCurBeat = beatToDispatch;
+
+  AddElapsedMicrosecondsToStat(
+    gEngineStatSimSync,
+    static_cast<std::int64_t>(gpg::time::CyclesToMicroseconds(syncTimer.ElapsedCycles()))
+  );
+
+  lock.lock();
+
+  const int32_t currentBeat = static_cast<int32_t>(mSim->mCurBeat);
+  const int32_t syncBeat = syncData->mCurBeat;
+  const int32_t oldestRetainedBeat = currentBeat - 128;
+  if (syncBeat >= oldestRetainedBeat && syncBeat < currentBeat) {
+    const gpg::MD5Digest& expectedDigest = mSim->mSimHashes[syncBeat & 0x7F];
+    if (!IsZeroDigest(expectedDigest)) {
+      mMarshaller->VerifyChecksum(expectedDigest, syncBeat);
+    }
   }
+
+  const bool hasBlockingSyncState = syncData->mPausedBy != -1 || syncData->mGameOver;
+  if (mSimBusy != hasBlockingSyncState) {
+    mSimBusy = hasBlockingSyncState;
+    if (!hasBlockingSyncState) {
+      mLastSyncCycleTime = mTimer.ElapsedCycles();
+    }
+    SetEvent(mConnectionEvent);
+  }
+
   mSyncDataQueue.PushBack(syncData);
 
   if (mSyncDataAvailableEvent) {
@@ -403,7 +457,7 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   mClientManager->UpdateStates(beatToDispatch);
   lock.lock();
 
-  FinalizeSyncDispatchLocked(beatToDispatch);
+  FinalizeSyncDispatchLocked(lock);
 
   if (mSimBusy) {
     return;

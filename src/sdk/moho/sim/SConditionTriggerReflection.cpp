@@ -347,6 +347,12 @@ namespace
       return gFastVectorSConditionTypeName.c_str();
     }
 
+    /**
+     * Address: 0x0070E6E0 (FUN_0070E6E0, gpg::RFastVectorType_SCondition::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current fastvector size.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
       const msvc8::string base = gpg::RType::GetLexical(ref);
@@ -648,6 +654,20 @@ namespace
 
       return gListSharedPtrSTriggerTypeName.c_str();
     }
+
+    /**
+     * Address: 0x0070F420 (FUN_0070F420, gpg::RListType_shared_ptr_STrigger::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current list element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    {
+      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const auto* const list = static_cast<const std::list<boost::shared_ptr<moho::STrigger>>*>(ref.mObj);
+      const int size = list ? static_cast<int>(list->size()) : 0;
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
+    }
   };
   static_assert(sizeof(RListSharedPtrSTriggerTypeInfo) == 0x64, "RListSharedPtrSTriggerTypeInfo size must be 0x64");
 
@@ -769,6 +789,20 @@ namespace
     }
 
     /**
+     * Address: 0x0070EE00 (FUN_0070EE00, gpg::RMapType_RUnitBlueprintP_float::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current map element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    {
+      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const auto* const map = static_cast<const UnitBlueprintWeightMap*>(ref.mObj);
+      const int size = map ? static_cast<int>(map->size()) : 0;
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
+    }
+
+    /**
      * Address: 0x0070EDE0 (FUN_0070EDE0, gpg::RMapType_RUnitBlueprintP_float::Init)
      *
      * What it does:
@@ -862,6 +896,20 @@ namespace
       }
 
       return gMapStringArmyStatItemPtrTypeName.c_str();
+    }
+
+    /**
+     * Address: 0x0070F2D0 (FUN_0070F2D0, gpg::RMapType_string_CArmyStateItemP::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current map element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    {
+      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const auto* const map = static_cast<const StringToArmyStatItemMap*>(ref.mObj);
+      const int size = map ? static_cast<int>(map->size()) : 0;
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
 
     /**

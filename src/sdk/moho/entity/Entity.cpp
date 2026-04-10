@@ -385,11 +385,6 @@ namespace
     return path;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   void AddStatCounter(StatItem* const statItem, const long delta) noexcept
   {
     if (!statItem) {
@@ -459,20 +454,9 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -731,35 +715,6 @@ namespace
     return args;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject GetLuaTableFieldByName(
-    const LuaPlus::LuaObject& tableObject,
-    const char* const fieldName
-  )
-  {
-    LuaPlus::LuaObject out{};
-    if (!tableObject.IsTable()) {
-      return out;
-    }
-
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const rawState = state->GetCState();
-    if (!rawState) {
-      return out;
-    }
-
-    const int top = lua_gettop(rawState);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(rawState);
-    lua_pushstring(rawState, fieldName ? fieldName : "");
-    lua_gettable(rawState, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(rawState, top);
-    return out;
-  }
-
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -786,7 +741,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetLuaTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -1890,6 +1845,15 @@ namespace moho
   }
 
   /**
+   * Address: 0x00677C60 (FUN_00677C60, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Provides the required out-of-line body for Entity's pure-virtual
+   * destructor so deleting-thunk wrappers can call base teardown.
+   */
+  Entity::~Entity() = default;
+
+  /**
    * Address: 0x006779E0 (FUN_006779E0)
    *
    * What it does:
@@ -2327,6 +2291,17 @@ namespace moho
     }
 
     return static_cast<int>(end - begin);
+  }
+
+  /**
+   * Address: 0x00678B90 (FUN_00678B90, Moho::Entity::GetArmyIndex)
+   *
+   * What it does:
+   * Returns the owning army id when present, otherwise `-1`.
+   */
+  int Entity::GetArmyIndex() const
+  {
+    return (ArmyRef != nullptr) ? ArmyRef->ArmyId : -1;
   }
 
   /**
@@ -2932,7 +2907,6 @@ namespace moho
     SimulationRef->mDeletionQueue.push_back(this);
     SimulationRef->Logf("Entity 0x%08x queued for delete.\n", static_cast<unsigned int>(id_));
 
-    mCoordNode.ListUnlink();
     mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
   }
 
@@ -3124,7 +3098,6 @@ namespace moho
 
     mStrategicUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
 
-    mCoordNode.ListUnlink();
     mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
   }
 
@@ -3286,7 +3259,7 @@ namespace moho
    */
   int cfunc_EntityCreateProjectile(lua_State* const luaContext)
   {
-    return cfunc_EntityCreateProjectileL(ResolveBindingState(luaContext));
+    return cfunc_EntityCreateProjectileL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3428,7 +3401,7 @@ namespace moho
    */
   int cfunc_EntityCreateProjectileAtBone(lua_State* const luaContext)
   {
-    return cfunc_EntityCreateProjectileAtBoneL(ResolveBindingState(luaContext));
+    return cfunc_EntityCreateProjectileAtBoneL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3543,7 +3516,7 @@ namespace moho
    */
   int cfunc_EntityShakeCamera(lua_State* const luaContext)
   {
-    return cfunc_EntityShakeCameraL(ResolveBindingState(luaContext));
+    return cfunc_EntityShakeCameraL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3654,7 +3627,7 @@ namespace moho
    */
   int cfunc_GetBlueprintSim(lua_State* const luaContext)
   {
-    return cfunc_GetBlueprintSimL(ResolveBindingState(luaContext));
+    return cfunc_GetBlueprintSimL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3709,7 +3682,7 @@ namespace moho
    */
   int cfunc_EntityGetAIBrain(lua_State* const luaContext)
   {
-    return cfunc_EntityGetAIBrainL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetAIBrainL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3780,7 +3753,7 @@ namespace moho
    */
   int cfunc_EntityGetBlueprint(lua_State* const luaContext)
   {
-    return cfunc_EntityGetBlueprintL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetBlueprintL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3835,7 +3808,7 @@ namespace moho
    */
   int cfunc_EntityGetArmy(lua_State* const luaContext)
   {
-    return cfunc_EntityGetArmyL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetArmyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3894,7 +3867,7 @@ namespace moho
    */
   int cfunc_EntityGetBoneDirection(lua_State* const luaContext)
   {
-    return cfunc_EntityGetBoneDirectionL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetBoneDirectionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3954,7 +3927,7 @@ namespace moho
    */
   int cfunc_EntityIsValidBone(lua_State* const luaContext)
   {
-    return cfunc_EntityIsValidBoneL(ResolveBindingState(luaContext));
+    return cfunc_EntityIsValidBoneL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4033,7 +4006,7 @@ namespace moho
    */
   int cfunc_EntityGetBoneCount(lua_State* const luaContext)
   {
-    return cfunc_EntityGetBoneCountL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetBoneCountL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4083,7 +4056,7 @@ namespace moho
    */
   int cfunc_EntityGetBoneName(lua_State* const luaContext)
   {
-    return cfunc_EntityGetBoneNameL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetBoneNameL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4145,7 +4118,7 @@ namespace moho
    */
   int cfunc_EntityRequestRefreshUI(lua_State* const luaContext)
   {
-    return cfunc_EntityRequestRefreshUIL(ResolveBindingState(luaContext));
+    return cfunc_EntityRequestRefreshUIL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4195,7 +4168,7 @@ namespace moho
    */
   int cfunc_EntityAttachBoneTo(lua_State* const luaContext)
   {
-    return cfunc_EntityAttachBoneToL(ResolveBindingState(luaContext));
+    return cfunc_EntityAttachBoneToL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4225,7 +4198,7 @@ namespace moho
    */
   int cfunc_EntitySetParentOffset(lua_State* const luaContext)
   {
-    return cfunc_EntitySetParentOffsetL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetParentOffsetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4288,7 +4261,7 @@ namespace moho
    */
   int cfunc_EntityDetachFrom(lua_State* const luaContext)
   {
-    return cfunc_EntityDetachFromL(ResolveBindingState(luaContext));
+    return cfunc_EntityDetachFromL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4353,7 +4326,7 @@ namespace moho
    */
   int cfunc_EntityGetParent(lua_State* const luaContext)
   {
-    return cfunc_EntityGetParentL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetParentL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4409,7 +4382,7 @@ namespace moho
    */
   int cfunc_EntityGetCollisionExtents(lua_State* const luaContext)
   {
-    return cfunc_EntityGetCollisionExtentsL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetCollisionExtentsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4439,7 +4412,7 @@ namespace moho
    */
   int cfunc_EntityPlaySound(lua_State* const luaContext)
   {
-    return cfunc_EntityPlaySoundL(ResolveBindingState(luaContext));
+    return cfunc_EntityPlaySoundL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4498,7 +4471,7 @@ namespace moho
    */
   int cfunc_EntitySetAmbientSound(lua_State* const luaContext)
   {
-    return cfunc_EntitySetAmbientSoundL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetAmbientSoundL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4563,7 +4536,7 @@ namespace moho
    */
   int cfunc_EntityGetFractionComplete(lua_State* const luaContext)
   {
-    return cfunc_EntityGetFractionCompleteL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetFractionCompleteL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4613,7 +4586,7 @@ namespace moho
    */
   int cfunc_EntityAdjustHealth(lua_State* const luaContext)
   {
-    return cfunc_EntityAdjustHealthL(ResolveBindingState(luaContext));
+    return cfunc_EntityAdjustHealthL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4678,7 +4651,7 @@ namespace moho
    */
   int cfunc_EntityGetHealth(lua_State* const luaContext)
   {
-    return cfunc_EntityGetHealthL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetHealthL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4728,7 +4701,7 @@ namespace moho
    */
   int cfunc_EntityGetMaxHealth(lua_State* const luaContext)
   {
-    return cfunc_EntityGetMaxHealthL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetMaxHealthL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4778,7 +4751,7 @@ namespace moho
    */
   int cfunc_EntitySetHealth(lua_State* const luaContext)
   {
-    return cfunc_EntitySetHealthL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetHealthL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4841,7 +4814,7 @@ namespace moho
    */
   int cfunc_EntitySetMaxHealth(lua_State* const luaContext)
   {
-    return cfunc_EntitySetMaxHealthL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetMaxHealthL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4897,7 +4870,7 @@ namespace moho
    */
   int cfunc_EntitySetVizToFocusPlayer(lua_State* const luaContext)
   {
-    return cfunc_EntitySetVizToFocusPlayerL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetVizToFocusPlayerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4942,7 +4915,7 @@ namespace moho
    */
   int cfunc_EntitySetVizToEnemies(lua_State* const luaContext)
   {
-    return cfunc_EntitySetVizToEnemiesL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetVizToEnemiesL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -4985,7 +4958,7 @@ namespace moho
    */
   int cfunc_EntitySetVizToAllies(lua_State* const luaContext)
   {
-    return cfunc_EntitySetVizToAlliesL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetVizToAlliesL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5029,7 +5002,7 @@ namespace moho
    */
   int cfunc_EntitySetVizToNeutrals(lua_State* const luaContext)
   {
-    return cfunc_EntitySetVizToNeutralsL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetVizToNeutralsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5072,7 +5045,7 @@ namespace moho
    */
   int cfunc_EntityGetEntityId(lua_State* const luaContext)
   {
-    return cfunc_EntityGetEntityIdL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetEntityIdL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5123,7 +5096,7 @@ namespace moho
    */
   int cfunc_EntityDetachAll(lua_State* const luaContext)
   {
-    return cfunc_EntityDetachAllL(ResolveBindingState(luaContext));
+    return cfunc_EntityDetachAllL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5226,7 +5199,7 @@ namespace moho
    */
   int cfunc_EntitySetCollisionShape(lua_State* const luaContext)
   {
-    return cfunc_EntitySetCollisionShapeL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetCollisionShapeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5314,7 +5287,7 @@ namespace moho
    */
   int cfunc_EntityReachedMaxShooters(lua_State* const luaContext)
   {
-    return cfunc_EntityReachedMaxShootersL(ResolveBindingState(luaContext));
+    return cfunc_EntityReachedMaxShootersL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5367,7 +5340,7 @@ namespace moho
    */
   int cfunc_EntityGetOrientation(lua_State* const luaContext)
   {
-    return cfunc_EntityGetOrientationL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetOrientationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5426,7 +5399,7 @@ namespace moho
    */
   int cfunc_EntityGetHeading(lua_State* const luaContext)
   {
-    return cfunc_EntityGetHeadingL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetHeadingL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5481,7 +5454,7 @@ namespace moho
    */
   int cfunc_EntityGetScale(lua_State* const luaContext)
   {
-    return cfunc_EntityGetScaleL(ResolveBindingState(luaContext));
+    return cfunc_EntityGetScaleL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5533,7 +5506,7 @@ namespace moho
    */
   int cfunc_EntityAddLocalImpulse(lua_State* const luaContext)
   {
-    return cfunc_EntityAddLocalImpulseL(ResolveBindingState(luaContext));
+    return cfunc_EntityAddLocalImpulseL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5607,7 +5580,7 @@ namespace moho
    */
   int cfunc_EntityAddWorldImpulse(lua_State* const luaContext)
   {
-    return cfunc_EntityAddWorldImpulseL(ResolveBindingState(luaContext));
+    return cfunc_EntityAddWorldImpulseL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5672,7 +5645,7 @@ namespace moho
    */
   int cfunc_EntitySetMesh(lua_State* const luaContext)
   {
-    return cfunc_EntitySetMeshL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetMeshL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5749,7 +5722,7 @@ namespace moho
    */
   int cfunc_EntitySetScale(lua_State* const luaContext)
   {
-    return cfunc_EntitySetScaleL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetScaleL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5808,7 +5781,6 @@ namespace moho
     entity->mDrawScaleX = scaleX;
     entity->mDrawScaleY = scaleY;
     entity->mDrawScaleZ = scaleZ;
-    entity->mCoordNode.ListUnlink();
     entity->mCoordNode.ListLinkBefore(&entity->SimulationRef->mCoordEntities);
 
     entity->mLuaObj.PushStack(state);
@@ -5844,7 +5816,7 @@ namespace moho
    */
   int cfunc_EntityAddManualScroller(lua_State* const luaContext)
   {
-    return cfunc_EntityAddManualScrollerL(ResolveBindingState(luaContext));
+    return cfunc_EntityAddManualScrollerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5905,7 +5877,7 @@ namespace moho
    */
   int cfunc_EntityAddThreadScroller(lua_State* const luaContext)
   {
-    return cfunc_EntityAddThreadScrollerL(ResolveBindingState(luaContext));
+    return cfunc_EntityAddThreadScrollerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -5963,7 +5935,7 @@ namespace moho
    */
   int cfunc_EntityAddPingPongScroller(lua_State* const luaContext)
   {
-    return cfunc_EntityAddPingPongScrollerL(ResolveBindingState(luaContext));
+    return cfunc_EntityAddPingPongScrollerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6028,7 +6000,7 @@ namespace moho
    */
   int cfunc_EntityRemoveScroller(lua_State* const luaContext)
   {
-    return cfunc_EntityRemoveScrollerL(ResolveBindingState(luaContext));
+    return cfunc_EntityRemoveScrollerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6079,7 +6051,7 @@ namespace moho
    */
   int cfunc_EntityDestroy(lua_State* const luaContext)
   {
-    return cfunc_EntityDestroyL(ResolveBindingState(luaContext));
+    return cfunc_EntityDestroyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6136,7 +6108,7 @@ namespace moho
    */
   int cfunc_EntityBeenDestroyed(lua_State* const luaContext)
   {
-    return cfunc_EntityBeenDestroyedL(ResolveBindingState(luaContext));
+    return cfunc_EntityBeenDestroyedL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6168,7 +6140,7 @@ namespace moho
    */
   int cfunc_EntityKill(lua_State* const luaContext)
   {
-    return cfunc_EntityKillL(ResolveBindingState(luaContext));
+    return cfunc_EntityKillL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6300,7 +6272,7 @@ namespace moho
    */
   int cfunc_EntitySetDrawScale(lua_State* const luaContext)
   {
-    return cfunc_EntitySetDrawScaleL(ResolveBindingState(luaContext));
+    return cfunc_EntitySetDrawScaleL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6334,7 +6306,6 @@ namespace moho
     entity->mDrawScaleX = drawScale;
     entity->mDrawScaleY = drawScale;
     entity->mDrawScaleZ = drawScale;
-    entity->mCoordNode.ListUnlink();
     entity->mCoordNode.ListLinkBefore(&entity->SimulationRef->mCoordEntities);
     return 0;
   }
@@ -6347,7 +6318,7 @@ namespace moho
    */
   int cfunc_EntityFallDown(lua_State* const luaContext)
   {
-    return cfunc_EntityFallDownL(ResolveBindingState(luaContext));
+    return cfunc_EntityFallDownL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -6749,3 +6720,4 @@ namespace moho
     }
   }
 } // namespace moho
+

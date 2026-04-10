@@ -20,6 +20,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/Stats.h"
@@ -188,11 +189,6 @@ namespace
     return path;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   struct CSquadUnitsRuntimeView
   {
     std::uint8_t pad_0000_0010[0x10];
@@ -248,20 +244,9 @@ namespace
     return unitCount;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -560,32 +545,6 @@ namespace
     return view->mBuilderSubsystem != nullptr;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject GetLuaTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* fieldName)
-  {
-    LuaPlus::LuaObject out;
-    if (!tableObject.IsTable()) {
-      return out;
-    }
-
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
-  }
-
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -621,7 +580,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetLuaTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -1419,6 +1378,75 @@ bool CAiBrain::BuildUnit(const char* const blueprintId, CAiBrain* const brain, U
 }
 
 /**
+ * Address: 0x0057BDB0 (FUN_0057BDB0, Moho::CAiBrain::ProcessAttackVectors)
+ *
+ * What it does:
+ * Rebuilds attack-vector debug lanes from current enemy army unit positions.
+ */
+void CAiBrain::ProcessAttackVectors()
+{
+  mAttackVectors.clear();
+
+  if (mCurrentEnemy == nullptr || mArmy == nullptr) {
+    return;
+  }
+
+  SEntitySetTemplateUnit enemyUnits{};
+  mCurrentEnemy->GetUnits(&enemyUnits, &mBuildCategoryRange);
+
+  float sumX = 0.0f;
+  float sumY = 0.0f;
+  float sumZ = 0.0f;
+  std::uint32_t enemyUnitCount = 0u;
+
+  for (Entity* const* unitIt = enemyUnits.mVec.begin(); unitIt != enemyUnits.mVec.end(); ++unitIt) {
+    Unit* const enemyUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitIt);
+    if (enemyUnit == nullptr || enemyUnit->IsDead() || enemyUnit->DestroyQueued()) {
+      continue;
+    }
+
+    const Wm3::Vec3f& enemyPosition = enemyUnit->GetPosition();
+    sumX += enemyPosition.x;
+    sumY += enemyPosition.y;
+    sumZ += enemyPosition.z;
+    ++enemyUnitCount;
+  }
+
+  if (enemyUnitCount == 0u) {
+    return;
+  }
+
+  const float inverseEnemyCount = 1.0f / static_cast<float>(enemyUnitCount);
+
+  SAiAttackVectorDebug debugVector{};
+  debugVector.mOrigin.x = sumX * inverseEnemyCount;
+  debugVector.mOrigin.y = sumY * inverseEnemyCount;
+  debugVector.mOrigin.z = sumZ * inverseEnemyCount;
+
+  Wm3::Vector2f armyStartPosition{};
+  mArmy->GetArmyStartPos(armyStartPosition);
+
+  float directionX = debugVector.mOrigin.x - armyStartPosition.x;
+  float directionZ = debugVector.mOrigin.z - armyStartPosition.y;
+  const float directionLength = std::sqrt((directionX * directionX) + (directionZ * directionZ));
+  if (directionLength > 0.0001f) {
+    const float inverseDirectionLength = 1.0f / directionLength;
+    directionX *= inverseDirectionLength;
+    directionZ *= inverseDirectionLength;
+  } else {
+    directionX = 0.0f;
+    directionZ = 1.0f;
+  }
+
+  constexpr float kAttackVectorDebugLength = 32.0f;
+  debugVector.mDirection.x = directionX * kAttackVectorDebugLength;
+  debugVector.mDirection.y = 0.0f;
+  debugVector.mDirection.z = directionZ * kAttackVectorDebugLength;
+
+  mAttackVectors.push_back(debugVector);
+}
+
+/**
  * Address: 0x0057BAA0 (FUN_0057BAA0, Moho::CAiBrain::DrawDebug)
  *
  * What it does:
@@ -1570,7 +1598,7 @@ SEntitySetTemplateUnit* CAiBrain::GetAvailableFactories(
  */
 int moho::cfunc_CAiBrainIsOpponentAIRunning(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainIsOpponentAIRunningL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainIsOpponentAIRunningL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1636,7 +1664,7 @@ int moho::cfunc_CAiBrainIsOpponentAIRunningL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetArmyIndex(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetArmyIndexL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetArmyIndexL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1688,7 +1716,7 @@ int moho::cfunc_CAiBrainGetArmyIndexL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetFactionIndex(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetFactionIndexL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetFactionIndexL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1740,7 +1768,7 @@ int moho::cfunc_CAiBrainGetFactionIndexL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainSetCurrentPlan(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainSetCurrentPlanL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainSetCurrentPlanL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1796,7 +1824,7 @@ int moho::cfunc_CAiBrainSetCurrentPlanL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetPersonality(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetPersonalityL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetPersonalityL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1853,7 +1881,7 @@ int moho::cfunc_CAiBrainGetPersonalityL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainSetCurrentEnemy(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainSetCurrentEnemyL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainSetCurrentEnemyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1911,7 +1939,7 @@ int moho::cfunc_CAiBrainSetCurrentEnemyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetCurrentEnemy(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetCurrentEnemyL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetCurrentEnemyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1974,7 +2002,7 @@ int moho::cfunc_CAiBrainGetCurrentEnemyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetUnitBlueprint(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetUnitBlueprintL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetUnitBlueprintL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2049,7 +2077,7 @@ int moho::cfunc_CAiBrainGetUnitBlueprintL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetArmyStat(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetArmyStatL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetArmyStatL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2129,7 +2157,7 @@ int moho::cfunc_CAiBrainGetArmyStatL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainSetArmyStat(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainSetArmyStatL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainSetArmyStatL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2213,7 +2241,7 @@ int moho::cfunc_CAiBrainSetArmyStatL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainAddArmyStat(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainAddArmyStatL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainAddArmyStatL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2297,7 +2325,7 @@ int moho::cfunc_CAiBrainAddArmyStatL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainSetGreaterOf(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainSetGreaterOfL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainSetGreaterOfL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2373,7 +2401,7 @@ int moho::cfunc_CAiBrainSetGreaterOfL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetBlueprintStat(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetBlueprintStatL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetBlueprintStatL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2445,7 +2473,7 @@ int moho::cfunc_CAiBrainGetBlueprintStatL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetCurrentUnits(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetCurrentUnitsL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetCurrentUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2513,7 +2541,7 @@ int moho::cfunc_CAiBrainGetCurrentUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainSetArmyStatsTrigger(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainSetArmyStatsTriggerL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainSetArmyStatsTriggerL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2618,7 +2646,7 @@ int moho::cfunc_CAiBrainSetArmyStatsTriggerL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainRemoveArmyStatsTrigger(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainRemoveArmyStatsTriggerL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainRemoveArmyStatsTriggerL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2689,7 +2717,7 @@ int moho::cfunc_CAiBrainRemoveArmyStatsTriggerL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetListOfUnits(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetListOfUnitsL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetListOfUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2797,7 +2825,7 @@ int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainSetResourceSharing(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainSetResourceSharingL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainSetResourceSharingL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2849,7 +2877,7 @@ int moho::cfunc_CAiBrainSetResourceSharingL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetArmyStartPos(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetArmyStartPosL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetArmyStartPosL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2908,7 +2936,7 @@ int moho::cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetAttackVectors(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetAttackVectorsL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetAttackVectorsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2999,7 +3027,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyStored_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainGetEconomyStored(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetEconomyStoredL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetEconomyStoredL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3054,7 +3082,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyIncome_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainGetEconomyIncome(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetEconomyIncomeL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetEconomyIncomeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3109,7 +3137,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyUsage_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainGetEconomyUsage(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetEconomyUsageL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetEconomyUsageL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3164,7 +3192,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyRequested_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainGetEconomyRequested(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetEconomyRequestedL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetEconomyRequestedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3219,7 +3247,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyTrend_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainGetEconomyTrend(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetEconomyTrendL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetEconomyTrendL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3254,7 +3282,7 @@ int moho::cfunc_CAiBrainGetEconomyTrendL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetMapWaterRatio(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetMapWaterRatioL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetMapWaterRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3310,7 +3338,7 @@ int moho::cfunc_CAiBrainGetMapWaterRatioL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetEconomyStoredRatio(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetEconomyStoredRatioL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetEconomyStoredRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3381,7 +3409,7 @@ int moho::cfunc_CAiBrainGetEconomyStoredRatioL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGiveResource(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGiveResourceL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGiveResourceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3454,7 +3482,7 @@ int moho::cfunc_CAiBrainGiveResourceL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGiveStorage(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGiveStorageL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGiveStorageL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3529,7 +3557,7 @@ int moho::cfunc_CAiBrainGiveStorageL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainTakeResource(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainTakeResourceL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainTakeResourceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3613,7 +3641,7 @@ int moho::cfunc_CAiBrainTakeResourceL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainFindUnit(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainFindUnitL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainFindUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3691,7 +3719,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindUnit_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainFindUpgradeBP(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainFindUpgradeBPL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainFindUpgradeBPL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3768,7 +3796,7 @@ int moho::cfunc_CAiBrainFindUpgradeBPL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainFindUnitToUpgrade(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainFindUnitToUpgradeL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainFindUnitToUpgradeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3863,7 +3891,7 @@ CScrLuaInitForm* moho::func_CAiBrainFindUnitToUpgrade_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainDecideWhatToBuild(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainDecideWhatToBuildL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainDecideWhatToBuildL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3947,7 +3975,7 @@ CScrLuaInitForm* moho::func_CAiBrainDecideWhatToBuild_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainBuildStructure(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainBuildStructureL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainBuildStructureL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4055,7 +4083,7 @@ CScrLuaInitForm* moho::func_CAiBrainBuildStructure_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainNumCurrentlyBuilding(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainNumCurrentlyBuildingL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainNumCurrentlyBuildingL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4141,7 +4169,7 @@ int moho::cfunc_CAiBrainNumCurrentlyBuildingL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainBuildUnit(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainBuildUnitL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainBuildUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4205,7 +4233,7 @@ int moho::cfunc_CAiBrainBuildUnitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainIsAnyEngineerBuilding(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainIsAnyEngineerBuildingL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainIsAnyEngineerBuildingL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4289,7 +4317,7 @@ CScrLuaInitForm* moho::func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef()
  */
 int moho::cfunc_CAiBrainGetNumPlatoonsWithAI(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetNumPlatoonsWithAIL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetNumPlatoonsWithAIL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4348,7 +4376,7 @@ int moho::cfunc_CAiBrainGetNumPlatoonsWithAIL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamed(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4413,7 +4441,7 @@ int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(LuaPlus::LuaState* const st
  */
 int moho::cfunc_CAiBrainPlatoonExists(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainPlatoonExistsL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainPlatoonExistsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4467,7 +4495,7 @@ int moho::cfunc_CAiBrainPlatoonExistsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetPlatoonsList(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetPlatoonsListL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetPlatoonsListL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4545,7 +4573,7 @@ int moho::cfunc_CAiBrainGetPlatoonsListL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainDisbandPlatoon(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainDisbandPlatoonL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainDisbandPlatoonL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4600,7 +4628,7 @@ int moho::cfunc_CAiBrainDisbandPlatoonL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainDisbandPlatoonUniquelyNamed(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainDisbandPlatoonUniquelyNamedL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainDisbandPlatoonUniquelyNamedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4661,7 +4689,7 @@ int moho::cfunc_CAiBrainDisbandPlatoonUniquelyNamedL(LuaPlus::LuaState* const st
  */
 int moho::cfunc_CAiBrainGetPlatoonUniquelyNamed(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetPlatoonUniquelyNamedL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetPlatoonUniquelyNamedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -4723,7 +4751,7 @@ int moho::cfunc_CAiBrainGetPlatoonUniquelyNamedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiBrainGetNoRushTicks(lua_State* const luaContext)
 {
-  return cfunc_CAiBrainGetNoRushTicksL(ResolveBindingState(luaContext));
+  return cfunc_CAiBrainGetNoRushTicksL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

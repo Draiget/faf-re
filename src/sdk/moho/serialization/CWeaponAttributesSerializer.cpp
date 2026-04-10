@@ -142,17 +142,16 @@ namespace
   }
 
   /**
-   * Address: 0x006D3790 (FUN_006D3790, save body)
+   * Address: 0x006DF180 (FUN_006DF180, save body)
    *
    * What it does:
    * Saves the reflected pointer/string/float lanes for `CWeaponAttributes`.
    */
-  void SaveCWeaponAttributes(
-    gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* ownerRef
+  void SaveCWeaponAttributesBody_006DF180(
+    moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
   )
   {
-    const auto* const attributes = reinterpret_cast<const moho::CWeaponAttributes*>(objectPtr);
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    const gpg::RRef owner{};
 
     gpg::RRef blueprintRef = MakeRUnitBlueprintWeaponRef(attributes->mBlueprint);
     gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, owner);
@@ -167,6 +166,48 @@ namespace
     archive->WriteFloat(attributes->mDamage);
     archive->WriteFloat(attributes->mUnknown_0044);
     archive->WriteFloat(attributes->mUnknown_0048);
+  }
+
+  /**
+   * Address: 0x006DD2A0 (FUN_006DD2A0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CWeaponAttributes serialize thunk alias into the shared
+   * save body (`FUN_006DF180`).
+   */
+  void SaveCWeaponAttributesThunkVariantA(
+    moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
+  )
+  {
+    SaveCWeaponAttributesBody_006DF180(attributes, archive);
+  }
+
+  /**
+   * Address: 0x006DE5D0 (FUN_006DE5D0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CWeaponAttributes serialize thunk alias into the
+   * shared save body (`FUN_006DF180`).
+   */
+  void SaveCWeaponAttributesThunkVariantB(
+    moho::CWeaponAttributes* attributes, gpg::WriteArchive* archive
+  )
+  {
+    SaveCWeaponAttributesBody_006DF180(attributes, archive);
+  }
+
+  /**
+   * Address: 0x006D3790 (FUN_006D3790, save callback bridge)
+   *
+   * What it does:
+   * Adapts serializer callback ABI and forwards to `FUN_006DF180` body.
+   */
+  void SaveCWeaponAttributes(
+    gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/
+  )
+  {
+    auto* const attributes = reinterpret_cast<moho::CWeaponAttributes*>(objectPtr);
+    SaveCWeaponAttributesBody_006DF180(attributes, archive);
   }
 
   /**

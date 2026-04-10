@@ -19,6 +19,8 @@ namespace gpg
 namespace moho
 {
   class CUnitCommandQueue;
+  class CAiTarget;
+  struct SNavGoal;
   class Unit;
 
   enum ETaskStatus : std::int32_t;
@@ -46,8 +48,70 @@ namespace moho
      * Address: 0x00598E80 (FUN_00598E80, ?TaskTick@IAiCommandDispatchImpl@Moho@@UAE?AW4ETaskStatus@2@XZ)
      *
      * VFTable SLOT: 1
+     *
+     * What it does:
+     * Drives the command-dispatch task state machine, starting queue-head
+     * dispatch when the unit is ready and consuming queue-result transitions
+     * when the linked command task finishes.
      */
-    virtual ETaskStatus TaskTick() = 0;
+    virtual ETaskStatus TaskTick();
+
+    /**
+     * Address: 0x00599030 (FUN_00599030, ?OnEvent@IAiCommandDispatchImpl@Moho@@UAEXW4EUnitCommandQueueStatus@2@@Z)
+     *
+     * VFTable SLOT: 2
+     *
+     * What it does:
+     * Handles queue-status events from the owner command queue by either
+     * refreshing unit speed-through status on insertion or interrupting active
+     * subtasks when queue clear/refresh events arrive.
+     */
+    void OnEvent(EUnitCommandQueueStatus event) override;
+
+    /**
+     * Address: 0x0060A490 (FUN_0060A490, Moho::IAiCommandDispatchImpl::Stop)
+     *
+     * What it does:
+     * Stops active attacker/silo-side work on the owned unit, requests a UI
+     * refresh, and marks the dispatch result as stopped.
+     */
+    int Stop();
+
+    /**
+     * Address: 0x0060B850 (FUN_0060B850, Moho::IAiCommandDispatchImpl::KillSelf)
+     *
+     * What it does:
+     * Routes the owned unit through the standard `Entity::Kill` path using the
+     * damage reason lane observed in the binary.
+     */
+    int KillSelf();
+
+    /**
+     * Address: 0x0060B890 (FUN_0060B890, Moho::IAiCommandDispatchImpl::SetNewTargetLayer)
+     *
+     * What it does:
+     * Applies a new movement layer to the owned unit's motion controller from
+     * the recovered navigation goal payload.
+     */
+    void SetNewTargetLayer(const SNavGoal& goal);
+
+    /**
+     * Address: 0x00606D80 (FUN_00606D80, Moho::IAiCommandDispatchImpl::IssueCarrierLandTask)
+     *
+     * What it does:
+     * Validates a carrier target, reports illegal carriers, and schedules the
+     * recovered carrier-land task lane.
+     */
+    void IssueCarrierLandTask(Unit* unit);
+
+    /**
+     * Address: 0x0061EF60 (FUN_0061EF60, Moho::IAiCommandDispatchImpl::IssueReclaimTask)
+     *
+     * What it does:
+     * Validates the reclaim target entity lane and schedules the recovered
+     * reclaim task using the target's gun position.
+     */
+    void IssueReclaimTask(const CAiTarget& target);
 
     /**
      * Address: 0x006012B0 (FUN_006012B0, Moho::IAiCommandDispatchImpl::IssueCallTeleportTask)

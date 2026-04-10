@@ -246,6 +246,70 @@ namespace
   }
 
   /**
+   * Address: 0x00698880 (FUN_00698880, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the first SPhysBody deserialize thunk alias into the
+   * recovered deserialize helper body.
+   */
+  void DeserializeSPhysBodyThunkVariantA(moho::SPhysBody* const object, gpg::ReadArchive* const archive)
+  {
+    if (!object || !archive) {
+      return;
+    }
+
+    DeserializeSPhysBody(*object, *archive);
+  }
+
+  /**
+   * Address: 0x00698890 (FUN_00698890, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the first SPhysBody serialize thunk alias into the recovered
+   * serialize helper body.
+   */
+  void SerializeSPhysBodyThunkVariantA(const moho::SPhysBody* const object, gpg::WriteArchive* const archive)
+  {
+    if (!object || !archive) {
+      return;
+    }
+
+    SerializeSPhysBody(*object, *archive);
+  }
+
+  /**
+   * Address: 0x006988E0 (FUN_006988E0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the second SPhysBody deserialize thunk alias into the
+   * recovered deserialize helper body.
+   */
+  void DeserializeSPhysBodyThunkVariantB(moho::SPhysBody* const object, gpg::ReadArchive* const archive)
+  {
+    if (!object || !archive) {
+      return;
+    }
+
+    DeserializeSPhysBody(*object, *archive);
+  }
+
+  /**
+   * Address: 0x006988F0 (FUN_006988F0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the second SPhysBody serialize thunk alias into the recovered
+   * serialize helper body.
+   */
+  void SerializeSPhysBodyThunkVariantB(const moho::SPhysBody* const object, gpg::WriteArchive* const archive)
+  {
+    if (!object || !archive) {
+      return;
+    }
+
+    SerializeSPhysBody(*object, *archive);
+  }
+
+  /**
    * Address: 0x00698630 (FUN_00698630 decomp helper lane)
    *
    * What it does:

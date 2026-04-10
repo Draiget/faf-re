@@ -7,6 +7,8 @@
 
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/audio/CSndParams.h"
+#include "moho/console/CVarAccess.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityId.h"
 #include "moho/entity/REntityBlueprint.h"
@@ -25,15 +27,8 @@ namespace
   constexpr std::uint32_t kSpatialDbClassProjectile = 0x400u;
   constexpr std::uint32_t kSpatialDbClassProp = 0x200u;
   constexpr std::uint32_t kSpatialDbClassOther = 0x800u;
-
-  struct NullRumbleSoundBinding
-  {
-    void* unk0;
-    void* unk4;
-    moho::CSndParams* current;
-  };
-
-  NullRumbleSoundBinding gNullRumbleSoundBinding{};
+  constexpr std::uint32_t kIntelRangeMagnitudeMask = 0x7FFFFFFFu;
+  constexpr std::uint32_t kIntelEnabledBit = 0x80000000u;
 
   [[nodiscard]] std::int32_t
   BuildSpatialDbRoutingMaskFromEntityId(const std::uint32_t entityId, const std::uint8_t sourceIndex) noexcept
@@ -97,6 +92,88 @@ namespace
     auto* const meshInstance = reinterpret_cast<moho::SpatialDB_MeshInstance*>(&storage);
     meshInstance->ClearRegistration();
   }
+
+  [[nodiscard]] bool IsFinite(const float value) noexcept
+  {
+    return std::isfinite(value);
+  }
+
+  [[nodiscard]] bool HasFiniteMeshBounds(const moho::MeshInstance& mesh) noexcept
+  {
+    return IsFinite(mesh.xMin) && IsFinite(mesh.yMin) && IsFinite(mesh.zMin) && IsFinite(mesh.xMax) &&
+      IsFinite(mesh.yMax) && IsFinite(mesh.zMax);
+  }
+
+  void CopyPoseState(moho::CAniPose& dst, const moho::CAniPose& src)
+  {
+    dst.mScale = src.mScale;
+    dst.mLocalTransform = src.mLocalTransform;
+    dst.mMaxOffset = src.mMaxOffset;
+
+    const moho::CAniPoseBone* const srcBegin = src.mBones.begin();
+    const moho::CAniPoseBone* const srcEnd = src.mBones.end();
+    moho::CAniPoseBone* const dstBegin = dst.mBones.begin();
+    moho::CAniPoseBone* const dstEnd = dst.mBones.end();
+    if (!srcBegin || !srcEnd || !dstBegin || !dstEnd) {
+      return;
+    }
+
+    const std::ptrdiff_t srcCount = srcEnd - srcBegin;
+    const std::ptrdiff_t dstCount = dstEnd - dstBegin;
+    if (srcCount <= 0 || dstCount <= 0) {
+      return;
+    }
+
+    const std::ptrdiff_t copyCount = std::min(srcCount, dstCount);
+    for (std::ptrdiff_t i = 0; i < copyCount; ++i) {
+      moho::CAniPoseBone& dstBone = dstBegin[i];
+      const moho::CAniPoseBone& srcBone = srcBegin[i];
+      dstBone.mVisible = srcBone.mVisible;
+      dstBone.mSkipNextInterp = srcBone.mSkipNextInterp;
+      dstBone.mLocalTransform = srcBone.mLocalTransform;
+      dstBone.mCompositeIsLocal = srcBone.mCompositeIsLocal;
+      dstBone.mCompositeDirty = 1u;
+    }
+  }
+
+  [[nodiscard]] bool TryRestorePose(
+    const boost::shared_ptr<moho::CAniPose>& destination,
+    const boost::shared_ptr<moho::CAniPose>& source
+  )
+  {
+    if (!destination || !source) {
+      return false;
+    }
+
+    const boost::shared_ptr<const moho::CAniSkel> dstSkeleton = destination->GetSkeleton();
+    const boost::shared_ptr<const moho::CAniSkel> srcSkeleton = source->GetSkeleton();
+    if (!dstSkeleton || !srcSkeleton || dstSkeleton.get() != srcSkeleton.get()) {
+      return false;
+    }
+
+    CopyPoseState(*destination, *source);
+    return true;
+  }
+
+  [[nodiscard]] std::uint32_t GetVisionRange(const moho::SSTIEntityVariableData& variableData) noexcept
+  {
+    return variableData.mIntelAttributes.vision & kIntelRangeMagnitudeMask;
+  }
+
+  [[nodiscard]] bool IsVisionEnabled(const moho::SSTIEntityVariableData& variableData) noexcept
+  {
+    return (variableData.mIntelAttributes.vision & kIntelEnabledBit) != 0u;
+  }
+
+  struct SessionVisionRuntimeView
+  {
+    std::uint8_t pad_0000_03C8[0x3C8];
+    moho::VisionDB visionDb; // +0x3C8
+  };
+  static_assert(
+    offsetof(SessionVisionRuntimeView, visionDb) == 0x3C8,
+    "SessionVisionRuntimeView::visionDb offset must be 0x3C8"
+  );
 
   [[nodiscard]] float ClampUnitInterval(const float value) noexcept
   {
@@ -196,18 +273,17 @@ namespace moho
     , mIUnitChainHead(nullptr)
     , mSession(&session)
     , mSpatialDbEntry{nullptr, 0}
-    , mAuxRuntimeHandle(nullptr)
+    , mVisionHandle(nullptr)
     , mPosePrimary()
     , mPoseSecondary()
     , mMeshInstance(nullptr)
     , mRuntimeLinkHead(nullptr)
     , mRuntimeSelectionToken(-1)
     , mCachedAmbientSound(nullptr)
-    , mRumbleSoundBinding(nullptr)
+    , mRumbleLoopHandle(nullptr)
     , mLastFocusDamageGameTick(-1000)
     , mParams(createParams)
     , mVariableData()
-    , pad_00FC_0120{}
     , mArmy(nullptr)
     , mTransform()
     , mLastInterpAmt(-1.0f)
@@ -234,7 +310,7 @@ namespace moho
     const std::int32_t spatialDbMask = BuildSpatialDbRoutingMaskFromEntityId(mParams.mEntityId, sourceIndex);
     InitializeSpatialDbEntry(mSpatialDbEntry, mSession->GetEntitySpatialDbStorage(), this, spatialDbMask);
 
-    mRumbleSoundBinding = &gNullRumbleSoundBinding;
+    mRumbleLoopHandle = SND_GetSharedAmbientHandle(nullptr);
   }
 
   /**
@@ -249,9 +325,9 @@ namespace moho
     // Matches the two intrusive-list teardown loops at +0x30 and +0x08.
     ResetLinkChain(mRuntimeLinkHead);
 
-    if (mAuxRuntimeHandle) {
-      mAuxRuntimeHandle->Release(1);
-      mAuxRuntimeHandle = nullptr;
+    if (mVisionHandle) {
+      delete mVisionHandle;
+      mVisionHandle = nullptr;
     }
 
     DestroySpatialDbMeshInstanceStorage(mSpatialDbEntry);
@@ -333,6 +409,148 @@ namespace moho
   UserCommandQueue* UserEntity::GetFactoryCommandQueue()
   {
     return nullptr;
+  }
+
+  /**
+   * Address: 0x008B8EB0 (FUN_008B8EB0, ?UpdateEntityData@UserEntity@Moho@@UAEXABUSSTIEntityVariableData@2@@Z)
+   *
+   * What it does:
+   * Applies one replicated variable-data snapshot, refreshes mesh/pose and
+   * spatial-db state, then updates fog-of-war vision handle tracking.
+   */
+  void UserEntity::UpdateEntityData(const SSTIEntityVariableData& variableData)
+  {
+    const bool requiresMeshRebuild =
+      (mMeshInstance == nullptr && variableData.mMeshBlueprint != nullptr) ||
+      (variableData.mMeshBlueprint != mVariableData.mMeshBlueprint) ||
+      (variableData.mScmResource.get() != mVariableData.mScmResource.get());
+
+    const bool scaleChanged = mMeshInstance != nullptr && mMeshInstance->isStaticPose == 0u &&
+      Wm3::Vector3f::Compare(&mMeshInstance->scale, &variableData.mScale);
+
+    const bool transformChanged = Wm3::Vector3f::Compare(&variableData.mCurTransform.pos_, &mVariableData.mCurTransform.pos_) ||
+      !AreQuaternionsNearlyEqual(mVariableData.mCurTransform.orient_, variableData.mCurTransform.orient_) ||
+      Wm3::Vector3f::Compare(&variableData.mLastTransform.pos_, &mVariableData.mLastTransform.pos_) ||
+      !AreQuaternionsNearlyEqual(mVariableData.mLastTransform.orient_, variableData.mLastTransform.orient_) ||
+      !NearlyEqual(variableData.mCurImpactValue, mVariableData.mCurImpactValue);
+
+    if (IsUserUnit() != nullptr && mVariableData.mHealth > variableData.mHealth) {
+      if (mArmy != nullptr && mSession != nullptr && mArmy == mSession->GetFocusUserArmy()) {
+        mLastFocusDamageGameTick = mSession->mGameTick;
+        NotifyFocusArmyUnitDamaged();
+      }
+    }
+
+    const EUserEntityVisibilityMode previousVisibility = mVariableData.mVisibilityMode;
+    const EUserEntityVisibilityMode nextVisibility = variableData.mVisibilityMode;
+    if (mSession != nullptr && previousVisibility != nextVisibility) {
+      if (nextVisibility == EUserEntityVisibilityMode::ReconGrid) {
+        mSession->AddToVizUpdate(this);
+      } else if (previousVisibility == EUserEntityVisibilityMode::ReconGrid) {
+        mSession->RemoveFromVizUpdate(this);
+      }
+    }
+
+    mVariableData = variableData;
+    if (mVariableData.mAmbientSound != mCachedAmbientSound) {
+      mCachedAmbientSound = mVariableData.mAmbientSound;
+    }
+    if (mRumbleLoopHandle == nullptr || mVariableData.mRumbleSound != mRumbleLoopHandle->mParams) {
+      mRumbleLoopHandle = SND_GetSharedAmbientHandle(mVariableData.mRumbleSound);
+    }
+
+    bool restoredPrimaryPose = false;
+    if (requiresMeshRebuild) {
+      if (mMeshInstance != nullptr && variableData.mMeshBlueprint != nullptr) {
+        const boost::shared_ptr<CAniPose> oldPrimaryPose = mPosePrimary;
+        const boost::shared_ptr<CAniPose> oldSecondaryPose = mPoseSecondary;
+        DestroyMeshInstance();
+
+        if (variableData.mScmResource.get() != nullptr) {
+          CreateMeshInstance(IsUserUnit() != nullptr);
+          restoredPrimaryPose = TryRestorePose(mPosePrimary, oldPrimaryPose);
+          (void)TryRestorePose(mPoseSecondary, oldSecondaryPose);
+        }
+      } else {
+        DestroyMeshInstance();
+        if (variableData.mMeshBlueprint != nullptr && variableData.mScmResource.get() != nullptr) {
+          CreateMeshInstance(IsUserUnit() != nullptr);
+        }
+      }
+    }
+
+    const bool stanceOrSpatialUpdateNeeded = transformChanged || scaleChanged;
+    if (mMeshInstance != nullptr) {
+      if (scaleChanged) {
+        mMeshInstance->scale = mVariableData.mScale;
+      }
+
+      mMeshInstance->scroll1.x = variableData.mScroll0U;
+      mMeshInstance->scroll1.y = variableData.mScroll0V;
+      mMeshInstance->scroll2.x = variableData.mScroll1U;
+      mMeshInstance->scroll2.y = variableData.mScroll1V;
+
+      if (mMeshInstance->isStaticPose != 0u) {
+        mMeshInstance->SetStance(
+          variableData.mCurTransform,
+          variableData.mLastTransform,
+          restoredPrimaryPose || stanceOrSpatialUpdateNeeded,
+          mPosePrimary,
+          mPoseSecondary
+        );
+      } else if (stanceOrSpatialUpdateNeeded) {
+        mMeshInstance->SetStance(variableData.mCurTransform, variableData.mLastTransform);
+      }
+    }
+
+    UpdateVisibility();
+
+    if (stanceOrSpatialUpdateNeeded) {
+      mLastInterpAmt = -1.0f;
+      Wm3::AxisAlignedBox3f spatialBounds{};
+      if (mMeshInstance != nullptr && HasFiniteMeshBounds(*mMeshInstance)) {
+        spatialBounds.Min.x = mMeshInstance->xMin;
+        spatialBounds.Min.y = mMeshInstance->yMin;
+        spatialBounds.Min.z = mMeshInstance->zMin;
+        spatialBounds.Max.x = mMeshInstance->xMax;
+        spatialBounds.Max.y = mMeshInstance->yMax;
+        spatialBounds.Max.z = mMeshInstance->zMax;
+      } else {
+        spatialBounds.Min = variableData.mCurTransform.pos_;
+        spatialBounds.Max = variableData.mCurTransform.pos_;
+      }
+      reinterpret_cast<SpatialDB_MeshInstance*>(&mSpatialDbEntry)->UpdateBounds(spatialBounds);
+    }
+
+    if (mMeshInstance != nullptr) {
+      mMeshInstance->fractionCompleteParameter = mVariableData.mFractionComplete;
+      const float maxHealth = mVariableData.mMaxHealth;
+      mMeshInstance->fractionHealthParameter = (maxHealth > 0.0f) ? (mVariableData.mHealth / maxHealth) : 1.0f;
+    }
+
+    if (!console::RenderFogOfWarEnabled() || mSession == nullptr) {
+      return;
+    }
+
+    const std::uint32_t visionRange = GetVisionRange(mVariableData);
+    if (visionRange != 0u && mVisionHandle == nullptr) {
+      const Wm3::Vector2f zero(0.0f, 0.0f);
+      auto* const sessionView = reinterpret_cast<SessionVisionRuntimeView*>(mSession);
+      mVisionHandle = sessionView->visionDb.NewHandle(zero, zero);
+    }
+
+    if (mVisionHandle == nullptr || IsUserUnit() != nullptr) {
+      return;
+    }
+
+    bool alliedVisibility = false;
+    if (const UserArmy* const focusArmy = mSession->GetFocusUserArmy(); focusArmy != nullptr && mArmy != nullptr) {
+      alliedVisibility = IsVisionEnabled(mVariableData) && focusArmy->IsAlly(mArmy->mArmyIndex);
+    }
+
+    const Wm3::Vector2f currentPosition(mVariableData.mCurTransform.pos_.x, mVariableData.mCurTransform.pos_.z);
+    const Wm3::Vector2f previousPosition(mVariableData.mLastTransform.pos_.x, mVariableData.mLastTransform.pos_.z);
+    mVisionHandle->Update(currentPosition, previousPosition, static_cast<float>(visionRange), alliedVisibility);
   }
 
   /**

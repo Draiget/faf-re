@@ -131,25 +131,9 @@ namespace
     return CachedType<CAniPose>(gCAniPoseType);
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -436,7 +420,7 @@ gpg::RType* ReconBlip::GetPointerType()
  */
 int moho::cfunc_ReconBlipGetBlueprint(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipGetBlueprintL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipGetBlueprintL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -468,7 +452,7 @@ int moho::cfunc_ReconBlipGetBlueprintL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipGetSource(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipGetSourceL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipGetSourceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -504,7 +488,7 @@ int moho::cfunc_ReconBlipGetSourceL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsSeenEver(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsSeenEverL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsSeenEverL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -526,7 +510,7 @@ int moho::cfunc_ReconBlipIsSeenEverL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsSeenNow(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsSeenNowL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsSeenNowL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -548,7 +532,7 @@ int moho::cfunc_ReconBlipIsSeenNowL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsMaybeDead(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsMaybeDeadL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsMaybeDeadL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -570,7 +554,7 @@ int moho::cfunc_ReconBlipIsMaybeDeadL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsOnOmni(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsOnOmniL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsOnOmniL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -592,7 +576,7 @@ int moho::cfunc_ReconBlipIsOnOmniL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsOnSonar(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsOnSonarL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsOnSonarL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -614,7 +598,7 @@ int moho::cfunc_ReconBlipIsOnSonarL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsOnRadar(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsOnRadarL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsOnRadarL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -636,7 +620,7 @@ int moho::cfunc_ReconBlipIsOnRadarL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ReconBlipIsKnownFake(lua_State* const luaContext)
 {
-  return cfunc_ReconBlipIsKnownFakeL(ResolveBindingState(luaContext));
+  return cfunc_ReconBlipIsKnownFakeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

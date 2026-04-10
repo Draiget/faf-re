@@ -180,6 +180,7 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SfxStreamState, fieldTransformMode) == 0x90, "SfxStreamState::fieldTransformMode offset must be 0x90");
 
   using AdxmErrorCallback = int(__cdecl*)(std::uint32_t errorCode, const char* errorText);
+  using AdxmMwIdleSleepCallback = std::int32_t(__cdecl*)(std::int32_t callbackParam);
 
   /**
    * Startup parameter block consumed by `adxm_setup_thrd`.
@@ -346,6 +347,7 @@ namespace moho
   struct MwsstPauseGate;
   struct SofdecSjRingBufferHandle;
   struct SofdecSjMemoryHandle;
+  struct SjChunkRange;
   using MwsstPauseGateQueryStartFn = std::int32_t(__stdcall*)(moho::MwsstPauseGate* gate, std::int32_t mode);
 
   /**
@@ -399,6 +401,13 @@ namespace moho
   struct SofdecSjSupplyHandle;
   using SofdecSjSupplyDestroyFn = void(__cdecl*)(SofdecSjSupplyHandle* handle);
   using SofdecSjSupplyOnStartFn = void(__cdecl*)(SofdecSjSupplyHandle* handle);
+  using SofdecSjSupplyGetChunkFn =
+    void(__cdecl*)(SofdecSjSupplyHandle* handle, std::int32_t lane, std::int32_t minBytes, moho::SjChunkRange* chunkRange);
+  using SofdecSjSupplyPutChunkFn =
+    void(__cdecl*)(SofdecSjSupplyHandle* handle, std::int32_t lane, moho::SjChunkRange* chunkRange);
+  using SofdecSjSupplySubmitChunkFn =
+    void(__cdecl*)(SofdecSjSupplyHandle* handle, std::int32_t lane, moho::SjChunkRange* chunkRange);
+  using SofdecSjSupplyQueryAvailableFn = std::int32_t(__cdecl*)(SofdecSjSupplyHandle* handle, std::int32_t lane);
 
   /**
    * Runtime dispatch table lane used by SJ supply handles.
@@ -413,12 +422,25 @@ namespace moho
     SofdecSjSupplyDestroyFn destroy = nullptr; // +0x0C
     std::uint8_t mUnknown10[0x04]{};
     SofdecSjSupplyOnStartFn onStart = nullptr; // +0x14
+    SofdecSjSupplyGetChunkFn getChunk = nullptr; // +0x18
+    SofdecSjSupplyPutChunkFn putChunk = nullptr; // +0x1C
+    SofdecSjSupplySubmitChunkFn submitChunk = nullptr; // +0x20
+    SofdecSjSupplyQueryAvailableFn queryAvailableBytes = nullptr; // +0x24
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SofdecSjSupplyVtable, destroy) == 0x0C, "SofdecSjSupplyVtable::destroy offset must be 0x0C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSjSupplyVtable, onStart) == 0x14, "SofdecSjSupplyVtable::onStart offset must be 0x14");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSjSupplyVtable, getChunk) == 0x18, "SofdecSjSupplyVtable::getChunk offset must be 0x18");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSjSupplyVtable, putChunk) == 0x1C, "SofdecSjSupplyVtable::putChunk offset must be 0x1C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSjSupplyVtable, submitChunk) == 0x20, "SofdecSjSupplyVtable::submitChunk offset must be 0x20"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSjSupplyVtable, queryAvailableBytes) == 0x24,
+    "SofdecSjSupplyVtable::queryAvailableBytes offset must be 0x24"
+  );
 
   struct SofdecSjSupplyHandle
   {
@@ -738,7 +760,12 @@ namespace moho
     std::int32_t monoRoutingMode = 0; // +0x0C
     IDirectSoundBuffer* secondaryBuffer = nullptr; // +0x10
     std::int32_t bufferPlacementMode = 0; // +0x14
-    std::uint8_t mUnknown18[0x18]{}; // +0x18
+    std::int32_t auxMaintenanceMode = 0; // +0x18
+    std::int32_t auxSwapPending = 0; // +0x1C
+    std::int32_t auxDrainPending = 0; // +0x20
+    std::int32_t auxDrainWriteCursorBytes = 0; // +0x24
+    std::int32_t auxDrainReadCursorBytes = 0; // +0x28
+    std::int32_t auxDrainAccumulatedBytes = 0; // +0x2C
     SofdecPcmWaveFormat format = {}; // +0x30
     std::uint8_t mUnknown42[0x2]{}; // +0x42
     std::int32_t playbackCursorByteOffset = 0; // +0x44
@@ -763,6 +790,30 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SofdecSoundPort, bufferPlacementMode) == 0x14,
     "SofdecSoundPort::bufferPlacementMode offset must be 0x14"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSoundPort, auxMaintenanceMode) == 0x18,
+    "SofdecSoundPort::auxMaintenanceMode offset must be 0x18"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSoundPort, auxSwapPending) == 0x1C,
+    "SofdecSoundPort::auxSwapPending offset must be 0x1C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSoundPort, auxDrainPending) == 0x20,
+    "SofdecSoundPort::auxDrainPending offset must be 0x20"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSoundPort, auxDrainWriteCursorBytes) == 0x24,
+    "SofdecSoundPort::auxDrainWriteCursorBytes offset must be 0x24"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSoundPort, auxDrainReadCursorBytes) == 0x28,
+    "SofdecSoundPort::auxDrainReadCursorBytes offset must be 0x28"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SofdecSoundPort, auxDrainAccumulatedBytes) == 0x2C,
+    "SofdecSoundPort::auxDrainAccumulatedBytes offset must be 0x2C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SofdecSoundPort, format) == 0x30, "SofdecSoundPort::format offset must be 0x30");
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -870,7 +921,8 @@ namespace moho
     void* mpegAudioDecoder = nullptr; // +0xC0
     std::uint8_t mUnknownC4[0x8]{};
     void* mpeg2AacDecoder = nullptr; // +0xCC
-    std::uint8_t mUnknownD0[0x8]{};
+    std::int32_t m2aDecodeSampleLimit = 0; // +0xD0
+    std::int32_t m2aDecodeBlockLimit = 0; // +0xD4
     std::int32_t ainfLength = 0; // +0xD8
     std::uint8_t dataIdBytes[0x10]{}; // +0xDC
     std::int16_t defaultOutputVolume = 0; // +0xEC
@@ -1061,6 +1113,14 @@ namespace moho
     "AdxBitstreamDecoderState::mpeg2AacDecoder offset must be 0xCC"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(AdxBitstreamDecoderState, m2aDecodeSampleLimit) == 0xD0,
+    "AdxBitstreamDecoderState::m2aDecodeSampleLimit offset must be 0xD0"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(AdxBitstreamDecoderState, m2aDecodeBlockLimit) == 0xD4,
+    "AdxBitstreamDecoderState::m2aDecodeBlockLimit offset must be 0xD4"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(AdxBitstreamDecoderState, ainfLength) == 0xD8, "AdxBitstreamDecoderState::ainfLength offset must be 0xD8"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -1231,6 +1291,53 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSjMemoryHandle) == 0x24, "SofdecSjMemoryHandle size must be 0x24");
 } // namespace moho
 
+namespace moho::cri
+{
+  // Compatibility aliases while Sofdec ownership is migrated from moho::* to moho::cri::*.
+  using MwsfdInitPrm = ::moho::MwsfdInitPrm;
+  using MwsfdLibWork = ::moho::MwsfdLibWork;
+  using MwsfdPlaybackStateSubobj = ::moho::MwsfdPlaybackStateSubobj;
+  using SofdecSfdWorkctrlSubobj = ::moho::SofdecSfdWorkctrlSubobj;
+  using MwsfdFrameInfo = ::moho::MwsfdFrameInfo;
+  using SofdecSjSupplyHandle = ::moho::SofdecSjSupplyHandle;
+  using SofdecSjRingBufferHandle = ::moho::SofdecSjRingBufferHandle;
+  using SofdecSjMemoryHandle = ::moho::SofdecSjMemoryHandle;
+  using SofdecSoundPort = ::moho::SofdecSoundPort;
+  using AdxBitstreamDecoderState = ::moho::AdxBitstreamDecoderState;
+}
+
+namespace moho::cri::adx
+{
+  using BitstreamDecoderState = ::moho::AdxBitstreamDecoderState;
+  using SoundPort = ::moho::SofdecSoundPort;
+}
+
+namespace moho::cri::cvfs
+{
+  using SjSupplyHandle = ::moho::SofdecSjSupplyHandle;
+  using SjRingBufferHandle = ::moho::SofdecSjRingBufferHandle;
+  using SjMemoryHandle = ::moho::SofdecSjMemoryHandle;
+}
+
+namespace moho::cri::sfd
+{
+  using InitPrm = ::moho::MwsfdInitPrm;
+  using LibWork = ::moho::MwsfdLibWork;
+  using PlaybackStateSubobj = ::moho::MwsfdPlaybackStateSubobj;
+  using WorkctrlSubobj = ::moho::SofdecSfdWorkctrlSubobj;
+  using FrameInfo = ::moho::MwsfdFrameInfo;
+}
+
+namespace moho::cri::m2a
+{
+  // Runtime/state type aliases will be added here as public M2A types are lifted into the header.
+}
+
+namespace moho::cri::mpa
+{
+  // Runtime/state type aliases will be added here as public MPA types are lifted into the header.
+}
+
 extern "C"
 {
   /**
@@ -1256,6 +1363,15 @@ extern "C"
    * override from `rootDirArgv[0]`.
    */
   int ADXPC_SetupFileSystem(const char** rootDirArgv);
+
+  /**
+   * Address: 0x00B13FE0 (FUN_00B13FE0, _ADXPC_GetVersion)
+   *
+   * What it does:
+   * Validates the ADXPC library signature lane and returns the static build
+   * version string.
+   */
+  char* ADXPC_GetVersion();
 
   /**
    * Address: 0x00B07B80 (_adxpc_err_dvd)
@@ -1649,6 +1765,25 @@ extern "C"
   void ADXM_SetCbErr(moho::AdxmErrorCallback callback, std::int32_t callbackParam);
 
   /**
+   * Address: 0x00B06FC0 (FUN_00B06FC0, _ADXM_SetCbSleepMwIdle)
+   *
+   * What it does:
+   * Publishes ADXM mw-idle sleep callback/context lanes and returns callback.
+   */
+  moho::AdxmMwIdleSleepCallback ADXM_SetCbSleepMwIdle(
+    moho::AdxmMwIdleSleepCallback callback,
+    std::int32_t callbackParam
+  );
+
+  /**
+   * Address: 0x00B06E40 (FUN_00B06E40, _ADXM_GetLockLevel)
+   *
+   * What it does:
+   * Returns current ADXM lock nesting level lane.
+   */
+  std::int32_t ADXM_GetLockLevel();
+
+  /**
    * Address: 0x00B07420 (sub_B07420)
    *
    * What it does:
@@ -1786,7 +1921,7 @@ extern "C"
    * Address: 0x00B0D9C0 (_ADXT_SetOutPan)
    *
    * What it does:
-   * Lock-guards one ADXT output-pan update and forwards to
+   * Runs one ADXT output-pan update inside legacy ADX enter/leave wrappers and forwards to
    * `adxt_SetOutPan`.
    */
   void ADXT_SetOutPan(void* adxtRuntime, std::int32_t laneIndex, std::int32_t panLevel);
@@ -1798,7 +1933,7 @@ extern "C"
    * Resolves one effective channel pan (default/override/mono rules), stores
    * the caller pan lane, and applies output pan to ADX RNA.
    */
-  void adxt_SetOutPan(void* adxtRuntime, std::int32_t laneIndex, std::int32_t panLevel);
+  std::int32_t adxt_SetOutPan(void* adxtRuntime, std::int32_t laneIndex, std::int32_t panLevel);
 
   /**
    * Address: 0x00AC9130 (_mwPlyInitSfdFx)
@@ -4038,6 +4173,63 @@ extern "C"
    * Tears down ADXM threads/locks/event state when init reference count reaches 0.
    */
   void ADXM_Finish();
+
+  /**
+   * Address: 0x00B17BD0 (FUN_00B17BD0, _ADXRNA_Init)
+   *
+   * What it does:
+   * Initializes ADXRNA global runtime state and increments init reference count.
+   */
+  std::int32_t ADXRNA_Init();
+
+  /**
+   * Address: 0x00B17BE0 (FUN_00B17BE0, _ADXRNA_Finish)
+   *
+   * What it does:
+   * Decrements ADXRNA init reference count and tears down global runtime state
+   * when count reaches zero.
+   */
+  std::int32_t ADXRNA_Finish();
+
+  /**
+   * Address: 0x00B17B50 (FUN_00B17B50, _ADXCRS_Init)
+   *
+   * What it does:
+   * Increments ADX critical-section init count.
+   */
+  std::int32_t ADXCRS_Init();
+
+  /**
+   * Address: 0x00B17B70 (FUN_00B17B70, _ADXCRS_Finish)
+   *
+   * What it does:
+   * Decrements ADX critical-section init count.
+   */
+  std::int32_t ADXCRS_Finish();
+
+  /**
+   * Address: 0x00B17A70 (FUN_00B17A70, _ADXT_ExecFsSvr)
+   *
+   * What it does:
+   * Executes one guarded ADXT filesystem-server tick.
+   */
+  void ADXT_ExecFsSvr();
+
+  /**
+   * Address: 0x00B17B00 (FUN_00B17B00, _ADXT_ExecFsServer)
+   *
+   * What it does:
+   * Executes one guarded ADXT filesystem-server wrapper tick.
+   */
+  void ADXT_ExecFsServer();
+
+  /**
+   * Address: 0x00B17B20 (FUN_00B17B20, _ADXT_IsActiveFsSvr)
+   *
+   * What it does:
+   * Returns whether ADXT filesystem-server dispatch is currently active.
+   */
+  std::int32_t ADXT_IsActiveFsSvr();
 
   /**
    * Address: 0x00B17B90 (_ADXCRS_Lock)

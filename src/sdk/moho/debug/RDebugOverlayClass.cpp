@@ -381,10 +381,7 @@ namespace moho
   void cleanup_sDBGOverlays()
   {
     TDatList<RDebugOverlayClass, void>& overlays = GlobalDebugOverlayClassList();
-    overlays.mNext->mPrev = overlays.mPrev;
-    overlays.mPrev->mNext = overlays.mNext;
-    overlays.mPrev = &overlays;
-    overlays.mNext = &overlays;
+    overlays.ListUnlink();
   }
 
   /**

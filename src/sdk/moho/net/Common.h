@@ -12,9 +12,15 @@
 #include "NetTransportEnums.h"
 #include "platform/Platform.h"
 
+namespace gpg
+{
+  class BinaryReader;
+}
+
 namespace moho
 {
   class INetConnector;
+  struct SNetCommandArg;
   struct CHostManager;
 
   /**
@@ -266,6 +272,18 @@ namespace moho
     uint64_t rangeEndUs,
     uint64_t averagingWindowUs
   );
+
+  /**
+   * Shared GPGNet socket decode lane:
+   * Reads one uint32 length followed by exact payload bytes.
+   */
+  [[nodiscard]] msvc8::string NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader);
+
+  /**
+   * Shared GPGNet socket decode lane:
+   * Decodes one wire argument (num/string/data) from stream payload.
+   */
+  [[nodiscard]] SNetCommandArg NET_DecodeSocketArg(gpg::BinaryReader& reader);
 
   /**
    * Address: 0x0047F5A0

@@ -235,6 +235,22 @@ CIntelCounterHandle::CIntelCounterHandle(
   }
 
   /**
+   * Address: 0x0076FDF0 (FUN_0076FDF0)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelCounterHandle::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CIntelCounterHandleMemberDeserializeBridgeA(
+    gpg::ReadArchive* const archive,
+    CIntelCounterHandle* const handle
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberDeserialize(archive);
+    }
+  }
+
+  /**
    * Address: 0x007701A0 (FUN_007701A0, Moho::CIntelCounterHandle::MemberSerialize)
    *
    * gpg::WriteArchive *
@@ -264,6 +280,54 @@ CIntelCounterHandle::CIntelCounterHandle(
 
     archive->WriteInt(static_cast<int>(mType));
     archive->Write(CIntelPosHandle::StaticGetClass(), static_cast<const CIntelPosHandle*>(this), ownerRef);
+  }
+
+  /**
+   * Address: 0x0076FE00 (FUN_0076FE00)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelCounterHandle::MemberSerialize`.
+   */
+  [[maybe_unused]] void CIntelCounterHandleMemberSerializeBridgeA(
+    const CIntelCounterHandle* const handle,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0076FFE0 (FUN_0076FFE0)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelCounterHandle::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CIntelCounterHandleMemberDeserializeBridgeB(
+    gpg::ReadArchive* const archive,
+    CIntelCounterHandle* const handle
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0076FFF0 (FUN_0076FFF0)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelCounterHandle::MemberSerialize`.
+   */
+  [[maybe_unused]] void CIntelCounterHandleMemberSerializeBridgeB(
+    const CIntelCounterHandle* const handle,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberSerialize(archive);
+    }
   }
 
   /**

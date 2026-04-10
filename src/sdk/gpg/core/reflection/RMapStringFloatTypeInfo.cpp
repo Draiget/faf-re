@@ -87,6 +87,20 @@ namespace gpg
   }
 
   /**
+   * Address: 0x006AE370 (FUN_006AE370, gpg::RMapType_string_float::GetLexical)
+   *
+   * What it does:
+   * Formats inherited lexical text and appends current map element count.
+   */
+  msvc8::string RMapStringFloatTypeInfo::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const auto* const map = static_cast<const std::map<std::string, float>*>(ref.mObj);
+    const int size = map ? static_cast<int>(map->size()) : 0;
+    return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
+  }
+
+  /**
    * Address: 0x006AF250 (FUN_006AF250, gpg::RMapType_string_float::SerLoad)
    *
    * What it does:

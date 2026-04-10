@@ -123,6 +123,7 @@ namespace
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
@@ -224,6 +225,18 @@ namespace
     }
 
     return gRecoveredRVectorTypeBoolName.c_str();
+  }
+
+  /**
+   * Address: 0x00641CE0 (FUN_00641CE0, gpg::RVectorType_bool::GetLexical)
+   *
+   * What it does:
+   * Formats inherited lexical text and appends current vector<bool> size.
+   */
+  msvc8::string RVectorTypeBool::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string base = gpg::RType::GetLexical(ref);
+    return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
   const gpg::RIndexed* RVectorTypeBool::IsIndexed() const

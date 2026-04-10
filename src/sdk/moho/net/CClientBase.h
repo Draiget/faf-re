@@ -164,7 +164,7 @@ namespace moho
      * Pure virtual in the base interface, but with a shared debug-dump body
      * used by concrete client debug implementations.
      */
-    virtual void Debug() = 0;
+    virtual void Debug();
 
     /**
      * Address: 0x0053BD40 (FUN_0053BD40)

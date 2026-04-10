@@ -629,6 +629,15 @@ namespace moho
     virtual int GetBoneCount() const;
 
     /**
+     * Address: 0x00678B90 (FUN_00678B90, Moho::Entity::GetArmyIndex)
+     *
+     * What it does:
+     * Returns owning army id for this entity, or `-1` when no army owner is
+     * bound.
+     */
+    [[nodiscard]] int GetArmyIndex() const;
+
+    /**
      * Address: 0x00678CC0 (FUN_00678CC0, Moho::Entity::ResolveBoneIndex)
      *
      * What it does:

@@ -45,25 +45,9 @@ namespace
   constexpr const char* kBeenDestroyedName = "BeenDestroyed";
   constexpr const char* kBeenDestroyedHelpText = "CSlideManipulator:BeenDestroyed()";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -395,7 +379,7 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
  */
 int moho::cfunc_CreateSlider(lua_State* const luaContext)
 {
-  return cfunc_CreateSliderL(ResolveBindingState(luaContext));
+  return cfunc_CreateSliderL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -510,7 +494,7 @@ moho::CScrLuaInitForm* moho::func_CreateSlider_LuaFuncDef()
  */
 int moho::cfunc_CSlideManipulatorSetWorldUnits(lua_State* const luaContext)
 {
-  return cfunc_CSlideManipulatorSetWorldUnitsL(ResolveBindingState(luaContext));
+  return cfunc_CSlideManipulatorSetWorldUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -562,7 +546,7 @@ int moho::cfunc_CSlideManipulatorSetWorldUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CSlideManipulatorSetSpeed(lua_State* const luaContext)
 {
-  return cfunc_CSlideManipulatorSetSpeedL(ResolveBindingState(luaContext));
+  return cfunc_CSlideManipulatorSetSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -638,7 +622,7 @@ int moho::cfunc_CSlideManipulatorSetSpeedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CSlideManipulatorSetAcceleration(lua_State* const luaContext)
 {
-  return cfunc_CSlideManipulatorSetAccelerationL(ResolveBindingState(luaContext));
+  return cfunc_CSlideManipulatorSetAccelerationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -699,7 +683,7 @@ int moho::cfunc_CSlideManipulatorSetAccelerationL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_CSlideManipulatorSetDeceleration(lua_State* const luaContext)
 {
-  return cfunc_CSlideManipulatorSetDecelerationL(ResolveBindingState(luaContext));
+  return cfunc_CSlideManipulatorSetDecelerationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -759,7 +743,7 @@ int moho::cfunc_CSlideManipulatorSetDecelerationL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_CSlideManipulatorSetGoal(lua_State* const luaContext)
 {
-  return cfunc_CSlideManipulatorSetGoalL(ResolveBindingState(luaContext));
+  return cfunc_CSlideManipulatorSetGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -833,7 +817,7 @@ int moho::cfunc_CSlideManipulatorSetGoalL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CSlideManipulatorBeenDestroyed(lua_State* const luaContext)
 {
-  return cfunc_CSlideManipulatorBeenDestroyedL(ResolveBindingState(luaContext));
+  return cfunc_CSlideManipulatorBeenDestroyedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

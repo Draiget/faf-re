@@ -789,6 +789,30 @@ namespace moho
     // are still pending full typed recovery.
   }
 
+  /**
+   * Address: 0x00501C10 (FUN_00501C10, sub_501C10)
+   *
+   * What it does:
+   * Copies one updated world AABB into this spatial-db entry payload lane.
+   */
+  void SpatialDB_MeshInstance::UpdateBounds(const Wm3::AxisAlignedBox3f& bounds)
+  {
+    if (!db || entry == 0) {
+      return;
+    }
+
+    std::uint8_t* const entryBytes = EntryBytes(entry);
+    if (!entryBytes) {
+      return;
+    }
+
+    // Entry layout keeps Min/Max AABB at +0x0C (6 floats) for current sort keys.
+    std::memcpy(entryBytes + kSpatialDbEntryPayloadOffset, &bounds, sizeof(bounds));
+
+    // Full remove/reinsert fast-path (sub_501990/sub_502120/sub_502200 chain) is
+    // still under recovery; preserve deterministic payload updates here.
+  }
+
   void SpatialDB_MeshInstance::ClearRegistration() noexcept
   {
     if (!db) {

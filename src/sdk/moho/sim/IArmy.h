@@ -141,12 +141,18 @@ namespace moho
     virtual void DisbandPlatoonUniquelyNamed(const char* platoonName) = 0;
     // Address: 0x00700540 (FUN_00700540)
     virtual void DisbandPlatoon(CPlatoon* platoon) = 0;
-    // Address: 0x007006C0 (FUN_007006C0)
-    virtual void Func9(int arg) = 0;
+    /**
+     * Address: 0x007006C0 (FUN_007006C0)
+     *
+     * What it does:
+     * Clears the incoming unit set out of any current platoons, then assigns
+     * those units into the named platoon's unassigned squad lane.
+     */
+    virtual void AssignUnitsToPlatoon(const SEntitySetTemplateUnit* units, const char* platoonName) = 0;
     // Address: 0x00700700 (FUN_00700700)
-    virtual void RemoveFromPlatoon(void* unit) = 0;
+    virtual void RemoveFromPlatoon(Unit* unit) = 0;
     // Address: 0x00700730 (FUN_00700730)
-    virtual void RemoveUnitsFromPlatoons(const void* units) = 0;
+    virtual void RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* units) = 0;
     // Address: 0x00700770 (FUN_00700770)
     virtual int GetNumPlatoonsTemplateNamed(const char* templateName) = 0;
     // Address: 0x007007C0 (FUN_007007C0)

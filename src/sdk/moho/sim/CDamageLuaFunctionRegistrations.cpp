@@ -23,25 +23,9 @@ namespace
   constexpr const char* kDamageRingHelpText =
     "DamageRing(instigator,location,minRadius,maxRadius,amount,damageType,damageFriendly,[damageSelf])";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -129,7 +113,7 @@ namespace moho
    */
   int cfunc_Damage(lua_State* const luaContext)
   {
-    return cfunc_DamageL(ResolveBindingState(luaContext));
+    return cfunc_DamageL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -235,7 +219,7 @@ namespace moho
    */
   int cfunc_DamageArea(lua_State* const luaContext)
   {
-    return cfunc_DamageAreaL(ResolveBindingState(luaContext));
+    return cfunc_DamageAreaL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -352,7 +336,7 @@ namespace moho
    */
   int cfunc_DamageRing(lua_State* const luaContext)
   {
-    return cfunc_DamageRingL(ResolveBindingState(luaContext));
+    return cfunc_DamageRingL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -481,7 +465,7 @@ namespace moho
    */
   int cfunc_CDamageGetInstigator(lua_State* const luaContext)
   {
-    return cfunc_CDamageGetInstigatorL(ResolveBindingState(luaContext));
+    return cfunc_CDamageGetInstigatorL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -537,7 +521,7 @@ namespace moho
    */
   int cfunc_CDamageSetInstigator(lua_State* const luaContext)
   {
-    return cfunc_CDamageSetInstigatorL(ResolveBindingState(luaContext));
+    return cfunc_CDamageSetInstigatorL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -594,7 +578,7 @@ namespace moho
    */
   int cfunc_CDamageGetTarget(lua_State* const luaContext)
   {
-    return cfunc_CDamageGetTargetL(ResolveBindingState(luaContext));
+    return cfunc_CDamageGetTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -651,7 +635,7 @@ namespace moho
    */
   int cfunc_CDamageSetTarget(lua_State* const luaContext)
   {
-    return cfunc_CDamageSetTargetL(ResolveBindingState(luaContext));
+    return cfunc_CDamageSetTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

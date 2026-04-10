@@ -19,6 +19,14 @@ namespace gpg
      * Lazily builds and caches reflected lexical type label `list<SDecalInfo>`.
      */
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0077A820 (FUN_0077A820, gpg::RListType_SDecalInfo::GetLexical)
+     *
+     * What it does:
+     * Formats inherited list lexical text with current `SDecalInfo` list size.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 } // namespace gpg
 
@@ -42,6 +50,27 @@ namespace
     gSDecalInfoListTypeName.clear();
     gSDecalInfoListTypeNameInitGuard = 0u;
   }
+
+  struct SDecalInfoListRuntimeView
+  {
+    void* mNodeProxy;      // +0x00
+    void* mSentinelNode;   // +0x04
+    std::uint32_t mCount;  // +0x08
+  };
+  static_assert(
+    offsetof(SDecalInfoListRuntimeView, mCount) == 0x08, "SDecalInfoListRuntimeView::mCount offset must be 0x08"
+  );
+  static_assert(sizeof(SDecalInfoListRuntimeView) == 0x0C, "SDecalInfoListRuntimeView size must be 0x0C");
+
+  [[nodiscard]] int CountSDecalInfoListElements(const void* const object) noexcept
+  {
+    if (object == nullptr) {
+      return 0;
+    }
+
+    const auto* const listView = static_cast<const SDecalInfoListRuntimeView*>(object);
+    return static_cast<int>(listView->mCount);
+  }
 } // namespace
 
 /**
@@ -63,6 +92,18 @@ const char* gpg::RListType_SDecalInfo::GetName() const
   }
 
   return gSDecalInfoListTypeName.c_str();
+}
+
+/**
+ * Address: 0x0077A820 (FUN_0077A820, gpg::RListType_SDecalInfo::GetLexical)
+ *
+ * What it does:
+ * Formats inherited list lexical text with current `SDecalInfo` list size.
+ */
+msvc8::string gpg::RListType_SDecalInfo::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), CountSDecalInfoListElements(ref.mObj));
 }
 
 namespace moho

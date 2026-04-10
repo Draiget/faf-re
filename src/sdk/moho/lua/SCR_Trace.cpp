@@ -13,10 +13,6 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
 } // namespace
 
 /**
@@ -27,7 +23,7 @@ namespace
  */
 int moho::cfunc_Trace(lua_State* const luaContext)
 {
-  return cfunc_TraceL(ResolveBindingState(luaContext));
+  return cfunc_TraceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -78,4 +74,3 @@ moho::CScrLuaInitForm* moho::register_Trace_LuaFuncDef()
 {
   return func_Trace_LuaFuncDef();
 }
-

@@ -48,16 +48,6 @@ namespace
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CConAlias& ConAlias_path_ArmyBudget()
   {
     static moho::CConAlias sAlias;
@@ -715,7 +705,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane21()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane21 = nullptr;
       return nullptr;
@@ -736,7 +726,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane22()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane22 = nullptr;
       return nullptr;
@@ -757,7 +747,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane23()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane23 = nullptr;
       return nullptr;
@@ -778,7 +768,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane24()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane24 = nullptr;
       return nullptr;
@@ -799,7 +789,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane25()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane25 = nullptr;
       return nullptr;
@@ -820,7 +810,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane26()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane26 = nullptr;
       return nullptr;
@@ -841,7 +831,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane27()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane27 = nullptr;
       return nullptr;
@@ -862,7 +852,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane28()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane28 = nullptr;
       return nullptr;
@@ -905,7 +895,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependMohoWeaponMethodsFactoryLane()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevMohoWeaponMethodsFactory = nullptr;
       return nullptr;
@@ -926,7 +916,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane30()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (simSet == nullptr) {
       gSimLuaInitFormPrevStartupLane30 = nullptr;
       return nullptr;
@@ -1559,7 +1549,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorA()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (!simSet) {
       gSimLuaInitFormPrevReconBlipAnchorA = nullptr;
       return nullptr;
@@ -1580,7 +1570,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorB()
   {
-    CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
     if (!simSet) {
       gSimLuaInitReconBlipAnchorB.mPrevDef = nullptr;
       return nullptr;

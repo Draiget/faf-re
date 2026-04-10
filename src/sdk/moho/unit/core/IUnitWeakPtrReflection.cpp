@@ -331,6 +331,12 @@ const char* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetName() const
   return gFastVectorWeakPtrIUnitTypeName.c_str();
 }
 
+/**
+ * Address: 0x0056BEB0 (FUN_0056BEB0, gpg::RFastVectorType_WeakPtr_IUnit::GetLexical)
+ *
+ * What it does:
+ * Formats vector lexical text and appends the runtime weak-pointer element count.
+ */
 msvc8::string gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);

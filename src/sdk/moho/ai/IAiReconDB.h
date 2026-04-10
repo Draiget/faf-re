@@ -197,7 +197,7 @@ namespace moho
      *
      * VFTable SLOT: 18
      */
-    virtual void UpdateSimChecksum() = 0;
+    virtual void UpdateSimChecksum();
 
     /**
      * Address: 0x005C15A0 (FUN_005C15A0)

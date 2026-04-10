@@ -459,6 +459,15 @@
     <ClCompile Include="moho\sim\CArmyImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\IdleUnitSelector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\PauseListener.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\sim\SelectionListener.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CEconomy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -703,6 +712,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\particles\ParticleRenderWorkItemRuntime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\particles\SParticleBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\particles\SWorldParticle.cpp">
@@ -1152,10 +1164,16 @@
     <ClCompile Include="moho\unit\tasks\CUnitCallTransportTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CBuildTaskHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitMoveTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitPodAssist.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitUpgradeTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitRefuel.cpp">
@@ -1165,6 +1183,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\core\CWeaponAttributes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\SSTIUnitConstantDataSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitAttributes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\core\UnitAttributesSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\core\EIntelTypeInfo.cpp">
@@ -1542,6 +1569,9 @@
     <ClCompile Include="moho\serialization\PrefetchHandleBaseTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\serialization\serializers\SBuildReserveInfoSerializer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\serialization\serializers\SWorldBeamSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1603,6 +1633,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\net\CGpgNetInterface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\net\IClientMgrUIInterface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\app\CScApp.cpp">
@@ -2741,6 +2774,9 @@
     <ClInclude Include="moho\serialization\WeakUnitSetTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\serialization\serializers\SBuildReserveInfoSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\serialization\serializers\SWorldBeamSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3272,6 +3308,9 @@
     <ClInclude Include="moho\net\IClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\net\IClientMgrUIInterface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\net\CClientBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3507,6 +3546,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\particles\ParticleRenderWorkItemRuntime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\particles\SParticleBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\particles\SWorldBeam.h">
@@ -3854,10 +3896,16 @@
     <ClInclude Include="moho\unit\tasks\CUnitCallTransportTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CBuildTaskHelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitMoveTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitUpgradeTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitRefuel.h">
@@ -3867,6 +3915,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\core\CWeaponAttributes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\SSTIUnitConstantDataSerializer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitAttributes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\core\UnitAttributesSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\core\EIntelTypeInfo.h">

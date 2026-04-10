@@ -1,7 +1,10 @@
 #include "ResourceDeposit.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <limits>
+#include <new>
+#include <typeinfo>
 
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/sim/STIMap.h"
@@ -40,6 +43,40 @@ namespace
     bounds.Max.y = std::max(bounds.Max.y, terrainY);
     bounds.Max.z = std::max(bounds.Max.z, pointZ);
   }
+
+  alignas(moho::ResourceDepositTypeInfo) unsigned char
+    gResourceDepositTypeInfoStorage[sizeof(moho::ResourceDepositTypeInfo)]{};
+  bool gResourceDepositTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()
+  {
+    if (!gResourceDepositTypeInfoConstructed) {
+      new (gResourceDepositTypeInfoStorage) moho::ResourceDepositTypeInfo();
+      gResourceDepositTypeInfoConstructed = true;
+    }
+
+    return *reinterpret_cast<moho::ResourceDepositTypeInfo*>(gResourceDepositTypeInfoStorage);
+  }
+
+  void cleanup_ResourceDepositTypeInfo()
+  {
+    if (!gResourceDepositTypeInfoConstructed) {
+      return;
+    }
+
+    AcquireResourceDepositTypeInfo().~ResourceDepositTypeInfo();
+    gResourceDepositTypeInfoConstructed = false;
+  }
+
+  struct ResourceDepositTypeInfoStartup
+  {
+    ResourceDepositTypeInfoStartup()
+    {
+      moho::register_ResourceDepositTypeInfo();
+    }
+  };
+
+  [[maybe_unused]] ResourceDepositTypeInfoStartup gResourceDepositTypeInfoStartup;
 } // namespace
 
 namespace moho
@@ -65,5 +102,46 @@ namespace moho
     ExtendBoundsWithTerrainCorner(bounds, field, footprintRect.x1, footprintRect.z0);
     ExtendBoundsWithTerrainCorner(bounds, field, footprintRect.x1, footprintRect.z1);
     return solid.Intersects(bounds);
+  }
+
+  /**
+   * Address: 0x00545BD0 (FUN_00545BD0, Moho::ResourceDepositTypeInfo::ResourceDepositTypeInfo)
+   */
+  ResourceDepositTypeInfo::ResourceDepositTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(ResourceDeposit), this);
+  }
+
+  /**
+   * Address: 0x00545C60 (FUN_00545C60, Moho::ResourceDepositTypeInfo::dtr)
+   */
+  ResourceDepositTypeInfo::~ResourceDepositTypeInfo() = default;
+
+  /**
+   * Address: 0x00545C50 (FUN_00545C50, Moho::ResourceDepositTypeInfo::GetName)
+   */
+  const char* ResourceDepositTypeInfo::GetName() const
+  {
+    return "ResourceDeposit";
+  }
+
+  /**
+   * Address: 0x00545C30 (FUN_00545C30, Moho::ResourceDepositTypeInfo::Init)
+   */
+  void ResourceDepositTypeInfo::Init()
+  {
+    size_ = sizeof(ResourceDeposit);
+    gpg::RType::Init();
+    Finish();
+  }
+
+  /**
+   * Address: 0x00BC9650 (FUN_00BC9650, register_ResourceDepositTypeInfo)
+   */
+  void register_ResourceDepositTypeInfo()
+  {
+    (void)AcquireResourceDepositTypeInfo();
+    (void)std::atexit(&cleanup_ResourceDepositTypeInfo);
   }
 } // namespace moho

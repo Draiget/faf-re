@@ -1,38 +1,26 @@
 #include "moho/render/camera/CameraImpl.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
 
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/STIMap.h"
+#include "moho/sim/UserArmy.h"
 
 namespace moho
 {
-  class CHeightField
-  {
-  public:
-    std::uint16_t* data;
-    std::int32_t width;
-    std::int32_t height;
-
-    [[nodiscard]] float GetElevation(float x, float z) const;
-  };
-
-  class STIMap
-  {
-  public:
-    [[nodiscard]] CHeightField* GetHeightField() const noexcept;
-    [[nodiscard]] bool IsWaterEnabled() const noexcept;
-    [[nodiscard]] float GetWaterElevation() const noexcept;
-  };
-
   extern float cam_NearZoom;
   extern float cam_FarFOV;
   extern float cam_FarPitch;
+  extern float ren_BorderSize;
   int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
   int cfunc_CameraImplReset(lua_State* luaContext);
   int cfunc_CameraImplResetL(LuaPlus::LuaState* state);
@@ -130,37 +118,39 @@ namespace
   struct CameraImplRuntimeView
   {
     std::uint8_t mUnknown000To04F[0x50]{};
-    msvc8::string mName{};                        // +0x050
-    moho::STIMap* mTerrainMap = nullptr;          // +0x06C
-    std::uint8_t mUnknown070To33C[0x2CD]{};       // +0x070
-    std::uint8_t mIsRotated = 0;                  // +0x33D
-    std::uint8_t mRevertRotation = 0;             // +0x33E
-    std::uint8_t mUnknown33FTo33F[0x01]{};        // +0x33F
-    float mFarFov = 0.0f;                         // +0x340
-    float mHeading = 0.0f;                        // +0x344
-    float mUnknown348 = 0.0f;                     // +0x348
-    float mFarPitch = 0.0f;                       // +0x34C
-    float mHeadingZoom = 0.0f;                    // +0x350
-    float mTargetZoom = 0.0f;                     // +0x354
-    float mNearZoom = 0.0f;                       // +0x358
-    std::uint8_t mUnknown35CTo35F[0x04]{};        // +0x35C
-    Wm3::Vec3f mOffset{};                         // +0x360
-    std::uint8_t mUnknown36CTo373[0x08]{};        // +0x36C
-    float mHeadingRate = 0.0f;                    // +0x374
-    float mZoomRate = 0.0f;                       // +0x378
-    std::int32_t mTargetType = 0;                 // +0x37C
-    Wm3::Vec3f mTargetLocation{};                 // +0x380
-    std::uint8_t mUnknown38CTo3B3[0x28]{};        // +0x38C
-    float mTargetTimeLeft = 0.0f;                 // +0x3B4
-    std::uint8_t mTargetTime = 0;                 // +0x3B8
-    std::uint8_t mUnknown3B9To3BB[0x03]{};        // +0x3B9
-    std::int32_t mTimeSource = 0;                 // +0x3BC
-    std::uint8_t mUnknown3C0To3CB[0x0C]{};        // +0x3C0
-    std::uint8_t mEnableEaseInOut = 0;            // +0x3CC
-    std::uint8_t mUnknown3CDTo3CF[0x03]{};        // +0x3CD
-    float mUnknown3D0 = 0.0f;                     // +0x3D0
-    std::uint8_t mUnknown3D4To44F[0x7C]{};        // +0x3D4
-    std::int32_t mAccType = 0;                    // +0x450
+    msvc8::string mName{};                   // +0x050
+    moho::STIMap* mTerrainMap = nullptr;     // +0x06C
+    moho::GeomCamera3 mCam{};                // +0x070
+    float mVerticalZoomMetricScale = 0.0f;   // +0x338
+    std::uint8_t mUnknown33CTo33C[0x01]{};   // +0x33C
+    std::uint8_t mIsRotated = 0;             // +0x33D
+    std::uint8_t mRevertRotation = 0;        // +0x33E
+    std::uint8_t mUnknown33FTo33F[0x01]{};   // +0x33F
+    float mFarFov = 0.0f;                    // +0x340
+    float mHeading = 0.0f;                   // +0x344
+    float mUnknown348 = 0.0f;                // +0x348
+    float mFarPitch = 0.0f;                  // +0x34C
+    float mHeadingZoom = 0.0f;               // +0x350
+    float mTargetZoom = 0.0f;                // +0x354
+    float mNearZoom = 0.0f;                  // +0x358
+    std::uint8_t mUnknown35CTo35F[0x04]{};   // +0x35C
+    Wm3::Vec3f mOffset{};                    // +0x360
+    std::uint8_t mUnknown36CTo373[0x08]{};   // +0x36C
+    float mHeadingRate = 0.0f;               // +0x374
+    float mZoomRate = 0.0f;                  // +0x378
+    std::int32_t mTargetType = 0;            // +0x37C
+    Wm3::Vec3f mTargetLocation{};            // +0x380
+    std::uint8_t mUnknown38CTo3B3[0x28]{};   // +0x38C
+    float mTargetTimeLeft = 0.0f;            // +0x3B4
+    std::uint8_t mTargetTime = 0;            // +0x3B8
+    std::uint8_t mUnknown3B9To3BB[0x03]{};   // +0x3B9
+    std::int32_t mTimeSource = 0;            // +0x3BC
+    std::uint8_t mUnknown3C0To3CB[0x0C]{};   // +0x3C0
+    std::uint8_t mEnableEaseInOut = 0;       // +0x3CC
+    std::uint8_t mUnknown3CDTo3CF[0x03]{};   // +0x3CD
+    float mUnknown3D0 = 0.0f;                // +0x3D0
+    std::uint8_t mUnknown3D4To44F[0x7C]{};   // +0x3D4
+    std::int32_t mAccType = 0;               // +0x450
   };
 
   static_assert(
@@ -178,6 +168,11 @@ namespace
   static_assert(
     offsetof(CameraImplRuntimeView, mTerrainMap) == 0x06C,
     "CameraImplRuntimeView::mTerrainMap offset must be 0x06C"
+  );
+  static_assert(offsetof(CameraImplRuntimeView, mCam) == 0x070, "CameraImplRuntimeView::mCam offset must be 0x070");
+  static_assert(
+    offsetof(CameraImplRuntimeView, mVerticalZoomMetricScale) == 0x338,
+    "CameraImplRuntimeView::mVerticalZoomMetricScale offset must be 0x338"
   );
   static_assert(
     offsetof(CameraImplRuntimeView, mHeading) == 0x344,
@@ -241,6 +236,11 @@ namespace
     return reinterpret_cast<CameraImplRuntimeView*>(camera);
   }
 
+  [[nodiscard]] const CameraImplRuntimeView* AsRuntimeView(const moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<const CameraImplRuntimeView*>(camera);
+  }
+
   struct CameraImplZoomLimitView
   {
     std::uint8_t mUnknown000To84F[0x850]{};
@@ -257,25 +257,14 @@ namespace
     return reinterpret_cast<CameraImplZoomLimitView*>(camera);
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] const CameraImplZoomLimitView* AsZoomLimitView(const moho::CameraImpl* const camera) noexcept
   {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "User") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
+    return reinterpret_cast<const CameraImplZoomLimitView*>(camera);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
       return *set;
     }
 
@@ -298,6 +287,21 @@ namespace moho
     return SCR_CreateSimpleMetatable(state);
   }
 } // namespace moho
+
+/**
+ * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
+ *
+ * What it does:
+ * Executes CameraImpl teardown and conditionally frees this object when
+ * `deleteFlags & 1` is set.
+ */
+void moho::CameraImpl::operator_delete(const std::int32_t deleteFlags)
+{
+  this->~CameraImpl();
+  if ((deleteFlags & 1) != 0) {
+    ::operator delete(this);
+  }
+}
 
 /**
  * Address: 0x007A6E70 (FUN_007A6E70)
@@ -405,6 +409,106 @@ void moho::CameraImpl::CameraReset()
 }
 
 /**
+ * Address: 0x007A69F0 (FUN_007A69F0, Moho::CameraImpl::CameraGetName)
+ *
+ * What it does:
+ * Returns the camera runtime name-string buffer.
+ */
+const char* moho::CameraImpl::CameraGetName() const
+{
+  return AsRuntimeView(this)->mName.c_str();
+}
+
+/**
+ * Address: 0x007A6A00 (FUN_007A6A00, Moho::CameraImpl::CameraGetView)
+ *
+ * What it does:
+ * Returns one read-only view of the embedded camera transform/projection state.
+ */
+const moho::GeomCamera3& moho::CameraImpl::CameraGetView() const
+{
+  return AsRuntimeView(this)->mCam;
+}
+
+/**
+ * Address: 0x007A6C80 (FUN_007A6C80, Moho::CameraImpl::CameraGetOffset)
+ *
+ * What it does:
+ * Returns one read-only camera target/offset vector lane.
+ */
+const Wm3::Vec3f& moho::CameraImpl::CameraGetOffset() const
+{
+  return AsRuntimeView(this)->mOffset;
+}
+
+/**
+ * Address: 0x007A6CA0 (FUN_007A6CA0, Moho::CameraImpl::CameraGetTargetZoom)
+ *
+ * What it does:
+ * Returns the active camera target-zoom scalar.
+ */
+float moho::CameraImpl::CameraGetTargetZoom() const
+{
+  return AsRuntimeView(this)->mTargetZoom;
+}
+
+/**
+ * Address: 0x007A7310 (FUN_007A7310, Moho::CameraImpl::GetMaxZoom)
+ *
+ * What it does:
+ * Computes max zoom from terrain dimensions, playable-rect policy, border size,
+ * and camera zoom-multiplier runtime lanes.
+ */
+float moho::CameraImpl::GetMaxZoom() const
+{
+  const CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  const STIMap* const terrainMap = runtime->mTerrainMap;
+  const CHeightField* const heightField = terrainMap != nullptr ? terrainMap->GetHeightField() : nullptr;
+
+  int minX = 0;
+  int minZ = 0;
+  int maxX = (heightField != nullptr) ? (heightField->width - 1) : 0;
+  int maxZ = (heightField != nullptr) ? (heightField->height - 1) : 0;
+
+  bool useWholeMapBounds = false;
+  if (const CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    const int focusArmyIndex = session->FocusArmy;
+    if (focusArmyIndex >= 0) {
+      const std::size_t vectorIndex = static_cast<std::size_t>(focusArmyIndex);
+      UserArmy* const focusArmy =
+        (vectorIndex < session->userArmies.size()) ? session->userArmies[vectorIndex] : nullptr;
+      useWholeMapBounds = (focusArmy != nullptr && focusArmy->mVarDat.mUseWholeMap != 0u);
+    }
+  }
+
+  if (!useWholeMapBounds && terrainMap != nullptr) {
+    minX = terrainMap->mPlayableRect.x0;
+    minZ = terrainMap->mPlayableRect.z0;
+    maxX = terrainMap->mPlayableRect.x1;
+    maxZ = terrainMap->mPlayableRect.z1;
+  }
+
+  const float borderSize = moho::ren_BorderSize;
+  const float maxZoomMult = AsZoomLimitView(this)->mMaxZoomMult;
+  const float horizontalExtent = (static_cast<float>(maxX - minX) + borderSize) * maxZoomMult;
+  const float verticalExtent =
+    (static_cast<float>(maxZ - minZ) + borderSize) * maxZoomMult * runtime->mVerticalZoomMetricScale;
+  return std::max(verticalExtent, horizontalExtent);
+}
+
+/**
+ * Address: 0x007A72C0 (FUN_007A72C0, Moho::CameraImpl::LODMetric)
+ *
+ * What it does:
+ * Projects one offset vector into the camera viewport LOD-metric row.
+ */
+float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
+{
+  const Vector4f& row = CameraGetView().viewport.r[1];
+  return offset.x * row.x + offset.y * row.y + offset.z * row.z + row.w;
+}
+
+/**
  * Address: 0x007A73C0 (FUN_007A73C0)
  *
  * What it does:
@@ -423,7 +527,7 @@ void moho::CameraImpl::SetMaxZoomMult(const float maxZoomMult)
  */
 int moho::cfunc_CameraImplSnapTo(lua_State* const luaContext)
 {
-  return cfunc_CameraImplSnapToL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplSnapToL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -487,7 +591,7 @@ int moho::cfunc_CameraImplSnapToL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplMoveTo(lua_State* const luaContext)
 {
-  return cfunc_CameraImplMoveToL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplMoveToL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -499,7 +603,7 @@ int moho::cfunc_CameraImplMoveTo(lua_State* const luaContext)
  */
 int moho::cfunc_CameraImplMoveToRegion(lua_State* const luaContext)
 {
-  return cfunc_CameraImplMoveToRegionL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplMoveToRegionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -569,7 +673,7 @@ int moho::cfunc_CameraImplMoveToL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplSetZoom(lua_State* const luaContext)
 {
-  return cfunc_CameraImplSetZoomL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplSetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -636,7 +740,7 @@ int moho::cfunc_CameraImplSetZoomL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplSetTargetZoom(lua_State* const luaContext)
 {
-  return cfunc_CameraImplSetTargetZoomL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplSetTargetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -713,7 +817,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplMoveTo_LuaFuncDef()
  */
 int moho::cfunc_CameraImplGetMinZoom(lua_State* const luaContext)
 {
-  return cfunc_CameraImplGetMinZoomL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplGetMinZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -764,7 +868,7 @@ int moho::cfunc_CameraImplGetMinZoomL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplSetMaxZoomMult(lua_State* const luaContext)
 {
-  return cfunc_CameraImplSetMaxZoomMultL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplSetMaxZoomMultL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -822,7 +926,7 @@ int moho::cfunc_CameraImplSetMaxZoomMultL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplSetAccMode(lua_State* const luaContext)
 {
-  return cfunc_CameraImplSetAccModeL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplSetAccModeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -882,7 +986,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetAccMode_LuaFuncDef()
  */
 int moho::cfunc_CameraImplSpin(lua_State* const luaContext)
 {
-  return cfunc_CameraImplSpinL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplSpinL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -953,7 +1057,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplSpin_LuaFuncDef()
  */
 int moho::cfunc_CameraImplReset(lua_State* const luaContext)
 {
-  return cfunc_CameraImplResetL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplResetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1062,7 +1166,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplNoseCam_LuaFuncDef()
  */
 int moho::cfunc_CameraImplHoldRotation(lua_State* const luaContext)
 {
-  return cfunc_CameraImplHoldRotationL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplHoldRotationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1114,7 +1218,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplHoldRotation_LuaFuncDef()
  */
 int moho::cfunc_CameraImplRevertRotation(lua_State* const luaContext)
 {
-  return cfunc_CameraImplRevertRotationL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplRevertRotationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1185,7 +1289,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetZoom_LuaFuncDef()
  */
 int moho::cfunc_CameraImplGetFocusPosition(lua_State* const luaContext)
 {
-  return cfunc_CameraImplGetFocusPositionL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplGetFocusPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1275,7 +1379,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplRestoreSettings_LuaFuncDef()
  */
 int moho::cfunc_CameraImplGetTargetZoom(lua_State* const luaContext)
 {
-  return cfunc_CameraImplGetTargetZoomL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplGetTargetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1329,7 +1433,7 @@ int moho::cfunc_CameraImplGetTargetZoomL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplGetMaxZoom(lua_State* const luaContext)
 {
-  return cfunc_CameraImplGetMaxZoomL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplGetMaxZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1383,7 +1487,7 @@ int moho::cfunc_CameraImplGetMaxZoomL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CameraImplUseGameClock(lua_State* const luaContext)
 {
-  return cfunc_CameraImplUseGameClockL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplUseGameClockL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1435,7 +1539,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplUseGameClock_LuaFuncDef()
  */
 int moho::cfunc_CameraImplUseSystemClock(lua_State* const luaContext)
 {
-  return cfunc_CameraImplUseSystemClockL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplUseSystemClockL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1487,7 +1591,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplUseSystemClock_LuaFuncDef()
  */
 int moho::cfunc_CameraImplEnableEaseInOut(lua_State* const luaContext)
 {
-  return cfunc_CameraImplEnableEaseInOutL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplEnableEaseInOutL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1539,7 +1643,7 @@ moho::CScrLuaInitForm* moho::func_CameraImplEnableEaseInOut_LuaFuncDef()
  */
 int moho::cfunc_CameraImplDisableEaseInOut(lua_State* const luaContext)
 {
-  return cfunc_CameraImplDisableEaseInOutL(ResolveBindingState(luaContext));
+  return cfunc_CameraImplDisableEaseInOutL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1581,3 +1685,6 @@ moho::CScrLuaInitForm* moho::func_CameraImplDisableEaseInOut_LuaFuncDef()
   );
   return &binder;
 }
+
+
+

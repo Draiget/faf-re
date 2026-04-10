@@ -22,10 +22,6 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
 } // namespace
 
 /**
@@ -36,7 +32,7 @@ namespace
  */
 int moho::cfunc_STR_xtoi(lua_State* const luaContext)
 {
-  return cfunc_STR_xtoiL(ResolveBindingState(luaContext));
+  return cfunc_STR_xtoiL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -94,7 +90,7 @@ moho::CScrLuaInitForm* moho::register_STR_xtoi_LuaFuncDef()
  */
 int moho::cfunc_STR_itox(lua_State* const luaContext)
 {
-  return cfunc_STR_itoxL(ResolveBindingState(luaContext));
+  return cfunc_STR_itoxL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -153,7 +149,7 @@ moho::CScrLuaInitForm* moho::register_STR_itox_LuaFuncDef()
  */
 int moho::cfunc_STR_Utf8Len(lua_State* const luaContext)
 {
-  return cfunc_STR_Utf8LenL(ResolveBindingState(luaContext));
+  return cfunc_STR_Utf8LenL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -212,7 +208,7 @@ moho::CScrLuaInitForm* moho::register_STR_Utf8Len_LuaFuncDef()
  */
 int moho::cfunc_STR_Utf8SubString(lua_State* const luaContext)
 {
-  return cfunc_STR_Utf8SubStringL(ResolveBindingState(luaContext));
+  return cfunc_STR_Utf8SubStringL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -281,7 +277,7 @@ moho::CScrLuaInitForm* moho::register_STR_Utf8SubString_LuaFuncDef()
  */
 int moho::cfunc_STR_GetTokens(lua_State* const luaContext)
 {
-  return cfunc_STR_GetTokensL(ResolveBindingState(luaContext));
+  return cfunc_STR_GetTokensL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -367,7 +363,7 @@ msvc8::string moho::GetEngineVersion()
  */
 int moho::cfunc_exists(lua_State* const luaContext)
 {
-  return cfunc_existsL(ResolveBindingState(luaContext));
+  return cfunc_existsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -428,7 +424,7 @@ moho::CScrLuaInitForm* moho::register_exists_LuaFuncDef()
  */
 int moho::cfunc_GetVersion(lua_State* const luaContext)
 {
-  return cfunc_GetVersionL(ResolveBindingState(luaContext));
+  return cfunc_GetVersionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

@@ -207,7 +207,6 @@ namespace
 
     while (pendingHead.mNext != &pendingHead) {
       ListenerNode* const node = pendingHead.mNext;
-      node->ListUnlink();
       node->ListLinkBefore(listenersHead);
 
       CDiskWatchListener* const listener = LinkOwnerFromNode(node);

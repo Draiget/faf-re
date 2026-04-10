@@ -1281,8 +1281,7 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
     --mConnector->mPacketPoolSize;
     pkt = reinterpret_cast<SNetPacket*>(mConnector->mPacketList.mNext);
     // unlink from pool
-    pkt->mPrev->mNext = pkt->mNext;
-    pkt->mNext->mPrev = pkt->mPrev;
+    pkt->ListUnlink();
   } else {
     // 536 bytes (0x218 from asm)
     pkt = new SNetPacket();

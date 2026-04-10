@@ -9,10 +9,19 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Logging.h"
+#include "IClient.h"
+#include "CClientManagerImpl.h"
 #include "INetTCPServer.h"
 #include "INetTCPSocket.h"
 #include "moho/app/CWaitHandleSet.h"
+#include "moho/client/Localization.h"
+#include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/sim/ISTIDriver.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/ui/UiRuntimeTypes.h"
 #include "platform/Platform.h"
 
 using namespace moho;
@@ -27,22 +36,9 @@ namespace
   std::mutex gGpgNetStateLock;
   boost::shared_ptr<CGpgNetInterface> gGpgNet;
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
-    lua_State* const luaContext
-  ) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "User") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
+    return moho::SCR_FindLuaInitFormSet("User");
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
@@ -81,54 +77,6 @@ namespace
       }
       total += got;
     }
-  }
-
-  LuaPlus::LuaObject GetTableField(
-    const LuaPlus::LuaObject& table,
-    const char* key
-  )
-  {
-    LuaPlus::LuaObject out;
-    if (table.IsNil() || !table.IsTable()) {
-      return out;
-    }
-
-    LuaPlus::LuaState* const state = table.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const luaState = state->GetCState();
-    if (!luaState) {
-      return out;
-    }
-
-    const int oldTop = lua_gettop(luaState);
-    const_cast<LuaPlus::LuaObject&>(table).PushStack(luaState);
-    lua_pushstring(luaState, key ? key : "");
-    lua_gettable(luaState, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(luaState, oldTop);
-    return out;
-  }
-
-  LuaPlus::LuaObject GetLobbyMethodOrThrow(
-    const LuaPlus::LuaObject& lobbyObject,
-    const char* methodName
-  )
-  {
-    if (lobbyObject.IsNil()) {
-      throw std::runtime_error("No lobby.");
-    }
-
-    LuaPlus::LuaObject methodObject = GetTableField(lobbyObject, methodName);
-    if (methodObject.IsNil()) {
-      throw std::runtime_error(
-        gpg::STR_Printf("Lobby method \"%s\" is unavailable.", methodName ? methodName : "").c_str()
-      );
-    }
-
-    return methodObject;
   }
 
   void LogUnknownCommand(
@@ -248,7 +196,7 @@ int moho::cfunc_GpgNetActive(
   lua_State* const luaContext
 )
 {
-  return cfunc_GpgNetActiveL(ResolveBindingState(luaContext));
+  return cfunc_GpgNetActiveL(SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -300,7 +248,7 @@ int moho::cfunc_GpgNetSend(
   lua_State* const luaContext
 )
 {
-  return cfunc_GpgNetSendL(ResolveBindingState(luaContext));
+  return cfunc_GpgNetSendL(SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1063,7 +1011,9 @@ void CGpgNetInterface::HostGame(
     throw std::runtime_error("Wrong number of arguments to HostGame command, expected 0 or 1");
   }
 
-  LuaPlus::LuaObject hostGameObj = GetLobbyMethodOrThrow(mLobbyObject, "HostGame");
+  LuaPlus::LuaObject hostGameObj = moho::SCR_GetLuaTableFieldOrThrow(
+    mLobbyObject, "HostGame", "No lobby.", "Lobby method \"%s\" is unavailable."
+  );
   LuaPlus::LuaFunction<void> hostGame(hostGameObj);
 
   msvc8::string scenarioPath;
@@ -1089,7 +1039,9 @@ void CGpgNetInterface::JoinGame(
     throw std::runtime_error("Wrong number of arguments to JoinGame command, expected 3");
   }
 
-  LuaPlus::LuaObject joinGameObj = GetLobbyMethodOrThrow(mLobbyObject, "JoinGame");
+  LuaPlus::LuaObject joinGameObj = moho::SCR_GetLuaTableFieldOrThrow(
+    mLobbyObject, "JoinGame", "No lobby.", "Lobby method \"%s\" is unavailable."
+  );
   LuaPlus::LuaFunction<void> joinGame(joinGameObj);
 
   const msvc8::string& hostAddress = ExpectedString(&args[0]);
@@ -1114,7 +1066,9 @@ void CGpgNetInterface::ConnectToPeer(
     throw std::runtime_error("Wrong number of arguments to ConnectToPeer command, expected 3");
   }
 
-  LuaPlus::LuaObject connectToPeerObj = GetLobbyMethodOrThrow(mLobbyObject, "ConnectToPeer");
+  LuaPlus::LuaObject connectToPeerObj = moho::SCR_GetLuaTableFieldOrThrow(
+    mLobbyObject, "ConnectToPeer", "No lobby.", "Lobby method \"%s\" is unavailable."
+  );
   LuaPlus::LuaFunction<void> connectToPeer(connectToPeerObj);
 
   const msvc8::string& endpoint = ExpectedString(&args[0]);
@@ -1139,7 +1093,9 @@ void CGpgNetInterface::DisconnectFromPeer(
     throw std::runtime_error("Wrong number of arguments to DisconnectFromPeer command, expected 1");
   }
 
-  LuaPlus::LuaObject disconnectObj = GetLobbyMethodOrThrow(mLobbyObject, "DisconnectFromPeer");
+  LuaPlus::LuaObject disconnectObj = moho::SCR_GetLuaTableFieldOrThrow(
+    mLobbyObject, "DisconnectFromPeer", "No lobby.", "Lobby method \"%s\" is unavailable."
+  );
   LuaPlus::LuaFunction<void> disconnectFromPeer(disconnectObj);
 
   const int peerUid = ExpectIntArg(*this, &args[0]);
@@ -1161,7 +1117,9 @@ void CGpgNetInterface::HasSupCom(
     throw std::runtime_error("Wrong number of arguments to SetHasSupcom command, expected 1");
   }
 
-  LuaPlus::LuaObject hasSupComObj = GetLobbyMethodOrThrow(mLobbyObject, "SetHasSupcom");
+  LuaPlus::LuaObject hasSupComObj = moho::SCR_GetLuaTableFieldOrThrow(
+    mLobbyObject, "SetHasSupcom", "No lobby.", "Lobby method \"%s\" is unavailable."
+  );
   LuaPlus::LuaFunction<void> setHasSupCom(hasSupComObj);
   setHasSupCom(ExpectIntArg(*this, &args[0]));
 }
@@ -1180,7 +1138,9 @@ void CGpgNetInterface::HasForgedAlliance(
     throw std::runtime_error("Wrong number of arguments to SetHasForgedAlliance command, expected 1");
   }
 
-  LuaPlus::LuaObject hasFaObj = GetLobbyMethodOrThrow(mLobbyObject, "SetHasForgedAlliance");
+  LuaPlus::LuaObject hasFaObj = moho::SCR_GetLuaTableFieldOrThrow(
+    mLobbyObject, "SetHasForgedAlliance", "No lobby.", "Lobby method \"%s\" is unavailable."
+  );
   LuaPlus::LuaFunction<void> setHasFa(hasFaObj);
   setHasFa(ExpectIntArg(*this, &args[0]));
 }
@@ -1228,10 +1188,8 @@ void CGpgNetInterface::SendNatPacket(
  * Address: 0x007B8E20 (FUN_007B8E20)
  *
  * What it does:
- * Validates eject request and forwards to lobby script method when available.
- *
- * Note:
- * Full CSimDriver-backed eject path is still pending reconstruction.
+ * Validates eject request, resolves the target client from the active sim
+ * driver, then disconnects/ejects it and prints the localized console notice.
  */
 void CGpgNetInterface::EjectPlayer(
   msvc8::vector<SNetCommandArg>& args
@@ -1241,18 +1199,36 @@ void CGpgNetInterface::EjectPlayer(
     throw std::runtime_error("Wrong number of arguments to EjectPlayer, expected 1");
   }
 
-  const int playerUid = ExpectIntArg(*this, &args[0]);
-
-  if (!mLobbyObject.IsNil()) {
-    LuaPlus::LuaObject ejectObj = GetTableField(mLobbyObject, "EjectPlayer");
-    if (!ejectObj.IsNil()) {
-      LuaPlus::LuaFunction<void> ejectPlayer(ejectObj);
-      ejectPlayer(playerUid);
-      return;
-    }
+  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  if (activeDriver == nullptr) {
+    throw std::runtime_error("No active session.");
   }
 
-  throw std::runtime_error("EjectPlayer path requires CSimDriver mapping and is not fully reconstructed yet.");
+  const int playerUid = ExpectIntArg(*this, &args[0]);
+  CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+  IClient* const targetClient = clientManager->GetClientWithData(playerUid);
+  if (targetClient == nullptr) {
+    throw std::runtime_error(gpg::STR_Printf("No client with uid %d", playerUid).c_str());
+  }
+
+  if (targetClient == clientManager->GetLocalClient()) {
+    clientManager->Disconnect();
+
+    const msvc8::string localizedMessage = Loc(
+      USER_GetLuaState(),
+      "<LOC Engine0016>You have been ejected due to connectivity issues."
+    );
+    CON_Printf(localizedMessage.c_str());
+    return;
+  }
+
+  targetClient->Eject();
+
+  const msvc8::string localizedMessage = Loc(
+    USER_GetLuaState(),
+    "<LOC Engine0017>%s has been ejected due to connectivity issues."
+  );
+  CON_Printf(localizedMessage.c_str(), targetClient->GetNickname().c_str());
 }
 
 /**
@@ -1326,38 +1302,7 @@ void CGpgNetInterface::ReadFromSocket()
       }
 
       for (uint32_t i = 0; i < argCount; ++i) {
-        uint8_t typeCode = 0;
-        reader.ReadExact(typeCode);
-
-        switch (typeCode) {
-        case 0: {
-          int32_t value = 0;
-          reader.ReadExact(value);
-          args.push_back(SNetCommandArg(value));
-          break;
-        }
-        case 1:
-        case 2: {
-          uint32_t payloadLen = 0;
-          reader.ReadExact(payloadLen);
-
-          msvc8::string payload;
-          if (payloadLen != 0) {
-            std::vector<char> payloadBuffer(payloadLen);
-            reader.Read(payloadBuffer.data(), payloadLen);
-            payload.assign(payloadBuffer.data(), payloadLen);
-          }
-
-          SNetCommandArg arg(payload);
-          if (typeCode == 2) {
-            arg.mType = SNetCommandArg::NETARG_Data;
-          }
-          args.push_back(arg);
-          break;
-        }
-        default:
-          throw std::runtime_error("invalid arg typecode");
-        }
+        args.push_back(moho::NET_DecodeSocketArg(reader));
       }
 
       EnqueueCommand(commandName.c_str(), args, kNetStateEstablishing);

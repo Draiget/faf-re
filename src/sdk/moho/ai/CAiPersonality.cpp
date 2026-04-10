@@ -12,6 +12,7 @@
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
@@ -159,24 +160,9 @@ namespace
     return path;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -416,7 +402,7 @@ int moho::cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiPersonalityAdjustDelay(lua_State* const luaContext)
 {
-  return cfunc_CAiPersonalityAdjustDelayL(ResolveBindingState(luaContext));
+  return cfunc_CAiPersonalityAdjustDelayL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -444,7 +430,7 @@ namespace
     lua_State* const luaContext, const char* const helpText
   )
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     if (state == nullptr) {
       return nullptr;
     }
@@ -487,7 +473,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushstring(rawState, personality->mPersonalityName.c_str());
     (void)lua_gettop(rawState);
@@ -501,7 +487,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushstring(rawState, personality->mChatPersonality.c_str());
     (void)lua_gettop(rawState);
@@ -515,7 +501,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, personality->mDifficulty);
     (void)lua_gettop(rawState);
@@ -529,7 +515,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mArmySize));
     (void)lua_gettop(rawState);
@@ -543,7 +529,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mPlatoonSize));
     (void)lua_gettop(rawState);
@@ -557,7 +543,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mAttackFrequency));
     (void)lua_gettop(rawState);
@@ -571,7 +557,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mRepeatAttackFrequency));
     (void)lua_gettop(rawState);
@@ -585,7 +571,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mCounterForces));
     (void)lua_gettop(rawState);
@@ -599,7 +585,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mIntelGathering));
     (void)lua_gettop(rawState);
@@ -613,7 +599,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mCoordinatedAttacks));
     (void)lua_gettop(rawState);
@@ -627,7 +613,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mExpansionDriven));
     (void)lua_gettop(rawState);
@@ -641,7 +627,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mTechAdvancement));
     (void)lua_gettop(rawState);
@@ -655,7 +641,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mUpgradesDriven));
     (void)lua_gettop(rawState);
@@ -669,7 +655,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mDefenseDriven));
     (void)lua_gettop(rawState);
@@ -683,7 +669,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mEconomyDriven));
     (void)lua_gettop(rawState);
@@ -697,7 +683,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mFactoryTycoon));
     (void)lua_gettop(rawState);
@@ -711,7 +697,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mIntelBuildingTycoon));
     (void)lua_gettop(rawState);
@@ -725,7 +711,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mSuperWeaponTendency));
     (void)lua_gettop(rawState);
@@ -744,7 +730,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mAirUnitsEmphasis));
     (void)lua_gettop(rawState);
@@ -758,7 +744,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mTankUnitsEmphasis));
     (void)lua_gettop(rawState);
@@ -772,7 +758,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mBotUnitsEmphasis));
     (void)lua_gettop(rawState);
@@ -786,7 +772,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mSeaUnitsEmphasis));
     (void)lua_gettop(rawState);
@@ -800,7 +786,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mSpecialtyForcesEmphasis));
     (void)lua_gettop(rawState);
@@ -814,7 +800,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mSupportUnitsEmphasis));
     (void)lua_gettop(rawState);
@@ -828,7 +814,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mDirectDamageEmphasis));
     (void)lua_gettop(rawState);
@@ -842,7 +828,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mIndirectDamageEmphasis));
     (void)lua_gettop(rawState);
@@ -861,7 +847,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mSurvivalEmphasis));
     (void)lua_gettop(rawState);
@@ -875,7 +861,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mTeamSupport));
     (void)lua_gettop(rawState);
@@ -889,7 +875,7 @@ namespace
       return 0;
     }
 
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     lua_pushnumber(rawState, ComputeDifficultyScaledRange(personality, personality->mFormationUse));
     (void)lua_gettop(rawState);
@@ -1518,7 +1504,7 @@ int moho::cfunc_CAiPersonalityGetFavouriteStructuresL(LuaPlus::LuaState* const s
  */
 int moho::cfunc_CAiPersonalityGetFavouriteStructures(lua_State* const luaContext)
 {
-  return cfunc_CAiPersonalityGetFavouriteStructuresL(ResolveBindingState(luaContext));
+  return cfunc_CAiPersonalityGetFavouriteStructuresL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1551,7 +1537,7 @@ int moho::cfunc_CAiPersonalityGetFavouriteUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiPersonalityGetFavouriteUnits(lua_State* const luaContext)
 {
-  return cfunc_CAiPersonalityGetFavouriteUnitsL(ResolveBindingState(luaContext));
+  return cfunc_CAiPersonalityGetFavouriteUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1580,7 +1566,7 @@ int moho::cfunc_CAiPersonalityGetTargetSpreadL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiPersonalityGetTargetSpread(lua_State* const luaContext)
 {
-  return cfunc_CAiPersonalityGetTargetSpreadL(ResolveBindingState(luaContext));
+  return cfunc_CAiPersonalityGetTargetSpreadL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1628,7 +1614,7 @@ int moho::cfunc_CAiPersonalityGetQuittingTendencyL(LuaPlus::LuaState* const stat
  */
 int moho::cfunc_CAiPersonalityGetQuittingTendency(lua_State* const luaContext)
 {
-  return cfunc_CAiPersonalityGetQuittingTendencyL(ResolveBindingState(luaContext));
+  return cfunc_CAiPersonalityGetQuittingTendencyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1676,7 +1662,7 @@ int moho::cfunc_CAiPersonalityGetChatFrequencyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiPersonalityGetChatFrequency(lua_State* const luaContext)
 {
-  return cfunc_CAiPersonalityGetChatFrequencyL(ResolveBindingState(luaContext));
+  return cfunc_CAiPersonalityGetChatFrequencyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

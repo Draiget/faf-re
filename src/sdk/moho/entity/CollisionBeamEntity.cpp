@@ -276,8 +276,7 @@ namespace moho
       return;
     }
 
-    const LuaPlus::LuaObject* const launcherWeaponLuaObject = &launcherWeapon->mLuaObj;
-    attacker->TransmitBeamImpactEvent(launcherWeaponLuaObject, this);
+    attacker->TransmitBeamImpactEvent(launcherWeapon, this);
     mCollisionListenerBound = 1u;
   }
 

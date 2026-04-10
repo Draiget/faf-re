@@ -9,6 +9,7 @@
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/misc/WeakObject.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/vision/VisionDB.h"
 
 namespace moho
 {
@@ -20,6 +21,7 @@ namespace moho
   class CD3DBatchTexture;
   class UserArmy;
   class CSndParams;
+  struct HSndEntityLoop;
   struct REntityBlueprint;
 
   struct SCreateEntityParams
@@ -39,13 +41,6 @@ namespace moho
     std::int32_t mEntryId; // 0x04
   };
   static_assert(sizeof(UserEntitySpatialDbEntry) == 0x08, "UserEntitySpatialDbEntry size must be 0x08");
-
-  class UserEntityAuxHandle
-  {
-  public:
-    virtual ~UserEntityAuxHandle() = default;
-    virtual void Release(std::int32_t destroyNow) = 0;
-  };
 
   class UserEntity : public WeakObject
   {
@@ -138,7 +133,7 @@ namespace moho
      * What it does:
      * Applies replicated variable snapshot data to the user-entity.
      */
-    virtual void UpdateEntityData(const SSTIEntityVariableData& variableData) = 0;
+    virtual void UpdateEntityData(const SSTIEntityVariableData& variableData);
 
     /**
      * Address: 0x008B9580 (FUN_008B9580, ?UpdateVisibility@UserEntity@Moho@@UAEXXZ)
@@ -228,18 +223,17 @@ namespace moho
     UserEntityLinkNode* mIUnitChainHead;        // 0x08
     CWldSession* mSession;                      // 0x0C
     UserEntitySpatialDbEntry mSpatialDbEntry;   // 0x10
-    UserEntityAuxHandle* mAuxRuntimeHandle;     // 0x18
+    VisionDB::Handle* mVisionHandle;            // 0x18
     boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
     boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24
     MeshInstance* mMeshInstance;                // 0x2C
     UserEntityLinkNode* mRuntimeLinkHead;       // 0x30
     std::int32_t mRuntimeSelectionToken;        // 0x34
     CSndParams* mCachedAmbientSound;            // 0x38
-    void* mRumbleSoundBinding;                  // 0x3C
+    HSndEntityLoop* mRumbleLoopHandle;          // 0x3C
     std::int32_t mLastFocusDamageGameTick;      // 0x40
     SCreateEntityParams mParams;                // 0x44
     SSTIEntityVariableData mVariableData;       // 0x50
-    std::uint8_t pad_00FC_0120[0x24]{};
     UserArmy* mArmy;                // 0x120
     VTransform mTransform;          // 0x124
     float mLastInterpAmt;           // 0x140
@@ -253,7 +247,7 @@ namespace moho
   static_assert(offsetof(UserEntity, mSession) == 0x0C, "UserEntity::mSession offset must be 0x0C");
   static_assert(offsetof(UserEntity, mIUnitChainHead) == 0x08, "UserEntity::mIUnitChainHead offset must be 0x08");
   static_assert(offsetof(UserEntity, mSpatialDbEntry) == 0x10, "UserEntity::mSpatialDbEntry offset must be 0x10");
-  static_assert(offsetof(UserEntity, mAuxRuntimeHandle) == 0x18, "UserEntity::mAuxRuntimeHandle offset must be 0x18");
+  static_assert(offsetof(UserEntity, mVisionHandle) == 0x18, "UserEntity::mVisionHandle offset must be 0x18");
   static_assert(offsetof(UserEntity, mPosePrimary) == 0x1C, "UserEntity::mPosePrimary offset must be 0x1C");
   static_assert(offsetof(UserEntity, mPoseSecondary) == 0x24, "UserEntity::mPoseSecondary offset must be 0x24");
   static_assert(offsetof(UserEntity, mMeshInstance) == 0x2C, "UserEntity::mMeshInstance offset must be 0x2C");
@@ -262,7 +256,7 @@ namespace moho
     offsetof(UserEntity, mRuntimeSelectionToken) == 0x34, "UserEntity::mRuntimeSelectionToken offset must be 0x34"
   );
   static_assert(
-    offsetof(UserEntity, mRumbleSoundBinding) == 0x3C, "UserEntity::mRumbleSoundBinding offset must be 0x3C"
+    offsetof(UserEntity, mRumbleLoopHandle) == 0x3C, "UserEntity::mRumbleLoopHandle offset must be 0x3C"
   );
   static_assert(
     offsetof(UserEntity, mLastFocusDamageGameTick) == 0x40, "UserEntity::mLastFocusDamageGameTick offset must be 0x40"

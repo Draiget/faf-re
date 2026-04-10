@@ -492,10 +492,7 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(void* const obj, const int
 IAiAttacker::~IAiAttacker()
 {
   Broadcaster* const link = static_cast<Broadcaster*>(&mListeners);
-  link->mPrev->mNext = link->mNext;
-  link->mNext->mPrev = link->mPrev;
-  link->mNext = link;
-  link->mPrev = link;
+  link->ListUnlink();
 }
 
 /**

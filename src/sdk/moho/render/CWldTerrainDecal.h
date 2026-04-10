@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "legacy/containers/String.h"
+#include "moho/math/VMatrix4.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/CountedObject.h"
 #include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
@@ -27,7 +28,13 @@ namespace moho
   class CWldTerrainDecal
   {
   public:
-    struct Quad;
+    struct Quad
+    {
+      Wm3::Vec3f mCorner0; // +0x00
+      Wm3::Vec3f mCorner1; // +0x0C
+      Wm3::Vec3f mCorner2; // +0x18
+      Wm3::Vec3f mCorner3; // +0x24
+    };
 
     /**
      * Address: 0x0089CA60 (FUN_0089CA60, Moho::CWldTerrainDecal::CWldTerrainDecal)
@@ -54,7 +61,7 @@ namespace moho
      * What it does:
      * Updates the decal's named texture lanes and per-slot name metadata.
      */
-    virtual void SetName(const msvc8::string& name, int slot) = 0;
+    virtual void SetName(const msvc8::string& name, int slot);
 
     /**
      * Address: 0x0089D9C0 (Moho::CWldTerrainDecal::ComputeCorner)
@@ -62,7 +69,7 @@ namespace moho
      * What it does:
      * Projects one decal corner in world space.
      */
-    virtual Wm3::Vec2f ComputeCorner(const Wm3::Vec2f& corner) const = 0;
+    virtual Wm3::Vec2f ComputeCorner(const Wm3::Vec2f& corner) const;
 
     /**
      * Address: 0x0089C890 (Moho::CWldTerrainDecal::EnableFlatOptimization)
@@ -70,7 +77,7 @@ namespace moho
      * What it does:
      * Toggles flatness optimization for this decal lane.
      */
-    virtual void EnableFlatOptimization(bool enabled) = 0;
+    virtual void EnableFlatOptimization(bool enabled);
 
     /**
      * Address: 0x0089D560 (Moho::CWldTerrainDecal::ComputeFlatness)
@@ -78,7 +85,7 @@ namespace moho
      * What it does:
      * Evaluates whether one quad is flat enough to keep the current LOD.
      */
-    virtual bool ComputeFlatness(Quad& quad) = 0;
+    virtual bool ComputeFlatness(Quad& quad);
 
     /**
      * Address: 0x0089DA80 (Moho::CWldTerrainDecal::ComputeCutoffLOD)
@@ -86,7 +93,15 @@ namespace moho
      * What it does:
      * Computes the distance-based cutoff LOD for the decal.
      */
-    virtual float ComputeCutoffLOD(float distance) const = 0;
+    virtual float ComputeCutoffLOD(float distance) const;
+
+    /**
+     * Address: 0x0089D3C0 (FUN_0089D3C0, Moho::CWldTerrainDecal::SetCutoffLOD)
+     *
+     * What it does:
+     * Stores one explicit cutoff-lod scalar and updates spatial-db dissolve sort key.
+     */
+    void SetCutoffLOD(float cutoffLod);
 
     /**
      * Address: 0x0089DC70 (Moho::CWldTerrainDecal::Update)
@@ -94,7 +109,7 @@ namespace moho
      * What it does:
      * Advances runtime decal state for the current frame.
      */
-    virtual void Update() = 0;
+    virtual void Update();
 
   public:
     CWldTerrainDecalLink* mLinkHead;           // +0x04
@@ -109,22 +124,28 @@ namespace moho
     Wm3::Vec3f mScale;                         // +0x5C
     Wm3::Vec3f mPosition;                      // +0x68
     Wm3::Vec3f mOrientation;                   // +0x74
-    float mUnknown80;                          // +0x80
-    float mUnknown84;                          // +0x84
-    float mUnknown88;                          // +0x88
-    float mUnknown8C;                          // +0x8C
-    float mUnknown90;                          // +0x90
+    float mCutoffLOD;                          // +0x80
+    float mNearCutoff;                         // +0x84
+    std::int32_t mRemoveTick;                  // +0x88
+    float mCurrentAlpha;                       // +0x8C
+    float mFadeDistance;                       // +0x90
     float mUnknown94;                          // +0x94
-    std::int32_t mUnknown98;                   // +0x98
+    std::int32_t mRuntimeHandle;               // +0x98
     std::int32_t mUnknown9C;                   // +0x9C
     std::uint8_t mUnknownA0;                   // +0xA0
     std::uint8_t mPadA1_A3[0x03];              // +0xA1
     CountedPtr<CountedObject> mResourceRefs[2]; // +0xA4
-    std::uint8_t mPadAC_13B[0x90];             // +0xAC
-    std::uint8_t mFlag13C;                     // +0x13C
-    std::uint8_t mFlag13D;                     // +0x13D
-    std::uint8_t mFlag13E;                     // +0x13E
+    VMatrix4 mTexMatrix;                       // +0xAC
+    VMatrix4 mTangentMatrix;                   // +0xEC
+    float mBoundsMinX;                         // +0x12C
+    float mBoundsMinZ;                         // +0x130
+    float mBoundsMaxX;                         // +0x134
+    float mBoundsMaxZ;                         // +0x138
+    std::uint8_t mFlatOptimizationEnabled;     // +0x13C
+    std::uint8_t mFlatnessCacheValid;          // +0x13D
+    std::uint8_t mCachedFlatResult;            // +0x13E
     std::uint8_t mPad13F;                      // +0x13F
+    Quad mCachedFlatQuad;                      // +0x140
   };
 
   static_assert(offsetof(CWldTerrainDecal, mLinkHead) == 0x04, "CWldTerrainDecal::mLinkHead offset must be 0x04");
@@ -138,20 +159,56 @@ namespace moho
   static_assert(offsetof(CWldTerrainDecal, mScale) == 0x5C, "CWldTerrainDecal::mScale offset must be 0x5C");
   static_assert(offsetof(CWldTerrainDecal, mPosition) == 0x68, "CWldTerrainDecal::mPosition offset must be 0x68");
   static_assert(offsetof(CWldTerrainDecal, mOrientation) == 0x74, "CWldTerrainDecal::mOrientation offset must be 0x74");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown80) == 0x80, "CWldTerrainDecal::mUnknown80 offset must be 0x80");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown84) == 0x84, "CWldTerrainDecal::mUnknown84 offset must be 0x84");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown88) == 0x88, "CWldTerrainDecal::mUnknown88 offset must be 0x88");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown8C) == 0x8C, "CWldTerrainDecal::mUnknown8C offset must be 0x8C");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown90) == 0x90, "CWldTerrainDecal::mUnknown90 offset must be 0x90");
+  static_assert(offsetof(CWldTerrainDecal, mCutoffLOD) == 0x80, "CWldTerrainDecal::mCutoffLOD offset must be 0x80");
+  static_assert(offsetof(CWldTerrainDecal, mNearCutoff) == 0x84, "CWldTerrainDecal::mNearCutoff offset must be 0x84");
+  static_assert(offsetof(CWldTerrainDecal, mRemoveTick) == 0x88, "CWldTerrainDecal::mRemoveTick offset must be 0x88");
+  static_assert(
+    offsetof(CWldTerrainDecal, mCurrentAlpha) == 0x8C, "CWldTerrainDecal::mCurrentAlpha offset must be 0x8C"
+  );
+  static_assert(offsetof(CWldTerrainDecal, mFadeDistance) == 0x90, "CWldTerrainDecal::mFadeDistance offset must be 0x90");
   static_assert(offsetof(CWldTerrainDecal, mUnknown94) == 0x94, "CWldTerrainDecal::mUnknown94 offset must be 0x94");
-  static_assert(offsetof(CWldTerrainDecal, mUnknown98) == 0x98, "CWldTerrainDecal::mUnknown98 offset must be 0x98");
+  static_assert(offsetof(CWldTerrainDecal, mRuntimeHandle) == 0x98, "CWldTerrainDecal::mRuntimeHandle offset must be 0x98");
   static_assert(offsetof(CWldTerrainDecal, mUnknown9C) == 0x9C, "CWldTerrainDecal::mUnknown9C offset must be 0x9C");
   static_assert(offsetof(CWldTerrainDecal, mUnknownA0) == 0xA0, "CWldTerrainDecal::mUnknownA0 offset must be 0xA0");
   static_assert(offsetof(CWldTerrainDecal, mResourceRefs) == 0xA4, "CWldTerrainDecal::mResourceRefs offset must be 0xA4");
-  static_assert(offsetof(CWldTerrainDecal, mFlag13C) == 0x13C, "CWldTerrainDecal::mFlag13C offset must be 0x13C");
-  static_assert(offsetof(CWldTerrainDecal, mFlag13D) == 0x13D, "CWldTerrainDecal::mFlag13D offset must be 0x13D");
-  static_assert(offsetof(CWldTerrainDecal, mFlag13E) == 0x13E, "CWldTerrainDecal::mFlag13E offset must be 0x13E");
+  static_assert(offsetof(CWldTerrainDecal, mTexMatrix) == 0xAC, "CWldTerrainDecal::mTexMatrix offset must be 0xAC");
+  static_assert(
+    offsetof(CWldTerrainDecal, mTangentMatrix) == 0xEC, "CWldTerrainDecal::mTangentMatrix offset must be 0xEC"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mBoundsMinX) == 0x12C,
+    "CWldTerrainDecal::mBoundsMinX offset must be 0x12C"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mBoundsMinZ) == 0x130,
+    "CWldTerrainDecal::mBoundsMinZ offset must be 0x130"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mBoundsMaxX) == 0x134,
+    "CWldTerrainDecal::mBoundsMaxX offset must be 0x134"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mBoundsMaxZ) == 0x138,
+    "CWldTerrainDecal::mBoundsMaxZ offset must be 0x138"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mFlatOptimizationEnabled) == 0x13C,
+    "CWldTerrainDecal::mFlatOptimizationEnabled offset must be 0x13C"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mFlatnessCacheValid) == 0x13D,
+    "CWldTerrainDecal::mFlatnessCacheValid offset must be 0x13D"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mCachedFlatResult) == 0x13E,
+    "CWldTerrainDecal::mCachedFlatResult offset must be 0x13E"
+  );
+  static_assert(
+    offsetof(CWldTerrainDecal, mCachedFlatQuad) == 0x140,
+    "CWldTerrainDecal::mCachedFlatQuad offset must be 0x140"
+  );
 
+  static_assert(sizeof(CWldTerrainDecal::Quad) == 0x30, "CWldTerrainDecal::Quad size must be 0x30");
   static_assert(sizeof(CountedPtr<CountedObject>) == 0x04, "CountedPtr<CountedObject> size must be 0x04");
-  static_assert(sizeof(CWldTerrainDecal) == 0x140, "CWldTerrainDecal size must be 0x140");
+  static_assert(sizeof(CWldTerrainDecal) == 0x170, "CWldTerrainDecal size must be 0x170");
 } // namespace moho

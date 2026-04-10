@@ -6,6 +6,7 @@
 #include "moho/console/CConAlias.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_Color.h"
 #include "moho/misc/XDataError.h"
@@ -38,11 +39,6 @@ namespace
   constexpr const char* kCivilianArmyColorFieldName = "CivilianArmyColor";
   constexpr const char* kUnidentifiedColorFieldName = "UnidentifiedColor";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   [[nodiscard]] moho::CConAlias& ConAlias_SetArmyColor()
   {
     static moho::CConAlias sAlias;
@@ -55,20 +51,9 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -376,7 +361,7 @@ namespace moho
    */
   int cfunc_CreateInitialArmyUnit(lua_State* const luaContext)
   {
-    return cfunc_CreateInitialArmyUnitL(ResolveBindingState(luaContext));
+    return cfunc_CreateInitialArmyUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -387,7 +372,7 @@ namespace moho
    */
   int cfunc_SetArmyColorIndex(lua_State* const luaContext)
   {
-    return cfunc_SetArmyColorIndexL(ResolveBindingState(luaContext));
+    return cfunc_SetArmyColorIndexL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -432,7 +417,7 @@ namespace moho
    */
   int cfunc_AddBuildRestriction(lua_State* const luaContext)
   {
-    return cfunc_AddBuildRestrictionL(ResolveBindingState(luaContext));
+    return cfunc_AddBuildRestrictionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -444,7 +429,7 @@ namespace moho
    */
   int cfunc_RemoveBuildRestriction(lua_State* const luaContext)
   {
-    return cfunc_RemoveBuildRestrictionL(ResolveBindingState(luaContext));
+    return cfunc_RemoveBuildRestrictionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

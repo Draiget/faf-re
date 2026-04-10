@@ -173,6 +173,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076FD10 (FUN_0076FD10)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelPosHandle::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CIntelPosHandleMemberDeserializeBridgeA(
+    CIntelPosHandle* const handle,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberDeserialize(archive);
+    }
+  }
+
+  /**
    * Address: 0x00770090 (FUN_00770090, Moho::CIntelPosHandle::MemberSerialize)
    *
    * gpg::WriteArchive *
@@ -200,6 +216,54 @@ namespace moho
     const gpg::RRef gridRef = MakeSharedIntelGridRef(mGrid.px);
     gpg::WriteRawPointer(archive, gridRef, gpg::TrackedPointerState::Shared, ownerRef);
     archive->WriteInt(mLastTickUpdated);
+  }
+
+  /**
+   * Address: 0x0076FD20 (FUN_0076FD20)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelPosHandle::MemberSerialize`.
+   */
+  [[maybe_unused]] void CIntelPosHandleMemberSerializeBridgeA(
+    const CIntelPosHandle* const handle,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0076FE10 (FUN_0076FE10)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelPosHandle::MemberDeserialize`.
+   */
+  [[maybe_unused]] void CIntelPosHandleMemberDeserializeBridgeB(
+    CIntelPosHandle* const handle,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberDeserialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x0076FE20 (FUN_0076FE20)
+   *
+   * What it does:
+   * Serializer bridge thunk that forwards to `CIntelPosHandle::MemberSerialize`.
+   */
+  [[maybe_unused]] void CIntelPosHandleMemberSerializeBridgeB(
+    const CIntelPosHandle* const handle,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (handle != nullptr) {
+      handle->MemberSerialize(archive);
+    }
   }
 
   /**

@@ -122,6 +122,18 @@ namespace moho
       return mOwnerId;
     }
 
+    /**
+     * Address: <synthetic host-build helper>
+     *
+     * What it does:
+     * Exposes the client nickname string tracked by this client record.
+     */
+    [[nodiscard]]
+    const msvc8::string& GetNickname() const
+    {
+      return mNickname;
+    }
+
   protected:
     msvc8::string mNickname;
     int mIndex{0};

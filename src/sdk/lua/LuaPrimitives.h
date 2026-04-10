@@ -10,16 +10,16 @@ extern "C"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#elif __has_include(<lua-lang/include/lua.h>)
-#include <lua-lang/include/lua.h>
-#include <lua-lang/include/lauxlib.h>
-#include <lua-lang/include/lualib.h>
-#elif __has_include("../../../dependencies/lua-lang/include/lua.h")
-#include "../../../dependencies/lua-lang/include/lua.h"
-#include "../../../dependencies/lua-lang/include/lauxlib.h"
-#include "../../../dependencies/lua-lang/include/lualib.h"
+#elif __has_include(<LuaPlus_Build1081/Src/LuaPlus/include/lua.h>)
+#include <LuaPlus_Build1081/Src/LuaPlus/include/lua.h>
+#include <LuaPlus_Build1081/Src/LuaPlus/include/lauxlib.h>
+#include <LuaPlus_Build1081/Src/LuaPlus/include/lualib.h>
+#elif __has_include("../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lua.h")
+#include "../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lua.h"
+#include "../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lauxlib.h"
+#include "../../../dependencies/LuaPlus_Build1081/Src/LuaPlus/include/lualib.h"
 #else
-#error "Lua headers not found. Add dependencies/lua-lang/include to include paths."
+#error "Lua headers not found. Add dependencies/LuaPlus_Build1081/Src/LuaPlus/include to include paths."
 #endif
 #else
 #include <lua.h>
@@ -137,7 +137,15 @@ namespace moho
 	class CLuaTask;
 }
 
-moho::Sim* lua_getglobaluserdata(lua_State* state);
+void* lua_getglobaluserdata(lua_State* state);
+
+inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
+{
+	return static_cast<moho::Sim*>(::lua_getglobaluserdata(state));
+}
+
+// Preserve typed SDK call sites while matching LuaPlus API signature.
+#define lua_getglobaluserdata lua_getglobaluserdata_typed
 
 namespace LuaPlus
 {

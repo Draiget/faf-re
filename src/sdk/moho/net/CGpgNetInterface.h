@@ -315,7 +315,11 @@ namespace moho
     void SendNatPacket(msvc8::vector<SNetCommandArg>& args);
 
     /**
-     * Address: 0x007B8E20
+     * Address: 0x007B8E20 (FUN_007B8E20)
+     *
+     * What it does:
+     * Resolves target client from active sim driver and executes local
+     * disconnect or remote eject with localized console messaging.
      *
      * @param args
      */

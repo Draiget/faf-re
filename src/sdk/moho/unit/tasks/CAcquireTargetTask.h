@@ -82,8 +82,8 @@ namespace moho
      * Address: 0x005D97F0 (FUN_005D97F0, listener callback lane)
      *
      * What it does:
-     * Clears the projectile-impact listener state when the listener lane is
-     * detached or reset.
+     * Dispatches listener action handling for projectile-impact callbacks:
+     * retarget probe on action==1, reset/counter-clear on action==0/2.
      */
     int HandleProjectileImpactListenerState(int action);
 
@@ -91,10 +91,24 @@ namespace moho
      * Address: 0x005D9830 (FUN_005D9830, listener callback lane)
      *
      * What it does:
-     * Clears the collision-beam listener state when the listener lane is
-     * detached or reset.
+     * Dispatches listener action handling for collision-beam callbacks:
+     * retarget probe on action==1, reset/counter-clear on action==0/2.
      */
     int HandleCollisionBeamListenerState(int action);
+
+  private:
+
+    /**
+     * Address: 0x005D9630 (FUN_005D9630, helper used by listener action==1 lanes)
+     *
+     * What it does:
+     * Applies moving-target retarget heuristics, including aim-spot repick,
+     * cooldown tagging, and blacklist/reset behavior after repeated stalled
+     * target probes.
+     */
+    void HandleRetargetProbeOnListenerTick();
+
+  public:
 
     /**
      * Address: 0x005E16A0 (FUN_005E16A0, Moho::CAcquireTargetTask::MemberDeserialize)

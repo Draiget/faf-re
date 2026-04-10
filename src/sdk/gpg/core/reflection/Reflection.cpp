@@ -1066,6 +1066,21 @@ TValue* TryUpcastValueOrThrow(const RRef& source, const std::type_info& targetTy
 }
 
 template <class T>
+T** TryUpcastPointerSlotWithTypeNameOrThrow(const RRef& source)
+{
+  RType* const targetType = CachedPointerType<T>();
+  const RRef upcast = gpg::REF_UpcastPtr(source, targetType);
+  auto* const slot = static_cast<T**>(upcast.mObj);
+  if (!slot) {
+    const char* const sourceName = source.mType ? source.mType->GetName() : "null";
+    const char* const targetName = targetType ? targetType->GetName() : "null";
+    throw gpg::BadRefCast(nullptr, sourceName, targetName);
+  }
+
+  return slot;
+}
+
+template <class T>
 RRef MakePointeeRef(T* const object, RType* const baseType)
 {
     RRef out{};
@@ -5900,6 +5915,186 @@ unsigned long* RRef::TryUpcastUnsignedLong() const
 {
   static RType* sUnsignedLongType = nullptr;
   return TryUpcastValueOrThrow<unsigned long>(*this, typeid(unsigned long), sUnsignedLongType);
+}
+
+/**
+ * Address: 0x00557A90 (FUN_00557A90, gpg::RRef::TryUpcast_RBlueprint_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `RBlueprint*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::RBlueprint** RRef::TryUpcastRBlueprintPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::RBlueprint>(*this);
+}
+
+/**
+ * Address: 0x0059DE10 (FUN_0059DE10, gpg::RRef::TryUpcast_IFormationInstance_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `IFormationInstance*` pointer-slot
+ * lane and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::IFormationInstance** RRef::TryUpcastIFormationInstancePointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::IFormationInstance>(*this);
+}
+
+/**
+ * Address: 0x005A1E90 (FUN_005A1E90, gpg::RRef::TryUpcast_RUnitBlueprint_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `RUnitBlueprint*` pointer-slot lane
+ * and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::RUnitBlueprint** RRef::TryUpcastRUnitBlueprintPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::RUnitBlueprint>(*this);
+}
+
+/**
+ * Address: 0x005CA2E0 (FUN_005CA2E0, gpg::RRef::TryUpcast_ReconBlip_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `ReconBlip*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::ReconBlip** RRef::TryUpcastReconBlipPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::ReconBlip>(*this);
+}
+
+/**
+ * Address: 0x005DF630 (FUN_005DF630, gpg::RRef::TryUpcast_UnitWeapon_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `UnitWeapon*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::UnitWeapon** RRef::TryUpcastUnitWeaponPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::UnitWeapon>(*this);
+}
+
+/**
+ * Address: 0x005DF6B0 (FUN_005DF6B0, gpg::RRef::TryUpcast_CAcquireTargetTask_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `CAcquireTargetTask*` pointer-slot
+ * lane and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::CAcquireTargetTask** RRef::TryUpcastCAcquireTargetTaskPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::CAcquireTargetTask>(*this);
+}
+
+/**
+ * Address: 0x0063E6E0 (FUN_0063E6E0, gpg::RRef::TryUpcast_IAniManipulator_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `IAniManipulator*` pointer-slot lane
+ * and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::IAniManipulator** RRef::TryUpcastIAniManipulatorPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::IAniManipulator>(*this);
+}
+
+/**
+ * Address: 0x0066D110 (FUN_0066D110, gpg::RRef::TryUpcast_IEffect_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `IEffect*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::IEffect** RRef::TryUpcastIEffectPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::IEffect>(*this);
+}
+
+/**
+ * Address: 0x0067FD80 (FUN_0067FD80, gpg::RRef::TryUpcast_Entity_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `Entity*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::Entity** RRef::TryUpcastEntityPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::Entity>(*this);
+}
+
+/**
+ * Address: 0x006B3D00 (FUN_006B3D00, gpg::RRef::TryUpcast_CEconomyEvent_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `CEconomyEvent*` pointer-slot lane
+ * and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::CEconomyEvent** RRef::TryUpcastCEconomyEventPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::CEconomyEvent>(*this);
+}
+
+/**
+ * Address: 0x006E3E10 (FUN_006E3E10, gpg::RRef::TryUpcast_CUnitCommand_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `CUnitCommand*` pointer-slot lane
+ * and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::CUnitCommand** RRef::TryUpcastCUnitCommandPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::CUnitCommand>(*this);
+}
+
+/**
+ * Address: 0x00712B20 (FUN_00712B20, gpg::RRef::TryUpcast_CArmyStatItem_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `CArmyStatItem*` pointer-slot lane
+ * and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::CArmyStatItem** RRef::TryUpcastCArmyStatItemPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::CArmyStatItem>(*this);
+}
+
+/**
+ * Address: 0x00751F10 (FUN_00751F10, gpg::RRef::TryUpcast_SimArmy_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `SimArmy*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::SimArmy** RRef::TryUpcastSimArmyPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::SimArmy>(*this);
+}
+
+/**
+ * Address: 0x00751FC0 (FUN_00751FC0, gpg::RRef::TryUpcast_Shield_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `Shield*` pointer-slot lane and
+ * throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::Shield** RRef::TryUpcastShieldPointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::Shield>(*this);
+}
+
+/**
+ * Address: 0x0077F430 (FUN_0077F430, gpg::RRef::TryUpcast_CDecalHandle_P)
+ *
+ * What it does:
+ * Upcasts this reflected reference to one `CDecalHandle*` pointer-slot lane
+ * and throws `BadRefCast` with source/target names on mismatch.
+ */
+moho::CDecalHandle** RRef::TryUpcastCDecalHandlePointerSlot() const
+{
+  return TryUpcastPointerSlotWithTypeNameOrThrow<moho::CDecalHandle>(*this);
 }
 
 /**

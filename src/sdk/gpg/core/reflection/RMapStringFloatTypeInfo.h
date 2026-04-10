@@ -23,6 +23,14 @@ namespace gpg
     [[nodiscard]] const char* GetName() const override;
 
     /**
+     * Address: 0x006AE370 (FUN_006AE370, gpg::RMapType_string_float::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current map element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
      * Address: 0x006AF250 (FUN_006AF250, gpg::RMapType_string_float::SerLoad)
      *
      * What it does:

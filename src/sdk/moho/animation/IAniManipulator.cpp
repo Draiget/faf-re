@@ -11,6 +11,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
 
@@ -33,25 +34,9 @@ namespace
     "may result in the bone's position snapping.";
   constexpr const char* kIAniManipulatorDestroyHelpText = "Manipulator:Destroy() -- destroy a manipulator.";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -184,7 +169,6 @@ namespace
       insertBefore = insertBefore->mNext;
     }
 
-    manipulator->mActorOrderLink.ListUnlink();
     manipulator->mActorOrderLink.ListLinkBefore(insertBefore);
   }
 
@@ -492,7 +476,7 @@ namespace moho
    */
   int cfunc_IAniManipulatorSetPrecedence(lua_State* const luaContext)
   {
-    return cfunc_IAniManipulatorSetPrecedenceL(ResolveBindingState(luaContext));
+    return cfunc_IAniManipulatorSetPrecedenceL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -560,7 +544,7 @@ namespace moho
    */
   int cfunc_IAniManipulatorEnable(lua_State* const luaContext)
   {
-    return cfunc_IAniManipulatorEnableL(ResolveBindingState(luaContext));
+    return cfunc_IAniManipulatorEnableL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -619,7 +603,7 @@ namespace moho
    */
   int cfunc_IAniManipulatorDisable(lua_State* const luaContext)
   {
-    return cfunc_IAniManipulatorDisableL(ResolveBindingState(luaContext));
+    return cfunc_IAniManipulatorDisableL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -678,7 +662,7 @@ namespace moho
    */
   int cfunc_IAniManipulatorDestroy(lua_State* const luaContext)
   {
-    return cfunc_IAniManipulatorDestroyL(ResolveBindingState(luaContext));
+    return cfunc_IAniManipulatorDestroyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

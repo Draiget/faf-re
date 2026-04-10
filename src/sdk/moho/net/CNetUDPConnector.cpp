@@ -113,15 +113,8 @@ CNetUDPConnector::~CNetUDPConnector()
   mOutboundPackets.clear();
 
   // Normalize intrusive lists (both to self-sentinel)
-  mPacketList.mPrev->mNext = mPacketList.mNext;
-  mPacketList.mNext->mPrev = mPacketList.mPrev;
-  mPacketList.mNext = &mPacketList;
-  mPacketList.mPrev = &mPacketList;
-
-  mConnections.mPrev->mNext = mConnections.mNext;
-  mConnections.mNext->mPrev = mConnections.mPrev;
-  mConnections.mNext = &mConnections;
-  mConnections.mPrev = &mConnections;
+  mPacketList.ListUnlink();
+  mConnections.ListUnlink();
 
   // Release weak_ptr to NAT traversal provider
   mNatTraversalProvider.reset();
@@ -361,7 +354,8 @@ void CNetUDPConnector::Pull()
       }
     }
 
-    for (auto* connection : mConnections.owners()) {
+    // FA snapshots `next` before potential delete in this loop body.
+    for (auto* connection : mConnections.owners_safe()) {
       if (connection->IsDestroyedFlagSet()) {
         delete (connection);
       } else {
@@ -506,7 +500,6 @@ void CNetUDPConnector::ReceiveData()
       break;
     }
 
-    packet->ListUnlink();
     packet->ListLinkBefore(&acquiredPackets);
 
     sockaddr_in from{};
@@ -838,7 +831,6 @@ void CNetUDPConnector::DisposePacket(SNetPacket* packet)
     packet->ListUnlink();
     operator delete(packet);
   } else {
-    packet->ListUnlink();
     packet->ListLinkBefore(&mPacketList);
     ++mPacketPoolSize;
   }

@@ -99,7 +99,7 @@ namespace moho
      * What it does:
      * Writes world-space AABB to caller scratch and returns `&scratch->bounds`.
      */
-    virtual const EntityCollisionBoundsView* GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const = 0;
+    virtual const EntityCollisionBoundsView* GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const;
 
     /**
      * Address: 0x004FF130 / 0x004FE780
@@ -107,7 +107,7 @@ namespace moho
      * What it does:
      * Returns a typed view to sphere payload for sphere primitive or null for box primitive.
      */
-    virtual const Wm3::Sphere3f* GetSphere() const = 0;
+    virtual const Wm3::Sphere3f* GetSphere() const;
 
     /**
      * Address: 0x004FF140 / 0x004FE790
@@ -115,7 +115,7 @@ namespace moho
      * What it does:
      * Returns a typed view to box payload for box primitive or null for sphere primitive.
      */
-    virtual const Wm3::Box3f* GetBox() const = 0;
+    virtual const Wm3::Box3f* GetBox() const;
 
     /**
      * Address: 0x004FF470 / 0x004FEBC0
@@ -128,7 +128,7 @@ namespace moho
      * What it does:
      * Applies world transform payload to local primitive state.
      */
-    virtual void SetTransform(const EntityTransformPayload& transform) = 0;
+    virtual void SetTransform(const EntityTransformPayload& transform);
 
     /**
      * Address: 0x004FFBE0 / 0x004FF960
@@ -141,7 +141,7 @@ namespace moho
      * What it does:
      * Copies current world-space center into `outCenter` and returns it.
      */
-    virtual Wm3::Vec3f* GetCenter(Wm3::Vec3f* outCenter) const = 0;
+    virtual Wm3::Vec3f* GetCenter(Wm3::Vec3f* outCenter) const;
 
     /**
      * Address: 0x004FFC00 / 0x004FF980
@@ -154,7 +154,7 @@ namespace moho
      * What it does:
      * Copies `*center` into primitive world-space center and returns `center`.
      */
-    virtual const Wm3::Vec3f* SetCenter(const Wm3::Vec3f* center) = 0;
+    virtual const Wm3::Vec3f* SetCenter(const Wm3::Vec3f* center);
 
     /**
      * Address: 0x004FF2D0 / 0x004FE9D0
@@ -169,7 +169,7 @@ namespace moho
      * Tests segment-vs-shape and fills direction/contact position/travel distance.
      */
     virtual bool
-    CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult) const = 0;
+    CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult) const;
 
     /**
      * Address: 0x004FF260 / 0x004FE860
@@ -179,7 +179,7 @@ namespace moho
      * What it does:
      * Tests box-vs-shape overlap and fills penetration direction/depth on hit.
      */
-    virtual bool CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const = 0;
+    virtual bool CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const;
 
     /**
      * Address: 0x004FF150 / 0x004FE7A0
@@ -189,7 +189,7 @@ namespace moho
      * What it does:
      * Tests sphere-vs-shape overlap and fills penetration direction/depth on hit.
      */
-    virtual bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const = 0;
+    virtual bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const;
 
     /**
      * Address: 0x004FF450 / 0x004FEB60
@@ -199,7 +199,7 @@ namespace moho
      * What it does:
      * Returns whether point lies inside primitive volume.
      */
-    virtual bool PointInShape(const Wm3::Vec3f* point) const = 0;
+    virtual bool PointInShape(const Wm3::Vec3f* point) const;
 
   protected:
     ~EntityCollisionUpdater() = default;

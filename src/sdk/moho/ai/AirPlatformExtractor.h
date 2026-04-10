@@ -26,6 +26,6 @@ namespace moho
      * Reads interpolated entity position and writes a 4-float payload
      * `{x, y, z, range}` when the platform has a valid positive range.
      */
-    virtual bool Extract(float* outPosRange, void* userEntity, float alpha) = 0;
+    virtual bool Extract(float* outPosRange, void* userEntity, float alpha);
   };
 } // namespace moho

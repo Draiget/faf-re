@@ -244,30 +244,14 @@ namespace
     return CScrLuaMetatableFactory<CAiNavigatorImpl>::Instance().Get(state);
   }
 
-  [[nodiscard]] CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
     static CScrLuaInitFormSet fallbackSet("sim");
     return fallbackSet;
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   [[nodiscard]] SAiNavigatorGoal BuildSingleCellGoalFromWorldPos(
@@ -429,7 +413,7 @@ int moho::cfunc_CAiNavigatorImplSetGoalL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplSetGoal(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplSetGoalL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplSetGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -484,7 +468,7 @@ int moho::cfunc_CAiNavigatorImplSetDestUnitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplSetDestUnit(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplSetDestUnitL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplSetDestUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -535,7 +519,7 @@ int moho::cfunc_CAiNavigatorImplAbortMoveL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplAbortMove(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplAbortMoveL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplAbortMoveL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -592,7 +576,7 @@ int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(LuaPlus::LuaState* con
  */
 int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEvent(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -646,7 +630,7 @@ int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoalL(LuaPlus::LuaState* const st
  */
 int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoal(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplSetSpeedThroughGoalL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplSetSpeedThroughGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -700,7 +684,7 @@ int moho::cfunc_CAiNavigatorImplGetCurrentTargetPosL(LuaPlus::LuaState* const st
  */
 int moho::cfunc_CAiNavigatorImplGetCurrentTargetPos(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplGetCurrentTargetPosL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplGetCurrentTargetPosL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -754,7 +738,7 @@ int moho::cfunc_CAiNavigatorImplGetGoalPosL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplGetGoalPos(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplGetGoalPosL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplGetGoalPosL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -807,7 +791,7 @@ int moho::cfunc_CAiNavigatorImplGetStatusL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplGetStatus(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplGetStatusL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplGetStatusL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -861,7 +845,7 @@ int moho::cfunc_CAiNavigatorImplHasGoodPathL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplHasGoodPath(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplHasGoodPathL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplHasGoodPathL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -915,7 +899,7 @@ int moho::cfunc_CAiNavigatorImplFollowingLeaderL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplFollowingLeader(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplFollowingLeaderL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplFollowingLeaderL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -968,7 +952,7 @@ int moho::cfunc_CAiNavigatorImplIgnoreFormationL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplIgnoreFormation(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplIgnoreFormationL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplIgnoreFormationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1021,7 +1005,7 @@ int moho::cfunc_CAiNavigatorImplIsIgnorningFormationL(LuaPlus::LuaState* const s
  */
 int moho::cfunc_CAiNavigatorImplIsIgnorningFormation(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplIsIgnorningFormationL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplIsIgnorningFormationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1074,7 +1058,7 @@ int moho::cfunc_CAiNavigatorImplAtgoalL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplAtgoal(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplAtgoalL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplAtgoalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1134,7 +1118,7 @@ int moho::cfunc_CAiNavigatorImplCanPathToGoalL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiNavigatorImplCanPathToGoal(lua_State* const luaContext)
 {
-  return cfunc_CAiNavigatorImplCanPathToGoalL(ResolveBindingState(luaContext));
+  return cfunc_CAiNavigatorImplCanPathToGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1164,7 +1148,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplCanPathToGoal_LuaFuncDef()
  */
 CScrLuaInitForm* moho::register_CAiNavigatorImplLuaInitFormAnchor()
 {
-  CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+  CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
   if (simSet == nullptr) {
     gRecoveredSimLuaInitFormPrev_off_F59970 = nullptr;
     gRecoveredSimLuaInitFormAnchor_off_F59960 = nullptr;

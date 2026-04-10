@@ -41,10 +41,6 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
 } // namespace
 
 /**
@@ -55,7 +51,7 @@ namespace
  */
 int moho::cfunc_OrientFromDir(lua_State* const luaContext)
 {
-  return cfunc_OrientFromDirL(ResolveBindingState(luaContext));
+  return cfunc_OrientFromDirL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -122,7 +118,7 @@ moho::CScrLuaInitForm* moho::register_OrientFromDir_LuaFuncDef()
  */
 int moho::cfunc_EulerToQuaternion(lua_State* const luaContext)
 {
-  return cfunc_EulerToQuaternionL(ResolveBindingState(luaContext));
+  return cfunc_EulerToQuaternionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -208,7 +204,7 @@ moho::CScrLuaInitForm* moho::register_EulerToQuaternion_LuaFuncDef()
  */
 int moho::cfunc_MinLerp(lua_State* const luaContext)
 {
-  return cfunc_MinLerpL(ResolveBindingState(luaContext));
+  return cfunc_MinLerpL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -285,7 +281,7 @@ moho::CScrLuaInitForm* moho::register_MinLerp_LuaFuncDef()
  */
 int moho::cfunc_MinSlerp(lua_State* const luaContext)
 {
-  return cfunc_MinSlerpL(ResolveBindingState(luaContext));
+  return cfunc_MinSlerpL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -362,7 +358,7 @@ moho::CScrLuaInitForm* moho::register_MinSlerp_LuaFuncDef()
  */
 int moho::cfunc_Vector(lua_State* const luaContext)
 {
-  return cfunc_VectorL(ResolveBindingState(luaContext));
+  return cfunc_VectorL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -440,7 +436,7 @@ moho::CScrLuaInitForm* moho::register_Vector_LuaFuncDef()
  */
 int moho::cfunc_Vector2(lua_State* const luaContext)
 {
-  return cfunc_Vector2L(ResolveBindingState(luaContext));
+  return cfunc_Vector2L(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -511,7 +507,7 @@ moho::CScrLuaInitForm* moho::register_Vector2_LuaFuncDef()
  */
 int moho::cfunc_PointVector(lua_State* const luaContext)
 {
-  return cfunc_PointVectorL(ResolveBindingState(luaContext));
+  return cfunc_PointVectorL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -586,7 +582,7 @@ moho::CScrLuaInitForm* moho::register_PointVector_LuaFuncDef()
  */
 int moho::cfunc_Rect(lua_State* const luaContext)
 {
-  return cfunc_RectL(ResolveBindingState(luaContext));
+  return cfunc_RectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -672,7 +668,7 @@ moho::CScrLuaInitForm* moho::register_Rect_LuaFuncDef()
  */
 int moho::cfunc_VDist3(lua_State* const luaContext)
 {
-  return cfunc_VDist3L(ResolveBindingState(luaContext));
+  return cfunc_VDist3L(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -744,7 +740,7 @@ moho::CScrLuaInitForm* moho::register_VDist3_LuaFuncDef()
  */
 int moho::cfunc_VDist3Sq(lua_State* const luaContext)
 {
-  return cfunc_VDist3SqL(ResolveBindingState(luaContext));
+  return cfunc_VDist3SqL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -816,7 +812,7 @@ moho::CScrLuaInitForm* moho::register_VDist3Sq_LuaFuncDef()
  */
 int moho::cfunc_VDist2(lua_State* const luaContext)
 {
-  return cfunc_VDist2L(ResolveBindingState(luaContext));
+  return cfunc_VDist2L(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -903,7 +899,7 @@ moho::CScrLuaInitForm* moho::register_VDist2_LuaFuncDef()
  */
 int moho::cfunc_VDist2Sq(lua_State* const luaContext)
 {
-  return cfunc_VDist2SqL(ResolveBindingState(luaContext));
+  return cfunc_VDist2SqL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -989,7 +985,7 @@ moho::CScrLuaInitForm* moho::register_VDist2Sq_LuaFuncDef()
  */
 int moho::cfunc_VDot(lua_State* const luaContext)
 {
-  return cfunc_VDotL(ResolveBindingState(luaContext));
+  return cfunc_VDotL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1058,7 +1054,7 @@ moho::CScrLuaInitForm* moho::register_VDot_LuaFuncDef()
  */
 int moho::cfunc_VDiff(lua_State* const luaContext)
 {
-  return cfunc_VDiffL(ResolveBindingState(luaContext));
+  return cfunc_VDiffL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1128,7 +1124,7 @@ moho::CScrLuaInitForm* moho::register_VDiff_LuaFuncDef()
  */
 int moho::cfunc_VAdd(lua_State* const luaContext)
 {
-  return cfunc_VAddL(ResolveBindingState(luaContext));
+  return cfunc_VAddL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1198,7 +1194,7 @@ moho::CScrLuaInitForm* moho::register_VAdd_LuaFuncDef()
  */
 int moho::cfunc_VMult(lua_State* const luaContext)
 {
-  return cfunc_VMultL(ResolveBindingState(luaContext));
+  return cfunc_VMultL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1262,7 +1258,7 @@ moho::CScrLuaInitForm* moho::register_VMult_LuaFuncDef()
  */
 int moho::cfunc_VPerpDot(lua_State* const luaContext)
 {
-  return cfunc_VPerpDotL(ResolveBindingState(luaContext));
+  return cfunc_VPerpDotL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1327,7 +1323,7 @@ moho::CScrLuaInitForm* moho::register_VPerpDot_LuaFuncDef()
  */
 int moho::cfunc_MATH_IRound(lua_State* const luaContext)
 {
-  return cfunc_MATH_IRoundL(ResolveBindingState(luaContext));
+  return cfunc_MATH_IRoundL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1387,7 +1383,7 @@ moho::CScrLuaInitForm* moho::register_MATH_IRound_LuaFuncDef()
  */
 int moho::cfunc_MATH_lerp(lua_State* const luaContext)
 {
-  return cfunc_MATH_lerpL(ResolveBindingState(luaContext));
+  return cfunc_MATH_lerpL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

@@ -177,7 +177,7 @@ namespace moho
     virtual void RemoveCommandFromUnitQueue(CmdId, EntId) = 0;
 
     /**
-     * Address: 0x007494B0
+     * Address: 0x00749A70
      *
      * VFTable SLOT: 19
      */

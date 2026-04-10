@@ -202,6 +202,15 @@ namespace moho
     void RemoveArmyStatsTrigger(const char* triggerName);
 
     /**
+     * Address: 0x0070BEA0 (FUN_0070BEA0, Moho::CArmyStats::Update)
+     *
+     * What it does:
+     * Evaluates all trigger conditions and dispatches `OnStatsTrigger` for
+     * each trigger whose conditions all pass in this update.
+     */
+    void Update();
+
+    /**
      * Address: 0x00704FD0 (FUN_00704FD0, sub_704FD0)
      *
      * What it does:

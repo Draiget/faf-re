@@ -788,6 +788,20 @@ namespace
       return gEntityDbIdPoolMapTypeName.c_str();
     }
 
+    /**
+     * Address: 0x00685D60 (FUN_00685D60, gpg::RMapType_uint_IdPool::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current map element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    {
+      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const auto* const map = static_cast<const std::map<unsigned int, moho::IdPool>*>(ref.mObj);
+      const int size = map ? static_cast<int>(map->size()) : 0;
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
+    }
+
     void Init() override
     {
       size_ = sizeof(std::map<unsigned int, moho::IdPool>);
@@ -819,6 +833,20 @@ namespace
       }
 
       return gEntityDbEntityListTypeName.c_str();
+    }
+
+    /**
+     * Address: 0x00685E90 (FUN_00685E90, gpg::RListType_EntityP::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current list element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    {
+      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const auto* const list = static_cast<const std::list<moho::Entity*>*>(ref.mObj);
+      const int size = list ? static_cast<int>(list->size()) : 0;
+      return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
 
     void Init() override

@@ -103,6 +103,70 @@ namespace moho
   }
 
   /**
+   * Address: 0x006585D0 (FUN_006585D0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CEfxBeam deserialize thunk alias into
+   * `CEfxBeam::MemberDeserialize`.
+   */
+  void DeserializeCEfxBeamThunkVariantA(CEfxBeam* const object, gpg::ReadArchive* const archive)
+  {
+    if (!object) {
+      return;
+    }
+
+    object->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x00658780 (FUN_00658780, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CEfxBeam deserialize thunk alias into
+   * `CEfxBeam::MemberDeserialize`.
+   */
+  void DeserializeCEfxBeamThunkVariantB(CEfxBeam* const object, gpg::ReadArchive* const archive)
+  {
+    if (!object) {
+      return;
+    }
+
+    object->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x006585E0 (FUN_006585E0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CEfxBeam serialize thunk alias into
+   * `CEfxBeam::MemberSerialize`.
+   */
+  void SerializeCEfxBeamThunkVariantA(const CEfxBeam* const object, gpg::WriteArchive* const archive)
+  {
+    if (!object) {
+      return;
+    }
+
+    object->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x00658790 (FUN_00658790, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CEfxBeam serialize thunk alias into
+   * `CEfxBeam::MemberSerialize`.
+   */
+  void SerializeCEfxBeamThunkVariantB(const CEfxBeam* const object, gpg::WriteArchive* const archive)
+  {
+    if (!object) {
+      return;
+    }
+
+    object->MemberSerialize(archive);
+  }
+
+  /**
    * What it does:
    * Returns the cached reflection descriptor for `CEfxBeam`.
    */

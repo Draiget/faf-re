@@ -39,14 +39,12 @@ namespace
     "    info.IsReadOnly -- true if file is read-only\n"
     "    info.SizeBytes -- size of file in bytes\n"
     "    info.LastWriteTime -- timestamp of last write to file";
-  constexpr const char* kDiskToLocalHelpText =
-    "localPath = DiskToLocal(SysOrLocalPath)\n"
-    "Converts a system path to a local path. Leaves\n"
-    "path alone if already local.";
+  constexpr const char* kDiskToLocalHelpText = "localPath = DiskToLocal(SysOrLocalPath)\n"
+                                               "Converts a system path to a local path. Leaves\n"
+                                               "path alone if already local.";
   constexpr const char* kBasenameHelpText =
     "base = Basename(fullPath,stripExtension?) -- return the last component of a path";
-  constexpr const char* kDirnameHelpText =
-    "base = Dirname(fullPath) -- return a path with trailing filename removed";
+  constexpr const char* kDirnameHelpText = "base = Dirname(fullPath) -- return a path with trailing filename removed";
   constexpr const char* kFileCollapsePathHelpText =
     "path = FileCollapsePath(fullPath) -- collapse out any intermediate /./ or /../ directory names from a path";
 
@@ -56,7 +54,9 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
@@ -68,7 +68,9 @@ namespace
    * Initializes one disk-thread-state TSS slot descriptor used by
    * `FWaitHandleSet::ErrorString`.
    */
-  void CreateDiskThreadStateRuntime(moho::FWHSThreadStateRuntime& runtime)
+  void CreateDiskThreadStateRuntime(
+    moho::FWHSThreadStateRuntime& runtime
+  )
   {
     runtime.mTss = &runtime;
   }
@@ -79,12 +81,16 @@ namespace
    * What it does:
    * Releases one heap-allocated disk thread-state error string value.
    */
-  void DestroyDiskThreadStateString(msvc8::string* const value)
+  void DestroyDiskThreadStateString(
+    msvc8::string* const value
+  )
   {
     delete value;
   }
 
-  void CleanupDiskThreadStateValue(const moho::FWHSThreadStateRuntime& runtime)
+  void CleanupDiskThreadStateValue(
+    const moho::FWHSThreadStateRuntime& runtime
+  )
   {
     const auto it = sDiskThreadStateStrings.find(&runtime);
     if (it != sDiskThreadStateStrings.end()) {
@@ -94,7 +100,9 @@ namespace
   }
 
   [[nodiscard]]
-  msvc8::string* GetOrCreateDiskThreadStateValue(moho::FWHSThreadStateRuntime& runtime)
+  msvc8::string* GetOrCreateDiskThreadStateValue(
+    moho::FWHSThreadStateRuntime& runtime
+  )
   {
     if (msvc8::string*& slot = sDiskThreadStateStrings[&runtime]; slot == nullptr) {
       slot = new msvc8::string();
@@ -110,7 +118,8 @@ namespace
    * `ownerTableIndex`, and returns a stack view for the nested table.
    */
   [[nodiscard]] LuaPlus::LuaStackObject CreateFlagsTableStackObject(
-    LuaPlus::LuaState* const state, const int ownerTableIndex
+    LuaPlus::LuaState* const state,
+    const int ownerTableIndex
   )
   {
     lua_newtable(state->m_state);
@@ -120,7 +129,9 @@ namespace
     return LuaPlus::LuaStackObject(state, lua_gettop(state->m_state));
   }
 
-  boost::mutex& EnsureFileWaitSetMutex(moho::FWHSLockRuntime& lockRuntime)
+  boost::mutex& EnsureFileWaitSetMutex(
+    moho::FWHSLockRuntime& lockRuntime
+  )
   {
     if (lockRuntime.mMutex == nullptr) {
       lockRuntime.mMutex = new boost::mutex();
@@ -129,7 +140,10 @@ namespace
   }
 
   [[nodiscard]]
-  int ComparePathViews(const std::string_view lhs, const std::string_view rhs)
+  int ComparePathViews(
+    const std::string_view lhs,
+    const std::string_view rhs
+  )
   {
     const std::size_t sharedCount = std::min(lhs.size(), rhs.size());
     const int sharedResult = sharedCount == 0 ? 0 : std::memcmp(lhs.data(), rhs.data(), sharedCount);
@@ -143,7 +157,10 @@ namespace
   }
 
   [[nodiscard]]
-  int CompareCanonicalPaths(const msvc8::string& lhs, const msvc8::string& rhs)
+  int CompareCanonicalPaths(
+    const msvc8::string& lhs,
+    const msvc8::string& rhs
+  )
   {
     return ComparePathViews(lhs.view(), rhs.view());
   }
@@ -155,16 +172,20 @@ namespace
    * Releases one legacy string's heap buffer when present and restores empty
    * SSO state.
    */
-  void ResetLegacyStringStorage(msvc8::string& value)
+  void ResetLegacyStringStorage(
+    msvc8::string& value
+  )
   {
     value.tidy(true, 0U);
   }
 
   [[nodiscard]]
-  void* AllocateCheckedArrayStorage(const std::uint32_t count, const std::size_t elementSize)
+  void* AllocateCheckedArrayStorage(
+    const std::uint32_t count,
+    const std::size_t elementSize
+  )
   {
-    if (count != 0u &&
-        static_cast<std::size_t>(count) > (std::numeric_limits<std::size_t>::max() / elementSize)) {
+    if (count != 0u && static_cast<std::size_t>(count) > (std::numeric_limits<std::size_t>::max() / elementSize)) {
       throw std::bad_alloc();
     }
     return ::operator new(static_cast<std::size_t>(count) * elementSize);
@@ -178,7 +199,9 @@ namespace
    * guard semantics.
    */
   [[nodiscard]]
-  moho::FWHSZipEntryMapNode* AllocateZipEntryMapNodes(const std::uint32_t count)
+  moho::FWHSZipEntryMapNode* AllocateZipEntryMapNodes(
+    const std::uint32_t count
+  )
   {
     return static_cast<moho::FWHSZipEntryMapNode*>(
       AllocateCheckedArrayStorage(count, sizeof(moho::FWHSZipEntryMapNode))
@@ -193,7 +216,9 @@ namespace
    * guard semantics.
    */
   [[nodiscard]]
-  moho::FWHSFileInfoMapNode* AllocateFileInfoMapNodes(const std::uint32_t count)
+  moho::FWHSFileInfoMapNode* AllocateFileInfoMapNodes(
+    const std::uint32_t count
+  )
   {
     return static_cast<moho::FWHSFileInfoMapNode*>(
       AllocateCheckedArrayStorage(count, sizeof(moho::FWHSFileInfoMapNode))
@@ -213,13 +238,17 @@ namespace
   }
 
   [[nodiscard]]
-  bool IsZipMapSentinel(const moho::FWHSZipEntryMapNode* const node)
+  bool IsZipMapSentinel(
+    const moho::FWHSZipEntryMapNode* const node
+  )
   {
     return node == nullptr || node->mIsNil != 0;
   }
 
   [[nodiscard]]
-  bool IsFileInfoMapSentinel(const moho::FWHSFileInfoMapNode* const node)
+  bool IsFileInfoMapSentinel(
+    const moho::FWHSFileInfoMapNode* const node
+  )
   {
     return node == nullptr || node->mIsNil != 0;
   }
@@ -325,13 +354,17 @@ namespace
   }
 
   [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoMapHead(const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map)
+  moho::FWHSFileInfoMapNode* FileInfoMapHead(
+    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
+  )
   {
     return map.mHead;
   }
 
   [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoMapRoot(const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map)
+  moho::FWHSFileInfoMapNode* FileInfoMapRoot(
+    const moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
+  )
   {
     moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
     if (IsFileInfoMapSentinel(head)) {
@@ -341,32 +374,43 @@ namespace
   }
 
   [[nodiscard]]
-  bool IsFileInfoNodeBlack(const moho::FWHSFileInfoMapNode* const node)
+  bool IsFileInfoNodeBlack(
+    const moho::FWHSFileInfoMapNode* const node
+  )
   {
     return IsFileInfoMapSentinel(node) || node->mColor != 0;
   }
 
   [[nodiscard]]
-  bool IsFileInfoNodeRed(const moho::FWHSFileInfoMapNode* const node)
+  bool IsFileInfoNodeRed(
+    const moho::FWHSFileInfoMapNode* const node
+  )
   {
     return !IsFileInfoNodeBlack(node);
   }
 
-  void SetFileInfoNodeBlack(moho::FWHSFileInfoMapNode* const node)
+  void SetFileInfoNodeBlack(
+    moho::FWHSFileInfoMapNode* const node
+  )
   {
     if (!IsFileInfoMapSentinel(node)) {
       node->mColor = 1;
     }
   }
 
-  void SetFileInfoNodeRed(moho::FWHSFileInfoMapNode* const node)
+  void SetFileInfoNodeRed(
+    moho::FWHSFileInfoMapNode* const node
+  )
   {
     if (!IsFileInfoMapSentinel(node)) {
       node->mColor = 0;
     }
   }
 
-  void SetFileInfoNodeColor(moho::FWHSFileInfoMapNode* const node, const std::uint8_t color)
+  void SetFileInfoNodeColor(
+    moho::FWHSFileInfoMapNode* const node,
+    const std::uint8_t color
+  )
   {
     if (!IsFileInfoMapSentinel(node)) {
       node->mColor = color;
@@ -440,7 +484,9 @@ namespace
     return head;
   }
 
-  void EnsureFileInfoMapInitialized(moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map)
+  void EnsureFileInfoMapInitialized(
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
+  )
   {
     if (map.mHead != nullptr) {
       return;
@@ -457,7 +503,8 @@ namespace
    * Performs one file-info map left rotation around `pivot`.
    */
   void FileInfoMapRotateLeft(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map, moho::FWHSFileInfoMapNode* const pivot
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
+    moho::FWHSFileInfoMapNode* const pivot
   )
   {
     if (IsFileInfoMapSentinel(pivot) || IsFileInfoMapSentinel(pivot->mRight)) {
@@ -492,7 +539,8 @@ namespace
    * Performs one file-info map right rotation around `pivot`.
    */
   void FileInfoMapRotateRight(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map, moho::FWHSFileInfoMapNode* const pivot
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
+    moho::FWHSFileInfoMapNode* const pivot
   )
   {
     if (IsFileInfoMapSentinel(pivot) || IsFileInfoMapSentinel(pivot->mLeft)) {
@@ -528,7 +576,8 @@ namespace
    * Restores red-black invariants after linking one file-info map node.
    */
   void FileInfoMapInsertFixup(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map, moho::FWHSFileInfoMapNode* node
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
+    moho::FWHSFileInfoMapNode* node
   )
   {
     while (!IsFileInfoMapSentinel(node->mParent) && node->mParent->mColor == 0) {
@@ -583,7 +632,9 @@ namespace
    * Returns the left-most descendant from one file-info tree node.
    */
   [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoTreeMinimumFrom(moho::FWHSFileInfoMapNode* node)
+  moho::FWHSFileInfoMapNode* FileInfoTreeMinimumFrom(
+    moho::FWHSFileInfoMapNode* node
+  )
   {
     while (!IsFileInfoMapSentinel(node) && !IsFileInfoMapSentinel(node->mLeft)) {
       node = node->mLeft;
@@ -598,7 +649,9 @@ namespace
    * Returns the right-most descendant from one file-info tree node.
    */
   [[nodiscard]]
-  moho::FWHSFileInfoMapNode* FileInfoTreeMaximumFrom(moho::FWHSFileInfoMapNode* node)
+  moho::FWHSFileInfoMapNode* FileInfoTreeMaximumFrom(
+    moho::FWHSFileInfoMapNode* node
+  )
   {
     while (!IsFileInfoMapSentinel(node) && !IsFileInfoMapSentinel(node->mRight)) {
       node = node->mRight;
@@ -614,7 +667,8 @@ namespace
    */
   [[nodiscard]]
   moho::FWHSFileInfoMapNode* FileInfoTreeNextNode(
-    moho::FWHSFileInfoMapNode* node, moho::FWHSFileInfoMapNode* const head
+    moho::FWHSFileInfoMapNode* node,
+    moho::FWHSFileInfoMapNode* const head
   )
   {
     if (IsFileInfoMapSentinel(node)) {
@@ -639,10 +693,10 @@ namespace
    * What it does:
    * Moves one file-info iterator node to its in-order predecessor.
    */
-  [[nodiscard]]
-  [[maybe_unused]]
+  [[nodiscard]] [[maybe_unused]]
   moho::FWHSFileInfoMapNode* FileInfoTreePreviousNode(
-    moho::FWHSFileInfoMapNode* node, moho::FWHSFileInfoMapNode* const head
+    moho::FWHSFileInfoMapNode* node,
+    moho::FWHSFileInfoMapNode* const head
   )
   {
     if (IsFileInfoMapSentinel(node)) {
@@ -700,7 +754,8 @@ namespace
    */
   [[nodiscard]]
   moho::SDiskFileInfo* FileInfoMapGetOrCreate(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map, const msvc8::string& canonicalPath
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
+    const msvc8::string& canonicalPath
   )
   {
     EnsureFileInfoMapInitialized(map);
@@ -710,8 +765,10 @@ namespace
     }
 
     moho::FWHSFileInfoMapNode* const lowerBound = FileInfoLowerBound(map, canonicalPath);
-    if (lowerBound != nullptr && lowerBound != head &&
-        CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) >= 0) {
+    if (
+      lowerBound != nullptr && lowerBound != head &&
+      CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) >= 0
+    ) {
       return &lowerBound->mInfo;
     }
 
@@ -744,14 +801,16 @@ namespace
       insertedNode->mParent = head;
     } else if (insertAsLeftChild) {
       parent->mLeft = insertedNode;
-      if (head->mLeft == parent ||
-          CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0) {
+      if (
+        head->mLeft == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0
+      ) {
         head->mLeft = insertedNode;
       }
     } else {
       parent->mRight = insertedNode;
-      if (head->mRight == parent ||
-          CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0) {
+      if (
+        head->mRight == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0
+      ) {
         head->mRight = insertedNode;
       }
     }
@@ -782,7 +841,9 @@ namespace
     }
   }
 
-  void FileInfoMapRebuildHeadLinks(moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map)
+  void FileInfoMapRebuildHeadLinks(
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
+  )
   {
     moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
     if (IsFileInfoMapSentinel(head)) {
@@ -819,8 +880,10 @@ namespace
           sibling = parent->mRight;
         }
 
-        if (IsFileInfoMapSentinel(sibling) ||
-            (IsFileInfoNodeBlack(sibling->mLeft) && IsFileInfoNodeBlack(sibling->mRight))) {
+        if (
+          IsFileInfoMapSentinel(sibling) ||
+          (IsFileInfoNodeBlack(sibling->mLeft) && IsFileInfoNodeBlack(sibling->mRight))
+        ) {
           SetFileInfoNodeRed(sibling);
           node = parent;
           parent = parent->mParent;
@@ -849,8 +912,10 @@ namespace
           sibling = parent->mLeft;
         }
 
-        if (IsFileInfoMapSentinel(sibling) ||
-            (IsFileInfoNodeBlack(sibling->mRight) && IsFileInfoNodeBlack(sibling->mLeft))) {
+        if (
+          IsFileInfoMapSentinel(sibling) ||
+          (IsFileInfoNodeBlack(sibling->mRight) && IsFileInfoNodeBlack(sibling->mLeft))
+        ) {
           SetFileInfoNodeRed(sibling);
           node = parent;
           parent = parent->mParent;
@@ -883,7 +948,8 @@ namespace
    * Erases one file-info map node by iterator and rebalances sentinel links.
    */
   void FileInfoMapEraseNode(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map, moho::FWHSFileInfoMapNode* const nodeToErase
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
+    moho::FWHSFileInfoMapNode* const nodeToErase
   )
   {
     if (IsFileInfoMapSentinel(nodeToErase)) {
@@ -944,7 +1010,8 @@ namespace
    */
   [[nodiscard]]
   std::uint32_t FileInfoMapRemoveByCanonicalPath(
-    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map, const msvc8::string& canonicalPath
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map,
+    const msvc8::string& canonicalPath
   )
   {
     moho::FWHSFileInfoMapNode* const head = FileInfoMapHead(map);
@@ -967,13 +1034,17 @@ namespace
   }
 
   [[nodiscard]]
-  bool HasWriteTime(const moho::SDiskFileInfo& info)
+  bool HasWriteTime(
+    const moho::SDiskFileInfo& info
+  )
   {
     return info.mLastWriteTime.dwLowDateTime != 0 || info.mLastWriteTime.dwHighDateTime != 0;
   }
 
   [[nodiscard]]
-  moho::EFileAttributes BuildFileAttributesFromWin32(const DWORD win32Attributes)
+  moho::EFileAttributes BuildFileAttributesFromWin32(
+    const DWORD win32Attributes
+  )
   {
     const std::uint32_t readonlyFlag = (win32Attributes & FILE_ATTRIBUTE_READONLY) != 0 ? moho::FA_Readonly : 0u;
     const std::uint32_t directoryFlag = (win32Attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ? moho::FA_Directory : 0u;
@@ -981,7 +1052,10 @@ namespace
   }
 
   [[nodiscard]]
-  bool TryQueryFileAttributes(const msvc8::string& canonicalPath, moho::SDiskFileInfo* const outInfo)
+  bool TryQueryFileAttributes(
+    const msvc8::string& canonicalPath,
+    moho::SDiskFileInfo* const outInfo
+  )
   {
     const std::wstring sourcePathWide = gpg::STR_Utf8ToWide(canonicalPath.c_str());
     WIN32_FILE_ATTRIBUTE_DATA fileInfo{};
@@ -1002,14 +1076,18 @@ namespace
     return true;
   }
 
-  void AddWaitHandleReference(moho::SFileWaitHandle* const handle)
+  void AddWaitHandleReference(
+    moho::SFileWaitHandle* const handle
+  )
   {
     if (handle != nullptr) {
       (void)::InterlockedExchangeAdd(&handle->mLock, 1);
     }
   }
 
-  void ReleaseWaitHandleReference(moho::SFileWaitHandle* const handle)
+  void ReleaseWaitHandleReference(
+    moho::SFileWaitHandle* const handle
+  )
   {
     if (handle == nullptr) {
       return;
@@ -1023,14 +1101,19 @@ namespace
     }
   }
 
-  void UnmapFileView(const char* const mappedView)
+  void UnmapFileView(
+    const char* const mappedView
+  )
   {
     if (mappedView != nullptr) {
       (void)::UnmapViewOfFile(mappedView);
     }
   }
 
-  void SetWaitHandleErrorString(moho::FWaitHandleSet* const waitHandleSet, const msvc8::string& errorText)
+  void SetWaitHandleErrorString(
+    moho::FWaitHandleSet* const waitHandleSet,
+    const msvc8::string& errorText
+  )
   {
     if (waitHandleSet == nullptr) {
       return;
@@ -1041,7 +1124,9 @@ namespace
     }
   }
 
-  void SetWaitHandleErrorFromWin32(moho::FWaitHandleSet* const waitHandleSet)
+  void SetWaitHandleErrorFromWin32(
+    moho::FWaitHandleSet* const waitHandleSet
+  )
   {
     SetWaitHandleErrorString(waitHandleSet, moho::WIN_GetLastError());
   }
@@ -1055,7 +1140,9 @@ namespace
      * What it does:
      * Acquires one shared wait lane and arms deferred notify-on-scope-exit.
      */
-    explicit ScopedWaitNotify(moho::FWaitHandleSet& waitHandleSet)
+    explicit ScopedWaitNotify(
+      moho::FWaitHandleSet& waitHandleSet
+    )
       : mWaitHandleSet(waitHandleSet)
     {
       mWaitHandleSet.Wait();
@@ -1091,7 +1178,9 @@ namespace
   class ScopedHandleRef
   {
   public:
-    explicit ScopedHandleRef(moho::SFileWaitHandle* const handle)
+    explicit ScopedHandleRef(
+      moho::SFileWaitHandle* const handle
+    )
       : mHandle(handle)
     {
       AddWaitHandleReference(mHandle);
@@ -1117,7 +1206,8 @@ namespace
    */
   [[nodiscard]]
   msvc8::auto_ptr<gpg::Stream> OpenFileReadFromWaitHandleSet(
-    moho::FWaitHandleSet& waitHandleSet, const gpg::StrArg sourcePath
+    moho::FWaitHandleSet& waitHandleSet,
+    const gpg::StrArg sourcePath
   )
   {
     msvc8::string canonicalPath{};
@@ -1145,13 +1235,17 @@ namespace
   }
 
   [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipMapHead(const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map)
+  moho::FWHSZipEntryMapNode* ZipMapHead(
+    const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
+  )
   {
     return map.mHead;
   }
 
   [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipMapRoot(const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map)
+  moho::FWHSZipEntryMapNode* ZipMapRoot(
+    const moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
+  )
   {
     moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
     if (IsZipMapSentinel(head)) {
@@ -1161,32 +1255,43 @@ namespace
   }
 
   [[nodiscard]]
-  bool IsZipNodeBlack(const moho::FWHSZipEntryMapNode* const node)
+  bool IsZipNodeBlack(
+    const moho::FWHSZipEntryMapNode* const node
+  )
   {
     return IsZipMapSentinel(node) || node->mColor != 0;
   }
 
   [[nodiscard]]
-  bool IsZipNodeRed(const moho::FWHSZipEntryMapNode* const node)
+  bool IsZipNodeRed(
+    const moho::FWHSZipEntryMapNode* const node
+  )
   {
     return !IsZipNodeBlack(node);
   }
 
-  void SetZipNodeBlack(moho::FWHSZipEntryMapNode* const node)
+  void SetZipNodeBlack(
+    moho::FWHSZipEntryMapNode* const node
+  )
   {
     if (!IsZipMapSentinel(node)) {
       node->mColor = 1;
     }
   }
 
-  void SetZipNodeRed(moho::FWHSZipEntryMapNode* const node)
+  void SetZipNodeRed(
+    moho::FWHSZipEntryMapNode* const node
+  )
   {
     if (!IsZipMapSentinel(node)) {
       node->mColor = 0;
     }
   }
 
-  void SetZipNodeColor(moho::FWHSZipEntryMapNode* const node, const std::uint8_t color)
+  void SetZipNodeColor(
+    moho::FWHSZipEntryMapNode* const node,
+    const std::uint8_t color
+  )
   {
     if (!IsZipMapSentinel(node)) {
       node->mColor = color;
@@ -1194,7 +1299,9 @@ namespace
   }
 
   [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipTreeMinimumFrom(moho::FWHSZipEntryMapNode* node)
+  moho::FWHSZipEntryMapNode* ZipTreeMinimumFrom(
+    moho::FWHSZipEntryMapNode* node
+  )
   {
     while (!IsZipMapSentinel(node) && !IsZipMapSentinel(node->mLeft)) {
       node = node->mLeft;
@@ -1203,7 +1310,9 @@ namespace
   }
 
   [[nodiscard]]
-  moho::FWHSZipEntryMapNode* ZipTreeMaximumFrom(moho::FWHSZipEntryMapNode* node)
+  moho::FWHSZipEntryMapNode* ZipTreeMaximumFrom(
+    moho::FWHSZipEntryMapNode* node
+  )
   {
     while (!IsZipMapSentinel(node) && !IsZipMapSentinel(node->mRight)) {
       node = node->mRight;
@@ -1217,10 +1326,10 @@ namespace
    * What it does:
    * Moves one zip-map iterator node to its in-order predecessor.
    */
-  [[nodiscard]]
-  [[maybe_unused]]
+  [[nodiscard]] [[maybe_unused]]
   moho::FWHSZipEntryMapNode* ZipTreePreviousNode(
-    moho::FWHSZipEntryMapNode* node, moho::FWHSZipEntryMapNode* const head
+    moho::FWHSZipEntryMapNode* node,
+    moho::FWHSZipEntryMapNode* const head
   )
   {
     if (IsZipMapSentinel(node)) {
@@ -1247,7 +1356,8 @@ namespace
    */
   [[nodiscard]]
   moho::FWHSZipEntryMapNode* ZipTreeNextNode(
-    moho::FWHSZipEntryMapNode* node, moho::FWHSZipEntryMapNode* const head
+    moho::FWHSZipEntryMapNode* node,
+    moho::FWHSZipEntryMapNode* const head
   )
   {
     if (IsZipMapSentinel(node)) {
@@ -1315,7 +1425,8 @@ namespace
   }
 
   void ZipMapRotateLeft(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map, moho::FWHSZipEntryMapNode* const pivot
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
+    moho::FWHSZipEntryMapNode* const pivot
   )
   {
     if (IsZipMapSentinel(pivot) || IsZipMapSentinel(pivot->mRight)) {
@@ -1344,7 +1455,8 @@ namespace
   }
 
   void ZipMapRotateRight(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map, moho::FWHSZipEntryMapNode* const pivot
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
+    moho::FWHSZipEntryMapNode* const pivot
   )
   {
     if (IsZipMapSentinel(pivot) || IsZipMapSentinel(pivot->mLeft)) {
@@ -1390,7 +1502,9 @@ namespace
     return head;
   }
 
-  void EnsureZipMapInitialized(moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map)
+  void EnsureZipMapInitialized(
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
+  )
   {
     if (map.mHead != nullptr) {
       return;
@@ -1401,7 +1515,8 @@ namespace
   }
 
   void ZipMapInsertFixup(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map, moho::FWHSZipEntryMapNode* node
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
+    moho::FWHSZipEntryMapNode* node
   )
   {
     while (!IsZipMapSentinel(node->mParent) && node->mParent->mColor == 0) {
@@ -1470,8 +1585,10 @@ namespace
     }
 
     moho::FWHSZipEntryMapNode* const lowerBound = ZipEntryLowerBound(map, canonicalPath);
-    if (lowerBound != nullptr && lowerBound != head &&
-        CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) >= 0) {
+    if (
+      lowerBound != nullptr && lowerBound != head &&
+      CompareCanonicalPaths(canonicalPath, lowerBound->mCanonicalPath) >= 0
+    ) {
       return false;
     }
 
@@ -1501,14 +1618,16 @@ namespace
       insertedNode->mParent = head;
     } else if (insertAsLeftChild) {
       parent->mLeft = insertedNode;
-      if (head->mLeft == parent ||
-          CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0) {
+      if (
+        head->mLeft == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mLeft->mCanonicalPath) < 0
+      ) {
         head->mLeft = insertedNode;
       }
     } else {
       parent->mRight = insertedNode;
-      if (head->mRight == parent ||
-          CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0) {
+      if (
+        head->mRight == parent || CompareCanonicalPaths(insertedNode->mCanonicalPath, head->mRight->mCanonicalPath) > 0
+      ) {
         head->mRight = insertedNode;
       }
     }
@@ -1539,7 +1658,9 @@ namespace
     }
   }
 
-  void ZipMapRebuildHeadLinks(moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map)
+  void ZipMapRebuildHeadLinks(
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
+  )
   {
     moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
     if (IsZipMapSentinel(head)) {
@@ -1639,7 +1760,8 @@ namespace
    * sentinel head links.
    */
   void ZipMapEraseNode(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map, moho::FWHSZipEntryMapNode* const nodeToErase
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
+    moho::FWHSZipEntryMapNode* const nodeToErase
   )
   {
     if (IsZipMapSentinel(nodeToErase)) {
@@ -1698,7 +1820,8 @@ namespace
    * Recursively destroys one zip-entry map subtree and canonical-path storage.
    */
   void DestroyZipSubtreeNodes(
-    moho::FWHSZipEntryMapNode* const node, const moho::FWHSZipEntryMapNode* const head
+    moho::FWHSZipEntryMapNode* const node,
+    const moho::FWHSZipEntryMapNode* const head
   )
   {
     moho::FWHSZipEntryMapNode* current = node;
@@ -1745,7 +1868,8 @@ namespace
 
   [[nodiscard]]
   moho::FWHSZipEntryMapNode* FindZipNodeByHandle(
-    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map, const moho::SFileWaitHandle* const handle
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map,
+    const moho::SFileWaitHandle* const handle
   )
   {
     moho::FWHSZipEntryMapNode* const head = ZipMapHead(map);
@@ -1760,14 +1884,17 @@ namespace
   }
 
   [[nodiscard]]
-  moho::SFileWaitHandle* WaitHandleListSentinel(moho::FWaitHandleSet& waitHandleSet)
+  moho::SFileWaitHandle* WaitHandleListSentinel(
+    moho::FWaitHandleSet& waitHandleSet
+  )
   {
     return reinterpret_cast<moho::SFileWaitHandle*>(&waitHandleSet.mPrev);
   }
 
   [[nodiscard]]
   moho::SFileWaitHandle* FindMountedZipHandleByCanonicalPath(
-    moho::FWaitHandleSet& waitHandleSet, const msvc8::string& canonicalPath
+    moho::FWaitHandleSet& waitHandleSet,
+    const msvc8::string& canonicalPath
   )
   {
     moho::SFileWaitHandle* const sentinel = WaitHandleListSentinel(waitHandleSet);
@@ -1780,7 +1907,10 @@ namespace
     return nullptr;
   }
 
-  void LinkMountedZipHandle(moho::FWaitHandleSet& waitHandleSet, moho::SFileWaitHandle* const handle)
+  void LinkMountedZipHandle(
+    moho::FWaitHandleSet& waitHandleSet,
+    moho::SFileWaitHandle* const handle
+  )
   {
     if (handle == nullptr) {
       return;
@@ -1803,15 +1933,19 @@ namespace
    * then inserts all non-directory zip entries into the mounted zip-entry map.
    */
   [[nodiscard]]
-  moho::SFileWaitHandle* MountZipFile(moho::FWaitHandleSet& waitHandleSet, const gpg::StrArg sourcePath)
+  moho::SFileWaitHandle* MountZipFile(
+    moho::FWaitHandleSet& waitHandleSet,
+    const gpg::StrArg sourcePath
+  )
   {
     msvc8::string canonicalPath{};
     gpg::STR_CanonizeFilename(&canonicalPath, sourcePath != nullptr ? sourcePath : "");
 
     waitHandleSet.Lock();
-    if (moho::SFileWaitHandle* const existingHandle =
-          FindMountedZipHandleByCanonicalPath(waitHandleSet, canonicalPath);
-        existingHandle != nullptr) {
+    if (
+      moho::SFileWaitHandle* const existingHandle = FindMountedZipHandleByCanonicalPath(waitHandleSet, canonicalPath);
+      existingHandle != nullptr
+    ) {
       AddWaitHandleReference(existingHandle);
       waitHandleSet.NotifyAll();
       return existingHandle;
@@ -1824,9 +1958,10 @@ namespace
     }
 
     waitHandleSet.Lock();
-    if (moho::SFileWaitHandle* const existingHandle =
-          FindMountedZipHandleByCanonicalPath(waitHandleSet, canonicalPath);
-        existingHandle != nullptr) {
+    if (
+      moho::SFileWaitHandle* const existingHandle = FindMountedZipHandleByCanonicalPath(waitHandleSet, canonicalPath);
+      existingHandle != nullptr
+    ) {
       AddWaitHandleReference(existingHandle);
       waitHandleSet.NotifyAll();
       return existingHandle;
@@ -1860,10 +1995,7 @@ namespace
         }
 
         (void)ZipMapInsertUniqueEntry(
-          waitHandleSet.mZipEntries,
-          mountedEntryPath,
-          mountedHandle.get(),
-          static_cast<std::uint32_t>(entryIndex)
+          waitHandleSet.mZipEntries, mountedEntryPath, mountedHandle.get(), static_cast<std::uint32_t>(entryIndex)
         );
       }
     } catch (...) {
@@ -1886,7 +2018,9 @@ namespace
     return mountedHandle.release();
   }
 
-  void ReleaseWaitHandleSetVfs(moho::FWaitHandleSet& waitHandleSet)
+  void ReleaseWaitHandleSetVfs(
+    moho::FWaitHandleSet& waitHandleSet
+  )
   {
     moho::CVirtualFileSystem* const vfs = waitHandleSet.mHandle;
     waitHandleSet.mHandle = nullptr;
@@ -1902,7 +2036,9 @@ namespace
    * Releases one current-thread disk-thread-state value lane and clears the
    * owning TSS slot descriptor.
    */
-  void ReleaseWaitHandleThreadStateRuntime(moho::FWHSThreadStateRuntime& runtime)
+  void ReleaseWaitHandleThreadStateRuntime(
+    moho::FWHSThreadStateRuntime& runtime
+  )
   {
     CleanupDiskThreadStateValue(runtime);
     runtime.mTss = nullptr;
@@ -1916,7 +2052,8 @@ namespace
    * canonical-path string storage.
    */
   void DestroyFileInfoSubtreeNodes(
-    moho::FWHSFileInfoMapNode* const node, const moho::FWHSFileInfoMapNode* const head
+    moho::FWHSFileInfoMapNode* const node,
+    const moho::FWHSFileInfoMapNode* const head
   )
   {
     moho::FWHSFileInfoMapNode* current = node;
@@ -1929,7 +2066,9 @@ namespace
     }
   }
 
-  void ClearFileInfoMapStorage(moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map)
+  void ClearFileInfoMapStorage(
+    moho::FWHSTreeMap<moho::FWHSFileInfoMapNode>& map
+  )
   {
     moho::FWHSFileInfoMapNode* const head = map.mHead;
     if (head == nullptr) {
@@ -1943,7 +2082,9 @@ namespace
     map.mSize = 0;
   }
 
-  void ClearZipMapStorage(moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map)
+  void ClearZipMapStorage(
+    moho::FWHSTreeMap<moho::FWHSZipEntryMapNode>& map
+  )
   {
     moho::FWHSZipEntryMapNode* const head = map.mHead;
     if (head == nullptr) {
@@ -1958,7 +2099,9 @@ namespace
     map.mSize = 0;
   }
 
-  void UnlinkWaitHandleSetSentinel(moho::FWaitHandleSet& waitHandleSet)
+  void UnlinkWaitHandleSetSentinel(
+    moho::FWaitHandleSet& waitHandleSet
+  )
   {
     if (waitHandleSet.mPrev != nullptr) {
       waitHandleSet.mPrev->mNext = waitHandleSet.mNext;
@@ -1979,7 +2122,9 @@ namespace
    * Initializes the static file wait-handle object runtime lanes before the
    * singleton publish step.
    */
-  moho::FWaitHandleSet* InitializeStaticFileWaitHandleSet(moho::FWaitHandleSet& waitHandleSet)
+  moho::FWaitHandleSet* InitializeStaticFileWaitHandleSet(
+    moho::FWaitHandleSet& waitHandleSet
+  )
   {
     if (waitHandleSet.mLock.mMutex == nullptr) {
       waitHandleSet.mLock.mMutex = new boost::mutex();
@@ -1997,7 +2142,9 @@ namespace
    * Performs process-shutdown synchronization teardown for the static
    * wait-handle mutex lane.
    */
-  void DestroyStaticFileWaitHandleSet(moho::FWaitHandleSet& waitHandleSet)
+  void DestroyStaticFileWaitHandleSet(
+    moho::FWaitHandleSet& waitHandleSet
+  )
   {
     if (waitHandleSet.mLock.mMutex != nullptr) {
       waitHandleSet.mLock.mMutex->lock();
@@ -2089,7 +2236,9 @@ moho::FWaitHandleSet* moho::FILE_GetWaitHandleSet()
  * Opens one source path for read through the file wait-handle owner and
  * mounted zip-entry lookup chain.
  */
-msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(const gpg::StrArg sourcePath)
+msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(
+  const gpg::StrArg sourcePath
+)
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
@@ -2107,7 +2256,9 @@ msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(const gpg::StrArg sourcePat
  * What it does:
  * Opens one source path for write using the legacy buffered FileStream lane.
  */
-msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileWrite(const gpg::StrArg sourcePath)
+msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileWrite(
+  const gpg::StrArg sourcePath
+)
 {
   return msvc8::auto_ptr<gpg::Stream>(
     new gpg::FileStream(sourcePath != nullptr ? sourcePath : "", gpg::Stream::ModeSend, 0u, 4096)
@@ -2123,7 +2274,9 @@ msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileWrite(const gpg::StrArg sourcePa
  * Mounts one zip archive through the process wait-handle runtime and returns
  * the intrusive mounted-handle reference.
  */
-moho::SFileWaitHandle* moho::DISK_MountZipFile(const gpg::StrArg sourcePath)
+moho::SFileWaitHandle* moho::DISK_MountZipFile(
+  const gpg::StrArg sourcePath
+)
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
@@ -2141,7 +2294,11 @@ moho::SFileWaitHandle* moho::DISK_MountZipFile(const gpg::StrArg sourcePath)
  * What it does:
  * Forwards metadata lookup to the process wait-handle runtime.
  */
-bool moho::DISK_GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo, const bool realOnly)
+bool moho::DISK_GetFileInfo(
+  const gpg::StrArg sourcePath,
+  SDiskFileInfo* const outInfo,
+  const bool realOnly
+)
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
@@ -2160,7 +2317,9 @@ bool moho::DISK_GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const o
  * Reads one source path into an owned mutable memory buffer through the
  * process wait-handle runtime.
  */
-gpg::MemBuffer<char> moho::DISK_ReadFile(const gpg::StrArg sourcePath)
+gpg::MemBuffer<char> moho::DISK_ReadFile(
+  const gpg::StrArg sourcePath
+)
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
@@ -2179,7 +2338,9 @@ gpg::MemBuffer<char> moho::DISK_ReadFile(const gpg::StrArg sourcePath)
  * Maps one source path into an immutable shared byte view through the process
  * wait-handle runtime.
  */
-gpg::MemBuffer<const char> moho::DISK_MemoryMapFile(const gpg::StrArg sourcePath)
+gpg::MemBuffer<const char> moho::DISK_MemoryMapFile(
+  const gpg::StrArg sourcePath
+)
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
@@ -2190,7 +2351,8 @@ gpg::MemBuffer<const char> moho::DISK_MemoryMapFile(const gpg::StrArg sourcePath
 }
 
 /**
- * Address: 0x00459D50 (FUN_00459D50, ?DISK_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ)
+ * Address: 0x00459D50 (FUN_00459D50,
+ * ?DISK_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ)
  *
  * What it does:
  * Returns a copy of the current thread-local disk error text.
@@ -2225,7 +2387,9 @@ moho::CVirtualFileSystem* moho::DISK_GetVFS()
  * Invalidates one canonical file-info cache key in the global wait-handle
  * singleton.
  */
-void moho::DISK_InvalidateFileInfoCache(const gpg::StrArg sourcePath)
+void moho::DISK_InvalidateFileInfoCache(
+  const gpg::StrArg sourcePath
+)
 {
   if (sourcePath == nullptr || sourcePath[0] == '\0') {
     return;
@@ -2244,7 +2408,9 @@ void moho::DISK_InvalidateFileInfoCache(const gpg::StrArg sourcePath)
  * Lua callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_DiskFindFilesL`.
  */
-int moho::cfunc_DiskFindFiles(lua_State* const luaContext)
+int moho::cfunc_DiskFindFiles(
+  lua_State* const luaContext
+)
 {
   return cfunc_DiskFindFilesL(ResolveBindingState(luaContext));
 }
@@ -2256,7 +2422,9 @@ int moho::cfunc_DiskFindFiles(lua_State* const luaContext)
  * Enumerates mounted VFS paths that match `(directory, pattern)` and returns
  * a 1-based Lua string array.
  */
-int moho::cfunc_DiskFindFilesL(LuaPlus::LuaState* const state)
+int moho::cfunc_DiskFindFilesL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
@@ -2300,12 +2468,7 @@ int moho::cfunc_DiskFindFilesL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_DiskFindFiles_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
-    "DiskFindFiles",
-    &moho::cfunc_DiskFindFiles,
-    nullptr,
-    "<global>",
-    kDiskFindFilesHelpText
+    CoreLuaInitSet(), "DiskFindFiles", &moho::cfunc_DiskFindFiles, nullptr, "<global>", kDiskFindFilesHelpText
   );
   return &binder;
 }
@@ -2317,7 +2480,9 @@ moho::CScrLuaInitForm* moho::func_DiskFindFiles_LuaFuncDef()
  * Lua callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_DiskGetFileInfoL`.
  */
-int moho::cfunc_DiskGetFileInfo(lua_State* const luaContext)
+int moho::cfunc_DiskGetFileInfo(
+  lua_State* const luaContext
+)
 {
   return cfunc_DiskGetFileInfoL(ResolveBindingState(luaContext));
 }
@@ -2329,17 +2494,13 @@ int moho::cfunc_DiskGetFileInfo(lua_State* const luaContext)
  * Resolves one mounted file path and returns Lua metadata details or `false`
  * when the file does not exist.
  */
-int moho::cfunc_DiskGetFileInfoL(LuaPlus::LuaState* const state)
+int moho::cfunc_DiskGetFileInfoL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected %d args, but got %d",
-      kDiskGetFileInfoHelpText,
-      1,
-      argumentCount
-    );
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kDiskGetFileInfoHelpText, 1, argumentCount);
   }
 
   FILE_EnsureWaitHandleSet();
@@ -2349,6 +2510,12 @@ int moho::cfunc_DiskGetFileInfoL(LuaPlus::LuaState* const state)
   const char* const filename = lua_tostring(state->m_state, 1);
   if (filename == nullptr) {
     filenameArg.TypeError("string");
+
+    // Added manually, not from original binary recovery: protect against nil filename input.
+    // Fixes: https://github.com/FAForever/FA-Binary-Patches/issues/125
+    lua_pushboolean(state->m_state, 0);
+    (void)lua_gettop(state->m_state);
+    return 1;
   }
 
   SDiskFileInfo fileInfo{};
@@ -2363,7 +2530,7 @@ int moho::cfunc_DiskGetFileInfoL(LuaPlus::LuaState* const state)
     flagsTable.SetInteger("SizeBytes", static_cast<std::int32_t>(fileInfo.mFileSize));
 
     const std::uint64_t rawTimestamp = (static_cast<std::uint64_t>(fileInfo.mLastWriteTime.dwHighDateTime) << 32U) |
-                                       static_cast<std::uint64_t>(fileInfo.mLastWriteTime.dwLowDateTime);
+      static_cast<std::uint64_t>(fileInfo.mLastWriteTime.dwLowDateTime);
     const msvc8::string timestampText = gpg::STR_Printf("%016llx", rawTimestamp);
     flagsTable.SetString("TimeStamp", timestampText.c_str());
 
@@ -2399,12 +2566,7 @@ int moho::cfunc_DiskGetFileInfoL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_DiskGetFileInfo_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
-    "DiskGetFileInfo",
-    &moho::cfunc_DiskGetFileInfo,
-    nullptr,
-    "<global>",
-    kDiskGetFileInfoHelpText
+    CoreLuaInitSet(), "DiskGetFileInfo", &moho::cfunc_DiskGetFileInfo, nullptr, "<global>", kDiskGetFileInfoHelpText
   );
   return &binder;
 }
@@ -2416,7 +2578,9 @@ moho::CScrLuaInitForm* moho::func_DiskGetFileInfo_LuaFuncDef()
  * Lua callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_DiskToLocalL`.
  */
-int moho::cfunc_DiskToLocal(lua_State* const luaContext)
+int moho::cfunc_DiskToLocal(
+  lua_State* const luaContext
+)
 {
   return cfunc_DiskToLocalL(ResolveBindingState(luaContext));
 }
@@ -2427,7 +2591,9 @@ int moho::cfunc_DiskToLocal(lua_State* const luaContext)
  * What it does:
  * Converts one system path to mounted/local VFS path form.
  */
-int moho::cfunc_DiskToLocalL(LuaPlus::LuaState* const state)
+int moho::cfunc_DiskToLocalL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -2459,12 +2625,7 @@ int moho::cfunc_DiskToLocalL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_DiskToLocal_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
-    "DiskToLocal",
-    &moho::cfunc_DiskToLocal,
-    nullptr,
-    "<global>",
-    kDiskToLocalHelpText
+    CoreLuaInitSet(), "DiskToLocal", &moho::cfunc_DiskToLocal, nullptr, "<global>", kDiskToLocalHelpText
   );
   return &binder;
 }
@@ -2476,7 +2637,9 @@ moho::CScrLuaInitForm* moho::func_DiskToLocal_LuaFuncDef()
  * Lua callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_BasenameL`.
  */
-int moho::cfunc_Basename(lua_State* const luaContext)
+int moho::cfunc_Basename(
+  lua_State* const luaContext
+)
 {
   return cfunc_BasenameL(ResolveBindingState(luaContext));
 }
@@ -2488,7 +2651,9 @@ int moho::cfunc_Basename(lua_State* const luaContext)
  * Returns the last path component for one input path, with optional
  * extension stripping.
  */
-int moho::cfunc_BasenameL(LuaPlus::LuaState* const state)
+int moho::cfunc_BasenameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 2) {
@@ -2518,12 +2683,7 @@ int moho::cfunc_BasenameL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Basename_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
-    "Basename",
-    &moho::cfunc_Basename,
-    nullptr,
-    "<global>",
-    kBasenameHelpText
+    CoreLuaInitSet(), "Basename", &moho::cfunc_Basename, nullptr, "<global>", kBasenameHelpText
   );
   return &binder;
 }
@@ -2535,7 +2695,9 @@ moho::CScrLuaInitForm* moho::func_Basename_LuaFuncDef()
  * Lua callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_DirnameL`.
  */
-int moho::cfunc_Dirname(lua_State* const luaContext)
+int moho::cfunc_Dirname(
+  lua_State* const luaContext
+)
 {
   return cfunc_DirnameL(ResolveBindingState(luaContext));
 }
@@ -2546,7 +2708,9 @@ int moho::cfunc_Dirname(lua_State* const luaContext)
  * What it does:
  * Returns one path with trailing filename removed.
  */
-int moho::cfunc_DirnameL(LuaPlus::LuaState* const state)
+int moho::cfunc_DirnameL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
@@ -2573,14 +2737,7 @@ int moho::cfunc_DirnameL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_Dirname_LuaFuncDef()
 {
-  static CScrLuaBinder binder(
-    CoreLuaInitSet(),
-    "Dirname",
-    &moho::cfunc_Dirname,
-    nullptr,
-    "<global>",
-    kDirnameHelpText
-  );
+  static CScrLuaBinder binder(CoreLuaInitSet(), "Dirname", &moho::cfunc_Dirname, nullptr, "<global>", kDirnameHelpText);
   return &binder;
 }
 
@@ -2591,7 +2748,9 @@ moho::CScrLuaInitForm* moho::func_Dirname_LuaFuncDef()
  * Lua callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_FileCollapsePathL`.
  */
-int moho::cfunc_FileCollapsePath(lua_State* const luaContext)
+int moho::cfunc_FileCollapsePath(
+  lua_State* const luaContext
+)
 {
   return cfunc_FileCollapsePathL(ResolveBindingState(luaContext));
 }
@@ -2602,17 +2761,13 @@ int moho::cfunc_FileCollapsePath(lua_State* const luaContext)
  * What it does:
  * Collapses one path (`/./`, `/../`) and returns `(collapsedPath, success)`.
  */
-int moho::cfunc_FileCollapsePathL(LuaPlus::LuaState* const state)
+int moho::cfunc_FileCollapsePathL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected %d args, but got %d",
-      kFileCollapsePathHelpText,
-      1,
-      argumentCount
-    );
+    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kFileCollapsePathHelpText, 1, argumentCount);
   }
 
   LuaPlus::LuaStackObject pathArg(state, 1);
@@ -2639,12 +2794,7 @@ int moho::cfunc_FileCollapsePathL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_FileCollapsePath_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
-    "FileCollapsePath",
-    &moho::cfunc_FileCollapsePath,
-    nullptr,
-    "<global>",
-    kFileCollapsePathHelpText
+    CoreLuaInitSet(), "FileCollapsePath", &moho::cfunc_FileCollapsePath, nullptr, "<global>", kFileCollapsePathHelpText
   );
   return &binder;
 }
@@ -2769,7 +2919,9 @@ void moho::FWaitHandleSet::NotifyAll()
  * Unlinks one zip wait-handle entry from the active-handle list, erases all
  * matching zip-map nodes, and destroys the detached handle object.
  */
-void moho::FWaitHandleSet::RemoveEntry(SFileWaitHandle* const handle)
+void moho::FWaitHandleSet::RemoveEntry(
+  SFileWaitHandle* const handle
+)
 {
   if (handle == nullptr) {
     return;
@@ -2805,7 +2957,11 @@ void moho::FWaitHandleSet::RemoveEntry(SFileWaitHandle* const handle)
  * Resolves metadata for one canonical path through zip-entry records and the
  * cached file-info map, then falls back to Win32 file attributes.
  */
-bool moho::FWaitHandleSet::GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo, const bool realOnly)
+bool moho::FWaitHandleSet::GetFileInfo(
+  const gpg::StrArg sourcePath,
+  SDiskFileInfo* const outInfo,
+  const bool realOnly
+)
 {
   if (sourcePath == nullptr || sourcePath[0] == '\0') {
     return false;
@@ -2904,7 +3060,9 @@ msvc8::string* moho::FWaitHandleSet::GetErrorString()
  * Reads one canonicalized file path into an owned mutable memory buffer,
  * preferring mounted zip entries when present.
  */
-gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(const gpg::StrArg sourcePath)
+gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
+  const gpg::StrArg sourcePath
+)
 {
   if (sourcePath == nullptr || sourcePath[0] == '\0') {
     return {};
@@ -2932,13 +3090,7 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(const gpg::StrArg sourcePath
 
   const std::wstring sourcePathWide = gpg::STR_Utf8ToWide(canonicalPath.c_str());
   HANDLE fileHandle = ::CreateFileW(
-    sourcePathWide.c_str(),
-    GENERIC_READ,
-    FILE_SHARE_READ,
-    nullptr,
-    OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL,
-    nullptr
+    sourcePathWide.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr
   );
   if (fileHandle == INVALID_HANDLE_VALUE) {
     SetWaitHandleErrorFromWin32(this);
@@ -2982,7 +3134,9 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(const gpg::StrArg sourcePath
  * Maps one canonicalized file path into an immutable shared memory view,
  * preferring mounted zip entries when present.
  */
-gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(const gpg::StrArg sourcePath)
+gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
+  const gpg::StrArg sourcePath
+)
 {
   if (sourcePath == nullptr || sourcePath[0] == '\0') {
     return {};
@@ -3010,13 +3164,7 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(const gpg::StrArg
 
   const std::wstring sourcePathWide = gpg::STR_Utf8ToWide(canonicalPath.c_str());
   HANDLE fileHandle = ::CreateFileW(
-    sourcePathWide.c_str(),
-    GENERIC_READ,
-    FILE_SHARE_READ,
-    nullptr,
-    OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL,
-    nullptr
+    sourcePathWide.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr
   );
   if (fileHandle == INVALID_HANDLE_VALUE) {
     SetWaitHandleErrorFromWin32(this);
@@ -3058,7 +3206,9 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(const gpg::StrArg
  * Canonicalizes one source path, acquires the exclusive lane, and removes all
  * matching cached file-info entries.
  */
-void moho::FWaitHandleSet::InvalidateFileInfoCache(const gpg::StrArg sourcePath)
+void moho::FWaitHandleSet::InvalidateFileInfoCache(
+  const gpg::StrArg sourcePath
+)
 {
   if (sourcePath == nullptr || sourcePath[0] == '\0') {
     return;
@@ -3079,7 +3229,11 @@ void moho::FWaitHandleSet::InvalidateFileInfoCache(const gpg::StrArg sourcePath)
  * Resolves file metadata through the wait-handle/VFS runtime when available.
  * The recovered `realOnly` gate is preserved for callsite parity.
  */
-bool moho::FILE_GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo, const bool realOnly)
+bool moho::FILE_GetFileInfo(
+  const gpg::StrArg sourcePath,
+  SDiskFileInfo* const outInfo,
+  const bool realOnly
+)
 {
   if (sourcePath == nullptr || sourcePath[0] == '\0') {
     return false;
@@ -3097,7 +3251,10 @@ bool moho::FILE_GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const o
   return false;
 }
 
-msvc8::string* moho::FILE_ToMountedPath(msvc8::string* const outPath, const gpg::StrArg sourcePath)
+msvc8::string* moho::FILE_ToMountedPath(
+  msvc8::string* const outPath,
+  const gpg::StrArg sourcePath
+)
 {
   if (outPath == nullptr) {
     return nullptr;

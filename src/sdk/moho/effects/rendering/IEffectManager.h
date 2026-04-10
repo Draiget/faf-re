@@ -163,8 +163,8 @@ namespace moho
       Wm3::Vector3<float> position,
       const msvc8::string& texturePrimary,
       const msvc8::string& textureSecondary,
-      float lifeTime,
-      float scale,
+      float size,
+      float lifetime,
       int armyIndex
     ) = 0;
 

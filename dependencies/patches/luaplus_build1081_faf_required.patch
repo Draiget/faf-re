@@ -1,0 +1,69 @@
+diff --git a/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c b/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c
+--- a/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c
++++ b/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c
+@@ -20,7 +20,7 @@
+ #ifndef lua_number2wstr
+ #include <stdio.h>
+-#define lua_number2wstr(s,n)    swprintf((s), LUA_NUMBER_WFMT, (n))
++#define lua_number2wstr(s,n)    _snwprintf((wchar_t*)(s), 32, LUA_NUMBER_WFMT, (n))
+ #endif
+ 
+ int luaV_towstring (lua_State *L, TObject *obj) {
+diff --git a/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c b/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c
+--- a/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c
++++ b/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c
+@@ -714,7 +714,7 @@ static void luaI_addquoted (lua_State *L, luaL_Buffer *b, int arg) {
+ 		  else
+ 		  {
+ 			  lua_WChar buf[5];
+-			  swprintf(buf, L"\\%03d", *s);
++			  _snwprintf((wchar_t*)buf, 5, L"\\%03d", *s);
+ 			  luaL_addlwstring(b, buf, 4);
+ 		  }
+     }
+@@ -752,7 +752,7 @@ static void luaI_addquotedbinary (lua_State *L, luaL_Buffer *b, int arg) {
+ 				else
+ 				{
+ 					lua_WChar str[10];
+-					swprintf(str, L"\\x%04x", (unsigned long)*s);
++					_snwprintf((wchar_t*)str, 10, L"\\x%04x", (unsigned long)*s);
+ 					luaL_addwstring(b, str);
+ 				}
+ 		}
+@@ -785,7 +785,7 @@ static void luaI_addquotedbinary (lua_State *L, luaL_Buffer *b, int arg) {
+ 				else
+ 				{
+ 					lua_WChar str[10];
+-					swprintf(str, L"\\x%02x", (unsigned long)(unsigned char)*s);
++					_snwprintf((wchar_t*)str, 10, L"\\x%02x", (unsigned long)(unsigned char)*s);
+ 					luaL_addwstring(b, str);
+ 				}
+ 		}
+@@ -908,15 +908,15 @@ int wstr_format_helper (luaL_Buffer* b, lua_State *L, int arg) {
+ 		  break;
+ 		}
+         case 'c':  case 'd':  case 'i':
+-          swprintf(buff, form, luaL_checkint(L, arg));
++          _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, luaL_checkint(L, arg));
+           break;
+         case 'o':  case 'u':  case 'x':  case 'X':
+           //?? How should this be for integers?
+-          swprintf(buff, form, (unsigned int)(luaL_checknumber(L, arg)));
++          _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, (unsigned int)(luaL_checknumber(L, arg)));
+           break;
+         case 'e':  case 'E': case 'f':
+         case 'g': case 'G':
+-          swprintf(buff, form, luaL_checknumber(L, arg));
++          _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, luaL_checknumber(L, arg));
+           break;
+         case 'q':
+           luaI_addquoted(L, b, arg);
+@@ -935,7 +935,7 @@ int wstr_format_helper (luaL_Buffer* b, lua_State *L, int arg) {
+             continue;  /* skip the `addsize' at the end */
+           }
+           else {
+-            swprintf(buff, form, s);
++            _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, (const wchar_t*)s);
+             break;
+           }
+         }

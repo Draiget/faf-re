@@ -14,6 +14,7 @@
 #include "moho/ai/IAiAttacker.h"
 #include "moho/entity/EntityCategorySetVectorReflection.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
@@ -100,11 +101,6 @@ namespace
   constexpr const char* kUnitWeaponSetFireTargetLayerCapsName = "SetFireTargetLayerCaps";
   constexpr const char* kUnitWeaponSetFireTargetLayerCapsHelpText = "UnitWeapon:SetFireTargetLayerCaps(mask)";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -131,7 +127,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = payload["_c_object"];
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -171,9 +167,9 @@ namespace
   enum class UnitWeaponTargetSolutionStatus : std::uint8_t
   {
     Available = 0u,
-    OutsideMaxRange = 1u,
-    InsideMinRange = 2u,
-    NoSolution = 3u,
+    InsideMinRange = 1u,
+    NoSolution = 2u,
+    OutsideMaxRange = 3u,
   };
 
   [[nodiscard]] float NormalizeAngleRadians(const float angleRadians) noexcept
@@ -398,20 +394,9 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -563,7 +548,7 @@ namespace moho
    */
   int cfunc_UnitWeaponPlaySound(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponPlaySoundL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponPlaySoundL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -624,7 +609,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetEnabled(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponSetEnabledL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponSetEnabledL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -744,7 +729,7 @@ namespace moho
    */
   int cfunc_UnitWeaponResetTarget(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponResetTargetL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponResetTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -785,7 +770,7 @@ namespace moho
    */
   int cfunc_UnitWeaponCreateProjectile(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponCreateProjectileL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponCreateProjectileL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -973,7 +958,7 @@ namespace moho
    */
   int cfunc_UnitWeaponIsFireControl(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponIsFireControlL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponIsFireControlL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1178,7 +1163,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetProjectileBlueprint(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponGetProjectileBlueprintL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponGetProjectileBlueprintL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1213,7 +1198,7 @@ namespace moho
    */
   int cfunc_UnitWeaponHasTarget(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponHasTargetL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponHasTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1251,7 +1236,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetCurrentTarget(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponGetCurrentTargetL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponGetCurrentTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1291,7 +1276,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetCurrentTargetPos(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponGetCurrentTargetPosL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponGetCurrentTargetPosL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1325,7 +1310,7 @@ namespace moho
    */
   int cfunc_UnitWeaponCanFire(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponCanFireL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponCanFireL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1375,7 +1360,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetTargetingPriorities(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponSetTargetingPrioritiesL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponSetTargetingPrioritiesL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1408,7 +1393,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetFiringRandomness(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponGetFiringRandomnessL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponGetFiringRandomnessL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1447,7 +1432,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetFireClockPct(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponGetFireClockPctL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponGetFireClockPctL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1487,7 +1472,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeProjectileBlueprint(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeProjectileBlueprintL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeProjectileBlueprintL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1525,7 +1510,7 @@ namespace moho
    */
   int cfunc_UnitWeaponTransferTarget(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponTransferTargetL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponTransferTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1557,7 +1542,7 @@ namespace moho
    */
   int cfunc_UnitWeaponBeenDestroyed(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponBeenDestroyedL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponBeenDestroyedL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1595,7 +1580,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetBlueprint(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponGetBlueprintL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponGetBlueprintL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1626,7 +1611,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetFireControl(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponSetFireControlL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponSetFireControlL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1711,7 +1696,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeFiringTolerance(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeFiringToleranceL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeFiringToleranceL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1768,7 +1753,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeRateOfFire(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeRateOfFireL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeRateOfFireL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1830,7 +1815,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeMinRadius(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeMinRadiusL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeMinRadiusL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1892,7 +1877,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeMaxRadius(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeMaxRadiusL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeMaxRadiusL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1949,7 +1934,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeMaxHeightDiff(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeMaxHeightDiffL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeMaxHeightDiffL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2007,7 +1992,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeDamageType(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeDamageTypeL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeDamageTypeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2064,7 +2049,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeDamageRadius(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeDamageRadiusL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeDamageRadiusL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2120,7 +2105,7 @@ namespace moho
    */
   int cfunc_UnitWeaponChangeDamage(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponChangeDamageL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponChangeDamageL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2177,7 +2162,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetFiringRandomness(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponSetFiringRandomnessL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponSetFiringRandomnessL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2240,7 +2225,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetFireTargetLayerCaps(lua_State* const luaContext)
   {
-    return cfunc_UnitWeaponSetFireTargetLayerCapsL(ResolveBindingState(luaContext));
+    return cfunc_UnitWeaponSetFireTargetLayerCapsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2260,6 +2245,18 @@ namespace moho
       kUnitWeaponSetFireTargetLayerCapsHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x0062FD70 (FUN_0062FD70, Moho::UnitWeapon::GetLabel)
+   *
+   * What it does:
+   * Copies this weapon label into caller-provided output string storage.
+   */
+  msvc8::string* UnitWeapon::GetLabel(msvc8::string* const outLabel) const
+  {
+    *outLabel = mLabel;
+    return outLabel;
   }
 
   /**
@@ -2315,6 +2312,59 @@ namespace moho
       delete mFireWeaponTask;
       mFireWeaponTask = nullptr;
     }
+  }
+
+  /**
+   * Address: 0x006D5200 (FUN_006D5200, sub_6D5200)
+   *
+   * What it does:
+   * Computes this weapon forward vector from either owner transform or muzzle
+   * bone world transform quaternion lanes.
+   */
+  Wm3::Vector3f UnitWeapon::GetForwardVector(const UnitWeapon* const weapon)
+  {
+    if (weapon == nullptr || weapon->mUnit == nullptr) {
+      return Wm3::Vector3f::Zero();
+    }
+
+    Wm3::Quaternionf orientation{};
+    if (weapon->mBone >= 0) {
+      orientation = weapon->mUnit->GetBoneWorldTransform(weapon->mBone).orient_;
+    } else {
+      orientation = weapon->mUnit->GetTransform().orient_;
+    }
+
+    const float w = orientation.w;
+    const float x = orientation.x;
+    const float y = orientation.y;
+    const float z = orientation.z;
+
+    return Wm3::Vector3f{
+      ((w * y) + (x * z)) * 2.0f,
+      ((y * z) - (w * x)) * 2.0f,
+      1.0f - (((x * x) + (y * y)) * 2.0f),
+    };
+  }
+
+  /**
+   * Address: 0x006D78C0 (FUN_006D78C0, sub_6D78C0)
+   *
+   * What it does:
+   * Returns whether `entity` is present in weapon blacklist rows.
+   */
+  bool UnitWeapon::IsEntityBlacklisted(const UnitWeapon* const weapon, const Entity* const entity)
+  {
+    if (weapon == nullptr || entity == nullptr) {
+      return false;
+    }
+
+    for (const SBlackListInfo& entry : weapon->mBlacklist) {
+      if (entry.mEntity.GetObjectPtr() == entity) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

@@ -25,6 +25,17 @@ namespace moho
    */
   struct SEntitySetTemplateUnit : TDatList<SEntitySetTemplateUnit, void>
   {
+    SEntitySetTemplateUnit() = default;
+
+    /**
+     * Address: 0x00579500 (FUN_00579500, copy-construct lane)
+     *
+     * What it does:
+     * Reinitializes intrusive links to singleton state and copies entity-set
+     * vector storage from `other`.
+     */
+    SEntitySetTemplateUnit(const SEntitySetTemplateUnit& other);
+
     [[nodiscard]] static Unit* UnitFromEntry(Entity* entity) noexcept;
     [[nodiscard]] static const Unit* UnitFromEntry(const Entity* entity) noexcept;
 
@@ -62,6 +73,15 @@ namespace moho
      * pointer match when present, and compacts trailing slots.
      */
     [[nodiscard]] bool RemoveUnit(Unit* unit);
+
+    /**
+     * Address: 0x006EEC40 (FUN_006EEC40, Moho::EntitySetTemplate_Entity::Same)
+     *
+     * What it does:
+     * Compares two sorted entity-set storages for exact membership equality by
+     * lower-bound lookup and exact pointer identity match.
+     */
+    [[nodiscard]] bool Same(const SEntitySetTemplateUnit& other) const noexcept;
 
     /**
      * Address: 0x00704070 (FUN_00704070, Moho::EntitySetTemplate_Entity::AddRange)

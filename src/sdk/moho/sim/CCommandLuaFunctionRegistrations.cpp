@@ -8,6 +8,8 @@
 #include "moho/ai/IAiBuilder.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
@@ -73,25 +75,9 @@ namespace
   constexpr const char* kIssueSiloBuildTacticalHelpText = "IssueSiloBuildTactical";
   constexpr const char* kIssueSiloBuildNukeHelpText = "IssueSiloBuildNuke";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -115,28 +101,6 @@ namespace
       cachedType = gpg::LookupRType(typeid(moho::CUnitCommand));
     }
     return cachedType;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* fieldName)
-  {
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
   }
 
   [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
@@ -165,7 +129,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -1072,7 +1036,7 @@ namespace moho
    */
   int cfunc_IsCommandDone(lua_State* const luaContext)
   {
-    return cfunc_IsCommandDoneL(ResolveBindingState(luaContext));
+    return cfunc_IsCommandDoneL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1108,7 +1072,7 @@ namespace moho
    */
   int cfunc_IssueClearCommands(lua_State* const luaContext)
   {
-    return cfunc_IssueClearCommandsL(ResolveBindingState(luaContext));
+    return cfunc_IssueClearCommandsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1158,7 +1122,7 @@ namespace moho
    */
   int cfunc_IssueStop(lua_State* const luaContext)
   {
-    return cfunc_IssueStopL(ResolveBindingState(luaContext));
+    return cfunc_IssueStopL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1169,7 +1133,7 @@ namespace moho
    */
   int cfunc_IssuePause(lua_State* const luaContext)
   {
-    return cfunc_IssuePauseL(ResolveBindingState(luaContext));
+    return cfunc_IssuePauseL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1237,7 +1201,7 @@ namespace moho
    */
   int cfunc_DecreaseBuildCountInQueue(lua_State* const luaContext)
   {
-    return cfunc_DecreaseBuildCountInQueueL(ResolveBindingState(luaContext));
+    return cfunc_DecreaseBuildCountInQueueL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1249,7 +1213,7 @@ namespace moho
    */
   int cfunc_GetUnitCommandData(lua_State* const luaContext)
   {
-    return cfunc_GetUnitCommandDataL(ResolveBindingState(luaContext));
+    return cfunc_GetUnitCommandDataL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1260,7 +1224,7 @@ namespace moho
    */
   int cfunc_IssueDockCommand(lua_State* const luaContext)
   {
-    return cfunc_IssueDockCommandL(ResolveBindingState(luaContext));
+    return cfunc_IssueDockCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1271,7 +1235,7 @@ namespace moho
    */
   int cfunc_IssueCommand(lua_State* const luaContext)
   {
-    return cfunc_IssueCommandL(ResolveBindingState(luaContext));
+    return cfunc_IssueCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1283,7 +1247,7 @@ namespace moho
    */
   int cfunc_IssueUnitCommand(lua_State* const luaContext)
   {
-    return cfunc_IssueUnitCommandL(ResolveBindingState(luaContext));
+    return cfunc_IssueUnitCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1295,7 +1259,7 @@ namespace moho
    */
   int cfunc_IssueBlueprintCommand(lua_State* const luaContext)
   {
-    return cfunc_IssueBlueprintCommandL(ResolveBindingState(luaContext));
+    return cfunc_IssueBlueprintCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1306,7 +1270,7 @@ namespace moho
    */
   int cfunc_GetRolloverInfo(lua_State* const luaContext)
   {
-    return cfunc_GetRolloverInfoL(ResolveBindingState(luaContext));
+    return cfunc_GetRolloverInfoL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1317,7 +1281,7 @@ namespace moho
    */
   int cfunc_SetOverlayFilter(lua_State* const luaContext)
   {
-    return cfunc_SetOverlayFilterL(ResolveBindingState(luaContext));
+    return cfunc_SetOverlayFilterL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1329,7 +1293,7 @@ namespace moho
    */
   int cfunc_GetActiveBuildTemplate(lua_State* const luaContext)
   {
-    return cfunc_GetActiveBuildTemplateL(ResolveBindingState(luaContext));
+    return cfunc_GetActiveBuildTemplateL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1341,7 +1305,7 @@ namespace moho
    */
   int cfunc_SetActiveBuildTemplate(lua_State* const luaContext)
   {
-    return cfunc_SetActiveBuildTemplateL(ResolveBindingState(luaContext));
+    return cfunc_SetActiveBuildTemplateL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1352,7 +1316,7 @@ namespace moho
    */
   int cfunc_OpenURL(lua_State* const luaContext)
   {
-    return cfunc_OpenURLL(ResolveBindingState(luaContext));
+    return cfunc_OpenURLL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1363,7 +1327,7 @@ namespace moho
    */
   int cfunc_SetCursor(lua_State* const luaContext)
   {
-    return cfunc_SetCursorL(ResolveBindingState(luaContext));
+    return cfunc_SetCursorL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2147,7 +2111,7 @@ namespace moho
    */
   int cfunc_IssueClearFactoryCommands(lua_State* const luaContext)
   {
-    return cfunc_IssueClearFactoryCommandsL(ResolveBindingState(luaContext));
+    return cfunc_IssueClearFactoryCommandsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2232,7 +2196,7 @@ namespace moho
    */
   int cfunc_CoordinateAttacks(lua_State* const luaContext)
   {
-    return cfunc_CoordinateAttacksL(ResolveBindingState(luaContext));
+    return cfunc_CoordinateAttacksL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2262,7 +2226,7 @@ namespace moho
    */
   int cfunc_IssueSiloBuildTactical(lua_State* const luaContext)
   {
-    return cfunc_IssueSiloBuildTacticalL(ResolveBindingState(luaContext));
+    return cfunc_IssueSiloBuildTacticalL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2301,7 +2265,7 @@ namespace moho
    */
   int cfunc_IssueSiloBuildNuke(lua_State* const luaContext)
   {
-    return cfunc_IssueSiloBuildNukeL(ResolveBindingState(luaContext));
+    return cfunc_IssueSiloBuildNukeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -15,12 +16,17 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/UserEntity.h"
+#include "moho/mesh/Mesh.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/misc/Stats.h"
+#include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/CArmyLuaFunctionRegistrations.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/UserArmy.h"
@@ -28,6 +34,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitAttributes.h"
+#include "moho/vision/VisionDB.h"
 
 using namespace moho;
 
@@ -469,18 +476,47 @@ namespace
 
   msvc8::vector<FactoryQueueDisplayItemRuntime> sCurrentFactoryBuildQueue;
 
+  struct UserCommandManagerPendingSlotView
+  {
+    std::int32_t dueSeqNo; // +0x00
+    std::uint8_t pad_0004_0008[0x04];
+  };
+  static_assert(
+    offsetof(UserCommandManagerPendingSlotView, dueSeqNo) == 0x00,
+    "UserCommandManagerPendingSlotView::dueSeqNo offset must be 0x00"
+  );
+
   struct UserCommandManagerRuntimeView
   {
     std::uint8_t pad_0000_0008[0x08];
     UserCommandQueueRangeView primaryRange;      // +0x08
-    std::uint8_t pad_0010_0038[0x28];
+    std::uint8_t pad_0010_002C[0x1C];
+    UserCommandManagerPendingSlotView** pendingIssueSlots; // +0x2C
+    std::uint32_t pendingSlotCount;              // +0x30
+    std::uint32_t pendingCursor;                 // +0x34
     std::uint32_t pendingIssueCount;             // +0x38
     std::uint8_t pad_003C_0040[0x04];
     UserCommandQueueRangeView resolvedRange;     // +0x40
+    UserCommandQueueEntryView* resolvedRangeEndStorage; // +0x48
+    UserCommandQueueEntryView** resolvedRangeInlineStorage; // +0x4C
+    std::uint8_t pad_0050_0060[0x10];
+    std::uint8_t resolvedRangeDirty; // +0x60
   };
   static_assert(
     offsetof(UserCommandManagerRuntimeView, primaryRange) == 0x08,
     "UserCommandManagerRuntimeView::primaryRange offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserCommandManagerRuntimeView, pendingIssueSlots) == 0x2C,
+    "UserCommandManagerRuntimeView::pendingIssueSlots offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(UserCommandManagerRuntimeView, pendingSlotCount) == 0x30,
+    "UserCommandManagerRuntimeView::pendingSlotCount offset must be 0x30"
+  );
+  static_assert(
+    offsetof(UserCommandManagerRuntimeView, pendingCursor) == 0x34,
+    "UserCommandManagerRuntimeView::pendingCursor offset must be 0x34"
   );
   static_assert(
     offsetof(UserCommandManagerRuntimeView, pendingIssueCount) == 0x38,
@@ -490,6 +526,44 @@ namespace
     offsetof(UserCommandManagerRuntimeView, resolvedRange) == 0x40,
     "UserCommandManagerRuntimeView::resolvedRange offset must be 0x40"
   );
+  static_assert(
+    offsetof(UserCommandManagerRuntimeView, resolvedRangeEndStorage) == 0x48,
+    "UserCommandManagerRuntimeView::resolvedRangeEndStorage offset must be 0x48"
+  );
+  static_assert(
+    offsetof(UserCommandManagerRuntimeView, resolvedRangeInlineStorage) == 0x4C,
+    "UserCommandManagerRuntimeView::resolvedRangeInlineStorage offset must be 0x4C"
+  );
+  static_assert(
+    offsetof(UserCommandManagerRuntimeView, resolvedRangeDirty) == 0x60,
+    "UserCommandManagerRuntimeView::resolvedRangeDirty offset must be 0x60"
+  );
+
+  struct UserUnitVisionRuntimeView
+  {
+    std::uint8_t pad_0000_0018[0x18];
+    VisionDB::Handle* visionHandle; // +0x18
+  };
+  static_assert(
+    offsetof(UserUnitVisionRuntimeView, visionHandle) == 0x18,
+    "UserUnitVisionRuntimeView::visionHandle offset must be 0x18"
+  );
+
+  struct UserArmyIdleSetRuntimeView
+  {
+    std::uint8_t pad_0000_01F8[0x1F8];
+    SSelectionSetUserEntity engineers; // +0x1F8
+    SSelectionSetUserEntity factories; // +0x208
+  };
+  static_assert(
+    offsetof(UserArmyIdleSetRuntimeView, engineers) == 0x1F8,
+    "UserArmyIdleSetRuntimeView::engineers offset must be 0x1F8"
+  );
+  static_assert(
+    offsetof(UserArmyIdleSetRuntimeView, factories) == 0x208,
+    "UserArmyIdleSetRuntimeView::factories offset must be 0x208"
+  );
+  static_assert(sizeof(UserArmyIdleSetRuntimeView) == 0x218, "UserArmyIdleSetRuntimeView size must be 0x218");
 
   [[nodiscard]] const IUnit* GetIUnitBridge(const UserUnit* const self) noexcept
   {
@@ -516,6 +590,11 @@ namespace
     return *reinterpret_cast<const UserUnitLuaObjectRuntimeView*>(self);
   }
 
+  [[nodiscard]] std::int32_t EncodeUserCommandManagerHandle(const UserUnitManager* const manager) noexcept
+  {
+    return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(manager));
+  }
+
   [[nodiscard]] UserCommandManagerRuntimeView* DecodeUserCommandManagerHandle(const std::int32_t managerHandle) noexcept
   {
     if (managerHandle == 0) {
@@ -534,6 +613,552 @@ namespace
     }
 
     return (manager->pendingIssueCount == 0u) ? &manager->primaryRange : &manager->resolvedRange;
+  }
+
+  [[nodiscard]] VisionDB::Handle*& GetUserUnitVisionHandle(UserUnit* const self) noexcept
+  {
+    return reinterpret_cast<UserUnitVisionRuntimeView*>(self)->visionHandle;
+  }
+
+  [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
+  {
+    return reinterpret_cast<const UserUnitVisionRuntimeView*>(self)->visionHandle;
+  }
+
+  [[nodiscard]] UserArmyIdleSetRuntimeView& GetUserArmyIdleSetView(UserArmy* const army) noexcept
+  {
+    return *reinterpret_cast<UserArmyIdleSetRuntimeView*>(army);
+  }
+
+  [[nodiscard]] const UserArmyIdleSetRuntimeView& GetUserArmyIdleSetView(const UserArmy* const army) noexcept
+  {
+    return *reinterpret_cast<const UserArmyIdleSetRuntimeView*>(army);
+  }
+
+  template <typename TNode>
+  [[nodiscard]] bool IsWeakEntitySentinelNode(const TNode* const node) noexcept
+  {
+    return node == nullptr || node->mIsSentinel != 0u;
+  }
+
+  template <typename TNode>
+  [[nodiscard]] TNode* NextWeakEntityNode(TNode* node) noexcept
+  {
+    if (node == nullptr || IsWeakEntitySentinelNode(node)) {
+      return node;
+    }
+
+    if (!IsWeakEntitySentinelNode(node->mRight)) {
+      node = node->mRight;
+      while (!IsWeakEntitySentinelNode(node->mLeft)) {
+        node = node->mLeft;
+      }
+      return node;
+    }
+
+    TNode* parent = node->mParent;
+    while (!IsWeakEntitySentinelNode(parent) && node == parent->mRight) {
+      node = parent;
+      parent = parent->mParent;
+    }
+    return parent;
+  }
+
+  [[nodiscard]] std::uint32_t WeakEntitySetKey(const UserEntity* const entity) noexcept
+  {
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(entity));
+  }
+
+  void LinkWeakEntityOwner(UserEntity* const entity, SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    weakRef.mOwnerLinkSlot = nullptr;
+    weakRef.mNextOwner = nullptr;
+    if (entity == nullptr) {
+      return;
+    }
+
+    auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
+    weakRef.mOwnerLinkSlot = ownerLinkSlot;
+    weakRef.mNextOwner = *ownerLinkSlot;
+    *ownerLinkSlot = &weakRef;
+  }
+
+  void UnlinkWeakEntityOwner(SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
+    if (ownerLinkSlot == nullptr) {
+      return;
+    }
+
+    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
+      ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
+    }
+
+    if (*ownerLinkSlot == &weakRef) {
+      *ownerLinkSlot = weakRef.mNextOwner;
+    }
+
+    weakRef.mOwnerLinkSlot = nullptr;
+    weakRef.mNextOwner = nullptr;
+  }
+
+  [[nodiscard]] SSelectionNodeUserEntity*
+  FindWeakEntitySetNodeByKey(const SSelectionSetUserEntity& selection, const std::uint32_t key) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    SSelectionNodeUserEntity* node = head->mParent;
+    while (!IsWeakEntitySentinelNode(node)) {
+      if (key < node->mKey) {
+        node = node->mLeft;
+      } else if (node->mKey < key) {
+        node = node->mRight;
+      } else {
+        return node;
+      }
+    }
+
+    return head;
+  }
+
+  [[nodiscard]] SSelectionNodeUserEntity*
+  WeakEntitySelectionMin(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head) noexcept
+  {
+    while (!IsWeakEntitySentinelNode(node) && !IsWeakEntitySentinelNode(node->mLeft)) {
+      node = node->mLeft;
+    }
+    return IsWeakEntitySentinelNode(node) ? head : node;
+  }
+
+  [[nodiscard]] SSelectionNodeUserEntity*
+  WeakEntitySelectionMax(SSelectionNodeUserEntity* node, SSelectionNodeUserEntity* const head) noexcept
+  {
+    while (!IsWeakEntitySentinelNode(node) && !IsWeakEntitySentinelNode(node->mRight)) {
+      node = node->mRight;
+    }
+    return IsWeakEntitySentinelNode(node) ? head : node;
+  }
+
+  void RecomputeWeakEntitySetExtrema(SSelectionSetUserEntity& selection) noexcept
+  {
+    if (selection.mHead == nullptr) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    SSelectionNodeUserEntity* const root = head->mParent;
+    if (IsWeakEntitySentinelNode(root)) {
+      head->mParent = head;
+      head->mLeft = head;
+      head->mRight = head;
+      return;
+    }
+
+    head->mLeft = WeakEntitySelectionMin(root, head);
+    head->mRight = WeakEntitySelectionMax(root, head);
+  }
+
+  void ReplaceWeakEntitySubtree(
+    SSelectionSetUserEntity& selection,
+    SSelectionNodeUserEntity* const oldNode,
+    SSelectionNodeUserEntity* const newNode
+  ) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    if (oldNode->mParent == head) {
+      head->mParent = newNode;
+    } else if (oldNode == oldNode->mParent->mLeft) {
+      oldNode->mParent->mLeft = newNode;
+    } else {
+      oldNode->mParent->mRight = newNode;
+    }
+
+    if (!IsWeakEntitySentinelNode(newNode)) {
+      newNode->mParent = oldNode->mParent;
+    }
+  }
+
+  void RotateWeakEntityLeft(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    SSelectionNodeUserEntity* const pivot = node->mRight;
+    node->mRight = pivot->mLeft;
+    if (!IsWeakEntitySentinelNode(pivot->mLeft)) {
+      pivot->mLeft->mParent = node;
+    }
+
+    pivot->mParent = node->mParent;
+    if (node->mParent == head) {
+      head->mParent = pivot;
+    } else if (node == node->mParent->mLeft) {
+      node->mParent->mLeft = pivot;
+    } else {
+      node->mParent->mRight = pivot;
+    }
+
+    pivot->mLeft = node;
+    node->mParent = pivot;
+  }
+
+  void RotateWeakEntityRight(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    SSelectionNodeUserEntity* const pivot = node->mLeft;
+    node->mLeft = pivot->mRight;
+    if (!IsWeakEntitySentinelNode(pivot->mRight)) {
+      pivot->mRight->mParent = node;
+    }
+
+    pivot->mParent = node->mParent;
+    if (node->mParent == head) {
+      head->mParent = pivot;
+    } else if (node == node->mParent->mRight) {
+      node->mParent->mRight = pivot;
+    } else {
+      node->mParent->mLeft = pivot;
+    }
+
+    pivot->mRight = node;
+    node->mParent = pivot;
+  }
+
+  void FixupWeakEntityInsert(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    while (node != head->mParent && node->mParent->mColor == 0u) {
+      SSelectionNodeUserEntity* const parent = node->mParent;
+      SSelectionNodeUserEntity* const grand = parent->mParent;
+      if (parent == grand->mLeft) {
+        SSelectionNodeUserEntity* const uncle = grand->mRight;
+        if (uncle->mColor == 0u) {
+          parent->mColor = 1u;
+          uncle->mColor = 1u;
+          grand->mColor = 0u;
+          node = grand;
+        } else {
+          if (node == parent->mRight) {
+            node = parent;
+            RotateWeakEntityLeft(selection, node);
+          }
+          node->mParent->mColor = 1u;
+          grand->mColor = 0u;
+          RotateWeakEntityRight(selection, grand);
+        }
+      } else {
+        SSelectionNodeUserEntity* const uncle = grand->mLeft;
+        if (uncle->mColor == 0u) {
+          parent->mColor = 1u;
+          uncle->mColor = 1u;
+          grand->mColor = 0u;
+          node = grand;
+        } else {
+          if (node == parent->mLeft) {
+            node = parent;
+            RotateWeakEntityRight(selection, node);
+          }
+          node->mParent->mColor = 1u;
+          grand->mColor = 0u;
+          RotateWeakEntityLeft(selection, grand);
+        }
+      }
+    }
+
+    head->mParent->mColor = 1u;
+  }
+
+  void FixupWeakEntityErase(
+    SSelectionSetUserEntity& selection,
+    SSelectionNodeUserEntity* node,
+    SSelectionNodeUserEntity* nodeParent
+  ) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    SSelectionNodeUserEntity* parent = !IsWeakEntitySentinelNode(node) ? node->mParent : nodeParent;
+    while (node != head->mParent && (IsWeakEntitySentinelNode(node) || node->mColor == 1u)) {
+      if (parent == nullptr) {
+        break;
+      }
+
+      if (node == parent->mLeft) {
+        SSelectionNodeUserEntity* sibling = parent->mRight;
+        if (sibling == head) {
+          node = parent;
+          parent = node->mParent;
+          continue;
+        }
+        if (sibling->mColor == 0u) {
+          sibling->mColor = 1u;
+          parent->mColor = 0u;
+          RotateWeakEntityLeft(selection, parent);
+          sibling = parent->mRight;
+        }
+
+        const bool leftBlack = IsWeakEntitySentinelNode(sibling->mLeft) || sibling->mLeft->mColor == 1u;
+        const bool rightBlack = IsWeakEntitySentinelNode(sibling->mRight) || sibling->mRight->mColor == 1u;
+        if (leftBlack && rightBlack) {
+          sibling->mColor = 0u;
+          node = parent;
+          parent = node->mParent;
+          continue;
+        }
+
+        if (IsWeakEntitySentinelNode(sibling->mRight) || sibling->mRight->mColor == 1u) {
+          if (!IsWeakEntitySentinelNode(sibling->mLeft)) {
+            sibling->mLeft->mColor = 1u;
+          }
+          sibling->mColor = 0u;
+          RotateWeakEntityRight(selection, sibling);
+          sibling = parent->mRight;
+        }
+
+        sibling->mColor = parent->mColor;
+        parent->mColor = 1u;
+        if (!IsWeakEntitySentinelNode(sibling->mRight)) {
+          sibling->mRight->mColor = 1u;
+        }
+        RotateWeakEntityLeft(selection, parent);
+        node = head->mParent;
+        break;
+      }
+
+      SSelectionNodeUserEntity* sibling = parent->mLeft;
+      if (sibling == head) {
+        node = parent;
+        parent = node->mParent;
+        continue;
+      }
+      if (sibling->mColor == 0u) {
+        sibling->mColor = 1u;
+        parent->mColor = 0u;
+        RotateWeakEntityRight(selection, parent);
+        sibling = parent->mLeft;
+      }
+
+      const bool rightBlack = IsWeakEntitySentinelNode(sibling->mRight) || sibling->mRight->mColor == 1u;
+      const bool leftBlack = IsWeakEntitySentinelNode(sibling->mLeft) || sibling->mLeft->mColor == 1u;
+      if (rightBlack && leftBlack) {
+        sibling->mColor = 0u;
+        node = parent;
+        parent = node->mParent;
+        continue;
+      }
+
+      if (IsWeakEntitySentinelNode(sibling->mLeft) || sibling->mLeft->mColor == 1u) {
+        if (!IsWeakEntitySentinelNode(sibling->mRight)) {
+          sibling->mRight->mColor = 1u;
+        }
+        sibling->mColor = 0u;
+        RotateWeakEntityLeft(selection, sibling);
+        sibling = parent->mLeft;
+      }
+
+      sibling->mColor = parent->mColor;
+      parent->mColor = 1u;
+      if (!IsWeakEntitySentinelNode(sibling->mLeft)) {
+        sibling->mLeft->mColor = 1u;
+      }
+      RotateWeakEntityRight(selection, parent);
+      node = head->mParent;
+      break;
+    }
+
+    if (!IsWeakEntitySentinelNode(node)) {
+      node->mColor = 1u;
+    }
+  }
+
+  [[nodiscard]] SSelectionNodeUserEntity*
+  EraseWeakEntityNodeAndAdvance(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* const node) noexcept
+  {
+    if (selection.mHead == nullptr || IsWeakEntitySentinelNode(node)) {
+      return node;
+    }
+
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    SSelectionNodeUserEntity* const next = NextWeakEntityNode(node);
+    SSelectionNodeUserEntity* removed = node;
+    SSelectionNodeUserEntity* spliceTarget = node;
+    std::uint8_t removedColor = spliceTarget->mColor;
+    SSelectionNodeUserEntity* fixNode = head;
+    SSelectionNodeUserEntity* fixParent = head;
+
+    if (IsWeakEntitySentinelNode(node->mLeft)) {
+      fixNode = node->mRight;
+      fixParent = node->mParent;
+      ReplaceWeakEntitySubtree(selection, node, node->mRight);
+    } else if (IsWeakEntitySentinelNode(node->mRight)) {
+      fixNode = node->mLeft;
+      fixParent = node->mParent;
+      ReplaceWeakEntitySubtree(selection, node, node->mLeft);
+    } else {
+      spliceTarget = WeakEntitySelectionMin(node->mRight, head);
+      removedColor = spliceTarget->mColor;
+      fixNode = spliceTarget->mRight;
+      if (spliceTarget->mParent == node) {
+        fixParent = spliceTarget;
+        if (!IsWeakEntitySentinelNode(fixNode)) {
+          fixNode->mParent = spliceTarget;
+        }
+      } else {
+        fixParent = spliceTarget->mParent;
+        ReplaceWeakEntitySubtree(selection, spliceTarget, spliceTarget->mRight);
+        spliceTarget->mRight = node->mRight;
+        spliceTarget->mRight->mParent = spliceTarget;
+      }
+
+      ReplaceWeakEntitySubtree(selection, node, spliceTarget);
+      spliceTarget->mLeft = node->mLeft;
+      spliceTarget->mLeft->mParent = spliceTarget;
+      spliceTarget->mColor = node->mColor;
+    }
+
+    UnlinkWeakEntityOwner(removed->mEnt);
+    ::operator delete(removed);
+
+    if (selection.mSize > 0u) {
+      --selection.mSize;
+    }
+    if (removedColor == 1u) {
+      FixupWeakEntityErase(selection, fixNode, fixParent);
+    }
+
+    RecomputeWeakEntitySetExtrema(selection);
+    return next;
+  }
+
+  [[nodiscard]] bool InsertWeakEntitySet(SSelectionSetUserEntity& selection, UserEntity* const entity) noexcept
+  {
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    if (head == nullptr || entity == nullptr) {
+      return false;
+    }
+
+    const std::uint32_t key = WeakEntitySetKey(entity);
+    SSelectionNodeUserEntity* parent = head;
+    SSelectionNodeUserEntity* probe = head->mParent;
+    while (!IsWeakEntitySentinelNode(probe)) {
+      parent = probe;
+      if (key < probe->mKey) {
+        probe = probe->mLeft;
+      } else if (probe->mKey < key) {
+        probe = probe->mRight;
+      } else {
+        return false;
+      }
+    }
+
+    auto* const inserted = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
+    inserted->mLeft = head;
+    inserted->mRight = head;
+    inserted->mParent = parent;
+    inserted->mKey = key;
+    inserted->mColor = 0u;
+    inserted->mIsSentinel = 0u;
+    inserted->pad_1A[0] = 0u;
+    inserted->pad_1A[1] = 0u;
+    LinkWeakEntityOwner(entity, inserted->mEnt);
+
+    if (parent == head) {
+      head->mParent = inserted;
+    } else if (key < parent->mKey) {
+      parent->mLeft = inserted;
+    } else {
+      parent->mRight = inserted;
+    }
+
+    ++selection.mSize;
+    FixupWeakEntityInsert(selection, inserted);
+    RecomputeWeakEntitySetExtrema(selection);
+    return true;
+  }
+
+  [[nodiscard]] bool EraseWeakEntitySet(SSelectionSetUserEntity& selection, UserEntity* const entity) noexcept
+  {
+    if (selection.mHead == nullptr || entity == nullptr) {
+      return false;
+    }
+
+    SSelectionNodeUserEntity* const node = FindWeakEntitySetNodeByKey(selection, WeakEntitySetKey(entity));
+    if (node == nullptr || node == selection.mHead) {
+      return false;
+    }
+
+    (void)EraseWeakEntityNodeAndAdvance(selection, node);
+    return true;
+  }
+
+  [[nodiscard]] bool IsUserCommandManagerQueueEmpty(const UserUnitManager* const manager) noexcept
+  {
+    const UserCommandQueueRangeView* const queueRange =
+      ResolveUserCommandQueueRange(EncodeUserCommandManagerHandle(manager));
+    return queueRange == nullptr || queueRange->begin == queueRange->end;
+  }
+
+  void UnlinkResolvedQueueOwnerLinks(
+    UserCommandQueueEntryView* const begin, UserCommandQueueEntryView* const end
+  ) noexcept
+  {
+    for (UserCommandQueueEntryView* cursor = begin; cursor != end; ++cursor) {
+      auto* ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(cursor->helper);
+      if (ownerLink == nullptr) {
+        continue;
+      }
+
+      while (*ownerLink != nullptr && *ownerLink != cursor) {
+        ownerLink = reinterpret_cast<UserCommandQueueEntryView**>(&(*ownerLink)->link);
+      }
+      if (*ownerLink == cursor) {
+        *ownerLink = reinterpret_cast<UserCommandQueueEntryView*>(cursor->link);
+      }
+    }
+  }
+
+  void AdvanceUserCommandManagerBySeq(UserUnitManager* const managerPtr, const std::int32_t seqNo) noexcept
+  {
+    auto* const manager = reinterpret_cast<UserCommandManagerRuntimeView*>(managerPtr);
+    if (manager == nullptr) {
+      return;
+    }
+
+    while (manager->pendingIssueCount != 0u) {
+      std::uint32_t queueIndex = manager->pendingCursor;
+      if (manager->pendingSlotCount <= queueIndex) {
+        queueIndex -= manager->pendingSlotCount;
+      }
+
+      const UserCommandManagerPendingSlotView* const slot = manager->pendingIssueSlots[queueIndex];
+      if (slot == nullptr || (slot->dueSeqNo - seqNo) > 0) {
+        break;
+      }
+
+      manager->pendingCursor += 1u;
+      if (manager->pendingSlotCount <= manager->pendingCursor) {
+        manager->pendingCursor = 0u;
+      }
+
+      manager->pendingIssueCount -= 1u;
+      if (manager->pendingIssueCount == 0u) {
+        manager->pendingCursor = 0u;
+      }
+      manager->resolvedRangeDirty = 1u;
+    }
+
+    if (manager->resolvedRangeDirty == 0u) {
+      return;
+    }
+
+    UnlinkResolvedQueueOwnerLinks(manager->resolvedRange.begin, manager->resolvedRange.end);
+    if (manager->resolvedRange.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager->resolvedRangeInlineStorage)) {
+      ::operator delete[](manager->resolvedRange.begin);
+      manager->resolvedRange.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager->resolvedRangeInlineStorage);
+      manager->resolvedRangeEndStorage = manager->resolvedRangeInlineStorage != nullptr
+        ? *manager->resolvedRangeInlineStorage
+        : nullptr;
+    }
+    manager->resolvedRange.end = manager->resolvedRange.begin;
   }
 
   [[nodiscard]] UserEntity* DecodeWeakOwnerUserEntity(const UserEntityWeakLinkView& weakEntityLink) noexcept
@@ -857,16 +1482,23 @@ namespace
     return entityView != nullptr && entityView->IsInCategory(category);
   }
 
+  [[nodiscard]] bool CanReuseSharedPoseForSkeleton(
+    const boost::shared_ptr<CAniPose>& sharedPose,
+    const boost::shared_ptr<const CAniSkel>& skeleton
+  )
+  {
+    if (!sharedPose || !skeleton) {
+      return false;
+    }
+
+    return sharedPose->GetSkeleton().get() == skeleton.get();
+  }
+
   [[nodiscard]] float PlanarDistanceXZ(const Wm3::Vector3<float>& from, const Wm3::Vector3<float>& to) noexcept
   {
     const float dx = to.x - from.x;
     const float dz = to.z - from.z;
     return std::sqrt((dx * dx) + (dz * dz));
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   [[nodiscard]] UserEntity* ResolveUserEntityView(UserUnit* const userUnit) noexcept
@@ -1040,19 +1672,9 @@ namespace
     return static_cast<UserUnit*>(upcast.mObj);
   }
 
-  [[nodiscard]] CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "user") == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
       return *set;
     }
 
@@ -1081,6 +1703,228 @@ CScrLuaMetatableFactory<UserUnit>& CScrLuaMetatableFactory<UserUnit>::Instance()
 LuaPlus::LuaObject CScrLuaMetatableFactory<UserUnit>::Create(LuaPlus::LuaState* const state)
 {
   return SCR_CreateSimpleMetatable(state);
+}
+
+/**
+ * Address: 0x008BF990 (FUN_008BF990)
+ *
+ * std::uint8_t deleteFlags
+ *
+ * What it does:
+ * Performs deleting-style user-unit teardown, clears user-unit-local runtime
+ * ownership lanes, and conditionally releases object memory.
+ */
+UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
+{
+  UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
+  UserArmy* const army = GetLuaRuntimeView(this).army;
+  const IUnit* const iunitBridge = GetIUnitBridge(this);
+
+  if (army != nullptr && iunitBridge != nullptr) {
+    auto& idleSets = GetUserArmyIdleSetView(army);
+    const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
+    if (blueprint != nullptr && blueprint->General.QuickSelectPriority <= 0) {
+      if (mQueueEmptyCached) {
+        if (mIsFactory) {
+          (void)EraseWeakEntitySet(idleSets.factories, entityView);
+        }
+        if (mIsEngineer) {
+          (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+        }
+      }
+    } else {
+      (void)EraseWeakEntitySet(idleSets.factories, entityView);
+      (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+    }
+  }
+
+  mSelectionSets.clear();
+
+  if (mFactoryManager != nullptr) {
+    AdvanceUserCommandManagerBySeq(mFactoryManager, std::numeric_limits<std::int32_t>::max());
+    ::operator delete(mFactoryManager);
+    mFactoryManager = nullptr;
+  }
+  if (mManager != nullptr) {
+    AdvanceUserCommandManagerBySeq(mManager, std::numeric_limits<std::int32_t>::max());
+    ::operator delete(mManager);
+    mManager = nullptr;
+  }
+
+  if (VisionDB::Handle* const handle = GetUserUnitVisionHandle(this); handle != nullptr) {
+    delete handle;
+    GetUserUnitVisionHandle(this) = nullptr;
+  }
+
+  entityView->UserEntity::~UserEntity();
+  if ((deleteFlags & 1u) != 0u) {
+    ::operator delete(this);
+  }
+  return this;
+}
+
+/**
+ * Address: 0x008C09B0 (FUN_008C09B0, moho::UserUnit::UpdateVisibility)
+ *
+ * What it does:
+ * Updates mesh hidden-state from replicated visibility mode/intel bits and
+ * toggles mesh-pose lock lane for non-mobile units in recon-grid mode.
+ */
+void UserUnit::UpdateVisibility()
+{
+  UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
+  MeshInstance* const meshInstance = entityView->mMeshInstance;
+  if (meshInstance == nullptr) {
+    return;
+  }
+
+  switch (entityView->mVariableData.mVisibilityMode) {
+  case EUserEntityVisibilityMode::Hidden:
+    meshInstance->isHidden = 1u;
+    break;
+  case EUserEntityVisibilityMode::MapPlayableRect:
+    meshInstance->isHidden = 0u;
+    break;
+  case EUserEntityVisibilityMode::ReconGrid:
+    if (GetIUnitBridge(this)->IsMobile()) {
+      meshInstance->isHidden = ((mIntelStateFlags & 0x08u) == 0u) ? 1u : 0u;
+      return;
+    }
+
+    meshInstance->isHidden = ((mIntelStateFlags & 0x10u) == 0u) ? 1u : 0u;
+    meshInstance->isLocked = ((mIntelStateFlags & 0x08u) == 0u) ? 1u : 0u;
+    if (meshInstance->isLocked == 0u) {
+      meshInstance->frameCounter = static_cast<std::int8_t>(MeshInstance::sFrameCounter);
+      meshInstance->currInterpolant = -1.0f;
+    }
+    break;
+  }
+}
+
+/**
+ * Address: 0x008C0A30 (FUN_008C0A30, moho::UserUnit::Tick)
+ *
+ * What it does:
+ * Advances command-manager queue state, updates idle engineer/factory weak-set
+ * membership, and maintains the vision-handle lane for fog/recon tracking.
+ */
+void UserUnit::Tick(const std::int32_t seqNo)
+{
+  AdvanceUserCommandManagerBySeq(mManager, seqNo);
+  if (mFactoryManager != nullptr) {
+    AdvanceUserCommandManagerBySeq(mFactoryManager, seqNo);
+  }
+
+  if (IsBeingBuilt()) {
+    return;
+  }
+
+  UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
+  const IUnit* const iunitBridge = GetIUnitBridge(this);
+  UserArmy* const army = GetLuaRuntimeView(this).army;
+  if (iunitBridge->IsDead()) {
+    if (army != nullptr) {
+      auto& idleSets = GetUserArmyIdleSetView(army);
+      const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
+      if (blueprint != nullptr && blueprint->General.QuickSelectPriority <= 0) {
+        if (mQueueEmptyCached) {
+          if (mIsFactory) {
+            (void)EraseWeakEntitySet(idleSets.factories, entityView);
+          }
+          if (mIsEngineer) {
+            (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+          }
+        }
+      } else {
+        (void)EraseWeakEntitySet(idleSets.factories, entityView);
+        (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+      }
+    }
+
+    if (VisionDB::Handle* const handle = GetUserUnitVisionHandle(this); handle != nullptr) {
+      delete handle;
+      GetUserUnitVisionHandle(this) = nullptr;
+    }
+    return;
+  }
+
+  const bool isQueueEmpty = GetLuaRuntimeView(this).isBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);
+  if (isQueueEmpty != mQueueEmptyCached) {
+    if (army != nullptr) {
+      auto& idleSets = GetUserArmyIdleSetView(army);
+      if (mIsEngineer) {
+        if (isQueueEmpty) {
+          (void)InsertWeakEntitySet(idleSets.engineers, entityView);
+        } else {
+          (void)EraseWeakEntitySet(idleSets.engineers, entityView);
+        }
+      }
+      if (mIsFactory) {
+        if (isQueueEmpty) {
+          (void)InsertWeakEntitySet(idleSets.factories, entityView);
+        } else {
+          (void)EraseWeakEntitySet(idleSets.factories, entityView);
+        }
+      }
+    }
+    mQueueEmptyCached = isQueueEmpty;
+  }
+
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return;
+  }
+
+  const std::uint32_t visionRange = GetIntelRangeMagnitude(this, UserUnitIntelLane::None);
+  VisionDB::Handle*& visionHandle = GetUserUnitVisionHandle(this);
+  if (visionRange != 0u && visionHandle == nullptr && !mIsFake) {
+    const Wm3::Vector2f zero(0.0f, 0.0f);
+    struct SessionVisionRuntimeView
+    {
+      std::uint8_t pad_0000_03C8[0x3C8];
+      VisionDB visionDb; // +0x3C8
+    };
+    static_assert(
+      offsetof(SessionVisionRuntimeView, visionDb) == 0x3C8,
+      "SessionVisionRuntimeView::visionDb offset must be 0x3C8"
+    );
+    VisionDB& visionDb = reinterpret_cast<SessionVisionRuntimeView*>(session)->visionDb;
+    visionHandle = visionDb.NewHandle(zero, zero);
+  }
+
+  if (visionHandle == nullptr) {
+    return;
+  }
+
+  if (mIsFake) {
+    delete visionHandle;
+    visionHandle = nullptr;
+    return;
+  }
+
+  bool isAlly = false;
+  const UserArmy* const focusArmy = session->GetFocusUserArmy();
+  if (focusArmy != nullptr && army != nullptr) {
+    isAlly = focusArmy->IsAlly(army->mArmyIndex);
+  }
+
+  const Wm3::Vector2f currentPos(entityView->mVariableData.mCurTransform.pos_.x, entityView->mVariableData.mCurTransform.pos_.z);
+  const Wm3::Vector2f previousPos(
+    entityView->mVariableData.mLastTransform.pos_.x, entityView->mVariableData.mLastTransform.pos_.z
+  );
+  visionHandle->Update(currentPos, previousPos, static_cast<float>(visionRange), isAlly);
+}
+
+/**
+ * Address: 0x008B8EB0 (FUN_008B8EB0, ?UpdateEntityData@UserEntity@Moho@@UAEXABUSSTIEntityVariableData@2@@Z)
+ *
+ * What it does:
+ * For UserUnit instances, forwards replicated variable-data updates to the
+ * shared UserEntity implementation for mesh/visibility/vision refresh.
+ */
+void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
+{
+  reinterpret_cast<UserEntity*>(this)->UserEntity::UpdateEntityData(variableData);
 }
 
 /**
@@ -1127,7 +1971,7 @@ float UserUnit::GetUnitformScale() const
  */
 std::int32_t UserUnit::GetCommandQueue1()
 {
-  return mCommandQueueHandle;
+  return EncodeUserCommandManagerHandle(mManager);
 }
 
 /**
@@ -1138,7 +1982,7 @@ std::int32_t UserUnit::GetCommandQueue1()
  */
 std::int32_t UserUnit::GetCommandQueue2() const
 {
-  return mCommandQueueHandle;
+  return EncodeUserCommandManagerHandle(mManager);
 }
 
 /**
@@ -1149,7 +1993,7 @@ std::int32_t UserUnit::GetCommandQueue2() const
  */
 std::int32_t UserUnit::GetFactoryCommandQueue1()
 {
-  return mFactoryCommandQueueHandle;
+  return EncodeUserCommandManagerHandle(mFactoryManager);
 }
 
 /**
@@ -1160,7 +2004,7 @@ std::int32_t UserUnit::GetFactoryCommandQueue1()
  */
 std::int32_t UserUnit::GetFactoryCommandQueue2() const
 {
-  return mFactoryCommandQueueHandle;
+  return EncodeUserCommandManagerHandle(mFactoryManager);
 }
 
 /**
@@ -1183,6 +2027,165 @@ bool UserUnit::RequiresUIRefresh() const
 bool UserUnit::IsBeingBuilt() const
 {
   return GetUiFlagView(this).isBeingBuilt != 0;
+}
+
+/**
+ * Address: 0x008C0500 (FUN_008C0500, moho::UserUnit::Select)
+ *
+ * What it does:
+ * Evaluates whether this user unit is currently selectable by UI selectors.
+ */
+bool UserUnit::Select()
+{
+  const IUnit* const iunitBridge = GetIUnitBridge(this);
+  if (iunitBridge == nullptr || !mSelectableOverride || !iunitBridge->IsMobile()) {
+    return false;
+  }
+
+  const UserEntity* const entityView = reinterpret_cast<const UserEntity*>(this);
+  if (entityView == nullptr) {
+    return false;
+  }
+
+  const msvc8::string podCategory("POD", 3u);
+  if (entityView->IsInCategory(podCategory)) {
+    return false;
+  }
+
+  if (iunitBridge->IsUnitState(UNITSTATE_UnSelectable)) {
+    return false;
+  }
+
+  if (iunitBridge->IsDead()) {
+    return false;
+  }
+
+  if (IsBeingBuilt()) {
+    const msvc8::string factoryCategory("FACTORY", 7u);
+    if (!entityView->IsInCategory(factoryCategory)) {
+      return false;
+    }
+  }
+
+  const msvc8::string selectableCategory("SELECTABLE", 10u);
+  return entityView->IsInCategory(selectableCategory);
+}
+
+/**
+ * Address: 0x008C1350 (FUN_008C1350, moho::UserUnit::NotifyFocusArmyUnitDamaged)
+ *
+ * What it does:
+ * Imports the game-main Lua module and calls
+ * `OnFocusArmyUnitDamaged` with this unit's Lua object.
+ */
+void UserUnit::NotifyFocusArmyUnitDamaged()
+{
+  CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr) {
+    return;
+  }
+
+  LuaPlus::LuaObject gameMainModule = SCR_Import(session->mState, "/lua/ui/game/gamemain.lua");
+  LuaPlus::LuaObject onFocusArmyUnitDamaged = gameMainModule["OnFocusArmyUnitDamaged"];
+  LuaPlus::LuaFunction callback(onFocusArmyUnitDamaged);
+
+  IUnit* const iunitBridge = GetIUnitBridge(this);
+  const LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
+  callback.Call_Object(unitObject);
+}
+
+/**
+ * Address: 0x008C00E0 (FUN_008C00E0, moho::UserUnit::CreateMeshInstance)
+ *
+ * What it does:
+ * Creates the unit mesh instance, applies team-color lookup parameter, and
+ * wires animation poses from shared unit pose lanes when skeletons match.
+ */
+void UserUnit::CreateMeshInstance()
+{
+  UserEntity* const entityView = ResolveUserEntityView(this);
+  if (entityView == nullptr || entityView->mSession == nullptr) {
+    return;
+  }
+
+  const IUnit* const iunitBridge = GetIUnitBridge(this);
+  const Unit* const unitView = iunitBridge ? iunitBridge->IsUnit() : nullptr;
+  const SSTIUnitVariableData* const unitVarDat = unitView ? &unitView->VarDat() : nullptr;
+
+  const UserArmy* const army = entityView->mArmy;
+  const std::int32_t playerColor = army ? static_cast<std::int32_t>(army->mVarDat.mPlayerColorBgra) : -1;
+  const std::int32_t colorIndex = army ? func_GetColorIndex(playerColor) : 0;
+
+  const float uniformScale = GetUnitformScale();
+  const Wm3::Vec3f uniformMeshScale{uniformScale, uniformScale, uniformScale};
+
+  entityView->mMeshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
+    entityView->mSession->mGameTick,
+    playerColor,
+    static_cast<const RMeshBlueprint*>(entityView->mVariableData.mMeshBlueprint),
+    uniformMeshScale,
+    true,
+    boost::shared_ptr<MeshMaterial>{}
+  );
+
+  if (entityView->mMeshInstance == nullptr) {
+    entityView->mPosePrimary.reset();
+    entityView->mPoseSecondary.reset();
+    return;
+  }
+
+  std::uint32_t teamColorLookupCount = GetPlayerColorCount();
+  if (teamColorLookupCount == 0u) {
+    teamColorLookupCount = 1u;
+  }
+
+  const float lookupCount = static_cast<float>(teamColorLookupCount);
+  float clampedColorIndex = static_cast<float>(colorIndex);
+  const float maxColorIndex = lookupCount - 1.0f;
+  if (clampedColorIndex > maxColorIndex) {
+    clampedColorIndex = maxColorIndex;
+  }
+  if (clampedColorIndex < 0.0f) {
+    clampedColorIndex = 0.0f;
+  }
+  entityView->mMeshInstance->meshColor = (clampedColorIndex + 0.5f) / lookupCount;
+
+  const boost::shared_ptr<Mesh> mesh = entityView->mMeshInstance->GetMesh();
+  const boost::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : boost::shared_ptr<RScmResource>{};
+  const boost::shared_ptr<const CAniSkel> skeleton = resource ? resource->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+
+  const boost::shared_ptr<CAniPose> priorSharedPose =
+    unitVarDat ? unitVarDat->mPriorSharedPose : boost::shared_ptr<CAniPose>{};
+  if (CanReuseSharedPoseForSkeleton(priorSharedPose, skeleton)) {
+    entityView->mPosePrimary = priorSharedPose;
+  } else {
+    entityView->mPosePrimary.reset(new CAniPose(skeleton, uniformScale));
+    if (entityView->mPosePrimary) {
+      entityView->mPosePrimary->mLocalTransform = entityView->mVariableData.mLastTransform;
+    }
+  }
+
+  const boost::shared_ptr<CAniPose> sharedPose = unitVarDat ? unitVarDat->mSharedPose : boost::shared_ptr<CAniPose>{};
+  if (CanReuseSharedPoseForSkeleton(sharedPose, skeleton)) {
+    entityView->mPoseSecondary = sharedPose;
+  } else {
+    entityView->mPoseSecondary.reset(new CAniPose(skeleton, uniformScale));
+    if (entityView->mPoseSecondary) {
+      entityView->mPoseSecondary->mLocalTransform = entityView->mVariableData.mCurTransform;
+    }
+  }
+}
+
+/**
+ * Address: 0x008C04D0 (FUN_008C04D0, j_?DestroyMeshInstance@UserEntity@Moho@@MAEXXZ)
+ *
+ * What it does:
+ * Forwards user-unit mesh teardown to the base `UserEntity` destroy path.
+ */
+void UserUnit::DestroyMeshInstance()
+{
+  auto* const entityView = reinterpret_cast<UserEntity*>(this);
+  entityView->UserEntity::DestroyMeshInstance();
 }
 
 /**
@@ -1576,7 +2579,7 @@ bool moho::USERUNIT_WithinBuildDistance(
  */
 int moho::cfunc_UserUnitCanAttackTarget(lua_State* const luaContext)
 {
-  return cfunc_UserUnitCanAttackTargetL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitCanAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1635,7 +2638,7 @@ int moho::cfunc_UserUnitCanAttackTargetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetFootPrintSize(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetFootPrintSizeL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetFootPrintSizeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1690,7 +2693,7 @@ int moho::cfunc_UserUnitGetFootPrintSizeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetUnitId(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetUnitIdL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetUnitIdL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1742,7 +2745,7 @@ int moho::cfunc_UserUnitGetUnitIdL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetBlueprint(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetBlueprintL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetBlueprintL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1794,7 +2797,7 @@ int moho::cfunc_UserUnitGetBlueprintL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsAutoMode(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsAutoModeL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsAutoModeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1846,7 +2849,7 @@ int moho::cfunc_UserUnitIsAutoModeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsAutoSurfaceMode(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsAutoSurfaceModeL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsAutoSurfaceModeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1897,7 +2900,7 @@ int moho::cfunc_UserUnitIsAutoSurfaceModeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsRepeatQueue(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsRepeatQueueL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsRepeatQueueL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1948,7 +2951,7 @@ int moho::cfunc_UserUnitIsRepeatQueueL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetEntityId(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetEntityIdL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetEntityIdL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2005,7 +3008,7 @@ int moho::cfunc_UserUnitGetEntityIdL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitHasUnloadCommandQueuedUp(lua_State* const luaContext)
 {
-  return cfunc_UserUnitHasUnloadCommandQueuedUpL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitHasUnloadCommandQueuedUpL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2062,7 +3065,7 @@ int moho::cfunc_UserUnitHasUnloadCommandQueuedUpL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_UserUnitProcessInfo(lua_State* const luaContext)
 {
-  return cfunc_UserUnitProcessInfoL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitProcessInfoL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2137,7 +3140,7 @@ int moho::cfunc_UserUnitProcessInfoL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitSetCustomName(lua_State* const luaContext)
 {
-  return cfunc_UserUnitSetCustomNameL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitSetCustomNameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2208,7 +3211,7 @@ int moho::cfunc_UserUnitSetCustomNameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitAddSelectionSet(lua_State* const luaContext)
 {
-  return cfunc_UserUnitAddSelectionSetL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitAddSelectionSetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2271,7 +3274,7 @@ int moho::cfunc_UserUnitAddSelectionSetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitRemoveSelectionSet(lua_State* const luaContext)
 {
-  return cfunc_UserUnitRemoveSelectionSetL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitRemoveSelectionSetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2334,7 +3337,7 @@ int moho::cfunc_UserUnitRemoveSelectionSetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetSelectionSets(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetSelectionSetsL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetSelectionSetsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2400,7 +3403,7 @@ int moho::cfunc_UserUnitGetSelectionSetsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsInCategory(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsInCategoryL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsInCategoryL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2463,7 +3466,7 @@ int moho::cfunc_UserUnitIsInCategoryL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetHealth(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetHealthL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetHealthL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2515,7 +3518,7 @@ int moho::cfunc_UserUnitGetHealthL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetMaxHealth(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetMaxHealthL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetMaxHealthL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2567,7 +3570,7 @@ int moho::cfunc_UserUnitGetMaxHealthL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetBuildRate(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetBuildRateL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetBuildRateL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2620,7 +3623,7 @@ int moho::cfunc_UserUnitGetBuildRateL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsOverchargePaused(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsOverchargePausedL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsOverchargePausedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2671,7 +3674,7 @@ int moho::cfunc_UserUnitIsOverchargePausedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsDead(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsDeadL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsDeadL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2723,7 +3726,7 @@ int moho::cfunc_UserUnitIsDeadL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetFuelRatio(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetFuelRatioL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetFuelRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2774,7 +3777,7 @@ int moho::cfunc_UserUnitGetFuelRatioL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetShieldRatio(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetShieldRatioL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetShieldRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2825,7 +3828,7 @@ int moho::cfunc_UserUnitGetShieldRatioL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetWorkProgress(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetWorkProgressL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetWorkProgressL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2876,7 +3879,7 @@ int moho::cfunc_UserUnitGetWorkProgressL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetStat(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetStatL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetStatL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -2978,7 +3981,7 @@ int moho::cfunc_UserUnitGetStatL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsStunned(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsStunnedL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsStunnedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3029,7 +4032,7 @@ int moho::cfunc_UserUnitIsStunnedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetCustomName(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetCustomNameL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetCustomNameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3089,7 +4092,7 @@ int moho::cfunc_UserUnitGetCustomNameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitHasSelectionSet(lua_State* const luaContext)
 {
-  return cfunc_UserUnitHasSelectionSetL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitHasSelectionSetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3153,7 +4156,7 @@ int moho::cfunc_UserUnitHasSelectionSetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitIsIdle(lua_State* const luaContext)
 {
-  return cfunc_UserUnitIsIdleL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitIsIdleL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3213,7 +4216,7 @@ int moho::cfunc_UserUnitIsIdleL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetFocus(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetFocusL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetFocusL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3280,7 +4283,7 @@ int moho::cfunc_UserUnitGetFocusL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetGuardedEntity(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetGuardedEntityL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetGuardedEntityL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3347,7 +4350,7 @@ int moho::cfunc_UserUnitGetGuardedEntityL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetCreator(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetCreatorL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetCreatorL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3415,7 +4418,7 @@ int moho::cfunc_UserUnitGetCreatorL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetPosition(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetPositionL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3468,7 +4471,7 @@ int moho::cfunc_UserUnitGetPositionL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetArmy(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetArmyL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetArmyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3528,7 +4531,7 @@ int moho::cfunc_UserUnitGetArmyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetEconData(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetEconDataL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetEconDataL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3589,7 +4592,7 @@ int moho::cfunc_UserUnitGetEconDataL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetCommandQueue(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetCommandQueueL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetCommandQueueL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3678,7 +4681,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_UserUnitGetMissileInfo(lua_State* const luaContext)
 {
-  return cfunc_UserUnitGetMissileInfoL(ResolveBindingState(luaContext));
+  return cfunc_UserUnitGetMissileInfoL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3739,7 +4742,7 @@ int moho::cfunc_UserUnitGetMissileInfoL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetCurrentFactoryForQueueDisplay(lua_State* const luaContext)
 {
-  return cfunc_SetCurrentFactoryForQueueDisplayL(ResolveBindingState(luaContext));
+  return cfunc_SetCurrentFactoryForQueueDisplayL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -3800,7 +4803,7 @@ int moho::cfunc_SetCurrentFactoryForQueueDisplayL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_GetBlueprintUser(lua_State* const luaContext)
 {
-  return cfunc_GetBlueprintUserL(ResolveBindingState(luaContext));
+  return cfunc_GetBlueprintUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

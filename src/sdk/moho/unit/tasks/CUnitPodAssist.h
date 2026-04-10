@@ -26,6 +26,16 @@ namespace moho
      */
     explicit CUnitPodAssist(CCommandTask* dispatchTask);
 
+    /**
+     * Address: 0x0061D7D0 (FUN_0061D7D0, Moho::CUnitPodAssist::operator new)
+     *
+     * What it does:
+     * Allocates one pod-assist task and runs the dispatch-bound constructor.
+     */
+    [[nodiscard]] static CUnitPodAssist* Create(CCommandTask* dispatchTask);
+
+    int Execute() override;
+
   public:
     CCommandTask* mDispatchTask;   // 0x30
     WeakPtr<Unit> mAssistTarget;   // 0x34
@@ -35,4 +45,3 @@ namespace moho
   static_assert(offsetof(CUnitPodAssist, mDispatchTask) == 0x30, "CUnitPodAssist::mDispatchTask offset must be 0x30");
   static_assert(offsetof(CUnitPodAssist, mAssistTarget) == 0x34, "CUnitPodAssist::mAssistTarget offset must be 0x34");
 } // namespace moho
-

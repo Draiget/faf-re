@@ -10,6 +10,7 @@
 #include "lua/LuaObject.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/REntityBlueprint.h"
 
@@ -37,25 +38,9 @@ namespace
     return kNullOwner;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindCoreLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "core") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindCoreLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("core"); set != nullptr) {
       return *set;
     }
 
@@ -84,31 +69,6 @@ namespace
     {}
   };
   static_assert(sizeof(EntityCategoryLuaMetatableFactory) == 0x8, "EntityCategoryLuaMetatableFactory size must be 0x8");
-
-  [[nodiscard]] LuaPlus::LuaObject GetLuaTableFieldByName(
-    const LuaPlus::LuaObject& tableObject,
-    const char* const fieldName
-  )
-  {
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (state == nullptr) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (lstate == nullptr) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName != nullptr ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
-  }
 
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
@@ -253,7 +213,7 @@ namespace moho
   {
     LuaPlus::LuaObject payload(valueObject);
     if (payload.IsTable()) {
-      payload = GetLuaTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     const gpg::RRef userDataRef = ExtractLuaUserDataRef(payload);
@@ -333,7 +293,7 @@ namespace moho
    */
   int cfunc_EntityCategory__add(lua_State* const luaContext)
   {
-    return cfunc_EntityCategory__addL(ResolveBindingState(luaContext));
+    return cfunc_EntityCategory__addL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -390,7 +350,7 @@ namespace moho
    */
   int cfunc_EntityCategory__sub(lua_State* const luaContext)
   {
-    return cfunc_EntityCategory__subL(ResolveBindingState(luaContext));
+    return cfunc_EntityCategory__subL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -447,7 +407,7 @@ namespace moho
    */
   int cfunc_EntityCategory__mul(lua_State* const luaContext)
   {
-    return cfunc_EntityCategory__mulL(ResolveBindingState(luaContext));
+    return cfunc_EntityCategory__mulL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -508,7 +468,7 @@ namespace moho
    */
   int cfunc_EntityCategoryEmpty(lua_State* const luaContext)
   {
-    return cfunc_EntityCategoryEmptyL(ResolveBindingState(luaContext));
+    return cfunc_EntityCategoryEmptyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -571,7 +531,7 @@ namespace moho
    */
   int cfunc_SecondsPerTick(lua_State* const luaContext)
   {
-    return cfunc_SecondsPerTickL(ResolveBindingState(luaContext));
+    return cfunc_SecondsPerTickL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

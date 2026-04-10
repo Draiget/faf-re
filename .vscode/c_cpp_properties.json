@@ -5,7 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/src/sdk",
                 "${workspaceFolder}/dependencies/zlib-1.2.3/include",
-                "${workspaceFolder}/dependencies/lua-lang/include",
+                "${workspaceFolder}/dependencies/LuaPlus_Build1081/Src/LuaPlus/include",
                 "${workspaceFolder}/**",
                 "${vcpkgRoot}/x86-windows/include"
             ],

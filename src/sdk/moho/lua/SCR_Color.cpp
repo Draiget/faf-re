@@ -183,11 +183,6 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   [[nodiscard]] const ColorNameMap& GetColorNameMap()
   {
     static const ColorNameMap sColorMap = [] {
@@ -321,7 +316,7 @@ LuaPlus::LuaObject moho::SCR_EncodeColor(LuaPlus::LuaState* const state, const s
  */
 int moho::cfunc_EnumColorNames(lua_State* const luaContext)
 {
-  return cfunc_EnumColorNamesL(ResolveBindingState(luaContext));
+  return cfunc_EnumColorNamesL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

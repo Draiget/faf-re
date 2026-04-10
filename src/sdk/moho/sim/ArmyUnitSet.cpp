@@ -1,6 +1,7 @@
 #include "moho/sim/ArmyUnitSet.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 
 #include "moho/entity/Entity.h"
@@ -25,7 +26,66 @@ namespace moho
       return static_cast<std::uint32_t>(entity->id_);
     }
 
+    /**
+     * Address: 0x0057D3F0 (FUN_0057D3F0, gpg::fastvector_n4_Entity::cpy)
+     *
+     * What it does:
+     * Rebinds one destination inline fast-vector lane and copies all entity
+     * entries from `source`.
+     */
+    void CopyEntityInlineVector(
+      const gpg::fastvector_n<Entity*, 4>& source,
+      gpg::fastvector_n<Entity*, 4>& destination
+    )
+    {
+      destination.ResetStorageToInline();
+      destination.reserve(source.size());
+      for (Entity* const entity : source) {
+        destination.push_back(entity);
+      }
+    }
+
+    /**
+     * Address: 0x005E8900 (FUN_005E8900, erase-and-return-cursor helper)
+     *
+     * What it does:
+     * Erases one slot from the sorted entity vector and returns the stable
+     * post-erase cursor position.
+     */
+    [[nodiscard]] Entity** EraseEntityVectorSlotAndReturnCursor(
+      gpg::fastvector_n<Entity*, 4>& entities,
+      Entity** const slot
+    )
+    {
+      Entity** const begin = entities.begin();
+      Entity** const end = entities.end();
+      if (slot == nullptr || slot < begin || slot >= end) {
+        return end;
+      }
+
+      const std::ptrdiff_t erasedIndex = slot - begin;
+      (void)entities.erase(slot);
+      Entity** const newBegin = entities.begin();
+      Entity** const newEnd = entities.end();
+      Entity** const newCursor = newBegin + erasedIndex;
+      return (newCursor <= newEnd) ? newCursor : newEnd;
+    }
+
   } // namespace
+
+  /**
+   * Address: 0x00579500 (FUN_00579500, copy-construct lane)
+   *
+   * What it does:
+   * Resets intrusive links to singleton state and copies entity-set storage
+   * from `other`.
+   */
+  SEntitySetTemplateUnit::SEntitySetTemplateUnit(const SEntitySetTemplateUnit& other)
+    : TDatList<SEntitySetTemplateUnit, void>()
+    , mVec()
+  {
+    CopyEntityInlineVector(other.mVec, mVec);
+  }
 
   Unit* SEntitySetTemplateUnit::UnitFromEntry(Entity* const entity) noexcept
   {
@@ -154,7 +214,39 @@ namespace moho
       return false;
     }
 
-    (void)mVec.erase(it);
+    (void)EraseEntityVectorSlotAndReturnCursor(mVec, it);
+    return true;
+  }
+
+  /**
+   * Address: 0x006EEC40 (FUN_006EEC40, Moho::EntitySetTemplate_Entity::Same)
+   *
+   * What it does:
+   * Compares two sorted entity-set storages for exact membership equality by
+   * lower-bound lookup and exact pointer identity match.
+   */
+  bool SEntitySetTemplateUnit::Same(const SEntitySetTemplateUnit& other) const noexcept
+  {
+    const Entity* const* const lhsBegin = mVec.begin();
+    const Entity* const* const lhsEnd = mVec.end();
+    const Entity* const* const rhsBegin = other.mVec.begin();
+    const Entity* const* const rhsEnd = other.mVec.end();
+
+    if ((lhsEnd - lhsBegin) != (rhsEnd - rhsBegin)) {
+      return false;
+    }
+
+    for (const Entity* const* it = lhsBegin; it != lhsEnd; ++it) {
+      const std::uint32_t key = EntitySetSortKey(*it);
+      const Entity* const* const found =
+        std::lower_bound(rhsBegin, rhsEnd, key, [](const Entity* const candidate, const std::uint32_t targetId) {
+          return EntitySetSortKey(candidate) < targetId;
+        });
+      if (found == rhsEnd || *found != *it) {
+        return false;
+      }
+    }
+
     return true;
   }
 

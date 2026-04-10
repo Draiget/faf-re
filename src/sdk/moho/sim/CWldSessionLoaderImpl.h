@@ -20,7 +20,7 @@ namespace moho
     /**
      * Address: 0x00885890 (FUN_00885890, ?SetCreated@CWldSessionLoaderImpl@Moho@@UAEXXZ)
      */
-    virtual void SetCreated() = 0;
+    virtual void SetCreated();
 
     /**
      * Address: 0x008858A0 (FUN_008858A0, ?GetScenarioInfo@CWldSessionLoaderImpl@Moho@@...)
@@ -28,22 +28,22 @@ namespace moho
      * What it does:
      * Reorders requested scenario into MRU position and optionally marks it as active game-data source.
      */
-    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData) = 0;
+    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData);
 
     /**
      * Address: 0x00885920 (FUN_00885920, ?CreateScenarioInfo@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods) = 0;
+    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods);
 
     /**
      * Address: 0x00885970 (FUN_00885970, ?IsLoaded@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual bool IsLoaded() = 0;
+    virtual bool IsLoaded();
 
     /**
      * Address: 0x008859B0 (FUN_008859B0, ?LoadGameData@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual SWldGameData* LoadGameData(SWldGameData* outData) = 0;
+    virtual SWldGameData* LoadGameData(SWldGameData* outData);
 
     /**
      * Address: 0x00885AD0 (FUN_00885AD0, ?Func5@CWldSessionLoaderImpl@Moho@@...)
@@ -51,7 +51,7 @@ namespace moho
      * What it does:
      * Drives background scenario-load scheduling and eviction.
      */
-    virtual void Update() = 0;
+    virtual void Update();
 
     /**
      * Address: 0x008856E0 (FUN_008856E0, ?Func6@CWldSessionLoaderImpl@Moho@@...)
@@ -59,7 +59,7 @@ namespace moho
      * What it does:
      * Finalizes loader runtime and destroys all scenario entries.
      */
-    virtual void Finalize() = 0;
+    virtual void Finalize();
   };
 
   class CWldSessionLoaderImpl final : public IWldSessionLoader

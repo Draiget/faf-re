@@ -781,12 +781,10 @@ void CTaskStage::UserFrame()
   auto* stageNode = mThreads.mNext;
   while (stageNode != stageSentinel) {
     auto* const thread = static_cast<CTaskThread*>(stageNode);
-    thread->ListUnlink();
     thread->ListLinkBefore(&processed);
 
     const int stepResult = RunThreadUserFrameStep(thread);
     if (stepResult == -2) {
-      thread->ListUnlink();
       thread->ListLinkBefore(&mThreads);
     } else if (stepResult == -1) {
       delete thread;
@@ -854,12 +852,10 @@ void CTaskStage::DeserializeThreads(gpg::ReadArchive* const archive)
   const gpg::RRef nullOwner{};
 
   while (CTaskThread* const thread = ReadOwnedTaskThreadPointer(archive, nullOwner)) {
-    thread->ListUnlink();
     thread->ListLinkBefore(&mThreads);
   }
 
   while (CTaskThread* const thread = ReadOwnedTaskThreadPointer(archive, nullOwner)) {
-    thread->ListUnlink();
     thread->ListLinkBefore(&mStagedThreads);
   }
 }

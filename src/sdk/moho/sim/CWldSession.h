@@ -325,6 +325,14 @@ namespace moho
     [[nodiscard]] const void* GetEntitySpatialDbStorage() const;
 
     /**
+     * Address: 0x00894210 (FUN_00894210, ?AddToVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+     *
+     * What it does:
+     * Adds an entity into the world-session viz-update RB-tree.
+     */
+    void AddToVizUpdate(UserEntity* entity);
+
+    /**
      * Address: 0x00894230 (FUN_00894230, ?RemoveFromVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
      *
      * What it does:

@@ -104,8 +104,14 @@ namespace moho
      * Address: 0x0042DC10
      * Slot: 2
      * Demangled: Moho::CD3DDevice::SetRenViewport
+     *
+     * What it does:
+     * Binds the active render viewport, rebuilds per-head writer locks and
+     * default output wrappers from backend output contexts, refreshes
+     * fidelity-support lanes, initializes device resources, and emits one
+     * device-init event to registered listeners.
      */
-    virtual void SetRenViewport(WRenViewport* viewport) = 0;
+    virtual void SetRenViewport(WRenViewport* viewport);
 
     /**
      * Address: 0x0042E9D0

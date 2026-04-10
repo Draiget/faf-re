@@ -100,20 +100,9 @@ namespace
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgsRangeWarning = "%s\n  expected between %d and %d args, but got %d";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -127,10 +116,6 @@ namespace
     return Target();
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
 } // namespace
 
 namespace moho
@@ -144,7 +129,7 @@ namespace moho
    */
   int cfunc_CollisionBeamEntity__init(lua_State* const luaContext)
   {
-    return cfunc_CollisionBeamEntity__initL(ResolveBindingState(luaContext));
+    return cfunc_CollisionBeamEntity__initL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -216,7 +201,7 @@ namespace moho
    */
   int cfunc_CollisionBeamEntitySetBeamFx(lua_State* const luaContext)
   {
-    return cfunc_CollisionBeamEntitySetBeamFxL(ResolveBindingState(luaContext));
+    return cfunc_CollisionBeamEntitySetBeamFxL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -262,7 +247,7 @@ namespace moho
    */
   int cfunc_CollisionBeamEntityDisable(lua_State* const luaContext)
   {
-    return cfunc_CollisionBeamEntityDisableL(ResolveBindingState(luaContext));
+    return cfunc_CollisionBeamEntityDisableL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -296,7 +281,7 @@ namespace moho
    */
   int cfunc_CollisionBeamEntityEnable(lua_State* const luaContext)
   {
-    return cfunc_CollisionBeamEntityEnableL(ResolveBindingState(luaContext));
+    return cfunc_CollisionBeamEntityEnableL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -330,7 +315,7 @@ namespace moho
    */
   int cfunc_CollisionBeamEntityIsEnabled(lua_State* const luaContext)
   {
-    return cfunc_CollisionBeamEntityIsEnabledL(ResolveBindingState(luaContext));
+    return cfunc_CollisionBeamEntityIsEnabledL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -364,7 +349,7 @@ namespace moho
    */
   int cfunc_CollisionBeamEntityGetLauncher(lua_State* const luaContext)
   {
-    return cfunc_CollisionBeamEntityGetLauncherL(ResolveBindingState(luaContext));
+    return cfunc_CollisionBeamEntityGetLauncherL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

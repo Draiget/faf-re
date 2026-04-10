@@ -5,21 +5,30 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <new>
 #include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/CDebugCanvas.h"
+#include "moho/sim/SPhysConstants.h"
+#include "moho/sim/Sim.h"
+#include "moho/task/CTaskEvent.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 
@@ -71,17 +80,43 @@ namespace
   constexpr std::uint8_t kTrackingResultOutsideTolerance = 0x01;
   constexpr std::uint8_t kTrackingResultHeadingMotion = 0x02;
 
+  constexpr float kAimVectorEpsilon = 0.001f;
+  constexpr float kAimDistanceSqEpsilon = 0.000099999997f;
+  constexpr float kLeadPolynomialA = 0.0076100002f;
+  constexpr float kLeadPolynomialB = 0.16605f;
+  constexpr float kAimVelocityScale = 10.0f;
+  constexpr float kAimVelocityStepScale = 0.1f;
+  constexpr float kAimGravityStepScale = 0.010000001f;
+  constexpr float kInterceptIterationDeltaEpsilon = 0.1f;
+  constexpr std::int32_t kInterceptIterationLimit = 10;
+  constexpr const char* kInvalidMuzzleBoneWarningFormat =
+    "Using non-existant muzzle bone in aim manipulator for unit %s";
+
   struct CAimManipulatorBaseRuntimeView
   {
-    std::uint8_t mUnresolved00_4F[0x50];
+    std::uint8_t mUnresolved00_03[0x04];
+    bool mTaskEventTriggered;                     // +0x04
+    std::uint8_t mUnresolved05_4B[0x47];
+    bool mBaseEnabled;                            // +0x4C
+    std::uint8_t mUnresolved4D_4F[0x03];
     moho::CAniActor* mOwnerActor;                 // +0x50
-    std::uint8_t mUnresolved54_5F[0x0C];
+    moho::Sim* mOwnerSim;                         // +0x54
+    std::int32_t mPrecedence;                     // +0x58
+    std::uint32_t mUnknown5C;                     // +0x5C
     moho::SAniManipBindingStorage mWatchBones;    // +0x60
   };
 
   static_assert(
+    offsetof(CAimManipulatorBaseRuntimeView, mTaskEventTriggered) == 0x04,
+    "CAimManipulatorBaseRuntimeView::mTaskEventTriggered offset must be 0x04"
+  );
+  static_assert(
     offsetof(CAimManipulatorBaseRuntimeView, mOwnerActor) == 0x50,
     "CAimManipulatorBaseRuntimeView::mOwnerActor offset must be 0x50"
+  );
+  static_assert(
+    offsetof(CAimManipulatorBaseRuntimeView, mOwnerSim) == 0x54,
+    "CAimManipulatorBaseRuntimeView::mOwnerSim offset must be 0x54"
   );
   static_assert(
     offsetof(CAimManipulatorBaseRuntimeView, mWatchBones) == 0x60,
@@ -292,25 +327,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -406,6 +425,228 @@ namespace
     const std::string_view view = value.view();
     return std::string(view.data(), view.size());
   }
+
+  [[nodiscard]] const Wm3::Vector3f& InvalidAimVector() noexcept
+  {
+    static bool initialized = false;
+    static Wm3::Vector3f invalid{};
+    if (!initialized) {
+      invalid = Wm3::Vector3f::NaN();
+      initialized = true;
+    }
+    return invalid;
+  }
+
+  [[nodiscard]] bool IsAimVectorValid(const Wm3::Vector3f& value) noexcept
+  {
+    return Wm3::Vector3f::IsntNaN(value);
+  }
+
+  [[nodiscard]] Wm3::Vector3f ComputeUnitForwardDirection(const moho::Unit& unit) noexcept
+  {
+    const moho::VTransform& transform = unit.GetTransform();
+    Wm3::Vector3f direction{};
+    direction.y =
+      ((transform.orient_.w * transform.orient_.z) - (transform.orient_.x * transform.orient_.y)) * 2.0f;
+    direction.x =
+      ((transform.orient_.x * transform.orient_.z) + (transform.orient_.w * transform.orient_.y)) * 2.0f;
+    direction.z =
+      1.0f - (((transform.orient_.z * transform.orient_.z) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
+    return direction;
+  }
+
+  /**
+   * Address: 0x006312B0 (FUN_006312B0)
+   *
+   * What it does:
+   * Predicts one intercept point for a moving target under constant projectile
+   * speed using the original polynomial lead approximation lane.
+   */
+  Wm3::Vector3f* PredictInterceptPointConstantSpeed(
+    Wm3::Vector3f* const outIntercept,
+    const Wm3::Vector3f& targetPosition,
+    const Wm3::Vector3f& targetVelocity,
+    const float projectileSpeed,
+    const Wm3::Vector3f& muzzlePosition
+  )
+  {
+    const float velocityMagnitude = std::sqrt(
+      (targetVelocity.x * targetVelocity.x) + (targetVelocity.y * targetVelocity.y) + (targetVelocity.z * targetVelocity.z)
+    );
+    if (velocityMagnitude < kAimVectorEpsilon) {
+      *outIntercept = targetPosition;
+      return outIntercept;
+    }
+
+    const float distanceX = muzzlePosition.x - targetPosition.x;
+    const float distanceY = muzzlePosition.y - targetPosition.y;
+    const float distanceZ = muzzlePosition.z - targetPosition.z;
+    const float distanceToMuzzle = std::sqrt((distanceX * distanceX) + (distanceY * distanceY) + (distanceZ * distanceZ));
+    if ((distanceToMuzzle * distanceToMuzzle) < kAimDistanceSqEpsilon) {
+      *outIntercept = targetPosition;
+      return outIntercept;
+    }
+
+    const float invDistance = 1.0f / distanceToMuzzle;
+    const float invVelocity = 1.0f / velocityMagnitude;
+    const Wm3::Vector3f normalizedDistance{distanceX * invDistance, distanceY * invDistance, distanceZ * invDistance};
+    const Wm3::Vector3f normalizedVelocity{
+      targetVelocity.x * invVelocity,
+      targetVelocity.y * invVelocity,
+      targetVelocity.z * invVelocity,
+    };
+
+    const float alignment =
+      2.0f -
+      ((normalizedVelocity.x * normalizedDistance.x) + (normalizedVelocity.y * normalizedDistance.y) +
+       (normalizedVelocity.z * normalizedDistance.z));
+    const float speedDelta = (velocityMagnitude * velocityMagnitude) - (projectileSpeed * projectileSpeed);
+    if ((speedDelta * speedDelta) < kAimDistanceSqEpsilon) {
+      *outIntercept = targetPosition;
+      return outIntercept;
+    }
+
+    const float alignmentSq = alignment * alignment;
+    const float interceptTerm = ((((alignmentSq * kLeadPolynomialA) - kLeadPolynomialB) * alignmentSq) + 1.0f) * alignment *
+                                distanceToMuzzle * velocityMagnitude;
+    const float discriminant =
+      (interceptTerm * interceptTerm) - ((speedDelta * distanceToMuzzle) * distanceToMuzzle);
+    if (discriminant < 0.0f) {
+      *outIntercept = targetPosition;
+      return outIntercept;
+    }
+
+    const float timeToIntercept = (interceptTerm - std::sqrt(discriminant)) / speedDelta;
+    outIntercept->x = targetPosition.x + (targetVelocity.x * timeToIntercept);
+    outIntercept->y = targetPosition.y + (targetVelocity.y * timeToIntercept);
+    outIntercept->z = targetPosition.z + (targetVelocity.z * timeToIntercept);
+    return outIntercept;
+  }
+
+  /**
+   * Address: 0x00631580 (FUN_00631580)
+   *
+   * What it does:
+   * Iteratively predicts one intercept point in horizontal plane using muzzle
+   * forward projected speed and target velocity lanes.
+   */
+  Wm3::Vector3f* PredictInterceptPointFromForwardVelocity(
+    Wm3::Vector3f* const outIntercept,
+    const Wm3::Quaternionf& muzzleOrientation,
+    const float projectileSpeed,
+    const Wm3::Vector3f& targetPosition,
+    const Wm3::Vector3f& targetVelocity,
+    const Wm3::Vector3f& muzzlePosition
+  )
+  {
+    const float forwardProjection = (muzzleOrientation.w * muzzleOrientation.y) + (muzzleOrientation.x * muzzleOrientation.z);
+    const float horizontalProjection =
+      1.0f - (((muzzleOrientation.z * muzzleOrientation.z) + (muzzleOrientation.y * muzzleOrientation.y)) * 2.0f);
+    const float horizontalSpeed = std::sqrt(
+                                    ((forwardProjection * 2.0f) * (forwardProjection * 2.0f)) +
+                                    (horizontalProjection * horizontalProjection)
+                                  ) *
+                                  projectileSpeed;
+    if (horizontalSpeed <= kAimVectorEpsilon) {
+      *outIntercept = targetPosition;
+      return outIntercept;
+    }
+
+    const float invHorizontalSpeed = 1.0f / horizontalSpeed;
+    float interceptTime = std::sqrt(
+                            ((muzzlePosition.x - targetPosition.x) * (muzzlePosition.x - targetPosition.x)) +
+                            ((muzzlePosition.z - targetPosition.z) * (muzzlePosition.z - targetPosition.z))
+                          ) *
+                          invHorizontalSpeed;
+
+    for (std::int32_t iteration = 0; iteration < kInterceptIterationLimit; ++iteration) {
+      const float previousTime = interceptTime;
+      const float predictedX = targetPosition.x + (targetVelocity.x * interceptTime);
+      const float predictedZ = targetPosition.z + (targetVelocity.z * interceptTime);
+      interceptTime = std::sqrt(
+                        ((muzzlePosition.x - predictedX) * (muzzlePosition.x - predictedX)) +
+                        ((muzzlePosition.z - predictedZ) * (muzzlePosition.z - predictedZ))
+                      ) *
+                      invHorizontalSpeed;
+      if (std::fabs(interceptTime - previousTime) <= kInterceptIterationDeltaEpsilon) {
+        break;
+      }
+    }
+
+    outIntercept->x = targetPosition.x + (targetVelocity.x * interceptTime);
+    outIntercept->y = targetPosition.y + (targetVelocity.y * interceptTime);
+    outIntercept->z = targetPosition.z + (targetVelocity.z * interceptTime);
+    return outIntercept;
+  }
+
+  /**
+   * Address: 0x005D6310 (FUN_005D6310, Moho::AI_CalculateFiringPitch)
+   *
+   * What it does:
+   * Solves high/low ballistic firing angles from start/end points, gravity,
+   * and muzzle velocity.
+   */
+  [[nodiscard]] bool CalculateFiringPitch(
+    float* const highArc,
+    const Wm3::Vector3f& muzzlePosition,
+    const Wm3::Vector3f& targetPosition,
+    const moho::SPhysConstants& physConstants,
+    const float muzzleVelocity,
+    float* const lowArc
+  )
+  {
+    const float dz = targetPosition.z - muzzlePosition.z;
+    const float horizontalDistance = std::sqrt((dz * dz) + ((targetPosition.x - muzzlePosition.x) * (targetPosition.x - muzzlePosition.x)));
+    const float pitchScalar = (0.0f - ((horizontalDistance * horizontalDistance) * physConstants.mGravity.y)) /
+                              ((muzzleVelocity * muzzleVelocity) * 2.0f);
+    const float negDistance = 0.0f - horizontalDistance;
+    const float discriminant =
+      (negDistance * negDistance) - ((((targetPosition.y - muzzlePosition.y) + pitchScalar) * pitchScalar) * 4.0f);
+    if (discriminant < 0.0f) {
+      return false;
+    }
+
+    const float discriminantRoot = std::sqrt(discriminant);
+    const float denominator = pitchScalar * 2.0f;
+    if (highArc != nullptr) {
+      *highArc = -std::atan2((discriminantRoot - negDistance) / denominator, 1.0f);
+    }
+    if (lowArc != nullptr) {
+      *lowArc = -std::atan2(((-negDistance) - discriminantRoot) / denominator, 1.0f);
+    }
+
+    return true;
+  }
+
+  /**
+   * Address: 0x005D6440 (FUN_005D6440, Moho::AI_CalculateFiringDirection)
+   *
+   * What it does:
+   * Builds one normalized firing direction vector from start/end points and
+   * selected ballistic pitch.
+   */
+  Wm3::Vector3f* CalculateFiringDirection(
+    Wm3::Vector3f* const outDirection,
+    const Wm3::Vector3f& from,
+    const Wm3::Vector3f& to,
+    const float pitch
+  )
+  {
+    outDirection->x = from.x - to.x;
+    outDirection->z = from.z - to.z;
+    outDirection->y = 0.0f;
+
+    const float cosinePitch = std::cos(pitch);
+    const float horizontalMagnitude = std::sqrt((outDirection->x * outDirection->x) + (outDirection->z * outDirection->z));
+    if (horizontalMagnitude > 0.0f) {
+      const float scale = cosinePitch / horizontalMagnitude;
+      outDirection->x *= scale;
+      outDirection->z *= scale;
+    }
+
+    outDirection->y = -std::sin(pitch);
+    return outDirection;
+  }
 } // namespace
 
 /**
@@ -442,6 +683,302 @@ gpg::RRef moho::CAimManipulator::GetDerivedObjectRef()
   return MakeDerivedRef(this, CachedCAimManipulatorType());
 }
 
+/**
+ * Address: 0x00630200 (FUN_00630200, Moho::CAimManipulator::dtr)
+ *
+ * What it does:
+ * Executes CAimManipulator teardown and conditionally frees this object when
+ * `deleteFlags & 1` is set.
+ */
+void moho::CAimManipulator::operator_delete(const std::int32_t deleteFlags)
+{
+  this->~CAimManipulator();
+  if ((deleteFlags & 1) != 0) {
+    ::operator delete(this);
+  }
+}
+
+/**
+ * Address: 0x00630DB0 (FUN_00630DB0, Moho::CAimManipulator::AimManip)
+ *
+ * What it does:
+ * Executes one manipulator update: validates owner/weapon state, drives aim
+ * target tracking, mirrors on-target state into weapon lanes, and updates
+ * task-event signaling.
+ */
+void moho::CAimManipulator::AimManip()
+{
+  auto* const runtimeView = AimManipulatorRuntimeView(this);
+  Unit* const unit = runtimeView->mUnit.GetObjectPtr();
+  if (unit == nullptr) {
+    return;
+  }
+
+  if (unit->IsBeingBuilt()) {
+    return;
+  }
+
+  const bool aimsStraightOnDisable =
+    runtimeView->mUnitWepBlueprint != nullptr && runtimeView->mUnitWepBlueprint->AimsStraightOnDisable != 0u;
+  if (!runtimeView->mEnabled && !aimsStraightOnDisable) {
+    return;
+  }
+
+  auto* const taskEvent = reinterpret_cast<CTaskEvent*>(this);
+  UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr();
+  if (weapon == nullptr || unit->IsDead() || unit->StunnedState != 0) {
+    runtimeView->mOnTarget = false;
+    if (CAniPoseBone* const watchBone0 = ResolveWatchBone(this, 0u); watchBone0 != nullptr) {
+      watchBone0->Rotate(runtimeView->mBone0Rot);
+    }
+    if (CAniPoseBone* const watchBone1 = ResolveWatchBone(this, 1u); watchBone1 != nullptr) {
+      watchBone1->Rotate(runtimeView->mBone1Rot);
+    }
+    taskEvent->EventSetSignaled(false);
+    return;
+  }
+
+  weapon->mUnknown174 = 1u;
+  weapon->mAimingAt = InvalidAimVector();
+
+  const bool shouldTrackTarget = runtimeView->mEnabled || !aimsStraightOnDisable;
+  CAiTarget* const target = &weapon->mTarget;
+  if (target->targetType != EAiTargetType::AITARGET_None && shouldTrackTarget) {
+    if (!target->HasTarget()) {
+      runtimeView->mOnTarget = false;
+      Rotate1(true);
+      Rotate2(true);
+    } else {
+      if (runtimeView->mResetPoseTime <= 0) {
+        std::int32_t resetTime = 1;
+        if (weapon->mWeaponBlueprint != nullptr) {
+          resetTime = static_cast<std::int32_t>(std::lround(weapon->mWeaponBlueprint->TargetCheckInterval * 10.0f));
+          if (resetTime < 1) {
+            resetTime = 1;
+          }
+        }
+        runtimeView->mResetTime = resetTime;
+      } else {
+        runtimeView->mResetTime = runtimeView->mResetPoseTime;
+      }
+
+      Wm3::Vector3f aimDirection{};
+      Aim(&aimDirection, target);
+      if (!IsAimVectorValid(aimDirection)) {
+        weapon->mUnknown174 = 0u;
+        runtimeView->mOnTarget = false;
+        Rotate1(true);
+        Rotate2(true);
+      } else {
+        runtimeView->mOnTarget = Track(aimDirection, 0u);
+        weapon->mAimingAt = aimDirection;
+      }
+    }
+  } else {
+    if (runtimeView->mResetTime <= 0) {
+      const Wm3::Vector3f forwardDirection{0.0f, 0.0f, 1.0f};
+      (void)Track(forwardDirection, kTrackingModeWorldSpace);
+    } else {
+      --runtimeView->mResetTime;
+      Rotate1(true);
+      Rotate2(true);
+    }
+    runtimeView->mOnTarget = false;
+  }
+
+  bool isWeaponLabelMatch = false;
+  if (weapon != nullptr) {
+    msvc8::string weaponLabel;
+    (void)weapon->GetLabel(&weaponLabel);
+    isWeaponLabelMatch = (_stricmp(weaponLabel.c_str(), runtimeView->mLabel.c_str()) == 0);
+  }
+
+  if (isWeaponLabelMatch) {
+    weapon->mCanFire = runtimeView->mOnTarget ? 1u : 0u;
+  }
+
+  if (runtimeView->mOnTarget) {
+    taskEvent->EventSetSignaled(true);
+    return;
+  }
+
+  taskEvent->EventSetSignaled(false);
+}
+
+/**
+ * Address: 0x006317B0 (FUN_006317B0, Moho::CAimManipulator::Aim)
+ *
+ * What it does:
+ * Computes one muzzle-relative aiming direction for the current target using
+ * lead prediction and optional ballistic correction paths.
+ */
+Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAiTarget* const target)
+{
+  auto* const baseView = AimManipulatorBaseView(this);
+  auto* const runtimeView = AimManipulatorRuntimeView(this);
+  UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr();
+  RUnitBlueprintWeapon* const weaponBlueprint = (weapon != nullptr) ? weapon->mWeaponBlueprint : nullptr;
+
+  Wm3::Vector3f aimDirection = InvalidAimVector();
+
+  CAniPoseBone* muzzleBone = nullptr;
+  if (baseView->mOwnerActor != nullptr && baseView->mOwnerActor->mPriorPose.px != nullptr) {
+    CAniPose* const priorPose = baseView->mOwnerActor->mPriorPose.px;
+    CAniPoseBone* const boneBegin = priorPose->mBones.begin();
+    CAniPoseBone* const boneEnd = priorPose->mBones.end();
+    if (boneBegin != nullptr && boneEnd != nullptr && boneBegin < boneEnd && runtimeView->mMuzzleBone >= 0) {
+      const std::ptrdiff_t boneCount = boneEnd - boneBegin;
+      if (runtimeView->mMuzzleBone < boneCount) {
+        muzzleBone = &boneBegin[runtimeView->mMuzzleBone];
+      }
+    }
+  }
+
+  Unit* const unit = runtimeView->mUnit.GetObjectPtr();
+  if (muzzleBone == nullptr) {
+    const RUnitBlueprint* const unitBlueprint = (unit != nullptr) ? unit->GetBlueprint() : nullptr;
+    const char* const unitBlueprintId = (unitBlueprint != nullptr) ? unitBlueprint->mBlueprintId.c_str() : "<null>";
+    gpg::Warnf(kInvalidMuzzleBoneWarningFormat, unitBlueprintId);
+
+    if (unit != nullptr) {
+      aimDirection = ComputeUnitForwardDirection(*unit);
+    }
+    *outDirection = aimDirection;
+    return outDirection;
+  }
+
+  const VTransform& muzzleTransform = muzzleBone->GetCompositeTransform();
+  Wm3::Quaternionf muzzleOrientation = muzzleTransform.orient_;
+  Wm3::Vector3f muzzlePosition = muzzleTransform.pos_;
+  if (unit != nullptr && unit->IsMobile()) {
+    const Wm3::Vector3f unitVelocity = unit->Entity::GetVelocity();
+    muzzlePosition.x += unitVelocity.x;
+    muzzlePosition.y += unitVelocity.y;
+    muzzlePosition.z += unitVelocity.z;
+  }
+
+  Wm3::Vector3f targetVelocity{0.0f, 0.0f, 0.0f};
+  if (target != nullptr) {
+    if (Entity* const targetEntity = target->targetEntity.GetObjectPtr(); targetEntity != nullptr) {
+      targetVelocity = targetEntity->GetVelocity();
+    }
+  }
+
+  Wm3::Vector3f targetPosition{0.0f, 0.0f, 0.0f};
+  if (target != nullptr) {
+    targetPosition = target->GetTargetPosGun(false);
+  }
+
+  Wm3::Vector3f predictedImpact{
+    targetPosition.x + targetVelocity.x,
+    targetPosition.y + targetVelocity.y,
+    targetPosition.z + targetVelocity.z,
+  };
+
+  const float horizontalDistance = std::sqrt(
+    ((muzzlePosition.x - predictedImpact.x) * (muzzlePosition.x - predictedImpact.x)) +
+    ((muzzlePosition.z - predictedImpact.z) * (muzzlePosition.z - predictedImpact.z))
+  );
+
+  float projectileSpeed = 0.0f;
+  if (weaponBlueprint != nullptr) {
+    if (weaponBlueprint->MuzzleVelocityReduceDistance <= horizontalDistance) {
+      projectileSpeed = weaponBlueprint->MuzzleVelocity;
+    } else {
+      projectileSpeed = std::sqrt(horizontalDistance / weaponBlueprint->MuzzleVelocityReduceDistance) *
+                        weaponBlueprint->MuzzleVelocity;
+    }
+  }
+
+  if (weaponBlueprint != nullptr && weaponBlueprint->LeadTarget != 0u && target != nullptr &&
+      target->targetType == EAiTargetType::AITARGET_Entity) {
+    const Wm3::Vector3f scaledTargetVelocity{
+      targetVelocity.x * kAimVelocityScale,
+      targetVelocity.y * kAimVelocityScale,
+      targetVelocity.z * kAimVelocityScale,
+    };
+    const RProjectileBlueprintPhysics* const projPhys = runtimeView->mProjPhysBlueprint;
+    if (projPhys != nullptr && projPhys->TrackTarget != 0u) {
+      (void)PredictInterceptPointConstantSpeed(
+        &predictedImpact,
+        predictedImpact,
+        scaledTargetVelocity,
+        projPhys->MaxSpeed,
+        muzzlePosition
+      );
+    } else if (projPhys != nullptr && projPhys->UseGravity != 0u) {
+      (void)PredictInterceptPointFromForwardVelocity(
+        &predictedImpact,
+        muzzleOrientation,
+        projectileSpeed,
+        predictedImpact,
+        scaledTargetVelocity,
+        muzzlePosition
+      );
+    } else {
+      (void)PredictInterceptPointConstantSpeed(
+        &predictedImpact,
+        predictedImpact,
+        scaledTargetVelocity,
+        projectileSpeed,
+        muzzlePosition
+      );
+    }
+  }
+
+  const RProjectileBlueprintPhysics* const projPhys = runtimeView->mProjPhysBlueprint;
+  if (projPhys != nullptr && projPhys->TrackTarget == 0u && projPhys->UseGravity != 0u) {
+    Sim* const sim = baseView->mOwnerSim;
+    float highArc = 0.0f;
+    float lowArc = 0.0f;
+    if (sim != nullptr && sim->mPhysConstants != nullptr &&
+        CalculateFiringPitch(&highArc, muzzlePosition, predictedImpact, *sim->mPhysConstants, projectileSpeed, &lowArc))
+    {
+      const float selectedArc =
+        (runtimeView->mUnitWepBlueprint != nullptr && runtimeView->mUnitWepBlueprint->BallisticArc == RULEUBA_HighArc)
+          ? highArc
+          : lowArc;
+      (void)CalculateFiringDirection(&aimDirection, predictedImpact, muzzlePosition, selectedArc);
+
+      if (dbg_Ballistics && sim->CheatsEnabled()) {
+        if (CDebugCanvas* const debugCanvas = sim->GetDebugCanvas(); debugCanvas != nullptr) {
+          const Wm3::Quaternionf aimOrientation = COORDS_Orient(aimDirection);
+          debugCanvas->AddWireCoords(muzzlePosition, aimOrientation, 2.0f);
+          const Wm3::Quaternionf identityOrientation = Wm3::Quaternionf::Identity();
+          debugCanvas->AddWireCoords(predictedImpact, identityOrientation, 2.0f);
+
+          const Wm3::Vector3f gravityStep{
+            sim->mPhysConstants->mGravity.x * kAimGravityStepScale,
+            sim->mPhysConstants->mGravity.y * kAimGravityStepScale,
+            sim->mPhysConstants->mGravity.z * kAimGravityStepScale,
+          };
+          const float velocityStep = projectileSpeed * kAimVelocityStepScale;
+          debugCanvas->AddParabolaClosedForm(predictedImpact, muzzlePosition, -highArc, velocityStep, gravityStep.y);
+          debugCanvas->AddParabolaClosedForm(predictedImpact, muzzlePosition, -lowArc, velocityStep, gravityStep.y);
+
+          const Wm3::Vector3f steppedVelocity{
+            aimDirection.x * velocityStep,
+            aimDirection.y * velocityStep,
+            aimDirection.z * velocityStep,
+          };
+          debugCanvas->AddParabolaStepped(steppedVelocity, muzzlePosition, predictedImpact, gravityStep);
+        }
+      }
+    }
+  } else {
+    Wm3::Vector3f directionToTarget{
+      predictedImpact.x - muzzlePosition.x,
+      predictedImpact.y - muzzlePosition.y,
+      predictedImpact.z - muzzlePosition.z,
+    };
+    aimDirection = directionToTarget;
+    (void)Wm3::Vector3f::Normalize(&aimDirection);
+  }
+
+  *outDirection = aimDirection;
+  return outDirection;
+}
+
 moho::CScrLuaMetatableFactory<moho::CAimManipulator>::CScrLuaMetatableFactory()
   : CScrLuaObjectFactory(CScrLuaObjectFactory::AllocateFactoryObjectIndex())
 {}
@@ -474,7 +1011,7 @@ LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CAimManipulator>::Create(
  */
 int moho::cfunc_CAimManipulatorSetFiringArc(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorSetFiringArcL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorSetFiringArcL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -817,7 +1354,7 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
  */
 int moho::cfunc_CAimManipulatorSetResetPoseTime(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorSetResetPoseTimeL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorSetResetPoseTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -882,7 +1419,7 @@ int moho::cfunc_CAimManipulatorSetResetPoseTimeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAimManipulatorOnTarget(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorOnTargetL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorOnTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -936,7 +1473,7 @@ int moho::cfunc_CAimManipulatorOnTargetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAimManipulatorSetEnabled(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorSetEnabledL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorSetEnabledL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -992,7 +1529,7 @@ int moho::cfunc_CAimManipulatorSetEnabledL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAimManipulatorGetHeadingPitch(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorGetHeadingPitchL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorGetHeadingPitchL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1048,7 +1585,7 @@ int moho::cfunc_CAimManipulatorGetHeadingPitchL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAimManipulatorSetHeadingPitch(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorSetHeadingPitchL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorSetHeadingPitchL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1115,7 +1652,7 @@ int moho::cfunc_CAimManipulatorSetHeadingPitchL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAimManipulatorSetAimHeadingOffset(lua_State* const luaContext)
 {
-  return cfunc_CAimManipulatorSetAimHeadingOffsetL(ResolveBindingState(luaContext));
+  return cfunc_CAimManipulatorSetAimHeadingOffsetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
