@@ -61,25 +61,9 @@ namespace
     helper.mPrev = self;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -281,6 +265,34 @@ namespace
   }
 
   /**
+   * Address: 0x00638930 (FUN_00638930, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CCollisionManipulator deserialize thunk alias into the
+   * shared deserialize callback body.
+   */
+  void DeserializeCCollisionManipulatorThunkVariantA(
+    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
+  )
+  {
+    DeserializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00638C20 (FUN_00638C20, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CCollisionManipulator deserialize thunk alias into
+   * the shared deserialize callback body.
+   */
+  void DeserializeCCollisionManipulatorThunkVariantB(
+    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
+  )
+  {
+    DeserializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
    * Address: 0x00638F90 (FUN_00638F90)
    *
    * What it does:
@@ -301,6 +313,34 @@ namespace
     WriteUnitPointer(archive, object->mOwnerUnit, owner);
     archive->WriteBool(object->mCollisionCallbacksEnabled);
     archive->WriteBool(object->mTerrainCollisionCheckEnabled);
+  }
+
+  /**
+   * Address: 0x00638940 (FUN_00638940, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CCollisionManipulator serialize thunk alias into the
+   * shared serialize callback body.
+   */
+  void SerializeCCollisionManipulatorThunkVariantA(
+    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
+  )
+  {
+    SerializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
+  }
+
+  /**
+   * Address: 0x00638C30 (FUN_00638C30, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CCollisionManipulator serialize thunk alias into
+   * the shared serialize callback body.
+   */
+  void SerializeCCollisionManipulatorThunkVariantB(
+    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
+  )
+  {
+    SerializeCCollisionManipulator(archive, objectPtr, version, ownerRef);
   }
 
   /**
@@ -412,7 +452,7 @@ namespace moho
    */
   int cfunc_CreateCollisionDetector(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     if (!state || !state->m_state) {
       return 0;
     }
@@ -474,7 +514,7 @@ namespace moho
    */
   int cfunc_CCollisionManipulatorEnableTerrainCheck(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     if (!state || !state->m_state) {
       return 0;
     }
@@ -525,7 +565,7 @@ namespace moho
    */
   int cfunc_CCollisionManipulatorEnable(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     if (!state || !state->m_state) {
       return 0;
     }
@@ -568,7 +608,7 @@ namespace moho
    */
   int cfunc_CCollisionManipulatorDisable(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     if (!state || !state->m_state) {
       return 0;
     }
@@ -611,7 +651,7 @@ namespace moho
    */
   int cfunc_CCollisionManipulatorWatchBone(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     if (!state || !state->m_state) {
       return 0;
     }

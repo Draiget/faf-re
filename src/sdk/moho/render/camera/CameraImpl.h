@@ -65,22 +65,26 @@ namespace moho
     virtual void CameraRevertRotation();
 
     /**
-     * Address: 0x007A7DC0 (sub_7A7DC0)
+     * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
      * Slot: 0
+     *
+     * What it does:
+     * Runs `CameraImpl` teardown and frees object storage when
+     * `deleteFlags & 1` is set.
      */
-    virtual void Reserved00() = 0;
+    virtual void operator_delete(std::int32_t deleteFlags);
 
     /**
      * Address: 0x007A69F0 (Moho::CameraImpl::CameraGetName)
      * Slot: 1
      */
-    [[nodiscard]] virtual const char* CameraGetName() const = 0;
+    [[nodiscard]] virtual const char* CameraGetName() const;
 
     /**
      * Address: 0x007A6A00 (Moho::CameraImpl::CameraGetView)
      * Slot: 2
      */
-    [[nodiscard]] virtual const GeomCamera3& CameraGetView() const = 0;
+    [[nodiscard]] virtual const GeomCamera3& CameraGetView() const;
 
     /**
      * Address context: called from `cfunc_CameraImplMoveToL` (`0x007AB760`)
@@ -99,19 +103,19 @@ namespace moho
      * What it does:
      * Returns the world-camera offset vector used by listener metric updates.
      */
-    [[nodiscard]] virtual const Wm3::Vec3f& CameraGetOffset() const = 0;
+    [[nodiscard]] virtual const Wm3::Vec3f& CameraGetOffset() const;
 
     /**
      * Address: 0x007A6CA0 (Moho::CameraImpl::CameraGetTargetZoom)
      * Slot: 19
      */
-    [[nodiscard]] virtual float CameraGetTargetZoom() const = 0;
+    [[nodiscard]] virtual float CameraGetTargetZoom() const;
 
     /**
      * Address: 0x007A7310 (Moho::CameraImpl::GetMaxZoom)
      * Slot: 20
      */
-    [[nodiscard]] virtual float GetMaxZoom() const = 0;
+    [[nodiscard]] virtual float GetMaxZoom() const;
 
     /**
      * Address: 0x007A73C0 (FUN_007A73C0, Moho::CameraImpl::SetMaxZoomMult)
@@ -123,10 +127,10 @@ namespace moho
     virtual void SetMaxZoomMult(float maxZoomMult);
 
     /**
-     * Address: 0x007A79E0 (Moho::CameraImpl::LODMetric)
+     * Address: 0x007A72C0 (FUN_007A72C0, Moho::CameraImpl::LODMetric)
      * Slot: 45
      */
-    [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const = 0;
+    [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
   };
 
   template <>

@@ -16,6 +16,7 @@ namespace moho
 {
   class CScrLuaInitForm;
   class CUnitCommand;
+  class IAiCommandDispatchImpl;
 
   /**
    * VFTABLE: 0x00E20C38
@@ -37,6 +38,25 @@ namespace moho
      * script-task runtime members.
      */
     CUnitScriptTask();
+
+    /**
+     * Address: 0x006228B0 (FUN_006228B0, dispatch ctor lane)
+     *
+     * What it does:
+     * Constructs a script task bound to one dispatch task context, resolves the
+     * current source command, links command-event listener lanes, creates Lua
+     * task object state, and runs `OnCreate(sourceArgs)`.
+     */
+    CUnitScriptTask(IAiCommandDispatchImpl* dispatchTask, const LuaPlus::LuaObject& sourceArgs);
+
+    /**
+     * Address: 0x00622F70 (FUN_00622F70, Moho::CUnitScriptTask::operator new)
+     *
+     * What it does:
+     * Allocates one script-task object and constructs it from dispatch/source
+     * Lua arguments.
+     */
+    [[nodiscard]] static CUnitScriptTask* Create(IAiCommandDispatchImpl* dispatchTask, LuaPlus::LuaObject* sourceArgs);
 
     /**
      * Address: 0x00622D00 (FUN_00622D00, scalar deleting thunk)

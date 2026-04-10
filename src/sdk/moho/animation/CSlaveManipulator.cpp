@@ -69,25 +69,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -241,7 +225,7 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
  */
 int moho::cfunc_CreateSlaver(lua_State* const luaContext)
 {
-  return cfunc_CreateSlaverL(ResolveBindingState(luaContext));
+  return cfunc_CreateSlaverL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -307,7 +291,7 @@ moho::CScrLuaInitForm* moho::func_CreateSlaver_LuaFuncDef()
  */
 int moho::cfunc_CSlaveManipulatorSetMaxRate(lua_State* const luaContext)
 {
-  return cfunc_CSlaveManipulatorSetMaxRateL(ResolveBindingState(luaContext));
+  return cfunc_CSlaveManipulatorSetMaxRateL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

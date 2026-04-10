@@ -376,6 +376,27 @@ namespace
   moho::EngineStats* EngineStatsSlot<0x10A9BFCu>::value = nullptr;
 
   template <>
+  struct EngineStatsSlot<0x10A9E30u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9E30u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A9E40u>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9E40u>::value = nullptr;
+
+  template <>
+  struct EngineStatsSlot<0x10A9EDCu>
+  {
+    static moho::EngineStats* value;
+  };
+  moho::EngineStats* EngineStatsSlot<0x10A9EDCu>::value = nullptr;
+
+  template <>
   struct EngineStatsSlot<0x10A7804u>
   {
     static moho::EngineStats* value;
@@ -1085,6 +1106,9 @@ namespace
       (void)moho::register_EngineStatsCleanupSlotVariant66();
       (void)moho::register_EngineStatsCleanupSlotVariant68();
       (void)moho::register_EngineStatsCleanupSlotVariant69();
+      (void)moho::register_EngineStatsCleanupSlotVariant139();
+      (void)moho::register_EngineStatsCleanupSlotVariant140();
+      (void)moho::register_EngineStatsCleanupSlotVariant141();
       (void)moho::register_EngineStatsCleanupSlotVariant22();
       (void)moho::register_EngineStatsCleanupSlotVariant23();
       (void)moho::register_EngineStatsCleanupSlotVariant24();
@@ -4374,5 +4398,71 @@ namespace moho
   int register_EngineStatsCleanupSlotVariant138()
   {
     return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant138>();
+  }
+
+  /**
+   * Address: 0x00BF1C80 (FUN_00BF1C80, sub_BF1C80)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9E30`.
+   */
+  void cleanup_EngineStatsSlotVariant139()
+  {
+    CleanupEngineStatsSlot<0x10A9E30u>();
+  }
+
+  /**
+   * Address: 0x00BC7770 (FUN_00BC7770, sub_BC7770)
+   *
+   * What it does:
+   * Registers the `dword_10A9E30` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant139()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant139>();
+  }
+
+  /**
+   * Address: 0x00BF1CA0 (FUN_00BF1CA0, sub_BF1CA0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9E40`.
+   */
+  void cleanup_EngineStatsSlotVariant140()
+  {
+    CleanupEngineStatsSlot<0x10A9E40u>();
+  }
+
+  /**
+   * Address: 0x00BC7840 (FUN_00BC7840, sub_BC7840)
+   *
+   * What it does:
+   * Registers the `dword_10A9E40` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant140()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant140>();
+  }
+
+  /**
+   * Address: 0x00BF1CE0 (FUN_00BF1CE0, sub_BF1CE0)
+   *
+   * What it does:
+   * Tears down the recovered `EngineStats` singleton slot at `dword_10A9EDC`.
+   */
+  void cleanup_EngineStatsSlotVariant141()
+  {
+    CleanupEngineStatsSlot<0x10A9EDCu>();
+  }
+
+  /**
+   * Address: 0x00BC78B0 (FUN_00BC78B0, sub_BC78B0)
+   *
+   * What it does:
+   * Registers the `dword_10A9EDC` `EngineStats` cleanup thunk with `atexit`.
+   */
+  int register_EngineStatsCleanupSlotVariant141()
+  {
+    return RegisterExitCleanup<&cleanup_EngineStatsSlotVariant141>();
   }
 } // namespace moho

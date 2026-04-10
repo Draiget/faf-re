@@ -1,17 +1,45 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/EAiAttackerEvent.h"
+#include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiTarget.h"
+#include "moho/ai/IAiAttacker.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/CollisionBeamEntity.h"
+#include "moho/misc/Listener.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/script/CScriptObject.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/ReconBlip.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/CSimConCommand.h"
+#include "moho/sim/CSimConVarBase.h"
+#include "moho/sim/CSimConVarInstanceBase.h"
+#include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
+#include "moho/task/CTaskThread.h"
+#include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "moho/unit/tasks/CAcquireTargetTask.h"
+#include "moho/unit/tasks/CFireWeaponTask.h"
 #include "lua/LuaObject.h"
+#include "gpg/core/utils/Global.h"
+#include "legacy/containers/Vector.h"
 
+#include <cmath>
+#include <array>
 #include <cstddef>
-#include <cstring>
 #include <cstdint>
+#include <cstring>
+#include <limits>
 
 using namespace moho;
 
@@ -60,6 +88,12 @@ namespace moho
   int cfunc_CAiAttackerImplResetReportingStateL(LuaPlus::LuaState* state);
   int cfunc_CAiAttackerImplForceEngage(lua_State* luaState);
   int cfunc_CAiAttackerImplForceEngageL(LuaPlus::LuaState* state);
+
+  bool AI_TestForTerrainBlockage(
+    const Unit* unit,
+    const Wm3::Vector3f& targetPosition,
+    ERuleBPUnitWeaponBallisticArc ballisticArc
+  );
 } // namespace moho
 
 namespace
@@ -106,6 +140,17 @@ namespace
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
   constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
+  constexpr EAiAttackerEvent kAiAttackerEventCannotTarget = static_cast<EAiAttackerEvent>(0x8);
+  constexpr EAiAttackerEvent kAiAttackerEventCanTarget = static_cast<EAiAttackerEvent>(0x9);
+  constexpr const char* kEngineerCategoryName = "ENGINEER";
+  constexpr const char* kWeaponTerrainBlockageConVarName = "WeaponTerrainBlockageTest";
+  constexpr std::array<float, 4> kBallisticArcHeightFactors{
+    0.70700002f,
+    0.29300001f,
+    -0.29300001f,
+    -0.70700002f,
+  };
+  constexpr float kDegreesToRadians = 0.017453292f;
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiAttackerImplIndex = 0;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
@@ -124,6 +169,391 @@ namespace
     offsetof(WeaponEmitterEntryView, extraRef) == 0xD0, "WeaponEmitterEntryView::extraRef offset must be 0xD0"
   );
 
+  struct CAiAttackerImplRuntimeView
+  {
+    std::uint8_t pad_00[0x40];
+    Unit* mUnit;                                   // +0x40
+    CTaskStage mStage;                             // +0x44
+    msvc8::vector<UnitWeapon*> mWeapons;           // +0x58
+    WeakPtr<CTaskThread> mThread;                  // +0x68
+    msvc8::vector<CAcquireTargetTask*> mTasks;     // +0x70
+    CAiTarget mDesiredTarget;       // +0x80
+    EAiAttackerEvent mReportingState; // +0xA0
+  };
+
+  static_assert(offsetof(CAiAttackerImplRuntimeView, mUnit) == 0x40, "CAiAttackerImpl::mUnit offset must be 0x40");
+  static_assert(offsetof(CAiAttackerImplRuntimeView, mStage) == 0x44, "CAiAttackerImpl::mStage offset must be 0x44");
+  static_assert(
+    offsetof(CAiAttackerImplRuntimeView, mWeapons) == 0x58, "CAiAttackerImpl::mWeapons offset must be 0x58"
+  );
+  static_assert(
+    offsetof(CAiAttackerImplRuntimeView, mThread) == 0x68, "CAiAttackerImpl::mThread offset must be 0x68"
+  );
+  static_assert(
+    offsetof(CAiAttackerImplRuntimeView, mTasks) == 0x70, "CAiAttackerImpl::mTasks offset must be 0x70"
+  );
+  static_assert(
+    offsetof(CAiAttackerImplRuntimeView, mDesiredTarget) == 0x80,
+    "CAiAttackerImpl::mDesiredTarget offset must be 0x80"
+  );
+  static_assert(
+    offsetof(CAiAttackerImplRuntimeView, mReportingState) == 0xA0,
+    "CAiAttackerImpl::mReportingState offset must be 0xA0"
+  );
+  static_assert(sizeof(CAiAttackerImplRuntimeView) == 0xA4, "CAiAttackerImpl runtime view size must be 0xA4");
+
+  [[nodiscard]] CAiAttackerImplRuntimeView* AsRuntimeView(CAiAttackerImpl* const object) noexcept
+  {
+    return reinterpret_cast<CAiAttackerImplRuntimeView*>(object);
+  }
+
+  [[nodiscard]] const CAiAttackerImplRuntimeView* AsRuntimeView(const CAiAttackerImpl* const object) noexcept
+  {
+    return reinterpret_cast<const CAiAttackerImplRuntimeView*>(object);
+  }
+
+  [[nodiscard]] IAiAttacker* AsAiAttackerBase(CAiAttackerImpl* const object) noexcept
+  {
+    return reinterpret_cast<IAiAttacker*>(object);
+  }
+
+  [[nodiscard]] const IAiAttacker* AsAiAttackerBase(const CAiAttackerImpl* const object) noexcept
+  {
+    return reinterpret_cast<const IAiAttacker*>(object);
+  }
+
+  [[nodiscard]] CScriptObject* AsScriptObjectBase(CAiAttackerImpl* const object) noexcept
+  {
+    return reinterpret_cast<CScriptObject*>(reinterpret_cast<std::uint8_t*>(object) + 0x0C);
+  }
+
+  struct ProjectileImpactBroadcasterRuntimeView
+  {
+    std::uint8_t pad_00[0x270];
+    WeakPtr<void> mImpactBroadcaster; // +0x270
+  };
+
+  static_assert(
+    offsetof(ProjectileImpactBroadcasterRuntimeView, mImpactBroadcaster) == 0x270,
+    "Projectile impact broadcaster offset must be 0x270"
+  );
+
+  enum class WeaponTargetRangeStatus : std::int32_t
+  {
+    Available = 0,
+    InsideMinRange = 1,
+    NoSolution = 2,
+    OutsideMaxRange = 3,
+  };
+
+  [[nodiscard]] float NormalizeAngleRadians(float angleRadians) noexcept
+  {
+    constexpr float kPi = 3.14159265358979323846f;
+    constexpr float kTwoPi = 6.28318530717958647692f;
+
+    float normalized = std::fmod(angleRadians + kPi, kTwoPi);
+    if (normalized < 0.0f) {
+      normalized += kTwoPi;
+    }
+    return normalized - kPi;
+  }
+
+  [[nodiscard]] WeaponTargetRangeStatus EvaluateWeaponTargetSolutionStatusGun(
+    UnitWeapon* const weapon, const Wm3::Vector3f& targetPos, float* const inOutDistanceSq
+  )
+  {
+    if (weapon == nullptr || weapon->mUnit == nullptr) {
+      return WeaponTargetRangeStatus::NoSolution;
+    }
+
+    float distSq = 0.0f;
+    if (inOutDistanceSq != nullptr && *inOutDistanceSq > 0.0f) {
+      distSq = *inOutDistanceSq;
+    } else {
+      const Wm3::Vector3f& unitPos = weapon->mUnit->GetPosition();
+      const float dx = targetPos.x - unitPos.x;
+      const float dz = targetPos.z - unitPos.z;
+      distSq = (dx * dx) + (dz * dz);
+    }
+
+    if (const RUnitBlueprintWeapon* const blueprint = weapon->mAttributes.mBlueprint; blueprint != nullptr) {
+      if (weapon->mAttributes.mMaxRadiusSq < 0.0f) {
+        weapon->mAttributes.mMaxRadiusSq = blueprint->MaxRadius * blueprint->MaxRadius;
+      }
+      if (weapon->mAttributes.mMinRadiusSq < 0.0f) {
+        weapon->mAttributes.mMinRadiusSq = blueprint->MinRadius * blueprint->MinRadius;
+      }
+    }
+
+    if (distSq > weapon->mAttributes.mMaxRadiusSq) {
+      return WeaponTargetRangeStatus::OutsideMaxRange;
+    }
+    if (weapon->mAttributes.mMinRadiusSq >= distSq) {
+      return WeaponTargetRangeStatus::InsideMinRange;
+    }
+
+    float maxHeightDiff = weapon->mAttributes.mMaxHeightDiff;
+    if (maxHeightDiff < 0.0f && weapon->mAttributes.mBlueprint != nullptr) {
+      maxHeightDiff = weapon->mAttributes.mBlueprint->MaxHeightDiff;
+    }
+    if (std::fabs(targetPos.y - weapon->mUnit->GetPosition().y) > maxHeightDiff) {
+      return WeaponTargetRangeStatus::OutsideMaxRange;
+    }
+
+    if (weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->HeadingArcRange < 180.0f) {
+      Wm3::Vector3f muzzlePos = weapon->mUnit->GetPosition();
+      if (weapon->mBone >= 0) {
+        muzzlePos = weapon->mUnit->GetBoneWorldTransform(weapon->mBone).pos_;
+      }
+
+      const float targetHeading = std::atan2(targetPos.x - muzzlePos.x, targetPos.z - muzzlePos.z);
+      const Wm3::Vector3f unitForward = weapon->mUnit->GetTransform().orient_.Rotate(Wm3::Vector3f{0.0f, 0.0f, 1.0f});
+      const float unitHeading = std::atan2(unitForward.x, unitForward.z);
+      const float arcCenterRadians = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
+      const float arcRangeRadians = weapon->mWeaponBlueprint->HeadingArcRange * kDegreesToRadians;
+      const float headingDelta = NormalizeAngleRadians(targetHeading - unitHeading - arcCenterRadians);
+
+      if (std::fabs(headingDelta) > arcRangeRadians) {
+        return WeaponTargetRangeStatus::NoSolution;
+      }
+    }
+
+    if (inOutDistanceSq != nullptr) {
+      *inOutDistanceSq = distSq;
+    }
+    return WeaponTargetRangeStatus::Available;
+  }
+
+  [[nodiscard]] WeaponTargetRangeStatus ResolveWeaponTargetRangeStatus(UnitWeapon* const weapon, CAiTarget* const target)
+  {
+    if (weapon == nullptr || target == nullptr) {
+      return WeaponTargetRangeStatus::OutsideMaxRange;
+    }
+
+    const Wm3::Vector3f targetPos = target->GetTargetPosGun(true);
+    return EvaluateWeaponTargetSolutionStatusGun(weapon, targetPos, nullptr);
+  }
+
+  [[nodiscard]] bool CanWeaponPickEntityTarget(UnitWeapon* const weapon, Entity* const targetEntity)
+  {
+    if (weapon == nullptr || targetEntity == nullptr) {
+      return false;
+    }
+
+    CAiTarget target{};
+    target.UpdateTarget(targetEntity);
+    return UnitWeapon::CanAttackTarget(&target, weapon);
+  }
+
+  [[nodiscard]] CAiTarget BuildClearedTarget()
+  {
+    CAiTarget target{};
+    target.targetType = EAiTargetType::AITARGET_None;
+    target.targetEntity.ownerLinkSlot = nullptr;
+    target.targetEntity.nextInOwner = nullptr;
+    target.targetPoint = -1;
+    target.targetIsMobile = false;
+    return target;
+  }
+
+  [[nodiscard]] CSimConVarBase* FindSimConVarByName(const char* const name)
+  {
+    if (name == nullptr || *name == '\0') {
+      return nullptr;
+    }
+
+    CSimConCommand* const command = moho::FindRegisteredSimConCommand(name);
+    return dynamic_cast<CSimConVarBase*>(command);
+  }
+
+  [[nodiscard]] bool ReadSimConVarBoolByName(Sim* const sim, const char* const name, const bool defaultValue)
+  {
+    if (sim == nullptr) {
+      return defaultValue;
+    }
+
+    CSimConVarBase* const conVar = FindSimConVarByName(name);
+    if (conVar == nullptr) {
+      return defaultValue;
+    }
+
+    CSimConVarInstanceBase* const instance = sim->GetSimVar(conVar);
+    if (instance == nullptr) {
+      return defaultValue;
+    }
+
+    const void* const valueStorage = instance->GetValueStorage();
+    if (valueStorage == nullptr) {
+      return defaultValue;
+    }
+
+    return *static_cast<const bool*>(valueStorage);
+  }
+
+  [[nodiscard]] bool SegmentIntersectsTerrain(
+    const STIMap* const mapData,
+    const Wm3::Vector3f& startPosition,
+    const Wm3::Vector3f& endPosition
+  )
+  {
+    if (mapData == nullptr || mapData->mHeightField == nullptr) {
+      return false;
+    }
+
+    Wm3::Vector3f direction{
+      endPosition.x - startPosition.x,
+      endPosition.y - startPosition.y,
+      endPosition.z - startPosition.z,
+    };
+    const float length = Wm3::Vector3f::Normalize(&direction);
+    if (length <= 0.0f) {
+      return false;
+    }
+
+    GeomLine3 line{};
+    line.pos = startPosition;
+    line.dir = direction;
+    line.closest = 0.0f;
+    line.farthest = length;
+
+    CGeomHitResult hit{};
+    const Wm3::Vector3f intersection = mapData->mHeightField->Intersection(line, &hit);
+    return Wm3::Vector3fIsntNaN(&intersection) && hit.distance <= length;
+  }
+
+  void AttachTaskToStage(CTask* const task, CTaskStage* const stage, const bool owning)
+  {
+    if (task == nullptr || stage == nullptr || task->mOwnerThread != nullptr) {
+      return;
+    }
+
+    CTaskThread* const thread = new CTaskThread(stage);
+    if (thread == nullptr) {
+      return;
+    }
+
+    task->mAutoDelete = owning;
+    task->mOwnerThread = thread;
+    task->mSubtask = thread->mTaskTop;
+    thread->mTaskTop = task;
+  }
+
+  /**
+   * Address: 0x005D9520 (FUN_005D9520, helper for CAcquireTargetTask scheduling)
+   *
+   * What it does:
+   * Updates acquire-target task pending-frame countdown and unstages its thread
+   * when schedule changes require immediate processing.
+   */
+  void RefreshAcquireTargetTaskScheduling(CAcquireTargetTask* const task)
+  {
+    if (task == nullptr || task->mWeapon == nullptr) {
+      return;
+    }
+
+    int pendingFrames = 0;
+    CAiTarget* const desiredTarget =
+      (task->mAttacker != nullptr) ? task->mAttacker->GetDesiredTarget() : nullptr;
+
+    if (desiredTarget != nullptr && desiredTarget->targetType == EAiTargetType::AITARGET_None) {
+      if (task->mWeapon->mWeaponBlueprint != nullptr && task->mWeapon->mWeaponBlueprint->NeedPrep != 0u) {
+        pendingFrames = 2;
+      } else {
+        const float checkInterval =
+          (task->mWeapon->mWeaponBlueprint != nullptr) ? task->mWeapon->mWeaponBlueprint->TargetCheckInterval : 0.0f;
+        const int roundedFrames = static_cast<int>(std::ceil(checkInterval * 10.0f));
+        pendingFrames = (roundedFrames > 1) ? roundedFrames : 1;
+      }
+    }
+
+    CTaskThread* const ownerThread = task->mOwnerThread;
+    if (ownerThread == nullptr) {
+      return;
+    }
+
+    ownerThread->mPendingFrames = pendingFrames;
+    if (ownerThread->mStaged) {
+      ownerThread->Unstage();
+    }
+  }
+
+  template <class TBroadcaster, class TListener>
+  void BindManyToOneListener(TBroadcaster* const broadcaster, TListener* const listener) noexcept
+  {
+    if (broadcaster == nullptr) {
+      return;
+    }
+
+    auto& weakLink = reinterpret_cast<WeakPtr<void>&>(*broadcaster);
+    const void* const ownerLinkSlot = (listener != nullptr)
+                                        ? reinterpret_cast<const void*>(
+                                            reinterpret_cast<std::uintptr_t>(listener) + WeakPtr<void>::kOwnerLinkOffset
+                                          )
+                                        : nullptr;
+    weakLink.ResetFromOwnerLinkSlot(const_cast<void*>(ownerLinkSlot));
+  }
+
+  [[nodiscard]] CAcquireTargetTask*
+  FindAcquireTaskForWeapon(msvc8::vector<CAcquireTargetTask*>& tasks, UnitWeapon* const weapon) noexcept
+  {
+    for (CAcquireTargetTask* const task : tasks) {
+      if (task != nullptr && task->mWeapon == weapon) {
+        return task;
+      }
+    }
+    return nullptr;
+  }
+
+  [[nodiscard]] Listener<EAiAttackerEvent>* ListenerFromBroadcasterLink(Broadcaster* const node) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
+    return reinterpret_cast<Listener<EAiAttackerEvent>*>(bytePtr - offsetof(Listener<EAiAttackerEvent>, mListenerLink));
+  }
+
+  /**
+   * Address: 0x005DB480 (FUN_005DB480, broadcaster dispatch helper)
+   *
+   * What it does:
+   * Dispatches one attacker event to current listeners while preserving
+   * iteration safety for listeners that relink/unlink during callbacks.
+   */
+  void BroadcastAiAttackerEvent(CAiAttackerImpl* const attacker, const EAiAttackerEvent event)
+  {
+    if (attacker == nullptr) {
+      return;
+    }
+
+    Broadcaster& broadcaster = AsAiAttackerBase(attacker)->mListeners;
+    Broadcaster detached{};
+
+    if (broadcaster.mPrev == &broadcaster) {
+      return;
+    }
+
+    detached.mPrev = broadcaster.mPrev;
+    detached.mNext = broadcaster.mNext;
+    detached.mNext->mPrev = &detached;
+    detached.mPrev->mNext = &detached;
+    broadcaster.mPrev = &broadcaster;
+    broadcaster.mNext = &broadcaster;
+
+    while (detached.mPrev != &detached) {
+      Broadcaster* const listenerLink = static_cast<Broadcaster*>(detached.mPrev);
+      listenerLink->ListLinkAfter(&broadcaster);
+
+      if (Listener<EAiAttackerEvent>* const listener = ListenerFromBroadcasterLink(listenerLink); listener != nullptr) {
+        listener->OnEvent(event);
+      }
+    }
+
+    detached.mNext->mPrev = detached.mPrev;
+    detached.mPrev->mNext = detached.mNext;
+  }
+
   template <CScrLuaInitForm* (*Target)()>
   [[nodiscard]] CScrLuaInitForm* ForwardAiAttackerLuaThunk() noexcept
   {
@@ -138,30 +568,14 @@ namespace
     return index;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
     static moho::CScrLuaInitFormSet fallbackSet("sim");
     return fallbackSet;
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   void RequireLuaArgCount(LuaPlus::LuaState* const state, const char* const helpText, const int expectedArgs)
@@ -271,6 +685,939 @@ std::int32_t CAiAttackerImpl::ReadExtraDataValue(const WeaponExtraRefSubobject* 
 }
 
 /**
+ * Address: 0x005D6D30 (FUN_005D6D30, Moho::CAiAttackerImpl::WeaponsOnDestroy)
+ *
+ * What it does:
+ * Broadcasts `OnDestroy` to each live weapon script-object lane.
+ */
+void CAiAttackerImpl::WeaponsOnDestroy()
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon) {
+      (void)weapon->RunScript("OnDestroy");
+    }
+  }
+}
+
+/**
+ * Address: 0x005D5D60 (FUN_005D5D60, Moho::CAiAttackerImpl::GetUnit)
+ *
+ * What it does:
+ * Returns the owning attacker unit pointer lane.
+ */
+Unit* CAiAttackerImpl::GetUnit()
+{
+  return AsRuntimeView(this)->mUnit;
+}
+
+/**
+ * Address: 0x005D6D80 (FUN_005D6D80, Moho::CAiAttackerImpl::WeaponsBusy)
+ *
+ * What it does:
+ * Reports whether any weapon currently carries a non-empty target type.
+ */
+bool CAiAttackerImpl::WeaponsBusy()
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  for (const UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon && weapon->mTarget.targetType != EAiTargetType::AITARGET_None) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Address: 0x005D5D80 (FUN_005D5D80, Moho::CAiAttackerImpl::GetTaskStage)
+ *
+ * What it does:
+ * Returns the embedded task-stage lane used by attacker worker tasks.
+ */
+CTaskStage* CAiAttackerImpl::GetTaskStage()
+{
+  return &AsRuntimeView(this)->mStage;
+}
+
+/**
+ * Address: 0x005D76E0 (FUN_005D76E0, Moho::CAiAttackerImpl::CreateWeapon)
+ *
+ * What it does:
+ * Allocates one weapon for this attacker, binds task threads for fire/target
+ * control, and stores the weapon/task lanes into attacker-owned vectors.
+ */
+UnitWeapon* CAiAttackerImpl::CreateWeapon(RUnitBlueprintWeapon* const weaponBlueprint)
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const int weaponIndex = static_cast<int>(view->mWeapons.size());
+
+  UnitWeapon* weapon = new UnitWeapon();
+  if (weapon != nullptr) {
+    Unit* const ownerUnit = view->mUnit;
+    weapon->mSim = (ownerUnit != nullptr) ? ownerUnit->SimulationRef : nullptr;
+    weapon->mWeaponBlueprint = weaponBlueprint;
+    weapon->mProjectileBlueprint = nullptr;
+    weapon->mAttacker = AsAiAttackerBase(this);
+    weapon->mAttributes = CWeaponAttributes(weaponBlueprint);
+    weapon->mUnit = ownerUnit;
+    weapon->mWeaponIndex = weaponIndex;
+    weapon->mBone = -1;
+    weapon->mEnabled = 1u;
+    weapon->mCanFire = 1u;
+    weapon->mLabel = "Default";
+    weapon->mTarget = BuildClearedTarget();
+    weapon->mFiringRandomness = (weaponBlueprint != nullptr) ? weaponBlueprint->FiringRandomness : 0.0f;
+
+    if (weapon->mSim != nullptr && weapon->mSim->mRules != nullptr && weaponBlueprint != nullptr
+        && !weaponBlueprint->ProjectileId.name.empty()) {
+      weapon->mProjectileBlueprint = weapon->mSim->mRules->GetProjectileBlueprint(weaponBlueprint->ProjectileId);
+    }
+
+    weapon->mFireWeaponTask = new CFireWeaponTask(weapon);
+    AttachTaskToStage(weapon->mFireWeaponTask, &view->mStage, false);
+
+    (void)weapon->RunScript("OnCreate");
+  }
+
+  view->mWeapons.push_back(weapon);
+
+  if (weaponBlueprint != nullptr && weaponBlueprint->ManualFire == 0u) {
+    CAcquireTargetTask* const task = new CAcquireTargetTask(weapon, this);
+    AttachTaskToStage(task, &view->mStage, false);
+    view->mTasks.push_back(task);
+  }
+
+  if (view->mUnit != nullptr) {
+    view->mUnit->NeedSyncGameData = true;
+  }
+
+  return weapon;
+}
+
+/**
+ * Address: 0x005D5D90 (FUN_005D5D90, Moho::CAiAttackerImpl::GetWeaponCount)
+ *
+ * What it does:
+ * Returns the current attacker weapon vector length.
+ */
+int CAiAttackerImpl::GetWeaponCount()
+{
+  return static_cast<int>(AsRuntimeView(this)->mWeapons.size());
+}
+
+/**
+ * Address: 0x005D77D0 (FUN_005D77D0, Moho::CAiAttackerImpl::GetWeapon)
+ *
+ * What it does:
+ * Returns one attacker weapon by index and raises fatal error for invalid
+ * index lanes.
+ */
+UnitWeapon* CAiAttackerImpl::GetWeapon(const int index)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const unsigned int weaponCount = static_cast<unsigned int>(view->mWeapons.size());
+  const unsigned int weaponIndex = static_cast<unsigned int>(index);
+  if (weaponIndex >= weaponCount) {
+    gpg::Die("Invalid weapon index %i passed to AttackerGetWeaponByIndex.", index);
+    return nullptr;
+  }
+
+  return view->mWeapons[static_cast<std::size_t>(weaponIndex)];
+}
+
+/**
+ * Address: 0x005D75B0 (FUN_005D75B0, Moho::CAiAttackerImpl::SetDesiredTarget)
+ *
+ * What it does:
+ * Stores desired-target state, clears per-weapon active targets, refreshes
+ * acquire-task scheduling, and emits `CannotTarget` when state was previously set.
+ */
+void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  view->mDesiredTarget = (target != nullptr) ? *target : BuildClearedTarget();
+
+  const CAiTarget clearedTarget = BuildClearedTarget();
+  const bool hasDesiredTarget = (target != nullptr) && target->HasTarget();
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon == nullptr) {
+      continue;
+    }
+
+    weapon->mTarget = clearedTarget;
+
+    if (weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->NeedPrep != 0u && hasDesiredTarget) {
+      (void)weapon->RunScript("OnGotTarget");
+    }
+  }
+
+  for (CAcquireTargetTask* const task : view->mTasks) {
+    RefreshAcquireTargetTaskScheduling(task);
+  }
+
+  if (view->mReportingState != static_cast<EAiAttackerEvent>(0)) {
+    view->mReportingState = kAiAttackerEventCannotTarget;
+    BroadcastAiAttackerEvent(this, kAiAttackerEventCannotTarget);
+  }
+}
+
+/**
+ * Address: 0x005D5D70 (FUN_005D5D70, Moho::CAiAttackerImpl::GetDesiredTarget)
+ *
+ * What it does:
+ * Returns the owned desired-target payload lane.
+ */
+CAiTarget* CAiAttackerImpl::GetDesiredTarget()
+{
+  return &AsRuntimeView(this)->mDesiredTarget;
+}
+
+/**
+ * Address: 0x005D7570 (FUN_005D7570, Moho::CAiAttackerImpl::OnWeaponHaltFire)
+ *
+ * What it does:
+ * Broadcasts `OnHaltFire` to each live weapon script-object lane.
+ */
+void CAiAttackerImpl::OnWeaponHaltFire()
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon) {
+      (void)weapon->RunScript("OnHaltFire");
+    }
+  }
+}
+
+/**
+ * Address: 0x005D6FA0 (FUN_005D6FA0, Moho::CAiAttackerImpl::CanAttackTarget)
+ *
+ * What it does:
+ * Returns true when any owned weapon can attack the provided target payload.
+ */
+bool CAiAttackerImpl::CanAttackTarget(CAiTarget* const target)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
+    return false;
+  }
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (UnitWeapon::CanAttackTarget(target, weapon)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005D6F40 (FUN_005D6F40, Moho::CAiAttackerImpl::PickTarget)
+ *
+ * What it does:
+ * Tests one entity against each owned weapon's target-point eligibility and
+ * returns true when any weapon can pick that target.
+ */
+bool CAiAttackerImpl::PickTarget(Entity* const targetEntity)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (targetEntity == nullptr || !view->mUnit || view->mUnit->IsBeingBuilt()) {
+    return false;
+  }
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (CanWeaponPickEntityTarget(weapon, targetEntity)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005D6490 (FUN_005D6490, Moho::AI_TestForTerrainBlockage)
+ *
+ * What it does:
+ * Tests direct or ballistic quarter-segment lanes from the firing unit to
+ * `targetPosition` against terrain-heightfield intersections.
+ */
+bool moho::AI_TestForTerrainBlockage(
+  const Unit* const unit,
+  const Wm3::Vector3f& targetPosition,
+  const ERuleBPUnitWeaponBallisticArc ballisticArc
+)
+{
+  if (unit == nullptr || unit->mCurrentLayer == LAYER_Air || unit->SimulationRef == nullptr) {
+    return false;
+  }
+
+  const STIMap* const mapData = unit->SimulationRef->mMapData;
+  if (mapData == nullptr || mapData->mHeightField == nullptr) {
+    return false;
+  }
+
+  Wm3::Vector3f unitTop = unit->GetPosition();
+  const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+  const float sizeZ = (blueprint != nullptr) ? blueprint->mSizeZ : 0.0f;
+  unitTop.y = (sizeZ * 2.0f) + unitTop.y;
+
+  Wm3::Vector3f adjustedTarget = targetPosition;
+  adjustedTarget.y += 0.25f;
+
+  if (ballisticArc == RULEUBA_None) {
+    return SegmentIntersectsTerrain(mapData, unitTop, adjustedTarget);
+  }
+
+  const Wm3::Vector3f quarterDelta{
+    (adjustedTarget.x - unitTop.x) * 0.25f,
+    (adjustedTarget.y - unitTop.y) * 0.25f,
+    (adjustedTarget.z - unitTop.z) * 0.25f,
+  };
+
+  const float quarterDistance = Wm3::Vector3f::Length(quarterDelta);
+  Wm3::Vector3f previousPos = unitTop;
+
+  for (const float arcFactor : kBallisticArcHeightFactors) {
+    Wm3::Vector3f currentPos{
+      previousPos.x + quarterDelta.x,
+      previousPos.y + quarterDelta.y,
+      previousPos.z + quarterDelta.z,
+    };
+
+    const float arcScale = (ballisticArc == RULEUBA_LowArc) ? 0.5f : 2.0f;
+    currentPos.y += arcFactor * quarterDistance * arcScale;
+
+    if (SegmentIntersectsTerrain(mapData, previousPos, currentPos)) {
+      return true;
+    }
+
+    previousPos = currentPos;
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005D7A10 (FUN_005D7A10, Moho::CAiAttackerImpl::FindBestEnemy)
+ *
+ * What it does:
+ * Scores candidate enemy entities in `entities` and returns the highest
+ * priority/closest eligible target for `weapon`.
+ */
+Entity* CAiAttackerImpl::FindBestEnemy(
+  UnitWeapon* const weapon,
+  gpg::core::FastVectorN<SWeakRefSlot, 20>* const entities,
+  const float range,
+  const bool use3DDistance
+)
+{
+  if (weapon == nullptr || entities == nullptr || entities->begin() == entities->end()) {
+    return nullptr;
+  }
+
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  Unit* const unit = view->mUnit;
+  if (unit == nullptr || unit->ArmyRef == nullptr || unit->SimulationRef == nullptr || unit->SimulationRef->mRules == nullptr) {
+    return nullptr;
+  }
+
+  CArmyImpl* const army = unit->ArmyRef;
+  const Wm3::Vector3f unitPosition = unit->GetPosition();
+  const Wm3::Vector3f weaponForward = UnitWeapon::GetForwardVector(weapon);
+
+  const auto* const benignRange = unit->SimulationRef->mRules->GetEntityCategory("BENIGN");
+  const auto* const benignCategory = reinterpret_cast<const EntityCategorySet*>(benignRange);
+
+  const bool tryTerrainBlockage =
+    ReadSimConVarBoolByName(unit->SimulationRef, kWeaponTerrainBlockageConVarName, false);
+  const float maxRangeSq = range * range;
+
+  Entity* bestEntity = nullptr;
+  float bestDistance = std::numeric_limits<float>::infinity();
+  WeaponTargetRangeStatus bestSolution = WeaponTargetRangeStatus::OutsideMaxRange;
+  std::uint32_t bestCategory = 9999u;
+
+  for (const SWeakRefSlot& slot : *entities) {
+    std::uint32_t closestSeenCategory = 9999u;
+    Entity* const candidate = slot.ResolveObjectPtr<Entity>();
+    if (candidate == nullptr || candidate->Dead != 0u || candidate->DestroyQueuedFlag != 0u) {
+      continue;
+    }
+
+    ReconBlip* reconBlip = candidate->IsReconBlip();
+    if (reconBlip == nullptr) {
+      Unit* const candidateUnit = candidate->IsUnit();
+      if (candidateUnit == nullptr) {
+        continue;
+      }
+
+      CAiReconDBImpl* const reconDb = army->GetReconDB();
+      reconBlip = (reconDb != nullptr) ? reconDb->ReconGetBlip(candidateUnit) : nullptr;
+    }
+    if (reconBlip == nullptr) {
+      continue;
+    }
+
+    const Wm3::Vector3f candidatePosition = candidate->Position;
+    const float xDistance = unitPosition.x - candidatePosition.x;
+    const float zDistance = unitPosition.z - candidatePosition.z;
+    float distanceSq = (xDistance * xDistance) + (zDistance * zDistance);
+    if (distanceSq > maxRangeSq) {
+      continue;
+    }
+
+    const std::uint32_t candidateArmyId = (candidate->ArmyRef != nullptr)
+                                            ? static_cast<std::uint32_t>(candidate->ArmyRef->ArmyId)
+                                            : static_cast<std::uint32_t>(-1);
+    if (!army->IsEnemy(candidateArmyId)) {
+      continue;
+    }
+
+    const REntityBlueprint* const candidateBlueprint = candidate->BluePrint;
+    if (candidateBlueprint == nullptr) {
+      continue;
+    }
+
+    if (benignCategory != nullptr && EntityCategory::HasBlueprint(candidateBlueprint, benignCategory)) {
+      continue;
+    }
+
+    const bool isAirLayer = candidate->mCurrentLayer == LAYER_Air;
+    const bool isBeingBuilt = candidate->IsBeingBuilt();
+    if ((candidate->mAttachInfo.GetAttachTargetEntity() != nullptr && (isAirLayer || isBeingBuilt))
+        || (isAirLayer && isBeingBuilt)) {
+      continue;
+    }
+
+    if (UnitWeapon::IsEntityBlacklisted(weapon, candidate) || IsTargetExempt(candidate)) {
+      continue;
+    }
+
+    if (Unit* const candidateUnit = candidate->IsUnit();
+        candidateUnit != nullptr && candidateUnit->IsUnitState(UNITSTATE_DoNotTarget)) {
+      continue;
+    }
+
+    if (!isAirLayer) {
+      const STIMap* const candidateMap = (candidate->SimulationRef != nullptr) ? candidate->SimulationRef->mMapData : nullptr;
+      if (candidateMap == nullptr) {
+        continue;
+      }
+
+      const gpg::Rect2i& playableRect = candidateMap->mPlayableRect;
+      if (candidatePosition.x < static_cast<float>(playableRect.x0)
+          || candidatePosition.z < static_cast<float>(playableRect.z0)
+          || candidatePosition.x > static_cast<float>(playableRect.x1)
+          || candidatePosition.z > static_cast<float>(playableRect.z1)) {
+        continue;
+      }
+    }
+
+    if (!CanWeaponPickEntityTarget(weapon, candidate)) {
+      continue;
+    }
+
+    const WeaponTargetRangeStatus solutionStatus =
+      EvaluateWeaponTargetSolutionStatusGun(weapon, candidatePosition, &distanceSq);
+    if ((solutionStatus == WeaponTargetRangeStatus::InsideMinRange || solutionStatus == WeaponTargetRangeStatus::NoSolution)
+        && (!unit->IsMobile()
+            || weapon->mWeaponBlueprint == nullptr
+            || (weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u
+                && weapon->mWeaponBlueprint->SlavedToBody == 0u))) {
+      continue;
+    }
+
+    if (tryTerrainBlockage && weapon->mWeaponBlueprint != nullptr
+        && moho::AI_TestForTerrainBlockage(unit, candidatePosition, weapon->mWeaponBlueprint->BallisticArc)) {
+      continue;
+    }
+
+    if (const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
+        unitBlueprint != nullptr && unitBlueprint->AI.NeedUnpack != 0u
+        && solutionStatus != WeaponTargetRangeStatus::Available) {
+      continue;
+    }
+
+    float usedDistance = distanceSq;
+    if (use3DDistance) {
+      Wm3::Vector3f toTarget{
+        xDistance,
+        unitPosition.y - candidatePosition.y,
+        zDistance,
+      };
+      Wm3::Vector3f::Normalize(&toTarget);
+      usedDistance = Wm3::Vector3f::Dot(toTarget, weaponForward);
+    }
+
+    if (solutionStatus != WeaponTargetRangeStatus::Available
+        && weapon->mWeaponBlueprint != nullptr
+        && weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+      if (use3DDistance) {
+        usedDistance += 4.0f;
+      } else {
+        usedDistance *= 4.0f;
+      }
+    }
+
+    const bool seenEver =
+      (static_cast<std::uint32_t>(reconBlip->GetFlags(army)) & static_cast<std::uint32_t>(RECON_LOSEver)) != 0u;
+    Entity* const currentTarget = weapon->mTarget.targetEntity.GetObjectPtr();
+
+    const std::size_t priorityCount = weapon->mTargetPriorities.size();
+    for (std::size_t categoryIndex = 0; categoryIndex < priorityCount; ++categoryIndex) {
+      const std::uint32_t categoryLane = static_cast<std::uint32_t>(categoryIndex);
+
+      if (categoryLane > bestCategory
+          || (solutionStatus > bestSolution && bestEntity != nullptr)) {
+        break;
+      }
+
+      if (!EntityCategory::HasBlueprint(candidateBlueprint, &weapon->mTargetPriorities[categoryIndex])) {
+        continue;
+      }
+
+      if (seenEver) {
+        closestSeenCategory = categoryLane;
+      }
+
+      bool shouldSetBest = false;
+      if (bestCategory > closestSeenCategory) {
+        shouldSetBest = true;
+      } else if (currentTarget != nullptr) {
+        const bool shouldSkip =
+          currentTarget == bestEntity || (bestDistance <= usedDistance && currentTarget != candidate);
+        shouldSetBest = !shouldSkip;
+      } else {
+        shouldSetBest = bestDistance > usedDistance;
+      }
+
+      if (shouldSetBest) {
+        bestDistance = usedDistance;
+        bestEntity = candidate;
+        bestSolution = solutionStatus;
+        bestCategory = closestSeenCategory;
+      }
+    }
+  }
+
+  return bestEntity;
+}
+
+/**
+ * Address: 0x005D6DC0 (FUN_005D6DC0, Moho::CAiAttackerImpl::GetTargetWeapon)
+ *
+ * What it does:
+ * Returns the first weapon that can attack the provided target payload.
+ */
+UnitWeapon* CAiAttackerImpl::GetTargetWeapon(CAiTarget* const target)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
+    return nullptr;
+  }
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (UnitWeapon::CanAttackTarget(target, weapon)) {
+      return weapon;
+    }
+  }
+
+  return nullptr;
+}
+
+/**
+ * Address: 0x005D6E30 (FUN_005D6E30, Moho::CAiAttackerImpl::GetPrimaryWeapon)
+ *
+ * What it does:
+ * Returns the first non-null weapon with stable weapon index `0`.
+ */
+UnitWeapon* CAiAttackerImpl::GetPrimaryWeapon()
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
+    return nullptr;
+  }
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon && weapon->mWeaponIndex == 0) {
+      return weapon;
+    }
+  }
+
+  return nullptr;
+}
+
+/**
+ * Address: 0x005D6E80 (FUN_005D6E80, Moho::CAiAttackerImpl::GetMaxWeaponRange)
+ *
+ * What it does:
+ * Scans enabled non-manual-fire weapons and returns the max of direct radius
+ * and tracking-radius-adjusted range lanes.
+ */
+float CAiAttackerImpl::GetMaxWeaponRange()
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
+    return 0.0f;
+  }
+
+  float maxRange = 0.0f;
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (!weapon || weapon->mEnabled == 0u) {
+      continue;
+    }
+
+    const RUnitBlueprintWeapon* const weaponBlueprint = weapon->mWeaponBlueprint;
+    if (weaponBlueprint && weaponBlueprint->ManualFire != 0u) {
+      continue;
+    }
+
+    float weaponRange = weapon->mAttributes.mMaxRadius;
+    if (weaponRange < 0.0f && weapon->mAttributes.mBlueprint) {
+      weaponRange = weapon->mAttributes.mBlueprint->MaxRadius;
+    }
+
+    if (weaponRange > maxRange) {
+      maxRange = weaponRange;
+    }
+
+    if (weaponBlueprint) {
+      const float trackingRange = weaponBlueprint->TrackingRadius * weaponRange;
+      if (trackingRange > maxRange) {
+        maxRange = trackingRange;
+      }
+    }
+  }
+
+  return maxRange;
+}
+
+/**
+ * Address: 0x005D7190 (FUN_005D7190, Moho::CAiAttackerImpl::VectorIsWithinWeaponAttackRange)
+ *
+ * What it does:
+ * Checks XZ-plane range against one weapon's cached max-radius-squared lane.
+ */
+bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, const Wm3::Vector3f* const targetPos)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt() || !weapon || !targetPos) {
+    return false;
+  }
+
+  const Wm3::Vector3f& unitPos = view->mUnit->GetPosition();
+  const float dx = unitPos.x - targetPos->x;
+  const float dz = unitPos.z - targetPos->z;
+  const float distSq = (dz * dz) + (dx * dx);
+
+  if (weapon->mAttributes.mBlueprint && weapon->mAttributes.mMaxRadiusSq < 0.0f) {
+    weapon->mAttributes.mMaxRadiusSq = weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
+  }
+
+  return distSq <= weapon->mAttributes.mMaxRadiusSq;
+}
+
+/**
+ * Address: 0x005D70E0 (FUN_005D70E0, Moho::CAiAttackerImpl::VectorIsWithinAttackRange)
+ *
+ * What it does:
+ * Checks whether any enabled weapon covers the provided XZ-plane position.
+ */
+bool CAiAttackerImpl::VectorIsWithinAttackRange(const Wm3::Vector3f* const targetPos)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt() || !targetPos) {
+    return false;
+  }
+
+  const Wm3::Vector3f& unitPos = view->mUnit->GetPosition();
+  const float dx = unitPos.x - targetPos->x;
+  const float dz = unitPos.z - targetPos->z;
+  const float distSq = (dz * dz) + (dx * dx);
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (!weapon || weapon->mEnabled == 0u) {
+      continue;
+    }
+
+    if (weapon->mAttributes.mBlueprint && weapon->mAttributes.mMaxRadiusSq < 0.0f) {
+      weapon->mAttributes.mMaxRadiusSq = weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
+    }
+
+    if (weapon->mAttributes.mMaxRadiusSq > distSq) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005D7090 (FUN_005D7090, Moho::CAiAttackerImpl::TargetIsWithinWeaponAttackRange)
+ *
+ * What it does:
+ * Validates one target against one weapon and returns true only when the
+ * weapon can attack and target solution status is `Available`.
+ */
+bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(UnitWeapon* const weapon, CAiTarget* const target)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt() || weapon == nullptr || target == nullptr || weapon->mEnabled == 0u) {
+    return false;
+  }
+
+  if (!UnitWeapon::CanAttackTarget(target, weapon)) {
+    return false;
+  }
+
+  return ResolveWeaponTargetRangeStatus(weapon, target) == WeaponTargetRangeStatus::Available;
+}
+
+/**
+ * Address: 0x005D7000 (FUN_005D7000, Moho::CAiAttackerImpl::TargetIsWithinAttackRange)
+ *
+ * What it does:
+ * Returns true when any enabled weapon can attack the target and reports an
+ * available firing solution.
+ */
+bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt() || target == nullptr) {
+    return false;
+  }
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon == nullptr || weapon->mEnabled == 0u) {
+      continue;
+    }
+
+    if (UnitWeapon::CanAttackTarget(target, weapon)
+        && ResolveWeaponTargetRangeStatus(weapon, target) == WeaponTargetRangeStatus::Available) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005D7210 (FUN_005D7210, Moho::CAiAttackerImpl::IsTooClose)
+ *
+ * What it does:
+ * Reports whether the target is in the min-range-only lane for all eligible
+ * weapons while no enabled eligible weapon has an available solution.
+ */
+bool CAiAttackerImpl::IsTooClose(CAiTarget* const target)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (!view->mUnit || view->mUnit->IsBeingBuilt() || target == nullptr) {
+    return false;
+  }
+
+  bool isTooClose = false;
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (weapon == nullptr || !UnitWeapon::CanAttackTarget(target, weapon)) {
+      continue;
+    }
+
+    const WeaponTargetRangeStatus status = ResolveWeaponTargetRangeStatus(weapon, target);
+    if (status == WeaponTargetRangeStatus::Available) {
+      if (weapon->mEnabled != 0u) {
+        return false;
+      }
+    } else if (status == WeaponTargetRangeStatus::InsideMinRange) {
+      isTooClose = true;
+    }
+  }
+
+  return isTooClose;
+}
+
+/**
+ * Address: 0x005D7340 (FUN_005D7340, Moho::CAiAttackerImpl::IsTargetExempt)
+ *
+ * What it does:
+ * Exempts targets currently used by reclaim/capture commands or targets in
+ * `UNITSTATE_BeingCaptured` that are focused by live engineer units.
+ */
+bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
+{
+  if (target == nullptr) {
+    return false;
+  }
+
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  Unit* const ownerUnit = view->mUnit;
+  if (ownerUnit != nullptr && ownerUnit->CommandQueue != nullptr) {
+    const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot = ownerUnit->CommandQueue->mCommandVec;
+    for (const WeakPtr<CUnitCommand>& weakCommand : commandSnapshot) {
+      CUnitCommand* const command = weakCommand.GetObjectPtr();
+      if (command == nullptr) {
+        continue;
+      }
+
+      const EUnitCommandType commandType = command->mVarDat.mCmdType;
+      if (commandType != EUnitCommandType::UNITCOMMAND_Reclaim
+          && commandType != EUnitCommandType::UNITCOMMAND_Capture) {
+        continue;
+      }
+
+      if (command->mTarget.GetEntity() == target) {
+        return true;
+      }
+    }
+  }
+
+  Unit* const targetUnit = target->IsUnit();
+  if (targetUnit == nullptr || !targetUnit->IsUnitState(UNITSTATE_BeingCaptured)) {
+    return false;
+  }
+  if (ownerUnit == nullptr || ownerUnit->ArmyRef == nullptr || ownerUnit->SimulationRef == nullptr
+      || ownerUnit->SimulationRef->mRules == nullptr) {
+    return false;
+  }
+
+  const auto* const engineerCategory = ownerUnit->SimulationRef->mRules->GetEntityCategory(kEngineerCategoryName);
+  if (engineerCategory == nullptr) {
+    return false;
+  }
+
+  SEntitySetTemplateUnit engineerUnits{};
+  ownerUnit->ArmyRef->GetUnits(&engineerUnits, const_cast<void*>(static_cast<const void*>(engineerCategory)));
+  for (Entity* const* it = engineerUnits.mVec.begin(); it != engineerUnits.mVec.end(); ++it) {
+    Unit* const engineer = SEntitySetTemplateUnit::UnitFromEntry(*it);
+    if (engineer == nullptr || engineer->IsDead() || engineer->DestroyQueued()) {
+      continue;
+    }
+
+    if (engineer->FocusEntityRef.ResolveObjectPtr<Entity>() == target) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x005D72B0 (FUN_005D72B0, Moho::CAiAttackerImpl::HasSlavedTarget)
+ *
+ * What it does:
+ * Returns the first slaved-weapon target and optionally outputs that weapon.
+ */
+CAiTarget* CAiAttackerImpl::HasSlavedTarget(UnitWeapon** const outWeapon)
+{
+  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (outWeapon) {
+    *outWeapon = nullptr;
+  }
+
+  for (UnitWeapon* const weapon : view->mWeapons) {
+    if (!weapon || !weapon->mTarget.HasTarget()) {
+      continue;
+    }
+
+    const RUnitBlueprintWeapon* const weaponBlueprint = weapon->mWeaponBlueprint;
+    if (weaponBlueprint && weaponBlueprint->SlavedToBody != 0u) {
+      if (outWeapon) {
+        *outWeapon = weapon;
+      }
+      return &weapon->mTarget;
+    }
+  }
+
+  return nullptr;
+}
+
+/**
+ * Address: 0x005D5DB0 (FUN_005D5DB0, Moho::CAiAttackerImpl::ResetReportingState)
+ *
+ * What it does:
+ * Clears attacker reporting-state flags to the zero/default lane.
+ */
+void CAiAttackerImpl::ResetReportingState()
+{
+  AsRuntimeView(this)->mReportingState = static_cast<EAiAttackerEvent>(0);
+}
+
+/**
+ * Address: 0x005D7800 (FUN_005D7800, Moho::CAiAttackerImpl::TransmitProjectileImpactEvent)
+ *
+ * What it does:
+ * Finds the acquire-target task for `weapon` and binds projectile impact
+ * broadcaster ownership to that task's projectile-impact listener lane.
+ */
+void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Projectile* const projectile)
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  CAcquireTargetTask* const task = FindAcquireTaskForWeapon(view->mTasks, weapon);
+  if (projectile == nullptr) {
+    return;
+  }
+
+  auto* const projectileView = reinterpret_cast<ProjectileImpactBroadcasterRuntimeView*>(projectile);
+  auto* const listener = (task != nullptr) ? static_cast<ManyToOneListener_EProjectileImpactEvent*>(task) : nullptr;
+  BindManyToOneListener(&projectileView->mImpactBroadcaster, listener);
+}
+
+/**
+ * Address: 0x005D7870 (FUN_005D7870, Moho::CAiAttackerImpl::TransmitBeamImpactEvent)
+ *
+ * What it does:
+ * Finds the acquire-target task for `weapon` and binds collision-beam
+ * broadcaster ownership to that task's collision-beam listener lane.
+ */
+void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, CollisionBeamEntity* const beam)
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  CAcquireTargetTask* const task = FindAcquireTaskForWeapon(view->mTasks, weapon);
+  if (beam == nullptr) {
+    return;
+  }
+
+  auto* const listener = (task != nullptr) ? static_cast<ManyToOneListener_ECollisionBeamEvent*>(task) : nullptr;
+  BindManyToOneListener(&beam->mListener, listener);
+}
+
+/**
+ * Address: 0x005D8650 (FUN_005D8650, Moho::CAiAttackerImpl::ForceEngage)
+ *
+ * What it does:
+ * Sets unit focus entity, dispatches script callback for resolved focus,
+ * marks sync-dirty focus state, and notifies attacker listeners of can-target.
+ */
+void CAiAttackerImpl::ForceEngage(Entity* const target)
+{
+  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  if (view->mUnit == nullptr) {
+    return;
+  }
+
+  view->mUnit->FocusEntityRef.ResetObjectPtr<Entity>(target);
+  if (view->mUnit->FocusEntityRef.ResolveObjectPtr<Entity>() != nullptr) {
+    (void)view->mUnit->RunScript("OnAssignedFocusEntity");
+  }
+
+  view->mUnit->NeedSyncGameData = true;
+  BroadcastAiAttackerEvent(this, kAiAttackerEventCanTarget);
+}
+
+/**
+ * Address: 0x005D5DC0 (FUN_005D5DC0, Moho::CAiAttackerImpl::PushStack)
+ *
+ * What it does:
+ * Pushes this attacker's Lua object wrapper onto the provided Lua stack.
+ */
+void CAiAttackerImpl::PushStack(LuaPlus::LuaState* const luaState)
+{
+  if (luaState == nullptr) {
+    return;
+  }
+
+  AsScriptObjectBase(this)->mLuaObj.PushStack(luaState);
+}
+
+/**
  * Address: 0x005D56F0 (FUN_005D56F0, CAiAttackerImpl::Stop)
  *
  * What it does:
@@ -295,7 +1642,7 @@ void CAiAttackerImpl::Stop()
  */
 int moho::cfunc_CAiAttackerImplGetUnit(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplGetUnitL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplGetUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -324,7 +1671,7 @@ int moho::cfunc_CAiAttackerImplGetUnitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplAttackerWeaponsBusy(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplAttackerWeaponsBusyL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplAttackerWeaponsBusyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -353,7 +1700,7 @@ int moho::cfunc_CAiAttackerImplAttackerWeaponsBusyL(LuaPlus::LuaState* const sta
  */
 int moho::cfunc_CAiAttackerImplGetWeaponCount(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplGetWeaponCountL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplGetWeaponCountL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -382,7 +1729,7 @@ int moho::cfunc_CAiAttackerImplGetWeaponCountL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplSetDesiredTarget(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplSetDesiredTargetL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplSetDesiredTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -413,7 +1760,7 @@ int moho::cfunc_CAiAttackerImplSetDesiredTargetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplGetDesiredTarget(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplGetDesiredTargetL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplGetDesiredTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -443,7 +1790,7 @@ int moho::cfunc_CAiAttackerImplGetDesiredTargetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplStop(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplStopL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplStopL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -471,7 +1818,7 @@ int moho::cfunc_CAiAttackerImplStopL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplCanAttackTarget(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplCanAttackTargetL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplCanAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -507,7 +1854,7 @@ int moho::cfunc_CAiAttackerImplCanAttackTargetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplFindBestEnemy(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplFindBestEnemyL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplFindBestEnemyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -559,7 +1906,7 @@ int moho::cfunc_CAiAttackerImplFindBestEnemyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplGetTargetWeapon(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplGetTargetWeaponL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplGetTargetWeaponL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -598,7 +1945,7 @@ int moho::cfunc_CAiAttackerImplGetTargetWeaponL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplGetPrimaryWeapon(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplGetPrimaryWeaponL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplGetPrimaryWeaponL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -630,7 +1977,7 @@ int moho::cfunc_CAiAttackerImplGetPrimaryWeaponL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplGetMaxWeaponRange(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplGetMaxWeaponRangeL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplGetMaxWeaponRangeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -659,7 +2006,7 @@ int moho::cfunc_CAiAttackerImplGetMaxWeaponRangeL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_CAiAttackerImplIsTooClose(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplIsTooCloseL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplIsTooCloseL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -948,7 +2295,7 @@ int moho::cfunc_CAiAttackerImplIsTargetExemptL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplIsTargetExempt(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplIsTargetExemptL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplIsTargetExemptL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1010,7 +2357,7 @@ int moho::cfunc_CAiAttackerImplHasSlavedTargetL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplHasSlavedTarget(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplHasSlavedTargetL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplHasSlavedTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1062,7 +2409,7 @@ int moho::cfunc_CAiAttackerImplResetReportingStateL(LuaPlus::LuaState* const sta
  */
 int moho::cfunc_CAiAttackerImplResetReportingState(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplResetReportingStateL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplResetReportingStateL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1119,7 +2466,7 @@ int moho::cfunc_CAiAttackerImplForceEngageL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CAiAttackerImplForceEngage(lua_State* const luaContext)
 {
-  return cfunc_CAiAttackerImplForceEngageL(ResolveBindingState(luaContext));
+  return cfunc_CAiAttackerImplForceEngageL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -1150,7 +2497,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplForceEngage_LuaFuncDef()
  */
 CScrLuaInitForm* moho::register_CAiAttackerImplLuaInitFormAnchor()
 {
-  CScrLuaInitFormSet* const simSet = FindSimLuaInitSet();
+  CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("sim");
   if (simSet == nullptr) {
     gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
     return nullptr;

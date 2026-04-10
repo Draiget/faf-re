@@ -24,9 +24,11 @@ namespace gpg
 
 namespace moho
 {
+  class Entity;
   class Unit;
   class CAiFormationInstance;
   class Sim;
+  struct SOCellPos;
   struct SSTICommandIssueData;
   struct SSyncData;
 
@@ -65,6 +67,15 @@ namespace moho
      * digest/counter state, and links coordinating-order relationships.
      */
     CUnitCommand(Sim* sim, const SSTICommandIssueData& issueData);
+
+    /**
+     * Address: 0x006E81B0 (FUN_006E81B0, command-id override lane)
+     *
+     * What it does:
+     * Initializes one command from issue payload lanes while forcing the
+     * resolved command id used by digest/map insertion paths.
+     */
+    CUnitCommand(Sim* sim, const SSTICommandIssueData& issueData, CmdId resolvedCommandId);
 
     /**
      * Address: 0x006E7D40 (FUN_006E7D40, ?GetCoordinateWith@CUnitCommand@Moho@@QBE?AV?$vector@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@V?$allocator@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@@std@@@std@@XZ)
@@ -124,6 +135,60 @@ namespace moho
      * Removes `unit` from the command's unit-set without touching queue links.
      */
     void RemoveUnit(Unit* unit);
+
+    /**
+     * Address: 0x006E8D70 (FUN_006E8D70, Moho::CUnitCommand::FormRemoveUnit)
+     *
+     * What it does:
+     * Removes `unit` from the active formation lane and releases the formation
+     * instance when that lane becomes empty.
+     */
+    static void FormRemoveUnit(Unit* unit, CUnitCommand* command);
+
+    /**
+     * Address: 0x006E88D0 (FUN_006E88D0, Moho::CUnitCommand::Move)
+     *
+     * What it does:
+     * Keeps formation membership in sync for multi-unit commands and creates a
+     * new formation instance when the command first needs one.
+     */
+    static void Move(Unit* unit, CUnitCommand* command);
+
+    /**
+     * Address: 0x006E8A00 (FUN_006E8A00, Moho::CUnitCommand::InFormation)
+     *
+     * What it does:
+     * Returns the active formation instance when `unit` already belongs to the
+     * command's formation lane.
+     */
+    [[nodiscard]] static CAiFormationInstance* InFormation(Unit* unit, CUnitCommand* command);
+
+    /**
+     * Address: 0x006E8A30 (FUN_006E8A30, Moho::CUnitCommand::GetPosition)
+     *
+     * What it does:
+     * Resolves the cell position used by formation and non-formation move
+     * dispatch paths.
+     */
+    [[nodiscard]] static SOCellPos* GetPosition(CUnitCommand* command, Unit* unit, SOCellPos* dest);
+
+    /**
+     * Address: 0x005D5980 (FUN_005D5980, Moho::CUnitCommand::GetFocus)
+     *
+     * What it does:
+     * Returns the command target's focus entity when the weak target link is
+     * valid.
+     */
+    [[nodiscard]] static Entity* GetFocus(CUnitCommand* command);
+
+    /**
+     * Address: 0x005F55F0 (FUN_005F55F0, Moho::CUnitCommand::GetTarget)
+     *
+     * What it does:
+     * Returns the focused target unit when the command target resolves to a
+     * live unit entity.
+     */
+    [[nodiscard]] static Unit* GetTarget(CUnitCommand* command);
 
     /**
      * Address: 0x006F1650

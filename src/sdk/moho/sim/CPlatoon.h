@@ -1,6 +1,12 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+
+#include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/String.h"
+#include "lua/LuaObject.h"
+#include "moho/script/CScriptObject.h"
 
 namespace LuaPlus
 {
@@ -10,28 +16,66 @@ struct lua_State;
 
 namespace gpg
 {
+  class RRef;
   class RType;
 } // namespace gpg
 
 namespace moho
 {
+  class CArmyImpl;
   class CScrLuaInitForm;
   class CSquad;
+  class Entity;
+  class IArmy;
+  class Sim;
   class Unit;
   enum class ESquadClass : std::int32_t;
   enum EUnitState : std::int32_t;
 
   /**
-   * Recovered minimal polymorphic base for platoon pointers used by
-   * army serialization and reflection helper paths.
-   *
-   * Full gameplay layout/method surface is still pending dedicated recovery.
+   * Recovered `CPlatoon` runtime object.
    */
-  class CPlatoon
+  class CPlatoon : public CScriptObject
   {
   public:
     inline static gpg::RType* sType = nullptr;
-    virtual ~CPlatoon() = default;
+
+    /**
+     * Address: 0x0072A300 (FUN_0072A300, Moho::CPlatoon::operator new)
+     *
+     * What it does:
+     * Allocates one 0x110-byte platoon object and runs constructor lane
+     * (`FUN_00724CC0`) with the provided ownership/plan names.
+     */
+    static CPlatoon* Create(Sim* sim, CArmyImpl* army, const char* platoonName, const char* aiPlan);
+
+    /**
+     * Address: 0x00724CC0 (FUN_00724CC0, Moho::CPlatoon::CPlatoon)
+     *
+     * What it does:
+     * Constructs one script-backed platoon object, initializes squad/name
+     * lanes, and dispatches script `OnCreate(plan)`.
+     */
+    CPlatoon(Sim* sim, CArmyImpl* army, const char* platoonName, const char* aiPlan);
+
+    /**
+     * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
+     *
+     * What it does:
+     * Destroys owned squad objects, clears dynamic squad storage back to inline
+     * lanes, and decrements platoon instance counters.
+     */
+    ~CPlatoon() override;
+
+    /**
+     * Address: 0x00723AC0 (FUN_00723AC0, Moho::CPlatoon::GetClass)
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x00723AE0 (FUN_00723AE0, Moho::CPlatoon::GetDerivedObjectRef)
+     */
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x00729F90 (FUN_00729F90, Moho::CPlatoon::SquadHasState)
@@ -94,7 +138,59 @@ namespace moho
      * `OnDestroy/OnCreate` script callbacks when the plan actually changes.
      */
     void SwitchAIPlan(const char* planName);
+
+    /**
+     * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
+     *
+     * What it does:
+     * Moves this platoon's currently owned unit set into the army-pool
+     * unassigned lane and invalidates cached Lua unit lists.
+     */
+    void PullUnassignedUnitsFrom(CPlatoon* armyPool);
+
+    /**
+     * Address: 0x007253B0 (FUN_007253B0, Moho::CPlatoon::RemoveUnit)
+     *
+     * What it does:
+     * Clears the cached Lua unit list flag, finds the squad that owns the
+     * requested entity, and removes that unit from the first matching squad.
+     */
+    void RemoveUnit(Entity* unit);
+
+  public:
+    Sim* mSim;                                  // +0x34
+    IArmy* mArmy;                               // +0x38
+    std::uint32_t mUnknown_0x03C;               // +0x3C
+    gpg::fastvector_n<CSquad*, 8> mSquadList;   // +0x40
+    msvc8::string mName;                        // +0x70
+    msvc8::string mPlan;                        // +0x8C
+    msvc8::string mUniqueName;                  // +0xA8
+    msvc8::string mFormation;                   // +0xC4
+    std::uint8_t mDisbandOnIdle;                // +0xE0
+    std::uint8_t mPad_0x0E1[3];                 // +0xE1
+    std::int32_t mLifetimeStat1;                // +0xE4
+    std::int32_t mLifetimeStat2;                // +0xE8
+    float mLifetimeStat3;                       // +0xEC
+    float mLifetimeStat4;                       // +0xF0
+    LuaPlus::LuaObject mLuaUnitList;            // +0xF4
+    std::uint8_t mHasLuaList;                   // +0x108
+    std::uint8_t mPad_0x109[7];                 // +0x109
   };
+  static_assert(offsetof(CPlatoon, mSim) == 0x34, "CPlatoon::mSim offset must be 0x34");
+  static_assert(offsetof(CPlatoon, mArmy) == 0x38, "CPlatoon::mArmy offset must be 0x38");
+  static_assert(offsetof(CPlatoon, mSquadList) == 0x40, "CPlatoon::mSquadList offset must be 0x40");
+  static_assert(offsetof(CPlatoon, mName) == 0x70, "CPlatoon::mName offset must be 0x70");
+  static_assert(offsetof(CPlatoon, mPlan) == 0x8C, "CPlatoon::mPlan offset must be 0x8C");
+  static_assert(offsetof(CPlatoon, mUniqueName) == 0xA8, "CPlatoon::mUniqueName offset must be 0xA8");
+  static_assert(offsetof(CPlatoon, mFormation) == 0xC4, "CPlatoon::mFormation offset must be 0xC4");
+  static_assert(offsetof(CPlatoon, mDisbandOnIdle) == 0xE0, "CPlatoon::mDisbandOnIdle offset must be 0xE0");
+  static_assert(offsetof(CPlatoon, mLifetimeStat1) == 0xE4, "CPlatoon::mLifetimeStat1 offset must be 0xE4");
+  static_assert(offsetof(CPlatoon, mLifetimeStat2) == 0xE8, "CPlatoon::mLifetimeStat2 offset must be 0xE8");
+  static_assert(offsetof(CPlatoon, mLifetimeStat3) == 0xEC, "CPlatoon::mLifetimeStat3 offset must be 0xEC");
+  static_assert(offsetof(CPlatoon, mLifetimeStat4) == 0xF0, "CPlatoon::mLifetimeStat4 offset must be 0xF0");
+  static_assert(offsetof(CPlatoon, mLuaUnitList) == 0xF4, "CPlatoon::mLuaUnitList offset must be 0xF4");
+  static_assert(offsetof(CPlatoon, mHasLuaList) == 0x108, "CPlatoon::mHasLuaList offset must be 0x108");
+  static_assert(sizeof(CPlatoon) == 0x110, "CPlatoon size must be 0x110");
 
   /**
    * Address: 0x00BDAE70 (FUN_00BDAE70, register_CPlatoonCanConsiderFormingPlatoon_LuaFuncDef)

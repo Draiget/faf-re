@@ -14,22 +14,34 @@ namespace
   class CAiFormationInstanceTypeInfoConstructShim final : public CAiFormationInstance
   {
   public:
-    void Func6() override {}
-    void GetFormationPosition() override {}
-    void GetAdjustedFormationPosition() override {}
-    void Func9() override {}
-    void Func10() override {}
-    void Func11() override {}
-    void Func12() override {}
-    void CalcFormationSpeed() override {}
-    void Func14() override {}
+    SFormationLaneEntry* Func6(Unit*) override { return nullptr; }
+    SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit*, SFormationLaneEntry*) override { return dest; }
+    SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit*, SFormationLaneEntry*) override { return dest; }
+    SCoordsVec2* Func9(SCoordsVec2* dest, Unit*, SFormationLaneEntry*) override { return dest; }
+    Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit*, SFormationLaneEntry*) override { return out; }
+    float Func11(Unit*, SFormationLaneEntry*) override { return 0.0f; }
+    std::int32_t Func12(Unit*, SFormationLaneEntry*) override { return 1; }
+    float CalcFormationSpeed(Unit*, float* speedScaleOut, SFormationLaneEntry* laneEntry) override
+    {
+      if (speedScaleOut) {
+        *speedScaleOut = 0.0f;
+      }
+      return laneEntry ? laneEntry->preferredSpeed : 0.0f;
+    }
+    Unit* Func14(Unit* unit, SFormationLaneEntry*) override { return unit; }
     void AddUnit(Unit*) override {}
     void RemoveUnit(Unit*) override {}
-    void Func17() override {}
+    bool Func17(Unit*, bool) const override { return false; }
     void Update() override {}
-    void Func19() override {}
-    void Func21() override {}
-    void FindSlotFor() override {}
+    Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit*) const override { return out; }
+    bool Func21(Unit*) const override { return true; }
+    SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit*) override
+    {
+      if (dest && pos) {
+        *dest = *pos;
+      }
+      return dest;
+    }
   };
 
   static_assert(

@@ -20,7 +20,7 @@ namespace moho
      * What it does:
      * Notifies UI that `client` has transitioned to disconnected state.
      */
-    virtual void NoteDisconnect(const CClientBase* client) = 0;
+    virtual void NoteDisconnect(const CClientBase* client);
 
     /**
      * Address: 0x0088B6E0 (Moho::IClientMgrUIInterface::Func2)
@@ -29,7 +29,7 @@ namespace moho
      * What it does:
      * Notifies UI about an eject request from `requester` against `target`.
      */
-    virtual void NoteEjectRequest(const CClientBase* requester, const CClientBase* target) = 0;
+    virtual void NoteEjectRequest(const CClientBase* requester, const CClientBase* target);
 
     /**
      * Address: 0x0088B6F0 (Moho::IClientMgrUIInterface::ReceiveChat)
@@ -38,7 +38,7 @@ namespace moho
      * What it does:
      * Delivers chat payload bytes received from `sender`.
      */
-    virtual void ReceiveChat(const CClientBase* sender, gpg::MemBuffer<const char> data) = 0;
+    virtual void ReceiveChat(const CClientBase* sender, gpg::MemBuffer<const char> data);
 
     /**
      * Address: 0x0088B700 (Moho::IClientMgrUIInterface::NoteGameSpeedChange)
@@ -47,18 +47,18 @@ namespace moho
      * What it does:
      * Notifies UI that game speed arbitration selected a new active speed.
      */
-    virtual void NoteGameSpeedChanged() = 0;
+    virtual void NoteGameSpeedChanged();
 
     /**
      * Address: 0x0088B710 (Moho::IClientMgrUIInterface::ReportBottleneck)
      * Slot: 4
      */
-    virtual void ReportBottleneck() = 0;
+    virtual void ReportBottleneck();
 
     /**
      * Address: 0x0088B720 (Moho::IClientMgrUIInterface::ReportBottleneckCleared)
      * Slot: 5
      */
-    virtual void ReportBottleneckCleared() = 0;
+    virtual void ReportBottleneckCleared();
   };
 } // namespace moho

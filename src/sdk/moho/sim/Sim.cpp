@@ -38,10 +38,12 @@
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ai/CAiBrain.h"
+#include "moho/ai/CAiBuilderImpl.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiSiloBuildImpl.h"
+#include "moho/ai/IAiTransport.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/audio/CUserSoundManager.h"
 #include "moho/audio/CSimSoundManager.h"
@@ -65,6 +67,7 @@
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/path/PathTables.h"
+#include "moho/particles/SParticleBuffer.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/CDecalBuffer.h"
@@ -76,6 +79,7 @@
 #include "lua/LuaRuntimeTypes.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_Color.h"
 #include "moho/lua/SCR_FromLua.h"
@@ -1457,7 +1461,6 @@ namespace
 
   void RequeueEntityCoordUpdate(moho::Entity& entity) noexcept
   {
-    entity.mCoordNode.ListUnlink();
     entity.mCoordNode.ListLinkBefore(&entity.SimulationRef->mCoordEntities);
   }
 
@@ -1567,11 +1570,6 @@ namespace
 
     DWORD ignoredProtect = 0;
     virtualProtect(patchBaseAddress, kInvertMidMousePatchSize, oldProtect, &ignoredProtect);
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
@@ -1711,24 +1709,17 @@ namespace
 
   [[nodiscard]] CScrLuaInitFormSet& SimLuaInitSet()
   {
-    static CScrLuaInitFormSet sSet("sim");
-    return sSet;
-  }
-
-  [[nodiscard]] CScrLuaInitFormSet* FindCoreLuaInitSet() noexcept
-  {
-    for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "core") == 0) {
-        return set;
-      }
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+      return *set;
     }
 
-    return nullptr;
+    static CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
   }
 
   [[nodiscard]] CScrLuaInitFormSet& CoreLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = FindCoreLuaInitSet(); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("core"); set != nullptr) {
       return *set;
     }
 
@@ -1738,8 +1729,12 @@ namespace
 
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
-    static CScrLuaInitFormSet sSet("user");
-    return sSet;
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
+      return *set;
+    }
+
+    static CScrLuaInitFormSet fallbackSet("user");
+    return fallbackSet;
   }
 
   /**
@@ -2210,32 +2205,6 @@ namespace
     return *reinterpret_cast<const UserUnitLuaObjectRuntimeView*>(userUnit);
   }
 
-  [[nodiscard]] LuaPlus::LuaObject GetLuaTableFieldByName(
-    const LuaPlus::LuaObject& tableObject,
-    const char* const fieldName
-  )
-  {
-    LuaPlus::LuaObject out;
-
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const rawState = state->GetCState();
-    if (!rawState) {
-      return out;
-    }
-
-    const int top = lua_gettop(rawState);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(rawState);
-    lua_pushstring(rawState, fieldName ? fieldName : "");
-    lua_gettable(rawState, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(rawState, top);
-    return out;
-  }
-
   [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -2282,7 +2251,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetLuaTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -2334,7 +2303,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetLuaTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -2550,26 +2519,6 @@ namespace
     }
 
     return false;
-  }
-
-  bool ParseIntLiteral(const char* text, int& outValue)
-  {
-    if (!text) {
-      return false;
-    }
-
-    char* endPtr = nullptr;
-    const long parsed = std::strtol(text, &endPtr, 10);
-    if (endPtr == text || (endPtr && *endPtr != '\0')) {
-      return false;
-    }
-    if (parsed < static_cast<long>(std::numeric_limits<int>::min()) ||
-        parsed > static_cast<long>(std::numeric_limits<int>::max())) {
-      return false;
-    }
-
-    outValue = static_cast<int>(parsed);
-    return true;
   }
 
   struct CEconStorageRuntimeView
@@ -3855,6 +3804,908 @@ namespace
     AppendPendingReleasedCommandId(runtime->pendingReleasedCmdIds, cmdId);
   }
 
+  void InsertCommandNodeFixup(CommandDbMapStorageView& map, CommandDbMapNodeView* node)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    while (node->parent != head && node->parent->color == kTreeRed) {
+      CommandDbMapNodeView* const grandParent = node->parent->parent;
+      if (node->parent == grandParent->left) {
+        CommandDbMapNodeView* uncle = grandParent->right;
+        if (NodeColor(uncle, head) == kTreeRed) {
+          node->parent->color = kTreeBlack;
+          if (uncle != head) {
+            uncle->color = kTreeBlack;
+          }
+          grandParent->color = kTreeRed;
+          node = grandParent;
+          continue;
+        }
+
+        if (node == node->parent->right) {
+          node = node->parent;
+          RotateLeft(map, node);
+        }
+
+        node->parent->color = kTreeBlack;
+        grandParent->color = kTreeRed;
+        RotateRight(map, grandParent);
+      } else {
+        CommandDbMapNodeView* uncle = grandParent->left;
+        if (NodeColor(uncle, head) == kTreeRed) {
+          node->parent->color = kTreeBlack;
+          if (uncle != head) {
+            uncle->color = kTreeBlack;
+          }
+          grandParent->color = kTreeRed;
+          node = grandParent;
+          continue;
+        }
+
+        if (node == node->parent->left) {
+          node = node->parent;
+          RotateRight(map, node);
+        }
+
+        node->parent->color = kTreeBlack;
+        grandParent->color = kTreeRed;
+        RotateLeft(map, grandParent);
+      }
+    }
+
+    if (head->parent != nullptr && head->parent != head) {
+      head->parent->color = kTreeBlack;
+    }
+    RefreshTreeBounds(map);
+  }
+
+  [[nodiscard]] CommandDbMapNodeView* AllocateCommandNode(const CmdId cmdId, CUnitCommand* const command)
+  {
+    auto* const node = static_cast<CommandDbMapNodeView*>(::operator new(sizeof(CommandDbMapNodeView)));
+    node->left = nullptr;
+    node->parent = nullptr;
+    node->right = nullptr;
+    node->key = static_cast<std::uint32_t>(cmdId);
+    node->value = command;
+    node->color = kTreeRed;
+    node->isNil = 0u;
+    node->reserved16[0] = 0u;
+    node->reserved16[1] = 0u;
+    return node;
+  }
+
+  void InsertCommandNode(CommandDbMapStorageView& map, const CmdId cmdId, CUnitCommand* const command)
+  {
+    CommandDbMapNodeView* const head = map.head;
+    if (head == nullptr) {
+      return;
+    }
+
+    CommandDbMapNodeView* parent = head;
+    CommandDbMapNodeView* cursor = head->parent;
+    bool insertLeft = true;
+    const std::uint32_t key = static_cast<std::uint32_t>(cmdId);
+
+    while (cursor != nullptr && cursor != head && cursor->isNil == 0u) {
+      parent = cursor;
+      if (key < cursor->key) {
+        insertLeft = true;
+        cursor = cursor->left;
+      } else {
+        insertLeft = false;
+        cursor = cursor->right;
+      }
+    }
+
+    auto* const node = AllocateCommandNode(cmdId, command);
+    node->left = head;
+    node->right = head;
+    node->parent = parent;
+
+    if (parent == head) {
+      head->parent = node;
+      head->left = node;
+      head->right = node;
+    } else if (insertLeft) {
+      parent->left = node;
+      if (parent == head->left) {
+        head->left = node;
+      }
+    } else {
+      parent->right = node;
+      if (parent == head->right) {
+        head->right = node;
+      }
+    }
+
+    ++map.size;
+    InsertCommandNodeFixup(map, node);
+  }
+
+  [[nodiscard]] CUnitCommand* AddIssueDataToCommandDb(
+    CCommandDb* const commandDb,
+    const SSTICommandIssueData& issueData
+  )
+  {
+    if (!commandDb) {
+      return nullptr;
+    }
+
+    auto* const runtime = reinterpret_cast<CCommandDbRuntimeView*>(commandDb);
+    CmdId commandId = issueData.nextCommandId;
+    if ((static_cast<std::uint32_t>(commandId) & 0xFF000000u) == 0xFF000000u) {
+      unsigned int nextLowId = 0u;
+      if (runtime->pool.mReleasedLows.mWords.Empty()) {
+        nextLowId = static_cast<unsigned int>(runtime->pool.mNextLowId);
+        runtime->pool.mNextLowId = static_cast<std::int32_t>(nextLowId + 1u);
+      } else {
+        nextLowId = runtime->pool.mReleasedLows.GetNext(std::numeric_limits<unsigned int>::max());
+        (void)runtime->pool.mReleasedLows.Remove(nextLowId);
+      }
+
+      commandId = static_cast<CmdId>(nextLowId | 0x80000000u);
+    }
+
+    CUnitCommand* const command = new (std::nothrow) CUnitCommand(runtime->sim, issueData, commandId);
+    if (!command) {
+      return nullptr;
+    }
+
+    InsertCommandNode(runtime->map, commandId, command);
+    return command;
+  }
+
+  [[nodiscard]] bool IsUnitIdleState(Unit* const unit) noexcept
+  {
+    if (unit == nullptr || unit->CommandQueue == nullptr) {
+      return true;
+    }
+
+    return unit->CommandQueue->GetCurrentCommand() == nullptr;
+  }
+
+  [[nodiscard]] Unit* GetTransportedBy(const Unit* const unit) noexcept
+  {
+    return (unit != nullptr) ? unit->TransportedByRef.ResolveObjectPtr<Unit>() : nullptr;
+  }
+
+  [[nodiscard]] Unit* GetTransportFerryBeacon(Unit* const unit) noexcept
+  {
+    if (unit == nullptr || unit->CommandQueue == nullptr) {
+      return nullptr;
+    }
+
+    CUnitCommand* const currentCommand = unit->CommandQueue->GetCurrentCommand();
+    if (currentCommand == nullptr) {
+      return nullptr;
+    }
+
+    boost::shared_ptr<Unit> ferryBeacon = currentCommand->mUnit.lock();
+    return ferryBeacon ? ferryBeacon.get() : nullptr;
+  }
+
+  [[nodiscard]] bool HasCommandCap(const Unit* const unit, const ERuleBPUnitCommandCaps commandCap) noexcept
+  {
+    return unit != nullptr && (unit->GetAttributes().commandCapsMask & static_cast<std::uint32_t>(commandCap)) != 0u;
+  }
+
+  [[nodiscard]] bool IsValidTargetPosition(const Wm3::Vec3f& targetPosition) noexcept
+  {
+    return Wm3::Vector3fIsntNaN(&targetPosition);
+  }
+
+  [[nodiscard]] bool IsDuplicateSuppressionCommand(const EUnitCommandType commandType) noexcept
+  {
+    switch (commandType) {
+      case EUnitCommandType::UNITCOMMAND_Move:
+      case EUnitCommandType::UNITCOMMAND_FormMove:
+      case EUnitCommandType::UNITCOMMAND_Attack:
+      case EUnitCommandType::UNITCOMMAND_FormAttack:
+      case EUnitCommandType::UNITCOMMAND_Patrol:
+      case EUnitCommandType::UNITCOMMAND_FormPatrol:
+      case EUnitCommandType::UNITCOMMAND_Reclaim:
+      case EUnitCommandType::UNITCOMMAND_Repair:
+      case EUnitCommandType::UNITCOMMAND_Capture:
+      case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
+      case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits:
+      case EUnitCommandType::UNITCOMMAND_Upgrade:
+      case EUnitCommandType::UNITCOMMAND_Sacrifice:
+      case EUnitCommandType::UNITCOMMAND_AggressiveMove:
+      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove:
+      case EUnitCommandType::UNITCOMMAND_Dock:
+        return true;
+      default:
+        break;
+    }
+
+    return false;
+  }
+
+  [[nodiscard]] bool CommandUnitSetMatchesSelection(
+    const SCommandUnitSet& commandUnits,
+    const SEntitySetTemplateUnit& selectedUnits
+  ) noexcept
+  {
+    std::size_t commandUnitCount = 0;
+    for (CScriptObject* const* it = commandUnits.mVec.begin(); it != commandUnits.mVec.end(); ++it) {
+      const CScriptObject* const entry = *it;
+      if (!SCommandUnitSet::IsUsableEntry(entry)) {
+        continue;
+      }
+
+      if (SCommandUnitSet::UnitFromEntry(entry) != nullptr) {
+        ++commandUnitCount;
+      }
+    }
+
+    if (commandUnitCount != selectedUnits.mVec.size()) {
+      return false;
+    }
+
+    for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+      const Unit* const selectedUnit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      if (selectedUnit == nullptr) {
+        return false;
+      }
+
+      bool found = false;
+      for (CScriptObject* const* jt = commandUnits.mVec.begin(); jt != commandUnits.mVec.end(); ++jt) {
+        const CScriptObject* const entry = *jt;
+        if (!SCommandUnitSet::IsUsableEntry(entry)) {
+          continue;
+        }
+
+        const Unit* const commandUnit = SCommandUnitSet::UnitFromEntry(entry);
+        if (commandUnit == selectedUnit) {
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  [[nodiscard]] Unit* ResolveTargetUnit(Entity* const entity) noexcept
+  {
+    return entity != nullptr ? entity->IsUnit() : nullptr;
+  }
+
+  [[nodiscard]] Unit* ResolveTargetUnitOrReconCreator(Entity* const entity) noexcept
+  {
+    if (entity == nullptr) {
+      return nullptr;
+    }
+
+    if (ReconBlip* const blip = entity->IsReconBlip(); blip != nullptr) {
+      return blip->GetCreator();
+    }
+
+    return entity->IsUnit();
+  }
+
+  [[nodiscard]] bool CategoryCachesIntersect(
+    const RUnitBlueprint* const lhsBlueprint,
+    const RUnitBlueprint* const rhsBlueprint
+  )
+  {
+    if (lhsBlueprint == nullptr || rhsBlueprint == nullptr) {
+      return false;
+    }
+
+    const auto& lhsCategories = reinterpret_cast<const CategoryWordRangeView&>(lhsBlueprint->Economy.CategoryCache);
+    const auto& rhsCategories = reinterpret_cast<const CategoryWordRangeView&>(rhsBlueprint->Economy.CategoryCache);
+    const BVIntSet& lhsBits = CategoryWordRangeAsBVIntSet(lhsCategories);
+    const BVIntSet& rhsBits = CategoryWordRangeAsBVIntSet(rhsCategories);
+
+    BVIntSet intersection{};
+    lhsBits.Intersect(&intersection, &rhsBits);
+    return intersection.Count() != 0u;
+  }
+
+  [[nodiscard]] bool HasBlueprintInCategory(
+    const Sim* const sim,
+    const REntityBlueprint* const blueprint,
+    const char* const categoryName
+  )
+  {
+    if (sim == nullptr || sim->mRules == nullptr || blueprint == nullptr || categoryName == nullptr) {
+      return false;
+    }
+
+    const CategoryWordRangeView* const categoryRange = sim->mRules->GetEntityCategory(categoryName);
+    const EntityCategorySet* const categorySet =
+      categoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(categoryRange) : nullptr;
+    return categorySet != nullptr && EntityCategory::HasBlueprint(blueprint, categorySet);
+  }
+
+  [[nodiscard]] bool EqualsNoCase(const char* const lhs, const char* const rhs) noexcept
+  {
+    const char* const safeLhs = lhs != nullptr ? lhs : "";
+    const char* const safeRhs = rhs != nullptr ? rhs : "";
+    return _stricmp(safeLhs, safeRhs) == 0;
+  }
+
+  /**
+   * Address: 0x006EF660 (FUN_006EF660, sub_6EF660)
+   *
+   * What it does:
+   * For `TransportReverseLoadUnits`, replaces the incoming selected-unit set
+   * with one best transport candidate plus the requested target unit.
+   */
+  [[maybe_unused]] void RetargetReverseLoadUnits(
+    const SSTICommandIssueData& issueData,
+    Sim* const sim,
+    SEntitySetTemplateUnit& selectedUnits
+  )
+  {
+    if (sim == nullptr || issueData.mCommandType != EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits) {
+      return;
+    }
+
+    SEntitySetTemplateUnit originalSelection{};
+    for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+      originalSelection.mVec.PushBack(*it);
+    }
+    selectedUnits.Clear();
+
+    Entity* const targetEntity = FindEntityById(sim->mEntityDB, static_cast<EntId>(issueData.mTarget.mEntityId));
+    Unit* const targetUnit = targetEntity != nullptr ? targetEntity->IsUnit() : nullptr;
+    if (targetUnit == nullptr || targetUnit->IsDead() || !targetUnit->IsMobile()) {
+      return;
+    }
+
+    const RUnitBlueprint* const targetBlueprint = targetUnit->GetBlueprint();
+    Unit* bestTransport = nullptr;
+    float bestScore = std::numeric_limits<float>::infinity();
+
+    for (Entity* const* it = originalSelection.mVec.begin(); it != originalSelection.mVec.end(); ++it) {
+      Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      if (candidate == nullptr || candidate->IsDead() || candidate->IsBeingBuilt()) {
+        continue;
+      }
+
+      if (!candidate->IsInCategory("TRANSPORTATION") && !candidate->IsInCategory("AIRSTAGINGPLATFORM")
+          && !candidate->IsInCategory("TELEPORTATION")) {
+        continue;
+      }
+
+      IAiTransport* const transport = candidate->AiTransport;
+      if (transport == nullptr || !transport->TransportHasSpaceFor(targetBlueprint)) {
+        continue;
+      }
+
+      const Wm3::Vec3f& targetPos = targetUnit->GetPosition();
+      const Wm3::Vec3f& candidatePos = candidate->GetPosition();
+      const float dx = candidatePos.x - targetPos.x;
+      const float dz = candidatePos.z - targetPos.z;
+      float score = std::sqrt((dx * dx) + (dz * dz));
+      if (IsUnitIdleState(candidate)) {
+        score *= 0.5f;
+      }
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestTransport = candidate;
+      }
+    }
+
+    if (bestTransport != nullptr) {
+      (void)selectedUnits.AddUnit(bestTransport);
+      (void)selectedUnits.AddUnit(targetUnit);
+    }
+  }
+
+  [[nodiscard]] bool IsOutsideArmyNoRushRadius(const CArmyImpl* const army, const CAiTarget& target) noexcept
+  {
+    if (army == nullptr || army->NoRushTicks <= 0 || target.targetType == EAiTargetType::AITARGET_None) {
+      return false;
+    }
+
+    const float dx = (army->StartPosition.x + army->NoRushOffsetX) - target.position.x;
+    const float dz = (army->StartPosition.y + army->NoRushOffsetY) - target.position.z;
+    return std::sqrt((dx * dx) + (dz * dz)) > army->NoRushRadius;
+  }
+
+  /**
+   * Address: 0x006EF9E0 (FUN_006EF9E0, func_ProcessUnitCommand)
+   *
+   * What it does:
+   * Applies per-unit command-family validation and rejection side-effects
+   * before queue insertion in `UNIT_IssueCommand`.
+   */
+  [[nodiscard]] bool ProcessIssuedUnitCommand(
+    Sim* const sim,
+    const SSTICommandIssueData& commandIssueData,
+    Unit* const unit,
+    const bool clearQueue,
+    const SEntitySetTemplateUnit& selectedUnits
+  )
+  {
+    if (sim == nullptr || unit == nullptr) {
+      return false;
+    }
+
+    Entity* const targetEntity = FindEntityById(sim->mEntityDB, static_cast<EntId>(commandIssueData.mTarget.mEntityId));
+    CUnitCommandQueue* const queue = unit->CommandQueue;
+
+    if (unit->IsDead()) {
+      return false;
+    }
+
+    if (unit->IsBeingBuilt() && !unit->IsInCategory("FACTORY")) {
+      return false;
+    }
+
+    if (queue != nullptr && IsDuplicateSuppressionCommand(commandIssueData.mCommandType)) {
+      CUnitCommand* const currentCommand = queue->GetCurrentCommand();
+      if (clearQueue && currentCommand != nullptr && currentCommand->mVarDat.mCmdType == commandIssueData.mCommandType
+          && queue->GetNextCommand() == nullptr) {
+        bool sameTarget = false;
+        switch (commandIssueData.mTarget.mType) {
+          case EAiTargetType::AITARGET_Entity:
+            sameTarget = commandIssueData.mTarget.mEntityId == currentCommand->mVarDat.mTarget1.mEntityId;
+            break;
+          case EAiTargetType::AITARGET_Ground: {
+            const Wm3::Vec3f& currentTargetPos = currentCommand->mVarDat.mTarget1.mPos;
+            const float dx = commandIssueData.mTarget.mPos.x - currentTargetPos.x;
+            const float dy = commandIssueData.mTarget.mPos.y - currentTargetPos.y;
+            const float dz = commandIssueData.mTarget.mPos.z - currentTargetPos.z;
+            sameTarget = std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) < 0.001f;
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (sameTarget && CommandUnitSetMatchesSelection(currentCommand->mUnitSet, selectedUnits)) {
+          return false;
+        }
+      }
+    }
+
+    if (commandIssueData.mTarget.mType != EAiTargetType::AITARGET_None) {
+      const Wm3::Vec3f targetPosition = targetEntity != nullptr ? targetEntity->Position : commandIssueData.mTarget.mPos;
+      CArmyImpl* const army = unit->ArmyRef;
+
+      if (sim->mMapData != nullptr && army != nullptr && !sim->mMapData->IsWithin(targetPosition, 0.0f, army->UseWholeMap())) {
+        return false;
+      }
+
+      CAiTarget noRushTarget{};
+      noRushTarget.targetType = commandIssueData.mTarget.mType;
+      noRushTarget.position = targetPosition;
+      if (IsOutsideArmyNoRushRadius(army, noRushTarget)) {
+        return false;
+      }
+    }
+
+    if (unit->IsUnitState(UNITSTATE_Enhancing) && clearQueue
+        && commandIssueData.mCommandType != EUnitCommandType::UNITCOMMAND_Stop) {
+      return false;
+    }
+
+    switch (commandIssueData.mCommandType) {
+      case EUnitCommandType::UNITCOMMAND_Move:
+      case EUnitCommandType::UNITCOMMAND_FormMove:
+      case EUnitCommandType::UNITCOMMAND_Patrol:
+      case EUnitCommandType::UNITCOMMAND_FormPatrol:
+      case EUnitCommandType::UNITCOMMAND_AggressiveMove:
+      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove: {
+        Unit* const transportedBy = GetTransportedBy(unit);
+        const bool invalidTransportState =
+          transportedBy != nullptr && (unit->IsInCategory("POD") || transportedBy->IsInCategory("CARRIER"));
+        if (invalidTransportState || !unit->IsMobile() || !IsValidTargetPosition(commandIssueData.mTarget.mPos)
+            || commandIssueData.mTarget.mType == EAiTargetType::AITARGET_None) {
+          return false;
+        }
+        return true;
+      }
+      case EUnitCommandType::UNITCOMMAND_Dive: {
+        const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+        return blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_SurfacingSub;
+      }
+      case EUnitCommandType::UNITCOMMAND_BuildFactory:
+      case EUnitCommandType::UNITCOMMAND_BuildMobile:
+        return unit->IsInCategory("FACTORY") || unit->IsInCategory("ENGINEER") || unit->IsInCategory("NEEDMOBILEBUILD")
+          || unit->IsInCategory("POD");
+      case EUnitCommandType::UNITCOMMAND_Attack:
+      case EUnitCommandType::UNITCOMMAND_FormAttack:
+        if (!unit->IsMobile() && unit->AiAttacker == nullptr) {
+          return false;
+        }
+        if (targetEntity != nullptr && targetEntity->ArmyRef != nullptr && unit->ArmyRef != nullptr
+            && targetEntity->ArmyRef->GetAllianceWith(unit->ArmyRef) == ALLIANCE_Ally) {
+          return false;
+        }
+        return true;
+      case EUnitCommandType::UNITCOMMAND_Teleport:
+        return HasCommandCap(unit, RULEUCC_Teleport);
+      case EUnitCommandType::UNITCOMMAND_Guard: {
+        Unit* const transportedBy = GetTransportedBy(unit);
+        if ((transportedBy != nullptr && (transportedBy->IsInCategory("CARRIER") || unit->IsInCategory("POD")))
+            || !HasCommandCap(unit, RULEUCC_Guard)) {
+          return false;
+        }
+
+        Unit* const targetUnit = ResolveTargetUnit(targetEntity);
+        if (targetUnit == nullptr) {
+          return unit->IsMobile();
+        }
+
+        if (unit == targetUnit) {
+          return false;
+        }
+
+        if (!targetUnit->IsMobile() && !unit->IsMobile() && targetUnit->IsInCategory("FACTORY") && unit->IsInCategory("FACTORY")
+            && !CategoryCachesIntersect(unit->GetBlueprint(), targetUnit->GetBlueprint())) {
+          return false;
+        }
+
+        if (targetUnit->IsInCategory("FERRYBEACON") && GetTransportFerryBeacon(unit) == targetUnit) {
+          return false;
+        }
+
+        const bool unitIsFactory = HasBlueprintInCategory(sim, unit->GetBlueprint(), "FACTORY");
+        const bool targetIsFactory = HasBlueprintInCategory(sim, targetUnit->GetBlueprint(), "FACTORY");
+        if (unitIsFactory && !targetIsFactory) {
+          return false;
+        }
+
+        return targetUnit->GetGuardedUnit() != unit;
+      }
+      case EUnitCommandType::UNITCOMMAND_Ferry:
+        return GetTransportedBy(unit) == nullptr && unit->IsInCategory("TRANSPORTATION") && unit->AiTransport != nullptr;
+      case EUnitCommandType::UNITCOMMAND_Reclaim: {
+        if ((GetTransportedBy(unit) != nullptr && unit->IsInCategory("POD")) || !unit->IsInCategory("RECLAIM")) {
+          return false;
+        }
+
+        if (targetEntity != nullptr && !targetEntity->IsBeingBuilt()) {
+          if (targetEntity->BluePrint == nullptr || !targetEntity->IsInCategory("RECLAIMABLE")
+              || targetEntity->mCurrentLayer == LAYER_Air) {
+            return false;
+          }
+
+          Unit* const sourceUnit = ResolveTargetUnitOrReconCreator(targetEntity);
+          if (sourceUnit != nullptr && !sourceUnit->GetAttributes().mReclaimable) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+      case EUnitCommandType::UNITCOMMAND_Capture: {
+        if ((GetTransportedBy(unit) != nullptr && unit->IsInCategory("POD")) || !unit->IsInCategory("CAPTURE")) {
+          return false;
+        }
+
+        if (targetEntity != nullptr) {
+          Unit* const targetUnit = ResolveTargetUnitOrReconCreator(targetEntity);
+          if (targetUnit == nullptr || !targetUnit->GetAttributes().mCapturable) {
+            return false;
+          }
+
+          if ((unit->ArmyRef != nullptr && targetUnit->ArmyRef != nullptr
+               && unit->ArmyRef->GetAllianceWith(targetUnit->ArmyRef) == ALLIANCE_Ally)
+              || targetUnit->IsDead() || targetUnit->IsBeingBuilt()) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+      case EUnitCommandType::UNITCOMMAND_Repair:
+      case EUnitCommandType::UNITCOMMAND_Sacrifice: {
+        if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_Sacrifice
+            && !HasCommandCap(unit, RULEUCC_Sacrifice)) {
+          return false;
+        }
+
+        if (targetEntity == nullptr) {
+          return false;
+        }
+
+        if ((GetTransportedBy(unit) != nullptr && unit->IsInCategory("POD")) || !unit->IsInCategory("REPAIR")) {
+          return false;
+        }
+
+        if (unit->ArmyRef != nullptr && targetEntity->ArmyRef != nullptr
+            && unit->ArmyRef->GetAllianceWith(targetEntity->ArmyRef) == ALLIANCE_Enemy) {
+          return false;
+        }
+
+        if (Unit* const targetUnit = ResolveTargetUnit(targetEntity); targetUnit != nullptr && targetUnit == unit) {
+          return false;
+        }
+
+        return HasBlueprintInCategory(sim, unit->GetBlueprint(), "REPAIR");
+      }
+      case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
+      case EUnitCommandType::UNITCOMMAND_Dock: {
+        if (GetTransportedBy(unit) != nullptr || unit->IsInCategory("PODS")) {
+          return false;
+        }
+
+        Unit* const targetUnit = ResolveTargetUnit(targetEntity);
+        if (targetUnit == nullptr) {
+          return true;
+        }
+
+        if ((targetUnit != unit && !HasCommandCap(unit, RULEUCC_CallTransport)) || targetUnit->mCurrentLayer == LAYER_Seabed) {
+          return false;
+        }
+
+        const bool usesSpecialFerryFactoryLane =
+          targetUnit->IsInCategory("FERRYBEACON")
+          || (targetUnit->IsInCategory("FACTORY") && !targetUnit->IsInCategory("AIRSTAGINGPLATFORM")
+              && !targetUnit->IsInCategory("TELEPORTATION"));
+        if (!usesSpecialFerryFactoryLane) {
+          IAiTransport* const targetTransport = targetUnit->AiTransport;
+          if (targetUnit->IsDead() || targetUnit->IsBeingBuilt() || targetTransport == nullptr) {
+            return false;
+          }
+
+          if (targetUnit == unit || targetTransport->TransportCanCarryUnit(unit)) {
+            return true;
+          }
+
+          (void)targetUnit->RunScript("OnTransportReject");
+          return false;
+        }
+
+        if (targetUnit->IsInCategory("FERRYBEACON") && GetTransportFerryBeacon(unit) == targetUnit) {
+          return false;
+        }
+
+        if (unit->IsMobile() && !HasBlueprintInCategory(sim, unit->GetBlueprint(), "TRANSPORTATION")) {
+          return true;
+        }
+
+        return false;
+      }
+      case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits: {
+        if ((!unit->IsMobile() && !unit->IsInCategory("AIRSTAGINGPLATFORM")) || GetTransportedBy(unit) != nullptr
+            || unit->IsInCategory("PODS")) {
+          return false;
+        }
+
+        if (selectedUnits.Empty()) {
+          return false;
+        }
+
+        Unit* candidateTransport = nullptr;
+        for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+          Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*it);
+          if (candidate == nullptr || candidate->IsDead() || candidate->IsBeingBuilt() || candidate->AiTransport == nullptr) {
+            continue;
+          }
+
+          candidateTransport = candidate;
+          Unit* const targetUnit = ResolveTargetUnit(targetEntity);
+          if (targetUnit == nullptr) {
+            if (candidateTransport != unit) {
+              (void)candidateTransport->RunScript("OnTransportReject");
+            }
+            return false;
+          }
+
+          if (!candidate->AiTransport->TransportCanCarryUnit(targetUnit)) {
+            continue;
+          }
+
+          if (candidate->mCurrentLayer == LAYER_Seabed) {
+            return false;
+          }
+
+          return true;
+        }
+
+        if (candidateTransport != nullptr && candidateTransport != unit) {
+          (void)candidateTransport->RunScript("OnTransportReject");
+        }
+        return false;
+      }
+      case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
+      case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
+        return unit->mCurrentLayer != LAYER_Seabed && (unit->AiTransport != nullptr || GetTransportedBy(unit) != nullptr);
+      case EUnitCommandType::UNITCOMMAND_Upgrade: {
+        const RUnitBlueprint* const upgradeBlueprint = commandIssueData.mBlueprint;
+        const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
+        if (upgradeBlueprint == nullptr || unitBlueprint == nullptr) {
+          return false;
+        }
+
+        // FAF Binary Patch (non-1:1 with original binary):
+        // The retail path allows restricted upgrades to pass initial validation,
+        // which can later reach CUnitUpgradeTask::TaskTick (FUN_005F8890) and
+        // crash on a null-vtable weak-focus dereference at 0x005F8B20.
+        // Fixed behavior: reject restricted upgrades at issue time (including
+        // restricted mex tier-up), so the crashing task path is never entered.
+        // Related: https://github.com/FAForever/FA-Binary-Patches/issues/125
+        if (!unit->CanBuild(upgradeBlueprint)) {
+          return false;
+        }
+
+        const char* const seedUnitId = upgradeBlueprint->General.SeedUnit.name.c_str();
+        if (seedUnitId != nullptr && seedUnitId[0] != '\0') {
+          if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), seedUnitId)
+              && !EqualsNoCase(unitBlueprint->General.UpgradesFromBase.name.c_str(), seedUnitId)) {
+            return false;
+          }
+        } else {
+          const char* const unitUpgradesTo = unitBlueprint->General.UpgradesTo.name.c_str();
+          if (unitUpgradesTo == nullptr || unitUpgradesTo[0] == '\0') {
+            return false;
+          }
+
+          const char* const requiredSourceId = upgradeBlueprint->General.UpgradesFromBase.name.c_str();
+          if (!EqualsNoCase(requiredSourceId, "none")) {
+            if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), requiredSourceId)
+                && !EqualsNoCase(unitBlueprint->General.UpgradesFromBase.name.c_str(), requiredSourceId)) {
+              return false;
+            }
+          } else if (!EqualsNoCase(unitUpgradesTo, upgradeBlueprint->mBlueprintId.c_str())
+                     && !EqualsNoCase(unitUpgradesTo, upgradeBlueprint->General.UpgradesFrom.name.c_str())) {
+            return false;
+          }
+        }
+
+        unit->DirtySyncState = 1;
+        CUnitCommand* const lastCommand = queue != nullptr ? queue->GetLastCommand() : nullptr;
+        if (lastCommand != nullptr && lastCommand->mVarDat.mCmdType == commandIssueData.mCommandType) {
+          const REntityBlueprint* const lastBlueprint = lastCommand->mConstDat.blueprint;
+          if (lastBlueprint != nullptr && EqualsNoCase(lastBlueprint->mBlueprintId.c_str(), upgradeBlueprint->mBlueprintId.c_str())) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+      case EUnitCommandType::UNITCOMMAND_KillSelf:
+        return !unit->IsBeingBuilt() && unit->RunScriptUnitBool("CheckCanBeKilled", unit);
+      case EUnitCommandType::UNITCOMMAND_OverCharge:
+        return HasCommandCap(unit, RULEUCC_Overcharge);
+      case EUnitCommandType::UNITCOMMAND_SpecialAction:
+        return HasCommandCap(unit, RULEUCC_SpecialAction);
+      default:
+        return true;
+    }
+  }
+
+  [[nodiscard]] CUnitCommand* IssueFactoryCommandToSelectedUnits(
+    Sim* const sim,
+    const SEntitySetTemplateUnit& selectedUnits,
+    const SSTICommandIssueData& commandIssueData,
+    const bool clearQueue
+  )
+  {
+    if (!sim) {
+      return nullptr;
+    }
+
+    CAiTarget target{};
+    target.DecodeFromSSTITarget(commandIssueData.mTarget, sim);
+
+    CUnitCommand* issuedCommand = nullptr;
+    for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      if (!unit || unit->IsDead()) {
+        continue;
+      }
+
+      if (unit->TransportedByRef.ResolveObjectPtr<Unit>() != nullptr) {
+        continue;
+      }
+
+      if (IsOutsideArmyNoRushRadius(unit->ArmyRef, target)) {
+        continue;
+      }
+
+      auto* const builder = static_cast<CAiBuilderImpl*>(unit->AiBuilder);
+      if (!builder || !builder->BuilderIsFactory()) {
+        continue;
+      }
+
+      if (!issuedCommand) {
+        issuedCommand = AddIssueDataToCommandDb(sim->mCommandDB, commandIssueData);
+        if (!issuedCommand) {
+          break;
+        }
+        issuedCommand->mUnknownFlag142 = true;
+      }
+
+      if (clearQueue) {
+        builder->BuilderClearFactoryCommandQueue();
+      }
+
+      builder->BuilderAddFactoryCommand(issuedCommand, -1);
+    }
+
+    if (!issuedCommand) {
+      ReleaseCommandIdIfUnconsumed(sim->mCommandDB, commandIssueData.nextCommandId);
+    }
+
+    return issuedCommand;
+  }
+
+  /**
+   * Address: 0x006F12C0 (FUN_006F12C0, UNIT_IssueCommand)
+   *
+   * What it does:
+   * Validates each selected unit through `func_ProcessUnitCommand`, creates one
+   * shared command object lazily, and appends/inserts it into eligible queues.
+   */
+  [[nodiscard]] CUnitCommand* IssueCommandToSelectedUnits(
+    Sim* const sim,
+    SEntitySetTemplateUnit& selectedUnits,
+    const SSTICommandIssueData& commandIssueData,
+    const bool clearQueue
+  )
+  {
+    if (sim == nullptr || sim->mCommandDB == nullptr) {
+      ReleaseCommandIdIfUnconsumed(sim ? sim->mCommandDB : nullptr, commandIssueData.nextCommandId);
+      return nullptr;
+    }
+
+    RetargetReverseLoadUnits(commandIssueData, sim, selectedUnits);
+
+    CUnitCommand* issuedCommand = nullptr;
+    bool queuedAtLeastOnce = false;
+    const std::uint32_t commandIdTopByte = static_cast<std::uint32_t>(commandIssueData.nextCommandId) & 0xFF000000u;
+    const bool appendByDefault = commandIdTopByte == 0xFF000000u;
+
+    for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
+      CUnitCommandQueue* const queue = (unit != nullptr) ? unit->CommandQueue : nullptr;
+      if (queue == nullptr) {
+        continue;
+      }
+
+      if (!ProcessIssuedUnitCommand(sim, commandIssueData, unit, clearQueue, selectedUnits)) {
+        continue;
+      }
+
+      const std::size_t queueSize = queue->mCommandVec.size();
+      if (queueSize > 500u && !clearQueue) {
+        continue;
+      }
+
+      if (issuedCommand == nullptr) {
+        issuedCommand = AddIssueDataToCommandDb(sim->mCommandDB, commandIssueData);
+        if (issuedCommand == nullptr) {
+          break;
+        }
+      }
+
+      if (clearQueue) {
+        queue->mCommandType = commandIssueData.mCommandType;
+        queue->ClearCommandQueue();
+      }
+
+      if (appendByDefault) {
+        queue->AddCommandToQueue(issuedCommand);
+        queuedAtLeastOnce = true;
+        continue;
+      }
+
+      const int insertIndex = queue->FindCommandIndex(commandIssueData.nextCommandId);
+      if (insertIndex >= 0) {
+        queue->InsertCommandToQueue(issuedCommand, insertIndex);
+        queuedAtLeastOnce = true;
+      }
+    }
+
+    if (issuedCommand == nullptr || !queuedAtLeastOnce) {
+      ReleaseCommandIdIfUnconsumed(sim->mCommandDB, commandIssueData.nextCommandId);
+    }
+
+    return queuedAtLeastOnce ? issuedCommand : nullptr;
+  }
+
   // 0x00748AA0 resolves unit blueprints from RResId via RRuleGameRules::GetUnitBlueprint.
   const RUnitBlueprint* ResolveUnitBlueprint(RRuleGameRules* rules, const RResId& blueprintId)
   {
@@ -4810,6 +5661,39 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
 }
 
 /**
+ * Address: 0x00745390 (FUN_00745390, ?SerVars@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Writes active sim-console variables as `(name, lexical value)` string pairs
+ * and terminates the lane with an empty string name sentinel.
+ */
+void Sim::SerVars(gpg::WriteArchive* archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const std::size_t simVarCount = mSimVars.size();
+  for (std::size_t i = 0; i < simVarCount; ++i) {
+    CSimConVarInstanceBase* const simVar = mSimVars[i];
+    if (!simVar) {
+      continue;
+    }
+
+    msvc8::string varName(simVar->mName ? simVar->mName : "");
+    archive->WriteString(&varName);
+
+    gpg::RRef valueRef{};
+    simVar->GetValueRef(&valueRef);
+    msvc8::string lexical = valueRef.GetLexical();
+    archive->WriteString(&lexical);
+  }
+
+  msvc8::string endOfVars;
+  archive->WriteString(&endOfVars);
+}
+
+/**
  * Address: 0x007551C0 (FUN_007551C0, ?Dump@CMauiControl@Moho@@UAEXXZ_0)
  *
  * What it does:
@@ -4852,6 +5736,7 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   );
 
   SaveTaskStages(archive, &mTaskStageA, &mDiskWatcherTaskStage, &mTaskStageB, ownerRef);
+  SerVars(archive);
   SaveObjectByRType(archive, &mShields, {"std::list<Moho::Shield *>", "list<Moho::Shield *>"}, ownerRef);
 
   archive->WriteBool(mCheatsEnabled);
@@ -4955,6 +5840,17 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 }
 
 /**
+ * Address: 0x00743370 (FUN_00743370, func_FormatBeatStr)
+ *
+ * What it does:
+ * Builds one checksum-log file path as `<prefix>beat%05d.log`.
+ */
+[[nodiscard]] static msvc8::string FormatBeatLogFilePath(const msvc8::string& logFilePrefix, const int beat)
+{
+  return gpg::STR_Printf("%sbeat%05d.log", logFilePrefix.c_str(), beat);
+}
+
+/**
  * Address: 0x0074ADB0 (FUN_0074ADB0, ?FlushLog@Sim@Moho@@AAEXXZ)
  *
  * What it does:
@@ -4985,7 +5881,7 @@ void Sim::FlushLog()
     }
   }
 
-  mDesyncLogLine = gpg::STR_Printf("%sbeat%05d.log", mLogFilePrefix.c_str(), static_cast<int>(mCurBeat));
+  mDesyncLogLine = FormatBeatLogFilePath(mLogFilePrefix, static_cast<int>(mCurBeat));
   if (fopen_s(&mLog, mDesyncLogLine.c_str(), "w") != 0) {
     mLog = nullptr;
   }
@@ -6021,7 +6917,9 @@ bool Sim::OkayToMessWith(CUnitCommand* cmd)
   return true;
 }
 
-// 0x00748650
+/**
+ * Address: 0x00748650 (FUN_00748650, ?SetCommandSource@Sim@Moho@@UAEXI@Z)
+ */
 void Sim::SetCommandSource(const CommandSourceId sourceId)
 {
   if (sourceId == kInvalidCommandSource || sourceId < static_cast<CommandSourceId>(mCommandSources.size())) {
@@ -6033,7 +6931,9 @@ void Sim::SetCommandSource(const CommandSourceId sourceId)
   mCurCommandSource = static_cast<int32_t>(kInvalidCommandSource);
 }
 
-// 0x007486B0
+/**
+ * Address: 0x007486B0 (FUN_007486B0, ?OnCommandSourceTerminated@Sim@Moho@@UAEXXZ)
+ */
 void Sim::OnCommandSourceTerminated()
 {
   Logf("Command source %s terminated tick %d\n", GetCurrentCommandSourceName(), mCurTick);
@@ -6058,7 +6958,13 @@ void Sim::OnCommandSourceTerminated()
   }
 }
 
-// 0x007487C0
+/**
+ * Address: 0x007487C0 (FUN_007487C0, ?VerifyChecksum@Sim@Moho@@UAEXABVMD5Digest@gpg@@H@Z)
+ *
+ * What it does:
+ * Validates one remote beat checksum against the local rolling hash ring,
+ * records a desync entry on mismatch, and clears the cached desync log list.
+ */
 void Sim::VerifyChecksum(const gpg::MD5Digest& checksum, const CSeqNo beat)
 {
   if (mCurCommandSource == kInvalidCommandSource) {
@@ -6105,9 +7011,12 @@ void Sim::VerifyChecksum(const gpg::MD5Digest& checksum, const CSeqNo beat)
   );
 
   mIsDesyncFree = false;
+  mDesyncLogLines.clear();
 }
 
-// 0x00748960
+/**
+ * Address: 0x00748960 (FUN_00748960, ?RequestPause@Sim@Moho@@UAEXXZ)
+ */
 void Sim::RequestPause()
 {
   if (mPausedByCommandSource != -1) {
@@ -6128,7 +7037,9 @@ void Sim::RequestPause()
   mPausedByCommandSource = mCurCommandSource;
 }
 
-// 0x007489A0
+/**
+ * Address: 0x007489A0 (FUN_007489A0, ?Resume@Sim@Moho@@UAEXXZ)
+ */
 void Sim::Resume()
 {
   if (mCurCommandSource != kInvalidCommandSource) {
@@ -6136,7 +7047,9 @@ void Sim::Resume()
   }
 }
 
-// 0x007489C0
+/**
+ * Address: 0x007489C0 (FUN_007489C0, ?SingleStep@Sim@Moho@@UAEXXZ)
+ */
 void Sim::SingleStep()
 {
   if (mPausedByCommandSource != -1 && mCurCommandSource != kInvalidCommandSource) {
@@ -6322,7 +7235,9 @@ void Sim::DestroyEntity(const EntId entityId)
   entity->Destroy();
 }
 
-// 0x00748CD0
+/**
+ * Address: 0x00748CD0 (FUN_00748CD0, ?WarpEntity@Sim@Moho@@UAEXVEntId@2@ABVVTransform@2@@Z)
+ */
 void Sim::WarpEntity(const EntId entityId, const VTransform& transform)
 {
   if (!CheatsEnabled()) {
@@ -6337,109 +7252,141 @@ void Sim::WarpEntity(const EntId entityId, const VTransform& transform)
   ApplyWarpTransform(entity, transform);
 }
 
-// 0x00748D50
+/**
+ * Address: 0x00748D50 (FUN_00748D50, ?ProcessInfoPair@Sim@Moho@@UAEXVEntId@2@VStrArg@gpg@@1@Z)
+ *
+ * What it does:
+ * Applies one UI/info key-value command lane to a controllable live unit.
+ */
 void Sim::ProcessInfoPair(void* id, const char* key, const char* val)
 {
   const EntId entityId = static_cast<EntId>(reinterpret_cast<std::uintptr_t>(id));
-  Entity* entity = FindEntityById(mEntityDB, entityId);
-  if (!entity || !OkayToMessWith(entity)) {
-    return;
-  }
-
-  Unit* unit = entity->IsUnit();
-  if (!unit || unit->IsDead()) {
-    return;
-  }
-
-  bool boolValue = false;
-
-  if (gpg::STR_EqualsNoCase(key, "SetAutoMode")) {
-    if (ParseBoolLiteral(val, boolValue)) {
-      unit->SetAutoMode(boolValue);
-    }
-    return;
-  }
-
-  if (gpg::STR_EqualsNoCase(key, "SetAutoSurfaceMode")) {
-    if (ParseBoolLiteral(val, boolValue)) {
-      unit->SetAutoSurfaceMode(boolValue);
-    }
-    return;
-  }
-
-  if (gpg::STR_EqualsNoCase(key, "CustomName")) {
-    unit->SetCustomName(std::string(val ? val : ""));
-    return;
-  }
-
-  if (gpg::STR_EqualsNoCase(key, "SiloBuildTactical")) {
-    if (gpg::STR_EqualsNoCase(val, "add")) {
-      QueueSiloBuildRequest(unit, 0);
-    }
-    return;
-  }
-
-  if (gpg::STR_EqualsNoCase(key, "SiloBuildNuke")) {
-    if (gpg::STR_EqualsNoCase(val, "add")) {
-      QueueSiloBuildRequest(unit, 1);
-    }
-    return;
-  }
-
-  if (gpg::STR_EqualsNoCase(key, "SetRepeatQueue")) {
-    if (ParseBoolLiteral(val, boolValue)) {
-      unit->SetRepeatQueue(boolValue);
-    }
-    return;
-  }
-
-  if (gpg::STR_EqualsNoCase(key, "SetPaused")) {
-    if (ParseBoolLiteral(val, boolValue)) {
-      unit->SetPaused(boolValue);
-    }
+  Entity* const entity = FindEntityById(mEntityDB, entityId);
+  if (!entity || !OkayToMessWith(entity) || entity->Dead != 0u) {
     return;
   }
 
   if (gpg::STR_EqualsNoCase(key, "SetFireState")) {
-    int fireState = 0;
-    if (ParseIntLiteral(val, fireState) && fireState >= 0 && fireState <= 2) {
-      unit->SetFireState(fireState);
+    Unit* const unit = entity->IsUnit();
+    if (!unit) {
+      return;
     }
+
+    EFireState fireState = static_cast<EFireState>(0);
+    gpg::RRef fireStateRef{};
+    (void)gpg::RRef_EFireState(&fireStateRef, &fireState);
+    (void)fireStateRef.SetLexical(val);
+    if (static_cast<std::uint32_t>(fireState) <= 2u) {
+      unit->SetFireState(static_cast<int>(fireState));
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "SetAutoMode")) {
+    Unit* const unit = entity->IsUnit();
+    bool value = false;
+    if (unit && ParseBoolLiteral(val, value)) {
+      unit->SetAutoMode(value);
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "SetAutoSurfaceMode")) {
+    Unit* const unit = entity->IsUnit();
+    bool value = false;
+    if (unit && ParseBoolLiteral(val, value)) {
+      unit->SetAutoSurfaceMode(value);
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "SetRepeatQueue")) {
+    Unit* const unit = entity->IsUnit();
+    bool value = false;
+    if (unit && ParseBoolLiteral(val, value)) {
+      unit->SetRepeatQueue(value);
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "SetPaused")) {
+    Unit* const unit = entity->IsUnit();
+    bool value = false;
+    if (unit && ParseBoolLiteral(val, value)) {
+      unit->SetPaused(value);
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "SiloBuildTactical")) {
+    Unit* const unit = entity->IsUnit();
+    if (unit && gpg::STR_EqualsNoCase(val, "add")) {
+      QueueSiloBuildRequest(unit, 0);
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "SiloBuildNuke")) {
+    Unit* const unit = entity->IsUnit();
+    if (unit && gpg::STR_EqualsNoCase(val, "add")) {
+      QueueSiloBuildRequest(unit, 1);
+    }
+
+    return;
+  }
+
+  if (gpg::STR_EqualsNoCase(key, "CustomName")) {
+    Unit* const unit = entity->IsUnit();
+    if (unit) {
+      unit->SetCustomName(std::string(val ? val : ""));
+    }
+
     return;
   }
 
   if (gpg::STR_EqualsNoCase(key, "ToggleScriptBit")) {
-    int bitIndex = 0;
-    if (ParseIntLiteral(val, bitIndex)) {
-      unit->ToggleScriptBit(bitIndex);
+    Unit* const unit = entity->IsUnit();
+    if (unit) {
+      unit->ToggleScriptBit(std::atoi(val));
     }
+
     return;
   }
 
   if (gpg::STR_EqualsNoCase(key, "PlayNoStagingPlatformsVO")) {
-    static_cast<CScriptObject*>(unit)->CallbackStr("OnPlayNoStagingPlatformsVO");
+    Unit* const unit = entity->IsUnit();
+    if (!unit) {
+      return;
+    }
+
+    (void)reinterpret_cast<CScriptObject*>(unit->ArmyRef->GetArmyBrain())->RunScript("OnPlayNoStagingPlatformsVO");
     return;
   }
 
   if (gpg::STR_EqualsNoCase(key, "PlayBusyStagingPlatformsVO")) {
-    static_cast<CScriptObject*>(unit)->CallbackStr("OnPlayBusyStagingPlatformsVO");
+    Unit* const unit = entity->IsUnit();
+    if (!unit) {
+      return;
+    }
+
+    (void)reinterpret_cast<CScriptObject*>(unit->ArmyRef->GetArmyBrain())->RunScript("OnPlayBusyStagingPlatformsVO");
     return;
   }
-
-  Logf(
-    "ProcessInfoPair(entity=%d, key=%s, val=%s): key path not yet lifted.\n",
-    entityId,
-    key ? key : "<null>",
-    val ? val : "<null>"
-  );
 }
 
 /**
  * Address: 0x00749290 (FUN_00749290)
  *
  * What it does:
- * Validates command-id ownership, collects selected units, and (for now) keeps
- * id lifecycle consistent while full dispatch recovery remains in progress.
+ * Validates command-id ownership, filters selected units through sim command
+ * access rules, and forwards the recovered shared-command dispatch to unit
+ * queues.
  */
 void Sim::IssueCommand(
   const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
@@ -6449,8 +7396,7 @@ void Sim::IssueCommand(
     return;
   }
 
-  std::vector<Unit*> selectedUnits;
-  selectedUnits.reserve(entities.Bits().Count());
+  SEntitySetTemplateUnit selectedUnits{};
 
   auto collectUnit = [this, &selectedUnits](const EntId entId) {
     Entity* entity = FindEntityById(mEntityDB, entId);
@@ -6463,45 +7409,32 @@ void Sim::IssueCommand(
       return;
     }
 
-    if (std::find(selectedUnits.begin(), selectedUnits.end(), unit) == selectedUnits.end()) {
-      selectedUnits.push_back(unit);
-    }
+    (void)selectedUnits.AddUnit(unit);
   };
 
   entities.ForEachValue([&collectUnit](const unsigned int value) {
     collectUnit(static_cast<EntId>(value));
   });
 
-  if (selectedUnits.empty()) {
+  if (selectedUnits.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
     return;
   }
 
-  // 0x00749290 gates command type 31 behind CheatsEnabled().
-  const int commandType = static_cast<int>(commandIssueData.mCommandType);
-  if (commandType == 31 && !CheatsEnabled()) {
+  if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_DestroySelf && !CheatsEnabled()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
     return;
   }
 
-  // Full UNIT_IssueCommand dispatch (0x006F12C0) still depends on local
-  // helper containers built by 0x0057DDD0 / 0x005796A0.
-  Logf(
-    "IssueCommand(cmd=0x%08x, units=%zu, clear=%d, type=%d): dispatch path pending lift.\n",
-    commandIssueData.nextCommandId,
-    selectedUnits.size(),
-    clearQueue ? 1 : 0,
-    commandType
-  );
-  ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
+  (void)IssueCommandToSelectedUnits(this, selectedUnits, commandIssueData, clearQueue);
 }
 
 /**
  * Address: 0x007494B0 (FUN_007494B0)
  *
  * What it does:
- * Validates command-id ownership, collects selected factory units, and preserves
- * command-id recycling while factory dispatch lift is still pending.
+ * Validates command-id ownership, gathers controllable factory units, and
+ * issues one shared factory command to every eligible builder.
  */
 void Sim::IssueFactoryCommand(
   const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
@@ -6511,9 +7444,7 @@ void Sim::IssueFactoryCommand(
     return;
   }
 
-  std::vector<Unit*> selectedFactories;
-  selectedFactories.reserve(entities.Bits().Count());
-
+  SEntitySetTemplateUnit selectedFactories{};
   auto collectFactory = [this, &selectedFactories](const EntId entId) {
     Entity* entity = FindEntityById(mEntityDB, entId);
     if (!entity || !OkayToMessWith(entity)) {
@@ -6525,31 +7456,24 @@ void Sim::IssueFactoryCommand(
       return;
     }
 
-    if (std::find(selectedFactories.begin(), selectedFactories.end(), unit) == selectedFactories.end()) {
-      selectedFactories.push_back(unit);
-    }
+    (void)selectedFactories.AddUnit(unit);
   };
 
   entities.ForEachValue([&collectFactory](const unsigned int value) {
     collectFactory(static_cast<EntId>(value));
   });
 
-  if (selectedFactories.empty()) {
+  if (selectedFactories.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
     return;
   }
 
-  // Full dispatch path calls 0x006F14D0 after helper-list setup.
-  Logf(
-    "IssueFactoryCommand(cmd=0x%08x, factories=%zu, clear=%d): dispatch path pending lift.\n",
-    commandIssueData.nextCommandId,
-    selectedFactories.size(),
-    clearQueue ? 1 : 0
-  );
-  ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
+  (void)IssueFactoryCommandToSelectedUnits(this, selectedFactories, commandIssueData, clearQueue);
 }
 
-// 0x00749680
+/**
+ * Address: 0x00749680 (FUN_00749680, ?IncreaseCommandCount@Sim@Moho@@UAEXVCmdId@2@H@Z)
+ */
 void Sim::IncreaseCommandCount(const CmdId cmdId, const int count)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
@@ -6558,7 +7482,9 @@ void Sim::IncreaseCommandCount(const CmdId cmdId, const int count)
   }
 }
 
-// 0x007496E0
+/**
+ * Address: 0x007496E0 (FUN_007496E0, ?DecreaseCommandCount@Sim@Moho@@UAEXVCmdId@2@H@Z)
+ */
 void Sim::DecreaseCommandCount(const CmdId cmdId, const int count)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
@@ -6567,7 +7493,9 @@ void Sim::DecreaseCommandCount(const CmdId cmdId, const int count)
   }
 }
 
-// 0x00749740
+/**
+ * Address: 0x00749740 (FUN_00749740, ?SetCommandTarget@Sim@Moho@@UAEXVCmdId@2@ABUSSTITarget@2@@Z)
+ */
 void Sim::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
@@ -6580,7 +7508,9 @@ void Sim::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
   command->SetTarget(aiTarget);
 }
 
-// 0x00749800
+/**
+ * Address: 0x00749800 (FUN_00749800, ?SetCommandType@Sim@Moho@@UAEXVCmdId@2@W4EUnitCommandType@2@@Z)
+ */
 void Sim::SetCommandType(const CmdId cmdId, const EUnitCommandType commandType)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
@@ -6592,7 +7522,9 @@ void Sim::SetCommandType(const CmdId cmdId, const EUnitCommandType commandType)
   command->mNeedsUpdate = true;
 }
 
-// 0x00749860
+/**
+ * Address: 0x00749860 (FUN_00749860, ?SetCommandCells@Sim@Moho@@UAEXVCmdId@2@ABV?$fastvector@USOCellPos@Moho@@@gpg@@ABV?$Vector3@M@Wm3@@@Z)
+ */
 void Sim::SetCommandCells(
   const CmdId cmdId, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& targetPosition
 )
@@ -6617,7 +7549,9 @@ void Sim::SetCommandCells(
   command->SetTarget(aiTarget);
 }
 
-// 0x00749970
+/**
+ * Address: 0x00749970 (FUN_00749970, ?RemoveCommandFromUnitQueue@Sim@Moho@@UAEXVCmdId@2@VEntId@2@@Z)
+ */
 void Sim::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId unitId)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
@@ -6709,61 +7643,52 @@ void Sim::ExecuteLuaInSim(const char* functionName, const LuaPlus::LuaObject& ar
   lua_settop(state, oldTop);
 }
 
-// 0x00749B60
+/**
+ * Address: 0x00749B60 (FUN_00749B60, ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
+ *
+ * What it does:
+ * Imports `/lua/SimCallbacks.lua`, resolves `DoCallback`, builds an optional
+ * selected-unit table, then executes `DoCallback(callbackName,args,units)`.
+ */
 void Sim::LuaSimCallback(
   const char* callbackName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
 )
 {
-  if (!callbackName || !mLuaState || !mLuaState->m_state) {
-    return;
+  LuaPlus::LuaObject selectedUnits(mLuaState);
+  if (entities.Bits().Count() != 0u) {
+    selectedUnits.AssignNewTable(mLuaState, 0, 0);
+
+    int luaIndex = 1;
+    auto appendUnitLuaObject = [this, &selectedUnits, &luaIndex](const EntId entId) {
+      Entity* const entity = FindEntityById(mEntityDB, entId);
+      if (!entity) {
+        return;
+      }
+
+      Unit* const unit = entity->IsUnit();
+      if (!unit) {
+        return;
+      }
+
+      selectedUnits.SetObject(luaIndex, unit->GetLuaObject());
+      ++luaIndex;
+    };
+
+    entities.ForEachValue([&appendUnitLuaObject](const unsigned int value) {
+      appendUnitLuaObject(static_cast<EntId>(value));
+    });
   }
 
-  lua_State* state = mLuaState->m_state;
+  lua_State* const state = mLuaState->m_state;
   const int oldTop = lua_gettop(state);
-
-  lua_getglobal(state, "DoCallback");
-  if (!lua_isfunction(state, -1)) {
-    lua_settop(state, oldTop);
-    return;
+  LuaPlus::LuaObject simCallbacksModule = SCR_Import(mLuaState, "/lua/SimCallbacks.lua");
+  LuaPlus::LuaObject doCallbackObject = simCallbacksModule["DoCallback"];
+  if (!doCallbackObject.IsFunction()) {
+    doCallbackObject.TypeError("call");
   }
 
-  lua_pushstring(state, callbackName);
-
-  try {
-    LuaPlus::LuaPush(state, args);
-  } catch (const std::exception&) {
-    lua_pushnil(state);
-  }
-
-  lua_newtable(state);
-  int luaIndex = 1;
-
-  auto appendUnitLuaObject = [this, state, &luaIndex](const EntId entId) {
-    Entity* entity = FindEntityById(mEntityDB, entId);
-    if (!entity) {
-      return;
-    }
-
-    Unit* unit = entity->IsUnit();
-    if (!unit) {
-      return;
-    }
-
-    LuaPlus::LuaObject unitObject = unit->GetLuaObject();
-    lua_pushnumber(state, static_cast<lua_Number>(luaIndex++));
-    LuaPlus::LuaPush(state, unitObject);
-    lua_settable(state, -3);
-  };
-
-  entities.ForEachValue([&appendUnitLuaObject](const unsigned int value) {
-    appendUnitLuaObject(static_cast<EntId>(value));
-  });
-
-  if (lua_pcall(state, 3, 0, 0) != 0) {
-    const char* err = lua_tostring(state, -1);
-    gpg::Warnf("Sim::LuaSimCallback('%s') failed: %s", callbackName, err ? err : "<unknown>");
-  }
-
+  const LuaPlus::LuaFunction<> doCallback(doCallbackObject);
+  doCallback(callbackName, args, selectedUnits);
   lua_settop(state, oldTop);
 }
 
@@ -7624,7 +8549,7 @@ int Sim::AddLightParticle(
   }
 
   const msvc8::string textureSecondary("ramp_white_01");
-  sim->mEffectManager->CreateLightParticle(*worldPos, texturePrimary, textureSecondary, lifetime, size, -1);
+  sim->mEffectManager->CreateLightParticle(*worldPos, texturePrimary, textureSecondary, size, lifetime, -1);
   return 0;
 }
 
@@ -8488,7 +9413,7 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SpecFootprints(lua_State* const luaContext)
 {
-  return cfunc_SpecFootprintsL(ResolveBindingState(luaContext));
+  return cfunc_SpecFootprintsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 namespace
@@ -8983,7 +9908,7 @@ moho::CScrLuaInitForm* moho::j_func_BlueprintLoaderUpdateProgress_LuaFuncDef()
  */
 int moho::cfunc_RandomSim(lua_State* const luaContext)
 {
-  return cfunc_RandomSimL(ResolveBindingState(luaContext));
+  return cfunc_RandomSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9073,7 +9998,7 @@ int moho::cfunc_RandomSimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SelectedUnit(lua_State* const luaContext)
 {
-  return cfunc_SelectedUnitL(ResolveBindingState(luaContext));
+  return cfunc_SelectedUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9120,7 +10045,7 @@ int moho::cfunc_SelectedUnitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SimConExecute(lua_State* const luaContext)
 {
-  return cfunc_SimConExecuteL(ResolveBindingState(luaContext));
+  return cfunc_SimConExecuteL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9179,7 +10104,7 @@ int moho::cfunc_SimConExecuteL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ParseEntityCategorySim(lua_State* const luaContext)
 {
-  return cfunc_ParseEntityCategorySimL(ResolveBindingState(luaContext));
+  return cfunc_ParseEntityCategorySimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9295,7 +10220,7 @@ int moho::cfunc_ParseEntityCategoryUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ParseEntityCategoryUser(lua_State* const luaContext)
 {
-  return cfunc_ParseEntityCategoryUserL(ResolveBindingState(luaContext));
+  return cfunc_ParseEntityCategoryUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9358,7 +10283,7 @@ int moho::cfunc_EntityCategoryContainsSimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityCategoryContainsSim(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryContainsSimL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryContainsSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9388,7 +10313,7 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryContainsSim_LuaFuncDef()
  */
 int moho::cfunc_EntityCategoryFilterDownSim(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryFilterDownSimL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryFilterDownSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9506,7 +10431,7 @@ int moho::cfunc_EntityCategoryCountL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityCategoryCount(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryCountL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryCountL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9537,7 +10462,7 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryCount_LuaFuncDef()
  */
 int moho::cfunc_EntityCategoryCountAroundPosition(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryCountAroundPositionL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryCountAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9634,7 +10559,7 @@ int moho::cfunc_EntityCategoryCountAroundPositionL(LuaPlus::LuaState* const stat
  */
 int moho::cfunc_Warp(lua_State* const luaContext)
 {
-  return cfunc_WarpL(ResolveBindingState(luaContext));
+  return cfunc_WarpL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9717,7 +10642,7 @@ moho::CScrLuaInitForm* moho::func_Warp_LuaFuncDef()
  */
 int moho::cfunc_DebugGetSelection(lua_State* const luaContext)
 {
-  return cfunc_DebugGetSelectionL(ResolveBindingState(luaContext));
+  return cfunc_DebugGetSelectionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9792,7 +10717,7 @@ int moho::cfunc_DebugGetSelectionL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsEntity(lua_State* const luaContext)
 {
-  return cfunc_IsEntityL(ResolveBindingState(luaContext));
+  return cfunc_IsEntityL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9847,7 +10772,7 @@ int moho::cfunc_IsEntityL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsUnit(lua_State* const luaContext)
 {
-  return cfunc_IsUnitL(ResolveBindingState(luaContext));
+  return cfunc_IsUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9890,7 +10815,7 @@ int moho::cfunc_IsUnitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsProp(lua_State* const luaContext)
 {
-  return cfunc_IsPropL(ResolveBindingState(luaContext));
+  return cfunc_IsPropL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9933,7 +10858,7 @@ int moho::cfunc_IsPropL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsBlip(lua_State* const luaContext)
 {
-  return cfunc_IsBlipL(ResolveBindingState(luaContext));
+  return cfunc_IsBlipL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -9977,7 +10902,7 @@ int moho::cfunc_IsBlipL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsProjectile(lua_State* const luaContext)
 {
-  return cfunc_IsProjectileL(ResolveBindingState(luaContext));
+  return cfunc_IsProjectileL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10021,7 +10946,7 @@ int moho::cfunc_IsProjectileL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsCollisionBeam(lua_State* const luaContext)
 {
-  return cfunc_IsCollisionBeamL(ResolveBindingState(luaContext));
+  return cfunc_IsCollisionBeamL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10066,7 +10991,7 @@ int moho::cfunc_IsCollisionBeamL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetUnitCommandFromCommandCap(lua_State* const luaContext)
 {
-  return cfunc_GetUnitCommandFromCommandCapL(ResolveBindingState(luaContext));
+  return cfunc_GetUnitCommandFromCommandCapL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10281,7 +11206,7 @@ int moho::cfunc_EjectSessionClientL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EjectSessionClient(lua_State* const luaContext)
 {
-  return cfunc_EjectSessionClientL(ResolveBindingState(luaContext));
+  return cfunc_EjectSessionClientL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10333,7 +11258,7 @@ int moho::cfunc_WorldIsLoadingL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_WorldIsLoading(lua_State* const luaContext)
 {
-  return cfunc_WorldIsLoadingL(ResolveBindingState(luaContext));
+  return cfunc_WorldIsLoadingL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10381,7 +11306,7 @@ int moho::cfunc_WorldIsPlayingL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_WorldIsPlaying(lua_State* const luaContext)
 {
-  return cfunc_WorldIsPlayingL(ResolveBindingState(luaContext));
+  return cfunc_WorldIsPlayingL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10435,7 +11360,7 @@ int moho::cfunc_GetGameSpeedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetGameSpeed(lua_State* const luaContext)
 {
-  return cfunc_GetGameSpeedL(ResolveBindingState(luaContext));
+  return cfunc_GetGameSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10498,7 +11423,7 @@ int moho::cfunc_SetGameSpeedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetGameSpeed(lua_State* const luaContext)
 {
-  return cfunc_SetGameSpeedL(ResolveBindingState(luaContext));
+  return cfunc_SetGameSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10552,7 +11477,7 @@ int moho::cfunc_AddToSessionExtraSelectListL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_AddToSessionExtraSelectList(lua_State* const luaContext)
 {
-  return cfunc_AddToSessionExtraSelectListL(ResolveBindingState(luaContext));
+  return cfunc_AddToSessionExtraSelectListL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10608,7 +11533,7 @@ int moho::cfunc_RemoveFromSessionExtraSelectListL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_RemoveFromSessionExtraSelectList(lua_State* const luaContext)
 {
-  return cfunc_RemoveFromSessionExtraSelectListL(ResolveBindingState(luaContext));
+  return cfunc_RemoveFromSessionExtraSelectListL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10683,7 +11608,7 @@ moho::CScrLuaInitForm* moho::func_ClearSessionExtraSelectList_LuaFuncDef()
  */
 int moho::cfunc_CurrentTime(lua_State* const luaContext)
 {
-  return cfunc_CurrentTimeL(ResolveBindingState(luaContext));
+  return cfunc_CurrentTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10735,7 +11660,7 @@ int moho::cfunc_CurrentTimeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GameTime(lua_State* const luaContext)
 {
-  return cfunc_GameTimeL(ResolveBindingState(luaContext));
+  return cfunc_GameTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10793,7 +11718,7 @@ int moho::cfunc_GameTimeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GameTick(lua_State* const luaContext)
 {
-  return cfunc_GameTickL(ResolveBindingState(luaContext));
+  return cfunc_GameTickL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10850,7 +11775,7 @@ int moho::cfunc_GameTickL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsAllyUser(lua_State* const luaContext)
 {
-  return cfunc_IsAllyUserL(ResolveBindingState(luaContext));
+  return cfunc_IsAllyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10908,7 +11833,7 @@ int moho::cfunc_IsAllyUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsEnemyUser(lua_State* const luaContext)
 {
-  return cfunc_IsEnemyUserL(ResolveBindingState(luaContext));
+  return cfunc_IsEnemyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -10967,7 +11892,7 @@ int moho::cfunc_IsEnemyUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsNeutral(lua_State* const luaContext)
 {
-  return cfunc_IsNeutralL(ResolveBindingState(luaContext));
+  return cfunc_IsNeutralL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11052,7 +11977,7 @@ int moho::cfunc_SyncPlayableRectL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SyncPlayableRect(lua_State* const luaContext)
 {
-  return cfunc_SyncPlayableRectL(ResolveBindingState(luaContext));
+  return cfunc_SyncPlayableRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11082,7 +12007,7 @@ moho::CScrLuaInitForm* moho::func_SyncPlayableRect_LuaFuncDef()
  */
 int moho::cfunc_RandomUser(lua_State* const luaContext)
 {
-  return cfunc_RandomUserL(ResolveBindingState(luaContext));
+  return cfunc_RandomUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11203,7 +12128,7 @@ int moho::cfunc_EntityCategoryContainsUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityCategoryContainsUser(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryContainsUserL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryContainsUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11290,7 +12215,7 @@ int moho::cfunc_EntityCategoryFilterDownUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityCategoryFilterDownUser(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryFilterDownUserL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryFilterDownUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11374,7 +12299,7 @@ int moho::cfunc_EntityCategoryFilterOutL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityCategoryFilterOut(lua_State* const luaContext)
 {
-  return cfunc_EntityCategoryFilterOutL(ResolveBindingState(luaContext));
+  return cfunc_EntityCategoryFilterOutL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11404,7 +12329,7 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryFilterOut_LuaFuncDef()
  */
 int moho::cfunc_ExecLuaInSim(lua_State* const luaContext)
 {
-  return cfunc_ExecLuaInSimL(ResolveBindingState(luaContext));
+  return cfunc_ExecLuaInSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11531,7 +12456,7 @@ int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SimCallback(lua_State* const luaContext)
 {
-  return cfunc_SimCallbackL(ResolveBindingState(luaContext));
+  return cfunc_SimCallbackL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11610,7 +12535,7 @@ int moho::cfunc_SetAutoModeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetAutoMode(lua_State* const luaContext)
 {
-  return cfunc_SetAutoModeL(ResolveBindingState(luaContext));
+  return cfunc_SetAutoModeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11689,7 +12614,7 @@ int moho::cfunc_SetAutoSurfaceModeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetAutoSurfaceMode(lua_State* const luaContext)
 {
-  return cfunc_SetAutoSurfaceModeL(ResolveBindingState(luaContext));
+  return cfunc_SetAutoSurfaceModeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11780,7 +12705,7 @@ int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ToggleScriptBit(lua_State* const luaContext)
 {
-  return cfunc_ToggleScriptBitL(ResolveBindingState(luaContext));
+  return cfunc_ToggleScriptBitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11857,7 +12782,7 @@ int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetPaused(lua_State* const luaContext)
 {
-  return cfunc_SetPausedL(ResolveBindingState(luaContext));
+  return cfunc_SetPausedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -11887,7 +12812,7 @@ moho::CScrLuaInitForm* moho::func_SetPaused_LuaFuncDef()
  */
 int moho::cfunc_GetAttachedUnitsList(lua_State* const luaContext)
 {
-  return cfunc_GetAttachedUnitsListL(ResolveBindingState(luaContext));
+  return cfunc_GetAttachedUnitsListL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12034,7 +12959,7 @@ int moho::cfunc_ValidateUnitsListL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ValidateUnitsList(lua_State* const luaContext)
 {
-  return cfunc_ValidateUnitsListL(ResolveBindingState(luaContext));
+  return cfunc_ValidateUnitsListL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12065,7 +12990,7 @@ moho::CScrLuaInitForm* moho::func_ValidateUnitsList_LuaFuncDef()
  */
 int moho::cfunc_GetAssistingUnitsList(lua_State* const luaContext)
 {
-  return cfunc_GetAssistingUnitsListL(ResolveBindingState(luaContext));
+  return cfunc_GetAssistingUnitsListL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12201,7 +13126,7 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetArmyAvatars(lua_State* const luaContext)
 {
-  return cfunc_GetArmyAvatarsL(ResolveBindingState(luaContext));
+  return cfunc_GetArmyAvatarsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12275,7 +13200,7 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetIdleEngineers(lua_State* const luaContext)
 {
-  return cfunc_GetIdleEngineersL(ResolveBindingState(luaContext));
+  return cfunc_GetIdleEngineersL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12350,7 +13275,7 @@ int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetIdleFactories(lua_State* const luaContext)
 {
-  return cfunc_GetIdleFactoriesL(ResolveBindingState(luaContext));
+  return cfunc_GetIdleFactoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12475,7 +13400,7 @@ int moho::cfunc_GetSelectedUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSelectedUnits(lua_State* const luaContext)
 {
-  return cfunc_GetSelectedUnitsL(ResolveBindingState(luaContext));
+  return cfunc_GetSelectedUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12505,7 +13430,7 @@ moho::CScrLuaInitForm* moho::func_GetSelectedUnits_LuaFuncDef()
  */
 int moho::cfunc_SelectUnits(lua_State* const luaContext)
 {
-  return cfunc_SelectUnitsL(ResolveBindingState(luaContext));
+  return cfunc_SelectUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12594,7 +13519,7 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_AddSelectUnits(lua_State* const luaContext)
 {
-  return cfunc_AddSelectUnitsL(ResolveBindingState(luaContext));
+  return cfunc_AddSelectUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12820,7 +13745,7 @@ moho::CScrLuaInitForm* moho::func_ExitGame_LuaFuncDef()
  */
 int moho::cfunc_RestartSession(lua_State* const luaContext)
 {
-  return cfunc_RestartSessionL(ResolveBindingState(luaContext));
+  return cfunc_RestartSessionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12879,7 +13804,7 @@ int moho::cfunc_RestartSessionL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetFrame(lua_State* const luaContext)
 {
-  return cfunc_GetFrameL(ResolveBindingState(luaContext));
+  return cfunc_GetFrameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -12958,7 +13883,7 @@ int moho::cfunc_GetFrameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ClearFrame(lua_State* const luaContext)
 {
-  return cfunc_ClearFrameL(ResolveBindingState(luaContext));
+  return cfunc_ClearFrameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13031,7 +13956,7 @@ int moho::cfunc_ClearFrameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetNumRootFrames(lua_State* const luaContext)
 {
-  return cfunc_GetNumRootFramesL(ResolveBindingState(luaContext));
+  return cfunc_GetNumRootFramesL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13165,7 +14090,7 @@ int moho::cfunc_GetEconomyTotalsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetEconomyTotals(lua_State* const luaContext)
 {
-  return cfunc_GetEconomyTotalsL(ResolveBindingState(luaContext));
+  return cfunc_GetEconomyTotalsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13195,7 +14120,7 @@ moho::CScrLuaInitForm* moho::func_GetEconomyTotals_LuaFuncDef()
  */
 int moho::cfunc_GetResourceSharing(lua_State* const luaContext)
 {
-  return cfunc_GetResourceSharingL(ResolveBindingState(luaContext));
+  return cfunc_GetResourceSharingL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13266,7 +14191,7 @@ int moho::cfunc_GetResourceSharingL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetCurrentUIState(lua_State* const luaContext)
 {
-  return cfunc_GetCurrentUIStateL(ResolveBindingState(luaContext));
+  return cfunc_GetCurrentUIStateL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13322,7 +14247,7 @@ int moho::cfunc_GetCurrentUIStateL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSimTicksPerSecond(lua_State* const luaContext)
 {
-  return cfunc_GetSimTicksPerSecondL(ResolveBindingState(luaContext));
+  return cfunc_GetSimTicksPerSecondL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13374,7 +14299,7 @@ int moho::cfunc_GetSimTicksPerSecondL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionRequestPause(lua_State* const luaContext)
 {
-  return cfunc_SessionRequestPauseL(ResolveBindingState(luaContext));
+  return cfunc_SessionRequestPauseL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13431,7 +14356,7 @@ int moho::cfunc_SessionRequestPauseL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionResume(lua_State* const luaContext)
 {
-  return cfunc_SessionResumeL(ResolveBindingState(luaContext));
+  return cfunc_SessionResumeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13488,7 +14413,7 @@ int moho::cfunc_SessionResumeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionIsPaused(lua_State* const luaContext)
 {
-  return cfunc_SessionIsPausedL(ResolveBindingState(luaContext));
+  return cfunc_SessionIsPausedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13586,7 +14511,7 @@ moho::CScrLuaInitForm* moho::func_SessionIsGameOver_LuaFuncDef()
  */
 int moho::cfunc_SessionGetLocalCommandSource(lua_State* const luaContext)
 {
-  return cfunc_SessionGetLocalCommandSourceL(ResolveBindingState(luaContext));
+  return cfunc_SessionGetLocalCommandSourceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13650,7 +14575,7 @@ int moho::cfunc_SessionGetLocalCommandSourceL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionIsReplayUser(lua_State* const luaContext)
 {
-  return cfunc_SessionIsReplayUserL(ResolveBindingState(luaContext));
+  return cfunc_SessionIsReplayUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13708,7 +14633,7 @@ int moho::cfunc_SessionIsReplayUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionIsBeingRecorded(lua_State* const luaContext)
 {
-  return cfunc_SessionIsBeingRecordedL(ResolveBindingState(luaContext));
+  return cfunc_SessionIsBeingRecordedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13765,7 +14690,7 @@ int moho::cfunc_SessionIsBeingRecordedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionIsMultiplayer(lua_State* const luaContext)
 {
-  return cfunc_SessionIsMultiplayerL(ResolveBindingState(luaContext));
+  return cfunc_SessionIsMultiplayerL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13823,7 +14748,7 @@ int moho::cfunc_SessionIsMultiplayerL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionIsObservingAllowed(lua_State* const luaContext)
 {
-  return cfunc_SessionIsObservingAllowedL(ResolveBindingState(luaContext));
+  return cfunc_SessionIsObservingAllowedL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13880,7 +14805,7 @@ int moho::cfunc_SessionIsObservingAllowedL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionCanRestart(lua_State* const luaContext)
 {
-  return cfunc_SessionCanRestartL(ResolveBindingState(luaContext));
+  return cfunc_SessionCanRestartL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13937,7 +14862,7 @@ int moho::cfunc_SessionCanRestartL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionIsActive(lua_State* const luaContext)
 {
-  return cfunc_SessionIsActiveL(ResolveBindingState(luaContext));
+  return cfunc_SessionIsActiveL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -13990,7 +14915,7 @@ int moho::cfunc_SessionIsActiveL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SessionGetScenarioInfo(lua_State* const luaContext)
 {
-  return cfunc_SessionGetScenarioInfoL(ResolveBindingState(luaContext));
+  return cfunc_SessionGetScenarioInfoL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14052,7 +14977,7 @@ int moho::cfunc_SessionGetScenarioInfoL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetMouseWorldPos(lua_State* const luaContext)
 {
-  return cfunc_GetMouseWorldPosL(ResolveBindingState(luaContext));
+  return cfunc_GetMouseWorldPosL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14110,7 +15035,7 @@ int moho::cfunc_GetMouseWorldPosL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetMouseScreenPos(lua_State* const luaContext)
 {
-  return cfunc_GetMouseScreenPosL(ResolveBindingState(luaContext));
+  return cfunc_GetMouseScreenPosL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14168,7 +15093,7 @@ int moho::cfunc_GetMouseScreenPosL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetFocusArmyUser(lua_State* const luaContext)
 {
-  return cfunc_SetFocusArmyUserL(ResolveBindingState(luaContext));
+  return cfunc_SetFocusArmyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14245,7 +15170,7 @@ int moho::cfunc_SetFocusArmyUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetFocusArmyUser(lua_State* const luaContext)
 {
-  return cfunc_GetFocusArmyUserL(ResolveBindingState(luaContext));
+  return cfunc_GetFocusArmyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14307,7 +15232,7 @@ int moho::cfunc_GetFocusArmyUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsObserver(lua_State* const luaContext)
 {
-  return cfunc_IsObserverL(ResolveBindingState(luaContext));
+  return cfunc_IsObserverL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14370,7 +15295,7 @@ int moho::cfunc_IsObserverL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetGameTime(lua_State* const luaContext)
 {
-  return cfunc_GetGameTimeL(ResolveBindingState(luaContext));
+  return cfunc_GetGameTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14452,7 +15377,7 @@ int moho::cfunc_GetGameTimeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetGameTimeSecondsUser(lua_State* const luaContext)
 {
-  return cfunc_GetGameTimeSecondsUserL(ResolveBindingState(luaContext));
+  return cfunc_GetGameTimeSecondsUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14510,7 +15435,7 @@ int moho::cfunc_GetGameTimeSecondsUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSystemTime(lua_State* const luaContext)
 {
-  return cfunc_GetSystemTimeL(ResolveBindingState(luaContext));
+  return cfunc_GetSystemTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14583,7 +15508,7 @@ int moho::cfunc_GetSystemTimeL(LuaPlus::LuaState* const state)
  */
 static int cfunc_GetSystemTimeSecondsDispatch(lua_State* const luaContext)
 {
-  return moho::cfunc_GetSystemTimeSecondsL(ResolveBindingState(luaContext));
+  return moho::cfunc_GetSystemTimeSecondsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14697,7 +15622,7 @@ int moho::cfunc_FormatTimeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_FormatTime(lua_State* const luaContext)
 {
-  return cfunc_FormatTimeL(ResolveBindingState(luaContext));
+  return cfunc_FormatTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14727,7 +15652,7 @@ moho::CScrLuaInitForm* moho::func_FormatTime_LuaFuncDef()
  */
 int moho::cfunc_GetSimRate(lua_State* const luaContext)
 {
-  return cfunc_GetSimRateL(ResolveBindingState(luaContext));
+  return cfunc_GetSimRateL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14785,7 +15710,7 @@ int moho::cfunc_GetSimRateL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetArmiesTable(lua_State* const luaContext)
 {
-  return cfunc_GetArmiesTableL(ResolveBindingState(luaContext));
+  return cfunc_GetArmiesTableL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14905,7 +15830,7 @@ int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetArmyScore(lua_State* const luaContext)
 {
-  return cfunc_GetArmyScoreL(ResolveBindingState(luaContext));
+  return cfunc_GetArmyScoreL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -14961,7 +15886,7 @@ int moho::cfunc_GetArmyScoreL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_DeleteCommand(lua_State* const luaContext)
 {
-  return cfunc_DeleteCommandL(ResolveBindingState(luaContext));
+  return cfunc_DeleteCommandL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15032,7 +15957,7 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSpecialFiles(lua_State* const luaContext)
 {
-  return cfunc_GetSpecialFilesL(ResolveBindingState(luaContext));
+  return cfunc_GetSpecialFilesL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15123,7 +16048,7 @@ int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSpecialFilePath(lua_State* const luaContext)
 {
-  return cfunc_GetSpecialFilePathL(ResolveBindingState(luaContext));
+  return cfunc_GetSpecialFilePathL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15204,7 +16129,7 @@ int moho::cfunc_GetSpecialFilePathL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSpecialFolder(lua_State* const luaContext)
 {
-  return cfunc_GetSpecialFolderL(ResolveBindingState(luaContext));
+  return cfunc_GetSpecialFolderL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15269,7 +16194,7 @@ int moho::cfunc_GetSpecialFolderL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_RemoveSpecialFile(lua_State* const luaContext)
 {
-  return cfunc_RemoveSpecialFileL(ResolveBindingState(luaContext));
+  return cfunc_RemoveSpecialFileL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15365,7 +16290,7 @@ int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSpecialFileInfo(lua_State* const luaContext)
 {
-  return cfunc_GetSpecialFileInfoL(ResolveBindingState(luaContext));
+  return cfunc_GetSpecialFileInfoL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15500,7 +16425,7 @@ int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_RemoveProfileDirectories(lua_State* const luaContext)
 {
-  return cfunc_RemoveProfileDirectoriesL(ResolveBindingState(luaContext));
+  return cfunc_RemoveProfileDirectoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15567,7 +16492,7 @@ int moho::cfunc_RemoveProfileDirectoriesL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CopyCurrentReplay(lua_State* const luaContext)
 {
-  return cfunc_CopyCurrentReplayL(ResolveBindingState(luaContext));
+  return cfunc_CopyCurrentReplayL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15644,7 +16569,7 @@ int moho::cfunc_CopyCurrentReplayL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetOverlayFilters(lua_State* const luaContext)
 {
-  return cfunc_SetOverlayFiltersL(ResolveBindingState(luaContext));
+  return cfunc_SetOverlayFiltersL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15822,7 +16747,7 @@ moho::CScrLuaInitForm* moho::func_RenderOverlayIntel_LuaFuncDef()
  */
 int moho::cfunc_RenderOverlayEconomy(lua_State* const luaContext)
 {
-  return cfunc_RenderOverlayEconomyL(ResolveBindingState(luaContext));
+  return cfunc_RenderOverlayEconomyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15873,7 +16798,7 @@ int moho::cfunc_RenderOverlayEconomyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_TeamColorMode(lua_State* const luaContext)
 {
-  return cfunc_TeamColorModeL(ResolveBindingState(luaContext));
+  return cfunc_TeamColorModeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -15926,7 +16851,7 @@ int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetUnitByIdUser(lua_State* const luaContext)
 {
-  return cfunc_GetUnitByIdUserL(ResolveBindingState(luaContext));
+  return cfunc_GetUnitByIdUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16077,7 +17002,7 @@ moho::CScrLuaInitForm* moho::func_printSim_LuaFuncDef()
  */
 int moho::cfunc_CheatsEnabled(lua_State* const luaContext)
 {
-  return cfunc_CheatsEnabledL(ResolveBindingState(luaContext));
+  return cfunc_CheatsEnabledL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16128,7 +17053,7 @@ int moho::cfunc_CheatsEnabledL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetCurrentCommandSource(lua_State* const luaContext)
 {
-  return cfunc_GetCurrentCommandSourceL(ResolveBindingState(luaContext));
+  return cfunc_GetCurrentCommandSourceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16212,7 +17137,7 @@ int moho::cfunc_EndGameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EndGame(lua_State* const luaContext)
 {
-  return cfunc_EndGameL(ResolveBindingState(luaContext));
+  return cfunc_EndGameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16247,7 +17172,7 @@ int moho::cfunc_IsGameOverL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsGameOver(lua_State* const luaContext)
 {
-  return cfunc_IsGameOverL(ResolveBindingState(luaContext));
+  return cfunc_IsGameOverL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16277,7 +17202,7 @@ moho::CScrLuaInitForm* moho::func_GenerateRandomOrientation_LuaFuncDef()
  */
 int moho::cfunc_GenerateRandomOrientation(lua_State* const luaContext)
 {
-  return cfunc_GenerateRandomOrientationL(ResolveBindingState(luaContext));
+  return cfunc_GenerateRandomOrientationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16335,7 +17260,7 @@ int moho::cfunc_GenerateRandomOrientationL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetGameTimeSecondsSim(lua_State* const luaContext)
 {
-  return cfunc_GetGameTimeSecondsSimL(ResolveBindingState(luaContext));
+  return cfunc_GetGameTimeSecondsSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16384,7 +17309,7 @@ int moho::cfunc_GetGameTimeSecondsSimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetGameTick(lua_State* const luaContext)
 {
-  return cfunc_GetGameTickL(ResolveBindingState(luaContext));
+  return cfunc_GetGameTickL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16428,7 +17353,7 @@ int moho::cfunc_GetGameTickL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetSystemTimeSecondsOnlyForProfileUse(lua_State* const luaContext)
 {
-  return cfunc_GetSystemTimeSecondsOnlyForProfileUseL(ResolveBindingState(luaContext));
+  return cfunc_GetSystemTimeSecondsOnlyForProfileUseL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16483,7 +17408,7 @@ int moho::cfunc_GetSystemTimeSecondsOnlyForProfileUseL(LuaPlus::LuaState* const 
  */
 int moho::cfunc_GetUnitsInRect(lua_State* const luaContext)
 {
-  return cfunc_GetUnitsInRectL(ResolveBindingState(luaContext));
+  return cfunc_GetUnitsInRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16572,7 +17497,7 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetReclaimablesInRect(lua_State* const luaContext)
 {
-  return cfunc_GetReclaimablesInRectL(ResolveBindingState(luaContext));
+  return cfunc_GetReclaimablesInRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16661,7 +17586,7 @@ int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetMapSize(lua_State* const luaContext)
 {
-  return cfunc_GetMapSizeL(ResolveBindingState(luaContext));
+  return cfunc_GetMapSizeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16728,7 +17653,7 @@ moho::CScrLuaInitForm* moho::func_GetTerrainHeight_LuaFuncDef()
  */
 int moho::cfunc_GetTerrainHeight(lua_State* const luaContext)
 {
-  return cfunc_GetTerrainHeightL(ResolveBindingState(luaContext));
+  return cfunc_GetTerrainHeightL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16796,7 +17721,7 @@ moho::CScrLuaInitForm* moho::func_GetSurfaceHeight_LuaFuncDef()
  */
 int moho::cfunc_GetSurfaceHeight(lua_State* const luaContext)
 {
-  return cfunc_GetSurfaceHeightL(ResolveBindingState(luaContext));
+  return cfunc_GetSurfaceHeightL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16870,7 +17795,7 @@ moho::CScrLuaInitForm* moho::func_GetTerrainTypeOffset_LuaFuncDef()
  */
 int moho::cfunc_GetTerrainTypeOffset(lua_State* const luaContext)
 {
-  return cfunc_GetTerrainTypeOffsetL(ResolveBindingState(luaContext));
+  return cfunc_GetTerrainTypeOffsetL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -16937,7 +17862,7 @@ moho::CScrLuaInitForm* moho::func_GetTerrainType_LuaFuncDef()
  */
 int moho::cfunc_GetTerrainType(lua_State* const luaContext)
 {
-  return cfunc_GetTerrainTypeL(ResolveBindingState(luaContext));
+  return cfunc_GetTerrainTypeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17013,7 +17938,7 @@ moho::CScrLuaInitForm* moho::func_SetTerrainType_LuaFuncDef()
  */
 int moho::cfunc_SetTerrainType(lua_State* const luaContext)
 {
-  return cfunc_SetTerrainTypeL(ResolveBindingState(luaContext));
+  return cfunc_SetTerrainTypeL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17100,7 +18025,7 @@ moho::CScrLuaInitForm* moho::func_SetTerrainTypeRect_LuaFuncDef()
  */
 int moho::cfunc_SetTerrainTypeRect(lua_State* const luaContext)
 {
-  return cfunc_SetTerrainTypeRectL(ResolveBindingState(luaContext));
+  return cfunc_SetTerrainTypeRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17245,7 +18170,7 @@ int moho::cfunc_SetPlayableRectL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetPlayableRect(lua_State* const luaContext)
 {
-  return cfunc_SetPlayableRectL(ResolveBindingState(luaContext));
+  return cfunc_SetPlayableRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17256,7 +18181,7 @@ int moho::cfunc_SetPlayableRect(lua_State* const luaContext)
  */
 int moho::cfunc_FlushIntelInRect(lua_State* const luaContext)
 {
-  return cfunc_FlushIntelInRectL(ResolveBindingState(luaContext));
+  return cfunc_FlushIntelInRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17353,7 +18278,7 @@ int moho::cfunc_FlushIntelInRectL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyStatsSyncArmy(lua_State* const luaContext)
 {
-  return cfunc_SetArmyStatsSyncArmyL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyStatsSyncArmyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17432,7 +18357,7 @@ moho::CScrLuaInitForm* moho::func_GetUnitBlueprintByName_LuaFuncDef()
  */
 int moho::cfunc_GetUnitBlueprintByName(lua_State* const luaContext)
 {
-  return cfunc_GetUnitBlueprintByNameL(ResolveBindingState(luaContext));
+  return cfunc_GetUnitBlueprintByNameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17508,7 +18433,7 @@ moho::CScrLuaInitForm* moho::func_DrawLine_LuaFuncDef()
  */
 int moho::cfunc_DrawLine(lua_State* const luaContext)
 {
-  return cfunc_DrawLineL(ResolveBindingState(luaContext));
+  return cfunc_DrawLineL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17558,7 +18483,7 @@ int moho::cfunc_DrawLineL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_DrawLinePop(lua_State* const luaContext)
 {
-  return cfunc_DrawLinePopL(ResolveBindingState(luaContext));
+  return cfunc_DrawLinePopL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17675,7 +18600,7 @@ moho::CScrLuaInitForm* moho::func_DrawCircle_LuaFuncDef()
  */
 int moho::cfunc_DrawCircle(lua_State* const luaContext)
 {
-  return cfunc_DrawCircleL(ResolveBindingState(luaContext));
+  return cfunc_DrawCircleL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17726,7 +18651,7 @@ int moho::cfunc_DrawCircleL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityAttachTo(lua_State* const luaContext)
 {
-  return cfunc_EntityAttachToL(ResolveBindingState(luaContext));
+  return cfunc_EntityAttachToL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17814,7 +18739,7 @@ moho::CScrLuaInitForm* moho::func_EntityAttachTo_LuaFuncDef()
  */
 int moho::cfunc_EntitySetOrientation(lua_State* const luaContext)
 {
-  return cfunc_EntitySetOrientationL(ResolveBindingState(luaContext));
+  return cfunc_EntitySetOrientationL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17883,7 +18808,7 @@ moho::CScrLuaInitForm* moho::func_EntitySetOrientation_LuaFuncDef()
  */
 int moho::cfunc_EntitySetPosition(lua_State* const luaContext)
 {
-  return cfunc_EntitySetPositionL(ResolveBindingState(luaContext));
+  return cfunc_EntitySetPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -17955,7 +18880,7 @@ moho::CScrLuaInitForm* moho::func_EntitySetPosition_LuaFuncDef()
  */
 int moho::cfunc_EntityGetPosition(lua_State* const luaContext)
 {
-  return cfunc_EntityGetPositionL(ResolveBindingState(luaContext));
+  return cfunc_EntityGetPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18045,7 +18970,7 @@ moho::CScrLuaInitForm* moho::func_EntityGetPosition_LuaFuncDef()
  */
 int moho::cfunc_EntityGetPositionXYZ(lua_State* const luaContext)
 {
-  return cfunc_EntityGetPositionXYZL(ResolveBindingState(luaContext));
+  return cfunc_EntityGetPositionXYZL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18169,7 +19094,7 @@ int moho::cfunc_EntityGetCollisionExtentsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityIsIntelEnabled(lua_State* const luaContext)
 {
-  return cfunc_EntityIsIntelEnabledL(ResolveBindingState(luaContext));
+  return cfunc_EntityIsIntelEnabledL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18240,7 +19165,7 @@ int moho::cfunc_EntityIsIntelEnabledL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityEnableIntel(lua_State* const luaContext)
 {
-  return cfunc_EntityEnableIntelL(ResolveBindingState(luaContext));
+  return cfunc_EntityEnableIntelL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18323,7 +19248,7 @@ int moho::cfunc_EntityEnableIntelL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityDisableIntel(lua_State* const luaContext)
 {
-  return cfunc_EntityDisableIntelL(ResolveBindingState(luaContext));
+  return cfunc_EntityDisableIntelL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18406,7 +19331,7 @@ int moho::cfunc_EntityDisableIntelL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntitySetIntelRadius(lua_State* const luaContext)
 {
-  return cfunc_EntitySetIntelRadiusL(ResolveBindingState(luaContext));
+  return cfunc_EntitySetIntelRadiusL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18497,7 +19422,7 @@ int moho::cfunc_EntitySetIntelRadiusL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityGetIntelRadius(lua_State* const luaContext)
 {
-  return cfunc_EntityGetIntelRadiusL(ResolveBindingState(luaContext));
+  return cfunc_EntityGetIntelRadiusL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18574,7 +19499,7 @@ int moho::cfunc_EntityGetIntelRadiusL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityInitIntel(lua_State* const luaContext)
 {
-  return cfunc_EntityInitIntelL(ResolveBindingState(luaContext));
+  return cfunc_EntityInitIntelL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18695,7 +19620,7 @@ int moho::cfunc_EntityInitIntelL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityAddShooter(lua_State* const luaContext)
 {
-  return cfunc_EntityAddShooterL(ResolveBindingState(luaContext));
+  return cfunc_EntityAddShooterL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18755,7 +19680,7 @@ int moho::cfunc_EntityAddShooterL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityRemoveShooter(lua_State* const luaContext)
 {
-  return cfunc_EntityRemoveShooterL(ResolveBindingState(luaContext));
+  return cfunc_EntityRemoveShooterL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18815,7 +19740,7 @@ int moho::cfunc_EntityRemoveShooterL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CreateProp(lua_State* const luaContext)
 {
-  return cfunc_CreatePropL(ResolveBindingState(luaContext));
+  return cfunc_CreatePropL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -18887,7 +19812,7 @@ moho::CScrLuaInitForm* moho::func_CreateProp_LuaFuncDef()
  */
 int moho::cfunc_CreateUnitAtMouse(lua_State* const luaContext)
 {
-  return cfunc_CreateUnitAtMouseL(ResolveBindingState(luaContext));
+  return cfunc_CreateUnitAtMouseL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19030,7 +19955,7 @@ int moho::cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_EntityCreatePropAtBone(lua_State* const luaContext)
 {
-  return cfunc_EntityCreatePropAtBoneL(ResolveBindingState(luaContext));
+  return cfunc_EntityCreatePropAtBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19108,7 +20033,7 @@ moho::CScrLuaInitForm* moho::func_EntityCreatePropAtBone_LuaFuncDef()
  */
 int moho::cfunc_CreateResourceDeposit(lua_State* const luaContext)
 {
-  return cfunc_CreateResourceDepositL(ResolveBindingState(luaContext));
+  return cfunc_CreateResourceDepositL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19456,7 +20381,7 @@ int moho::ARMY_IndexFromLuaState(LuaPlus::LuaState* const state, const LuaPlus::
  */
 int moho::cfunc_ShouldCreateInitialArmyUnits(lua_State* const luaContext)
 {
-  return cfunc_ShouldCreateInitialArmyUnitsL(ResolveBindingState(luaContext));
+  return cfunc_ShouldCreateInitialArmyUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19505,7 +20430,7 @@ int moho::cfunc_ShouldCreateInitialArmyUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ListArmies(lua_State* const luaContext)
 {
-  return cfunc_ListArmiesL(ResolveBindingState(luaContext));
+  return cfunc_ListArmiesL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19564,7 +20489,7 @@ int moho::cfunc_ListArmiesL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetArmyBrain(lua_State* const luaContext)
 {
-  return cfunc_GetArmyBrainL(ResolveBindingState(luaContext));
+  return cfunc_GetArmyBrainL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19614,7 +20539,7 @@ int moho::cfunc_GetArmyBrainL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyStart(lua_State* const luaContext)
 {
-  return cfunc_SetArmyStartL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyStartL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19678,7 +20603,7 @@ int moho::cfunc_SetArmyStartL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GenerateArmyStart(lua_State* const luaContext)
 {
-  return cfunc_GenerateArmyStartL(ResolveBindingState(luaContext));
+  return cfunc_GenerateArmyStartL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19728,7 +20653,7 @@ int moho::cfunc_GenerateArmyStartL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ArmyInitializePrebuiltUnits(lua_State* const luaContext)
 {
-  return cfunc_ArmyInitializePrebuiltUnitsL(ResolveBindingState(luaContext));
+  return cfunc_ArmyInitializePrebuiltUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19780,7 +20705,7 @@ int moho::cfunc_ArmyInitializePrebuiltUnitsL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetIgnoreArmyUnitCap(lua_State* const luaContext)
 {
-  return cfunc_SetIgnoreArmyUnitCapL(ResolveBindingState(luaContext));
+  return cfunc_SetIgnoreArmyUnitCapL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19833,7 +20758,7 @@ int moho::cfunc_SetIgnoreArmyUnitCapL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetIgnorePlayableRect(lua_State* const luaContext)
 {
-  return cfunc_SetIgnorePlayableRectL(ResolveBindingState(luaContext));
+  return cfunc_SetIgnorePlayableRectL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19885,7 +20810,7 @@ int moho::cfunc_SetIgnorePlayableRectL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsAllySim(lua_State* const luaContext)
 {
-  return cfunc_IsAllySimL(ResolveBindingState(luaContext));
+  return cfunc_IsAllySimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -19944,7 +20869,7 @@ int moho::cfunc_IsAllySimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsEnemySim(lua_State* const luaContext)
 {
-  return cfunc_IsEnemySimL(ResolveBindingState(luaContext));
+  return cfunc_IsEnemySimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20003,7 +20928,7 @@ int moho::cfunc_IsEnemySimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_IsNeutralSim(lua_State* const luaContext)
 {
-  return cfunc_IsNeutralSimL(ResolveBindingState(luaContext));
+  return cfunc_IsNeutralSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20062,7 +20987,7 @@ int moho::cfunc_IsNeutralSimL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ArmyIsCivilian(lua_State* const luaContext)
 {
-  return cfunc_ArmyIsCivilianL(ResolveBindingState(luaContext));
+  return cfunc_ArmyIsCivilianL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20116,7 +21041,7 @@ int moho::cfunc_ArmyIsCivilianL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyFactionIndex(lua_State* const luaContext)
 {
-  return cfunc_SetArmyFactionIndexL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyFactionIndexL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20178,7 +21103,7 @@ int moho::cfunc_SetArmyFactionIndexL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_OkayToMessWithArmy(lua_State* const luaContext)
 {
-  return cfunc_OkayToMessWithArmyL(ResolveBindingState(luaContext));
+  return cfunc_OkayToMessWithArmyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20247,7 +21172,7 @@ int moho::cfunc_OkayToMessWithArmyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ArmyIsOutOfGame(lua_State* const luaContext)
 {
-  return cfunc_ArmyIsOutOfGameL(ResolveBindingState(luaContext));
+  return cfunc_ArmyIsOutOfGameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20301,7 +21226,7 @@ int moho::cfunc_ArmyIsOutOfGameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyOutOfGame(lua_State* const luaContext)
 {
-  return cfunc_SetArmyOutOfGameL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyOutOfGameL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20357,7 +21282,7 @@ int moho::cfunc_SetArmyOutOfGameL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetAlliance(lua_State* const luaContext)
 {
-  return cfunc_SetAllianceL(ResolveBindingState(luaContext));
+  return cfunc_SetAllianceL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20430,7 +21355,7 @@ int moho::cfunc_SetAllianceL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetAllianceOneWay(lua_State* const luaContext)
 {
-  return cfunc_SetAllianceOneWayL(ResolveBindingState(luaContext));
+  return cfunc_SetAllianceOneWayL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20500,7 +21425,7 @@ int moho::cfunc_SetAllianceOneWayL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetAlliedVictory(lua_State* const luaContext)
 {
-  return cfunc_SetAlliedVictoryL(ResolveBindingState(luaContext));
+  return cfunc_SetAlliedVictoryL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20556,7 +21481,7 @@ int moho::cfunc_SetAlliedVictoryL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ArmyGetHandicap(lua_State* const luaContext)
 {
-  return cfunc_ArmyGetHandicapL(ResolveBindingState(luaContext));
+  return cfunc_ArmyGetHandicapL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20609,7 +21534,7 @@ int moho::cfunc_ArmyGetHandicapL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyEconomy(lua_State* const luaContext)
 {
-  return cfunc_SetArmyEconomyL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyEconomyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20677,7 +21602,7 @@ int moho::cfunc_SetArmyEconomyL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetArmyUnitCostTotal(lua_State* const luaContext)
 {
-  return cfunc_GetArmyUnitCostTotalL(ResolveBindingState(luaContext));
+  return cfunc_GetArmyUnitCostTotalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20727,7 +21652,7 @@ int moho::cfunc_GetArmyUnitCostTotalL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetArmyUnitCap(lua_State* const luaContext)
 {
-  return cfunc_GetArmyUnitCapL(ResolveBindingState(luaContext));
+  return cfunc_GetArmyUnitCapL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20777,7 +21702,7 @@ int moho::cfunc_GetArmyUnitCapL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyUnitCap(lua_State* const luaContext)
 {
-  return cfunc_SetArmyUnitCapL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyUnitCapL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20869,7 +21794,7 @@ int moho::cfunc_SetArmyAIPersonalityL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyAIPersonality(lua_State* const luaContext)
 {
-  return cfunc_SetArmyAIPersonalityL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyAIPersonalityL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20899,7 +21824,7 @@ moho::CScrLuaInitForm* moho::func_SetArmyAIPersonality_LuaFuncDef()
  */
 int moho::cfunc_SetArmyShowScore(lua_State* const luaContext)
 {
-  return cfunc_SetArmyShowScoreL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyShowScoreL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -20954,7 +21879,7 @@ int moho::cfunc_SetArmyShowScoreL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyPlans(lua_State* const luaContext)
 {
-  return cfunc_SetArmyPlansL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyPlansL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21014,7 +21939,7 @@ moho::CScrLuaInitForm* moho::func_SetArmyPlans_LuaFuncDef()
  */
 int moho::cfunc_InitializeArmyAI(lua_State* const luaContext)
 {
-  return cfunc_InitializeArmyAIL(ResolveBindingState(luaContext));
+  return cfunc_InitializeArmyAIL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21099,7 +22024,7 @@ int moho::cfunc_SetArmyColorL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_SetArmyColor(lua_State* const luaContext)
 {
-  return cfunc_SetArmyColorL(ResolveBindingState(luaContext));
+  return cfunc_SetArmyColorL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21167,7 +22092,7 @@ moho::CScrLuaInitForm* moho::func_IsGameOver_LuaFuncDef()
  */
 int moho::cfunc_GetEntityById(lua_State* const luaContext)
 {
-  return cfunc_GetEntityByIdL(ResolveBindingState(luaContext));
+  return cfunc_GetEntityByIdL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21236,7 +22161,7 @@ int moho::cfunc_GetEntityByIdL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_GetUnitByIdSim(lua_State* const luaContext)
 {
-  return cfunc_GetUnitByIdSimL(ResolveBindingState(luaContext));
+  return cfunc_GetUnitByIdSimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21325,7 +22250,7 @@ moho::CScrLuaInitForm* moho::func_SetPlayableRect_LuaFuncDef()
  */
 int moho::cfunc_GetFocusArmySim(lua_State* const luaContext)
 {
-  return cfunc_GetFocusArmySimL(ResolveBindingState(luaContext));
+  return cfunc_GetFocusArmySimL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21415,7 +22340,7 @@ moho::CScrLuaInitForm* moho::func_AudioSetLanguageSim_LuaFuncDef()
  */
 int moho::cfunc_AudioSetLanguageUser(lua_State* const luaContext)
 {
-  return cfunc_AudioSetLanguageUserL(ResolveBindingState(luaContext));
+  return cfunc_AudioSetLanguageUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21518,7 +22443,7 @@ int moho::cfunc_HasLocalizedVOUserL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_HasLocalizedVOUser(lua_State* const luaContext)
 {
-  return cfunc_HasLocalizedVOUserL(ResolveBindingState(luaContext));
+  return cfunc_HasLocalizedVOUserL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21623,7 +22548,7 @@ moho::CScrLuaInitForm* moho::func_SubmitXMLArmyStats_LuaFuncDef()
  */
 int moho::cfunc_PlayLoop(lua_State* const luaContext)
 {
-  return cfunc_PlayLoopL(ResolveBindingState(luaContext));
+  return cfunc_PlayLoopL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -21686,7 +22611,7 @@ int moho::cfunc_PlayLoopL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_StopLoop(lua_State* const luaContext)
 {
-  return cfunc_StopLoopL(ResolveBindingState(luaContext));
+  return cfunc_StopLoopL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

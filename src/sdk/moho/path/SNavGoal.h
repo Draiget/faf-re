@@ -9,6 +9,7 @@
 namespace moho
 {
   enum ELayer : std::int32_t;
+  struct SOCellPos;
 
   /**
    * Recovered goal rectangle payload passed to land/air navigator goal evaluators.
@@ -40,6 +41,17 @@ namespace moho
         ELayer mLayer;
       };
     };
+
+    SNavGoal() = default;
+
+    /**
+     * Address: 0x005A2CB0 (FUN_005A2CB0, Moho::SNavGoal::SNavGoal)
+     *
+     * What it does:
+     * Builds a one-cell navigation goal rectangle from one map cell coordinate
+     * and clears secondary bounds/layer lanes.
+     */
+    explicit SNavGoal(SOCellPos cellPos) noexcept;
 
     static gpg::RType* sType;
 

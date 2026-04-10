@@ -1,7 +1,5 @@
 #include "moho/debug/CPathDebugger.h"
 
-#include <cstring>
-
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
@@ -15,20 +13,9 @@ namespace
   constexpr const char* kCPathDebuggerDestroyName = "Destroy";
   constexpr const char* kCPathDebuggerDestroyHelpText = "Destroy the path debugger";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "User") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
+    return moho::SCR_FindLuaInitFormSet("User");
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
@@ -95,7 +82,7 @@ namespace moho
    */
   int cfunc__c_CreatePathDebugger(lua_State* const luaContext)
   {
-    return cfunc__c_CreatePathDebuggerL(ResolveBindingState(luaContext));
+    return cfunc__c_CreatePathDebuggerL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -150,7 +137,7 @@ namespace moho
    */
   int cfunc_CPathDebuggerDestroy(lua_State* const luaContext)
   {
-    return cfunc_CPathDebuggerDestroyL(ResolveBindingState(luaContext));
+    return cfunc_CPathDebuggerDestroyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

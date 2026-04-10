@@ -1,7 +1,9 @@
 #include <Windows.h>
 
+#include <cctype>
 #include <cerrno>
 #include <clocale>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -11,7 +13,9 @@
 #include <cwchar>
 #include <exception>
 #include <io.h>
+#include <locale>
 #include <new>
+#include <stdexcept>
 #include <string>
 #include <sys/timeb.h>
 
@@ -95,6 +99,39 @@ extern "C" char* __clocalestr;
 extern "C" void __cdecl __free_lc_time(void* lcTimeData);
 extern "C" void __cdecl __free_lconv_num(lconv* localeConv);
 extern "C" void __cdecl __free_lconv_mon(lconv* localeConv);
+extern "C" LCID* __cdecl __lc_handle_func();
+extern "C" int __cdecl __lc_codepage_func();
+extern "C" const std::uint16_t* __cdecl __pctype_func();
+extern "C" int __cdecl __crtLCMapStringA(
+  int localeType,
+  LCID locale,
+  unsigned int mapFlags,
+  LPCCH multiByteString,
+  int multiByteCount,
+  LPWSTR wideDestination,
+  int destinationCount,
+  int codePage,
+  int errorControl
+);
+extern "C" int __cdecl __crtLCMapStringW(
+  int localeType,
+  LCID locale,
+  unsigned int mapFlags,
+  LPCWSTR wideSource,
+  int sourceCount,
+  LPWSTR wideDestination,
+  int destinationCount,
+  int codePage
+);
+extern "C" int __cdecl __crtGetStringTypeW(
+  int localeType,
+  unsigned int infoType,
+  LPCWCH sourceText,
+  int sourceCount,
+  LPWORD charTypeOutput,
+  int codePage,
+  LCID locale
+);
 extern "C" void __cdecl _invalid_parameter(
   const wchar_t* expression,
   const wchar_t* functionName,
@@ -112,9 +149,12 @@ extern "C" void __cdecl _invoke_watson(
 
 namespace
 {
+  using RuntimeSignalHandler = void(__cdecl*)(int);
+
   constexpr int kRuntimeEnvironmentLock = 7;
   constexpr int kRuntimeSetLocaleLock = 12;
   constexpr int kRuntimeIobScanLock = 1;
+  constexpr int kRuntimeSignalLock = 0;
   constexpr int kRuntimeTimeLock = 6;
   constexpr int kRuntimeFileFlagFlushMask = 0x83;
   constexpr int kRuntimeFileFlagWritable = 0x02;
@@ -122,11 +162,68 @@ namespace
   constexpr std::uint64_t kFiletimeHundredNsPerSecond = 10000000ull;
   constexpr std::uint64_t kFiletimeHundredNsPerMinute = 600000000ull;
   constexpr std::uint64_t kFiletimeToUnixEpochOffset = 116444736000000000ull;
+  constexpr std::size_t kRuntimeCodePageLocaleHashBucketCount = 0x3Eu;
+  constexpr int kRuntimeOnExitFailureCode = 0x18;
 
   std::int64_t gRuntimeElapsedMinutesCache = 0;
   std::int32_t gRuntimeDstFlagCache = 0;
   std::int32_t gRuntimeTzsetFirstTime = 0;
   std::int32_t gRuntimeGetEnvironmentStringsEncodingMode = 0;
+  void* gRuntimeCtrlCActionEncoded = nullptr;
+  void* gRuntimeCtrlBreakActionEncoded = nullptr;
+  volatile long gRuntimeStdLockInit = -1;
+  CRITICAL_SECTION gRuntimeStdLockSlots[4]{};
+  void* gRuntimeIosStdStreams[9]{};
+  std::int8_t gRuntimeIosStdOpenCounts[9]{};
+  struct RuntimeCodePageLocaleHashEntry;
+  struct RuntimeLocaleLocimpView;
+  RuntimeCodePageLocaleHashEntry* gRuntimeCodePageLocaleHash[kRuntimeCodePageLocaleHashBucketCount]{};
+  RuntimeLocaleLocimpView* gRuntimeGlobalLocale = nullptr;
+  RuntimeLocaleLocimpView* gRuntimeClassicLocale = nullptr;
+  std::uint8_t gRuntimeGlobalLocaleAtexitRegistered = 0;
+  std::int32_t gRuntimeLocaleIdCounter = 0;
+  std::int32_t gRuntimeLocaleIdCtypeChar = 0;
+  std::int32_t gRuntimeLocaleIdSlotA = 0;
+  std::int32_t gRuntimeLocaleIdSlotB = 0;
+  std::int32_t gRuntimeLocaleIdSlotC = 0;
+  std::int32_t gRuntimeLocaleIdSlotD = 0;
+  std::uintptr_t gRuntimeStaticStorageSlotA = 0;
+  std::int32_t gRuntimeStaticStorageSlotB = 0;
+  std::uintptr_t gRuntimeStaticStorageSlotC = 0;
+  std::uintptr_t gRuntimeStaticStorageSlotD = 0;
+  struct RuntimeStdLocaleObject
+  {
+    RuntimeLocaleLocimpView* ptr = nullptr;
+  };
+  static_assert(sizeof(RuntimeStdLocaleObject) == 0x4, "RuntimeStdLocaleObject size must be 0x4");
+  RuntimeStdLocaleObject gRuntimeClassicLocaleObject{};
+  struct RuntimeFacetNode
+  {
+    RuntimeFacetNode* next = nullptr;
+    std::locale::facet* facet = nullptr;
+  };
+  static_assert(sizeof(RuntimeFacetNode) == 0x8, "RuntimeFacetNode size must be 0x8");
+  RuntimeFacetNode* gRuntimeFacetHead = nullptr;
+
+  struct RuntimeLockitState
+  {
+    std::int32_t slot = 0;
+  };
+  static_assert(sizeof(RuntimeLockitState) == 0x4, "RuntimeLockitState size must be 0x4");
+
+  struct RuntimeMutexHandle
+  {
+    CRITICAL_SECTION* criticalSection = nullptr;
+  };
+  static_assert(sizeof(RuntimeMutexHandle) == 0x4, "RuntimeMutexHandle size must be 0x4");
+
+  struct RuntimeCodePageLocaleHashEntry
+  {
+    RuntimeCodePageLocaleHashEntry* next = nullptr; // +0x00
+    std::uint32_t codePage = 0;                     // +0x04
+    RuntimeLocaleHandle* locale = nullptr;          // +0x08
+  };
+  static_assert(sizeof(RuntimeCodePageLocaleHashEntry) == 0xC, "RuntimeCodePageLocaleHashEntry size must be 0xC");
 
   [[nodiscard]] unsigned long* RuntimeDosErrno();
 
@@ -147,6 +244,33 @@ namespace
       flags |= kRuntimeFileFlagFlushMask;
     }
     return flags;
+  }
+
+  void RuntimeMtxInit(CRITICAL_SECTION* const lock) noexcept
+  {
+    ::InitializeCriticalSection(lock);
+  }
+
+  int RuntimeMtxLock(CRITICAL_SECTION* const lock) noexcept
+  {
+    ::EnterCriticalSection(lock);
+    return 0;
+  }
+
+  int RuntimeMtxUnlock(CRITICAL_SECTION* const lock) noexcept
+  {
+    ::LeaveCriticalSection(lock);
+    return 0;
+  }
+
+  void RuntimeMtxDestroy(CRITICAL_SECTION* const lock) noexcept
+  {
+    ::DeleteCriticalSection(lock);
+  }
+
+  [[nodiscard]] CRITICAL_SECTION* RuntimeStdLockSlot(const int slot) noexcept
+  {
+    return &gRuntimeStdLockSlots[slot & 3];
   }
 
   struct RuntimeSetLocLocaleView
@@ -194,6 +318,26 @@ namespace
     int* wideRefcount = nullptr;      // +0x0C
   };
   static_assert(sizeof(RuntimeLocaleCategoryView) == 0x10, "RuntimeLocaleCategoryView size must be 0x10");
+
+  struct RuntimeCtypeVec
+  {
+    LCID handle = 0;                        // +0x00
+    std::int32_t codePage = 0;              // +0x04
+    const std::uint16_t* table = nullptr;   // +0x08
+    std::int32_t ownsCopiedTable = 0;       // +0x0C
+  };
+  static_assert(offsetof(RuntimeCtypeVec, handle) == 0x0, "RuntimeCtypeVec::handle offset must be 0x0");
+  static_assert(offsetof(RuntimeCtypeVec, codePage) == 0x4, "RuntimeCtypeVec::codePage offset must be 0x4");
+  static_assert(offsetof(RuntimeCtypeVec, table) == 0x8, "RuntimeCtypeVec::table offset must be 0x8");
+  static_assert(offsetof(RuntimeCtypeVec, ownsCopiedTable) == 0xC, "RuntimeCtypeVec::ownsCopiedTable offset must be 0xC");
+  static_assert(sizeof(RuntimeCtypeVec) == 0x10, "RuntimeCtypeVec size must be 0x10");
+
+  struct RuntimeCvtVec
+  {
+    LCID handle = 0;           // +0x00
+    std::int32_t codePage = 0; // +0x04
+  };
+  static_assert(sizeof(RuntimeCvtVec) == 0x8, "RuntimeCvtVec size must be 0x8");
 
   struct RuntimeThreadLocInfoView
   {
@@ -249,6 +393,14 @@ namespace
     const std::size_t blockOffset = static_cast<std::size_t>(fileDescriptor & 0x1F) * sizeof(RuntimeIoInfo);
     const auto* const ioBytes = reinterpret_cast<const std::uint8_t*>(ioBlock) + blockOffset;
     return ioBytes[4];
+  }
+
+  [[nodiscard]] constexpr unsigned char RuntimeAsciiToLower(const unsigned char value) noexcept
+  {
+    if (value >= 'A' && value <= 'Z') {
+      return static_cast<unsigned char>(value + ('a' - 'A'));
+    }
+    return value;
   }
 
   class RuntimeEnvironmentLockGuard
@@ -740,6 +892,897 @@ namespace moho::runtime
     return ::_wfsopen(filePath, mode, shareFlag);
   }
 
+  [[nodiscard]] int RuntimeGetOsPlatform(int* const outPlatform)
+  {
+    if (outPlatform == nullptr) {
+      return EINVAL;
+    }
+
+    #pragma warning(push)
+    #pragma warning(disable:4996)
+    const DWORD version = ::GetVersion();
+    #pragma warning(pop)
+    *outPlatform = ((version & 0x80000000u) != 0u) ? 1 : 2;
+    return 0;
+  }
+
+  [[nodiscard]] void* RuntimeEncodedNullPointer()
+  {
+    return ::EncodePointer(nullptr);
+  }
+
+  [[nodiscard]] RuntimeSignalHandler RuntimeDecodeSignalAction(void*& encodedActionSlot)
+  {
+    if (encodedActionSlot == nullptr) {
+      encodedActionSlot = RuntimeEncodedNullPointer();
+    }
+    return reinterpret_cast<RuntimeSignalHandler>(_decode_pointer(encodedActionSlot));
+  }
+
+  /**
+   * Address: 0x00ABFAA0 (FUN_00ABFAA0, std::_Xfsopen)
+   *
+   * What it does:
+   * Opens one wide path with fallback conversion on Win9x platform lanes:
+   * uses `_wfsopen` on NT-class systems and `wcstombs_s` + `_fsopen` on Win9x.
+   */
+  std::FILE* RuntimeXfsopen(const wchar_t* const filePath, const wchar_t* const mode, const int shareFlag)
+  {
+    int osPlatform = 0;
+    if (RuntimeGetOsPlatform(&osPlatform) != 0) {
+      _invoke_watson(nullptr, nullptr, nullptr, 0u, 0u);
+    }
+
+    if (osPlatform != 1) {
+      return RuntimeWfsopen(filePath, mode, shareFlag);
+    }
+
+    char narrowFilePath[0x104]{};
+    char narrowMode[0x14]{};
+    if (::wcstombs_s(nullptr, narrowFilePath, 0x104u, filePath, 0x103u) != 0
+        || ::wcstombs_s(nullptr, narrowMode, 0x14u, mode, 0x13u) != 0) {
+      return nullptr;
+    }
+
+    return RuntimeFsopen(narrowFilePath, narrowMode, shareFlag);
+  }
+
+  /**
+   * Address: 0x00ABFB55 (FUN_00ABFB55, std::_Fiopen(wchar_t const*,int,int))
+   *
+   * What it does:
+   * Normalizes iostream openmode flags, resolves one CRT fopen mode string,
+   * performs noreplace probe when requested, and opens the stream.
+   */
+  std::FILE* RuntimeFiopenWide(const wchar_t* const filePath, const int openMode, const int shareFlag)
+  {
+    static constexpr int kFiopenValidModes[] = {
+      0x01, 0x02, 0x12, 0x0A, 0x21, 0x22, 0x32, 0x2A, 0x03, 0x13, 0x0B, 0x23, 0x33, 0x2B, 0x00
+    };
+    static constexpr const wchar_t* kFiopenModeStrings[] = {
+      L"r",   L"w",   L"w",   L"a",   L"rb",  L"wb",  L"wb",
+      L"ab",  L"r+",  L"w+",  L"a+",  L"r+b", L"w+b", L"a+b"
+    };
+
+    int normalizedMode = openMode;
+    if ((openMode & 0x40) != 0) {
+      normalizedMode |= 0x01;
+    }
+    if ((normalizedMode & 0x08) != 0) {
+      normalizedMode |= 0x02;
+    }
+
+    const unsigned int fiopenMode = static_cast<unsigned int>(normalizedMode) & 0xFFFFFF3Bu;
+
+    int modeIndex = 0;
+    while (kFiopenValidModes[modeIndex] != 0 && static_cast<unsigned int>(kFiopenValidModes[modeIndex]) != fiopenMode) {
+      ++modeIndex;
+    }
+    if (kFiopenValidModes[modeIndex] == 0) {
+      return nullptr;
+    }
+
+    if ((openMode & 0x80) != 0 && (fiopenMode & 0x01u) != 0u) {
+      if (std::FILE* const existing = RuntimeXfsopen(filePath, L"r", shareFlag); existing != nullptr) {
+        std::fclose(existing);
+        return nullptr;
+      }
+    }
+
+    std::FILE* const file = RuntimeXfsopen(filePath, kFiopenModeStrings[modeIndex], shareFlag);
+    if (file == nullptr) {
+      return nullptr;
+    }
+
+    if ((openMode & 0x04) != 0 && std::fseek(file, 0, SEEK_END) != 0) {
+      std::fclose(file);
+      return nullptr;
+    }
+
+    return file;
+  }
+
+  /**
+   * Address: 0x00ABFC0A (FUN_00ABFC0A, j_std::_Fiopen(wchar_t const*,int,int))
+   *
+   * What it does:
+   * Thunk lane that forwards directly to wide `_Fiopen`.
+   */
+  std::FILE* RuntimeFiopenWideThunk(const wchar_t* const filePath, const int openMode, const int shareFlag)
+  {
+    return RuntimeFiopenWide(filePath, openMode, shareFlag);
+  }
+
+  /**
+   * Address: 0x00ABFC0F (FUN_00ABFC0F, std::_Fiopen(char const*,int,int))
+   *
+   * What it does:
+   * Converts a narrow path to wide form and forwards to wide `_Fiopen`.
+   */
+  std::FILE* RuntimeFiopenNarrow(const char* const filePath, const int openMode, const int shareFlag)
+  {
+    wchar_t wideFilePath[0x104]{};
+    if (::mbstowcs_s(nullptr, wideFilePath, 0x104u, filePath, 0x103u) != 0) {
+      return nullptr;
+    }
+
+    return RuntimeFiopenWide(wideFilePath, openMode, shareFlag);
+  }
+
+  struct RuntimeLegacyFileIoBufView
+  {
+    char* ptr = nullptr;      // +0x00
+    std::int32_t cnt = 0;     // +0x04
+    char* base = nullptr;     // +0x08
+  };
+  static_assert(offsetof(RuntimeLegacyFileIoBufView, ptr) == 0x00, "RuntimeLegacyFileIoBufView::ptr offset must be 0x00");
+  static_assert(offsetof(RuntimeLegacyFileIoBufView, cnt) == 0x04, "RuntimeLegacyFileIoBufView::cnt offset must be 0x04");
+  static_assert(offsetof(RuntimeLegacyFileIoBufView, base) == 0x08, "RuntimeLegacyFileIoBufView::base offset must be 0x08");
+  static_assert(sizeof(RuntimeLegacyFileIoBufView) == 0x0C, "RuntimeLegacyFileIoBufView size must be 0x0C");
+
+  struct RuntimeFilebufCharDispatch
+  {
+    std::uintptr_t unknown00 = 0;                            // +0x00
+    std::int32_t(__thiscall* overflow)(void* self, int ch) = nullptr; // +0x04
+  };
+  static_assert(offsetof(RuntimeFilebufCharDispatch, overflow) == 0x04, "RuntimeFilebufCharDispatch::overflow offset must be 0x04");
+
+  using RuntimeCodecvtCharFacet = std::codecvt<char, char, std::mbstate_t>;
+
+  struct RuntimeFilebufCharView
+  {
+    RuntimeFilebufCharDispatch* dispatch = nullptr; // +0x00
+    std::uint8_t reserved04_0F[0x0C]{};             // +0x04
+    char** inputBase = nullptr;                     // +0x10
+    char** outputBase = nullptr;                    // +0x14
+    std::uint8_t reserved18_1F[0x08]{};             // +0x18
+    char** inputPtr = nullptr;                      // +0x20
+    char** outputPtr = nullptr;                     // +0x24
+    std::uint8_t reserved28_2F[0x08]{};             // +0x28
+    std::int32_t* inputCount = nullptr;             // +0x30
+    std::int32_t* outputCount = nullptr;            // +0x34
+    std::uint8_t reserved38_3B[0x04]{};             // +0x38
+    const RuntimeCodecvtCharFacet* codecvtFacet = nullptr; // +0x3C
+    std::uint8_t reserved40 = 0;                    // +0x40
+    std::uint8_t wroteSome = 0;                     // +0x41
+    std::uint8_t reserved42_43[0x02]{};             // +0x42
+    std::int32_t stateWord = 0;                     // +0x44
+    std::uint8_t closeOnClose = 0;                  // +0x48
+    std::uint8_t reserved49_4B[0x03]{};             // +0x49
+    std::FILE* myFile = nullptr;                    // +0x4C
+  };
+  static_assert(offsetof(RuntimeFilebufCharView, inputBase) == 0x10, "RuntimeFilebufCharView::inputBase offset must be 0x10");
+  static_assert(offsetof(RuntimeFilebufCharView, outputBase) == 0x14, "RuntimeFilebufCharView::outputBase offset must be 0x14");
+  static_assert(offsetof(RuntimeFilebufCharView, inputPtr) == 0x20, "RuntimeFilebufCharView::inputPtr offset must be 0x20");
+  static_assert(offsetof(RuntimeFilebufCharView, outputPtr) == 0x24, "RuntimeFilebufCharView::outputPtr offset must be 0x24");
+  static_assert(offsetof(RuntimeFilebufCharView, inputCount) == 0x30, "RuntimeFilebufCharView::inputCount offset must be 0x30");
+  static_assert(offsetof(RuntimeFilebufCharView, outputCount) == 0x34, "RuntimeFilebufCharView::outputCount offset must be 0x34");
+  static_assert(offsetof(RuntimeFilebufCharView, codecvtFacet) == 0x3C, "RuntimeFilebufCharView::codecvtFacet offset must be 0x3C");
+  static_assert(offsetof(RuntimeFilebufCharView, wroteSome) == 0x41, "RuntimeFilebufCharView::wroteSome offset must be 0x41");
+  static_assert(offsetof(RuntimeFilebufCharView, stateWord) == 0x44, "RuntimeFilebufCharView::stateWord offset must be 0x44");
+  static_assert(offsetof(RuntimeFilebufCharView, closeOnClose) == 0x48, "RuntimeFilebufCharView::closeOnClose offset must be 0x48");
+  static_assert(offsetof(RuntimeFilebufCharView, myFile) == 0x4C, "RuntimeFilebufCharView::myFile offset must be 0x4C");
+  static_assert(sizeof(RuntimeFilebufCharView) == 0x50, "RuntimeFilebufCharView size must be 0x50");
+
+  std::int32_t gRuntimeFilebufInitialStateWord = 0;
+
+  void RuntimeFilebufResetIoLanes(RuntimeFilebufCharView* const filebuf)
+  {
+    filebuf->inputBase = nullptr;
+    filebuf->outputBase = nullptr;
+    filebuf->inputPtr = nullptr;
+    filebuf->outputPtr = nullptr;
+    filebuf->inputCount = nullptr;
+    filebuf->outputCount = nullptr;
+  }
+
+  void RuntimeFilebufBindFileIoLanes(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
+  {
+    auto* const ioView = reinterpret_cast<RuntimeLegacyFileIoBufView*>(file);
+    filebuf->inputBase = &ioView->base;
+    filebuf->outputBase = &ioView->base;
+    filebuf->inputPtr = &ioView->ptr;
+    filebuf->outputPtr = &ioView->ptr;
+    filebuf->inputCount = &ioView->cnt;
+    filebuf->outputCount = &ioView->cnt;
+  }
+
+  std::intptr_t RuntimeFilebufApplyCodecvtFacet(
+    RuntimeFilebufCharView* filebuf,
+    const RuntimeCodecvtCharFacet* codecvtFacet
+  );
+
+  RuntimeLockitState* RuntimeLockitConstruct(RuntimeLockitState* object, int requestedSlot);
+  void RuntimeLockitDestroy(RuntimeLockitState* object);
+
+  /**
+   * Address: 0x004C52F0 (FUN_004C52F0, nullsub_802)
+   *
+   * What it does:
+   * Legacy no-op CRT hook.
+   */
+  [[maybe_unused]] void RuntimeNoOpCrtHookA()
+  {
+  }
+
+  /**
+   * Address: 0x004C53A0 (FUN_004C53A0, nullsub_803)
+   *
+   * What it does:
+   * Legacy no-op CRT hook.
+   */
+  [[maybe_unused]] void RuntimeNoOpCrtHookB()
+  {
+  }
+
+  /**
+   * Address: 0x004C53E0 (FUN_004C53E0, sub_4C53E0)
+   *
+   * What it does:
+   * Fills one dword range with a repeated source dword and returns one-past-end
+   * destination pointer.
+   */
+  [[maybe_unused]] std::uint32_t* RuntimeFillDwordRangeFromSource(
+    const std::uint32_t* const sourceWord,
+    std::uint32_t* const destination,
+    const std::int32_t count
+  )
+  {
+    std::uint32_t* writeCursor = destination;
+    for (std::int32_t remaining = count; remaining > 0; --remaining) {
+      *writeCursor++ = *sourceWord;
+    }
+    return destination + count;
+  }
+
+  /**
+   * Address: 0x004C5410 (FUN_004C5410, nullsub_804)
+   *
+   * What it does:
+   * Legacy stdcall no-op hook.
+   */
+  [[maybe_unused]] void __stdcall RuntimeNoOpStdcallInt(const int /*unused*/)
+  {
+  }
+
+  /**
+   * Address: 0x004C5420 (FUN_004C5420, nullsub_805)
+   *
+   * What it does:
+   * Legacy no-op CRT hook.
+   */
+  [[maybe_unused]] void RuntimeNoOpCrtHookC()
+  {
+  }
+
+  /**
+   * Address: 0x004C5430 (FUN_004C5430, std::basic_filebuf<char,std::char_traits<char>>::_Init)
+   *
+   * What it does:
+   * Initializes filebuf file-pointer lanes from one optional `FILE*` and resets
+   * conversion state/cache words.
+   */
+  [[maybe_unused]] RuntimeFilebufCharView* RuntimeFilebufInit(RuntimeFilebufCharView* const filebuf, std::FILE* const file)
+  {
+    filebuf->closeOnClose = 0;
+    filebuf->wroteSome = 0;
+    RuntimeFilebufResetIoLanes(filebuf);
+    if (file != nullptr) {
+      RuntimeFilebufBindFileIoLanes(filebuf, file);
+    }
+    filebuf->myFile = file;
+    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
+    filebuf->codecvtFacet = nullptr;
+    return filebuf;
+  }
+
+  bool RuntimeFilebufEndWrite(RuntimeFilebufCharView* const filebuf)
+  {
+    if (filebuf->codecvtFacet == nullptr || filebuf->wroteSome == 0) {
+      return true;
+    }
+
+    if (filebuf->dispatch == nullptr || filebuf->dispatch->overflow == nullptr) {
+      return false;
+    }
+    if (filebuf->dispatch->overflow(filebuf, -1) == -1) {
+      return false;
+    }
+
+    std::string converted(8u, '\0');
+    while (true) {
+      std::mbstate_t shiftState{};
+      std::memcpy(&shiftState, &filebuf->stateWord, (std::min)(sizeof(shiftState), sizeof(filebuf->stateWord)));
+
+      char* const outBegin = converted.data();
+      char* const outEnd = outBegin + converted.size();
+      char* outNext = outBegin;
+      const std::codecvt_base::result result = filebuf->codecvtFacet->unshift(shiftState, outBegin, outEnd, outNext);
+
+      std::memcpy(&filebuf->stateWord, &shiftState, (std::min)(sizeof(shiftState), sizeof(filebuf->stateWord)));
+
+      if (result == std::codecvt_base::ok) {
+        filebuf->wroteSome = 0;
+      } else if (result == std::codecvt_base::noconv) {
+        return true;
+      } else if (result != std::codecvt_base::partial) {
+        return false;
+      }
+
+      const std::size_t producedBytes = static_cast<std::size_t>(outNext - outBegin);
+      if (producedBytes != 0u && std::fwrite(outBegin, 1u, producedBytes, filebuf->myFile) != producedBytes) {
+        return false;
+      }
+
+      if (filebuf->wroteSome == 0) {
+        return true;
+      }
+      if (producedBytes == 0u) {
+        converted.append(8u, '\0');
+      }
+    }
+  }
+
+  /**
+   * Address: 0x004C54A0 (FUN_004C54A0, std::basic_filebuf<char,std::char_traits<char>>::open)
+   *
+   * What it does:
+   * Opens one narrow path via `_Fiopen`, binds `FILE` lane pointers into the
+   * filebuf runtime view, and refreshes codecvt lane when conversion is needed.
+   */
+  [[maybe_unused]] RuntimeFilebufCharView* RuntimeFilebufOpen(
+    RuntimeFilebufCharView* const filebuf,
+    const char* const filename,
+    const std::int32_t openMode,
+    const std::int32_t shareMode
+  )
+  {
+    if (filebuf->myFile != nullptr) {
+      return nullptr;
+    }
+
+    std::FILE* const file = RuntimeFiopenNarrow(filename, openMode, shareMode);
+    if (file == nullptr) {
+      return nullptr;
+    }
+
+    filebuf->closeOnClose = 1;
+    filebuf->wroteSome = 0;
+    RuntimeFilebufResetIoLanes(filebuf);
+    RuntimeFilebufBindFileIoLanes(filebuf, file);
+    filebuf->myFile = file;
+    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
+    filebuf->codecvtFacet = nullptr;
+
+    const std::locale locale = std::locale();
+    auto& codecvtFacet = std::use_facet<RuntimeCodecvtCharFacet>(locale);
+    (void)RuntimeFilebufApplyCodecvtFacet(filebuf, &codecvtFacet);
+
+    return filebuf;
+  }
+
+  /**
+   * Address: 0x004C55A0 (FUN_004C55A0, std::basic_filebuf<char,std::char_traits<char>>::close)
+   *
+   * What it does:
+   * Flushes pending conversion output lane, closes bound `FILE*`, then resets
+   * filebuf file-pointer/conversion state lanes.
+   */
+  [[maybe_unused]] RuntimeFilebufCharView* RuntimeFilebufClose(RuntimeFilebufCharView* const filebuf)
+  {
+    RuntimeFilebufCharView* result = filebuf;
+    if (filebuf->myFile != nullptr) {
+      if (!RuntimeFilebufEndWrite(filebuf)) {
+        result = nullptr;
+      }
+      if (std::fclose(filebuf->myFile) != 0) {
+        result = nullptr;
+      }
+    } else {
+      result = nullptr;
+    }
+
+    filebuf->closeOnClose = 0;
+    filebuf->wroteSome = 0;
+    RuntimeFilebufResetIoLanes(filebuf);
+    filebuf->myFile = nullptr;
+    filebuf->stateWord = gRuntimeFilebufInitialStateWord;
+    filebuf->codecvtFacet = nullptr;
+    return result;
+  }
+
+  /**
+   * Address: 0x004C57B0 (FUN_004C57B0, sub_4C57B0)
+   *
+   * What it does:
+   * Applies one codecvt facet lane to filebuf state, clearing `_Pcvt` when the
+   * facet reports `always_noconv()`.
+   */
+  [[maybe_unused]] std::intptr_t RuntimeFilebufApplyCodecvtFacet(
+    RuntimeFilebufCharView* const filebuf,
+    const RuntimeCodecvtCharFacet* const codecvtFacet
+  )
+  {
+    if (codecvtFacet->always_noconv()) {
+      filebuf->codecvtFacet = nullptr;
+      return 1;
+    }
+
+    filebuf->codecvtFacet = codecvtFacet;
+    RuntimeFilebufResetIoLanes(filebuf);
+    return reinterpret_cast<std::intptr_t>(filebuf);
+  }
+
+  /**
+   * Address: 0x004C5880 (FUN_004C5880, nullsub_806)
+   *
+   * What it does:
+   * Legacy stdcall no-op hook.
+   */
+  [[maybe_unused]] void __stdcall RuntimeNoOpStdcallInt2(const int /*unused*/)
+  {
+  }
+
+  /**
+   * Address: 0x004C5890 (FUN_004C5890, sub_4C5890)
+   *
+   * What it does:
+   * Returns one dword from indirect pointer lane.
+   */
+  [[maybe_unused]] std::int32_t RuntimeReadIndirectDwordA(const std::int32_t* const valuePointer)
+  {
+    return *valuePointer;
+  }
+
+  /**
+   * Address: 0x004C58B0 (FUN_004C58B0, sub_4C58B0)
+   *
+   * What it does:
+   * Writes one dword through indirect pointer lane and returns that pointer.
+   */
+  [[maybe_unused]] std::int32_t* RuntimeWriteIndirectDword(std::int32_t* const outValuePointer, const std::int32_t value)
+  {
+    *outValuePointer = value;
+    return outValuePointer;
+  }
+
+  /**
+   * Address: 0x004C58E0 (FUN_004C58E0, sub_4C58E0)
+   *
+   * What it does:
+   * Returns one dword from indirect pointer lane.
+   */
+  [[maybe_unused]] std::int32_t RuntimeReadIndirectDwordB(const std::int32_t* const valuePointer)
+  {
+    return *valuePointer;
+  }
+
+  struct RuntimeStreamPositionStateView
+  {
+    std::int32_t statusWord = 0;       // +0x00
+    std::int32_t reservedWord04 = 0;   // +0x04
+    std::int32_t positionLow = 0;      // +0x08
+    std::int32_t positionHigh = 0;     // +0x0C
+    std::int32_t stateTag = 0;         // +0x10
+  };
+  static_assert(offsetof(RuntimeStreamPositionStateView, statusWord) == 0x00, "RuntimeStreamPositionStateView::statusWord offset must be 0x00");
+  static_assert(offsetof(RuntimeStreamPositionStateView, positionLow) == 0x08, "RuntimeStreamPositionStateView::positionLow offset must be 0x08");
+  static_assert(offsetof(RuntimeStreamPositionStateView, positionHigh) == 0x0C, "RuntimeStreamPositionStateView::positionHigh offset must be 0x0C");
+  static_assert(offsetof(RuntimeStreamPositionStateView, stateTag) == 0x10, "RuntimeStreamPositionStateView::stateTag offset must be 0x10");
+  static_assert(sizeof(RuntimeStreamPositionStateView) == 0x14, "RuntimeStreamPositionStateView size must be 0x14");
+
+  /**
+   * Address: 0x004C5900 (FUN_004C5900, sub_4C5900)
+   *
+   * What it does:
+   * Initializes one stream-position state lane triplet (`stateTag`, 64-bit
+   * position split high/low) and clears status lane.
+   */
+  [[maybe_unused]] RuntimeStreamPositionStateView* RuntimeStreamPositionInitialize(
+    RuntimeStreamPositionStateView* const positionState,
+    const std::int32_t stateTag,
+    const std::int32_t positionLow,
+    const std::int32_t positionHigh
+  )
+  {
+    positionState->positionLow = positionLow;
+    positionState->statusWord = 0;
+    positionState->positionHigh = positionHigh;
+    positionState->stateTag = stateTag;
+    return positionState;
+  }
+
+  /**
+   * Address: 0x004C5920 (FUN_004C5920, sub_4C5920)
+   *
+   * What it does:
+   * Returns stream-position state-tag lane.
+   */
+  [[maybe_unused]] std::int32_t RuntimeStreamPositionGetStateTag(const RuntimeStreamPositionStateView* const positionState)
+  {
+    return positionState->stateTag;
+  }
+
+  /**
+   * Address: 0x004C5930 (FUN_004C5930, sub_4C5930)
+   *
+   * What it does:
+   * Returns 64-bit stream-position payload from low/high dword lanes.
+   */
+  [[maybe_unused]] std::int64_t RuntimeStreamPositionGetOffset(const RuntimeStreamPositionStateView* const positionState)
+  {
+    const std::uint32_t low = static_cast<std::uint32_t>(positionState->positionLow);
+    const std::uint32_t high = static_cast<std::uint32_t>(positionState->positionHigh);
+    const std::uint64_t combined = low | (static_cast<std::uint64_t>(high) << 32u);
+    return static_cast<std::int64_t>(combined);
+  }
+
+  class RuntimeFacetBaseVtableProbe final : public std::locale::facet
+  {
+  public:
+    RuntimeFacetBaseVtableProbe()
+      : std::locale::facet(0)
+    {
+    }
+
+    static void* CaptureBaseVtable()
+    {
+      alignas(RuntimeFacetBaseVtableProbe) std::uint8_t storage[sizeof(RuntimeFacetBaseVtableProbe)]{};
+      auto* const probe = new (storage) RuntimeFacetBaseVtableProbe();
+      probe->std::locale::facet::~facet();
+      return *reinterpret_cast<void**>(storage);
+    }
+  };
+
+  [[nodiscard]] void* RuntimeGetLocaleFacetBaseVtable()
+  {
+    static void* const baseVtable = RuntimeFacetBaseVtableProbe::CaptureBaseVtable();
+    return baseVtable;
+  }
+
+  /**
+   * Address: 0x004C5960 (FUN_004C5960, sub_4C5960)
+   *
+   * What it does:
+   * Rebinds one locale facet object to the base `std::locale::facet` vtable.
+   */
+  [[maybe_unused]] std::locale::facet* RuntimeLocaleFacetBindBaseVtable(std::locale::facet* const facet)
+  {
+    *reinterpret_cast<void**>(facet) = RuntimeGetLocaleFacetBaseVtable();
+    return facet;
+  }
+
+  /**
+   * Address: 0x004C5970 (FUN_004C5970, std::codecvt::do_in)
+   *
+   * What it does:
+   * Reports `noconv`, copying input/output next-pointer lanes to begin pointers.
+   */
+  [[maybe_unused]] std::codecvt_base::result RuntimeCodecvtDoInNoConversion(
+    const void* const /*codecvtSelf*/,
+    const char* const fromBegin,
+    const char* const /*fromEnd*/,
+    const char** const fromNext,
+    char* const toBegin,
+    char* const /*toEnd*/,
+    char** const toNext
+  )
+  {
+    *fromNext = fromBegin;
+    *toNext = toBegin;
+    return std::codecvt_base::noconv;
+  }
+
+  /**
+   * Address: 0x004C5990 (FUN_004C5990, std::codecvt::do_out)
+   *
+   * What it does:
+   * Reports `noconv`, copying input/output next-pointer lanes to begin pointers.
+   */
+  [[maybe_unused]] std::codecvt_base::result RuntimeCodecvtDoOutNoConversion(
+    const void* const /*codecvtSelf*/,
+    const char* const fromBegin,
+    const char* const /*fromEnd*/,
+    const char** const fromNext,
+    char* const toBegin,
+    char* const /*toEnd*/,
+    char** const toNext
+  )
+  {
+    *fromNext = fromBegin;
+    *toNext = toBegin;
+    return std::codecvt_base::noconv;
+  }
+
+  /**
+   * Address: 0x004C59B0 (FUN_004C59B0, std::codecvt::do_unshift)
+   *
+   * What it does:
+   * Reports `noconv` and keeps output-next lane at output begin.
+   */
+  [[maybe_unused]] std::codecvt_base::result RuntimeCodecvtDoUnshiftNoConversion(
+    const void* const /*codecvtSelf*/,
+    char* const toBegin,
+    char* const /*toEnd*/,
+    char** const toNext
+  )
+  {
+    *toNext = toBegin;
+    return std::codecvt_base::noconv;
+  }
+
+  /**
+   * Address: 0x004C59D0 (FUN_004C59D0, std::codecvt::do_length)
+   *
+   * What it does:
+   * Returns min(maxCount, byte-span between begin/end input pointers).
+   */
+  [[maybe_unused]] std::uint32_t RuntimeCodecvtDoLengthNoConversion(
+    const void* const /*codecvtSelf*/,
+    const char* const fromBegin,
+    const char* const fromEnd,
+    const std::uint32_t maxCount
+  )
+  {
+    const std::uint32_t spanBytes = static_cast<std::uint32_t>(
+      reinterpret_cast<std::uintptr_t>(fromEnd) - reinterpret_cast<std::uintptr_t>(fromBegin)
+    );
+    if (maxCount < spanBytes) {
+      return maxCount;
+    }
+    return spanBytes;
+  }
+
+  /**
+   * Address: 0x004C59F0 (FUN_004C59F0, sub_4C59F0)
+   *
+   * What it does:
+   * Runs base facet vtable rebinding and optionally frees storage when delete
+   * flag bit0 is set.
+   */
+  [[maybe_unused]] std::locale::facet* RuntimeLocaleFacetDestroyMaybeDelete(
+    std::locale::facet* const facet,
+    const std::uint8_t deleteFlag
+  )
+  {
+    RuntimeLocaleFacetBindBaseVtable(facet);
+    if ((deleteFlag & 1u) != 0u) {
+      ::operator delete(facet);
+    }
+    return facet;
+  }
+
+  struct RuntimeBasicStreambufLocaleView
+  {
+    std::uint8_t reserved00_37[0x38]{};
+    RuntimeStdLocaleObject* localeObject = nullptr; // +0x38
+  };
+  static_assert(offsetof(RuntimeBasicStreambufLocaleView, localeObject) == 0x38, "RuntimeBasicStreambufLocaleView::localeObject offset must be 0x38");
+  static_assert(sizeof(RuntimeBasicStreambufLocaleView) == 0x3C, "RuntimeBasicStreambufLocaleView size must be 0x3C");
+
+  /**
+   * Address: 0x004C5A10 (FUN_004C5A10, std::basic_streambuf<wchar_t,std::char_traits<wchar_t>>::getloc)
+   *
+   * What it does:
+   * Returns one locale object copied from streambuf locale lane and increments
+   * `_Locimp::_Refs` under `_Lockit(0)` unless refs is `-1`.
+   */
+  [[maybe_unused]] RuntimeStdLocaleObject* RuntimeBasicStreambufGetLocale(
+    const RuntimeBasicStreambufLocaleView* const streambuf,
+    RuntimeStdLocaleObject* const outLocale
+  )
+  {
+    RuntimeLocaleLocimpView* const localeImpl = streambuf->localeObject->ptr;
+    outLocale->ptr = localeImpl;
+
+    RuntimeLockitState lockit{};
+    RuntimeLockitConstruct(&lockit, 0);
+    if (localeImpl->refs != -1) {
+      ++localeImpl->refs;
+    }
+    RuntimeLockitDestroy(&lockit);
+    return outLocale;
+  }
+
+  struct RuntimeStreambufPointerTripletView
+  {
+    std::uint8_t reserved00_0F[0x10]{};
+    void* lane0Begin = nullptr;           // +0x10
+    void* lane0End = nullptr;             // +0x14
+    std::uint8_t reserved18_1F[0x08]{};
+    void* lane1Begin = nullptr;           // +0x20
+    void* lane1End = nullptr;             // +0x24
+    std::uint8_t reserved28_2F[0x08]{};
+    void* lane2Begin = nullptr;           // +0x30
+    void* lane2End = nullptr;             // +0x34
+  };
+  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane0Begin) == 0x10, "RuntimeStreambufPointerTripletView::lane0Begin offset must be 0x10");
+  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane0End) == 0x14, "RuntimeStreambufPointerTripletView::lane0End offset must be 0x14");
+  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane1Begin) == 0x20, "RuntimeStreambufPointerTripletView::lane1Begin offset must be 0x20");
+  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane1End) == 0x24, "RuntimeStreambufPointerTripletView::lane1End offset must be 0x24");
+  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2Begin) == 0x30, "RuntimeStreambufPointerTripletView::lane2Begin offset must be 0x30");
+  static_assert(offsetof(RuntimeStreambufPointerTripletView, lane2End) == 0x34, "RuntimeStreambufPointerTripletView::lane2End offset must be 0x34");
+  static_assert(sizeof(RuntimeStreambufPointerTripletView) == 0x38, "RuntimeStreambufPointerTripletView size must be 0x38");
+
+  /**
+   * Address: 0x004C5A50 (FUN_004C5A50, sub_4C5A50)
+   *
+   * What it does:
+   * Stores three begin/end pointer pairs into streambuf pointer-lane triplet
+   * and returns the third begin pointer lane.
+   */
+  [[maybe_unused]] void* RuntimeStreambufSetPointerTriplets(
+    RuntimeStreambufPointerTripletView* const streambuf,
+    void* const lane0Begin,
+    void* const lane1Begin,
+    void* const lane2Begin,
+    void* const lane0End,
+    void* const lane1End,
+    void* const lane2End
+  )
+  {
+    streambuf->lane0Begin = lane0Begin;
+    streambuf->lane0End = lane0End;
+    streambuf->lane1Begin = lane1Begin;
+    streambuf->lane1End = lane1End;
+    streambuf->lane2Begin = lane2Begin;
+    streambuf->lane2End = lane2End;
+    return lane2Begin;
+  }
+
+  /**
+   * Address: 0x00A99754 (FUN_00A99754, HandlerRoutine)
+   *
+   * What it does:
+   * Dispatches console Ctrl-C / Ctrl-Break events through encoded signal
+   * handlers under `_SIGNAL_LOCK`, clearing one-shot user handlers after decode.
+   */
+  BOOL __stdcall RuntimeConsoleControlHandler(const DWORD controlType)
+  {
+    _lock(kRuntimeSignalLock);
+
+    void** encodedActionSlot = nullptr;
+    RuntimeSignalHandler decodedHandler = nullptr;
+    int signalNumber = 0;
+
+    if (controlType == CTRL_C_EVENT) {
+      encodedActionSlot = &gRuntimeCtrlCActionEncoded;
+      decodedHandler = RuntimeDecodeSignalAction(gRuntimeCtrlCActionEncoded);
+      signalNumber = 2;
+    } else {
+      encodedActionSlot = &gRuntimeCtrlBreakActionEncoded;
+      decodedHandler = RuntimeDecodeSignalAction(gRuntimeCtrlBreakActionEncoded);
+      signalNumber = 21;
+    }
+
+    if (decodedHandler != nullptr && decodedHandler != reinterpret_cast<RuntimeSignalHandler>(1)) {
+      *encodedActionSlot = RuntimeEncodedNullPointer();
+    }
+
+    _unlock(kRuntimeSignalLock);
+
+    if (decodedHandler == nullptr) {
+      return FALSE;
+    }
+
+    if (decodedHandler != reinterpret_cast<RuntimeSignalHandler>(1)) {
+      decodedHandler(signalNumber);
+    }
+    return TRUE;
+  }
+
+  /**
+   * Address: 0x00ABF81C (FUN_00ABF81C, _Init_locks::_Init_locks)
+   *
+   * What it does:
+   * Initializes one shared 4-slot CRT lock table on first init epoch.
+   */
+  void* RuntimeInitStdLocks(void* const object)
+  {
+    if (::InterlockedIncrement(&gRuntimeStdLockInit) == 0) {
+      for (CRITICAL_SECTION& lock : gRuntimeStdLockSlots) {
+        RuntimeMtxInit(&lock);
+      }
+    }
+    return object;
+  }
+
+  /**
+   * Address: 0x00ABF8DB (FUN_00ABF8DB, std::_Lockit::_Lockit)
+   *
+   * What it does:
+   * Captures one lock-slot id (`arg & 3`) and enters that CRT lock slot.
+   */
+  RuntimeLockitState* RuntimeLockitConstruct(RuntimeLockitState* const object, const int requestedSlot)
+  {
+    const int slot = requestedSlot & 3;
+    object->slot = slot;
+    (void)RuntimeMtxLock(RuntimeStdLockSlot(slot));
+    return object;
+  }
+
+  /**
+   * Address: 0x00ABF8FC (FUN_00ABF8FC, std::_Lockit::~_Lockit)
+   *
+   * What it does:
+   * Leaves the CRT lock slot captured by this `_Lockit` guard.
+   */
+  void RuntimeLockitDestroy(RuntimeLockitState* const object)
+  {
+    (void)RuntimeMtxUnlock(RuntimeStdLockSlot(object->slot));
+  }
+
+  /**
+   * Address: 0x00ABF97B (FUN_00ABF97B, std::_Mutex::_Mutex)
+   *
+   * What it does:
+   * Allocates one `CRITICAL_SECTION` object and initializes it.
+   */
+  RuntimeMutexHandle* RuntimeMutexConstruct(RuntimeMutexHandle* const object)
+  {
+    auto* const lock = static_cast<CRITICAL_SECTION*>(::operator new(sizeof(CRITICAL_SECTION)));
+    object->criticalSection = lock;
+    RuntimeMtxInit(lock);
+    return object;
+  }
+
+  /**
+   * Address: 0x00ABF993 (FUN_00ABF993, std::_Mutex::~_Mutex)
+   *
+   * What it does:
+   * Destroys and frees one heap-allocated `CRITICAL_SECTION`.
+   */
+  void RuntimeMutexDestroy(RuntimeMutexHandle* const object)
+  {
+    if (object->criticalSection != nullptr) {
+      RuntimeMtxDestroy(object->criticalSection);
+      ::operator delete(object->criticalSection);
+      object->criticalSection = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x00ABF9A8 (FUN_00ABF9A8, std::_Mutex::_Lock)
+   *
+   * What it does:
+   * Enters the mutex critical section.
+   */
+  int RuntimeMutexLock(RuntimeMutexHandle* const object)
+  {
+    return RuntimeMtxLock(object->criticalSection);
+  }
+
+  /**
+   * Address: 0x00ABF9B1 (FUN_00ABF9B1, std::_Mutex::_Unlock)
+   *
+   * What it does:
+   * Leaves the mutex critical section.
+   */
+  int RuntimeMutexUnlock(RuntimeMutexHandle* const object)
+  {
+    return RuntimeMtxUnlock(object->criticalSection);
+  }
+
   /**
    * Address: 0x00AAACB0 (FUN_00AAACB0, __crtGetEnvironmentStringsA)
    *
@@ -844,6 +1887,75 @@ namespace moho::runtime
     *_errno() = EINVAL;
     _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
     return -1;
+  }
+
+  /**
+   * Address: 0x00A89B60 (FUN_00A89B60, strncpy)
+   *
+   * What it does:
+   * Copies up to `count` chars from `source` into `destination`, stopping at
+   * the first source NUL and zero-filling remaining destination bytes.
+   */
+  char* RuntimeStrncpy(char* const destination, const char* const source, const std::size_t count)
+  {
+    if (count == 0u) {
+      return destination;
+    }
+
+    std::size_t writeIndex = 0u;
+    while (writeIndex < count) {
+      destination[writeIndex] = source[writeIndex];
+      if (source[writeIndex] == '\0') {
+        ++writeIndex;
+        while (writeIndex < count) {
+          destination[writeIndex++] = '\0';
+        }
+        return destination;
+      }
+      ++writeIndex;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x00A8E0E0 (FUN_00A8E0E0, __CIpow)
+   *
+   * What it does:
+   * Computes one power lane (`base^exponent`) for CRT inline-fpu callsites.
+   */
+  double RuntimeCIPow(const double base, const double exponent)
+  {
+    return std::pow(base, exponent);
+  }
+
+  /**
+   * Address: 0x00AB9AED (FUN_00AB9AED, _memicmp)
+   *
+   * What it does:
+   * ASCII case-insensitive memory compare lane with CRT-style invalid-argument
+   * reporting on null or oversized requests.
+   */
+  int RuntimeMemicmp(const void* const lhsBuffer, const void* const rhsBuffer, const std::size_t byteCount)
+  {
+    if (lhsBuffer != nullptr && rhsBuffer != nullptr && byteCount <= 0x7FFFFFFFu) {
+      const auto* const lhsBytes = static_cast<const unsigned char*>(lhsBuffer);
+      const auto* const rhsBytes = static_cast<const unsigned char*>(rhsBuffer);
+
+      for (std::size_t index = 0; index < byteCount; ++index) {
+        const unsigned char lhsLower = RuntimeAsciiToLower(lhsBytes[index]);
+        const unsigned char rhsLower = RuntimeAsciiToLower(rhsBytes[index]);
+        if (lhsLower != rhsLower) {
+          return static_cast<int>(lhsLower) - static_cast<int>(rhsLower);
+        }
+      }
+
+      return 0;
+    }
+
+    *_errno() = EINVAL;
+    _invalid_parameter(nullptr, nullptr, nullptr, 0u, 0u);
+    return 0x7FFFFFFF;
   }
 
   /**
@@ -1475,6 +2587,17 @@ namespace moho::runtime
   }
 
   /**
+   * Address: 0x00A8C6D0 (FUN_00A8C6D0, j___free_locale)
+   *
+   * What it does:
+   * Thunk wrapper that forwards locale-handle teardown to `RuntimeFreeLocale`.
+   */
+  void RuntimeFreeLocaleThunk(RuntimeLocaleHandle* const locale)
+  {
+    RuntimeFreeLocale(locale);
+  }
+
+  /**
    * Address: 0x00A8C7A3 (FUN_00A8C7A3, _lc_strtolc)
    *
    * What it does:
@@ -1560,6 +2683,339 @@ namespace moho::runtime
   }
 
   /**
+   * Address: 0x00ABF013 (FUN_00ABF013, std::_String_base::_Xlen)
+   * Mangled: ?_Xlen@_String_base@std@@SAXXZ
+   *
+   * What it does:
+   * Throws one `std::length_error` with the CRT fixed diagnostic text
+   * `"string too long"`.
+   */
+  [[noreturn]] void RuntimeThrowStringTooLong()
+  {
+    throw std::length_error("string too long");
+  }
+
+  /**
+   * Address: 0x00ABF052 (FUN_00ABF052, std::_String_base::_Xran)
+   *
+   * What it does:
+   * Throws one `std::out_of_range` with the CRT fixed diagnostic text
+   * `"invalid string position"`.
+   */
+  [[noreturn]] void RuntimeThrowInvalidStringPosition()
+  {
+    throw std::out_of_range("invalid string position");
+  }
+
+  /**
+   * Address: 0x00ABF091 (FUN_00ABF091)
+   *
+   * What it does:
+   * Throws one `std::invalid_argument` instance with the CRT fixed diagnostic
+   * text `"invalid string argument"`.
+   */
+  [[noreturn]] void RuntimeThrowInvalidStringArgument()
+  {
+    throw std::invalid_argument("invalid string argument");
+  }
+
+  struct RuntimeIosFnNode
+  {
+    RuntimeIosFnNode* next = nullptr;               // +0x00
+    std::int32_t index = 0;                         // +0x04
+    void(__cdecl* callback)(int, void*, int) = nullptr; // +0x08
+  };
+  static_assert(sizeof(RuntimeIosFnNode) == 0xC, "RuntimeIosFnNode size must be 0xC");
+
+  struct RuntimeIosArrayNode
+  {
+    RuntimeIosArrayNode* next = nullptr; // +0x00
+  };
+  static_assert(sizeof(RuntimeIosArrayNode) == 0x4, "RuntimeIosArrayNode size must be 0x4");
+
+  struct RuntimeIosBaseView
+  {
+    void* vtable = nullptr;                    // +0x00
+    std::int32_t stdStreamSlot = 0;            // +0x04
+    std::uint8_t reserved08[0x14]{};           // +0x08
+    RuntimeIosArrayNode* arrayHead = nullptr;  // +0x1C
+    RuntimeIosFnNode* callbackHead = nullptr;  // +0x20
+    std::locale* localePtr = nullptr;          // +0x24
+  };
+  static_assert(offsetof(RuntimeIosBaseView, stdStreamSlot) == 0x4, "RuntimeIosBaseView::stdStreamSlot offset must be 0x4");
+  static_assert(offsetof(RuntimeIosBaseView, arrayHead) == 0x1C, "RuntimeIosBaseView::arrayHead offset must be 0x1C");
+  static_assert(offsetof(RuntimeIosBaseView, callbackHead) == 0x20, "RuntimeIosBaseView::callbackHead offset must be 0x20");
+  static_assert(offsetof(RuntimeIosBaseView, localePtr) == 0x24, "RuntimeIosBaseView::localePtr offset must be 0x24");
+  static_assert(sizeof(RuntimeIosBaseView) == 0x28, "RuntimeIosBaseView size must be 0x28");
+
+  /**
+   * Address: 0x00ABF0D0 (FUN_00ABF0D0, std::ios_base::_Callfns)
+   *
+   * What it does:
+   * Walks one `ios_base` callback-node chain and invokes each callback with
+   * `(event, ios_base, index)` parameters.
+   */
+  void RuntimeIosBaseCallFns(void* const iosBaseStorage, const int event)
+  {
+    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
+    for (RuntimeIosFnNode* node = iosBase->callbackHead; node != nullptr; node = node->next) {
+      node->callback(event, iosBaseStorage, node->index);
+    }
+  }
+
+  /**
+   * Address: 0x00ABF0F2 (FUN_00ABF0F2, std::ios_base::_Tidy)
+   *
+   * What it does:
+   * Emits `erase_event` callbacks, then deletes linked ios-array and callback
+   * nodes, clearing both head pointers.
+   */
+  void RuntimeIosBaseTidy(void* const iosBaseStorage)
+  {
+    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
+    RuntimeIosBaseCallFns(iosBaseStorage, 0);
+
+    RuntimeIosArrayNode* arrayNode = iosBase->arrayHead;
+    while (arrayNode != nullptr) {
+      RuntimeIosArrayNode* const nextNode = arrayNode->next;
+      ::operator delete(arrayNode);
+      arrayNode = nextNode;
+    }
+
+    iosBase->arrayHead = nullptr;
+
+    RuntimeIosFnNode* callbackNode = iosBase->callbackHead;
+    while (callbackNode != nullptr) {
+      RuntimeIosFnNode* const nextNode = callbackNode->next;
+      ::operator delete(callbackNode);
+      callbackNode = nextNode;
+    }
+
+    iosBase->callbackHead = nullptr;
+  }
+
+  /**
+   * Address: 0x00ABF150 (FUN_00ABF150, std::ios_base::_Addstd)
+   *
+   * What it does:
+   * Registers one `ios_base` lane in CRT std-stream slot tables under
+   * `_Lockit(2)` and increments the selected slot open-count byte.
+   */
+  void RuntimeIosBaseAddStd(void* const iosBaseStorage)
+  {
+    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
+    RuntimeLockitState lockit{};
+    RuntimeLockitConstruct(&lockit, 2);
+
+    iosBase->stdStreamSlot = 1;
+    while (true) {
+      void* const current = gRuntimeIosStdStreams[iosBase->stdStreamSlot];
+      if (current == nullptr || current == iosBaseStorage) {
+        break;
+      }
+
+      ++iosBase->stdStreamSlot;
+      if (iosBase->stdStreamSlot >= 8) {
+        break;
+      }
+    }
+
+    gRuntimeIosStdStreams[iosBase->stdStreamSlot] = iosBaseStorage;
+    ++gRuntimeIosStdOpenCounts[iosBase->stdStreamSlot];
+
+    RuntimeLockitDestroy(&lockit);
+  }
+
+  /**
+   * Address: 0x00ABF1A0 (FUN_00ABF1A0, std::ios_base::_Ios_base_dtor)
+   * Mangled: ?_Ios_base_dtor@ios_base@std@@CAXPAV12@@Z
+   *
+   * What it does:
+   * Runs one `ios_base` teardown lane: decrements std-stream open-count for
+   * registered standard slots, calls `_Tidy` when this is the last opener (or
+   * when no std slot is attached), then destroys/deletes the owned locale
+   * object when present.
+   */
+  void RuntimeIosBaseDtor(void* const iosBaseStorage)
+  {
+    auto* const iosBase = static_cast<RuntimeIosBaseView*>(iosBaseStorage);
+
+    const int stdStreamSlot = iosBase->stdStreamSlot;
+    if (stdStreamSlot == 0 || --gRuntimeIosStdOpenCounts[stdStreamSlot] <= 0) {
+      RuntimeIosBaseTidy(iosBaseStorage);
+      if (std::locale* const locale = iosBase->localePtr; locale != nullptr) {
+        locale->~locale();
+        ::operator delete(locale);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00ABF138 (FUN_00ABF138)
+   *
+   * What it does:
+   * Returns one static storage-slot address used by CRT startup lane.
+   */
+  void* RuntimeGetStaticStorageSlotA()
+  {
+    return &gRuntimeStaticStorageSlotA;
+  }
+
+  /**
+   * Address: 0x00ABF13E (FUN_00ABF13E)
+   *
+   * What it does:
+   * Returns one static integer-storage address used by CRT startup lane.
+   */
+  std::int32_t* RuntimeGetStaticStorageSlotB()
+  {
+    return &gRuntimeStaticStorageSlotB;
+  }
+
+  /**
+   * Address: 0x00ABF144 (FUN_00ABF144)
+   *
+   * What it does:
+   * Returns one static storage-slot address used by CRT startup lane.
+   */
+  void* RuntimeGetStaticStorageSlotC()
+  {
+    return &gRuntimeStaticStorageSlotC;
+  }
+
+  /**
+   * Address: 0x00ABF14A (FUN_00ABF14A)
+   *
+   * What it does:
+   * Returns one static storage-slot address used by CRT startup lane.
+   */
+  void* RuntimeGetStaticStorageSlotD()
+  {
+    return &gRuntimeStaticStorageSlotD;
+  }
+
+  /**
+   * Address: 0x00ABF61B (FUN_00ABF61B, std::_Locinfo::_Locinfo_ctor)
+   *
+   * What it does:
+   * Captures current `LC_ALL` locale name into `_Locinfo::oldlocname`, then
+   * applies optional incoming locale text and stores resulting name (or `"*"`)
+   * into `_Locinfo::newlocname`.
+   */
+  void RuntimeLocinfoConstruct(void* const locinfoStorage, const char* const requestedLocaleText)
+  {
+    struct RuntimeLocinfoView
+    {
+      std::uint8_t reserved00[0x3C];
+    };
+    constexpr std::size_t kRuntimeLocinfoOldNameOffset = 0x3C;
+    constexpr std::size_t kRuntimeLocinfoNewNameOffset = 0x58;
+    static_assert(sizeof(RuntimeLocinfoView) == kRuntimeLocinfoOldNameOffset, "RuntimeLocinfoView size must be 0x3C");
+
+    auto* const locinfo = reinterpret_cast<std::uint8_t*>(static_cast<RuntimeLocinfoView*>(locinfoStorage));
+    auto& oldLocaleName = *reinterpret_cast<std::string*>(locinfo + kRuntimeLocinfoOldNameOffset);
+    auto& newLocaleName = *reinterpret_cast<std::string*>(locinfo + kRuntimeLocinfoNewNameOffset);
+
+    const char* previousLocaleName = std::setlocale(LC_ALL, nullptr);
+    if (previousLocaleName == nullptr) {
+      previousLocaleName = "";
+    }
+    oldLocaleName.assign(previousLocaleName);
+
+    const char* appliedLocaleName = "*";
+    if (requestedLocaleText != nullptr) {
+      const char* const setLocaleResult = std::setlocale(LC_ALL, requestedLocaleText);
+      if (setLocaleResult != nullptr) {
+        appliedLocaleName = setLocaleResult;
+      }
+    }
+
+    newLocaleName.assign(appliedLocaleName);
+  }
+
+  /**
+   * Address: 0x00ABF4BC (FUN_00ABF4BC, std::_Locinfo::_Locinfo_dtor)
+   *
+   * What it does:
+   * Restores `LC_ALL` to the saved old-locale string lane when that saved
+   * locale text is non-empty.
+   */
+  const char* RuntimeLocinfoDtor(const char* const locinfoStorage)
+  {
+    struct RuntimeLegacyStringView
+    {
+      union
+      {
+        const char* heapPtr;
+        char inlineBuffer[16];
+      } storage{};
+      std::uint32_t size = 0;
+      std::uint32_t capacity = 0;
+    };
+    static_assert(sizeof(RuntimeLegacyStringView) == 0x18, "RuntimeLegacyStringView size must be 0x18");
+
+    struct RuntimeLocinfoOldLocaleView
+    {
+      std::uint8_t reserved00[0x40];
+      RuntimeLegacyStringView oldLocaleName;
+    };
+    static_assert(
+      offsetof(RuntimeLocinfoOldLocaleView, oldLocaleName) == 0x40,
+      "RuntimeLocinfoOldLocaleView::oldLocaleName offset must be 0x40"
+    );
+
+    const auto* const locinfo = reinterpret_cast<const RuntimeLocinfoOldLocaleView*>(locinfoStorage);
+    if (locinfo->oldLocaleName.size > 0u) {
+      const char* const localeText = (locinfo->oldLocaleName.capacity < 0x10u)
+        ? locinfo->oldLocaleName.storage.inlineBuffer
+        : locinfo->oldLocaleName.storage.heapPtr;
+      return std::setlocale(LC_ALL, localeText);
+    }
+
+    return locinfoStorage;
+  }
+
+  /**
+   * Address: 0x00ABF2F2 (FUN_00ABF2F2)
+   *
+   * What it does:
+   * Returns incoming `this` pointer unchanged; ignores one trailing argument.
+   */
+  void* RuntimeReturnSelfIgnoringInt(void* const self, int /*unused*/)
+  {
+    return self;
+  }
+
+  /**
+   * Address: 0x00ABF2F7 (FUN_00ABF2F7)
+   *
+   * What it does:
+   * Writes one 32-bit value into `this[0]` and returns `this`.
+   */
+  std::int32_t* RuntimeAssignFirstInt(std::int32_t* const self, const std::int32_t value)
+  {
+    self[0] = value;
+    return self;
+  }
+
+  /**
+   * Address: 0x00ABF302 (FUN_00ABF302)
+   *
+   * What it does:
+   * Writes two 32-bit values into `this[0..1]` and returns `this`.
+   */
+  std::int32_t* RuntimeAssignFirstTwoInts(
+    std::int32_t* const self,
+    const std::int32_t firstValue,
+    const std::int32_t secondValue
+  )
+  {
+    self[0] = firstValue;
+    self[1] = secondValue;
+    return self;
+  }
+
+  /**
    * Address: 0x00AA65B1 (FUN_00AA65B1, ProcessCodePage)
    *
    * What it does:
@@ -1591,6 +3047,1060 @@ namespace moho::runtime
     }
 
     return static_cast<int>(std::atol(codePageValue));
+  }
+
+  struct RuntimeFacetRefView
+  {
+    void* vtable = nullptr;     // +0x00
+    std::int32_t refs = 0;      // +0x04
+  };
+  static_assert(sizeof(RuntimeFacetRefView) == 0x8, "RuntimeFacetRefView size must be 0x8");
+
+  struct RuntimeFacetDeleteDispatchBase
+  {
+    virtual ~RuntimeFacetDeleteDispatchBase() = default;
+  };
+
+  void RuntimeDestroyFacetPolymorphic(std::locale::facet* const facet)
+  {
+    auto* const dispatchBase = reinterpret_cast<RuntimeFacetDeleteDispatchBase*>(facet);
+    delete dispatchBase;
+  }
+
+  [[nodiscard]] std::locale::facet* RuntimeLocaleFacetDecref(std::locale::facet* const facet)
+  {
+    auto* const view = reinterpret_cast<RuntimeFacetRefView*>(facet);
+    --view->refs;
+    if (view->refs == 0) {
+      return facet;
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00ABF314 (FUN_00ABF314)
+   *
+   * What it does:
+   * Decrements the facet reference count stored in the second pointer lane of a
+   * two-pointer record and deletes the facet when it reaches zero.
+   */
+  std::locale::facet* RuntimeReleaseSecondFacetInPair(void* const pairStorage)
+  {
+    auto** const pair = static_cast<std::locale::facet**>(pairStorage);
+    std::locale::facet* const facet = pair[1];
+    if (facet == nullptr) {
+      return nullptr;
+    }
+
+    std::locale::facet* const releasedFacet = RuntimeLocaleFacetDecref(facet);
+    if (releasedFacet != nullptr) {
+      RuntimeDestroyFacetPolymorphic(releasedFacet);
+      return releasedFacet;
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00ABF440 (FUN_00ABF440, __Fac_tidy)
+   *
+   * What it does:
+   * Under `_Lockit(0)`, drains the global facet registration list, releases
+   * each facet lane, and deletes each list node.
+   */
+  void RuntimeFacetTidy()
+  {
+    RuntimeLockitState lockit{};
+    RuntimeLockitConstruct(&lockit, 0);
+
+    while (gRuntimeFacetHead != nullptr) {
+      RuntimeFacetNode* const node = gRuntimeFacetHead;
+      gRuntimeFacetHead = node->next;
+      RuntimeReleaseSecondFacetInPair(node);
+      ::operator delete(node);
+    }
+
+    RuntimeLockitDestroy(&lockit);
+  }
+
+  /**
+   * Address: 0x00ABF483 (FUN_00ABF483, std::locale::facet::facet_Register)
+   *
+   * What it does:
+   * Registers one facet pointer in the global facet list and ensures list tidy
+   * is scheduled at process-exit.
+   */
+  void RuntimeRegisterFacet(std::locale::facet* const facet)
+  {
+    if (gRuntimeFacetHead == nullptr) {
+      std::atexit(RuntimeFacetTidy);
+    }
+
+    auto* node = static_cast<RuntimeFacetNode*>(::operator new(sizeof(RuntimeFacetNode), std::nothrow));
+    if (node != nullptr) {
+      node->next = gRuntimeFacetHead;
+      node->facet = facet;
+    } else {
+      node = nullptr;
+    }
+
+    gRuntimeFacetHead = node;
+  }
+
+  /**
+   * Address: 0x00ABF345 (FUN_00ABF345)
+   *
+   * What it does:
+   * Decrements one facet pointer lane and deletes the facet when the reference
+   * count reaches zero.
+   */
+  std::locale::facet* RuntimeReleaseFacetSlot(std::locale::facet** const facetSlot)
+  {
+    if (facetSlot == nullptr) {
+      return nullptr;
+    }
+
+    std::locale::facet* const facet = *facetSlot;
+    if (facet == nullptr) {
+      return reinterpret_cast<std::locale::facet*>(facetSlot);
+    }
+
+    std::locale::facet* const releasedFacet = RuntimeLocaleFacetDecref(facet);
+    if (releasedFacet != nullptr) {
+      RuntimeDestroyFacetPolymorphic(releasedFacet);
+      return releasedFacet;
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x00ABF361 (FUN_00ABF361, _tidy_global)
+   *
+   * What it does:
+   * Under `_Lockit(0)`, releases one global locale facet lane and clears the
+   * process-global locale pointer.
+   */
+  void RuntimeTidyGlobalLocale()
+  {
+    RuntimeLockitState lockit{};
+    RuntimeLockitConstruct(&lockit, 0);
+    RuntimeReleaseFacetSlot(reinterpret_cast<std::locale::facet**>(&gRuntimeGlobalLocale));
+    gRuntimeGlobalLocale = nullptr;
+    RuntimeLockitDestroy(&lockit);
+  }
+
+  /**
+   * Address: 0x00ABF38B (FUN_00ABF38B, std::locale::_Getgloballocale)
+   *
+   * What it does:
+   * Returns the process-global locale implementation pointer.
+   */
+  RuntimeLocaleLocimpView* RuntimeGetGlobalLocale()
+  {
+    return gRuntimeGlobalLocale;
+  }
+
+  /**
+   * Address: 0x00ABF391 (FUN_00ABF391, std::locale::_Setgloballocale)
+   *
+   * What it does:
+   * One-time registers global locale tidy callback and updates the process
+   * global locale implementation pointer.
+   */
+  RuntimeLocaleLocimpView* RuntimeSetGlobalLocale(RuntimeLocaleLocimpView* const localeImpl)
+  {
+    if (gRuntimeGlobalLocaleAtexitRegistered == 0) {
+      gRuntimeGlobalLocaleAtexitRegistered = 1;
+      std::atexit(RuntimeTidyGlobalLocale);
+    }
+
+    gRuntimeGlobalLocale = localeImpl;
+    return localeImpl;
+  }
+
+  /**
+   * Address: 0x00ABF3B6 (FUN_00ABF3B6, std::locale::_Locimp::_Clocptr_func)
+   *
+   * What it does:
+   * Returns pointer-to-pointer storage for classic locale implementation lane.
+   */
+  RuntimeLocaleLocimpView** RuntimeGetClassicLocimpPointerSlot()
+  {
+    return &gRuntimeClassicLocale;
+  }
+
+  /**
+   * Address: 0x00ABF3BC (FUN_00ABF3BC)
+   *
+   * What it does:
+   * Returns storage for the locale-id global counter lane.
+   */
+  std::int32_t* RuntimeGetLocaleIdCounterSlot()
+  {
+    return &gRuntimeLocaleIdCounter;
+  }
+
+  /**
+   * Address: 0x00ABF3C2 (FUN_00ABF3C2)
+   *
+   * What it does:
+   * Returns storage for the `ctype<char>` locale-id lane.
+   */
+  std::int32_t* RuntimeGetCtypeCharIdSlot()
+  {
+    return &gRuntimeLocaleIdCtypeChar;
+  }
+
+  /**
+   * Address: 0x00ABF3C8 (FUN_00ABF3C8)
+   *
+   * What it does:
+   * Returns storage for one static locale-id lane.
+   */
+  std::int32_t* RuntimeGetLocaleIdSlotA()
+  {
+    return &gRuntimeLocaleIdSlotA;
+  }
+
+  /**
+   * Address: 0x00ABF3CE (FUN_00ABF3CE)
+   *
+   * What it does:
+   * Returns storage for one static locale-id lane.
+   */
+  std::int32_t* RuntimeGetLocaleIdSlotB()
+  {
+    return &gRuntimeLocaleIdSlotB;
+  }
+
+  /**
+   * Address: 0x00ABF3D4 (FUN_00ABF3D4)
+   *
+   * What it does:
+   * Returns storage for one static locale-id lane.
+   */
+  std::int32_t* RuntimeGetLocaleIdSlotC()
+  {
+    return &gRuntimeLocaleIdSlotC;
+  }
+
+  /**
+   * Address: 0x00ABF3DA (FUN_00ABF3DA)
+   *
+   * What it does:
+   * Returns storage for one static locale-id lane.
+   */
+  std::int32_t* RuntimeGetLocaleIdSlotD()
+  {
+    return &gRuntimeLocaleIdSlotD;
+  }
+
+  /**
+   * Address: 0x00ABF3E0 (FUN_00ABF3E0)
+   *
+   * What it does:
+   * Under `_Lockit(0)`, decrements refs/deletes each facet in one `_Locimp`
+   * facet vector lane, then frees the facet vector storage.
+   */
+  void RuntimeReleaseLocimpFacetVector(RuntimeLocaleLocimpView* const localeImpl)
+  {
+    RuntimeLockitState lockit{};
+    RuntimeLockitConstruct(&lockit, 0);
+
+    auto** const facets = static_cast<std::locale::facet**>(localeImpl->facetVector);
+    for (int index = localeImpl->facetCount - 1; index >= 0; --index) {
+      std::locale::facet* const facet = facets[index];
+      if (facet != nullptr) {
+        std::locale::facet* const releasedFacet = RuntimeLocaleFacetDecref(facet);
+        if (releasedFacet != nullptr) {
+          RuntimeDestroyFacetPolymorphic(releasedFacet);
+        }
+      }
+    }
+
+    _free_crt(localeImpl->facetVector);
+    RuntimeLockitDestroy(&lockit);
+  }
+
+  /**
+   * Address: 0x00ABF528 (FUN_00ABF528)
+   *
+   * What it does:
+   * Runs non-deleting `_Locimp` destruction by releasing facet vector lanes and
+   * destroying the embedded locale-name string.
+   */
+  RuntimeLocaleLocimpView* RuntimeDestroyLocimp(RuntimeLocaleLocimpView* const localeImpl)
+  {
+    RuntimeReleaseLocimpFacetVector(localeImpl);
+    localeImpl->name.~basic_string();
+    return localeImpl;
+  }
+
+  /**
+   * Address: 0x00ABF565 (FUN_00ABF565)
+   *
+   * What it does:
+   * Runs `_Locimp` destroy tail and conditionally deletes storage when the
+   * scalar-deleting-destructor flag bit is set.
+   */
+  RuntimeLocaleLocimpView* RuntimeDestroyLocimpDeleting(
+    RuntimeLocaleLocimpView* const localeImpl,
+    const unsigned int deleteFlags
+  )
+  {
+    RuntimeDestroyLocimp(localeImpl);
+    if ((deleteFlags & 1u) != 0u) {
+      ::operator delete(localeImpl);
+    }
+    return localeImpl;
+  }
+
+  /**
+   * Address: 0x00ABF581 (FUN_00ABF581, std::locale::_Init)
+   *
+   * What it does:
+   * Lazily initializes the process-global `"C"` locale implementation under
+   * `_Lockit(0)`, seeds classic-locale pointers, and bumps facet refs.
+   */
+  RuntimeLocaleLocimpView* RuntimeLocaleInit()
+  {
+    RuntimeLocaleLocimpView* localeImpl = gRuntimeGlobalLocale;
+    if (localeImpl != nullptr) {
+      return localeImpl;
+    }
+
+    RuntimeLockitState lockit{};
+    RuntimeLockitConstruct(&lockit, 0);
+
+    localeImpl = gRuntimeGlobalLocale;
+    if (localeImpl == nullptr) {
+      auto* const storage = static_cast<RuntimeLocaleLocimpView*>(::operator new(sizeof(RuntimeLocaleLocimpView)));
+      try {
+        localeImpl = RuntimeLocaleLocimpConstruct(storage, false);
+      } catch (...) {
+        ::operator delete(storage);
+        RuntimeLockitDestroy(&lockit);
+        throw;
+      }
+
+      RuntimeSetGlobalLocale(localeImpl);
+      localeImpl->categoryMask = 0x3F;
+      localeImpl->name.assign("C");
+      gRuntimeClassicLocale = localeImpl;
+      ++localeImpl->refs;
+      gRuntimeClassicLocaleObject.ptr = gRuntimeClassicLocale;
+    }
+
+    RuntimeLockitDestroy(&lockit);
+    return localeImpl;
+  }
+
+  /**
+   * Address: 0x00ABF665 (FUN_00ABF665, std::locale::classic)
+   *
+   * What it does:
+   * Ensures global locale initialization and returns reference storage for the
+   * process classic locale object.
+   */
+  RuntimeStdLocaleObject* RuntimeLocaleClassic()
+  {
+    RuntimeLocaleInit();
+    return &gRuntimeClassicLocaleObject;
+  }
+
+  /**
+   * Address: 0x00ABF670 (FUN_00ABF670, std::locale::empty)
+   *
+   * What it does:
+   * Ensures global locale initialization, allocates one new `_Locimp` in
+   * `isParent=true` mode, stores it into the destination locale object lane,
+   * and returns that destination pointer.
+   */
+  RuntimeStdLocaleObject* RuntimeLocaleEmpty(RuntimeStdLocaleObject* const destinationLocale)
+  {
+    RuntimeLocaleInit();
+
+    RuntimeLocaleLocimpView* localeImpl = nullptr;
+    auto* const storage = static_cast<RuntimeLocaleLocimpView*>(::operator new(sizeof(RuntimeLocaleLocimpView), std::nothrow));
+    if (storage != nullptr) {
+      localeImpl = RuntimeLocaleLocimpConstruct(storage, true);
+    }
+
+    destinationLocale->ptr = localeImpl;
+    return destinationLocale;
+  }
+
+  [[nodiscard]] std::size_t RuntimeCodePageHashBucket(const std::uint32_t codePage) noexcept
+  {
+    return static_cast<std::size_t>(codePage % static_cast<std::uint32_t>(kRuntimeCodePageLocaleHashBucketCount));
+  }
+
+  [[nodiscard]] int RuntimeGetCodePageMaxCharBytes(const RuntimeLocaleHandle* const locale, const UINT fallbackCodePage)
+  {
+    struct RuntimeThreadLocInfoMbCurMaxView
+    {
+      std::uint8_t reserved00[0xAC];
+      std::int32_t mbCurMax;
+    };
+    static_assert(
+      offsetof(RuntimeThreadLocInfoMbCurMaxView, mbCurMax) == 0xAC,
+      "RuntimeThreadLocInfoMbCurMaxView::mbCurMax offset must be 0xAC"
+    );
+
+    if (locale != nullptr && locale->locinfo != nullptr) {
+      const auto* const localeView = reinterpret_cast<const RuntimeThreadLocInfoMbCurMaxView*>(locale->locinfo);
+      if (localeView->mbCurMax > 0) {
+        return localeView->mbCurMax;
+      }
+    }
+
+    CPINFO codePageInfo{};
+    if (::GetCPInfo(fallbackCodePage, &codePageInfo) != FALSE && codePageInfo.MaxCharSize > 0u) {
+      return static_cast<int>(codePageInfo.MaxCharSize);
+    }
+    return 1;
+  }
+
+  /**
+   * Address: 0x00ABFCCD (FUN_00ABFCCD)
+   *
+   * What it does:
+   * Builds one `".<codepage>"` locale descriptor and creates a CRT locale
+   * bundle for that codepage lane.
+   */
+  RuntimeLocaleHandle* RuntimeCreateCodePageLocale(const std::uint32_t codePage)
+  {
+    char codePageText[31] = {};
+    if (_ultoa_s(static_cast<unsigned long>(codePage), codePageText, _countof(codePageText), 10) != 0) {
+      return nullptr;
+    }
+
+    char localeName[32] = ".";
+    if (strcat_s(localeName, codePageText) != 0) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<RuntimeLocaleHandle*>(_create_locale(LC_ALL, localeName));
+  }
+
+  /**
+   * Address: 0x00ABFD0D (FUN_00ABFD0D)
+   *
+   * What it does:
+   * Returns one cached CRT locale handle for a codepage lane, creating and
+   * atomically publishing a new cache node when no match exists.
+   */
+  RuntimeLocaleHandle* RuntimeGetCachedCodePageLocale(const std::uint32_t codePage)
+  {
+    const std::size_t bucketIndex = RuntimeCodePageHashBucket(codePage);
+    auto* const bucket = reinterpret_cast<PVOID volatile*>(&gRuntimeCodePageLocaleHash[bucketIndex]);
+
+    RuntimeCodePageLocaleHashEntry* pendingEntry = nullptr;
+    while (true) {
+      auto* const bucketHead = static_cast<RuntimeCodePageLocaleHashEntry*>(*bucket);
+      RuntimeCodePageLocaleHashEntry* probe = bucketHead;
+      while (probe != nullptr) {
+        if (probe->codePage == codePage) {
+          if (pendingEntry != nullptr) {
+            RuntimeFreeLocale(pendingEntry->locale);
+            _free_crt(pendingEntry);
+          }
+          return probe->locale;
+        }
+        probe = probe->next;
+      }
+
+      if (pendingEntry == nullptr) {
+        pendingEntry = static_cast<RuntimeCodePageLocaleHashEntry*>(std::malloc(sizeof(RuntimeCodePageLocaleHashEntry)));
+        if (pendingEntry == nullptr) {
+          return nullptr;
+        }
+
+        RuntimeLocaleHandle* const locale = RuntimeCreateCodePageLocale(codePage);
+        pendingEntry->locale = locale;
+        if (locale == nullptr) {
+          _free_crt(pendingEntry);
+          return nullptr;
+        }
+        pendingEntry->codePage = codePage;
+      }
+
+      pendingEntry->next = bucketHead;
+      PVOID const priorHead = ::InterlockedCompareExchangePointer(bucket, pendingEntry, bucketHead);
+      if (priorHead == bucketHead) {
+        return pendingEntry->locale;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00ABFD9F (FUN_00ABFD9F, _ReleaseCPLocHash)
+   *
+   * What it does:
+   * Atomically drains all codepage-locale hash buckets and frees each cached
+   * locale bundle and node.
+   */
+  void RuntimeReleaseCodePageLocaleHash()
+  {
+    for (std::size_t bucketIndex = 0; bucketIndex < kRuntimeCodePageLocaleHashBucketCount; ++bucketIndex) {
+      auto* const bucket = reinterpret_cast<PVOID volatile*>(&gRuntimeCodePageLocaleHash[bucketIndex]);
+      auto* entry = static_cast<RuntimeCodePageLocaleHashEntry*>(::InterlockedExchangePointer(bucket, nullptr));
+      while (entry != nullptr) {
+        RuntimeCodePageLocaleHashEntry* const nextEntry = entry->next;
+        RuntimeFreeLocale(entry->locale);
+        _free_crt(entry);
+        entry = nextEntry;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00ABFDDD (FUN_00ABFDDD, _InitCPLocHash)
+   *
+   * What it does:
+   * Registers one process-exit cleanup hook for the codepage-locale hash and
+   * returns CRT on-exit failure code semantics.
+   */
+  int RuntimeInitCodePageLocaleHash()
+  {
+    return std::atexit(RuntimeReleaseCodePageLocaleHash) != 0 ? kRuntimeOnExitFailureCode : 0;
+  }
+
+  /**
+   * Address: 0x00ABFA01 (FUN_00ABFA01)
+   *
+   * What it does:
+   * Converts one wide character to multibyte using `_Cvtvec` locale/codepage
+   * lanes, reporting `EILSEQ` for conversion failure/default-char substitution.
+   */
+  int RuntimeWideCharToMultiByteLocale(
+    char* const destination,
+    const wchar_t sourceCharacter,
+    int /*unused*/,
+    const RuntimeCvtVec* const localeVector
+  )
+  {
+    constexpr std::size_t kRuntimeCtypeIndexWideConvert = 2u;
+
+    LCID localeHandle = 0;
+    UINT codePage = 0;
+    if (localeVector != nullptr) {
+      localeHandle = localeVector->handle;
+      codePage = static_cast<UINT>(localeVector->codePage);
+    } else {
+      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexWideConvert];
+      codePage = static_cast<UINT>(__lc_codepage_func());
+    }
+
+    if (localeHandle == 0) {
+      if (static_cast<unsigned int>(sourceCharacter) <= 0xFFu) {
+        *destination = static_cast<char>(sourceCharacter);
+        return 1;
+      }
+
+      *_errno() = EILSEQ;
+      return -1;
+    }
+
+    BOOL usedDefaultChar = FALSE;
+    RuntimeLocaleHandle* const codePageLocale = RuntimeGetCachedCodePageLocale(codePage);
+    const int destinationBytes = RuntimeGetCodePageMaxCharBytes(codePageLocale, codePage);
+
+    wchar_t sourceWide = sourceCharacter;
+    const int conversionResult =
+      ::WideCharToMultiByte(codePage, 0, &sourceWide, 1, destination, destinationBytes, nullptr, &usedDefaultChar);
+    if (conversionResult == 0 || usedDefaultChar != FALSE) {
+      *_errno() = EILSEQ;
+      return -1;
+    }
+
+    return conversionResult;
+  }
+
+  /**
+   * Address: 0x00ABFA96 (FUN_00ABFA96)
+   *
+   * What it does:
+   * Jump-thunk lane for `RuntimeWideCharToMultiByteLocale`.
+   */
+  int RuntimeWideCharToMultiByteLocaleThunk(
+    char* const destination,
+    const wchar_t sourceCharacter,
+    const int unused,
+    const RuntimeCvtVec* const localeVector
+  )
+  {
+    return RuntimeWideCharToMultiByteLocale(destination, sourceCharacter, unused, localeVector);
+  }
+
+  /**
+   * Address: 0x00ABFDF0 (FUN_00ABFDF0)
+   *
+   * What it does:
+   * Converts one multibyte step to wide-char under `_Cvtvec` locale lanes,
+   * including pending-lead-byte state handling and `EILSEQ` error semantics.
+   */
+  int RuntimeMultiByteToWideStep(
+    wchar_t* const destinationWideChar,
+    const char* const sourceBytes,
+    const unsigned int sourceByteCount,
+    char* const pendingStateBytes,
+    const RuntimeCvtVec* const localeVector
+  )
+  {
+    constexpr std::size_t kRuntimeCtypeIndexMultiByteConvert = 2u;
+    constexpr DWORD kRuntimeMbToWideFlags = 9u;
+
+    if (sourceBytes == nullptr || sourceByteCount == 0u) {
+      return 0;
+    }
+
+    if (sourceBytes[0] == '\0') {
+      if (destinationWideChar != nullptr) {
+        *destinationWideChar = L'\0';
+      }
+      return 0;
+    }
+
+    LCID localeHandle = 0;
+    UINT codePage = 0;
+    if (localeVector != nullptr) {
+      localeHandle = localeVector->handle;
+      codePage = static_cast<UINT>(localeVector->codePage);
+    } else {
+      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexMultiByteConvert];
+      codePage = static_cast<UINT>(__lc_codepage_func());
+    }
+
+    if (localeHandle == 0) {
+      if (destinationWideChar != nullptr) {
+        *destinationWideChar = static_cast<wchar_t>(static_cast<unsigned char>(sourceBytes[0]));
+      }
+      return 1;
+    }
+
+    RuntimeLocaleHandle* const codePageLocale = RuntimeGetCachedCodePageLocale(codePage);
+    auto* const pendingState = reinterpret_cast<std::uint32_t*>(pendingStateBytes);
+    if (*pendingState != 0u) {
+      pendingStateBytes[1] = sourceBytes[0];
+      const int maxCharBytes = RuntimeGetCodePageMaxCharBytes(codePageLocale, codePage);
+      if (maxCharBytes > 1
+          && ::MultiByteToWideChar(
+            codePage,
+            kRuntimeMbToWideFlags,
+            pendingStateBytes,
+            2,
+            destinationWideChar,
+            (destinationWideChar != nullptr) ? 1 : 0
+          ) != 0) {
+        *pendingState = 0u;
+        return maxCharBytes;
+      }
+
+      *pendingState = 0u;
+      *_errno() = EILSEQ;
+      return -1;
+    }
+
+    bool isLeadByte = false;
+    if (codePageLocale != nullptr && codePageLocale->mbcinfo != nullptr) {
+      struct RuntimeThreadMbcInfoLeadByteView
+      {
+        std::uint8_t reserved00[0x1D];
+        std::uint8_t leadByteFlags[256];
+      };
+      const auto* const mbcView = reinterpret_cast<const RuntimeThreadMbcInfoLeadByteView*>(codePageLocale->mbcinfo);
+      isLeadByte = (mbcView->leadByteFlags[static_cast<unsigned char>(sourceBytes[0])] & 0x4u) != 0u;
+    } else {
+      isLeadByte = (__pctype_func()[static_cast<unsigned char>(sourceBytes[0])] & 0x8000u) != 0u;
+    }
+
+    if (!isLeadByte) {
+      if (::MultiByteToWideChar(
+            codePage,
+            kRuntimeMbToWideFlags,
+            sourceBytes,
+            1,
+            destinationWideChar,
+            (destinationWideChar != nullptr) ? 1 : 0
+          ) != 0) {
+        return 1;
+      }
+
+      *pendingState = 0u;
+      *_errno() = EILSEQ;
+      return -1;
+    }
+
+    const int maxCharBytes = RuntimeGetCodePageMaxCharBytes(codePageLocale, codePage);
+    if (sourceByteCount < static_cast<unsigned int>(maxCharBytes)) {
+      pendingStateBytes[0] = sourceBytes[0];
+      return -2;
+    }
+
+    if (maxCharBytes > 1
+        && ::MultiByteToWideChar(
+          codePage,
+          kRuntimeMbToWideFlags,
+          sourceBytes,
+          maxCharBytes,
+          destinationWideChar,
+          (destinationWideChar != nullptr) ? 1 : 0
+        ) != 0) {
+      *pendingState = 0u;
+      return maxCharBytes;
+    }
+
+    if (sourceBytes[1] != '\0') {
+      *pendingState = 0u;
+      return maxCharBytes;
+    }
+
+    *pendingState = 0u;
+    *_errno() = EILSEQ;
+    return -1;
+  }
+
+  /**
+   * Address: 0x00ABF1DE (FUN_00ABF1DE)
+   *
+   * What it does:
+   * Converts one input character to uppercase using the CRT locale conversion
+   * path (`__crtLCMapStringA`) and falls back to ASCII uppercasing when locale
+   * handle lane is unset.
+   */
+  int RuntimeToupper(const int character, RuntimeCtypeVec* const localeVector)
+  {
+    constexpr std::size_t kRuntimeCtypeIndexToupper = 2u;
+
+    RuntimeCtypeVec* const ctypeVector = localeVector;
+    LCID localeHandle = 0;
+    int codePage = 0;
+    if (ctypeVector != nullptr) {
+      localeHandle = ctypeVector->handle;
+      codePage = ctypeVector->codePage;
+    } else {
+      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexToupper];
+      codePage = __lc_codepage_func();
+    }
+
+    if (localeHandle == 0) {
+      if (character >= static_cast<int>('a') && character <= static_cast<int>('z')) {
+        return character - static_cast<int>('a' - 'A');
+      }
+      return character;
+    }
+
+    if (static_cast<unsigned int>(character) < 0x100u) {
+      if (ctypeVector == nullptr) {
+        if (::islower(character) == 0) {
+          return character;
+        }
+      } else if ((ctypeVector->table[static_cast<unsigned int>(character)] & 0x2u) == 0u) {
+        return character;
+      }
+    }
+
+    const int highByte = character >> 8;
+    int hasLeadByteFlag = 0;
+    if (ctypeVector == nullptr) {
+      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
+      hasLeadByteFlag = (__pctype_func()[highByteIndex] & 0x8000u) != 0u ? 1 : 0;
+    } else {
+      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
+      hasLeadByteFlag = (ctypeVector->table[highByteIndex] >> 15) & 0x1;
+    }
+
+    char inputBuffer[3] = {};
+    int inputLength = 1;
+    inputBuffer[0] = static_cast<char>(character & 0xFF);
+    if (hasLeadByteFlag != 0) {
+      inputBuffer[0] = static_cast<char>(highByte & 0xFF);
+      inputBuffer[1] = static_cast<char>(character & 0xFF);
+      inputLength = 2;
+    }
+
+    char outputBuffer[3] = {};
+    const int mappedLength = __crtLCMapStringA(
+      0,
+      localeHandle,
+      LCMAP_UPPERCASE,
+      inputBuffer,
+      inputLength,
+      reinterpret_cast<LPWSTR>(outputBuffer),
+      3,
+      codePage,
+      1
+    );
+    if (mappedLength == 0) {
+      return character;
+    }
+    if (mappedLength == 1) {
+      return static_cast<unsigned char>(outputBuffer[0]);
+    }
+
+    return (static_cast<int>(static_cast<unsigned char>(outputBuffer[0])) << 8)
+      | static_cast<int>(static_cast<unsigned char>(outputBuffer[1]));
+  }
+
+  /**
+   * Address: 0x00ABF6B2 (FUN_00ABF6B2, _Tolower)
+   *
+   * What it does:
+   * Converts one input character to lowercase using the CRT locale conversion
+   * path (`__crtLCMapStringA`) and falls back to ASCII lowercasing when locale
+   * handle lane is unset.
+   */
+  int RuntimeTolower(const int character, RuntimeCtypeVec* const localeVector)
+  {
+    constexpr std::size_t kRuntimeCtypeIndexTolower = 2u;
+
+    RuntimeCtypeVec* const ctypeVector = localeVector;
+    LCID localeHandle = 0;
+    int codePage = 0;
+    if (ctypeVector != nullptr) {
+      localeHandle = ctypeVector->handle;
+      codePage = ctypeVector->codePage;
+    } else {
+      localeHandle = __lc_handle_func()[kRuntimeCtypeIndexTolower];
+      codePage = __lc_codepage_func();
+    }
+
+    if (localeHandle == 0) {
+      if (character >= static_cast<int>('A') && character <= static_cast<int>('Z')) {
+        return character + static_cast<int>('a' - 'A');
+      }
+      return character;
+    }
+
+    if (static_cast<unsigned int>(character) < 0x100u) {
+      if (ctypeVector == nullptr) {
+        if (::isupper(character) == 0) {
+          return character;
+        }
+      } else if ((ctypeVector->table[static_cast<unsigned int>(character)] & 0x1u) == 0u) {
+        return character;
+      }
+    }
+
+    const int highByte = character >> 8;
+    int hasLeadByteFlag = 0;
+    if (ctypeVector == nullptr) {
+      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
+      hasLeadByteFlag = (__pctype_func()[highByteIndex] & 0x8000u) != 0u ? 1 : 0;
+    } else {
+      const unsigned int highByteIndex = static_cast<unsigned int>(highByte) & 0xFFu;
+      hasLeadByteFlag = (ctypeVector->table[highByteIndex] >> 15) & 0x1;
+    }
+
+    char inputBuffer[3] = {};
+    int inputLength = 1;
+    inputBuffer[0] = static_cast<char>(character & 0xFF);
+    if (hasLeadByteFlag != 0) {
+      inputBuffer[0] = static_cast<char>(highByte & 0xFF);
+      inputBuffer[1] = static_cast<char>(character & 0xFF);
+      inputLength = 2;
+    }
+
+    char outputBuffer[3] = {};
+    const int mappedLength = __crtLCMapStringA(
+      0,
+      localeHandle,
+      LCMAP_LOWERCASE,
+      inputBuffer,
+      inputLength,
+      reinterpret_cast<LPWSTR>(outputBuffer),
+      3,
+      codePage,
+      1
+    );
+    if (mappedLength == 0) {
+      return character;
+    }
+    if (mappedLength == 1) {
+      return static_cast<unsigned char>(outputBuffer[0]);
+    }
+
+    return (static_cast<int>(static_cast<unsigned char>(outputBuffer[0])) << 8)
+      | static_cast<int>(static_cast<unsigned char>(outputBuffer[1]));
+  }
+
+  /**
+   * Address: 0x00ABF7C1 (FUN_00ABF7C1, _Getctype)
+   *
+   * What it does:
+   * Builds one `_Ctypevec` lane from thread locale handle/codepage and either
+   * clones the current CRT `_pctype` table or aliases it on allocation failure.
+   */
+  RuntimeCtypeVec* RuntimeGetctype(RuntimeCtypeVec* const ctypeVector)
+  {
+    constexpr std::size_t kRuntimeCtypeIndexGetctype = 1u;
+
+    ctypeVector->handle = __lc_handle_func()[kRuntimeCtypeIndexGetctype];
+    ctypeVector->codePage = __lc_codepage_func();
+
+    auto* const tableCopy = static_cast<std::uint16_t*>(_calloc_crt(0x100u, sizeof(std::uint16_t)));
+    ctypeVector->table = tableCopy;
+    if (tableCopy != nullptr) {
+      std::memcpy(tableCopy, __pctype_func(), 0x200u);
+      ctypeVector->ownsCopiedTable = 1;
+    } else {
+      ctypeVector->ownsCopiedTable = 0;
+      ctypeVector->table = __pctype_func();
+    }
+
+    return ctypeVector;
+  }
+
+  /**
+   * Address: 0x00ABFA82 (FUN_00ABFA82, _Getcvt)
+   *
+   * What it does:
+   * Returns one `_Cvtvec` pair containing thread locale conversion handle lane
+   * and current locale codepage lane.
+   */
+  RuntimeCvtVec RuntimeGetcvt()
+  {
+    constexpr std::size_t kRuntimeCtypeIndexGetcvt = 2u;
+
+    RuntimeCvtVec cvtVector{};
+    cvtVector.handle = __lc_handle_func()[kRuntimeCtypeIndexGetcvt];
+    cvtVector.codePage = __lc_codepage_func();
+    return cvtVector;
+  }
+
+  /**
+   * Address: 0x00ABFA9B (FUN_00ABFA9B, std::uncaught_exception)
+   *
+   * What it does:
+   * Forwards to the CRT uncaught-exception state probe and returns one boolean
+   * result lane.
+   */
+  bool RuntimeUncaughtException()
+  {
+    return __uncaught_exception();
+  }
+
+  /**
+   * Address: 0x00ABFC6A (FUN_00ABFC6A)
+   *
+   * What it does:
+   * Uppercases one wide-character lane with locale/codepage context from
+   * `_Cvtvec`, with ASCII fallback when locale handle lane is zero.
+   */
+  int RuntimeToupperWide(const std::uint16_t sourceCharacter, const RuntimeCvtVec* const localeVector)
+  {
+    std::uint16_t destinationCharacter = sourceCharacter;
+    if (sourceCharacter == 0xFFFFu) {
+      return static_cast<int>(sourceCharacter);
+    }
+
+    if (localeVector->handle != 0 || sourceCharacter >= 0x100u) {
+      wchar_t sourceWide = static_cast<wchar_t>(sourceCharacter);
+      wchar_t destinationWide = sourceWide;
+      const int mapResult = __crtLCMapStringW(
+        0,
+        localeVector->handle,
+        LCMAP_UPPERCASE,
+        &sourceWide,
+        1,
+        &destinationWide,
+        1,
+        localeVector->codePage
+      );
+      if (mapResult != 0) {
+        destinationCharacter = static_cast<std::uint16_t>(destinationWide);
+      }
+      return static_cast<int>(destinationCharacter);
+    }
+
+    if (sourceCharacter >= static_cast<std::uint16_t>('a') && sourceCharacter <= static_cast<std::uint16_t>('z')) {
+      destinationCharacter = static_cast<std::uint16_t>(sourceCharacter - static_cast<std::uint16_t>('a' - 'A'));
+    }
+    return static_cast<int>(destinationCharacter);
+  }
+
+  /**
+   * Address: 0x00ABFF61 (FUN_00ABFF61)
+   *
+   * What it does:
+   * Queries CRT wide-char type flags for one code unit under `_Cvtvec` locale
+   * context and returns one signed 16-bit flag lane on success.
+   */
+  int RuntimeGetWideCharTypeSingle(const std::uint16_t sourceCharacter, const RuntimeCvtVec* const localeVector)
+  {
+    wchar_t sourceWide = static_cast<wchar_t>(sourceCharacter);
+    WORD charType = 0;
+    const int getTypeResult = __crtGetStringTypeW(
+      0,
+      1u,
+      &sourceWide,
+      1,
+      &charType,
+      localeVector->codePage,
+      localeVector->handle
+    );
+    if (getTypeResult == 0) {
+      return 0;
+    }
+    return static_cast<short>(charType);
+  }
+
+  /**
+   * Address: 0x00ABFF8E (FUN_00ABFF8E)
+   *
+   * What it does:
+   * Fills type flags for one wide-char span under `_Cvtvec` locale context and
+   * returns the original end pointer lane.
+   */
+  const wchar_t* RuntimeGetWideCharTypeRange(
+    const wchar_t* const sourceBegin,
+    const wchar_t* const sourceEnd,
+    WORD* const outCharTypes,
+    const RuntimeCvtVec* const localeVector
+  )
+  {
+    const int sourceCount = static_cast<int>(sourceEnd - sourceBegin);
+    __crtGetStringTypeW(0, 1u, sourceBegin, sourceCount, outCharTypes, localeVector->codePage, localeVector->handle);
+    return sourceEnd;
+  }
+
+  /**
+   * Address: 0x00ABFFB9 (FUN_00ABFFB9)
+   *
+   * What it does:
+   * Lowercases one wide-character lane with locale/codepage context from
+   * `_Cvtvec`, with ASCII fallback when locale handle lane is zero.
+   */
+  int RuntimeTolowerWide(const std::uint16_t sourceCharacter, const RuntimeCvtVec* const localeVector)
+  {
+    std::uint16_t destinationCharacter = sourceCharacter;
+    if (sourceCharacter == 0xFFFFu) {
+      return static_cast<int>(sourceCharacter);
+    }
+
+    if (localeVector->handle != 0 || sourceCharacter >= 0x100u) {
+      wchar_t sourceWide = static_cast<wchar_t>(sourceCharacter);
+      wchar_t destinationWide = sourceWide;
+      const int mapResult = __crtLCMapStringW(
+        0,
+        localeVector->handle,
+        LCMAP_LOWERCASE,
+        &sourceWide,
+        1,
+        &destinationWide,
+        1,
+        localeVector->codePage
+      );
+      if (mapResult != 0) {
+        destinationCharacter = static_cast<std::uint16_t>(destinationWide);
+      }
+      return static_cast<int>(destinationCharacter);
+    }
+
+    if (sourceCharacter >= static_cast<std::uint16_t>('A') && sourceCharacter <= static_cast<std::uint16_t>('Z')) {
+      destinationCharacter = static_cast<std::uint16_t>(sourceCharacter + static_cast<std::uint16_t>('a' - 'A'));
+    }
+    return static_cast<int>(destinationCharacter);
   }
 
   /**
@@ -2130,5 +4640,266 @@ namespace moho::runtime
   void EhDeletePendingAllocationC(void* allocation)
   {
     ::operator delete(allocation);
+  }
+
+  struct RuntimeScopedMutexLockView
+  {
+    struct RuntimeMutexView* mutex = nullptr; // +0x00
+    std::uint8_t ownsLock = 0;            // +0x04
+    std::uint8_t reserved05[0x3]{};       // +0x05
+  };
+  static_assert(
+    offsetof(RuntimeScopedMutexLockView, ownsLock) == 0x4,
+    "RuntimeScopedMutexLockView::ownsLock offset must be 0x4"
+  );
+  static_assert(sizeof(RuntimeScopedMutexLockView) == 0x8, "RuntimeScopedMutexLockView size must be 0x8");
+
+  struct RuntimeMutexView
+  {
+    void* nativeHandleOrCriticalSection = nullptr; // +0x00
+    std::uint8_t lockMode = 0;                     // +0x04
+    std::uint8_t reserved05[0x3]{};                // +0x05
+  };
+  static_assert(sizeof(RuntimeMutexView) == 0x8, "RuntimeMutexView size must be 0x8");
+
+  void RuntimeUnlockMutex(RuntimeMutexView* const mutex)
+  {
+    if (mutex == nullptr || mutex->nativeHandleOrCriticalSection == nullptr) {
+      return;
+    }
+
+    if ((mutex->lockMode & 0x1u) != 0u) {
+      ::LeaveCriticalSection(static_cast<CRITICAL_SECTION*>(mutex->nativeHandleOrCriticalSection));
+    } else {
+      ::ReleaseMutex(static_cast<HANDLE>(mutex->nativeHandleOrCriticalSection));
+    }
+  }
+
+  struct RuntimeOwnedHandleCell
+  {
+    HANDLE handle = nullptr;              // +0x00
+    std::uint32_t reserved04 = 0;         // +0x04
+    std::uint8_t shouldCloseHandle = 0;   // +0x08
+    std::uint8_t reserved09[0x3]{};       // +0x09
+  };
+  static_assert(
+    offsetof(RuntimeOwnedHandleCell, shouldCloseHandle) == 0x8,
+    "RuntimeOwnedHandleCell::shouldCloseHandle offset must be 0x8"
+  );
+  static_assert(sizeof(RuntimeOwnedHandleCell) == 0xC, "RuntimeOwnedHandleCell size must be 0xC");
+
+  struct RuntimeWxStringView
+  {
+    wchar_t* m_pchData = nullptr; // +0x00
+  };
+  static_assert(sizeof(RuntimeWxStringView) == 0x4, "RuntimeWxStringView size must be 0x4");
+
+  struct RuntimeWxObjectView
+  {
+    void* vtable = nullptr;  // +0x00
+    void* refData = nullptr; // +0x04
+  };
+  static_assert(offsetof(RuntimeWxObjectView, refData) == 0x4, "RuntimeWxObjectView::refData offset must be 0x4");
+  static_assert(sizeof(RuntimeWxObjectView) == 0x8, "RuntimeWxObjectView size must be 0x8");
+
+  struct RuntimeWxCommandEventView
+  {
+    std::uint8_t reserved00[0x20]{};
+    RuntimeWxStringView commandString; // +0x20
+  };
+  static_assert(
+    offsetof(RuntimeWxCommandEventView, commandString) == 0x20,
+    "RuntimeWxCommandEventView::commandString offset must be 0x20"
+  );
+
+  struct RuntimeCriticalSectionLeaveGuard
+  {
+    std::uint8_t shouldLeave = 0;         // +0x00
+    std::uint8_t reserved01[0x3]{};       // +0x01
+    CRITICAL_SECTION* criticalSection = nullptr; // +0x04
+  };
+  static_assert(
+    offsetof(RuntimeCriticalSectionLeaveGuard, criticalSection) == 0x4,
+    "RuntimeCriticalSectionLeaveGuard::criticalSection offset must be 0x4"
+  );
+  static_assert(sizeof(RuntimeCriticalSectionLeaveGuard) == 0x8, "RuntimeCriticalSectionLeaveGuard size must be 0x8");
+
+  void DestroySharedWxStringRuntimePayload(RuntimeWxStringView* const value)
+  {
+    auto* const header = reinterpret_cast<std::int32_t*>(value->m_pchData) - 3;
+    const std::int32_t refCount = header[0];
+    if (refCount != -1) {
+      header[0] = refCount - 1;
+      if (refCount == 1) {
+        ::operator delete(static_cast<void*>(header));
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00B5F8B0 (FUN_00B5F8B0)
+   *
+   * What it does:
+   * EH cleanup helper that destroys one pending `wxCommandEvent` lane loaded
+   * from a stack pointer slot.
+   */
+  void EhCleanupDestroyPendingWxCommandEvent(RuntimeWxCommandEventView** const commandEventSlot)
+  {
+    RuntimeWxCommandEventView* const commandEvent = *commandEventSlot;
+    DestroySharedWxStringRuntimePayload(&commandEvent->commandString);
+    reinterpret_cast<RuntimeWxObjectView*>(commandEvent)->refData = nullptr;
+  }
+
+  /**
+   * Address: 0x00B5F8E0 (FUN_00B5F8E0)
+   *
+   * What it does:
+   * EH cleanup helper that runs the shared wx-object unref tail for one pending
+   * object pointer lane.
+   */
+  void EhCleanupDestroyPendingWxObject(RuntimeWxObjectView** const objectSlot)
+  {
+    (*objectSlot)->refData = nullptr;
+  }
+
+  /**
+   * Address: 0x00B5F970 (FUN_00B5F970)
+   *
+   * What it does:
+   * EH cleanup helper that runs the wx-region base unref tail on one stack
+   * object lane.
+   */
+  void EhCleanupDestroyStackWxRegion(RuntimeWxObjectView* const regionStorage)
+  {
+    regionStorage->refData = nullptr;
+  }
+
+  /**
+   * Address: 0x00B5F9A0 (FUN_00B5F9A0)
+   *
+   * What it does:
+   * EH cleanup helper that releases one stack `wxString` shared payload lane.
+   */
+  void EhCleanupDestroyStackWxStringA(RuntimeWxStringView* const stringStorage)
+  {
+    DestroySharedWxStringRuntimePayload(stringStorage);
+  }
+
+  /**
+   * Address: 0x00B6FD40 (FUN_00B6FD40)
+   *
+   * What it does:
+   * EH cleanup helper that releases one stack `wxString` shared payload lane.
+   */
+  void EhCleanupDestroyStackWxStringB(RuntimeWxStringView* const stringStorage)
+  {
+    DestroySharedWxStringRuntimePayload(stringStorage);
+  }
+
+  /**
+   * Address: 0x00B6FD48 (FUN_00B6FD48)
+   *
+   * What it does:
+   * EH cleanup helper that releases one stack `wxString` shared payload lane.
+   */
+  void EhCleanupDestroyStackWxStringC(RuntimeWxStringView* const stringStorage)
+  {
+    DestroySharedWxStringRuntimePayload(stringStorage);
+  }
+
+  /**
+   * Address: 0x00B6FD50 (FUN_00B6FD50)
+   *
+   * What it does:
+   * EH cleanup helper that releases the adjacent `wxString` stack lane reached
+   * from the incoming frame-base pointer.
+   */
+  void EhCleanupDestroyStackWxStringD(RuntimeWxStringView* const frameBaseAsString)
+  {
+    DestroySharedWxStringRuntimePayload(frameBaseAsString + 1);
+  }
+
+  /**
+   * Address: 0x00B77300 (FUN_00B77300)
+   *
+   * What it does:
+   * EH cleanup helper that unlocks one scoped mutex lock lane if ownership is
+   * still active.
+   */
+  void EhCleanupUnlockScopedMutexA(RuntimeScopedMutexLockView* const scopedLock)
+  {
+    if (scopedLock->ownsLock != 0) {
+      RuntimeUnlockMutex(scopedLock->mutex);
+      scopedLock->ownsLock = 0;
+    }
+  }
+
+  /**
+   * Address: 0x00B77450 (FUN_00B77450)
+   *
+   * What it does:
+   * EH cleanup helper that unlocks one scoped mutex lock lane if ownership is
+   * still active.
+   */
+  void EhCleanupUnlockScopedMutexB(RuntimeScopedMutexLockView* const scopedLock)
+  {
+    if (scopedLock->ownsLock != 0) {
+      RuntimeUnlockMutex(scopedLock->mutex);
+      scopedLock->ownsLock = 0;
+    }
+  }
+
+  /**
+   * Address: 0x00B7748B (FUN_00B7748B)
+   *
+   * What it does:
+   * EH cleanup helper that conditionally closes one owned handle and deletes
+   * the owning cell.
+   */
+  void EhCleanupDestroyOwnedHandleCell(RuntimeOwnedHandleCell** const handleCellSlot)
+  {
+    RuntimeOwnedHandleCell* const handleCell = *handleCellSlot;
+    if (handleCell != nullptr) {
+      if (handleCell->shouldCloseHandle != 0) {
+        ::CloseHandle(handleCell->handle);
+      }
+      ::operator delete(handleCell);
+    }
+  }
+
+  /**
+   * Address: 0x00B777E0 (FUN_00B777E0)
+   *
+   * What it does:
+   * EH cleanup helper that leaves one critical section lane when the guard
+   * still owns the lock.
+   */
+  void EhCleanupLeaveCriticalSection(RuntimeCriticalSectionLeaveGuard* const guard)
+  {
+    if (guard->shouldLeave != 0) {
+      ::LeaveCriticalSection(guard->criticalSection);
+    }
+  }
+
+  /**
+   * Address: 0x00B915E0 (FUN_00B915E0)
+   *
+   * What it does:
+   * EH cleanup helper that destroys one stack-local `std::string` lane.
+   */
+  void EhCleanupDestroyStdStringA(std::string* const stringStorage)
+  {
+    stringStorage->~basic_string();
+  }
+
+  /**
+   * Address: 0x00B915E8 (FUN_00B915E8)
+   *
+   * What it does:
+   * EH cleanup helper that destroys one stack-local `std::string` lane.
+   */
+  void EhCleanupDestroyStdStringB(std::string* const stringStorage)
+  {
+    stringStorage->~basic_string();
   }
 } // namespace moho::runtime

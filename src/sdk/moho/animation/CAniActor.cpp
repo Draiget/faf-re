@@ -371,7 +371,6 @@ namespace
       static_cast<moho::TDatListItem<moho::IAniManipulator, void>*>(&actor->mManipulatorsByPrecedence);
 
     while (manipulator) {
-      manipulator->mActorOrderLink.ListUnlink();
       manipulator->mActorOrderLink.ListLinkBefore(listHead);
       manipulator = ReadOwnedManipulatorPointer(archive, owner);
     }
@@ -398,10 +397,7 @@ namespace
   {
     auto* const head =
       static_cast<moho::TDatListItem<moho::IAniManipulator, void>*>(&actor->mManipulatorsByPrecedence);
-    head->mPrev->mNext = head->mNext;
-    head->mNext->mPrev = head->mPrev;
-    head->mPrev = head;
-    head->mNext = head;
+    head->ListUnlink();
   }
 
   [[nodiscard]] moho::CAniActorTypeInfo* AcquireCAniActorTypeInfo()
@@ -565,6 +561,38 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063CB10 (FUN_0063CB10, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CAniActor deserialize thunk alias into
+   * `CAniActor::MemberDeserialize`.
+   */
+  void DeserializeCAniActorThunkVariantA(moho::CAniActor* const actor, gpg::ReadArchive* const archive)
+  {
+    if (!actor) {
+      return;
+    }
+
+    actor->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x0063D3D0 (FUN_0063D3D0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CAniActor deserialize thunk alias into
+   * `CAniActor::MemberDeserialize`.
+   */
+  void DeserializeCAniActorThunkVariantB(moho::CAniActor* const actor, gpg::ReadArchive* const archive)
+  {
+    if (!actor) {
+      return;
+    }
+
+    actor->MemberDeserialize(archive);
+  }
+
+  /**
    * Address: 0x0063E2A0 (FUN_0063E2A0, sub_63E2A0)
    */
   void CAniActor::MemberSerialize(gpg::WriteArchive* const archive) const
@@ -579,6 +607,38 @@ namespace moho
     WriteSharedCAniPosePointer(mPose, archive, gpg::RRef{});
     WriteSharedCAniPosePointer(mPriorPose, archive, gpg::RRef{});
     SerializeManipulatorList(this, archive);
+  }
+
+  /**
+   * Address: 0x0063CB20 (FUN_0063CB20, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CAniActor serialize thunk alias into
+   * `CAniActor::MemberSerialize`.
+   */
+  void SerializeCAniActorThunkVariantA(const moho::CAniActor* const actor, gpg::WriteArchive* const archive)
+  {
+    if (!actor) {
+      return;
+    }
+
+    actor->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x0063D3E0 (FUN_0063D3E0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CAniActor serialize thunk alias into
+   * `CAniActor::MemberSerialize`.
+   */
+  void SerializeCAniActorThunkVariantB(const moho::CAniActor* const actor, gpg::WriteArchive* const archive)
+  {
+    if (!actor) {
+      return;
+    }
+
+    actor->MemberSerialize(archive);
   }
 
   /**

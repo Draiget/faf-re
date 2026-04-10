@@ -31,6 +31,17 @@ namespace moho
     virtual void RegisterSerializeFunctions();
 
   public:
+    /**
+     * Address: 0x007711E0 (FUN_007711E0, Moho::IEffectSerializer::Deserialize)
+     */
+    static void Deserialize(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x007711F0 (FUN_007711F0, Moho::IEffectSerializer::Serialize)
+     */
+    static void Serialize(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+  public:
     gpg::SerHelperBase* mHelperNext;
     gpg::SerHelperBase* mHelperPrev;
     gpg::RType::load_func_t mLoadCallback;
@@ -47,4 +58,3 @@ namespace moho
   );
   static_assert(sizeof(IEffectSerializer) == 0x14, "IEffectSerializer size must be 0x14");
 } // namespace moho
-

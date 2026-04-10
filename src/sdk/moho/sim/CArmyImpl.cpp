@@ -1,8 +1,10 @@
 #include "CArmyImpl.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <new>
 #include <type_traits>
 #include <typeinfo>
@@ -18,8 +20,13 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/path/PathTables.h"
 #include "moho/sim/ArmyUnitSetVectorReflection.h"
+#include "moho/sim/CSimConCommand.h"
+#include "moho/sim/CSimConVarBase.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/unit/core/Unit.h"
@@ -658,6 +665,52 @@ namespace
     return *reinterpret_cast<const UnitCategorySetVectorView*>(&army.UnitCategorySetsBegin);
   }
 
+  struct CArmyBuildCategoryFilterRuntimeView
+  {
+    std::uint8_t unresolved0000_0198[0x198];
+    moho::CategoryWordRangeView mBuildCategoryFilterSet; // +0x198
+  };
+
+  static_assert(
+    offsetof(CArmyBuildCategoryFilterRuntimeView, mBuildCategoryFilterSet) == 0x198,
+    "CArmyBuildCategoryFilterRuntimeView::mBuildCategoryFilterSet offset must be 0x198"
+  );
+
+  [[nodiscard]] moho::CategoryWordRangeView& ArmyBuildCategoryFilterWords(moho::CArmyImpl& army) noexcept
+  {
+    return reinterpret_cast<CArmyBuildCategoryFilterRuntimeView&>(army).mBuildCategoryFilterSet;
+  }
+
+  [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::CategoryWordRangeView& range) noexcept
+  {
+    static_assert(
+      offsetof(moho::CategoryWordRangeView, mStartWordIndex) == 0x08,
+      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
+    );
+    static_assert(sizeof(moho::BVIntSet) == 0x20, "BVIntSet size must be 0x20");
+    return *reinterpret_cast<moho::BVIntSet*>(&range.mStartWordIndex);
+  }
+
+  void MarkAllArmyUnitsNeedSyncGameData(moho::CArmyImpl& army)
+  {
+    if (army.Simulation == nullptr || army.Simulation->mEntityDB == nullptr) {
+      return;
+    }
+
+    const std::uint32_t armyIndex = static_cast<std::uint32_t>(army.ArmyId);
+    moho::CEntityDbAllUnitsNode* node = army.Simulation->mEntityDB->AllUnitsEnd(armyIndex);
+    const moho::CEntityDbAllUnitsNode* const endNode = army.Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
+    while (node != endNode) {
+      moho::Unit* const unit = moho::CEntityDb::UnitFromAllUnitsNode(node);
+      if (unit == nullptr) {
+        break;
+      }
+
+      unit->MarkNeedsSyncGameData();
+      node = moho::CEntityDb::NextAllUnitsNode(node);
+    }
+  }
+
   [[nodiscard]] moho::BVIntSet& AsBVIntSet(moho::Set& set) noexcept
   {
     using WordVectorStorage = gpg::core::FastVectorN<std::uint32_t, 2>;
@@ -877,6 +930,279 @@ namespace
     }
 
     return blueprint->General.CapCost;
+  }
+
+  constexpr const char* kConVarPathArmyBudget = "path_ArmyBudget";
+  constexpr const char* kConVarRenderDebugAttackVectors = "AI_RenderDebugAttackVectors";
+  constexpr const char* kConVarDebugArmyIndex = "AI_DebugArmyIndex";
+  constexpr const char* kConVarRenderDebugPlayableRect = "AI_RenderDebugPlayableRect";
+  constexpr const char* kArmyPoolName = "ArmyPool";
+  constexpr const char* kOnDestroyScriptName = "OnDestroy";
+
+  [[nodiscard]] moho::CSimConVarBase* FindSimConVarByName(const char* const name)
+  {
+    if (name == nullptr || *name == '\0') {
+      return nullptr;
+    }
+
+    moho::CSimConCommand* const command = moho::FindRegisteredSimConCommand(name);
+    return dynamic_cast<moho::CSimConVarBase*>(command);
+  }
+
+  template <typename TValue>
+  [[nodiscard]] bool ReadSimConVarValue(moho::Sim* const sim, const char* const name, TValue& outValue)
+  {
+    if (sim == nullptr) {
+      return false;
+    }
+
+    moho::CSimConVarBase* const conVar = FindSimConVarByName(name);
+    if (conVar == nullptr) {
+      return false;
+    }
+
+    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(conVar);
+    if (instance == nullptr) {
+      return false;
+    }
+
+    const void* const valueStorage = instance->GetValueStorage();
+    if (valueStorage == nullptr) {
+      return false;
+    }
+
+    outValue = *static_cast<const TValue*>(valueStorage);
+    return true;
+  }
+
+  void SetArmyFloatStatValue(moho::CArmyStats* const stats, const char* const statPath, const float value)
+  {
+    if (stats == nullptr || statPath == nullptr || *statPath == '\0') {
+      return;
+    }
+
+    moho::CArmyStatItem* const statItem = stats->GetStringItemCached(statPath);
+    if (statItem == nullptr) {
+      return;
+    }
+
+    statItem->SynchronizeAsFloat();
+    statItem->mPrimaryValueBits = std::bit_cast<std::int32_t>(value);
+  }
+
+  /**
+   * Address: 0x00771B50 (FUN_00771B50, func_ArmyProcessEconomy)
+   *
+   * What it does:
+   * Refreshes army-visible economy cache lanes from the current per-army
+   * economy totals block.
+   */
+  void ProcessArmyEconomyTick(moho::CArmyImpl& army)
+  {
+    moho::CSimArmyEconomyInfo* const economyInfo = army.EconomyInfo;
+    if (economyInfo == nullptr) {
+      return;
+    }
+
+    const moho::SEconTotals& totals = economyInfo->economy;
+    army.EnergyCurrent = totals.mStored.ENERGY;
+    army.MassCurrent = totals.mStored.MASS;
+
+    army.IncomeEnergy10x = totals.mIncome.ENERGY;
+    army.IncomeMass10x = totals.mIncome.MASS;
+
+    army.ReclaimedEnergy10x = totals.mReclaimed.ENERGY;
+    army.ReclaimedMass10x = totals.mReclaimed.MASS;
+
+    army.RequestedEnergy10x = totals.mLastUseRequested.ENERGY;
+    army.RequestedMass10x = totals.mLastUseRequested.MASS;
+
+    army.ExpenseEnergy10x = totals.mLastUseActual.ENERGY;
+    army.ExpenseMass10x = totals.mLastUseActual.MASS;
+
+    army.EnergyCapacity = static_cast<std::uint32_t>(totals.mMaxStorage.ENERGY);
+    army.MassCapacity = static_cast<std::uint32_t>(totals.mMaxStorage.MASS);
+    army.IsResourceSharingEnabled = economyInfo->isResourceSharingEnabled;
+  }
+
+  struct CSquadRuntimeUnitsView
+  {
+    std::uint8_t pad_0000_0010[0x10];
+    moho::Entity** unitSlotsBegin; // +0x10
+    moho::Entity** unitSlotsEnd;   // +0x14
+  };
+
+  static_assert(
+    offsetof(CSquadRuntimeUnitsView, unitSlotsBegin) == 0x10, "CSquadRuntimeUnitsView::unitSlotsBegin offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CSquadRuntimeUnitsView, unitSlotsEnd) == 0x14, "CSquadRuntimeUnitsView::unitSlotsEnd offset must be 0x14"
+  );
+
+  struct CPlatoonCleanupView
+  {
+    std::uint8_t pad_0000_0040[0x40];
+    CSquadRuntimeUnitsView** squadBegin; // +0x40
+    CSquadRuntimeUnitsView** squadEnd;   // +0x44
+    std::uint8_t pad_0048_00A8[0x60];
+    msvc8::string uniqueName;            // +0xA8
+    std::uint8_t pad_00C4_00E0[0x1C];
+    std::uint8_t disbandOnIdle;          // +0xE0
+  };
+
+  static_assert(offsetof(CPlatoonCleanupView, squadBegin) == 0x40, "CPlatoonCleanupView::squadBegin offset must be 0x40");
+  static_assert(offsetof(CPlatoonCleanupView, squadEnd) == 0x44, "CPlatoonCleanupView::squadEnd offset must be 0x44");
+  static_assert(offsetof(CPlatoonCleanupView, uniqueName) == 0xA8, "CPlatoonCleanupView::uniqueName offset must be 0xA8");
+  static_assert(
+    offsetof(CPlatoonCleanupView, disbandOnIdle) == 0xE0, "CPlatoonCleanupView::disbandOnIdle offset must be 0xE0"
+  );
+
+  constexpr std::uintptr_t kEntitySetUnitOwnerBias = 0x8u;
+
+  struct CSquadAssignmentRuntimeView
+  {
+    std::uint8_t pad_0000_0008[0x08];
+    moho::SEntitySetTemplateUnit mUnits; // +0x08
+    moho::ESquadClass mSquadClass; // +0x30
+  };
+  static_assert(
+    offsetof(CSquadAssignmentRuntimeView, mUnits) == 0x08, "CSquadAssignmentRuntimeView::mUnits offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CSquadAssignmentRuntimeView, mSquadClass) == 0x30,
+    "CSquadAssignmentRuntimeView::mSquadClass offset must be 0x30"
+  );
+
+  struct CPlatoonAssignmentRuntimeView
+  {
+    std::uint8_t pad_0000_0040[0x40];
+    CSquadAssignmentRuntimeView** mSquadBegin; // +0x40
+    CSquadAssignmentRuntimeView** mSquadEnd;   // +0x44
+    std::uint8_t pad_0048_0108[0xC0];
+    std::uint8_t mHasLuaList; // +0x108
+  };
+  static_assert(
+    offsetof(CPlatoonAssignmentRuntimeView, mSquadBegin) == 0x40,
+    "CPlatoonAssignmentRuntimeView::mSquadBegin offset must be 0x40"
+  );
+  static_assert(
+    offsetof(CPlatoonAssignmentRuntimeView, mSquadEnd) == 0x44,
+    "CPlatoonAssignmentRuntimeView::mSquadEnd offset must be 0x44"
+  );
+  static_assert(
+    offsetof(CPlatoonAssignmentRuntimeView, mHasLuaList) == 0x108,
+    "CPlatoonAssignmentRuntimeView::mHasLuaList offset must be 0x108"
+  );
+
+  struct CPlatoonTemplatePlanQueryView
+  {
+    std::uint8_t pad_0000_0070[0x70];
+    msvc8::string mTemplateName; // +0x70
+    msvc8::string mPlanName;     // +0x8C
+  };
+  static_assert(
+    offsetof(CPlatoonTemplatePlanQueryView, mTemplateName) == 0x70,
+    "CPlatoonTemplatePlanQueryView::mTemplateName offset must be 0x70"
+  );
+  static_assert(
+    offsetof(CPlatoonTemplatePlanQueryView, mPlanName) == 0x8C,
+    "CPlatoonTemplatePlanQueryView::mPlanName offset must be 0x8C"
+  );
+
+  [[nodiscard]] moho::Unit* DecodeUnitFromEntitySetEntry(const moho::Entity* const entry) noexcept
+  {
+    const auto rawEntry = reinterpret_cast<std::uintptr_t>(entry);
+    if (rawEntry <= kEntitySetUnitOwnerBias) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::Unit*>(rawEntry - kEntitySetUnitOwnerBias);
+  }
+
+  void AppendUnitsToUnassignedSquad(moho::CPlatoon* const platoon, const moho::SEntitySetTemplateUnit& units)
+  {
+    if (platoon == nullptr) {
+      return;
+    }
+
+    auto& platoonView = *reinterpret_cast<CPlatoonAssignmentRuntimeView*>(platoon);
+    constexpr moho::ESquadClass kUnassignedSquadClass = static_cast<moho::ESquadClass>(0);
+    for (CSquadAssignmentRuntimeView** squadLane = platoonView.mSquadBegin; squadLane != platoonView.mSquadEnd;
+         ++squadLane) {
+      CSquadAssignmentRuntimeView* const squad = *squadLane;
+      if (squad == nullptr || squad->mSquadClass != kUnassignedSquadClass) {
+        continue;
+      }
+
+      squad->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
+      break;
+    }
+
+    platoonView.mHasLuaList = 0u;
+  }
+
+  [[nodiscard]] const CPlatoonCleanupView& AsCleanupView(const moho::CPlatoon* const platoon)
+  {
+    return *reinterpret_cast<const CPlatoonCleanupView*>(platoon);
+  }
+
+  [[nodiscard]] bool PlatoonDisbandsOnIdle(const moho::CPlatoon* const platoon)
+  {
+    return platoon != nullptr && AsCleanupView(platoon).disbandOnIdle != 0u;
+  }
+
+  [[nodiscard]] bool IsPlatoonUniqueNameEmpty(const moho::CPlatoon* const platoon)
+  {
+    if (platoon == nullptr) {
+      return true;
+    }
+
+    return ::_stricmp(AsCleanupView(platoon).uniqueName.data(), "") == 0;
+  }
+
+  [[nodiscard]] std::size_t CountPlatoonUnits(const moho::CPlatoon* const platoon)
+  {
+    if (platoon == nullptr) {
+      return 0u;
+    }
+
+    const CPlatoonCleanupView& view = AsCleanupView(platoon);
+    std::size_t unitCount = 0u;
+    for (CSquadRuntimeUnitsView* const* squadLane = view.squadBegin; squadLane != view.squadEnd; ++squadLane) {
+      const CSquadRuntimeUnitsView* const squad = *squadLane;
+      if (squad == nullptr || squad->unitSlotsBegin == nullptr || squad->unitSlotsEnd == nullptr) {
+        continue;
+      }
+
+      if (squad->unitSlotsEnd > squad->unitSlotsBegin) {
+        unitCount += static_cast<std::size_t>(squad->unitSlotsEnd - squad->unitSlotsBegin);
+      }
+    }
+
+    return unitCount;
+  }
+
+  void RunPlatoonOnDestroyAndDelete(moho::CPlatoon* const platoon)
+  {
+    if (platoon == nullptr) {
+      return;
+    }
+
+    reinterpret_cast<moho::CScriptObject*>(platoon)->RunScript(kOnDestroyScriptName);
+    delete platoon;
+  }
+
+  void ProcessArmyPathQueueBudget(void* const pathQueueProxy, int budget)
+  {
+    if (pathQueueProxy == nullptr) {
+      return;
+    }
+
+    // The full PathQueue::Work closure (FUN_00765ED0 family) is still pending
+    // dedicated PathQueue owner recovery. The runtime proxy is layout-compatible
+    // with PathTables and preserves the same queue pointer lane.
+    auto* const pathTables = static_cast<moho::PathTables*>(pathQueueProxy);
+    pathTables->UpdateBackground(&budget);
   }
 
 } // namespace
@@ -1251,6 +1577,345 @@ namespace moho
   }
 
   /**
+   * Address: 0x006FDEE0 (FUN_006FDEE0, Moho::CArmyImpl::SetCanSee)
+   *
+   * What it does:
+   * Updates per-army ally visibility against the current focused army id.
+   */
+  void CArmyImpl::SetCanSee(const std::int32_t focusArmyIndex)
+  {
+    if (focusArmyIndex < 0) {
+      IsAlly = 1u;
+      return;
+    }
+
+    IsAlly = AsBVIntSet(Allies).Contains(static_cast<std::uint32_t>(focusArmyIndex)) ? 1u : 0u;
+  }
+
+  /**
+   * Address: 0x006FFF70 (FUN_006FFF70, Moho::CArmyImpl::RenderDebugPlayableRect)
+   *
+   * What it does:
+   * Draws this army's playable-rect bounds to the sim debug canvas when
+   * corresponding debug convars are enabled.
+   */
+  void CArmyImpl::RenderDebugPlayableRect()
+  {
+    if (Simulation == nullptr || UseWholeMapFlag != 0u) {
+      return;
+    }
+
+    bool renderPlayableRect = false;
+    if (!ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugPlayableRect, renderPlayableRect) || !renderPlayableRect) {
+      return;
+    }
+
+    if (Simulation->mSyncFilter.focusArmy != ArmyId) {
+      return;
+    }
+
+    CDebugCanvas* const debugCanvas = Simulation->GetDebugCanvas();
+    STIMap* const mapData = Simulation->mMapData;
+    CHeightField* const heightField = (mapData != nullptr) ? mapData->GetHeightField() : nullptr;
+    if (debugCanvas == nullptr || mapData == nullptr || heightField == nullptr) {
+      return;
+    }
+
+    const gpg::Rect2i& playableRect = mapData->mPlayableRect;
+
+    const Wm3::Vector2f lowerLeft{static_cast<float>(playableRect.x0), static_cast<float>(playableRect.z0)};
+    const Wm3::Vector2f upperLeft{static_cast<float>(playableRect.x0), static_cast<float>(playableRect.z1)};
+    const Wm3::Vector2f upperRight{static_cast<float>(playableRect.x1), static_cast<float>(playableRect.z1)};
+    const Wm3::Vector2f lowerRight{static_cast<float>(playableRect.x1), static_cast<float>(playableRect.z0)};
+
+    constexpr std::uint32_t kPlayableRectColor = 0xFF7F7F7Fu;
+    debugCanvas->AddContouredLine(upperLeft, lowerLeft, kPlayableRectColor, *heightField);
+    debugCanvas->AddContouredLine(upperRight, upperLeft, kPlayableRectColor, *heightField);
+    debugCanvas->AddContouredLine(lowerRight, upperRight, kPlayableRectColor, *heightField);
+    debugCanvas->AddContouredLine(lowerLeft, lowerRight, kPlayableRectColor, *heightField);
+  }
+
+  /**
+   * Address: 0x00700820 (FUN_00700820, Moho::CArmyImpl::CleanUpPlatoons)
+   *
+   * What it does:
+   * Removes disbanded or empty uniquely-named platoons from this army and
+   * dispatches script destruction callbacks.
+   */
+  void CArmyImpl::CleanUpPlatoons()
+  {
+    msvc8::vector<CPlatoon*> platoonsToDestroy;
+    CPlatoon* const armyPool = GetPlatoonByName(kArmyPoolName);
+
+    auto& platoons = PlatoonPool.platoons;
+    for (CPlatoon** platoonIt = platoons.begin(); platoonIt != platoons.end();) {
+      CPlatoon* const platoon = *platoonIt;
+      bool shouldDisband = false;
+
+      if (PlatoonDisbandsOnIdle(platoon) && platoon != nullptr && platoon->AssignedSquadsAreIdle()) {
+        if (armyPool != nullptr && platoon != armyPool) {
+          platoon->PullUnassignedUnitsFrom(armyPool);
+        }
+        shouldDisband = true;
+      }
+
+      if (!shouldDisband && IsPlatoonUniqueNameEmpty(platoon) && CountPlatoonUnits(platoon) == 0u) {
+        shouldDisband = true;
+      }
+
+      if (!shouldDisband) {
+        ++platoonIt;
+        continue;
+      }
+
+      platoonsToDestroy.push_back(platoon);
+      platoonIt = platoons.erase(platoonIt);
+    }
+
+    for (CPlatoon** destroyIt = platoonsToDestroy.begin(); destroyIt != platoonsToDestroy.end(); ++destroyIt) {
+      RunPlatoonOnDestroyAndDelete(*destroyIt);
+    }
+  }
+
+  /**
+   * Address: 0x006FFD70 (FUN_006FFD70, Moho::CArmyImpl::OnTick)
+   *
+   * What it does:
+   * Executes one per-army simulation tick: refreshes visibility and platoon
+   * cleanup, updates selected stat lanes, advances AI task stages, processes
+   * pathing budget work, and renders enabled AI debug overlays.
+   */
+  void CArmyImpl::OnTick()
+  {
+    if (Stats != nullptr && Stats->mItem != nullptr) {
+      Stats->mItem->ClearChildren(1);
+    }
+
+    if (NoRushTicks > 0) {
+      --NoRushTicks;
+    }
+
+    if (Simulation != nullptr) {
+      SetCanSee(Simulation->mSyncFilter.focusArmy);
+    }
+
+    CleanUpPlatoons();
+
+    ProcessArmyEconomyTick(*this);
+
+    if (Simulation != nullptr && Simulation->mCurTick > 10u && Stats != nullptr) {
+      Stats->Update();
+    }
+
+    if (
+      Simulation != nullptr
+      && static_cast<std::uint32_t>(ArmyId) == (Simulation->mCurTick % 30u)
+      && InfluenceMap != nullptr
+    ) {
+      InfluenceMap->Update();
+    }
+
+    if (CArmyStats* const armyStats = GetArmyStats(); armyStats != nullptr) {
+      SetArmyFloatStatValue(armyStats, "UnitCap_Current", GetArmyUnitCostTotal());
+      SetArmyFloatStatValue(armyStats, "UnitCap_MaxCap", GetUnitCap());
+    }
+
+    if (AiBrain != nullptr) {
+      if (AiBrain->mAiThreadStage != nullptr) {
+        AiBrain->mAiThreadStage->UserFrame();
+      }
+      if (AiBrain->mAttackerThreadStage != nullptr) {
+        AiBrain->mAttackerThreadStage->UserFrame();
+      }
+      if (AiBrain->mReservedThreadStage != nullptr) {
+        AiBrain->mReservedThreadStage->UserFrame();
+      }
+    }
+
+    int pathBudget = 2500;
+    if (Simulation != nullptr) {
+      (void)ReadSimConVarValue<int>(Simulation, kConVarPathArmyBudget, pathBudget);
+    }
+    ProcessArmyPathQueueBudget(PathFinder, pathBudget);
+
+    RenderDebugPlayableRect();
+
+    bool renderAttackVectors = false;
+    if (Simulation != nullptr) {
+      (void)ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugAttackVectors, renderAttackVectors);
+    }
+
+    if (!renderAttackVectors || AiBrain == nullptr) {
+      return;
+    }
+
+    int debugArmyIndex = -1;
+    if (Simulation != nullptr) {
+      (void)ReadSimConVarValue<int>(Simulation, kConVarDebugArmyIndex, debugArmyIndex);
+    }
+
+    if (debugArmyIndex >= 0 && Simulation != nullptr) {
+      CArmyImpl* debugArmy = nullptr;
+      const std::size_t armyIndex = static_cast<std::size_t>(debugArmyIndex);
+      if (armyIndex < Simulation->mArmiesList.size()) {
+        debugArmy = Simulation->mArmiesList[armyIndex];
+      }
+
+      AiBrain->mCurrentEnemy = debugArmy;
+      AiBrain->ProcessAttackVectors();
+    }
+
+    (void)CAiBrain::DrawDebug(AiBrain);
+  }
+
+  /**
+   * Address: 0x00700540 (FUN_00700540, Moho::CArmyImpl::DisbandPlatoon)
+   *
+   * What it does:
+   * Removes one platoon from this army and dispatches its `OnDestroy` script.
+   */
+  void CArmyImpl::DisbandPlatoon(CPlatoon* platoon)
+  {
+    CPlatoon* const armyPool = GetPlatoonByName(kArmyPoolName);
+
+    auto& platoons = PlatoonPool.platoons;
+    for (CPlatoon** platoonIt = platoons.begin(); platoonIt != platoons.end(); ++platoonIt) {
+      CPlatoon* const current = *platoonIt;
+      if (current != platoon || current == armyPool) {
+        continue;
+      }
+
+      if (armyPool != nullptr) {
+        current->PullUnassignedUnitsFrom(armyPool);
+      }
+      platoons.erase(platoonIt);
+      RunPlatoonOnDestroyAndDelete(current);
+      return;
+    }
+  }
+
+  /**
+   * Address: 0x007005F0 (FUN_007005F0, Moho::CArmyImpl::DisbandPlatoonUniquelyNamed)
+   *
+   * What it does:
+   * Locates one platoon by unique-name string, removes it from this army, and
+   * dispatches its `OnDestroy` script.
+   */
+  void CArmyImpl::DisbandPlatoonUniquelyNamed(const char* platoonName)
+  {
+    if (platoonName == nullptr) {
+      return;
+    }
+
+    CPlatoon* const armyPool = GetPlatoonByName(kArmyPoolName);
+    auto& platoons = PlatoonPool.platoons;
+    for (CPlatoon** platoonIt = platoons.begin(); platoonIt != platoons.end(); ++platoonIt) {
+      CPlatoon* const platoon = *platoonIt;
+      if (::_stricmp(AsCleanupView(platoon).uniqueName.data(), platoonName) != 0) {
+        continue;
+      }
+
+      if (armyPool != nullptr && platoon != armyPool) {
+        platoon->PullUnassignedUnitsFrom(armyPool);
+      }
+
+      platoons.erase(platoonIt);
+      RunPlatoonOnDestroyAndDelete(platoon);
+      return;
+    }
+  }
+
+  /**
+   * Address: 0x007006C0 (FUN_007006C0, Moho::CArmyImpl::AssignUnitsToPlatoon)
+   *
+   * What it does:
+   * Removes all input units from their existing platoons, resolves one named
+   * platoon, and appends those units into its unassigned squad lane.
+   */
+  void CArmyImpl::AssignUnitsToPlatoon(const SEntitySetTemplateUnit* const units, const char* const platoonName)
+  {
+    RemoveUnitsFromPlatoons(units);
+    CPlatoon* const platoon = GetPlatoonByName(platoonName);
+    if (platoon == nullptr) {
+      return;
+    }
+
+    AppendUnitsToUnassignedSquad(platoon, *units);
+  }
+
+  /**
+   * Address: 0x00700700 (FUN_00700700, Moho::CArmyImpl::RemoveFromPlatoon)
+   *
+   * What it does:
+   * Resolves the platoon currently owning one unit and removes that unit from
+   * the first matching squad lane.
+   */
+  void CArmyImpl::RemoveFromPlatoon(Unit* const unit)
+  {
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    CPlatoon* const platoon = GetPlatoonFor(static_cast<int>(reinterpret_cast<std::uintptr_t>(unit)), &squadClass);
+    if (platoon != nullptr) {
+      platoon->RemoveUnit(unit);
+    }
+  }
+
+  /**
+   * Address: 0x00700730 (FUN_00700730, Moho::CArmyImpl::RemoveUnitsFromPlatoons)
+   *
+   * What it does:
+   * Iterates one unit-set entity storage and detaches each decoded unit from
+   * its owning platoon.
+   */
+  void CArmyImpl::RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* const units)
+  {
+    for (Entity* const* unitEntry = units->mVec.begin(); unitEntry != units->mVec.end(); ++unitEntry) {
+      RemoveFromPlatoon(DecodeUnitFromEntitySetEntry(*unitEntry));
+    }
+  }
+
+  /**
+   * Address: 0x00700770 (FUN_00700770, Moho::CArmyImpl::GetNumPlatoonsTemplateNamed)
+   *
+   * What it does:
+   * Counts platoon lanes whose template-name string matches `templateName`
+   * case-insensitively.
+   */
+  int CArmyImpl::GetNumPlatoonsTemplateNamed(const char* const templateName)
+  {
+    int count = 0;
+    for (CPlatoon* const* platoonIt = PlatoonPool.platoons.begin(); platoonIt != PlatoonPool.platoons.end();
+         ++platoonIt) {
+      const auto& platoonView = *reinterpret_cast<const CPlatoonTemplatePlanQueryView*>(*platoonIt);
+      if (::_stricmp(platoonView.mTemplateName.data(), templateName) == 0) {
+        ++count;
+      }
+    }
+
+    return count;
+  }
+
+  /**
+   * Address: 0x007007C0 (FUN_007007C0, Moho::CArmyImpl::GetNumPlatoonWithPlan)
+   *
+   * What it does:
+   * Counts platoon lanes whose active plan string matches `planName`
+   * case-insensitively.
+   */
+  int CArmyImpl::GetNumPlatoonWithPlan(const char* const planName)
+  {
+    int count = 0;
+    for (CPlatoon* const* platoonIt = PlatoonPool.platoons.begin(); platoonIt != PlatoonPool.platoons.end();
+         ++platoonIt) {
+      const auto& platoonView = *reinterpret_cast<const CPlatoonTemplatePlanQueryView*>(*platoonIt);
+      if (::_stricmp(platoonView.mPlanName.data(), planName) == 0) {
+        ++count;
+      }
+    }
+
+    return count;
+  }
+
+  /**
    * Address: 0x00700FC0 (FUN_00700FC0, Moho::CArmyImpl::OnCommandSourceTerminated)
    */
   void CArmyImpl::OnCommandSourceTerminated(const std::uint32_t sourceId)
@@ -1417,6 +2082,64 @@ namespace moho
   }
 
   /**
+   * Address: 0x00700410 (FUN_00700410, Moho::CArmyImpl::MakePlatoon)
+   *
+   * What it does:
+   * Creates one platoon object owned by this army/sim and appends it to the
+   * platoon pool vector.
+   */
+  CPlatoon* CArmyImpl::MakePlatoon(const char* const platoonName, const char* const aiPlan)
+  {
+    CPlatoon* const platoon = CPlatoon::Create(Simulation, this, platoonName, aiPlan);
+    PlatoonPool.platoons.PushBack(platoon);
+    return platoon;
+  }
+
+  /**
+   * Address: 0x00700470 (FUN_00700470, Moho::CArmyImpl::GetPlatoonByName)
+   */
+  CPlatoon* CArmyImpl::GetPlatoonByName(const char* const platoonName)
+  {
+    if (platoonName == nullptr) {
+      return nullptr;
+    }
+
+    for (CPlatoon* const platoon : PlatoonPool.platoons) {
+      if (platoon == nullptr) {
+        continue;
+      }
+
+      if (::_stricmp(AsCleanupView(platoon).uniqueName.data(), platoonName) == 0) {
+        return platoon;
+      }
+    }
+
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor)
+   */
+  CPlatoon* CArmyImpl::GetPlatoonFor(const int queryArg, ESquadClass* const outSquadClass)
+  {
+    Unit* const queryUnit = reinterpret_cast<Unit*>(static_cast<std::uintptr_t>(queryArg));
+
+    for (CPlatoon* const platoon : PlatoonPool.platoons) {
+      if (platoon == nullptr || !platoon->IsInPlatoon(queryUnit)) {
+        continue;
+      }
+
+      if (outSquadClass != nullptr) {
+        *outSquadClass = platoon->GetSquadClass(queryUnit);
+      }
+
+      return platoon;
+    }
+
+    return nullptr;
+  }
+
+  /**
    * Address: 0x00700A00 (FUN_00700A00, Moho::CArmyImpl::CountUnitsInBoundsXZ)
    */
   int CArmyImpl::CountUnitsInBoundsXZ(
@@ -1495,6 +2218,64 @@ namespace moho
     }
 
     return set->RemoveUnit(unit);
+  }
+
+  /**
+   * Address: 0x00700EB0 (FUN_00700EB0, Moho::CArmyImpl::GetUnits)
+   *
+   * What it does:
+   * Resets `outUnits`, then unions all per-category cached unit sets whose
+   * blueprint ordinals are selected in `filterBuckets`.
+   */
+  void* CArmyImpl::GetUnits(void* const outUnits, void* const filterBuckets)
+  {
+    auto* const resultSet = static_cast<SEntitySetTemplateUnit*>(outUnits);
+    if (resultSet == nullptr) {
+      return nullptr;
+    }
+
+    resultSet->ListResetLinks();
+    resultSet->mVec.RebindInlineNoFree();
+
+    if (filterBuckets == nullptr || Simulation == nullptr || Simulation->mRules == nullptr) {
+      return resultSet;
+    }
+
+    auto* const categorySet = static_cast<const EntityCategorySet*>(filterBuckets);
+    const BVIntSet& categoryOrdinals = categorySet->Bits();
+    const unsigned int sentinel = categoryOrdinals.Max();
+
+    for (unsigned int ordinal = categoryOrdinals.GetNext(std::numeric_limits<unsigned int>::max()); ordinal != sentinel;
+         ordinal = categoryOrdinals.GetNext(ordinal)) {
+      const RBlueprint* const blueprint = Simulation->mRules->GetBlueprintFromOrdinal(static_cast<int>(ordinal));
+      if (blueprint == nullptr) {
+        continue;
+      }
+
+      const auto* const entityBlueprint = reinterpret_cast<const REntityBlueprint*>(blueprint);
+      const std::uint32_t categoryBitIndex = entityBlueprint->mCategoryBitIndex;
+      if (categoryBitIndex < UnitCategoryBaseIndex || categoryBitIndex > UnitCategoryMaxIndex) {
+        continue;
+      }
+
+      if (UnitCategorySetsBegin == nullptr) {
+        continue;
+      }
+
+      const std::size_t relativeIndex = static_cast<std::size_t>(categoryBitIndex - UnitCategoryBaseIndex);
+      SEntitySetTemplateUnit* const set = UnitCategorySetsBegin + relativeIndex;
+      if (UnitCategorySetsEnd != nullptr && set >= UnitCategorySetsEnd) {
+        continue;
+      }
+
+      if (set->mVec.begin() == set->mVec.end()) {
+        continue;
+      }
+
+      resultSet->AddRange(set->mVec.begin(), set->mVec.end());
+    }
+
+    return resultSet;
   }
 
   /**
@@ -1592,6 +2373,42 @@ namespace moho
   bool CArmyImpl::UseWholeMap()
   {
     return UseWholeMapFlag != 0;
+  }
+
+  /**
+   * Address: 0x006FE1B0 (FUN_006FE1B0, Moho::CArmyImpl::AddBuildRestriction)
+   *
+   * What it does:
+   * Removes category bits from the army-level build-allow set and marks
+   * all army units dirty for sync-game-data refresh.
+   */
+  void CArmyImpl::AddBuildRestriction(void* const restriction)
+  {
+    if (restriction == nullptr) {
+      return;
+    }
+
+    auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
+    CategoryWordRangeAsBitset(ArmyBuildCategoryFilterWords(*this)).RemoveAllFrom(&categorySet->Bits());
+    MarkAllArmyUnitsNeedSyncGameData(*this);
+  }
+
+  /**
+   * Address: 0x006FE220 (FUN_006FE220, Moho::CArmyImpl::RemoveBuildRestriction)
+   *
+   * What it does:
+   * Adds category bits back into the army-level build-allow set and marks
+   * all army units dirty for sync-game-data refresh.
+   */
+  void CArmyImpl::RemoveBuildRestriction(void* const restriction)
+  {
+    if (restriction == nullptr) {
+      return;
+    }
+
+    auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
+    CategoryWordRangeAsBitset(ArmyBuildCategoryFilterWords(*this)).AddAllFrom(&categorySet->Bits());
+    MarkAllArmyUnitsNeedSyncGameData(*this);
   }
 
   /**

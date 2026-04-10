@@ -2,16 +2,20 @@
 
 #include <exception>
 #include <cstdint>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/Unit.h"
 
 using namespace moho;
@@ -27,13 +31,12 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    static moho::CScrLuaInitFormSet sSet("sim");
-    return sSet;
-  }
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+      return *set;
+    }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
+    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
   }
 
   [[nodiscard]] gpg::RType* CachedCUnitScriptTaskType()
@@ -77,6 +80,47 @@ namespace
       CUnitCommand::sType = cached;
     }
     return cached;
+  }
+
+  /**
+   * Address: 0x00622A60 (FUN_00622A60, CUnitScriptTask class-resolve helper)
+   *
+   * What it does:
+   * Resolves task class name from `sourceArgs["TaskName"]`, writes script
+   * path, imports task module, and falls back to `ScriptTask` class lane.
+   */
+  [[nodiscard]] LuaPlus::LuaObject ResolveTaskClassFromSourceArgs(
+    CUnitScriptTask* const task,
+    const LuaPlus::LuaObject& sourceArgs
+  )
+  {
+    LuaPlus::LuaObject taskClass{};
+    LuaPlus::LuaState* const state = sourceArgs.GetActiveState();
+    if (!task || !state) {
+      return taskClass;
+    }
+
+    LuaPlus::LuaObject taskNameObject = sourceArgs.GetByName("TaskName");
+    const char* taskName = (!taskNameObject.IsNil()) ? taskNameObject.GetString() : nullptr;
+    if (taskName == nullptr || taskName[0] == '\0') {
+      taskName = "ScriptTask";
+    }
+
+    task->mTaskScriptPath = gpg::STR_Printf("/lua/sim/tasks/%s.lua", taskName);
+
+    taskClass.AssignNil(state);
+    const LuaPlus::LuaObject importedTaskModule = SCR_Import(state, task->mTaskScriptPath.c_str());
+    if (!importedTaskModule.IsNil()) {
+      taskClass = importedTaskModule.GetByName(taskName);
+    }
+
+    if (taskClass.IsNil()) {
+      gpg::Logf("Can't find task %s, using ScriptTask directly", taskName);
+      const LuaPlus::LuaObject scriptTaskModule = SCR_Import(state, "/lua/sim/ScriptTask.lua");
+      taskClass = scriptTaskModule.GetByName("ScriptTask");
+    }
+
+    return taskClass;
   }
 
   [[nodiscard]] gpg::RRef MakeCUnitScriptTaskRef(CUnitScriptTask* object)
@@ -230,6 +274,55 @@ CUnitScriptTask::CUnitScriptTask()
 {}
 
 /**
+ * Address: 0x006228B0 (FUN_006228B0, dispatch ctor lane)
+ */
+CUnitScriptTask::CUnitScriptTask(IAiCommandDispatchImpl* const dispatchTask, const LuaPlus::LuaObject& sourceArgs)
+  : CCommandTask(static_cast<CCommandTask*>(dispatchTask))
+  , CScriptObject()
+  , Listener<ECommandEvent>()
+  , mSourceCommand(nullptr)
+  , mSourceLuaObj(sourceArgs)
+  , mTaskClassLua()
+  , mTaskScriptPath()
+{
+  if (mUnit != nullptr && mUnit->CommandQueue != nullptr) {
+    mSourceCommand = mUnit->CommandQueue->GetCurrentCommand();
+  }
+
+  if (mSourceCommand != nullptr) {
+    mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(mSourceCommand));
+  }
+
+  mTaskClassLua = ResolveTaskClassFromSourceArgs(this, mSourceLuaObj);
+
+  LuaPlus::LuaObject nilArg1{};
+  LuaPlus::LuaObject nilArg2{};
+  LuaPlus::LuaObject nilArg3{};
+  LuaPlus::LuaState* const state = mSourceLuaObj.GetActiveState();
+  if (state != nullptr) {
+    nilArg1.AssignNil(state);
+    nilArg2.AssignNil(state);
+    nilArg3.AssignNil(state);
+  }
+
+  CreateLuaObject(mTaskClassLua, nilArg1, nilArg2, nilArg3);
+  LuaCall("OnCreate", &mSourceLuaObj);
+}
+
+/**
+ * Address: 0x00622F70 (FUN_00622F70, Moho::CUnitScriptTask::operator new)
+ */
+CUnitScriptTask* CUnitScriptTask::Create(IAiCommandDispatchImpl* const dispatchTask, LuaPlus::LuaObject* const sourceArgs)
+{
+  if (sourceArgs != nullptr) {
+    return new (std::nothrow) CUnitScriptTask(dispatchTask, *sourceArgs);
+  }
+
+  const LuaPlus::LuaObject emptyArgs{};
+  return new (std::nothrow) CUnitScriptTask(dispatchTask, emptyArgs);
+}
+
+/**
  * Address: 0x00623140 (FUN_00623140, non-deleting body)
  */
 CUnitScriptTask::~CUnitScriptTask()
@@ -263,7 +356,7 @@ gpg::RRef CUnitScriptTask::GetDerivedObjectRef()
  */
 int moho::cfunc_CUnitScriptTaskGetUnit(lua_State* const luaContext)
 {
-  return cfunc_CUnitScriptTaskGetUnitL(ResolveBindingState(luaContext));
+  return cfunc_CUnitScriptTaskGetUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -314,7 +407,7 @@ int moho::cfunc_CUnitScriptTaskGetUnitL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_CUnitScriptTaskSetAIResult(lua_State* const luaContext)
 {
-  return cfunc_CUnitScriptTaskSetAIResultL(ResolveBindingState(luaContext));
+  return cfunc_CUnitScriptTaskSetAIResultL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**

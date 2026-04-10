@@ -44,11 +44,7 @@ namespace
 
   void ResetLoopList(LoopList& loops)
   {
-    auto* const sentinel = static_cast<LoopNode*>(&loops);
-    sentinel->mPrev->mNext = sentinel->mNext;
-    sentinel->mNext->mPrev = sentinel->mPrev;
-    sentinel->mNext = sentinel;
-    sentinel->mPrev = sentinel;
+    loops.ListUnlink();
   }
 } // namespace
 

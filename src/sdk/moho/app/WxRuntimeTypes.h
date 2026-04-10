@@ -1596,7 +1596,7 @@ public:
    * What it does:
    * Populates one `wxListItem` payload lane for the requested row.
    */
-  [[nodiscard]] virtual bool GetItem(wxListItemRuntime* item) = 0;
+  [[nodiscard]] virtual bool GetItem(wxListItemRuntime* item);
 
   /**
    * Address: 0x0099D120 (FUN_0099D120, wxListCtrl::GetItemData)
@@ -2272,7 +2272,7 @@ public:
    * Address: 0x009AA860
    * Mangled: ?OnExit@wxAppBase@@UAEHXZ
    */
-  virtual int OnExit() = 0;
+  virtual int OnExit();
 
   virtual void OnFatalException() = 0;
   virtual int MainLoop() = 0;
@@ -2283,13 +2283,13 @@ public:
    * Address: 0x00992230
    * Mangled: ?Pending@wxApp@@UAE_NXZ
    */
-  virtual bool Pending() = 0;
+  virtual bool Pending();
 
   /**
    * Address: 0x00992250
    * Mangled: ?Dispatch@wxApp@@UAEXXZ
    */
-  virtual void Dispatch() = 0;
+  virtual void Dispatch();
 
   /**
    * Address: 0x009923C0
@@ -2304,7 +2304,7 @@ public:
    * Address: 0x00992190
    * Mangled: ?ProcessIdle@wxApp@@UAE_NXZ
    */
-  virtual bool ProcessIdle() = 0;
+  virtual bool ProcessIdle();
   virtual bool IsActive() const = 0;
   virtual wxWindowBase* GetTopWindow() const = 0;
   virtual void OnInitCmdLine(void* cmdLineParser) = 0;
@@ -2330,7 +2330,7 @@ public:
    * Pumps one Win32 message for the wx app loop, dispatching immediately on
    * the GUI owner thread and deferring cross-thread deliveries.
    */
-  virtual bool DoMessage() = 0;
+  virtual bool DoMessage();
   virtual void DoMessage(void** message) = 0;
   virtual bool ProcessMessage(void** message) = 0;
 

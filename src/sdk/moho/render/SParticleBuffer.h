@@ -122,8 +122,6 @@ namespace moho
     [[nodiscard]] bool Initialize();
   };
 
-  using SParticleBuffer = ParticleBuffer;
-
   static_assert(offsetof(ParticleBuffer, mMaxParticles) == 0x04, "ParticleBuffer::mMaxParticles offset must be 0x04");
   static_assert(offsetof(ParticleBuffer, mInitialized) == 0x08, "ParticleBuffer::mInitialized offset must be 0x08");
   static_assert(offsetof(ParticleBuffer, mVertexFormat) == 0x0C, "ParticleBuffer::mVertexFormat offset must be 0x0C");

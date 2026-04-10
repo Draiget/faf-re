@@ -21,6 +21,7 @@ namespace moho
 {
   class SSTIEntityVariableData;
   class UserEntity;
+  struct UserUnitManager;
   class UserUnitWeapon;
   class CWldSession;
   struct RUnitBlueprint;
@@ -40,8 +41,13 @@ namespace moho
      * Address: 0x008BF990
      * Slot: 0
      * Demangled: DestroyUserUnit
+     *
+     * std::uint8_t deleteFlags
+     *
+     * IDA signature:
+     * void* __thiscall sub_8BF990(void* this, char deleteFlags);
      */
-    virtual void DestroyUserUnit() = 0;
+    virtual UserUnit* DestroyUserUnit(std::uint8_t deleteFlags);
 
     /**
      * Address: 0x008C0A30
@@ -51,7 +57,7 @@ namespace moho
      * What it does:
      * Per-beat update hook for UI unit state.
      */
-    virtual void Tick(std::int32_t seqNo) = 0;
+    virtual void Tick(std::int32_t seqNo);
 
     /**
      * Address: 0x008BF120
@@ -129,14 +135,14 @@ namespace moho
      * Demangled: public: virtual void __thiscall moho::UserEntity::UpdateEntityData(struct moho::SSTIEntityVariableData
      * const near &)
      */
-    virtual void UpdateEntityData(moho::SSTIEntityVariableData const&) = 0;
+    virtual void UpdateEntityData(moho::SSTIEntityVariableData const&);
 
     /**
      * Address: 0x008C09B0
      * Slot: 10
      * Demangled: moho::UserUnit::UpdateVisibility
      */
-    virtual void UpdateVisibility() = 0;
+    virtual void UpdateVisibility();
 
     /**
      * Address: 0x008B8530
@@ -152,8 +158,11 @@ namespace moho
      * Address: 0x008C0500
      * Slot: 12
      * Demangled: moho::UserUnit::Select
+     *
+     * What it does:
+     * Returns whether this unit should be selectable in user UI state.
      */
-    virtual void Select() = 0;
+    virtual bool Select();
 
     /**
      * Address: 0x008BEFB0
@@ -169,22 +178,30 @@ namespace moho
      * Address: 0x008C1350
      * Slot: 14
      * Demangled: moho::UserUnit::NotifyFocusArmyUnitDamaged
+     *
+     * What it does:
+     * Imports the UI game-main module and calls
+     * `OnFocusArmyUnitDamaged(thisLuaObject)`.
      */
-    virtual void NotifyFocusArmyUnitDamaged() = 0;
+    virtual void NotifyFocusArmyUnitDamaged();
 
     /**
      * Address: 0x008C00E0
      * Slot: 15
      * Demangled: moho::UserUnit::CreateMeshInstance
+     *
+     * What it does:
+     * Creates one unit mesh-instance with team-color setup and pose reuse from
+     * unit variable-data shared-pose lanes.
      */
-    virtual void CreateMeshInstance() = 0;
+    virtual void CreateMeshInstance();
 
     /**
      * Address: 0x008C04D0
      * Slot: 16
      * Demangled: protected: virtual void __thiscall moho::UserEntity::DestroyMeshInstance(void)
      */
-    virtual void DestroyMeshInstance() = 0;
+    virtual void DestroyMeshInstance();
 
     /**
      * Address: 0x008BFC50
@@ -334,7 +351,7 @@ namespace moho
     // RTTI for UserUnit shows secondary subobjects:
     // +0x148: IUnit subobject (22-slot vtable), +0x150: CScriptObject-style 4-slot subobject.
     std::uint8_t mIUnitAndScriptBridge[0x190 - 0x148]{};
-    bool mSelectionMarkerLocked; // 0x0190
+    bool mIsFake; // 0x0190
     std::uint8_t pad_0191_01A0[0x1A0 - 0x191]{};
     bool mAutoMode;           // 0x01A0
     bool mAutoSurfaceMode;    // 0x01A1
@@ -374,12 +391,12 @@ namespace moho
     std::uint8_t pad_03A9_03B9[0x3B9 - 0x3A9]{};
     bool mOverchargePaused; // 0x03B9
     std::uint8_t pad_03BA_03C8[0x3C8 - 0x3BA]{};
-    std::int32_t mCommandQueueHandle;        // 0x03C8
-    std::int32_t mFactoryCommandQueueHandle; // 0x03CC
+    UserUnitManager* mManager;        // 0x03C8
+    UserUnitManager* mFactoryManager; // 0x03CC
     msvc8::set<msvc8::string> mSelectionSets; // 0x03D0
     bool mQueueEmptyCached;          // 0x03DC
-    bool mQueueAssistOverlayEnabled; // 0x03DD
-    bool mQueueGuardOverlayEnabled;  // 0x03DE
+    bool mIsEngineer; // 0x03DD
+    bool mIsFactory;  // 0x03DE
     std::uint8_t pad_03DF_03E0[0x03E0 - 0x03DF]{};
     std::uint32_t mIntelStateFlags; // 0x03E0
     std::uint8_t pad_03E4_03E8[0x3E8 - 0x03E4]{};
@@ -400,21 +417,18 @@ namespace moho
   );
   static_assert(offsetof(UserUnit, mOverchargePaused) == 0x03B9, "UserUnit::mOverchargePaused offset must be 0x03B9");
   static_assert(
-    offsetof(UserUnit, mCommandQueueHandle) == 0x03C8, "UserUnit::mCommandQueueHandle offset must be 0x03C8"
+    offsetof(UserUnit, mManager) == 0x03C8, "UserUnit::mManager offset must be 0x03C8"
   );
   static_assert(
-    offsetof(UserUnit, mFactoryCommandQueueHandle) == 0x03CC,
-    "UserUnit::mFactoryCommandQueueHandle offset must be 0x03CC"
+    offsetof(UserUnit, mFactoryManager) == 0x03CC,
+    "UserUnit::mFactoryManager offset must be 0x03CC"
   );
   static_assert(offsetof(UserUnit, mSelectionSets) == 0x03D0, "UserUnit::mSelectionSets offset must be 0x03D0");
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(
-    offsetof(UserUnit, mQueueAssistOverlayEnabled) == 0x03DD,
-    "UserUnit::mQueueAssistOverlayEnabled offset must be 0x03DD"
+    offsetof(UserUnit, mIsEngineer) == 0x03DD, "UserUnit::mIsEngineer offset must be 0x03DD"
   );
-  static_assert(
-    offsetof(UserUnit, mQueueGuardOverlayEnabled) == 0x03DE, "UserUnit::mQueueGuardOverlayEnabled offset must be 0x03DE"
-  );
+  static_assert(offsetof(UserUnit, mIsFactory) == 0x03DE, "UserUnit::mIsFactory offset must be 0x03DE");
   static_assert(offsetof(UserUnit, mIntelStateFlags) == 0x03E0, "UserUnit::mIntelStateFlags offset must be 0x03E0");
 #endif
 

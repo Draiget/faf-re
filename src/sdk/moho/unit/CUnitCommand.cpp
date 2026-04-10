@@ -13,6 +13,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiFormationInstance.h"
+#include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/command/SSTICommandIssueData.h"
@@ -375,6 +376,32 @@ namespace
     object = nullptr;
   }
 
+  /**
+   * Address: 0x006E9650 (FUN_006E9650)
+   *
+   * What it does:
+   * Rebinds one intrusive counted formation pointer slot, releasing previous
+   * ownership and add-refing the new pointee when non-null.
+   */
+  void AssignFormationInstanceRef(CAiFormationInstance*& slot, CAiFormationInstance* const value) noexcept
+  {
+    if (slot == value) {
+      return;
+    }
+
+    if (slot != nullptr) {
+      auto* const previous = reinterpret_cast<CountedObject*>(slot);
+      (void)previous->ReleaseReference();
+    }
+
+    slot = value;
+
+    if (slot != nullptr) {
+      auto* const current = reinterpret_cast<CountedObject*>(slot);
+      current->AddReference();
+    }
+  }
+
   void CopyIssueDataToVariablePayload(const SSTICommandIssueData& issueData, SSTICommandVariableData& variableData)
   {
     variableData = SSTICommandVariableData{};
@@ -583,6 +610,19 @@ CUnitCommand::CUnitCommand()
  * digest/counter state, and links coordinating-order relationships.
  */
 CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData)
+  : CUnitCommand(sim, issueData, issueData.nextCommandId)
+{
+}
+
+/**
+ * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
+ *
+ * What it does:
+ * Initializes one command from issue payload lanes, updates sim command
+ * digest/counter state, and links coordinating-order relationships, using the
+ * resolved command id passed by command-db allocation paths.
+ */
+CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData, const CmdId resolvedCommandId)
   : unk0(nullptr)
   , mSim(sim)
   , mConstDat{}
@@ -605,7 +645,7 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   mPrev = this;
   mNext = this;
 
-  mConstDat.cmd = issueData.nextCommandId;
+  mConstDat.cmd = resolvedCommandId;
   mConstDat.unk0 = reinterpret_cast<void*>(static_cast<std::uintptr_t>(issueData.unk38));
   mConstDat.origin = issueData.mOri;
   mConstDat.unk1 = issueData.unk4C;
@@ -910,6 +950,182 @@ void CUnitCommand::RemoveUnit(Unit* const unit)
       ReleaseIntrusiveRefcountedObject(formationObject);
       mFormationInstance = nullptr;
     }
+  }
+}
+
+/**
+ * Address: 0x006E8D70 (FUN_006E8D70, Moho::CUnitCommand::FormRemoveUnit)
+ *
+ * What it does:
+ * Removes one unit from the active formation lane and releases the formation
+ * instance when that lane becomes empty.
+ */
+void CUnitCommand::FormRemoveUnit(Unit* const unit, CUnitCommand* const command)
+{
+  if (!command) {
+    return;
+  }
+
+  CAiFormationInstance* const formationInstance = command->mFormationInstance;
+  if (!formationInstance) {
+    return;
+  }
+
+  formationInstance->RemoveUnit(unit);
+  if (formationInstance->UnitCount() != 0) {
+    return;
+  }
+
+  CountedObject* formationObject = reinterpret_cast<CountedObject*>(formationInstance);
+  ReleaseIntrusiveRefcountedObject(formationObject);
+  command->mFormationInstance = nullptr;
+}
+
+/**
+ * Address: 0x005D5980 (FUN_005D5980, Moho::CUnitCommand::GetFocus)
+ *
+ * What it does:
+ * Returns the current focus entity from the target weak-link lane.
+ */
+Entity* CUnitCommand::GetFocus(CUnitCommand* const command)
+{
+  if (!command) {
+    return nullptr;
+  }
+
+  return command->mTarget.targetEntity.GetObjectPtr();
+}
+
+/**
+ * Address: 0x005F55F0 (FUN_005F55F0, Moho::CUnitCommand::GetTarget)
+ *
+ * What it does:
+ * Resolves the focused entity to a live unit pointer when available.
+ */
+Unit* CUnitCommand::GetTarget(CUnitCommand* const command)
+{
+  Entity* const focus = GetFocus(command);
+  return focus ? focus->IsUnit() : nullptr;
+}
+
+/**
+ * Address: 0x006E8A00 (FUN_006E8A00, Moho::CUnitCommand::InFormation)
+ *
+ * What it does:
+ * Returns the active formation instance when `unit` already belongs to it.
+ */
+CAiFormationInstance* CUnitCommand::InFormation(Unit* const unit, CUnitCommand* const command)
+{
+  if (!command || !unit) {
+    return nullptr;
+  }
+
+  CAiFormationInstance* const formationInstance = command->mFormationInstance;
+  if (!formationInstance || !formationInstance->Func17(unit, true)) {
+    return nullptr;
+  }
+
+  return formationInstance;
+}
+
+/**
+ * Address: 0x006E8A30 (FUN_006E8A30, Moho::CUnitCommand::GetPosition)
+ *
+ * What it does:
+ * Resolves the command position used by formation and non-formation move
+ * dispatch paths.
+ */
+SOCellPos* CUnitCommand::GetPosition(CUnitCommand* const command, Unit* const unit, SOCellPos* const dest)
+{
+  if (!command || !unit || !dest) {
+    return dest;
+  }
+
+  CAiFormationInstance* const formationInstance = command->mFormationInstance;
+  if (command->mUnitSet.mVec.size() <= 1u || !formationInstance) {
+    const Wm3::Vec3f targetPos = command->mTarget.GetTargetPosGun(false);
+    const SFootprint& footprint = unit->GetFootprint();
+    dest->x = static_cast<std::int32_t>(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
+    dest->z = static_cast<std::int32_t>(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+    return dest;
+  }
+
+  (void)formationInstance->GetAdjustedFormationPosition(dest, unit, nullptr);
+  return dest;
+}
+
+/**
+ * Address: 0x006E88D0 (FUN_006E88D0, Moho::CUnitCommand::Move)
+ *
+ * What it does:
+ * Keeps formation membership in sync for multi-unit commands, adds units to
+ * existing formations when appropriate, and creates a new formation instance
+ * when the command first needs one.
+ */
+void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
+{
+  if (!unit || !command) {
+    return;
+  }
+
+  if (command->mUnitSet.mVec.size() <= 1u || command->mVarDat.v2 < 0) {
+    return;
+  }
+
+  CAiFormationInstance* const formationInstance = command->mFormationInstance;
+  if (formationInstance && !formationInstance->Func17(unit, true) && !unit->IsDead() && !unit->DestroyQueued()) {
+    formationInstance->AddUnit(unit);
+    return;
+  }
+
+  if (command->mFormationInstance != nullptr) {
+    return;
+  }
+
+  CAiFormationDBImpl* const formationDb = command->mSim ? command->mSim->mFormationDB : nullptr;
+  if (!formationDb) {
+    return;
+  }
+
+  const EFormationType formationType = (unit->mCurrentLayer == LAYER_Air) ? EFormationType::Air : EFormationType::Surface;
+  const char* const scriptName = formationDb->GetScriptName(command->mVarDat.v2, formationType);
+  if (!scriptName) {
+    return;
+  }
+
+  const Wm3::Vec3f targetPos = command->mTarget.GetTargetPosGun(false);
+
+  SCoordsVec2 formationCenter{};
+  formationCenter.x = targetPos.x;
+  formationCenter.z = targetPos.z;
+  SFormationUnitWeakRefSet weakSet{};
+  weakSet.reserve(command->mUnitSet.mVec.size());
+  for (CScriptObject* const entry : command->mUnitSet.mVec) {
+    Unit* const queuedUnit = SCommandUnitSet::UnitFromEntry(entry);
+    if (!queuedUnit) {
+      continue;
+    }
+
+    weakSet.push_back(SFormationUnitWeakRef::FromUnit(queuedUnit));
+  }
+
+  CAiFormationInstance* const newFormation = formationDb->NewFormation(
+    &weakSet,
+    scriptName,
+    &formationCenter,
+    command->mConstDat.origin.x,
+    command->mConstDat.origin.y,
+    command->mConstDat.origin.z,
+    command->mConstDat.origin.w,
+    static_cast<int>(command->mVarDat.mCmdType)
+  );
+  if (!newFormation) {
+    return;
+  }
+
+  AssignFormationInstanceRef(command->mFormationInstance, newFormation);
+  if (command->mFormationInstance != nullptr) {
+    command->mFormationInstance->Func22(command->mConstDat.unk1);
   }
 }
 

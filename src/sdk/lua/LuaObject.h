@@ -215,6 +215,14 @@ namespace LuaPlus
 		 */
 		void AssignString(LuaState* state, const char* value);
 		void AssignLightUserData(LuaState* state, void* value);
+
+		/**
+		 * Address: 0x00909840 (FUN_00909840, LuaPlus::LuaObject::AssignNewUserData)
+		 *
+		 * What it does:
+		 * Rebinds this object to `state` root ownership and stores one reflected
+		 * userdata payload built from `value`.
+		 */
 		gpg::RRef AssignNewUserData(LuaState* state, const gpg::RRef& value);
 
 		/**

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <new>
 #include <stdexcept>
 #include <typeinfo>
@@ -46,6 +47,14 @@ namespace gpg
      * `multimap<EntId,std::string>` lane.
      */
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00899140 (FUN_00899140, gpg::RMultiMapType_EntId_string::GetLexical)
+     *
+     * What it does:
+     * Formats inherited lexical text and appends current multimap element count.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 } // namespace gpg
 
@@ -141,6 +150,27 @@ const char* gpg::RMultiMapType_EntId_string::GetName() const
   }
 
   return gEntIdStringMultiMapTypeName.c_str();
+}
+
+/**
+ * Address: 0x00899140 (FUN_00899140, gpg::RMultiMapType_EntId_string::GetLexical)
+ *
+ * What it does:
+ * Formats inherited lexical text and appends current multimap element count.
+ */
+msvc8::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) const
+{
+  struct MultiMapRuntimeView
+  {
+    void* allocProxy;
+    void* head;
+    std::uint32_t size;
+  };
+
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const auto* const map = static_cast<const MultiMapRuntimeView*>(ref.mObj);
+  const int size = map ? static_cast<int>(map->size) : 0;
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
 }
 
 namespace moho
@@ -2031,6 +2061,137 @@ namespace moho
       return candidate;
     }
 
+    [[nodiscard]] bool IsVizNodeNil(const VizUpdateNode* const node) noexcept
+    {
+      return node == nullptr || node->isSentinel != 0u;
+    }
+
+    void RecomputeVizUpdateExtrema(VizUpdateTree* tree)
+    {
+      if (!tree || !tree->head) {
+        return;
+      }
+
+      VizUpdateNode* const head = tree->head;
+      VizUpdateNode* const root = head->parent;
+      if (IsVizNodeNil(root)) {
+        head->parent = head;
+        head->left = head;
+        head->right = head;
+        return;
+      }
+
+      head->left = TreeMin(root, head);
+      head->right = TreeMax(root, head);
+    }
+
+    void LinkVizUpdateOwner(UserEntity* const entity, VizUpdateNode* const node)
+    {
+      node->ownerLinkHead = 0u;
+      node->ownerNextLink = 0u;
+      if (entity == nullptr) {
+        return;
+      }
+
+      auto* const ownerLinkSlot = reinterpret_cast<std::uintptr_t*>(&entity->mIUnitChainHead);
+      node->ownerLinkHead = reinterpret_cast<std::uintptr_t>(ownerLinkSlot);
+      node->ownerNextLink = *ownerLinkSlot;
+      *ownerLinkSlot = reinterpret_cast<std::uintptr_t>(&node->ownerLinkHead);
+    }
+
+    void RotateLeft(VizUpdateTree* tree, VizUpdateNode* node);
+    void RotateRight(VizUpdateTree* tree, VizUpdateNode* node);
+
+    void FixupAfterVizInsert(VizUpdateTree* tree, VizUpdateNode* node)
+    {
+      VizUpdateNode* const head = tree->head;
+      while (node != head->parent && node->parent->color == 0u) {
+        VizUpdateNode* const parent = node->parent;
+        VizUpdateNode* const grand = parent->parent;
+        if (parent == grand->left) {
+          VizUpdateNode* const uncle = grand->right;
+          if (uncle->color == 0u) {
+            parent->color = 1u;
+            uncle->color = 1u;
+            grand->color = 0u;
+            node = grand;
+          } else {
+            if (node == parent->right) {
+              node = parent;
+              RotateLeft(tree, node);
+            }
+            node->parent->color = 1u;
+            grand->color = 0u;
+            RotateRight(tree, grand);
+          }
+        } else {
+          VizUpdateNode* const uncle = grand->left;
+          if (uncle->color == 0u) {
+            parent->color = 1u;
+            uncle->color = 1u;
+            grand->color = 0u;
+            node = grand;
+          } else {
+            if (node == parent->left) {
+              node = parent;
+              RotateRight(tree, node);
+            }
+            node->parent->color = 1u;
+            grand->color = 0u;
+            RotateLeft(tree, grand);
+          }
+        }
+      }
+
+      head->parent->color = 1u;
+    }
+
+    [[nodiscard]] bool InsertVizUpdateNode(VizUpdateTree* tree, UserEntity* const entity)
+    {
+      if (!tree || !tree->head || entity == nullptr) {
+        return false;
+      }
+
+      const std::uintptr_t key = reinterpret_cast<std::uintptr_t>(entity);
+      VizUpdateNode* const head = tree->head;
+      VizUpdateNode* parent = head;
+      VizUpdateNode* probe = head->parent;
+      while (!IsVizNodeNil(probe)) {
+        parent = probe;
+        if (key < probe->key) {
+          probe = probe->left;
+        } else if (probe->key < key) {
+          probe = probe->right;
+        } else {
+          return false;
+        }
+      }
+
+      auto* const inserted = static_cast<VizUpdateNode*>(::operator new(sizeof(VizUpdateNode)));
+      inserted->left = head;
+      inserted->parent = parent;
+      inserted->right = head;
+      inserted->key = key;
+      inserted->color = 0u;
+      inserted->isSentinel = 0u;
+      inserted->pad_1A[0] = 0u;
+      inserted->pad_1A[1] = 0u;
+      LinkVizUpdateOwner(entity, inserted);
+
+      if (parent == head) {
+        head->parent = inserted;
+      } else if (key < parent->key) {
+        parent->left = inserted;
+      } else {
+        parent->right = inserted;
+      }
+
+      ++tree->size;
+      FixupAfterVizInsert(tree, inserted);
+      RecomputeVizUpdateExtrema(tree);
+      return true;
+    }
+
     void RotateLeft(VizUpdateTree* tree, VizUpdateNode* node)
     {
       VizUpdateNode* const pivot = node->right;
@@ -2702,6 +2863,23 @@ namespace moho
     head->mRight = head;
     extraSelection.mSize = 0u;
     UI_EndCommandMode();
+  }
+
+  /**
+   * Address: 0x00894210 (FUN_00894210, ?AddToVizUpdate@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)
+   */
+  void CWldSession::AddToVizUpdate(UserEntity* const entity)
+  {
+    if (!entity) {
+      return;
+    }
+
+    VizUpdateTree* const tree = GetVizUpdateTree(this);
+    if (!tree || !tree->head) {
+      return;
+    }
+
+    (void)InsertVizUpdateNode(tree, entity);
   }
 
   /**

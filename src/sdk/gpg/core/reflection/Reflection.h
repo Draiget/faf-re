@@ -513,6 +513,141 @@ namespace gpg
     [[nodiscard]] unsigned long* TryUpcastUnsignedLong() const;
 
     /**
+     * Address: 0x00557A90 (FUN_00557A90, gpg::RRef::TryUpcast_RBlueprint_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `RBlueprint*` pointer-slot lane
+     * and throws `gpg::BadRefCast` when the runtime type is incompatible.
+     */
+    [[nodiscard]] moho::RBlueprint** TryUpcastRBlueprintPointerSlot() const;
+
+    /**
+     * Address: 0x0059DE10 (FUN_0059DE10, gpg::RRef::TryUpcast_IFormationInstance_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `IFormationInstance*`
+     * pointer-slot lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::IFormationInstance** TryUpcastIFormationInstancePointerSlot() const;
+
+    /**
+     * Address: 0x005A1E90 (FUN_005A1E90, gpg::RRef::TryUpcast_RUnitBlueprint_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `RUnitBlueprint*` pointer-slot
+     * lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::RUnitBlueprint** TryUpcastRUnitBlueprintPointerSlot() const;
+
+    /**
+     * Address: 0x005CA2E0 (FUN_005CA2E0, gpg::RRef::TryUpcast_ReconBlip_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `ReconBlip*` pointer-slot lane
+     * and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::ReconBlip** TryUpcastReconBlipPointerSlot() const;
+
+    /**
+     * Address: 0x005DF630 (FUN_005DF630, gpg::RRef::TryUpcast_UnitWeapon_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `UnitWeapon*` pointer-slot lane
+     * and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::UnitWeapon** TryUpcastUnitWeaponPointerSlot() const;
+
+    /**
+     * Address: 0x005DF6B0 (FUN_005DF6B0, gpg::RRef::TryUpcast_CAcquireTargetTask_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `CAcquireTargetTask*`
+     * pointer-slot lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::CAcquireTargetTask** TryUpcastCAcquireTargetTaskPointerSlot() const;
+
+    /**
+     * Address: 0x0063E6E0 (FUN_0063E6E0, gpg::RRef::TryUpcast_IAniManipulator_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `IAniManipulator*` pointer-slot
+     * lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::IAniManipulator** TryUpcastIAniManipulatorPointerSlot() const;
+
+    /**
+     * Address: 0x0066D110 (FUN_0066D110, gpg::RRef::TryUpcast_IEffect_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `IEffect*` pointer-slot lane and
+     * throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::IEffect** TryUpcastIEffectPointerSlot() const;
+
+    /**
+     * Address: 0x0067FD80 (FUN_0067FD80, gpg::RRef::TryUpcast_Entity_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `Entity*` pointer-slot lane and
+     * throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::Entity** TryUpcastEntityPointerSlot() const;
+
+    /**
+     * Address: 0x006B3D00 (FUN_006B3D00, gpg::RRef::TryUpcast_CEconomyEvent_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `CEconomyEvent*` pointer-slot
+     * lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::CEconomyEvent** TryUpcastCEconomyEventPointerSlot() const;
+
+    /**
+     * Address: 0x006E3E10 (FUN_006E3E10, gpg::RRef::TryUpcast_CUnitCommand_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `CUnitCommand*` pointer-slot lane
+     * and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::CUnitCommand** TryUpcastCUnitCommandPointerSlot() const;
+
+    /**
+     * Address: 0x00712B20 (FUN_00712B20, gpg::RRef::TryUpcast_CArmyStatItem_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `CArmyStatItem*` pointer-slot
+     * lane and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::CArmyStatItem** TryUpcastCArmyStatItemPointerSlot() const;
+
+    /**
+     * Address: 0x00751F10 (FUN_00751F10, gpg::RRef::TryUpcast_SimArmy_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `SimArmy*` pointer-slot lane and
+     * throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::SimArmy** TryUpcastSimArmyPointerSlot() const;
+
+    /**
+     * Address: 0x00751FC0 (FUN_00751FC0, gpg::RRef::TryUpcast_Shield_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `Shield*` pointer-slot lane and
+     * throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::Shield** TryUpcastShieldPointerSlot() const;
+
+    /**
+     * Address: 0x0077F430 (FUN_0077F430, gpg::RRef::TryUpcast_CDecalHandle_P)
+     *
+     * What it does:
+     * Upcasts this reflected reference to one `CDecalHandle*` pointer-slot lane
+     * and throws `gpg::BadRefCast` on type mismatch.
+     */
+    [[nodiscard]] moho::CDecalHandle** TryUpcastCDecalHandlePointerSlot() const;
+
+    /**
      * Address: 0x0084AB10 (FUN_0084AB10, gpg::RRef::CurrentUIState)
      *
      * What it does:

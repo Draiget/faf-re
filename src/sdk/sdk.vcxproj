@@ -73,32 +73,32 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -115,11 +115,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -134,11 +134,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -155,11 +155,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;LUAPLUS_LIB;BOOST_ALL_NO_LIB;BOOST_NO_AUTO_PTR;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\lua-lang\include;$(SolutionDir)dependencies\lua-lang\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(SolutionDir)dependencies\zlib-1.2.3\include;$(SolutionDir)dependencies\wxWindows-2.4.2\include;$(SolutionDir)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -587,6 +587,9 @@
     <ClCompile Include="moho\particles\BeamRenderHelpers.cpp" />
     <ClCompile Include="moho\particles\ParticleRenderBuckets.cpp" />
     <ClCompile Include="moho\particles\ParticleRenderWorkItemRuntime.cpp" />
+    <ClCompile Include="moho\particles\SParticleBuffer.cpp">
+      <ObjectFileName>$(IntDir)particles\SParticleBuffer.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="moho\particles\SWorldParticle.cpp" />
     <ClCompile Include="moho\misc\CDecoder.cpp" />
     <ClCompile Include="moho\movie\MPVDecoder.cpp" />
@@ -632,6 +635,7 @@
     <ClCompile Include="moho\serialization\PrefetchHandleBase.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBaseSerializer.cpp" />
     <ClCompile Include="moho\serialization\PrefetchHandleBaseTypeInfo.cpp" />
+    <ClCompile Include="moho\serialization\serializers\SBuildReserveInfoSerializer.cpp" />
     <ClCompile Include="moho\serialization\serializers\SWorldBeamSerializer.cpp" />
     <ClCompile Include="moho\serialization\serializers\SWorldParticleSerializer.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\SWorldBeamTypeInfo.cpp" />
@@ -646,6 +650,7 @@
     <ClCompile Include="moho\net\CNullClient.cpp" />
     <ClCompile Include="moho\net\CReplayClient.cpp" />
     <ClCompile Include="moho\net\CGpgNetInterface.cpp" />
+    <ClCompile Include="moho\net\IClientMgrUIInterface.cpp" />
     <ClCompile Include="moho\net\CHostManager.cpp" />
     <ClCompile Include="moho\net\CLobby.cpp" />
     <ClCompile Include="moho\net\CLobbyTypeInfo.cpp" />
@@ -767,6 +772,9 @@
     <ClCompile Include="moho\sim\ArmyUnitSetVectorReflection.cpp" />
     <ClCompile Include="moho\sim\SDelayedSubVizInfoReflection.cpp" />
     <ClCompile Include="moho\sim\CArmyImpl.cpp" />
+    <ClCompile Include="moho\sim\IdleUnitSelector.cpp" />
+    <ClCompile Include="moho\sim\PauseListener.cpp" />
+    <ClCompile Include="moho\sim\SelectionListener.cpp" />
     <ClCompile Include="moho\sim\CEconomy.cpp" />
     <ClCompile Include="moho\sim\CArmyLuaFunctionRegistrations.cpp" />
     <ClCompile Include="moho\sim\CDamageLuaFunctionRegistrations.cpp" />
@@ -887,11 +895,16 @@
     <ClCompile Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTransport.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCallTransportTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CBuildTaskHelper.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMoveTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitPodAssist.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitUpgradeTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitRefuel.cpp" />
     <ClCompile Include="moho\unit\tasks\CFireWeaponTask.cpp" />
     <ClCompile Include="moho\unit\core\CWeaponAttributes.cpp" />
+    <ClCompile Include="moho\unit\core\SSTIUnitConstantDataSerializer.cpp" />
+    <ClCompile Include="moho\unit\core\UnitAttributes.cpp" />
+    <ClCompile Include="moho\unit\core\UnitAttributesSerializer.cpp" />
     <ClCompile Include="moho\unit\core\EIntelTypeInfo.cpp" />
     <ClCompile Include="moho\unit\core\EFireStateTypeInfo.cpp" />
     <ClCompile Include="moho\unit\core\EJobTypeTypeInfo.cpp" />
@@ -1586,6 +1599,7 @@
     <ClInclude Include="moho\serialization\PrefetchHandleBase.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseSerializer.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseTypeInfo.h" />
+    <ClInclude Include="moho\serialization\serializers\SBuildReserveInfoSerializer.h" />
     <ClInclude Include="moho\serialization\serializers\SWorldBeamSerializer.h" />
     <ClInclude Include="moho\serialization\serializers\SWorldParticleSerializer.h" />
     <ClInclude Include="moho\serialization\typeinfo\SWorldBeamTypeInfo.h" />
@@ -1611,6 +1625,7 @@
     <ClInclude Include="moho\net\NetConVars.h" />
     <ClInclude Include="moho\net\Common.h" />
     <ClInclude Include="moho\net\IClient.h" />
+    <ClInclude Include="moho\net\IClientMgrUIInterface.h" />
     <ClInclude Include="moho\net\IMessageReceiver.h" />
     <ClInclude Include="moho\net\INetConnection.h" />
     <ClInclude Include="moho\net\INetConnector.h" />
@@ -1631,6 +1646,7 @@
     <ClInclude Include="moho\particles\BeamRenderHelpers.h" />
     <ClInclude Include="moho\particles\ParticleRenderBuckets.h" />
     <ClInclude Include="moho\particles\ParticleRenderWorkItemRuntime.h" />
+    <ClInclude Include="moho\particles\SParticleBuffer.h" />
     <ClInclude Include="moho\particles\SWorldBeam.h" />
     <ClInclude Include="moho\particles\SWorldParticle.h" />
     <ClInclude Include="moho\resource\CSimResources.h" />
@@ -1797,11 +1813,16 @@
     <ClInclude Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitCallTransport.h" />
     <ClInclude Include="moho\unit\tasks\CUnitCallTransportTypeInfo.h" />
+    <ClInclude Include="moho\unit\tasks\CBuildTaskHelper.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMoveTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitUpgradeTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitRefuel.h" />
     <ClInclude Include="moho\unit\tasks\CFireWeaponTask.h" />
     <ClInclude Include="moho\unit\core\CWeaponAttributes.h" />
+    <ClInclude Include="moho\unit\core\SSTIUnitConstantDataSerializer.h" />
+    <ClInclude Include="moho\unit\core\UnitAttributes.h" />
+    <ClInclude Include="moho\unit\core\UnitAttributesSerializer.h" />
     <ClInclude Include="moho\unit\core\EIntelTypeInfo.h" />
     <ClInclude Include="moho\unit\core\EFireStateTypeInfo.h" />
     <ClInclude Include="moho\unit\core\EJobTypeTypeInfo.h" />

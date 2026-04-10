@@ -3,6 +3,15 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/entity/EntityCategoryReflection.h"
+
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+  class RType;
+}
+
 namespace moho
 {
   struct RUnitBlueprint;
@@ -23,7 +32,8 @@ namespace moho
   struct UnitAttributes
   {
     const RUnitBlueprint* blueprint;    // +0x00
-    std::uint8_t unknown_0004[0x2C];    // +0x04
+    std::uint32_t unknown_0004;         // +0x04
+    EntityCategorySet restrictionCategory; // +0x08
     float spawnElevationOffset;         // +0x30 (also written by Unit:SetElevation)
     float moveSpeedMult;                // +0x34 (also written by Unit:SetSpeedMult)
     float accelerationMult;             // +0x38
@@ -44,6 +54,34 @@ namespace moho
     std::uint8_t unknown_006B;     // +0x6B
     std::uint32_t unknown_006C;    // +0x6C
 
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0055C2D0 (FUN_0055C2D0, Moho::UnitAttributes::StaticGetClass)
+     *
+     * What it does:
+     * Returns the cached reflection descriptor for `UnitAttributes`.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0055DC00 (FUN_0055DC00, Moho::UnitAttributes::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes pointer/category/float/caps/bool lanes into one
+     * `UnitAttributes` object.
+     */
+    static void MemberDeserialize(gpg::ReadArchive* archive, UnitAttributes* attributes);
+
+    /**
+     * Address: 0x0055DD80 (FUN_0055DD80, Moho::UnitAttributes::MemberSerialize)
+     *
+     * What it does:
+     * Serializes pointer/category/float/caps/bool lanes from one
+     * `UnitAttributes` object.
+     */
+    static void MemberSerialize(const UnitAttributes* attributes, gpg::WriteArchive* archive);
+
     [[nodiscard]] std::uint8_t GetReconBlipBlueprintState0() const noexcept
     {
       return static_cast<std::uint8_t>(mReclaimable ? 1u : 0u);
@@ -56,6 +94,11 @@ namespace moho
   };
 
   static_assert(offsetof(UnitAttributes, blueprint) == 0x00, "UnitAttributes::blueprint offset must be 0x00");
+  static_assert(offsetof(UnitAttributes, unknown_0004) == 0x04, "UnitAttributes::unknown_0004 offset must be 0x04");
+  static_assert(
+    offsetof(UnitAttributes, restrictionCategory) == 0x08,
+    "UnitAttributes::restrictionCategory offset must be 0x08"
+  );
   static_assert(
     offsetof(UnitAttributes, spawnElevationOffset) == 0x30, "UnitAttributes::spawnElevationOffset offset must be 0x30"
   );

@@ -46,6 +46,12 @@ namespace
   public:
     [[nodiscard]] const char* GetName() const override;
 
+    /**
+     * Address: 0x005C3F10 (FUN_005C3F10, gpg::RVectorType_SPerArmyReconInfo::GetLexical)
+     *
+     * What it does:
+     * Formats vector lexical text and appends the runtime per-army recon count.
+     */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
       const msvc8::string base = gpg::RType::GetLexical(ref);

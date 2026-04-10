@@ -1432,6 +1432,17 @@ extern "C" int MPV_Destroy(const int handleAddress)
 }
 
 /**
+ * Address: 0x00AD4FB0 (FUN_00AD4FB0, _sfmpv_DestroySub)
+ *
+ * What it does:
+ * Thin wrapper that forwards one MPV handle destroy request to `MPV_Destroy`.
+ */
+extern "C" int sfmpv_DestroySub(const int handleAddress)
+{
+  return MPV_Destroy(handleAddress);
+}
+
+/**
  * Address: 0x00AE7FB0 (FUN_00AE7FB0, nullsub_48)
  *
  * What it does:

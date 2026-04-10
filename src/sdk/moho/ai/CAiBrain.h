@@ -185,6 +185,14 @@ namespace moho
     static CAiBrain* DrawDebug(CAiBrain* brain);
 
     /**
+     * Address: 0x0057BDB0 (FUN_0057BDB0, Moho::CAiBrain::ProcessAttackVectors)
+     *
+     * What it does:
+     * Rebuilds debug attack-vector lanes from current enemy unit positions.
+     */
+    void ProcessAttackVectors();
+
+    /**
      * Address: 0x0057AEC0 (FUN_0057AEC0, Moho::CAiBrain::GetAvailableFactories)
      *
      * What it does:

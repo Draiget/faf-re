@@ -86,33 +86,6 @@ namespace
 #endif
   }
 
-  [[nodiscard]]
-  LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* const fieldName)
-  {
-    LuaPlus::LuaObject out;
-    if (!tableObject.IsTable()) {
-      return out;
-    }
-
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int stackTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, stackTop);
-    return out;
-  }
-
   [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -139,7 +112,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {

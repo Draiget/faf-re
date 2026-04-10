@@ -517,6 +517,11 @@ namespace moho
      *
      * Wm3::Vector3<float> const *, AudioEngine *, IXACTCue *
      *
+     * IDA signature:
+     * void callcnv_E3 Moho::AudioEngine::Calculate3D(
+     *   Wm3::Vector3f *a1@<eax>, Moho::AudioEngine *a2@<ecx>, struct IXACTCue *a3
+     * );
+     *
      * What it does:
      * Applies 3D listener/emitter transform to an active cue.
      */

@@ -151,24 +151,9 @@ namespace
     return ref;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "user") == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
   {
-    if (CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
+    if (CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
       return *set;
     }
 
@@ -321,7 +306,7 @@ gpg::RRef ScriptedDecal::GetDerivedObjectRef()
  */
 int moho::cfunc__c_CreateDecal(lua_State* const luaContext)
 {
-  return cfunc__c_CreateDecalL(ResolveBindingState(luaContext));
+  return cfunc__c_CreateDecalL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -458,7 +443,7 @@ ScriptedDecal* ScriptedDecal::SetTexture(const char* const texturePath)
  */
 int moho::cfunc_ScriptedDecalSetTexture(lua_State* const luaContext)
 {
-  return cfunc_ScriptedDecalSetTextureL(ResolveBindingState(luaContext));
+  return cfunc_ScriptedDecalSetTextureL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -516,7 +501,7 @@ int moho::cfunc_ScriptedDecalSetTextureL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ScriptedDecalSetScale(lua_State* const luaContext)
 {
-  return cfunc_ScriptedDecalSetScaleL(ResolveBindingState(luaContext));
+  return cfunc_ScriptedDecalSetScaleL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -582,7 +567,7 @@ int moho::cfunc_ScriptedDecalSetScaleL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ScriptedDecalSetPositionByScreen(lua_State* const luaContext)
 {
-  return cfunc_ScriptedDecalSetPositionByScreenL(ResolveBindingState(luaContext));
+  return cfunc_ScriptedDecalSetPositionByScreenL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -648,7 +633,7 @@ int moho::cfunc_ScriptedDecalSetPositionByScreenL(LuaPlus::LuaState* const state
  */
 int moho::cfunc_ScriptedDecalSetPosition(lua_State* const luaContext)
 {
-  return cfunc_ScriptedDecalSetPositionL(ResolveBindingState(luaContext));
+  return cfunc_ScriptedDecalSetPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -702,7 +687,7 @@ int moho::cfunc_ScriptedDecalSetPositionL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_ScriptedDecalDestroy(lua_State* const luaContext)
 {
-  return cfunc_ScriptedDecalDestroyL(ResolveBindingState(luaContext));
+  return cfunc_ScriptedDecalDestroyL(moho::SCR_ResolveBindingState(luaContext));
 }
 
 /**
@@ -746,3 +731,6 @@ int moho::cfunc_ScriptedDecalDestroyL(LuaPlus::LuaState* const state)
 
   return 0;
 }
+
+
+

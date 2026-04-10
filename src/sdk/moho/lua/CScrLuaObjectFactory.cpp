@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <stdexcept>
 #include <string>
 
 #include "gpg/core/containers/String.h"
@@ -421,6 +422,42 @@ namespace moho
     return result;
   }
 
+  LuaPlus::LuaObject SCR_GetLuaTableFieldOrThrow(
+    const LuaPlus::LuaObject& tableObj,
+    const char* const fieldName,
+    const char* const missingTableMessage,
+    const char* const missingFieldFormat
+  )
+  {
+    if (tableObj.IsNil()) {
+      throw std::runtime_error(missingTableMessage != nullptr ? missingTableMessage : "Lua table is unavailable.");
+    }
+
+    if (!tableObj.IsTable()) {
+      throw std::runtime_error(
+        gpg::STR_Printf(
+          missingFieldFormat != nullptr ? missingFieldFormat : "Lua table field \"%s\" is unavailable.",
+          fieldName != nullptr ? fieldName : ""
+        )
+          .c_str()
+      );
+    }
+
+    LuaPlus::LuaState* const state = tableObj.GetActiveState();
+    LuaPlus::LuaObject fieldObject = SCR_GetLuaTableField(state, tableObj, fieldName);
+    if (fieldObject.IsNil()) {
+      throw std::runtime_error(
+        gpg::STR_Printf(
+          missingFieldFormat != nullptr ? missingFieldFormat : "Lua table field \"%s\" is unavailable.",
+          fieldName != nullptr ? fieldName : ""
+        )
+          .c_str()
+      );
+    }
+
+    return fieldObject;
+  }
+
   /**
    * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
    *
@@ -725,7 +762,12 @@ namespace moho
     loadData.pendingTrailingNewline = false;
 
     const msvc8::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
-    const int loadStatus = lua_load(state->m_state, func_LoadConcat, &loadData, chunkName.c_str());
+    const int loadStatus = lua_load(
+      state->m_state,
+      reinterpret_cast<lua_Chunkreader>(func_LoadConcat),
+      &loadData,
+      chunkName.c_str()
+    );
     if (loadStatus != 0) {
       LuaPlus::LuaStackObject errorObject{};
       errorObject.m_state = state;

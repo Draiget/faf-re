@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <io.h>
 #include <limits>
 #include <new>
 #include <sstream>
@@ -46,6 +47,22 @@ namespace
 	static_assert(
 		offsetof(LuaGlobalStateGcRuntimeView, allocatedBytes) == 0x2C,
 		"LuaGlobalStateGcRuntimeView::allocatedBytes offset must be 0x2C"
+	);
+
+	struct LuaGlobalStateUserdataRuntimeView
+	{
+		std::uint8_t reserved00[0x14];
+		GCObject* rootUserdata;
+		std::uint8_t reserved18To117[0x100];
+		Table* userdataMetatable;
+	};
+	static_assert(
+		offsetof(LuaGlobalStateUserdataRuntimeView, rootUserdata) == 0x14,
+		"LuaGlobalStateUserdataRuntimeView::rootUserdata offset must be 0x14"
+	);
+	static_assert(
+		offsetof(LuaGlobalStateUserdataRuntimeView, userdataMetatable) == 0x118,
+		"LuaGlobalStateUserdataRuntimeView::userdataMetatable offset must be 0x118"
 	);
 }
 
@@ -192,8 +209,6 @@ namespace
 		std::FILE* __cdecl __iob_func(void);
 		void luaO_chunkid(char* out, const char* source, size_t bufflen);
 		void luaA_pushobject(lua_State* L, const TObject* o);
-		void lua_setusergcfunction(lua_State* L, void(__cdecl* userGcFunction)(GCState*));
-		void lua_setstateuserdata(lua_State* L, LuaState* stateUserData);
 		int luaopen_serialize(lua_State* L);
 		void reallymarkobject(GCState* gcState, GCObject* object);
 		void luaD_reallocCI(lua_State* L, int newsize);
@@ -227,6 +242,50 @@ namespace
 			outRef->mType = fallbackType;
 		}
 		return outRef;
+	}
+
+	/**
+	 * Address: 0x00924AF0 (FUN_00924AF0, luaS_newudata2)
+	 *
+	 * What it does:
+	 * Allocates one reflected userdata payload for `sourceRef`, move-constructs
+	 * it through the source type handler, and links it into root userdata lanes.
+	 */
+	[[nodiscard]] Udata* CreateRefUserdata(lua_State* const state, gpg::RRef* const sourceRef)
+	{
+		gpg::RType* const sourceType = sourceRef->mType;
+		if (sourceType->movRefFunc_ == nullptr) {
+			luaG_runerror(state, "type %s is not copy constructible", sourceType->GetName());
+		}
+
+		const std::size_t userdataSize = sizeof(Udata) + static_cast<std::size_t>(sourceType->size_);
+		Udata* const userdata = static_cast<Udata*>(luaM_realloc(state, nullptr, 0u, userdataSize));
+
+		try {
+			void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+			(void)sourceType->movRefFunc_(payload, sourceRef);
+		} catch (...) {
+			(void)luaM_realloc(state, userdata, userdataSize, 0u);
+			throw;
+		}
+
+		userdata->len = reinterpret_cast<std::size_t>(sourceType);
+		userdata->tt = LUA_TUSERDATA;
+		userdata->marked = (sourceType->dtrFunc_ != nullptr) ? 2u : 0u;
+
+		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateUserdataRuntimeView*>(state->l_G);
+		userdata->metatable = globalStateRuntime->userdataMetatable;
+		userdata->next = globalStateRuntime->rootUserdata;
+		globalStateRuntime->rootUserdata = reinterpret_cast<GCObject*>(userdata);
+		return userdata;
+	}
+
+	[[nodiscard]] gpg::RRef BuildRefFromUserdata(Udata* const userdata)
+	{
+		gpg::RRef out{};
+		out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+		out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
+		return out;
 	}
 
 	/**
@@ -600,6 +659,39 @@ namespace
 		lua_pushfstring(state, "%s", std::strerror(errorCode));
 		lua_pushnumber(state, static_cast<lua_Number>(errorCode));
 		return 3;
+	}
+
+	/**
+	 * Address: 0x00915F60 (FUN_00915F60, lua::io_dir)
+	 *
+	 * What it does:
+	 * Expands one wildcard expression through CRT find-first/find-next and
+	 * returns one Lua table of 1-based filename entries.
+	 */
+	[[maybe_unused]] int LuaIoDir(lua_State* const state)
+	{
+		const char* const wildcard = lua_tostring(state, 1);
+		lua_newtable(state);
+
+		__finddata64_t findData{};
+		const intptr_t findHandle = ::_findfirst64(wildcard, &findData);
+		if (findHandle != -1) {
+			int index = 1;
+			lua_pushnumber(state, static_cast<lua_Number>(index));
+			lua_pushstring(state, findData.name);
+			lua_settable(state, -3);
+
+			while (::_findnext64(findHandle, &findData) == 0) {
+				++index;
+				lua_pushnumber(state, static_cast<lua_Number>(index));
+				lua_pushstring(state, findData.name);
+				lua_settable(state, -3);
+			}
+
+			(void)::_findclose(findHandle);
+		}
+
+		return 1;
 	}
 
 	bool ReadLine(std::FILE* const stream, lua_State* const state);
@@ -3373,7 +3465,7 @@ LuaState::LuaState(const StandardLibraries initStandardLibrary)
 {
 	m_state = lua_open();
 	m_ownState = 1;
-	lua_setusergcfunction(m_state, &LuaPlusGCFunction);
+	lua_setusergcfunction(m_state, reinterpret_cast<void(__cdecl*)(void*)>(&LuaPlusGCFunction));
 	lua_setstateuserdata(m_state, this);
 
 	m_headObject.m_next = reinterpret_cast<LuaObject*>(&m_tailObject);
@@ -4299,25 +4391,24 @@ void LuaObject::AssignLightUserData(LuaState* state, void* value)
 	m_object.value.p = value;
 }
 
+/**
+ * Address: 0x00909840 (FUN_00909840, LuaPlus::LuaObject::AssignNewUserData)
+ *
+ * What it does:
+ * Rebinds this object to `state` root ownership, then materializes one
+ * reflected userdata lane from `value` and stores it as object payload.
+ */
 gpg::RRef LuaObject::AssignNewUserData(LuaState* state, const gpg::RRef& value)
 {
 	RebindToState(*this, state);
+	Ensure(state != nullptr, "state");
+	lua_State* const lstate = state->m_state;
+	Ensure(lstate != nullptr, "state->m_state");
 
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
-
-	const int oldTop = lua_gettop(lstate);
-	void* storage = lua_newuserdata(lstate, sizeof(gpg::RRef));
-	auto* storedRef = reinterpret_cast<gpg::RRef*>(storage);
-	*storedRef = value;
-
-	m_object = *(lstate->top - 1);
-	lua_settop(lstate, oldTop);
-
-	gpg::RRef out{};
-	out.mObj = storedRef;
-	out.mType = value.mType;
-	return out;
+	Udata* const userdata = CreateRefUserdata(lstate, const_cast<gpg::RRef*>(&value));
+	m_object.tt = static_cast<int>(userdata->tt);
+	m_object.value.p = userdata;
+	return BuildRefFromUserdata(userdata);
 }
 
 /**

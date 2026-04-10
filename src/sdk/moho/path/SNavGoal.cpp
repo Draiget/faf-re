@@ -8,6 +8,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
+#include "moho/sim/SOCellPos.h"
 
 #pragma init_seg(lib)
 
@@ -109,6 +110,27 @@ namespace
 namespace moho
 {
   gpg::RType* SNavGoal::sType = nullptr;
+
+  /**
+   * Address: 0x005A2CB0 (FUN_005A2CB0, Moho::SNavGoal::SNavGoal)
+   *
+   * What it does:
+   * Builds a one-cell goal rectangle from one cell coordinate and clears the
+   * secondary rectangle/layer payload.
+   */
+  SNavGoal::SNavGoal(const SOCellPos cellPos) noexcept
+  {
+    mPos1.x0 = cellPos.x;
+    mPos1.z0 = cellPos.z;
+    mPos1.x1 = cellPos.x + 1;
+    mPos1.z1 = cellPos.z + 1;
+
+    mPos2.x0 = 0;
+    mPos2.z0 = 0;
+    mPos2.x1 = 0;
+    mPos2.z1 = 0;
+    mLayer = LAYER_None;
+  }
 
   /**
    * Address: 0x0050CDB0 (FUN_0050CDB0, Moho::SNavGoal::MemberDeserialize)

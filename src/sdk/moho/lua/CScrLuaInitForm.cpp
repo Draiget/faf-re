@@ -1,11 +1,13 @@
 #include "moho/lua/CScrLuaInitForm.h"
 
 #include <algorithm>
+#include <cstring>
 #include <string_view>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Vector.h"
+#include "lua/LuaRuntimeTypes.h"
 
 namespace
 {
@@ -35,6 +37,40 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address context:
+   * - recurring Lua callback-thunk context unwrap sequence.
+   *
+   * What it does:
+   * Resolves LuaPlus wrapper state pointer from raw `lua_State` callback lane.
+   */
+  LuaPlus::LuaState* SCR_ResolveBindingState(lua_State* const luaContext) noexcept
+  {
+    return luaContext ? luaContext->stateUserData : nullptr;
+  }
+
+  /**
+   * Address context:
+   * - recurring `CScrLuaInitFormSet` intrusive list lookup sequence.
+   *
+   * What it does:
+   * Returns first init-form set whose name exactly matches `setName`.
+   */
+  CScrLuaInitFormSet* SCR_FindLuaInitFormSet(const char* const setName) noexcept
+  {
+    if (setName == nullptr) {
+      return nullptr;
+    }
+
+    for (CScrLuaInitFormSet* set = CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
+      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
+        return set;
+      }
+    }
+
+    return nullptr;
+  }
+
   CScrLuaInitFormSet* CScrLuaInitFormSet::sSets = nullptr;
 
   /**

@@ -35,6 +35,9 @@
 #endif
 namespace moho
 {
+  template <class T>
+  class Stats;
+
   class LaunchInfoBase;
   class CMarshaller;
   class CDecoder;
@@ -64,7 +67,7 @@ namespace moho
   {
     std::uint8_t mBuildStateTag = 0;                  // +0x00
     std::uint8_t pad_01_03[0x03]{};                   // +0x01
-    boost::shared_ptr<StatItem> mStatsRoot;           // +0x04
+    boost::shared_ptr<Stats<StatItem>> mStatsRoot;    // +0x04
     std::uint8_t mFake = 0;                           // +0x0C
     std::uint8_t pad_0D_0F[0x03]{};                   // +0x0D
   };
@@ -106,7 +109,11 @@ namespace moho
     msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
     msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
     msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
-    std::uint8_t pad_01C8_02B8[0xF0]{};                     // +0x1C8
+    std::uint8_t pad_01C8_0250[0x88]{};                     // +0x1C8
+    int32_t mPausedBy = -1;                                 // +0x250
+    std::uint8_t pad_0254_0270[0x1C]{};                     // +0x254
+    bool mGameOver = false;                                 // +0x270
+    std::uint8_t pad_0271_02B8[0x47]{};                     // +0x271
 
     /**
      * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
@@ -144,6 +151,8 @@ namespace moho
     offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
     "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
   );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mPausedBy) == 0x250, "SSyncData::mPausedBy offset must be 0x250");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
 
   /**
@@ -427,9 +436,10 @@ namespace moho
      * Address: 0x0073DAD0 (FUN_0073DAD0)
      *
      * What it does:
-     * Copies pending filter state into active state and queues one sync packet.
+     * Unlocks the driver mutex, runs one `Sim::Sync` publish pass, relocks,
+     * verifies historical checksums when available, and enqueues the sync packet.
      */
-    void FinalizeSyncDispatchLocked(int32_t beatToDispatch);
+    void FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock);
     // Shared tail lifted from FUN_0073B1B0/FUN_0073BBF0 and command wrappers.
     void MarkFirstConnectionActivityLocked();
     /**

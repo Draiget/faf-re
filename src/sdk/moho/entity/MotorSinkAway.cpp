@@ -184,6 +184,54 @@ namespace
     archive->WriteFloat(object->mSinkDeltaY);
   }
 
+  /**
+   * Address: 0x00696FB0 (FUN_00696FB0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the MotorSinkAway deserialize thunk alias to the recovered
+   * serializer load body.
+   */
+  void DeserializeMotorSinkAwayThunkVariantA(moho::MotorSinkAway* const object, gpg::ReadArchive* const archive)
+  {
+    DeserializeMotorSinkAwayBody(object, archive);
+  }
+
+  /**
+   * Address: 0x00696FC0 (FUN_00696FC0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the MotorSinkAway serialize thunk alias to the recovered
+   * serializer save body.
+   */
+  void SerializeMotorSinkAwayThunkVariantA(const moho::MotorSinkAway* const object, gpg::WriteArchive* const archive)
+  {
+    SerializeMotorSinkAwayBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006971B0 (FUN_006971B0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the second MotorSinkAway deserialize thunk alias to the
+   * recovered serializer load body.
+   */
+  void DeserializeMotorSinkAwayThunkVariantB(moho::MotorSinkAway* const object, gpg::ReadArchive* const archive)
+  {
+    DeserializeMotorSinkAwayBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006971C0 (FUN_006971C0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the second MotorSinkAway serialize thunk alias to the
+   * recovered serializer save body.
+   */
+  void SerializeMotorSinkAwayThunkVariantB(const moho::MotorSinkAway* const object, gpg::WriteArchive* const archive)
+  {
+    SerializeMotorSinkAwayBody(object, archive);
+  }
+
   void cleanup_MotorSinkAwayConstruct_atexit()
   {
     (void)moho::cleanup_MotorSinkAwayConstruct();

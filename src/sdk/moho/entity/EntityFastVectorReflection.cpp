@@ -599,7 +599,10 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00694380 family (gpg::RFastVectorType_Entity_P::GetLexical)
+   * Address: 0x00693CA0 (FUN_00693CA0, gpg::RFastVectorType_EntityP::GetLexical)
+   *
+   * What it does:
+   * Formats inherited lexical text and appends current fastvector element count.
    */
   msvc8::string RFastVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
   {

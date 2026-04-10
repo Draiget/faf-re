@@ -77,15 +77,11 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName == nullptr) {
-        continue;
-      }
-      if (std::strcmp(set->mSetName, "User") == 0 || std::strcmp(set->mSetName, "user") == 0) {
-        return set;
-      }
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
+      return set;
     }
-    return nullptr;
+
+    return moho::SCR_FindLuaInitFormSet("user");
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
@@ -96,11 +92,6 @@ namespace
 
     static moho::CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext != nullptr ? luaContext->stateUserData : nullptr;
   }
 
   struct EntityLoopTreeNode
@@ -886,9 +877,7 @@ namespace moho
    */
   CUserSoundManager::~CUserSoundManager()
   {
-    mActiveLoops.mPrev->mNext = mActiveLoops.mNext;
-    mActiveLoops.mNext->mPrev = mActiveLoops.mPrev;
-    mActiveLoops.ListResetLinks();
+    mActiveLoops.ListUnlink();
     UnlinkArmyHook(mListenerArmyHook);
 
     const std::size_t handleCount = mSoundHandles.Size();
@@ -1841,7 +1830,7 @@ namespace moho
    */
   int cfunc_PlaySound(lua_State* const luaContext)
   {
-    return cfunc_PlaySoundL(ResolveBindingState(luaContext));
+    return cfunc_PlaySoundL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1900,7 +1889,7 @@ namespace moho
    */
   int cfunc_SoundIsPrepared(lua_State* const luaContext)
   {
-    return cfunc_SoundIsPreparedL(ResolveBindingState(luaContext));
+    return cfunc_SoundIsPreparedL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1967,7 +1956,7 @@ namespace moho
    */
   int cfunc_StartSound(lua_State* const luaContext)
   {
-    return cfunc_StartSoundL(ResolveBindingState(luaContext));
+    return cfunc_StartSoundL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2032,7 +2021,7 @@ namespace moho
    */
   int cfunc_SetVolume(lua_State* const luaContext)
   {
-    return cfunc_SetVolumeL(ResolveBindingState(luaContext));
+    return cfunc_SetVolumeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2091,7 +2080,7 @@ namespace moho
    */
   int cfunc_GetVolume(lua_State* const luaContext)
   {
-    return cfunc_GetVolumeL(ResolveBindingState(luaContext));
+    return cfunc_GetVolumeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2145,7 +2134,7 @@ namespace moho
    */
   int cfunc_StopSound(lua_State* const luaContext)
   {
-    return cfunc_StopSoundL(ResolveBindingState(luaContext));
+    return cfunc_StopSoundL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2202,7 +2191,7 @@ namespace moho
    */
   int cfunc_StopAllSounds(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount != 0) {
@@ -2237,7 +2226,7 @@ namespace moho
    */
   int cfunc_DisableWorldSounds(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount != 0) {
@@ -2278,7 +2267,7 @@ namespace moho
    */
   int cfunc_EnableWorldSounds(lua_State* const luaContext)
   {
-    LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount != 0) {
@@ -2319,7 +2308,7 @@ namespace moho
    */
   int cfunc_PlayTutorialVO(lua_State* const luaContext)
   {
-    return cfunc_PlayTutorialVOL(ResolveBindingState(luaContext));
+    return cfunc_PlayTutorialVOL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2387,7 +2376,7 @@ namespace moho
    */
   int cfunc_PlayVoice(lua_State* const luaContext)
   {
-    return cfunc_PlayVoiceL(ResolveBindingState(luaContext));
+    return cfunc_PlayVoiceL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

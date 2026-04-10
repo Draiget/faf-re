@@ -286,15 +286,7 @@ namespace moho
 
     while (detached.mPrev != &detached) {
       auto* const listenerLink = reinterpret_cast<Broadcaster*>(detached.mPrev);
-      listenerLink->mNext->mPrev = listenerLink->mPrev;
-      listenerLink->mPrev->mNext = listenerLink->mNext;
-      listenerLink->mPrev = listenerLink;
-      listenerLink->mNext = listenerLink;
-
-      listenerLink->mNext = mNext;
-      listenerLink->mPrev = this;
-      mNext = listenerLink;
-      listenerLink->mNext->mPrev = listenerLink;
+      listenerLink->ListLinkAfter(this);
 
       if (Listener<EUnitCommandQueueStatus>* const listener = ListenerFromLinkNode(listenerLink)) {
         listener->OnEvent(event);

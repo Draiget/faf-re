@@ -428,6 +428,34 @@ void CCommandTaskSerializer::Deserialize(
 }
 
 /**
+ * Address: 0x0060C270 (FUN_0060C270, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CCommandTask serializer-load thunk alias into the shared
+ * CCommandTask deserialize callback body.
+ */
+void DeserializeCCommandTaskThunkVariantA(
+  gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+)
+{
+  AcquireCCommandTaskSerializer()->Deserialize(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x0060C830 (FUN_0060C830, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CCommandTask serializer-load thunk alias into the
+ * shared CCommandTask deserialize callback body.
+ */
+void DeserializeCCommandTaskThunkVariantB(
+  gpg::ReadArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+)
+{
+  AcquireCCommandTaskSerializer()->Deserialize(archive, objectPtr, version, ownerRef);
+}
+
+/**
  * Address: 0x00608DF0 (FUN_00608DF0, Moho::CCommandTaskSerializer::Serialize)
  * Address: 0x0060D0C0 (FUN_0060D0C0, shared callback body)
  */
@@ -461,6 +489,34 @@ void CCommandTaskSerializer::Serialize(
   gpg::WriteRawPointer(
     archive, MakeEAiResultRef(task->mDispatchResult), gpg::TrackedPointerState::Unowned, owner
   );
+}
+
+/**
+ * Address: 0x0060C280 (FUN_0060C280, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CCommandTask serializer-save thunk alias into the shared
+ * CCommandTask serialize callback body.
+ */
+void SerializeCCommandTaskThunkVariantA(
+  gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+)
+{
+  AcquireCCommandTaskSerializer()->Serialize(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x0060C840 (FUN_0060C840, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CCommandTask serializer-save thunk alias into the
+ * shared CCommandTask serialize callback body.
+ */
+void SerializeCCommandTaskThunkVariantB(
+  gpg::WriteArchive* const archive, const int objectPtr, const int version, gpg::RRef* const ownerRef
+)
+{
+  AcquireCCommandTaskSerializer()->Serialize(archive, objectPtr, version, ownerRef);
 }
 
 /**

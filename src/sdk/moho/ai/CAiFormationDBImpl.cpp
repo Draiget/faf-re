@@ -422,6 +422,38 @@ void CAiFormationDBImpl::MemberSerialize(gpg::WriteArchive* const archive) const
 }
 
 /**
+ * Address: 0x0059DBF0 (FUN_0059DBF0)
+ *
+ * What it does:
+ * Serializer bridge thunk that forwards to `CAiFormationDBImpl::MemberSerialize`.
+ */
+[[maybe_unused]] void CAiFormationDbMemberSerializeBridgeA(
+  const CAiFormationDBImpl* const formationDb,
+  gpg::WriteArchive* const archive
+)
+{
+  if (formationDb != nullptr) {
+    formationDb->MemberSerialize(archive);
+  }
+}
+
+/**
+ * Address: 0x0059E030 (FUN_0059E030)
+ *
+ * What it does:
+ * Serializer bridge thunk that forwards to `CAiFormationDBImpl::MemberSerialize`.
+ */
+[[maybe_unused]] void CAiFormationDbMemberSerializeBridgeB(
+  const CAiFormationDBImpl* const formationDb,
+  gpg::WriteArchive* const archive
+)
+{
+  if (formationDb != nullptr) {
+    formationDb->MemberSerialize(archive);
+  }
+}
+
+/**
  * Address: 0x0059C030 (FUN_0059C030)
  */
 void CAiFormationDBImpl::Update()

@@ -23,6 +23,7 @@ namespace gpg
 
 namespace moho
 {
+  class Unit;
   class UnitWeapon;
 
   template <class T>
@@ -253,6 +254,21 @@ namespace moho
     offsetof(WeakPtrVectorRuntimeView<void>, capacityEnd) == 0x0C,
     "WeakPtrVectorRuntimeView<T>::capacityEnd offset must be 0x0C"
   );
+
+  /**
+   * Address: 0x0056D3C0 (FUN_0056D3C0, sub_56D3C0)
+   *
+   * What it does:
+   * Unlinks each `WeakPtr<Unit>` in [`begin`, `end`) from its owner chain by
+   * replacing owner-chain references to each node with that node's `nextInOwner`.
+   */
+  inline void UnlinkWeakPtrUnitRange(WeakPtr<Unit>* begin, WeakPtr<Unit>* end) noexcept
+  {
+    while (begin != end) {
+      begin->UnlinkFromOwnerChain();
+      ++begin;
+    }
+  }
 
   template <class T>
   [[nodiscard]] WeakPtrVectorRuntimeView<T>& AsWeakPtrVectorRuntimeView(msvc8::vector<WeakPtr<T>>& weakVector) noexcept

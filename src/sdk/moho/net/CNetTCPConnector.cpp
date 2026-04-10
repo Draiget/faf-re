@@ -234,10 +234,7 @@ namespace moho
    */
   void ResetPartialListHead(TDatListItem<STcpPartialConnection, void>* const head)
   {
-    head->mPrev->mNext = head->mNext;
-    head->mNext->mPrev = head->mPrev;
-    head->mNext = head;
-    head->mPrev = head;
+    head->ListUnlink();
   }
 
   /**
@@ -249,10 +246,7 @@ namespace moho
    */
   void ResetConnectionListHead(TDatListItem<CNetTCPConnection, void>* const head)
   {
-    head->mPrev->mNext = head->mNext;
-    head->mNext->mPrev = head->mPrev;
-    head->mNext = head;
-    head->mPrev = head;
+    head->ListUnlink();
   }
 } // namespace moho
 

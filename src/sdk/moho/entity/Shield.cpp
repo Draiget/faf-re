@@ -41,29 +41,14 @@ namespace
     return sEntityType;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
     static moho::CScrLuaInitFormSet fallbackSet("sim");
     return fallbackSet;
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   [[nodiscard]] std::uint32_t BuildShieldFamilySourceBits(const std::uint32_t armySourceIndex) noexcept
@@ -225,7 +210,7 @@ namespace moho
    */
   int cfunc__c_CreateShield(lua_State* const luaContext)
   {
-    return cfunc__c_CreateShieldL(ResolveBindingState(luaContext));
+    return cfunc__c_CreateShieldL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

@@ -46,6 +46,126 @@ namespace
     entry->mPrevCircle = previousCircle;
     entry->mCurCircle = currentCircle;
   }
+
+  [[nodiscard]] bool CircleFullyContains(
+    const VisionDB::Pool::EntryCircle& outer,
+    const VisionDB::Pool::EntryCircle& inner
+  ) noexcept
+  {
+    if (inner.radius > outer.radius) {
+      return false;
+    }
+
+    const float dx = inner.x - outer.x;
+    const float dy = inner.y - outer.y;
+    const float radiusDelta = outer.radius - inner.radius;
+    return (radiusDelta * radiusDelta) >= ((dx * dx) + (dy * dy));
+  }
+
+  [[nodiscard]] bool EntryFullyContains(
+    const VisionDB::Pool::PooledNode* const outer,
+    const VisionDB::Pool::PooledNode* const inner
+  ) noexcept
+  {
+    if (outer == nullptr || inner == nullptr) {
+      return false;
+    }
+
+    return CircleFullyContains(outer->mPrevCircle, inner->mPrevCircle)
+      && CircleFullyContains(outer->mCurCircle, inner->mCurCircle);
+  }
+
+  void EntryAddToChain(VisionDB::Pool::PooledNode* chain, VisionDB::Pool::PooledNode* append) noexcept
+  {
+    if (chain == nullptr || append == nullptr) {
+      return;
+    }
+
+    while (chain->mNext != nullptr) {
+      chain = chain->mNext;
+    }
+
+    chain->mNext = append;
+    append->mParent = chain->mParent;
+  }
+
+  void EntryRemoveFromChain(VisionDB::Pool::PooledNode* const root, VisionDB::Pool::PooledNode* const entry) noexcept
+  {
+    if (root == nullptr || entry == nullptr) {
+      return;
+    }
+
+    VisionDB::Pool::PooledNode* result = root->mContained;
+    if (result == entry) {
+      result = result->mNext;
+      root->mContained = result;
+    } else if (result != nullptr) {
+      while (result->mNext != nullptr && result->mNext != entry) {
+        result = result->mNext;
+      }
+      if (result->mNext == entry) {
+        result->mNext = result->mNext->mNext;
+      }
+    }
+
+    VisionDB::Pool::PooledNode* const children = entry->mContained;
+    if (children != nullptr) {
+      VisionDB::Pool::PooledNode* const rootContained = root->mContained;
+      if (rootContained != nullptr) {
+        if (rootContained->mNext != nullptr) {
+          EntryAddToChain(rootContained->mNext, children);
+        } else {
+          rootContained->mNext = children;
+          children->mParent = rootContained->mParent;
+        }
+      } else {
+        root->mContained = children;
+        children->mParent = root;
+      }
+
+      for (VisionDB::Pool::PooledNode* child = children; child != nullptr; child = child->mNext) {
+        child->mParent = root;
+      }
+    }
+
+    entry->mParent = nullptr;
+    entry->mContained = nullptr;
+    entry->mNext = nullptr;
+  }
+
+  void EntryPutInChain(VisionDB::Pool::PooledNode* entry, VisionDB::Pool::PooledNode* root) noexcept
+  {
+    if (entry == nullptr || root == nullptr) {
+      return;
+    }
+
+    while (EntryFullyContains(root, entry)) {
+      VisionDB::Pool::PooledNode* containingChild = nullptr;
+      for (VisionDB::Pool::PooledNode* child = root->mContained; child != nullptr; child = child->mNext) {
+        if (EntryFullyContains(child, entry)) {
+          containingChild = child;
+          break;
+        }
+      }
+
+      if (containingChild == nullptr) {
+        break;
+      }
+      root = containingChild;
+    }
+
+    if (VisionDB::Pool::PooledNode* const contained = root->mContained; contained != nullptr) {
+      if (contained->mNext != nullptr) {
+        EntryAddToChain(contained->mNext, entry);
+      } else {
+        contained->mNext = entry;
+        entry->mParent = contained->mParent;
+      }
+    } else {
+      root->mContained = entry;
+      entry->mParent = root;
+    }
+  }
 } // namespace
 
 /**
@@ -299,6 +419,38 @@ VisionDB::VisionDB()
 {}
 
 /**
+ * Address: 0x0081AFD0 (FUN_0081AFD0, Moho::VisionDB::NewHandle)
+ *
+ * What it does:
+ * Allocates one tracked vision handle using previous/current 2D positions
+ * and inserts its pooled node under the root vision entry.
+ */
+VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous)
+{
+  Pool::EntryCircle prevCircle{};
+  prevCircle.x = previous.x;
+  prevCircle.y = previous.y;
+  prevCircle.radius = 0.0f;
+
+  Pool::EntryCircle curCircle{};
+  curCircle.x = current.x;
+  curCircle.y = current.y;
+  curCircle.radius = 0.0f;
+
+  Pool::PooledNode* const entry = pool_.NewEntry(prevCircle, curCircle, true);
+  if (entry == nullptr) {
+    return nullptr;
+  }
+
+  EntryPutInChain(entry, reinterpret_cast<Pool::PooledNode*>(rootNode_));
+
+  Handle* const handle = new Handle();
+  handle->mDB = reinterpret_cast<std::uintptr_t>(this);
+  handle->mNode = reinterpret_cast<std::uintptr_t>(entry);
+  return handle;
+}
+
+/**
  * Address: 0x0081AEB0 (FUN_0081AEB0)
  * Address: 0x103E3E30
  *
@@ -308,4 +460,41 @@ VisionDB::VisionDB()
 VisionDB::~VisionDB()
 {
   rootNode_ = nullptr;
+}
+
+/**
+ * Address: 0x008B83B0 (FUN_008B83B0, Moho::VisionDB::Handle::Update)
+ *
+ * What it does:
+ * Refreshes this handle's previous/current circles and visibility bit,
+ * then reparents into the vision tree when containment no longer holds.
+ */
+void VisionDB::Handle::Update(
+  const Wm3::Vector2f& next,
+  const Wm3::Vector2f& previous,
+  const float radius,
+  const bool visible
+)
+{
+  auto* const node = reinterpret_cast<Pool::PooledNode*>(mNode);
+  auto* const db = reinterpret_cast<VisionDB*>(mDB);
+  if (node == nullptr || db == nullptr) {
+    return;
+  }
+
+  node->mVis = visible ? 1u : 0u;
+  node->mPrevCircle.x = previous.x;
+  node->mPrevCircle.y = previous.y;
+  node->mPrevCircle.radius = radius;
+  node->mCurCircle.x = next.x;
+  node->mCurCircle.y = next.y;
+  node->mCurCircle.radius = radius;
+
+  auto* const parent = reinterpret_cast<Pool::PooledNode*>(node->mParent);
+  if (parent == nullptr || EntryFullyContains(parent, node)) {
+    return;
+  }
+
+  EntryRemoveFromChain(parent, node);
+  EntryPutInChain(node, reinterpret_cast<Pool::PooledNode*>(db->rootNode_));
 }

@@ -1,16 +1,69 @@
 #include "CArmyStats.h"
 
+#include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/ai/CAiBrain.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 
 namespace
 {
+  constexpr const char* kOnStatsTriggerScriptName = "OnStatsTrigger";
+
+  [[nodiscard]] bool CategorySetHasAnyBits(const moho::EntityCategorySet& categorySet)
+  {
+    const moho::BVIntSet& bits = categorySet.Bits();
+    const unsigned int sentinel = bits.Max();
+    return bits.GetNext(std::numeric_limits<unsigned int>::max()) != sentinel;
+  }
+
+  [[nodiscard]] float ResolveConditionValue(const moho::SCondition& condition)
+  {
+    moho::CArmyStatItem* const item = condition.mItem;
+    if (item == nullptr) {
+      return 0.0f;
+    }
+
+    if (CategorySetHasAnyBits(condition.mCat)) {
+      return item->SumCategory(&condition.mCat);
+    }
+
+    switch (item->mType) {
+      case moho::EStatType::kFloat:
+        return item->GetFloat(false);
+      case moho::EStatType::kInt:
+        return static_cast<float>(item->GetInt(false));
+      case moho::EStatType::kString:
+      default: {
+        msvc8::string value;
+        item->SetValueCopy(&value);
+        return static_cast<float>(std::atof(value.c_str()));
+      }
+    }
+  }
+
+  [[nodiscard]] bool EvaluateCondition(const moho::SCondition& condition, const float value)
+  {
+    switch (condition.mOp) {
+      case moho::TRIGGER_GreaterThan:
+        return value > condition.mVal;
+      case moho::TRIGGER_GreaterThanOrEqual:
+        return value >= condition.mVal;
+      case moho::TRIGGER_LessThan:
+        return value < condition.mVal;
+      case moho::TRIGGER_LessThanOrEqual:
+        return value <= condition.mVal;
+      default:
+        return false;
+    }
+  }
+
   [[nodiscard]] int CompareNameIndexKey(const msvc8::string& lhs, const msvc8::string& rhs)
   {
     return std::strcmp(lhs.c_str(), rhs.c_str());
@@ -922,6 +975,47 @@ namespace moho
         }
         return;
       }
+    }
+  }
+
+  /**
+   * Address: 0x0070BEA0 (FUN_0070BEA0, Moho::CArmyStats::Update)
+   *
+   * What it does:
+   * Evaluates all trigger condition vectors and dispatches one
+   * `OnStatsTrigger` script callback per trigger when all conditions pass.
+   */
+  void CArmyStats::Update()
+  {
+    ArmyTriggerNode* const head = mAuxHead;
+    if (head == nullptr || mOwnerArmy == nullptr) {
+      return;
+    }
+
+    for (ArmyTriggerNode* node = head->next; node != head; node = node->next) {
+      if (node->trigger == nullptr) {
+        continue;
+      }
+
+      auto& conditions = node->trigger->mConditions;
+      if (conditions.begin == nullptr || conditions.end == nullptr || conditions.begin == conditions.end) {
+        continue;
+      }
+
+      bool allConditionsSatisfied = true;
+      for (const SCondition* condition = conditions.begin; condition != conditions.end; ++condition) {
+        const float conditionValue = ResolveConditionValue(*condition);
+        if (!EvaluateCondition(*condition, conditionValue)) {
+          allConditionsSatisfied = false;
+          break;
+        }
+      }
+
+      if (!allConditionsSatisfied) {
+        continue;
+      }
+
+      (void)mOwnerArmy->RunScript(kOnStatsTriggerScriptName, node->trigger->mName.c_str());
     }
   }
 

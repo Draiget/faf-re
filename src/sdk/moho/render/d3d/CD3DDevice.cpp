@@ -210,10 +210,7 @@ namespace
       return nullptr;
     }
 
-    broadcaster->mNext->mPrev = broadcaster->mPrev;
-    broadcaster->mPrev->mNext = broadcaster->mNext;
-    broadcaster->mPrev = broadcaster;
-    broadcaster->mNext = broadcaster;
+    broadcaster->ListUnlink();
     return broadcaster;
   }
 
@@ -595,11 +592,6 @@ namespace
       (void)UnlinkAndResetDeviceBroadcaster(static_cast<moho::Broadcaster*>(this));
     }
 
-    void SetRenViewport(moho::WRenViewport* const viewport) override
-    {
-      CD3DDeviceRuntimeView::FromDevice(this)->mViewport = viewport;
-    }
-
     [[nodiscard]] moho::ID3DDeviceResources* GetResources() override
     {
       return &mResources;
@@ -753,6 +745,87 @@ namespace moho
       return nullptr;
     }
     return static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+  }
+
+  /**
+   * Address: 0x0042DC10 (FUN_0042DC10)
+   *
+   * What it does:
+   * Binds the active render viewport, rebuilds per-head writer-lock wrappers
+   * from backend output contexts, refreshes fidelity-support lanes, initializes
+   * device resources, and emits one device-init event.
+   */
+  void CD3DDevice::SetRenViewport(WRenViewport* const viewport)
+  {
+    CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
+    runtime->mViewport = viewport;
+
+    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    if (device == nullptr) {
+      return;
+    }
+
+    gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+    if (context == nullptr) {
+      return;
+    }
+
+    if (moho::CFG_GetArgOption("/softwareinstancing", 0, nullptr)) {
+      context->mHWBasedInstancing = false;
+    }
+
+    const int headCount = context->GetHeadCount();
+    bool supportsAdvancedShadowFidelity = true;
+    if (headCount > 0) {
+      for (int headIndex = 0; headIndex < headCount; ++headIndex) {
+        const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
+        const bool headSupportsShadow = context->mSupportsFloat16 || head.antialiasingHigh != 0u || head.antialiasingLow != 0u;
+        supportsAdvancedShadowFidelity = supportsAdvancedShadowFidelity && headSupportsShadow;
+      }
+    }
+
+    if (context->mPixelShaderProfile > 5) {
+      moho::graphics_FidelitySupported = 2;
+      moho::shadow_FidelitySupported = supportsAdvancedShadowFidelity ? 3 : 1;
+    } else {
+      moho::graphics_FidelitySupported = 1;
+      moho::shadow_FidelitySupported = supportsAdvancedShadowFidelity ? 2 : 1;
+    }
+
+    const std::size_t lockHeadCount =
+      std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
+    for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+      ReleaseHeadWriterLocks(*runtime, headIndex);
+
+      const auto* const outputContext =
+        reinterpret_cast<const OutputContextD3D9RuntimeView*>(device->GetHead2(static_cast<unsigned int>(headIndex)));
+      if (outputContext == nullptr) {
+        continue;
+      }
+
+      runtime->mReaderWriterLocks1[headIndex].reset(
+        new moho::CD3DRenderTarget(this, outputContext->renderTarget)
+      );
+      runtime->mReaderWriterLocks2[headIndex].reset(
+        new moho::CD3DDepthStencil(this, outputContext->depthStencil)
+      );
+    }
+
+    runtime->mRenderTarget.reset(new moho::CD3DRenderTarget());
+    runtime->mDepthStencil.reset(new moho::CD3DDepthStencil());
+
+    if (auto* const resources = static_cast<moho::CD3DDeviceResources*>(GetResources()); resources != nullptr) {
+      (void)resources->InitResources(true);
+    }
+
+    runtime->mDrawViewportBackground = 0u;
+    const moho::SD3DDeviceEvent deviceInitEvent{0u, true, {0u, 0u, 0u}};
+    (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
+
+    if (runtime->mViewport != nullptr) {
+      runtime->mViewport->D3DWindowOnDeviceInit();
+    }
+    runtime->mInitialized = 1u;
   }
 
   /**

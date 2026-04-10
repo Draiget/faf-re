@@ -13,7 +13,6 @@
 #include "lua/LuaObject.h"
 #include "moho/entity/Entity.h"
 #include "moho/render/RDebugOverlay.h"
-#include "moho/render/SParticleBuffer.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/task/CTaskThread.h"
@@ -54,6 +53,7 @@ namespace moho
   class CArmyImpl;
   class CEffectManagerImpl;
   class CSimSoundManager;
+  struct SParticleBuffer;
   struct SEntitySetTemplateUnit;
   class CScrLuaInitForm;
 
@@ -76,7 +76,11 @@ namespace moho
     void OnCommandSourceTerminated() override;
 
     /**
-     * Address: 0x007487C0
+     * Address: 0x007487C0 (FUN_007487C0, ?VerifyChecksum@Sim@Moho@@UAEXABVMD5Digest@gpg@@H@Z)
+     *
+     * What it does:
+     * Validates one remote beat checksum against the local rolling hash ring,
+     * records desync details on mismatch, and clears the cached desync log list.
      */
     void VerifyChecksum(const gpg::MD5Digest&, CSeqNo) override;
 
@@ -135,24 +139,35 @@ namespace moho
     void WarpEntity(EntId, const VTransform&) override;
 
     /**
-     * Address: 0x00748D50
+     * Address: 0x00748D50 (FUN_00748D50, ?ProcessInfoPair@Sim@Moho@@UAEXVEntId@2@VStrArg@gpg@@1@Z)
+     *
+     * What it does:
+     * Applies one UI/info key-value command to a controllable live unit.
      */
     void ProcessInfoPair(void* id, const char* key, const char* val) override;
 
     /**
-     * Address: 0x00749290
+     * Address: 0x00749290 (FUN_00749290)
      *
      * Moho::BVSet<Moho::EntId,Moho::EntIdUniverse> const &,Moho::SSTICommandIssueData const &,bool
      *
      * IDA signature:
      * char __userpurge Moho__Sim__IssueCommand@<al>(Moho::Sim *this@<ecx>, int esi0@<esi>, int *a3,
      * Moho::SSTICommandIssueData *commandIssueData, BOOL flag);
+     *
+     * What it does:
+     * Validates command-id ownership, collects controllable units, and forwards
+     * through UNIT_IssueCommand dispatch closure.
      */
     void
     IssueCommand(const BVSet<EntId, EntIdUniverse>&, const SSTICommandIssueData& commandIssueData, bool flag) override;
 
     /**
-     * Address: 0x007494B0
+     * Address: 0x007494B0 (FUN_007494B0)
+     *
+     * What it does:
+     * Validates command-id ownership, collects controllable factories, and
+     * emits one shared command through the factory-dispatch lane.
      */
     void IssueFactoryCommand(
       const BVSet<EntId, EntIdUniverse>&, const SSTICommandIssueData& commandIssueData, bool
@@ -194,7 +209,11 @@ namespace moho
     void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override;
 
     /**
-     * Address: 0x00749B60
+     * Address: 0x00749B60 (FUN_00749B60, ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
+     *
+     * What it does:
+     * Imports `/lua/SimCallbacks.lua` and invokes `DoCallback(name,args,units)`
+     * with an optional selected-unit Lua table payload.
      */
     void LuaSimCallback(const char*, const LuaPlus::LuaObject&, const BVSet<EntId, EntIdUniverse>&) override;
 
@@ -915,6 +934,15 @@ namespace moho
      * Core Sim load-serialization routine used by Sim serializer callback.
      */
     void SerializeLoadBody(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00745390 (FUN_00745390, ?SerVars@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Serializes active sim-convar pairs as `(name, lexical value)` strings,
+     * followed by an empty-name sentinel.
+     */
+    void SerVars(gpg::WriteArchive* archive);
 
     /**
      * Address: 0x007551C0 (FUN_007551C0)

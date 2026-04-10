@@ -5,6 +5,7 @@
 
 #include "boost/weak_ptr.h"
 #include "moho/particles/ParticleRenderBuckets.h"
+#include "moho/particles/SParticleBuffer.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/particles/BeamRenderHelpers.h"
 #include "moho/particles/SWorldBeam.h"
@@ -21,55 +22,6 @@ namespace moho
   class ID3DIndexSheet;
   struct ParticleBucketTreeNodeRuntime;
   struct TrailBucketTreeNodeRuntime;
-
-  /**
-   * What it does:
-   * Typed runtime view for one world-particle submit buffer passed through
-   * `CWorldParticles::AddParticles`.
-   */
-  struct ParticleSubmitBufferRuntimeView
-  {
-    std::uint32_t particlesIteratorProxy; // +0x00
-    SWorldParticle* particlesBegin;       // +0x04
-    SWorldParticle* particlesEnd;         // +0x08
-    SWorldParticle* particlesCapacityEnd; // +0x0C
-
-    std::uint32_t trailsIteratorProxy;    // +0x10
-    TrailRuntimeView* trailsBegin;        // +0x14
-    TrailRuntimeView* trailsEnd;          // +0x18
-    TrailRuntimeView* trailsCapacityEnd;  // +0x1C
-
-    std::uint32_t beamsIteratorProxy;     // +0x20
-    SWorldBeam* beamsBegin;               // +0x24
-    SWorldBeam* beamsEnd;                 // +0x28
-    SWorldBeam* beamsCapacityEnd;         // +0x2C
-  };
-
-  static_assert(
-    offsetof(ParticleSubmitBufferRuntimeView, particlesBegin) == 0x04,
-    "ParticleSubmitBufferRuntimeView::particlesBegin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ParticleSubmitBufferRuntimeView, particlesEnd) == 0x08,
-    "ParticleSubmitBufferRuntimeView::particlesEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ParticleSubmitBufferRuntimeView, trailsBegin) == 0x14,
-    "ParticleSubmitBufferRuntimeView::trailsBegin offset must be 0x14"
-  );
-  static_assert(
-    offsetof(ParticleSubmitBufferRuntimeView, trailsEnd) == 0x18,
-    "ParticleSubmitBufferRuntimeView::trailsEnd offset must be 0x18"
-  );
-  static_assert(
-    offsetof(ParticleSubmitBufferRuntimeView, beamsBegin) == 0x24,
-    "ParticleSubmitBufferRuntimeView::beamsBegin offset must be 0x24"
-  );
-  static_assert(
-    offsetof(ParticleSubmitBufferRuntimeView, beamsEnd) == 0x28,
-    "ParticleSubmitBufferRuntimeView::beamsEnd offset must be 0x28"
-  );
-  static_assert(sizeof(ParticleSubmitBufferRuntimeView) == 0x30, "ParticleSubmitBufferRuntimeView size must be 0x30");
 
   /**
    * What it does:
@@ -289,7 +241,7 @@ namespace moho
      * Dispatches one submit-buffer payload into world-particle, trail, and beam
      * append paths in original order.
      */
-    void AddParticles(const ParticleSubmitBufferRuntimeView& batch);
+    void AddParticles(const SParticleBuffer& batch);
 
     /**
      * Address: 0x00492E30 (FUN_00492E30)

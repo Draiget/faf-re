@@ -6,12 +6,15 @@
 #include <cstdlib>
 #include <new>
 #include <stdexcept>
+#include <vector>
 
 #include "CHostManager.h"
+#include "CGpgNetInterface.h"
 #include "CNetNullConnector.h"
 #include "CNetTCPConnector.h"
 #include "CNetUDPConnector.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "NetConVars.h"
@@ -1272,6 +1275,45 @@ void moho::NET_BuildBandwidthUsageSeries(
     ) * (1.0f / 3.0f);
 
     previousOriginal = currentOriginal;
+  }
+}
+
+msvc8::string moho::NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader)
+{
+  uint32_t payloadLen = 0;
+  reader.ReadExact(payloadLen);
+
+  msvc8::string payload;
+  if (payloadLen != 0) {
+    std::vector<char> payloadBuffer(payloadLen);
+    reader.Read(payloadBuffer.data(), payloadLen);
+    payload.assign(payloadBuffer.data(), payloadLen);
+  }
+
+  return payload;
+}
+
+SNetCommandArg moho::NET_DecodeSocketArg(gpg::BinaryReader& reader)
+{
+  uint8_t typeCode = 0;
+  reader.ReadExact(typeCode);
+
+  const auto wireType = static_cast<SNetCommandArg::EType>(typeCode);
+  switch (wireType) {
+  case SNetCommandArg::NETARG_Num: {
+    int32_t value = 0;
+    reader.ReadExact(value);
+    return SNetCommandArg(value);
+  }
+  case SNetCommandArg::NETARG_String:
+    return SNetCommandArg(NET_ReadLengthPrefixedArgPayload(reader));
+  case SNetCommandArg::NETARG_Data: {
+    SNetCommandArg arg(NET_ReadLengthPrefixedArgPayload(reader));
+    arg.mType = SNetCommandArg::NETARG_Data;
+    return arg;
+  }
+  default:
+    throw std::runtime_error("invalid arg typecode");
   }
 }
 

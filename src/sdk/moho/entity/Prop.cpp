@@ -131,10 +131,6 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
 } // namespace
 
 namespace moho
@@ -220,7 +216,7 @@ namespace moho
    */
   int cfunc_PropAddBoundedProp(lua_State* const luaContext)
   {
-    return cfunc_PropAddBoundedPropL(ResolveBindingState(luaContext));
+    return cfunc_PropAddBoundedPropL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

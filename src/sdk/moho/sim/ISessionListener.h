@@ -6,7 +6,22 @@ namespace moho
   {
     // Primary vftable (2 entries)
   public:
-    virtual void OnSessionEvent0() = 0;   // 0xA82547 (slot 0)
-    virtual void OnSessionEvent1() = 0; // 0xA82547 (slot 1)
+    /**
+     * Address: 0x00A82547 (_purecall)
+     * Slot: 0
+     *
+     * What it does:
+     * Base lane-attach hook for concrete session listeners.
+     */
+    virtual void AttachToSessionListenerLane(void* laneContext) = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall)
+     * Slot: 1
+     *
+     * What it does:
+     * Base lane-detach hook for concrete session listeners.
+     */
+    virtual void DetachFromSessionListenerLane(void* laneContext) = 0;
   };
 } // namespace moho

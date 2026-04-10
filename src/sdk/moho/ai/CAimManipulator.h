@@ -18,6 +18,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class CAiTarget;
   class CAniPoseBone;
   class CScrLuaInitForm;
 
@@ -86,18 +87,26 @@ namespace moho
     [[nodiscard]] gpg::RRef GetDerivedObjectRef();
 
     /**
-     * Address: 0x00630200
+     * Address: 0x00630200 (FUN_00630200, Moho::CAimManipulator::dtr)
      * Slot: 0
-     * Demangled: public: __thiscall Moho::CAniManipulator::operator delete()
+     *
+     * What it does:
+     * Runs `CAimManipulator` teardown and frees object storage when
+     * `deleteFlags & 1` is set.
      */
-    virtual void operator_delete() = 0;
+    virtual void operator_delete(std::int32_t deleteFlags);
 
     /**
      * Address: 0x00630DB0
      * Slot: 1
      * Demangled: Moho::CAimManipulator::AimManip
+     *
+     * What it does:
+     * Runs one aim-manipulator update tick: validates owner/weapon state,
+     * resolves target aim direction, updates tracking state, and toggles
+     * event signaled state when target lock is achieved.
      */
-    virtual void AimManip() = 0;
+    virtual void AimManip();
 
     /**
      * Address: 0x00633730 (FUN_00633730, Moho::CAimManipulator::MemberDeserialize)
@@ -125,6 +134,15 @@ namespace moho
     void SetFiringArc(CAimFiringArc arc);
 
   private:
+    /**
+     * Address: 0x006317B0 (FUN_006317B0, Moho::CAimManipulator::Aim)
+     *
+     * What it does:
+     * Computes one normalized aiming direction from muzzle transform and AI
+     * target state, including lead/ballistic prediction paths.
+     */
+    [[nodiscard]] Wm3::Vector3f* Aim(Wm3::Vector3f* outDirection, CAiTarget* target);
+
     /**
      * Address: 0x00630760 (FUN_00630760, Moho::CAimManipulator::Track)
      *

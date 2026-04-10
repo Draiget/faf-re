@@ -1,5 +1,7 @@
 #include "moho/unit/tasks/CUnitPodAssist.h"
 
+#include <new>
+
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
@@ -32,5 +34,17 @@ namespace moho
 
     mTaskState = TASKSTATE_Waiting;
   }
-} // namespace moho
 
+  /**
+   * Address: 0x0061D7D0 (FUN_0061D7D0, Moho::CUnitPodAssist::operator new)
+   */
+  CUnitPodAssist* CUnitPodAssist::Create(CCommandTask* const dispatchTask)
+  {
+    return new (std::nothrow) CUnitPodAssist(dispatchTask);
+  }
+
+  int CUnitPodAssist::Execute()
+  {
+    return 1;
+  }
+} // namespace moho

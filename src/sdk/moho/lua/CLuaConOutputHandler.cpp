@@ -6,6 +6,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 namespace
 {
@@ -14,20 +15,12 @@ namespace
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("user"); set != nullptr) {
+      return *set;
+    }
+
     static moho::CScrLuaInitFormSet sSet("user");
     return sSet;
-  }
-
-  /**
-   * Address: 0x0041EB00 (FUN_0041EB00, context unwrap)
-   * Address: 0x0041ED00 (FUN_0041ED00, context unwrap)
-   *
-   * What it does:
-   * Resolves LuaPlus wrapper state from the native Lua callback context.
-   */
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   gpg::RType* CachedCLuaConOutputHandlerType()
@@ -75,28 +68,6 @@ namespace
     ref.mObj = handler;
     ref.mType = CachedCLuaConOutputHandlerPointerType();
     return ref;
-  }
-
-  LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* fieldName)
-  {
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
   }
 
   /**
@@ -175,7 +146,6 @@ namespace
       return;
     }
 
-    handler->ListUnlink();
     handler->ListLinkBefore(&moho::CON_GetOutputHandlers());
   }
 
@@ -420,7 +390,7 @@ moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus:
 {
   LuaPlus::LuaObject payload(object);
   if (payload.IsTable()) {
-    payload = GetTableFieldByName(payload, "_c_object");
+    payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
   }
 
   if (!payload.IsUserData()) {
@@ -437,7 +407,7 @@ moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus:
  */
 int moho::cfunc_AddConsoleOutputReciever(lua_State* const luaContext)
 {
-  auto* const state = ResolveBindingState(luaContext);
+  auto* const state = moho::SCR_ResolveBindingState(luaContext);
   return cfunc_AddConsoleOutputRecieverL(state);
 }
 
@@ -467,7 +437,7 @@ int moho::cfunc_AddConsoleOutputRecieverL(LuaPlus::LuaState* const state)
  */
 int moho::cfunc_RemoveConsoleOutputReciever(lua_State* const luaContext)
 {
-  auto* const state = ResolveBindingState(luaContext);
+  auto* const state = moho::SCR_ResolveBindingState(luaContext);
   return cfunc_RemoveConsoleOutputRecieverL(state);
 }
 

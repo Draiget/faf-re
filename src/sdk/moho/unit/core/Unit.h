@@ -35,6 +35,8 @@ namespace moho
   class UserUnit;
   class VTransform;
   struct SExtraUnitData;
+  template <class T>
+  class Stats;
 } // namespace moho
 namespace moho
 {
@@ -54,6 +56,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   class RRef;
+  class RType;
   class SerConstructResult;
 } // namespace gpg
 
@@ -302,9 +305,38 @@ namespace moho
    */
   struct SSTIUnitConstantData
   {
+    /**
+     * Address: 0x005BD720 (FUN_005BD720, ??0SSTIUnitConstantData@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one unit constant-data payload and seeds a default
+     * `Stats<StatItem>` shared root.
+     */
+    SSTIUnitConstantData();
+
+    /**
+     * Address: 0x0055DF40 (FUN_0055DF40, Moho::SSTIUnitConstantData::MemberDeserialize)
+     *
+     * What it does:
+     * Loads build-state tag, stats root shared-pointer lane, and fake flag from
+     * archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version);
+
+    /**
+     * Address: 0x0055DFB0 (FUN_0055DFB0, Moho::SSTIUnitConstantData::MemberSerialize)
+     *
+     * What it does:
+     * Saves build-state tag, stats root shared-pointer lane, and fake flag to
+     * archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version) const;
+
+    static gpg::RType* sType;
+
     std::uint8_t mBuildStateTag;    // +0x00
     std::uint8_t pad_01[3];         // +0x01
-    boost::shared_ptr<StatItem> mStatsRoot; // +0x04
+    boost::shared_ptr<Stats<StatItem>> mStatsRoot; // +0x04
     std::uint8_t mFake;             // +0x0C
     std::uint8_t pad_0D[3];         // +0x0D
   };
@@ -906,6 +938,34 @@ namespace moho
      */
     [[nodiscard]]
     Unit* GetStagingPlatform() const;
+
+    /**
+     * Address: 0x005E3C30 (FUN_005E3C30, Moho::Unit::GetTransportedBy)
+     *
+     * What it does:
+     * Resolves `TransportedByRef` intrusive weak-link slot to a `Unit*`.
+     */
+    [[nodiscard]]
+    Unit* GetTransportedBy() const;
+
+    /**
+     * Address: 0x005F5540 (FUN_005F5540, Moho::Unit::GetCreator)
+     *
+     * What it does:
+     * Resolves `CreatorRef` intrusive weak-link slot to a `Unit*`.
+     */
+    [[nodiscard]]
+    Unit* GetCreator() const;
+
+    /**
+     * Address: 0x006A8D40 (FUN_006A8D40, Moho::Unit::IsSameFormationLayerWith)
+     *
+     * What it does:
+     * Returns true when both units are not attacking and share the same
+     * non-null formation-layer pointer in `SInfoCache`.
+     */
+    [[nodiscard]]
+    bool IsSameFormationLayerWith(const Unit* other) const;
 
     /**
      * Address: 0x006A8D80 (FUN_006A8D80, ?IsHigherPriorityThan@Unit@Moho@@QBE_NPBV12@@Z)

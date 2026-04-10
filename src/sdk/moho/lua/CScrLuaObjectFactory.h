@@ -47,6 +47,17 @@ namespace moho
   SCR_GetLuaTableField(LuaPlus::LuaState* state, const LuaPlus::LuaObject& tableObj, const char* fieldName);
 
   /**
+   * Reads one table field and throws with explicit messages when table/field
+   * are unavailable.
+   */
+  [[nodiscard]] LuaPlus::LuaObject SCR_GetLuaTableFieldOrThrow(
+    const LuaPlus::LuaObject& tableObj,
+    const char* fieldName,
+    const char* missingTableMessage,
+    const char* missingFieldFormat
+  );
+
+  /**
    * Address: 0x004D2F70 (FUN_004D2F70, ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
    *
    * What it does:

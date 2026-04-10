@@ -97,7 +97,6 @@ namespace
    */
   [[maybe_unused]] moho::CTaskThread* RelinkThreadToPrimaryStageList(moho::CTaskThread* const thread)
   {
-    thread->ListUnlink();
     thread->ListLinkBefore(&thread->mStage->mThreads);
     thread->mStaged = false;
     return thread;

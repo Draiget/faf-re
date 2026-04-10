@@ -1614,28 +1614,6 @@ namespace
     return cached;
   }
 
-  LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* const fieldName)
-  {
-    LuaPlus::LuaObject out{};
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int savedTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, savedTop);
-    return out;
-  }
-
   [[nodiscard]] LuaPlus::LuaObject CopyLuaObjectToState(const LuaPlus::LuaObject& source, LuaPlus::LuaState* const targetState)
   {
     if (!targetState || !targetState->GetCState()) {
@@ -1677,7 +1655,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -14818,16 +14796,10 @@ moho::CMauiControl::~CMauiControl()
   reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mRightLV)->~LuaObject();
   reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mLeftLV)->~LuaObject();
 
-  childSentinel->mPrev->mNext = childSentinel->mNext;
-  childSentinel->mNext->mPrev = childSentinel->mPrev;
-  childSentinel->mNext = childSentinel;
-  childSentinel->mPrev = childSentinel;
+  childSentinel->ListUnlink();
 
   CMauiControlListNode* const parentListNode = &hierarchyView->mParentList;
-  parentListNode->mPrev->mNext = parentListNode->mNext;
-  parentListNode->mNext->mPrev = parentListNode->mPrev;
-  parentListNode->mNext = parentListNode;
-  parentListNode->mPrev = parentListNode;
+  parentListNode->ListUnlink();
 
   reinterpret_cast<CScriptObject*>(this)->~CScriptObject();
 }

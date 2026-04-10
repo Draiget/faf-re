@@ -895,8 +895,17 @@ namespace
     static std::int32_t nextRuntimeEventType = 10000;
     return ++nextRuntimeEventType;
   }
+  std::int32_t gWxEvtIdleRuntimeType = 0;
   std::int32_t gWxEvtDropFilesRuntimeType = 0;
   std::int32_t gWxEvtMouseCaptureChangedRuntimeType = 0;
+
+  [[nodiscard]] std::int32_t EnsureWxEvtIdleRuntimeType()
+  {
+    if (gWxEvtIdleRuntimeType == 0) {
+      gWxEvtIdleRuntimeType = wxNewEventType();
+    }
+    return gWxEvtIdleRuntimeType;
+  }
 
   [[nodiscard]] std::int32_t EnsureWxEvtDropFilesRuntimeType()
   {
@@ -913,6 +922,47 @@ namespace
     }
     return gWxEvtMouseCaptureChangedRuntimeType;
   }
+
+  class WxIdleEventRuntime final : public wxEventRuntime
+  {
+  public:
+    WxIdleEventRuntime()
+      : wxEventRuntime(0, EnsureWxEvtIdleRuntimeType())
+      , mRequestMore(false)
+      , mPadding21To23{0, 0, 0}
+    {
+    }
+
+    WxIdleEventRuntime* Clone() const override
+    {
+      auto* const clone = new (std::nothrow) WxIdleEventRuntime();
+      if (clone == nullptr) {
+        return nullptr;
+      }
+
+      clone->mRefData = mRefData;
+      clone->mEventObject = mEventObject;
+      clone->mEventType = mEventType;
+      clone->mEventTimestamp = mEventTimestamp;
+      clone->mEventId = mEventId;
+      clone->mCallbackUserData = mCallbackUserData;
+      clone->mSkipped = mSkipped;
+      clone->mIsCommandEvent = mIsCommandEvent;
+      clone->mReserved1E = mReserved1E;
+      clone->mReserved1F = mReserved1F;
+      clone->mRequestMore = mRequestMore;
+      return clone;
+    }
+
+    bool mRequestMore;
+    std::uint8_t mPadding21To23[0x03];
+  };
+
+  static_assert(
+    offsetof(WxIdleEventRuntime, mRequestMore) == 0x20,
+    "WxIdleEventRuntime::mRequestMore offset must be 0x20"
+  );
+  static_assert(sizeof(WxIdleEventRuntime) == 0x24, "WxIdleEventRuntime size must be 0x24");
 
   class WxDropFilesEventRuntime final : public wxEventRuntime
   {
@@ -3441,6 +3491,58 @@ void* wxWindowBase::GetDropTarget() const
 {
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
   return state != nullptr ? state->dropTarget : nullptr;
+}
+
+/**
+ * Address: 0x00992230 (FUN_00992230, ?Pending@wxApp@@UAE_NXZ)
+ *
+ * What it does:
+ * Reports whether at least one Win32 message is pending without removing it.
+ */
+bool wxApp::Pending()
+{
+  return ::PeekMessageW(&gCurrentMessage, nullptr, 0u, 0u, 0u) != FALSE;
+}
+
+/**
+ * Address: 0x00992250 (FUN_00992250, ?Dispatch@wxApp@@UAEXXZ)
+ *
+ * What it does:
+ * Dispatches one queued app-loop message through the recovered wx runtime lane.
+ */
+void wxApp::Dispatch()
+{
+  (void)DoMessage();
+}
+
+/**
+ * Address: 0x009AA860 (FUN_009AA860, ?OnExit@wxAppBase@@UAEHXZ)
+ *
+ * What it does:
+ * Base wx app shutdown hook. The recovered FA lane returns success (`0`)
+ * after higher-level teardown paths complete.
+ */
+int wxApp::OnExit()
+{
+  return 0;
+}
+
+/**
+ * Address: 0x00992190 (FUN_00992190, ?ProcessIdle@wxApp@@UAE_NXZ)
+ *
+ * What it does:
+ * Builds one idle event, dispatches it through the app event-handler lane,
+ * and returns the idle-event `request more` flag.
+ */
+bool wxApp::ProcessIdle()
+{
+  WxIdleEventRuntime idleEvent{};
+  idleEvent.mEventObject = this;
+
+  (void)ProcessEvent(&idleEvent);
+  const bool requestMore = idleEvent.mRequestMore;
+  RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&idleEvent));
+  return requestMore;
 }
 
 /**

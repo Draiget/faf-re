@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "moho/containers/TDatList.h"
+#include "wm3/Vector2.h"
 
 namespace moho
 {
@@ -175,6 +176,15 @@ namespace moho
       virtual ~Handle();
 
       /**
+       * Address: 0x008B83B0 (FUN_008B83B0, Moho::VisionDB::Handle::Update)
+       *
+       * What it does:
+       * Refreshes this handle's previous/current circles and visibility bit,
+       * then reparents into the vision tree when containment no longer holds.
+       */
+      void Update(const Wm3::Vector2f& next, const Wm3::Vector2f& previous, float radius, bool visible);
+
+      /**
        * Address: 0x0081AE10 (FUN_0081AE10)
        *
        * What it does:
@@ -224,6 +234,15 @@ namespace moho
     MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mNode) == 0x08, "VisionDB::Handle::mNode offset must be 0x08");
 
     VisionDB();
+
+    /**
+     * Address: 0x0081AFD0 (FUN_0081AFD0, Moho::VisionDB::NewHandle)
+     *
+     * What it does:
+     * Allocates one tracked vision handle using previous/current 2D positions
+     * and inserts its pooled node under the root vision entry.
+     */
+    [[nodiscard]] Handle* NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous);
 
     /**
      * Address: 0x0081AEB0 (FUN_0081AEB0)

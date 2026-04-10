@@ -18,6 +18,7 @@ namespace
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 
   static_assert(sizeof(Rect2iListTypeInfo) == 0x64, "Rect2iListTypeInfo size must be 0x64");
@@ -164,6 +165,20 @@ namespace
     }
 
     return gRect2iListTypeName.c_str();
+  }
+
+  /**
+   * Address: 0x005AB060 (FUN_005AB060, gpg::RListType_Rect2i::GetLexical)
+   *
+   * What it does:
+   * Formats the default RTTI lexical text and appends current list length.
+   */
+  msvc8::string Rect2iListTypeInfo::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string lexical = gpg::RType::GetLexical(ref);
+    const auto* const list = static_cast<const std::list<gpg::Rect2i>*>(ref.mObj);
+    const int size = list ? static_cast<int>(list->size()) : 0;
+    return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
   }
 
   void AddBaseByTypeInfo(gpg::RType* typeInfo, const std::type_info& baseTypeInfo, const std::int32_t baseOffset)

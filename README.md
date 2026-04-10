@@ -1,8 +1,8 @@
-# FAF-RE
+﻿# FAF-RE
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries.
 
-## Recovery Coverage (2026-04-08, `fa_full_2026_03_26`)
+## Recovery Coverage (2026-04-09, `fa_full_2026_03_26`)
 
 Coverage is computed from:
 
@@ -17,26 +17,35 @@ python scripts/recovery_coverage.py --dump-excluded-external-csv decomp/recovery
 python scripts/detect_boost_patch_version.py --mode binary --binary-file bin/external/ForgedAlliance.exe
 ```
 
+Pending-reconstruction guard (prevents "forgotten partial lifts"):
+
+```bat
+python scripts/recovery_pending_audit.py --namespace fa_full_2026_03_26 --include-untracked
+python scripts/recovery_pending_audit.py --namespace fa_full_2026_03_26 --include-untracked --queue-out decomp/recovery/queues/pending_reconstruction_mismatches.txt
+python skills/fa-recovery-iteration/scripts/recovered_progress.py bulk-mark --namespace fa_full_2026_03_26 --functions-file decomp/recovery/queues/pending_reconstruction_mismatches.txt --status needs_evidence --note "Source contains pending reconstruction marker; keep tracked as unfinished."
+```
+
 Progress snapshot:
 
-- Total exported functions: `67,164 of 67,164 (100.00% completed)`
-- Recovered so far: `27,190`
-- Pending: `37,912`
-- Blocked: `2,111`
-- Coverage (recovered): `40.48%`
+- Total functions: `67,166`
+- Recovered so far: `27,769`
+- Pending: `37,316`
+- Blocked: `2,135`
+- In progress: `8`
+- **Coverage (of recovered functions): `41.34%`**
 
 By namespace:
 
-- `moho`: `5,023/8,717 (57.62%)`
-- `gpg`: `1,350/2,172 (62.15%)`
-- `other`: `11,733/53,936 (21.75%)`
-- `dependencies` (external entries with body evidence): `360/2,328 (15.46%)`
-- `dependencies` not link-proven in built libs (recovery-required): `402/1,063 (37.82%)`
+- `moho`: `5,042/8,717 (57.84%)`
+- `gpg`: `1,370/2,172 (63.08%)`
+- `other`: `12,266/53,936 (22.74%)`
+- `dependencies` (external entries with body evidence): `370/2,328 (15.89%)`
+- `dependencies` not link-proven in built libs (recovery-required): `417/1,068 (39.04%)`
 
 By external dependency:
 
-- `wxWidgets`: `1,265/1,359` will be linked (`93.08%`); recovery-required `1/94 (1.06%)`
-- `MSVC STL/CRT`: `0/398` will be linked (`0.00%`); recovery-required `192/398 (48.24%)`
+- `wxWidgets`: `1,260/1,359` will be linked (`92.72%`); recovery-required `6/99 (6.06%)`
+- `MSVC STL/CRT`: `0/398` will be linked (`0.00%`); recovery-required `202/398 (50.75%)`
 - `WildMagic`: `0/387` will be linked (`0.00%`); recovery-required `50/387 (12.92%)`
 - `LuaPlus/Lua`: `0/184` will be linked (`0.00%`); recovery-required `159/184 (86.41%)`
 

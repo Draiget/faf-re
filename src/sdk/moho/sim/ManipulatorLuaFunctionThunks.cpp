@@ -274,11 +274,6 @@ namespace
     "CRotateManipulatorRuntimeView::mHasGoal offset must be 0x80"
   );
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
   [[nodiscard]] gpg::RType* CachedCRotateManipulatorType()
   {
     static gpg::RType* cached = nullptr;
@@ -289,28 +284,6 @@ namespace
       cached = gpg::REF_FindTypeNamed("Moho::CRotateManipulator");
     }
     return cached;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* fieldName)
-  {
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
   }
 
   [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
@@ -339,7 +312,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -380,20 +353,9 @@ namespace
     return static_cast<CRotateManipulatorRuntimeView*>(upcast.mObj);
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -488,7 +450,7 @@ namespace moho
    */
   int cfunc_CRotateManipulatorClearGoal(lua_State* const luaContext)
   {
-    return cfunc_CRotateManipulatorClearGoalL(ResolveBindingState(luaContext));
+    return cfunc_CRotateManipulatorClearGoalL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

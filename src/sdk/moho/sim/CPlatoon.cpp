@@ -3,17 +3,20 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
 #include <string>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/InstanceCounter.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
@@ -388,6 +391,23 @@ namespace
     return unit && !unit->IsDead() && !unit->DestroyQueued();
   }
 
+  void DestroyOwnedSquad(moho::CSquad* const squad) noexcept
+  {
+    if (squad == nullptr) {
+      return;
+    }
+
+    auto** const vtable = *reinterpret_cast<void***>(squad);
+    if (vtable == nullptr || vtable[2] == nullptr) {
+      operator delete(squad);
+      return;
+    }
+
+    using DeletingDtor = void(__thiscall*)(void*, int);
+    const auto deletingDtor = reinterpret_cast<DeletingDtor>(vtable[2]);
+    deletingDtor(squad, 1);
+  }
+
   [[nodiscard]] float ReadSquaredRadiusArg(LuaPlus::LuaState* const state, const int stackIndex)
   {
     LuaPlus::LuaStackObject radiusArg(state, stackIndex);
@@ -428,42 +448,60 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
+  /**
+   * Address: 0x00724150 (FUN_00724150, Moho::CSquad::RemoveUnit)
+   *
+   * What it does:
+   * Searches one squad's unit slot vector for a matching entity, removes the
+   * matched slot by compacting trailing entries, and preserves first-match
+   * behavior.
+   */
+  void RemoveUnitFromSquad(CSquadRuntimeView* const squad, const moho::Entity* const entity)
   {
-    static moho::CScrLuaInitFormSet sSet("sim");
-    return sSet;
+    if (!squad || !entity) {
+      return;
+    }
+
+    void** const begin = squad->mUnitSlotBegin;
+    void** const end = squad->mUnitSlotEnd;
+    if (begin == end) {
+      return;
+    }
+
+    void** match = begin;
+    for (; match != end; ++match) {
+      const moho::Unit* const unit = DecodeSquadUnit(*match);
+      if (unit != nullptr && static_cast<const moho::Entity*>(unit) == entity) {
+        break;
+      }
+    }
+
+    if (match == end) {
+      return;
+    }
+
+    const std::ptrdiff_t tailCount = end - (match + 1);
+    if (tailCount > 0) {
+      const std::size_t byteCount = static_cast<std::size_t>(tailCount) * sizeof(void*);
+      memmove_s(match, byteCount, match + 1, byteCount);
+    }
+
+    squad->mUnitSlotEnd = end - 1;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    return luaContext ? luaContext->stateUserData : nullptr;
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("sim");
+    return fallbackSet;
   }
 
   [[nodiscard]] gpg::RType* CachedCUnitCommandType()
   {
     return moho::CUnitCommand::StaticGetClass();
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* fieldName)
-  {
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
   }
 
   [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
@@ -492,7 +530,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {
@@ -634,6 +672,108 @@ namespace moho
   }
 
   /**
+   * Address: 0x00723AC0 (FUN_00723AC0, Moho::CPlatoon::GetClass)
+   */
+  gpg::RType* CPlatoon::GetClass() const
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CPlatoon));
+    }
+    return sType;
+  }
+
+  /**
+   * Address: 0x00723AE0 (FUN_00723AE0, Moho::CPlatoon::GetDerivedObjectRef)
+   */
+  gpg::RRef CPlatoon::GetDerivedObjectRef()
+  {
+    gpg::RRef objectRef{};
+    objectRef.mObj = this;
+    objectRef.mType = GetClass();
+    return objectRef;
+  }
+
+  /**
+   * Address: 0x0072A300 (FUN_0072A300, Moho::CPlatoon::operator new)
+   */
+  CPlatoon* CPlatoon::Create(
+    Sim* const sim,
+    CArmyImpl* const army,
+    const char* const platoonName,
+    const char* const aiPlan
+  )
+  {
+    return new (std::nothrow) CPlatoon(sim, army, platoonName, aiPlan);
+  }
+
+  /**
+   * Address: 0x00724CC0 (FUN_00724CC0, Moho::CPlatoon::CPlatoon)
+   */
+  CPlatoon::CPlatoon(Sim* const sim, CArmyImpl* const army, const char* const platoonName, const char* const aiPlan)
+    : CScriptObject(
+      CScrLuaMetatableFactory<CPlatoon>::Instance().Get(sim ? sim->mLuaState : nullptr),
+      LuaPlus::LuaObject{},
+      LuaPlus::LuaObject{},
+      LuaPlus::LuaObject{}
+    )
+    , mSim(sim)
+    , mArmy(army)
+    , mUnknown_0x03C(0u)
+    , mSquadList()
+    , mName()
+    , mPlan()
+    , mUniqueName()
+    , mFormation()
+    , mDisbandOnIdle(0u)
+    , mPad_0x0E1{0u, 0u, 0u}
+    , mLifetimeStat1(0)
+    , mLifetimeStat2(0)
+    , mLifetimeStat3(0.0f)
+    , mLifetimeStat4(0.0f)
+    , mLuaUnitList()
+    , mHasLuaList(0u)
+    , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
+  {
+    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
+#if defined(_WIN32)
+      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1);
+#else
+      statItem->mPrimaryValueBits += 1;
+#endif
+    }
+
+    if (platoonName != nullptr) {
+      mName.assign(platoonName);
+    }
+
+    if (aiPlan != nullptr) {
+      mPlan.assign(aiPlan);
+    }
+
+    const char* planArg = mPlan.c_str();
+    CallbackStr("OnCreate", &planArg);
+  }
+
+  /**
+   * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
+   */
+  CPlatoon::~CPlatoon()
+  {
+    for (CSquad** squadIt = mSquadList.begin(); squadIt != mSquadList.end(); ++squadIt) {
+      DestroyOwnedSquad(*squadIt);
+    }
+    mSquadList.ResetStorageToInline();
+
+    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
+#if defined(_WIN32)
+      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), -1);
+#else
+      statItem->mPrimaryValueBits -= 1;
+#endif
+    }
+  }
+
+  /**
    * Address: 0x00725630 (FUN_00725630, Moho::CPlatoon::GetSquad)
    *
    * What it does:
@@ -644,6 +784,34 @@ namespace moho
     auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
     CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, squadClass);
     return reinterpret_cast<CSquad*>(squadView);
+  }
+
+  /**
+   * Address: 0x007253B0 (FUN_007253B0, Moho::CPlatoon::RemoveUnit)
+   *
+   * What it does:
+   * Clears the platoon Lua unit cache flag, walks each squad lane, and removes
+   * the first matching entity from the owning squad.
+   */
+  void CPlatoon::RemoveUnit(Entity* const unit)
+  {
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    runtimeView.mHasLuaList = 0u;
+
+    for (CSquadRuntimeView** squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
+      CSquadRuntimeView* const squadView = *squadLane;
+      if (!squadView) {
+        continue;
+      }
+
+      for (void** unitSlot = squadView->mUnitSlotBegin; unitSlot != squadView->mUnitSlotEnd; ++unitSlot) {
+        const moho::Unit* const squadUnit = DecodeSquadUnit(*unitSlot);
+        if (squadUnit != nullptr && static_cast<const moho::Entity*>(squadUnit) == unit) {
+          RemoveUnitFromSquad(squadView, unit);
+          return;
+        }
+      }
+    }
   }
 
   /**
@@ -843,6 +1011,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
+   *
+   * What it does:
+   * Moves this platoon's current unit set into the army-pool platoon
+   * unassigned lane and invalidates Lua unit-list caches on both platoons.
+   */
+  void CPlatoon::PullUnassignedUnitsFrom(CPlatoon* const armyPool)
+  {
+    constexpr const char* kArmyPoolName = "ArmyPool";
+
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    runtimeView.mHasLuaList = 0u;
+
+    if (armyPool == nullptr || runtimeView.mArmy == nullptr) {
+      return;
+    }
+
+    auto& armyPoolRuntimeView = *reinterpret_cast<CPlatoonRuntimeView*>(armyPool);
+    if (FindSquadByClass(armyPoolRuntimeView, kUnassignedSquadClass) == nullptr) {
+      return;
+    }
+
+    SEntitySetTemplateUnit unitsToTransfer{};
+    BuildPlatoonUnitSet(runtimeView, unitsToTransfer);
+    if (unitsToTransfer.mVec.empty()) {
+      return;
+    }
+
+    runtimeView.mArmy->AssignUnitsToPlatoon(&unitsToTransfer, kArmyPoolName);
+    runtimeView.mHasLuaList = 0u;
+    armyPoolRuntimeView.mHasLuaList = 0u;
+  }
+
+  /**
    * Address: 0x00BDAE70 (FUN_00BDAE70, register_CPlatoonCanConsiderFormingPlatoon_LuaFuncDef)
    *
    * What it does:
@@ -862,7 +1064,7 @@ namespace moho
    */
   int cfunc_CPlatoonIsOpponentAIRunning(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonIsOpponentAIRunningL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonIsOpponentAIRunningL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -892,7 +1094,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetPersonality(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetPersonalityL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetPersonalityL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -951,7 +1153,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetBrain(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetBrainL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetBrainL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1001,7 +1203,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetFactionIndex(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetFactionIndexL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetFactionIndexL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1056,7 +1258,7 @@ namespace moho
    */
   int cfunc_CPlatoonUniquelyNamePlatoon(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonUniquelyNamePlatoonL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonUniquelyNamePlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1113,7 +1315,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetPlatoonUniqueName(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetPlatoonUniqueNameL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetPlatoonUniqueNameL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1171,7 +1373,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetAIPlan(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetAIPlanL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetAIPlanL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1225,7 +1427,7 @@ namespace moho
    */
   int cfunc_CPlatoonSwitchAIPlan(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonSwitchAIPlanL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonSwitchAIPlanL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1281,7 +1483,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetPlatoonPosition(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetPlatoonPositionL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetPlatoonPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1342,7 +1544,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetSquadPosition(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetSquadPositionL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetSquadPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1424,7 +1626,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetSquadUnits(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetSquadUnitsL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetSquadUnitsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1547,7 +1749,7 @@ namespace moho
    */
   int cfunc_CPlatoonCanConsiderFormingPlatoon(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonCanConsiderFormingPlatoonL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonCanConsiderFormingPlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1602,7 +1804,7 @@ namespace moho
    */
   int cfunc_CPlatoonDisbandOnIdle(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonDisbandOnIdleL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonDisbandOnIdleL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1653,7 +1855,7 @@ namespace moho
    */
   int cfunc_CPlatoonIsCommandsActive(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonIsCommandsActiveL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonIsCommandsActiveL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1722,7 +1924,7 @@ namespace moho
    */
   int cfunc_CPlatoonIsAttacking(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonIsAttackingL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonIsAttackingL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1786,7 +1988,7 @@ namespace moho
    */
   int cfunc_CPlatoonIsMoving(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonIsMovingL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonIsMovingL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1850,7 +2052,7 @@ namespace moho
    */
   int cfunc_CPlatoonIsPatrolling(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonIsPatrollingL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonIsPatrollingL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1914,7 +2116,7 @@ namespace moho
    */
   int cfunc_CPlatoonIsFerrying(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonIsFerryingL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonIsFerryingL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1978,7 +2180,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetPlatoonUnits(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetPlatoonUnitsL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetPlatoonUnitsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2075,7 +2277,7 @@ namespace moho
    */
   int cfunc_CPlatoonCanFormPlatoon(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonCanFormPlatoonL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonCanFormPlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2105,7 +2307,7 @@ namespace moho
    */
   int cfunc_CPlatoonFormPlatoon(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFormPlatoonL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFormPlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2136,7 +2338,7 @@ namespace moho
    */
   int cfunc_CPlatoonSetPrioritizedTargetList(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonSetPrioritizedTargetListL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonSetPrioritizedTargetListL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2166,7 +2368,7 @@ namespace moho
    */
   int cfunc_CPlatoonFindPrioritizedUnit(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFindPrioritizedUnitL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFindPrioritizedUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2196,7 +2398,7 @@ namespace moho
    */
   int cfunc_CPlatoonFindClosestUnit(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFindClosestUnitL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFindClosestUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2226,7 +2428,7 @@ namespace moho
    */
   int cfunc_CPlatoonFindClosestUnitToBase(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFindClosestUnitToBaseL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFindClosestUnitToBaseL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2256,7 +2458,7 @@ namespace moho
    */
   int cfunc_CPlatoonFindFurthestUnit(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFindFurthestUnitL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFindFurthestUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2286,7 +2488,7 @@ namespace moho
    */
   int cfunc_CPlatoonFindHighestValueUnit(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFindHighestValueUnitL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFindHighestValueUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2316,7 +2518,7 @@ namespace moho
    */
   int cfunc_CPlatoonCanAttackTarget(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonCanAttackTargetL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonCanAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2346,7 +2548,7 @@ namespace moho
    */
   int cfunc_CPlatoonStop(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonStopL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonStopL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2418,7 +2620,7 @@ namespace moho
    */
   int cfunc_CPlatoonAttackTarget(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonAttackTargetL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2448,7 +2650,7 @@ namespace moho
    */
   int cfunc_CPlatoonMoveToTarget(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonMoveToTargetL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonMoveToTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2478,7 +2680,7 @@ namespace moho
    */
   int cfunc_CPlatoonMoveToLocation(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonMoveToLocationL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonMoveToLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2508,7 +2710,7 @@ namespace moho
    */
   int cfunc_CPlatoonAggressiveMoveToLocation(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonAggressiveMoveToLocationL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonAggressiveMoveToLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2538,7 +2740,7 @@ namespace moho
    */
   int cfunc_CPlatoonFerryToLocation(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonFerryToLocationL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonFerryToLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2568,7 +2770,7 @@ namespace moho
    */
   int cfunc_CPlatoonLoadUnits(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonLoadUnitsL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonLoadUnitsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2598,7 +2800,7 @@ namespace moho
    */
   int cfunc_CPlatoonUnloadUnitsAtLocation(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonUnloadUnitsAtLocationL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonUnloadUnitsAtLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2628,7 +2830,7 @@ namespace moho
    */
   int cfunc_CPlatoonUnloadAllAtLocation(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonUnloadAllAtLocationL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonUnloadAllAtLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2658,7 +2860,7 @@ namespace moho
    */
   int cfunc_CPlatoonPatrol(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonPatrolL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonPatrolL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2688,7 +2890,7 @@ namespace moho
    */
   int cfunc_CPlatoonGuardTarget(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGuardTargetL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGuardTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2718,7 +2920,7 @@ namespace moho
    */
   int cfunc_CPlatoonDestroy(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonDestroyL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonDestroyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2748,7 +2950,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetFerryBeacons(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetFerryBeaconsL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetFerryBeaconsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2778,7 +2980,7 @@ namespace moho
    */
   int cfunc_CPlatoonUseFerryBeacon(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonUseFerryBeaconL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonUseFerryBeaconL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2808,7 +3010,7 @@ namespace moho
    */
   int cfunc_CPlatoonUseTeleporter(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonUseTeleporterL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonUseTeleporterL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2838,7 +3040,7 @@ namespace moho
    */
   int cfunc_CPlatoonSetPlatoonFormationOverride(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonSetPlatoonFormationOverrideL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonSetPlatoonFormationOverrideL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2868,7 +3070,7 @@ namespace moho
    */
   int cfunc_CPlatoonGetPlatoonLifetimeStats(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonGetPlatoonLifetimeStatsL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonGetPlatoonLifetimeStatsL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -2932,7 +3134,7 @@ namespace moho
    */
   int cfunc_CPlatoonCalculatePlatoonThreat(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonCalculatePlatoonThreatL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonCalculatePlatoonThreatL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3017,7 +3219,7 @@ namespace moho
    */
   int cfunc_CPlatoonCalculatePlatoonThreatAroundPosition(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3119,7 +3321,7 @@ namespace moho
    */
   int cfunc_CPlatoonPlatoonCategoryCountAroundPosition(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -3210,7 +3412,7 @@ namespace moho
    */
   int cfunc_CPlatoonPlatoonCategoryCount(lua_State* const luaContext)
   {
-    return cfunc_CPlatoonPlatoonCategoryCountL(ResolveBindingState(luaContext));
+    return cfunc_CPlatoonPlatoonCategoryCountL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

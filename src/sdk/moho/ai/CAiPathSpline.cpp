@@ -1104,9 +1104,16 @@ const char* FastVectorCPathPointTypeInfo::GetName() const
   return gFastVectorCPathPointTypeName.c_str();
 }
 
+/**
+ * Address: 0x005B4A10 (FUN_005B4A10, gpg::RFastVectorType_CPathPoint::GetLexical)
+ *
+ * What it does:
+ * Formats vector lexical text and appends the runtime path-point count.
+ */
 msvc8::string FastVectorCPathPointTypeInfo::GetLexical(const gpg::RRef& ref) const
 {
-  return gpg::RType::GetLexical(ref);
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
 const gpg::RIndexed* FastVectorCPathPointTypeInfo::IsIndexed() const

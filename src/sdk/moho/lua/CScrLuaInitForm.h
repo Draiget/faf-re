@@ -8,6 +8,8 @@ namespace LuaPlus
   class LuaState;
 }
 
+struct lua_State;
+
 namespace moho
 {
   class CScrLuaInitForm;
@@ -175,4 +177,22 @@ namespace moho
   static_assert(offsetof(CScrLuaInitForm, mDocString) == 0x0C, "CScrLuaInitForm::mDocString offset must be 0x0C");
   static_assert(offsetof(CScrLuaInitForm, mNextInSet) == 0x10, "CScrLuaInitForm::mNextInSet offset must be 0x10");
   static_assert(sizeof(CScrLuaInitForm) == 0x14, "CScrLuaInitForm size must be 0x14");
+
+  /**
+   * Address context:
+   * - recurring Lua callback-thunk context unwrap sequence.
+   *
+   * What it does:
+   * Resolves LuaPlus wrapper state pointer from raw `lua_State` callback lane.
+   */
+  [[nodiscard]] LuaPlus::LuaState* SCR_ResolveBindingState(lua_State* luaContext) noexcept;
+
+  /**
+   * Address context:
+   * - recurring `CScrLuaInitFormSet` intrusive list lookup sequence.
+   *
+   * What it does:
+   * Returns first init-form set whose name exactly matches `setName`.
+   */
+  [[nodiscard]] CScrLuaInitFormSet* SCR_FindLuaInitFormSet(const char* setName) noexcept;
 } // namespace moho

@@ -69,24 +69,9 @@ namespace
   constexpr const char* kSetDirectionalAnimHelpText = "AnimationManipulator:SetDirectionalAnim(bool)";
   constexpr const char* kPlayAnimHelpText = "AnimManipulator:PlayAnim(entity, animName, looping=false)";
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
-  {
-    return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindSimLuaInitSet() noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, "sim") == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
-    if (moho::CScrLuaInitFormSet* const set = FindSimLuaInitSet(); set != nullptr) {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("sim"); set != nullptr) {
       return *set;
     }
 
@@ -447,6 +432,34 @@ namespace
   }
 
   /**
+   * Address: 0x006423A0 (FUN_006423A0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CAnimationManipulator deserialize thunk alias into the
+   * shared deserialize helper body.
+   */
+  void DeserializeCAnimationManipulatorThunkVariantA(
+    moho::CAnimationManipulator* const object, gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCAnimationManipulatorState(object, archive);
+  }
+
+  /**
+   * Address: 0x00642800 (FUN_00642800, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CAnimationManipulator deserialize thunk alias into
+   * the shared deserialize helper body.
+   */
+  void DeserializeCAnimationManipulatorThunkVariantB(
+    moho::CAnimationManipulator* const object, gpg::ReadArchive* const archive
+  )
+  {
+    DeserializeCAnimationManipulatorState(object, archive);
+  }
+
+  /**
    * Address: 0x00642BB0 (FUN_00642BB0, SerializeCAnimationManipulatorState)
    *
    * What it does:
@@ -475,6 +488,34 @@ namespace
     archive->WriteBool(object->mOverwriteMode);
     archive->WriteBool(object->mDisableOnSignal);
     archive->WriteBool(object->mDirectionalAnim);
+  }
+
+  /**
+   * Address: 0x006423B0 (FUN_006423B0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CAnimationManipulator serialize thunk alias into the
+   * shared serialize helper body.
+   */
+  void SerializeCAnimationManipulatorThunkVariantA(
+    const moho::CAnimationManipulator* const object, gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCAnimationManipulatorState(object, archive);
+  }
+
+  /**
+   * Address: 0x00642810 (FUN_00642810, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CAnimationManipulator serialize thunk alias into
+   * the shared serialize helper body.
+   */
+  void SerializeCAnimationManipulatorThunkVariantB(
+    const moho::CAnimationManipulator* const object, gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCAnimationManipulatorState(object, archive);
   }
 
   gpg::SerHelperBase* cleanup_CAnimationManipulatorConstructImpl()
@@ -555,7 +596,7 @@ namespace moho
    */
   int cfunc_CreateAnimator(lua_State* const luaContext)
   {
-    return cfunc_CreateAnimatorL(ResolveBindingState(luaContext));
+    return cfunc_CreateAnimatorL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -630,7 +671,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetRate(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetRateL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetRateL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -689,7 +730,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorGetRate(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorGetRateL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorGetRateL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -741,7 +782,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorGetAnimationFraction(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorGetAnimationFractionL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorGetAnimationFractionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -793,7 +834,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetAnimationFraction(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetAnimationFractionL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetAnimationFractionL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -854,7 +895,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorGetAnimationTime(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorGetAnimationTimeL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorGetAnimationTimeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -906,7 +947,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetAnimationTime(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetAnimationTimeL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetAnimationTimeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -966,7 +1007,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorGetAnimationDuration(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorGetAnimationDurationL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorGetAnimationDurationL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1018,7 +1059,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetBoneEnabled(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetBoneEnabledL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetBoneEnabledL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1093,7 +1134,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetOverwriteMode(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetOverwriteModeL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetOverwriteModeL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1147,7 +1188,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetDisableOnSignal(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetDisableOnSignalL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetDisableOnSignalL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**
@@ -1201,7 +1242,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetDirectionalAnim(lua_State* const luaContext)
   {
-    return cfunc_CAnimationManipulatorSetDirectionalAnimL(ResolveBindingState(luaContext));
+    return cfunc_CAnimationManipulatorSetDirectionalAnimL(moho::SCR_ResolveBindingState(luaContext));
   }
 
   /**

@@ -56,6 +56,14 @@ namespace moho
     ~UnitWeapon() override;
 
     /**
+     * Address: 0x0062FD70 (FUN_0062FD70, Moho::UnitWeapon::GetLabel)
+     *
+     * What it does:
+     * Copies this weapon label text into caller-provided output storage.
+     */
+    msvc8::string* GetLabel(msvc8::string* outLabel) const;
+
+    /**
      * Address family: 0x006DB9E0 / 0x006DB960 callsites
      *
      * What it does:
@@ -105,6 +113,23 @@ namespace moho
      * entity layer/category gates and ground water-surface layer gates.
      */
     [[nodiscard]] static bool CanAttackTarget(CAiTarget* target, UnitWeapon* weapon);
+
+    /**
+     * Address: 0x006D5200 (FUN_006D5200, sub_6D5200)
+     *
+     * What it does:
+     * Computes this weapon forward vector from either owner transform or muzzle
+     * bone world transform quaternion lanes.
+     */
+    [[nodiscard]] static Wm3::Vector3f GetForwardVector(const UnitWeapon* weapon);
+
+    /**
+     * Address: 0x006D78C0 (FUN_006D78C0, sub_6D78C0)
+     *
+     * What it does:
+     * Returns whether `entity` is present in weapon blacklist rows.
+     */
+    [[nodiscard]] static bool IsEntityBlacklisted(const UnitWeapon* weapon, const Entity* entity);
 
   public:
     Sim* mSim;                                  // +0x44

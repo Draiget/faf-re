@@ -9,7 +9,22 @@ namespace moho
   {
     // Primary vftable (2 entries)
   public:
-    virtual void OnIdleSelectionEvent0() = 0; // 0x8656A0 (slot 0)
-    virtual void OnIdleSelectionEvent1() = 0; // 0x8656E0 (slot 1)
+    /**
+     * Address: 0x008656A0 (FUN_008656A0)
+     * Slot: 0
+     *
+     * What it does:
+     * Re-links this listener node into the provided session-listener lane.
+     */
+    void AttachToSessionListenerLane(void* laneContext) override;
+
+    /**
+     * Address: 0x008656E0 (FUN_008656E0)
+     * Slot: 1
+     *
+     * What it does:
+     * Unlinks this listener node from its current session-listener lane.
+     */
+    void DetachFromSessionListenerLane(void* laneContext) override;
   };
 } // namespace moho

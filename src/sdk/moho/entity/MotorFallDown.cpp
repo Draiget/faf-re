@@ -273,6 +273,54 @@ namespace
   }
 
   /**
+   * Address: 0x00695DE0 (FUN_00695DE0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the MotorFallDown deserialize thunk alias to the recovered
+   * serializer load body.
+   */
+  void DeserializeMotorFallDownThunkVariantA(moho::MotorFallDown* const object, gpg::ReadArchive* const archive)
+  {
+    DeserializeMotorFallDownBody(object, archive);
+  }
+
+  /**
+   * Address: 0x00695DF0 (FUN_00695DF0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the MotorFallDown serialize thunk alias to the recovered
+   * serializer save body.
+   */
+  void SerializeMotorFallDownThunkVariantA(const moho::MotorFallDown* const object, gpg::WriteArchive* const archive)
+  {
+    SerializeMotorFallDownBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006960B0 (FUN_006960B0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the second MotorFallDown deserialize thunk alias to the
+   * recovered serializer load body.
+   */
+  void DeserializeMotorFallDownThunkVariantB(moho::MotorFallDown* const object, gpg::ReadArchive* const archive)
+  {
+    DeserializeMotorFallDownBody(object, archive);
+  }
+
+  /**
+   * Address: 0x006960C0 (FUN_006960C0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards the second MotorFallDown serialize thunk alias to the
+   * recovered serializer save body.
+   */
+  void SerializeMotorFallDownThunkVariantB(const moho::MotorFallDown* const object, gpg::WriteArchive* const archive)
+  {
+    SerializeMotorFallDownBody(object, archive);
+  }
+
+  /**
    * Address: 0x00695ED0 (FUN_00695ED0, metatable index bootstrap lane)
    */
   int InitializeMotorFallDownLuaFactoryIndex()
@@ -673,4 +721,3 @@ namespace
 
   [[maybe_unused]] MotorFallDownBootstrap gMotorFallDownBootstrap;
 } // namespace
-

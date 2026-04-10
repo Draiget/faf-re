@@ -13,6 +13,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitMoveTask.h"
 
 namespace
 {
@@ -84,18 +85,7 @@ namespace
 
   void QueueMoveGoal(moho::CCommandTask* const ownerTask, const moho::SNavGoal& goal)
   {
-    if (!ownerTask || !ownerTask->mUnit) {
-      return;
-    }
-
-    moho::IAiNavigator* const navigator = ownerTask->mUnit->AiNavigator;
-    if (!navigator) {
-      return;
-    }
-
-    // FUN_006190A0 (`Moho::NewMoveTask`) always sets navigator goal first.
-    // Move-subtask allocation lane (`CUnitMoveTask`) is still pending recovery.
-    navigator->SetGoal(goal);
+    moho::NewMoveTask(goal, ownerTask, 0, nullptr, 0);
   }
 
   [[nodiscard]] bool CommandHeadsMatch(moho::Unit* const a, moho::Unit* const b)

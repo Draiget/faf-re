@@ -3,6 +3,7 @@
 #pragma once
 
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "wm3/Vector3.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -29,10 +30,13 @@ namespace moho
 {
   struct SWeakRefSlot;
   struct WeaponExtraRefSubobject;
+  struct RUnitBlueprintWeapon;
   class CAiTarget;
   class CollisionBeamEntity;
   class CScrLuaInitForm;
+  class CTaskStage;
   class Entity;
+  class Projectile;
   class Unit;
   class UnitWeapon;
 
@@ -55,84 +59,84 @@ namespace moho
      * Slot: 1
      * Demangled: Moho::CAiAttackerImpl::WeaponsOnDestroy
      */
-    virtual void WeaponsOnDestroy() = 0;
+    virtual void WeaponsOnDestroy();
 
     /**
      * Address: 0x005D5D60
      * Slot: 2
      * Demangled: Moho::CAiAttackerImpl::GetUnit
      */
-    virtual Unit* GetUnit() = 0;
+    virtual Unit* GetUnit();
 
     /**
      * Address: 0x005D6D80
      * Slot: 3
      * Demangled: Moho::CAiAttackerImpl::WeaponsBusy
      */
-    virtual bool WeaponsBusy() = 0;
+    virtual bool WeaponsBusy();
 
     /**
      * Address: 0x005D5D80
      * Slot: 4
      * Demangled: Moho::CAiAttackerImpl::GetTaskStage
      */
-    virtual void GetTaskStage() = 0;
+    virtual CTaskStage* GetTaskStage();
 
     /**
      * Address: 0x005D76E0
      * Slot: 5
      * Demangled: Moho::CAiAttackerImpl::CreateWeapon
      */
-    virtual void CreateWeapon() = 0;
+    virtual UnitWeapon* CreateWeapon(RUnitBlueprintWeapon* weaponBlueprint);
 
     /**
      * Address: 0x005D5D90
      * Slot: 6
      * Demangled: Moho::CAiAttackerImpl::GetWeaponCount
      */
-    virtual int GetWeaponCount() = 0;
+    virtual int GetWeaponCount();
 
     /**
      * Address: 0x005D77D0
      * Slot: 7
      * Demangled: Moho::CAiAttackerImpl::GetWeapon
      */
-    virtual void* GetWeapon(int index) = 0;
+    virtual UnitWeapon* GetWeapon(int index);
 
     /**
      * Address: 0x005D75B0
      * Slot: 8
      * Demangled: Moho::CAiAttackerImpl::SetDesiredTarget
      */
-    virtual void SetDesiredTarget(CAiTarget* target) = 0;
+    virtual void SetDesiredTarget(CAiTarget* target);
 
     /**
      * Address: 0x005D5D70
      * Slot: 9
      * Demangled: Moho::CAiAttackerImpl::GetDesiredTarget
      */
-    virtual CAiTarget* GetDesiredTarget() = 0;
+    virtual CAiTarget* GetDesiredTarget();
 
     /**
      * Address: 0x005D7570
      * Slot: 10
      * Demangled: Moho::CAiAttackerImpl::OnWeaponHaltFire
      */
-    virtual void OnWeaponHaltFire() = 0;
+    virtual void OnWeaponHaltFire();
 
     /**
      * Address: 0x005D6FA0
      * Slot: 11
      * Demangled: Moho::CAiAttackerImpl::CanAttackTarget
      */
-    virtual bool CanAttackTarget(CAiTarget* target) = 0;
+    virtual bool CanAttackTarget(CAiTarget* target);
 
     /**
      * Address: 0x005D6F40
      * Slot: 12
      * Demangled: Moho::CAiAttackerImpl::PickTarget
      */
-    virtual void PickTarget() = 0;
+    virtual bool PickTarget(Entity* targetEntity);
 
     /**
      * Address: 0x005D7A10
@@ -144,113 +148,113 @@ namespace moho
       UnitWeapon* weapon,
       gpg::core::FastVectorN<SWeakRefSlot, 20>* blipsInRange,
       float maxRange,
-      bool ignoreTargetExemption
-    ) = 0;
+      bool use3DDistance
+    );
 
     /**
      * Address: 0x005D6DC0
      * Slot: 14
      * Demangled: Moho::CAiAttackerImpl::GetTargetWeapon
      */
-    virtual UnitWeapon* GetTargetWeapon(CAiTarget* target) = 0;
+    virtual UnitWeapon* GetTargetWeapon(CAiTarget* target);
 
     /**
      * Address: 0x005D6E30
      * Slot: 15
      * Demangled: Moho::CAiAttackerImpl::GetPrimaryWeapon
      */
-    virtual UnitWeapon* GetPrimaryWeapon() = 0;
+    virtual UnitWeapon* GetPrimaryWeapon();
 
     /**
      * Address: 0x005D6E80
      * Slot: 16
      * Demangled: Moho::CAiAttackerImpl::GetMaxWeaponRange
      */
-    virtual float GetMaxWeaponRange() = 0;
+    virtual float GetMaxWeaponRange();
 
     /**
      * Address: 0x005D7190
      * Slot: 17
      * Demangled: Moho::CAiAttackerImpl::VectorIsWithinWeaponAttackRange
      */
-    virtual void VectorIsWithinWeaponAttackRange() = 0;
+    virtual bool VectorIsWithinWeaponAttackRange(UnitWeapon* weapon, const Wm3::Vector3f* targetPos);
 
     /**
      * Address: 0x005D70E0
      * Slot: 18
      * Demangled: Moho::CAiAttackerImpl::VectorIsWithinAttackRange
      */
-    virtual void VectorIsWithinAttackRange() = 0;
+    virtual bool VectorIsWithinAttackRange(const Wm3::Vector3f* targetPos);
 
     /**
      * Address: 0x005D7090
      * Slot: 19
      * Demangled: Moho::CAiAttackerImpl::TargetIsWithinWeaponAttackRange
      */
-    virtual void TargetIsWithinWeaponAttackRange() = 0;
+    virtual bool TargetIsWithinWeaponAttackRange(UnitWeapon* weapon, CAiTarget* target);
 
     /**
      * Address: 0x005D7000
      * Slot: 20
      * Demangled: Moho::CAiAttackerImpl::TargetIsWithinAttackRange
      */
-    virtual void TargetIsWithinAttackRange() = 0;
+    virtual bool TargetIsWithinAttackRange(CAiTarget* target);
 
     /**
      * Address: 0x005D7210
      * Slot: 21
      * Demangled: Moho::CAiAttackerImpl::IsTooClose
      */
-    virtual bool IsTooClose(CAiTarget* target) = 0;
+    virtual bool IsTooClose(CAiTarget* target);
 
     /**
      * Address: 0x005D7340
      * Slot: 22
      * Demangled: Moho::CAiAttackerImpl::IsTargetExempt
      */
-    virtual bool IsTargetExempt(Entity* target) = 0;
+    virtual bool IsTargetExempt(Entity* target);
 
     /**
      * Address: 0x005D72B0
      * Slot: 23
      * Demangled: Moho::CAiAttackerImpl::HasSlavedTarget
      */
-    virtual CAiTarget* HasSlavedTarget(UnitWeapon** outWeapon) = 0;
+    virtual CAiTarget* HasSlavedTarget(UnitWeapon** outWeapon);
 
     /**
      * Address: 0x005D5DB0
      * Slot: 24
      * Demangled: Moho::CAiAttackerImpl::ResetReportingState
      */
-    virtual void ResetReportingState() = 0;
+    virtual void ResetReportingState();
 
     /**
      * Address: 0x005D7800
      * Slot: 25
      * Demangled: Moho::CAiAttackerImpl::TransmitProjectileImpactEvent
      */
-    virtual void TransmitProjectileImpactEvent() = 0;
+    virtual void TransmitProjectileImpactEvent(UnitWeapon* weapon, Projectile* projectile);
 
     /**
      * Address: 0x005D7870
      * Slot: 26
      * Demangled: Moho::CAiAttackerImpl::TransmitBeamImpactEvent
      */
-    virtual void TransmitBeamImpactEvent(const LuaPlus::LuaObject* launcherWeaponLuaObject, CollisionBeamEntity* beam) = 0;
+    virtual void TransmitBeamImpactEvent(UnitWeapon* weapon, CollisionBeamEntity* beam);
 
     /**
      * Address: 0x005D8650
      * Slot: 27
      * Demangled: Moho::CAiAttackerImpl::ForceEngage
      */
-    virtual void ForceEngage(Entity* target) = 0;
+    virtual void ForceEngage(Entity* target);
 
     /**
      * Address: 0x005D5DC0
      * Slot: 28
      * Demangled: Moho::CAiAttackerImpl::PushStack
      */
-    virtual void PushStack(LuaPlus::LuaState* luaState) = 0;
+    virtual void PushStack(LuaPlus::LuaState* luaState);
 
   public:
     /**

@@ -118,145 +118,145 @@ namespace moho
      * Address: 0x00529F70
      * Slot: 1
      */
-    virtual void ExportToLuaState(LuaPlus::LuaState*) = 0;
+    virtual void ExportToLuaState(LuaPlus::LuaState*);
 
     /**
      * Address: 0x0052A3D0
      * Slot: 2
      */
-    virtual void UpdateLuaState(LuaPlus::LuaState*) = 0;
+    virtual void UpdateLuaState(LuaPlus::LuaState*);
 
     /**
      * Address: 0x0052AA20
      * Slot: 3
      */
-    virtual void CancelExport(LuaPlus::LuaState*) = 0;
+    virtual void CancelExport(LuaPlus::LuaState*);
 
     /**
      * Address: 0x005282C0
      * Slot: 4
      */
-    virtual int AssignNextOrdinal() = 0;
+    virtual int AssignNextOrdinal();
 
     /**
      * Address: 0x0052B1A0
      * Slot: 5
      */
-    virtual RBlueprint* GetBlueprintFromOrdinal(int ordinal) const = 0;
+    virtual RBlueprint* GetBlueprintFromOrdinal(int ordinal) const;
 
     /**
      * Address: 0x005282E0
      * Slot: 6
      */
-    virtual const SRuleFootprintsBlueprint* GetFootprints() const = 0;
+    virtual const SRuleFootprintsBlueprint* GetFootprints() const;
 
     /**
      * Address: 0x0052AAE0
      * Slot: 7
      */
-    virtual const SNamedFootprint* FindFootprint(const SFootprint& footprint, const char* name) const = 0;
+    virtual const SNamedFootprint* FindFootprint(const SFootprint& footprint, const char* name) const;
 
     /**
      * Address: 0x005282F0
      * Slot: 8
      */
-    virtual const RRuleGameRulesBlueprintMap& GetUnitBlueprints() = 0;
+    virtual const RRuleGameRulesBlueprintMap& GetUnitBlueprints();
 
     /**
      * Address: 0x00528300
      * Slot: 9
      */
-    virtual const RRuleGameRulesBlueprintMap& GetPropBlueprints() = 0;
+    virtual const RRuleGameRulesBlueprintMap& GetPropBlueprints();
 
     /**
      * Address: 0x00528320
      * Slot: 10
      */
-    virtual const RRuleGameRulesBlueprintMap& GetProjectileBlueprints() = 0;
+    virtual const RRuleGameRulesBlueprintMap& GetProjectileBlueprints();
 
     /**
      * Address: 0x00528310
      * Slot: 11
      */
-    virtual const RRuleGameRulesBlueprintMap& GetMeshBlueprints() = 0;
+    virtual const RRuleGameRulesBlueprintMap& GetMeshBlueprints();
 
     /**
      * Address: 0x0052AEB0
      * Slot: 12
      */
-    virtual REntityBlueprint* GetEntityBlueprint(const RResId&) = 0;
+    virtual REntityBlueprint* GetEntityBlueprint(const RResId&);
 
     /**
      * Address: 0x0052AB70
      * Slot: 13
      */
-    virtual RUnitBlueprint* GetUnitBlueprint(const RResId&) = 0;
+    virtual RUnitBlueprint* GetUnitBlueprint(const RResId&);
 
     /**
      * Address: 0x0052AD10
      * Slot: 14
      */
-    virtual RPropBlueprint* GetPropBlueprint(const RResId&) = 0;
+    virtual RPropBlueprint* GetPropBlueprint(const RResId&);
 
     /**
      * Address: 0x0052ADE0
      * Slot: 15
      */
-    virtual RMeshBlueprint* GetMeshBlueprint(const RResId&) = 0;
+    virtual RMeshBlueprint* GetMeshBlueprint(const RResId&);
 
     /**
      * Address: 0x0052AC40
      * Slot: 16
      */
-    virtual RProjectileBlueprint* GetProjectileBlueprint(const RResId&) = 0;
+    virtual RProjectileBlueprint* GetProjectileBlueprint(const RResId&);
 
     /**
      * Address: 0x0052AEF0
      * Slot: 17
      */
-    virtual REmitterBlueprint* GetEmitterBlueprint(const RResId&) = 0;
+    virtual REmitterBlueprint* GetEmitterBlueprint(const RResId&);
 
     /**
      * Address: 0x0052AFC0
      * Slot: 18
      */
-    virtual RBeamBlueprint* GetBeamBlueprint(const RResId&) = 0;
+    virtual RBeamBlueprint* GetBeamBlueprint(const RResId&);
 
     /**
      * Address: 0x0052B090
      * Slot: 19
      */
-    virtual RTrailBlueprint* GetTrailBlueprint(const RResId&) = 0;
+    virtual RTrailBlueprint* GetTrailBlueprint(const RResId&);
 
     /**
      * Address: 0x0052B160
      * Slot: 20
      */
-    virtual REffectBlueprint* GetEffectBlueprint(const RResId&) = 0;
+    virtual REffectBlueprint* GetEffectBlueprint(const RResId&);
 
     /**
      * Address: 0x00528330
      * Slot: 21
      */
-    virtual unsigned int GetUnitCount() const = 0;
+    virtual unsigned int GetUnitCount() const;
 
     /**
      * Address: 0x0052B1E0
      * Slot: 22
      */
-    virtual const CategoryWordRangeView* GetEntityCategory(const char*) const = 0;
+    virtual const CategoryWordRangeView* GetEntityCategory(const char*) const;
 
     /**
      * Address: 0x0052B280
      * Slot: 23
      */
-    virtual CategoryWordRangeView ParseEntityCategory(const char*) const = 0;
+    virtual CategoryWordRangeView ParseEntityCategory(const char*) const;
 
     /**
      * Address: 0x0052B2B0
      * Slot: 24
      */
-    virtual void UpdateChecksum(void* md5Context, void* fileHandle) = 0;
+    virtual void UpdateChecksum(void* md5Context, void* fileHandle);
 
     /**
      * Address: 0x0051CF90 callsite family (func_GetPropBlueprint)

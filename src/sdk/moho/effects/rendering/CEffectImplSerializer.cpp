@@ -98,6 +98,34 @@ namespace
   }
 
   /**
+   * Address: 0x0065A7B0 (FUN_0065A7B0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CEffectImpl deserialize thunk alias into the shared
+   * deserialize core body.
+   */
+  void DeserializeCEffectImplCoreThunkVariantA(
+    moho::CEffectImpl* const object, gpg::ReadArchive* const archive, const gpg::RRef&
+  )
+  {
+    DeserializeCEffectImplCore(object, archive);
+  }
+
+  /**
+   * Address: 0x0065ADA0 (FUN_0065ADA0, serializer load thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CEffectImpl deserialize thunk alias into the shared
+   * deserialize core body.
+   */
+  void DeserializeCEffectImplCoreThunkVariantB(
+    moho::CEffectImpl* const object, gpg::ReadArchive* const archive, const gpg::RRef&
+  )
+  {
+    DeserializeCEffectImplCore(object, archive);
+  }
+
+  /**
    * Address: 0x0065B110 (FUN_0065B110, CEffectImplSerializer::SerializeCore)
    *
    * What it does:
@@ -118,6 +146,34 @@ namespace
     );
     archive->WriteBool(object->mNewAttachment != 0);
     archive->Write(ResolveCachedType<moho::VMatrix4>(moho::VMatrix4::sType), &object->mMatrix, gpg::RRef{});
+  }
+
+  /**
+   * Address: 0x0065A7C0 (FUN_0065A7C0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards one CEffectImpl serialize thunk alias into the shared
+   * serialize core body.
+   */
+  void SerializeCEffectImplCoreThunkVariantA(
+    const moho::CEffectImpl* const object, gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCEffectImplCore(object, archive);
+  }
+
+  /**
+   * Address: 0x0065ADB0 (FUN_0065ADB0, serializer save thunk alias)
+   *
+   * What it does:
+   * Tail-forwards a second CEffectImpl serialize thunk alias into the shared
+   * serialize core body.
+   */
+  void SerializeCEffectImplCoreThunkVariantB(
+    const moho::CEffectImpl* const object, gpg::WriteArchive* const archive
+  )
+  {
+    SerializeCEffectImplCore(object, archive);
   }
 
   void cleanup_CEffectImplSerializer_atexit()

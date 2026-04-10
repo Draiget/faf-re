@@ -64,10 +64,7 @@ namespace moho
    */
   HSound* HSound::Destroy(const std::uint8_t flags)
   {
-    mSimLoopLink.mNext->mPrev = mSimLoopLink.mPrev;
-    mSimLoopLink.mPrev->mNext = mSimLoopLink.mNext;
-    mSimLoopLink.mPrev = &mSimLoopLink;
-    mSimLoopLink.mNext = &mSimLoopLink;
+    mSimLoopLink.ListUnlink();
 
     this->CScriptEvent::~CScriptEvent();
     if ((flags & 0x1u) != 0u) {

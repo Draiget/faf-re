@@ -27,6 +27,7 @@ namespace moho
   enum class EUnitCommandType : std::int32_t;
   class RRuleGameRules;
   class Sim;
+  struct SOCellPos;
   class Unit;
 
   struct SFormationLinkedUnitRef
@@ -44,10 +45,13 @@ namespace moho
     SFormationLaneUnitNode* parent; // +0x04
     SFormationLaneUnitNode* right;  // +0x08
     std::uint32_t unitEntityId;     // +0x0C
-    std::uint8_t unknown10[0x0C];   // +0x10
+    std::uint32_t linkedUnitOwnerWord; // +0x10
+    std::uint32_t linkedUnitNextWord;  // +0x14
+    std::int32_t leaderPriority;       // +0x18
     float formationOffsetX;         // +0x1C
     float formationOffsetZ;         // +0x20
-    std::uint8_t unknown24[0x10];   // +0x24
+    Wm3::Vec3f formationVector;     // +0x24
+    float formationWeight;          // +0x30
     float speedBandLow;             // +0x34
     float speedBandMid;             // +0x38
     float speedBandHigh;            // +0x3C
@@ -82,10 +86,13 @@ namespace moho
   struct SFormationLaneEntry
   {
     SFormationLaneUnitMap unitMap;            // +0x00
-    std::uint8_t unknown0C[0x1C];             // +0x0C
+    std::uint8_t unknown0C[0x14];             // +0x0C
+    float overlapRadiusX;                     // +0x20
+    float overlapRadiusZ;                     // +0x24
     float dynamicOffsetX;                     // +0x28
     float dynamicOffsetZ;                     // +0x2C
-    std::uint8_t unknown30[0x08];             // +0x30
+    float overlapAnchorX;                     // +0x30
+    float overlapAnchorZ;                     // +0x34
     std::uint8_t applyDynamicOffset;          // +0x38
     std::uint8_t slotAvailable;               // +0x39
     std::uint8_t pad3A[2];                    // +0x3A
@@ -231,98 +238,103 @@ namespace moho
      * Slot: 5
      * Demangled: Moho::CFormationInstance::Func6
      */
-    virtual void Func6() = 0;
+    virtual SFormationLaneEntry* Func6(Unit* unit);
 
     /**
      * Address: 0x00569CB0
      * Slot: 6
      * Demangled: Moho::CFormationInstance::GetFormationPosition
      */
-    virtual void GetFormationPosition() = 0;
+    virtual SCoordsVec2* GetFormationPosition(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x00569EA0
      * Slot: 7
      * Demangled: Moho::CFormationInstance::GetAdjustedFormationPosition
      */
-    virtual void GetAdjustedFormationPosition() = 0;
+    virtual SOCellPos* GetAdjustedFormationPosition(SOCellPos* dest, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x00569F70
      * Slot: 8
      * Demangled: Moho::CFormationInstance::Func9
      */
-    virtual void Func9() = 0;
+    virtual SCoordsVec2* Func9(SCoordsVec2* dest, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x0056A150
      * Slot: 9
      * Demangled: Moho::CFormationInstance::Func10
      */
-    virtual void Func10() = 0;
+    virtual Wm3::Vec3f* Func10(Wm3::Vec3f* out, Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x0059A790
      * Slot: 10
      * Demangled: Moho::CAiFormationInstance::Func11
      */
-    virtual void Func11() = 0;
+    virtual float Func11(Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x0059A7D0
      * Slot: 11
      * Demangled: Moho::CAiFormationInstance::Func12
      */
-    virtual void Func12() = 0;
+    virtual std::int32_t Func12(Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x0059A620
      * Slot: 12
      * Demangled: Moho::CAiFormationInstance::CalcFormationSpeed
      */
-    virtual void CalcFormationSpeed() = 0;
+    virtual float CalcFormationSpeed(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x0059A870
      * Slot: 13
      * Demangled: Moho::CAiFormationInstance::Func14
      */
-    virtual void Func14() = 0;
+    virtual Unit* Func14(Unit* unit, SFormationLaneEntry* laneEntry);
 
     /**
      * Address: 0x0056A220
      * Slot: 14
      * Demangled: Moho::CFormationInstance::AddUnit
      */
-    virtual void AddUnit(Unit* unit) = 0;
+    virtual void AddUnit(Unit* unit);
 
     /**
      * Address: 0x0056A300
      * Slot: 15
      * Demangled: Moho::CFormationInstance::RemoveUnit
      */
-    virtual void RemoveUnit(Unit* unit) = 0;
+    virtual void RemoveUnit(Unit* unit);
 
     /**
      * Address: 0x0056A440
      * Slot: 16
      * Demangled: Moho::CFormationInstance::Func17
      */
-    virtual void Func17() = 0;
+    virtual bool Func17(Unit* unit, bool checkAll) const;
 
     /**
-     * Address: 0x0059AE80
+     * Address: 0x0059AE80 (FUN_0059AE80, Moho::CAiFormationInstance::Update)
+     *
+     * What it does:
+     * Advances the active formation lanes, refreshes lane leaders, and
+     * dispatches the formation update event when the lane state becomes
+     * actionable.
      * Slot: 17
      * Demangled: Moho::CAiFormationInstance::Update
      */
-    virtual void Update() = 0;
+    virtual void Update();
 
     /**
      * Address: 0x00569B60
      * Slot: 18
      * Demangled: Moho::CFormationInstance::Func19
      */
-    virtual void Func19() = 0;
+    virtual Wm3::Vec3f* Func19(Wm3::Vec3f* out, Unit* unit) const;
 
     /**
      * Address: 0x00569BF0
@@ -336,7 +348,7 @@ namespace moho
      * Slot: 20
      * Demangled: Moho::CFormationInstance::Func21
      */
-    virtual void Func21() = 0;
+    virtual bool Func21(Unit* unit) const;
 
     /**
      * Address: 0x0056A4F0
@@ -370,8 +382,13 @@ namespace moho
      * Address: 0x0059AA20
      * Slot: 25
      * Demangled: Moho::CAiFormationInstance::FindSlotFor
+     *
+     * What it does:
+     * Resolves one free formation slot near `pos`, records the chosen occupied
+     * slot, and falls back to current unit position when no free slot can be
+     * found.
      */
-    virtual void FindSlotFor() = 0;
+    virtual SCoordsVec2* FindSlotFor(SCoordsVec2* dest, const SCoordsVec2* pos, Unit* unit);
 
     /**
      * Address: 0x0059A570
@@ -379,6 +396,15 @@ namespace moho
      * Demangled: Moho::CAiFormationInstance::Func27
      */
     virtual bool Func27(const SCoordsVec2& position, std::int32_t footprintSize, std::int32_t laneToken) const;
+
+    /**
+     * Address: 0x005691E0 (FUN_005691E0, Moho::CAiFormationInstance::RemoveDeadUnits)
+     *
+     * What it does:
+     * Removes null/dead/destroy-queued units from linked formation unit refs
+     * and reports whether `checkForUnit` remains live in the set.
+     */
+    bool RemoveDeadUnits(Unit* checkForUnit);
 
   public:
     std::int32_t mUnitCount;                      // +0x04

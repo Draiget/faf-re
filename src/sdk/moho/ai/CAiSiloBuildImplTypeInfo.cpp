@@ -26,6 +26,7 @@ namespace
   {
   public:
     [[nodiscard]] const char* GetName() const override;
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 
   static_assert(sizeof(SSiloBuildInfoTypeInfo) == 0x64, "SSiloBuildInfoTypeInfo size must be 0x64");
@@ -260,6 +261,20 @@ const char* ESiloTypeListTypeInfo::GetName() const
   }
 
   return gESiloTypeListTypeName.c_str();
+}
+
+/**
+ * Address: 0x005CFC90 (FUN_005CFC90, gpg::RListType_ESiloType::GetLexical)
+ *
+ * What it does:
+ * Formats default RTTI lexical text and appends current list element count.
+ */
+msvc8::string ESiloTypeListTypeInfo::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string lexical = gpg::RType::GetLexical(ref);
+  const auto* const list = static_cast<const std::list<ESiloType>*>(ref.mObj);
+  const int size = list ? static_cast<int>(list->size()) : 0;
+  return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
 }
 
 /**

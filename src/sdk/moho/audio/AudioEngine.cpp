@@ -79,7 +79,6 @@ namespace
   constexpr std::uint16_t kInvalidVariableId = 0xFFFFu;
   constexpr float kDefaultCategoryVolume = 1.0f;
   constexpr const char* kGlobalCategoryName = "Global";
-  bool gSuppressXact3dApplyFailureWarning = true;
 
   struct AudioSoundBankLoader
   {
@@ -1769,15 +1768,16 @@ namespace moho
    *
    * Wm3::Vector3<float> const *, AudioEngine *, IXACTCue *
    *
+   * IDA signature:
+   * void callcnv_E3 Moho::AudioEngine::Calculate3D(
+   *   Wm3::Vector3f *a1@<eax>, Moho::AudioEngine *a2@<ecx>, struct IXACTCue *a3
+   * );
+   *
    * What it does:
    * Applies 3D listener/emitter transform to an active cue.
    */
   void AudioEngine::Calculate3D(const Wm3::Vec3f* const worldPos, AudioEngine* const engine, IXACTCue* const cue)
   {
-    if (worldPos == nullptr || engine == nullptr || engine->mImpl == nullptr || cue == nullptr) {
-      return;
-    }
-
     AudioEngineImpl* const impl = engine->mImpl;
     if (impl->mInstance == nullptr) {
       return;
@@ -1806,10 +1806,7 @@ namespace moho
 
     const int applyResult = ApplySettingsToCue(&impl->mSettings, cue);
     if (applyResult < 0) {
-      if (gSuppressXact3dApplyFailureWarning) {
-        gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
-        gSuppressXact3dApplyFailureWarning = false;
-      }
+      gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
     }
   }
 } // namespace moho

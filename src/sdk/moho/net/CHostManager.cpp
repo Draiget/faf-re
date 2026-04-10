@@ -214,7 +214,6 @@ msvc8::string& CHostManager::GetHostName(const std::uint32_t host, msvc8::string
 void CHostManager::Touch(Host& h) noexcept
 {
   auto& node = static_cast<TDatListItem<Host, void>&>(h);
-  node.ListUnlink();
   node.ListLinkAfter(&mHostList);
 }
 

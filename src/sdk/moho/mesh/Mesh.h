@@ -12,6 +12,7 @@
 #include "moho/containers/TDatList.h"
 #include "moho/resource/CResourceWatcher.h"
 #include "moho/render/camera/VTransform.h"
+#include "wm3/AABB.h"
 #include "wm3/Box3.h"
 #include "wm3/Sphere3.h"
 #include "wm3/Vector2.h"
@@ -50,6 +51,14 @@ namespace moho
      * Updates dissolve-cutoff payload in the current spatial-db entry.
      */
     void UpdateDissolveCutoff(float cutoff);
+
+    /**
+     * Address: 0x00501C10 (FUN_00501C10, sub_501C10)
+     *
+     * What it does:
+     * Updates cached entry AABB payload lanes for this mesh-instance in spatial DB.
+     */
+    void UpdateBounds(const Wm3::AxisAlignedBox3f& bounds);
 
     /**
      * What it does:

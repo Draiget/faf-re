@@ -8460,24 +8460,18 @@ namespace moho
    * Dispatches one submit-buffer payload into world-particle, trail, and beam
    * append paths in original order.
    */
-  void CWorldParticles::AddParticles(const ParticleSubmitBufferRuntimeView& batch)
+  void CWorldParticles::AddParticles(const SParticleBuffer& batch)
   {
-    if (batch.particlesBegin != nullptr && batch.particlesEnd != nullptr) {
-      for (const SWorldParticle* particle = batch.particlesBegin; particle != batch.particlesEnd; ++particle) {
-        AddWorldParticle(*particle, nullptr);
-      }
+    for (const SWorldParticle& particle : batch.mParticles) {
+      AddWorldParticle(particle, nullptr);
     }
 
-    if (batch.trailsBegin != nullptr && batch.trailsEnd != nullptr) {
-      for (const TrailRuntimeView* trail = batch.trailsBegin; trail != batch.trailsEnd; ++trail) {
-        AddTrail(*trail, nullptr);
-      }
+    for (const TrailRuntimeView& trail : batch.mTrails) {
+      AddTrail(trail, nullptr);
     }
 
-    if (batch.beamsBegin != nullptr && batch.beamsEnd != nullptr) {
-      for (const SWorldBeam* beam = batch.beamsBegin; beam != batch.beamsEnd; ++beam) {
-        AddBeam(*beam);
-      }
+    for (const SWorldBeam& beam : batch.mBeams) {
+      AddBeam(beam);
     }
   }
 

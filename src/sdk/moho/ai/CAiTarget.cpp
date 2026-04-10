@@ -237,6 +237,42 @@ void CAiTarget::SerializeToArchive(gpg::WriteArchive* archive, int objectPtr, in
 }
 
 /**
+ * Address: 0x005E3640 (FUN_005E3640, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CAiTarget serializer-load thunk alias into
+ * `CAiTarget::DeserializeFromArchive`.
+ */
+void DeserializeCAiTargetThunkVariantA(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
+{
+  CAiTarget::DeserializeFromArchive(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x005E3650 (FUN_005E3650, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CAiTarget serializer-save thunk alias into
+ * `CAiTarget::SerializeToArchive`.
+ */
+void SerializeCAiTargetThunkVariantA(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
+{
+  CAiTarget::SerializeToArchive(archive, objectPtr, version, ownerRef);
+}
+
+/**
+ * Address: 0x005E3870 (FUN_005E3870, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CAiTarget serializer-save thunk alias into
+ * `CAiTarget::SerializeToArchive`.
+ */
+void SerializeCAiTargetThunkVariantB(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef)
+{
+  CAiTarget::SerializeToArchive(archive, objectPtr, version, ownerRef);
+}
+
+/**
  * Address: 0x005D55B0 (FUN_005D55B0)
  *
  * What it does:

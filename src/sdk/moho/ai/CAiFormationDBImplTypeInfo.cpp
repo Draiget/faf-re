@@ -291,6 +291,12 @@ const char* IFormationInstanceFastVectorTypeInfo::GetName() const
   return gFastVectorIFormationInstanceTypeName.c_str();
 }
 
+/**
+ * Address: 0x0059CA40 (FUN_0059CA40, gpg::RFastVectorType_IFormationInstanceP::GetLexical)
+ *
+ * What it does:
+ * Formats vector lexical text and appends the runtime pointer count.
+ */
 msvc8::string IFormationInstanceFastVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);

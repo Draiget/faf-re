@@ -21,6 +21,14 @@ namespace gpg
      * `DList<IPathTraveler,void>` lane.
      */
     [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00766FB0 (FUN_00766FB0, gpg::RDListType_IPathTraveler::GetLexical)
+     *
+     * What it does:
+     * Returns inherited lexical text for the reflected DList lane.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
   };
 } // namespace gpg
 
@@ -103,6 +111,18 @@ const char* gpg::RDListType_IPathTraveler::GetName() const
   }
 
   return gDListIPathTravelerTypeName.c_str();
+}
+
+/**
+ * Address: 0x00766FB0 (FUN_00766FB0, gpg::RDListType_IPathTraveler::GetLexical)
+ *
+ * What it does:
+ * Returns inherited lexical text for the reflected DList lane.
+ */
+msvc8::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s", base.c_str());
 }
 
 namespace moho

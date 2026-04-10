@@ -26,6 +26,7 @@
 #include "moho/render/CDecalHandle.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/misc/StatItem.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CUnitScriptTask.h"
 #include "moho/script/ScriptedDecal.h"
 #include "moho/sim/ReconBlip.h"
@@ -643,28 +644,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-  LuaPlus::LuaObject GetTableFieldByName(const LuaPlus::LuaObject& tableObject, const char* fieldName)
-  {
-    LuaPlus::LuaObject out;
-    LuaPlus::LuaState* const state = tableObject.GetActiveState();
-    if (!state) {
-      return out;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return out;
-    }
-
-    const int top = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(tableObject).PushStack(lstate);
-    lua_pushstring(lstate, fieldName ? fieldName : "");
-    lua_gettable(lstate, -2);
-    out = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, -1));
-    lua_settop(lstate, top);
-    return out;
-  }
-
   gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
   {
     gpg::RRef out{};
@@ -691,7 +670,7 @@ namespace
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
-      payload = GetTableFieldByName(payload, "_c_object");
+      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
     }
 
     if (!payload.IsUserData()) {

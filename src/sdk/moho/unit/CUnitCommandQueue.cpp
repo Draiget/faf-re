@@ -215,6 +215,42 @@ void CUnitCommandQueue::MemberDeserialize(gpg::ReadArchive& archive)
 }
 
 /**
+ * Address: 0x006F8D60 (FUN_006F8D60, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CUnitCommandQueue deserialize thunk alias into
+ * `CUnitCommandQueue::MemberDeserialize`.
+ */
+void DeserializeCUnitCommandQueueThunkVariantA(
+  const gpg::RRef* const, const int, CUnitCommandQueue* const queue, gpg::ReadArchive* const archive
+)
+{
+  if (!queue || !archive) {
+    return;
+  }
+
+  queue->MemberDeserialize(*archive);
+}
+
+/**
+ * Address: 0x006F93B0 (FUN_006F93B0, serializer load thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CUnitCommandQueue deserialize thunk alias into
+ * `CUnitCommandQueue::MemberDeserialize`.
+ */
+void DeserializeCUnitCommandQueueThunkVariantB(
+  const gpg::RRef* const, const int, CUnitCommandQueue* const queue, gpg::ReadArchive* const archive
+)
+{
+  if (!queue || !archive) {
+    return;
+  }
+
+  queue->MemberDeserialize(*archive);
+}
+
+/**
  * Address: 0x006F9750 (FUN_006F9750, sub_6F9750)
  *
  * What it does:
@@ -227,6 +263,42 @@ void CUnitCommandQueue::MemberSerialize(gpg::WriteArchive& archive) const
   archive.Write(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
   archive.Write(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
   archive.WriteUInt(static_cast<unsigned int>(unk0));
+}
+
+/**
+ * Address: 0x006F8D70 (FUN_006F8D70, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards one CUnitCommandQueue serialize thunk alias into
+ * `CUnitCommandQueue::MemberSerialize`.
+ */
+void SerializeCUnitCommandQueueThunkVariantA(
+  gpg::RRef* const, CUnitCommandQueue* const queue, gpg::WriteArchive* const archive
+)
+{
+  if (!queue || !archive) {
+    return;
+  }
+
+  queue->MemberSerialize(*archive);
+}
+
+/**
+ * Address: 0x006F93C0 (FUN_006F93C0, serializer save thunk alias)
+ *
+ * What it does:
+ * Tail-forwards a second CUnitCommandQueue serialize thunk alias into
+ * `CUnitCommandQueue::MemberSerialize`.
+ */
+void SerializeCUnitCommandQueueThunkVariantB(
+  gpg::RRef* const, CUnitCommandQueue* const queue, gpg::WriteArchive* const archive
+)
+{
+  if (!queue || !archive) {
+    return;
+  }
+
+  queue->MemberSerialize(*archive);
 }
 
 /**

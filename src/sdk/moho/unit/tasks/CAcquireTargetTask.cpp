@@ -1,6 +1,7 @@
 #include "moho/unit/tasks/CAcquireTargetTask.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <string>
 #include <typeinfo>
@@ -11,6 +12,10 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/unit/CUnitCommand.h"
+#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/entity/Entity.h"
 
 using namespace moho;
 
@@ -173,6 +178,51 @@ namespace
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
   }
+
+  constexpr std::int32_t kAcquireTargetRetargetCooldownTicks = 30;
+  constexpr std::int32_t kAcquireTargetRetargetReprobeThresholdPrimary = 5;
+  constexpr std::int32_t kAcquireTargetRetargetReprobeThresholdSecondary = 10;
+  constexpr std::int32_t kAcquireTargetBlacklistTicks = 10;
+
+  [[nodiscard]] bool PositionUnchanged(const Wm3::Vector3f& lhs, const Wm3::Vector3f& rhs) noexcept
+  {
+    return std::memcmp(&lhs, &rhs, sizeof(Wm3::Vector3f)) == 0;
+  }
+
+  void AddWeaponBlacklistEntry(UnitWeapon& weapon, Entity* const entity, const std::int32_t value)
+  {
+    if (entity == nullptr) {
+      return;
+    }
+
+    for (SBlackListInfo& entry : weapon.mBlacklist) {
+      if (entry.mEntity.GetObjectPtr() == entity) {
+        entry.mValue = value;
+        return;
+      }
+    }
+
+    SBlackListInfo entry{};
+    entry.mEntity.ResetFromObject(entity);
+    entry.mValue = value;
+    weapon.mBlacklist.push_back(entry);
+  }
+
+  void ResetWeaponTargetAfterRetargetProbe(UnitWeapon& weapon)
+  {
+    CAiTarget clearedTarget{};
+    clearedTarget.targetType = EAiTargetType::AITARGET_Entity;
+    clearedTarget.targetEntity.ClearLinkState();
+    clearedTarget.targetPoint = -1;
+    clearedTarget.targetIsMobile = false;
+    clearedTarget.PickTargetPoint();
+
+    weapon.mTarget = clearedTarget;
+    weapon.PickNewTargetAimSpot();
+    weapon.mUnknown170 = 0;
+    weapon.mUnknown174 = 1u;
+    weapon.mShotsAtTarget = 0;
+  }
 } // namespace
 
 namespace moho
@@ -247,11 +297,21 @@ namespace moho
    */
   int CAcquireTargetTask::HandleProjectileImpactListenerState(const int action)
   {
+    if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr) {
+      return action;
+    }
+    if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+      return action;
+    }
+
+    if (action == 1) {
+      HandleRetargetProbeOnListenerTick();
+      return action;
+    }
+
     if (action == 0 || action == 2) {
       mTargetCooldown = 0;
-      if (mWeapon) {
-        mWeapon->mShotsAtTarget = 0;
-      }
+      mWeapon->mUnknown170 = 0;
     }
 
     return action;
@@ -262,14 +322,81 @@ namespace moho
    */
   int CAcquireTargetTask::HandleCollisionBeamListenerState(const int action)
   {
+    if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr) {
+      return action;
+    }
+    if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+      return action;
+    }
+
+    if (action == 1) {
+      HandleRetargetProbeOnListenerTick();
+      return action;
+    }
+
     if (action == 0 || action == 2) {
-      mUpdateAttackerState = 0u;
-      if (mAttacker) {
-        (void)mAttacker;
-      }
+      mTargetCooldown = 0;
+      mWeapon->mUnknown170 = 0;
     }
 
     return action;
+  }
+
+  /**
+   * Address: 0x005D9630 (FUN_005D9630, helper used by listener action==1 lanes)
+   *
+   * What it does:
+   * Probes desired/current entity targets for repeated stationary-aim cases,
+   * then either repicks aim-spot, applies cooldown tagging, or blacklists and
+   * clears the stuck target lane.
+   */
+  void CAcquireTargetTask::HandleRetargetProbeOnListenerTick()
+  {
+    GPG_ASSERT(mWeapon != nullptr);
+    GPG_ASSERT(mAttacker != nullptr);
+    GPG_ASSERT(mUnit != nullptr);
+    if (mWeapon == nullptr || mAttacker == nullptr || mUnit == nullptr) {
+      return;
+    }
+
+    CAiTarget* const desiredTarget = mAttacker->GetDesiredTarget();
+    CAiTarget* const currentWeaponTarget = &mWeapon->mTarget;
+
+    if (mWeapon->mWeaponIndex == 0 && desiredTarget != nullptr) {
+      Entity* const desiredEntity = desiredTarget->GetEntity();
+      if (
+        desiredEntity != nullptr && mUnit->IsMobile()
+        && PositionUnchanged(mUnit->Position, mUnit->PrevPosition)
+        && desiredEntity->mCurrentLayer != LAYER_Air
+        && PositionUnchanged(desiredEntity->Position, desiredEntity->PrevPosition)
+      ) {
+        ++mWeapon->mUnknown170;
+        if (mWeapon->mUnknown170 > kAcquireTargetRetargetReprobeThresholdPrimary) {
+          mTargetCooldown = kAcquireTargetRetargetCooldownTicks;
+          return;
+        }
+
+        mWeapon->PickNewTargetAimSpot();
+        return;
+      }
+    }
+
+    Entity* const currentTargetEntity = currentWeaponTarget->GetEntity();
+    if (
+      currentTargetEntity != nullptr
+      && PositionUnchanged(mUnit->Position, mUnit->PrevPosition)
+      && currentTargetEntity->mCurrentLayer != LAYER_Air
+      && PositionUnchanged(currentTargetEntity->Position, currentTargetEntity->PrevPosition)
+    ) {
+      ++mWeapon->mUnknown170;
+      if (mWeapon->mUnknown170 > kAcquireTargetRetargetReprobeThresholdSecondary) {
+        AddWeaponBlacklistEntry(*mWeapon, currentTargetEntity, kAcquireTargetBlacklistTicks);
+        ResetWeaponTargetAfterRetargetProbe(*mWeapon);
+        return;
+      }
+
+      mWeapon->PickNewTargetAimSpot();
+    }
   }
 
   /**
@@ -334,9 +461,45 @@ namespace moho
 
   /**
    * Address: 0x005D8C40 (FUN_005D8C40, Moho::CAcquireTargetTask::CheckAutoInitiate)
+   *
+   * What it does:
+   * Returns true when auto-initiate should repick targeting because the queue
+   * head is missing or the final attack command resolves to a dead/queued
+   * focus entity.
    */
   bool CAcquireTargetTask::CheckAutoInitiate() const
   {
+    if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr || mUnit == nullptr) {
+      return false;
+    }
+
+    if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+      return false;
+    }
+
+    CUnitCommandQueue* const commandQueue = mUnit->CommandQueue;
+    CUnitCommand* const currentCommand = commandQueue ? commandQueue->GetCurrentCommand() : nullptr;
+    CUnitCommand* const nextCommand = commandQueue ? commandQueue->GetNextCommand() : nullptr;
+
+    if (currentCommand == nullptr) {
+      return true;
+    }
+
+    if (nextCommand == nullptr) {
+      const EUnitCommandType commandType = currentCommand->mVarDat.mCmdType;
+      if (commandType == EUnitCommandType::UNITCOMMAND_Attack || commandType == EUnitCommandType::UNITCOMMAND_FormAttack)
+      {
+        CAiTarget commandTarget = currentCommand->mTarget;
+        Entity* const focusEntity = commandTarget.GetEntity();
+        if (
+          commandTarget.targetType == EAiTargetType::AITARGET_Entity
+          && (focusEntity == nullptr || focusEntity->Dead != 0u || focusEntity->DestroyQueuedFlag != 0u)
+        ) {
+          return true;
+        }
+      }
+    }
+
     return false;
   }
 } // namespace moho
