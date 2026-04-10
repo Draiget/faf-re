@@ -77,6 +77,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x004FEFF0 (FUN_004FEFF0, Moho::DColPrimBoxTypeInfo::DColPrimBoxTypeInfo)
+     *
+     * What it does:
+     * Constructs the typeinfo object and pre-registers the
+     * `CColPrimitive<Wm3::Box3f>` RTTI lane.
+     */
+    DColPrimBoxTypeInfo();
+
+    /**
      * Address: 0x004FF080 (FUN_004FF080, Moho::DColPrimBoxTypeInfo::dtr)
      * Slot: 2
      */

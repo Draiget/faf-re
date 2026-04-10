@@ -213,17 +213,12 @@ namespace
 
   [[nodiscard]] SAiNavigatorGoal BuildSingleCellGoal(const SOCellPos& cell) noexcept
   {
-    return {
-      static_cast<std::int32_t>(cell.x),
-      static_cast<std::int32_t>(cell.z),
-      static_cast<std::int32_t>(cell.x) + 1,
-      static_cast<std::int32_t>(cell.z) + 1,
-      0,
-      0,
-      0,
-      0,
-      0,
-    };
+    SAiNavigatorGoal goal{};
+    goal.minX = static_cast<std::int32_t>(cell.x);
+    goal.minZ = static_cast<std::int32_t>(cell.z);
+    goal.maxX = static_cast<std::int32_t>(cell.x) + 1;
+    goal.maxZ = static_cast<std::int32_t>(cell.z) + 1;
+    return goal;
   }
 
   [[nodiscard]] std::uint32_t PackCell(const SOCellPos& cell) noexcept
