@@ -20,6 +20,8 @@ namespace moho
   class Shield : public Entity
   {
   public:
+    static gpg::RType* sPointerType;
+
     /**
      * Address: 0x00776590 (FUN_00776590, ??0Shield@Moho@@QAE@@ZZ)
      *
@@ -47,6 +49,14 @@ namespace moho
      */
     [[nodiscard]]
     gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x0074E5D0 (FUN_0074E5D0, Moho::Shield::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected RTTI for `Shield*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x00776310 (FUN_00776310)

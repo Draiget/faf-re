@@ -23,6 +23,8 @@ dependencies/wxWindows-2.4.2/**/*
 *.obj
 
 AGENTS.md
+CLAUDE.md
+mcp/
 skills/
 
 .github/copilot-instructions.md

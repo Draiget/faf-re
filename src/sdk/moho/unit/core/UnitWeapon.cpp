@@ -515,6 +515,7 @@ namespace
 namespace moho
 {
   gpg::RType* UnitWeapon::sType = nullptr;
+  gpg::RType* UnitWeapon::sPointerType = nullptr;
 
   // Callback bodies are recovered in adjacent lanes; publishers are required
   // here so startup thunk registration resolves to source-defined binders.
@@ -2485,6 +2486,25 @@ namespace moho
     }
 
     return sType;
+  }
+
+  /**
+   * Address: 0x005DCD70 (FUN_005DCD70, Moho::UnitWeapon::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches reflected RTTI for `UnitWeapon*`.
+   */
+  gpg::RType* UnitWeapon::GetPointerType()
+  {
+    (void)StaticGetClass();
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(UnitWeapon*));
+      sPointerType = cached;
+    }
+
+    return cached;
   }
 
   /**

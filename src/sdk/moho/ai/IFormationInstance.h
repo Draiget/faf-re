@@ -23,6 +23,16 @@ namespace moho
   {
   public:
     inline static gpg::RType* sType = nullptr;
+    inline static gpg::RType* sPointerType = nullptr;
+
+    /**
+     * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for
+     * `IFormationInstance*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     virtual void operator_delete(std::int32_t deleteFlags) = 0;
   };

@@ -8,7 +8,16 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0074E550 (FUN_0074E550, Moho::SimArmy::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected RTTI for `SimArmy*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x00703EA0 (FUN_00703EA0, Moho::SimArmy::MemberDeserialize)

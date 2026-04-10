@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "gpg/core/containers/String.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -15,6 +17,45 @@ namespace LuaPlus
 namespace moho
 {
   class CScrLuaInitForm;
+
+  struct CameraUserEntityWeakRef
+  {
+    void* mOwnerLinkSlot;                  // +0x00
+    CameraUserEntityWeakRef* mNextOwnerRef; // +0x04
+  };
+
+  static_assert(sizeof(CameraUserEntityWeakRef) == 0x08, "CameraUserEntityWeakRef size must be 0x08");
+  static_assert(
+    offsetof(CameraUserEntityWeakRef, mOwnerLinkSlot) == 0x00,
+    "CameraUserEntityWeakRef::mOwnerLinkSlot offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CameraUserEntityWeakRef, mNextOwnerRef) == 0x04,
+    "CameraUserEntityWeakRef::mNextOwnerRef offset must be 0x04"
+  );
+
+  struct CameraFrustumUserEntityList
+  {
+    CameraUserEntityWeakRef* mStart;        // +0x00
+    CameraUserEntityWeakRef* mFinish;       // +0x04
+    CameraUserEntityWeakRef* mCapacity;     // +0x08
+    CameraUserEntityWeakRef* mInlineOrigin; // +0x0C
+  };
+
+  static_assert(sizeof(CameraFrustumUserEntityList) == 0x10, "CameraFrustumUserEntityList size must be 0x10");
+  static_assert(
+    offsetof(CameraFrustumUserEntityList, mStart) == 0x00, "CameraFrustumUserEntityList::mStart offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CameraFrustumUserEntityList, mFinish) == 0x04, "CameraFrustumUserEntityList::mFinish offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CameraFrustumUserEntityList, mCapacity) == 0x08, "CameraFrustumUserEntityList::mCapacity offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CameraFrustumUserEntityList, mInlineOrigin) == 0x0C,
+    "CameraFrustumUserEntityList::mInlineOrigin offset must be 0x0C"
+  );
 
   class CameraImpl
   {
@@ -85,6 +126,15 @@ namespace moho
      * Slot: 2
      */
     [[nodiscard]] virtual const GeomCamera3& CameraGetView() const;
+
+    /**
+     * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
+     *
+     * What it does:
+     * Returns one cached weak-vector view of focus-army units currently in
+     * camera frustum.
+     */
+    [[nodiscard]] CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
 
     /**
      * Address context: called from `cfunc_CameraImplMoveToL` (`0x007AB760`)

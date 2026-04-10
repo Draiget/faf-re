@@ -24,6 +24,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/resource/RResId.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -31,6 +32,8 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/UserArmy.h"
+#include "moho/ui/UiRuntimeTypes.h"
+#include "moho/unit/core/IUnit.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
 
@@ -175,6 +178,13 @@ msvc8::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) 
 
 namespace moho
 {
+  // Address lanes:
+  // - 0x010A645D (`ui_DebugAltClick`)
+  // - 0x010A645E (`UI_SelectAnything`)
+  // Recovered as process-global convar-backed toggles used by selection paths.
+  bool ui_DebugAltClick = false;
+  bool UI_SelectAnything = false;
+
   class UICommandGraph
   {
   public:
@@ -1060,6 +1070,45 @@ namespace moho
     static_assert(offsetof(SessionEntityMap, mHead) == 0x04, "SessionEntityMap::mHead offset must be 0x04");
     static_assert(offsetof(SessionEntityMap, mSize) == 0x08, "SessionEntityMap::mSize offset must be 0x08");
 
+    struct UserEntityWeakLinkSlotRuntimeView
+    {
+      void* mOwnerLinkSlot; // +0x00
+    };
+
+    static_assert(
+      sizeof(UserEntityWeakLinkSlotRuntimeView) == sizeof(void*),
+      "UserEntityWeakLinkSlotRuntimeView size must be pointer-sized"
+    );
+
+    struct CursorInfoRuntimeView
+    {
+      std::uint8_t mHitValid; // +0x00
+      std::uint8_t pad_01[3];
+      Wm3::Vector3f mMouseWorldPos;            // +0x04
+      UserEntityWeakLinkSlotRuntimeView mUnitHover; // +0x10
+      UserEntityWeakLinkSlotRuntimeView mPrevious;  // +0x14
+      std::int32_t mIsDragger;                 // +0x18
+      Wm3::Vector2f mMouseScreenPos;           // +0x1C
+    };
+
+    static_assert(sizeof(CursorInfoRuntimeView) == 0x24, "CursorInfoRuntimeView size must be 0x24");
+    static_assert(offsetof(CursorInfoRuntimeView, mUnitHover) == 0x10, "CursorInfoRuntimeView::mUnitHover offset must be 0x10");
+    static_assert(offsetof(CursorInfoRuntimeView, mPrevious) == 0x14, "CursorInfoRuntimeView::mPrevious offset must be 0x14");
+    static_assert(
+      offsetof(CursorInfoRuntimeView, mIsDragger) == 0x18, "CursorInfoRuntimeView::mIsDragger offset must be 0x18"
+    );
+
+    struct CWldSessionCursorRuntimeView
+    {
+      std::uint8_t pad_0000_04AF[0x4B0];
+      CursorInfoRuntimeView mCursorInfo; // +0x4B0
+    };
+
+    static_assert(
+      offsetof(CWldSessionCursorRuntimeView, mCursorInfo) == 0x4B0,
+      "CWldSessionCursorRuntimeView::mCursorInfo offset must be 0x4B0"
+    );
+
     struct SessionSaveTagNode
     {
       SessionSaveTagNode* mLeft;   // +0x00
@@ -1143,6 +1192,81 @@ namespace moho
       }
 
       return reinterpret_cast<UserEntity*>(raw - kSelectionOwnerLinkOffset);
+    }
+
+    [[nodiscard]] UserEntity* DecodeUserEntityWeakRef(const CameraUserEntityWeakRef& weakRef)
+    {
+      constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+      static_assert(kUserEntityWeakOwnerOffset == 0x08, "UserEntity weak-ref owner offset must stay 0x08");
+#endif
+
+      const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+      if (raw == 0u || raw == kUserEntityWeakOwnerOffset || raw < kUserEntityWeakOwnerOffset) {
+        return nullptr;
+      }
+
+      return reinterpret_cast<UserEntity*>(raw - kUserEntityWeakOwnerOffset);
+    }
+
+    [[nodiscard]] UserEntity* DecodeUserEntityWeakLinkSlot(const UserEntityWeakLinkSlotRuntimeView& weakSlot)
+    {
+      constexpr std::uintptr_t kUserEntityWeakOwnerOffset = offsetof(UserEntity, mIUnitChainHead);
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+      static_assert(kUserEntityWeakOwnerOffset == 0x08, "UserEntity weak-link owner offset must stay 0x08");
+#endif
+
+      const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakSlot.mOwnerLinkSlot);
+      if (raw == 0u || raw == kUserEntityWeakOwnerOffset || raw < kUserEntityWeakOwnerOffset) {
+        return nullptr;
+      }
+
+      return reinterpret_cast<UserEntity*>(raw - kUserEntityWeakOwnerOffset);
+    }
+
+    [[nodiscard]] UserEntity* GetHoveredUserEntity(const CWldSession* const session) noexcept
+    {
+      if (session == nullptr) {
+        return nullptr;
+      }
+
+      const auto* const sessionView = reinterpret_cast<const CWldSessionCursorRuntimeView*>(session);
+      return DecodeUserEntityWeakLinkSlot(sessionView->mCursorInfo.mUnitHover);
+    }
+
+    [[nodiscard]] const IUnit* ResolveIUnitBridge(const UserUnit* const userUnit) noexcept
+    {
+      return userUnit ? reinterpret_cast<const IUnit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+    }
+
+    [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const userUnit) noexcept
+    {
+      return userUnit ? reinterpret_cast<IUnit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
+    }
+
+    [[nodiscard]] bool ContainsUnitPtr(const msvc8::vector<UserUnit*>& units, const UserUnit* const unit)
+    {
+      return std::find(units.begin(), units.end(), unit) != units.end();
+    }
+
+    void AppendUnitUnique(msvc8::vector<UserUnit*>& units, UserUnit* const unit)
+    {
+      if (unit == nullptr || ContainsUnitPtr(units, unit)) {
+        return;
+      }
+      units.push_back(unit);
+    }
+
+    void RemoveUnitIfPresent(msvc8::vector<UserUnit*>& units, const UserUnit* const unit)
+    {
+      msvc8::vector<UserUnit*> filteredUnits{};
+      filteredUnits.reserve(units.size());
+      for (UserUnit* const candidate : units) {
+        if (candidate != unit) {
+          filteredUnits.push_back(candidate);
+        }
+      }
+      units = filteredUnits;
     }
 
     [[nodiscard]] bool ContainsEntityPtr(const msvc8::vector<UserEntity*>& entities, const UserEntity* const entity)
@@ -1692,6 +1816,34 @@ namespace moho
         "CWldSession::mSaveSourceTreeSize offset must be 0x4C"
       );
       return *reinterpret_cast<SessionEntityMap*>(&session->mUnknownOwner44);
+    }
+
+    void CollectSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
+    {
+      outUnits.clear();
+      if (session == nullptr) {
+        return;
+      }
+
+      SessionEntityMap& entityMap = GetSessionEntityMap(session);
+      SessionEntityMapNode* const head = entityMap.mHead;
+      if (head == nullptr || head->mLeft == head) {
+        return;
+      }
+
+      for (SessionEntityMapNode* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)) {
+        UserEntity* const entity = node->mEntity;
+        if (entity == nullptr) {
+          continue;
+        }
+
+        UserUnit* const unit = entity->IsUserUnit();
+        if (unit == nullptr) {
+          continue;
+        }
+
+        AppendUnitUnique(outUnits, unit);
+      }
     }
 
     struct TerrainResMapBridge
@@ -3168,6 +3320,185 @@ namespace moho
     }
 
     UI_EndCommandMode();
+  }
+
+  /**
+   * Address: 0x00865830 (FUN_00865830, ?CanSelectUnit@CWldSession@Moho@@QBE_NPAVUserUnit@2@@Z)
+   */
+  bool CWldSession::CanSelectUnit(UserUnit* const unit) const
+  {
+    const UserEntity* const entity = reinterpret_cast<const UserEntity*>(unit);
+    const bool selectableByArmy = entity != nullptr && entity->IsSelectable() && entity->mArmy == GetFocusUserArmy();
+    return selectableByArmy || (UI_SelectAnything && this != nullptr && IsCheatsEnabled);
+  }
+
+  /**
+   * Address: 0x00865920 (FUN_00865920, ?ReleaseDrag@CWldSession@Moho@@QAEXW4EMauiEventModifier@2@@Z)
+   */
+  void CWldSession::ReleaseDrag(const EMauiEventModifier modifiers)
+  {
+    constexpr std::uint32_t kShiftMask = static_cast<std::uint32_t>(MEM_Shift);
+    constexpr std::uint32_t kCtrlMask = static_cast<std::uint32_t>(MEM_Ctrl);
+    constexpr std::uint32_t kAltMask = static_cast<std::uint32_t>(MEM_Alt);
+    constexpr std::uint32_t kShiftCtrlMask = kShiftMask | kCtrlMask;
+
+    const std::uint32_t modifierBits = static_cast<std::uint32_t>(modifiers);
+    msvc8::vector<UserUnit*> nextSelection{};
+
+    UserEntity* const hoveredEntity = GetHoveredUserEntity(this);
+    UserUnit* const hoveredUnit = hoveredEntity != nullptr ? hoveredEntity->IsUserUnit() : nullptr;
+
+    if (ui_DebugAltClick && (modifierBits & kAltMask) != 0u && hoveredEntity != nullptr) {
+      UserArmy* const hoveredArmy = hoveredEntity->mArmy;
+      if (hoveredArmy != nullptr && hoveredArmy != GetFocusUserArmy()) {
+        SetSelectionUnits(nextSelection);
+        RequestFocusArmy(static_cast<int>(hoveredArmy->mArmyIndex));
+        return;
+      }
+    }
+
+    if (!CanSelectUnit(hoveredUnit)) {
+      if ((modifierBits & kShiftCtrlMask) == 0u) {
+        SetSelectionUnits(nextSelection);
+      }
+      return;
+    }
+
+    if ((modifierBits & kCtrlMask) != 0u) {
+      msvc8::vector<UserUnit*> currentSelection{};
+      GetSelectionUnits(currentSelection);
+
+      const IUnit* const hoveredBridge = ResolveIUnitBridge(hoveredUnit);
+      const RUnitBlueprint* const targetBlueprint = hoveredBridge != nullptr ? hoveredBridge->GetBlueprint() : nullptr;
+
+      if ((modifierBits & kShiftMask) != 0u) {
+        if (ContainsUnitPtr(currentSelection, hoveredUnit)) {
+          for (UserUnit* const selectedUnit : currentSelection) {
+            const IUnit* const selectedBridge = ResolveIUnitBridge(selectedUnit);
+            if (selectedBridge == nullptr || selectedBridge->GetBlueprint() != targetBlueprint) {
+              AppendUnitUnique(nextSelection, selectedUnit);
+            }
+          }
+
+          SetSelectionUnits(nextSelection);
+          return;
+        }
+
+        nextSelection = currentSelection;
+      }
+
+      msvc8::vector<UserUnit*> allSessionUnits{};
+      CollectSessionUserUnits(this, allSessionUnits);
+      const UserArmy* const focusArmy = GetFocusUserArmy();
+      for (UserUnit* const sessionUnit : allSessionUnits) {
+        if (sessionUnit == nullptr || sessionUnit->IsBeingBuilt()) {
+          continue;
+        }
+
+        const IUnit* const sessionBridge = ResolveIUnitBridge(sessionUnit);
+        if (sessionBridge == nullptr || sessionBridge->IsDead()) {
+          continue;
+        }
+
+        const UserEntity* const sessionEntity = reinterpret_cast<const UserEntity*>(sessionUnit);
+        if (sessionEntity == nullptr || sessionEntity->mArmy != focusArmy) {
+          continue;
+        }
+
+        if (sessionBridge->GetBlueprint() != targetBlueprint) {
+          continue;
+        }
+
+        AppendUnitUnique(nextSelection, sessionUnit);
+      }
+
+      SetSelectionUnits(nextSelection);
+      return;
+    }
+
+    if ((modifierBits & kShiftMask) != 0u) {
+      GetSelectionUnits(nextSelection);
+      if (ContainsUnitPtr(nextSelection, hoveredUnit)) {
+        RemoveUnitIfPresent(nextSelection, hoveredUnit);
+      } else {
+        AppendUnitUnique(nextSelection, hoveredUnit);
+      }
+    } else {
+      AppendUnitUnique(nextSelection, hoveredUnit);
+    }
+
+    SetSelectionUnits(nextSelection);
+  }
+
+  /**
+   * Address: 0x00865E20 (FUN_00865E20, ?HandleDoubleClickSelection@CWldSession@Moho@@QAEXPAVCameraImpl@2@@Z)
+   */
+  void CWldSession::HandleDoubleClickSelection(CameraImpl* const camera)
+  {
+    UserEntity* const hoveredEntity = GetHoveredUserEntity(this);
+    if (hoveredEntity == nullptr) {
+      return;
+    }
+
+    UserUnit* const hoveredUnit = hoveredEntity->IsUserUnit();
+    if (hoveredUnit == nullptr) {
+      return;
+    }
+
+    if (hoveredEntity->IsInCategory(msvc8::string("WALL"))) {
+      return;
+    }
+
+    if (hoveredEntity->mArmy != GetFocusUserArmy()) {
+      return;
+    }
+
+    const IUnit* const hoveredBridge = ResolveIUnitBridge(hoveredUnit);
+    if (hoveredBridge == nullptr) {
+      return;
+    }
+
+    const RUnitBlueprint* const targetBlueprint = hoveredBridge->GetBlueprint();
+    msvc8::vector<UserUnit*> nextSelection{};
+    GetSelectionUnits(nextSelection);
+
+    CameraFrustumUserEntityList* const frustumUnits = camera != nullptr ? camera->GetArmyUnitsInFrustum() : nullptr;
+    if (frustumUnits != nullptr) {
+      for (CameraUserEntityWeakRef* weakRef = frustumUnits->mStart;
+           weakRef != nullptr && weakRef != frustumUnits->mFinish;
+           ++weakRef) {
+        UserEntity* const entity = DecodeUserEntityWeakRef(*weakRef);
+        if (entity == nullptr) {
+          continue;
+        }
+
+        UserUnit* const unit = entity->IsUserUnit();
+        if (unit == nullptr || unit == hoveredUnit) {
+          continue;
+        }
+
+        IUnit* const unitBridge = ResolveIUnitBridge(unit);
+        if (unitBridge == nullptr || unitBridge->IsDead() || unitBridge->DestroyQueued()) {
+          continue;
+        }
+
+        if (!CanSelectUnit(unit)) {
+          continue;
+        }
+
+        if (unitBridge->GetBlueprint() != targetBlueprint) {
+          continue;
+        }
+
+        if (unitBridge->IsUnitState(UNITSTATE_BeingUpgraded)) {
+          continue;
+        }
+
+        AppendUnitUnique(nextSelection, unit);
+      }
+    }
+
+    SetSelectionUnits(nextSelection);
   }
 
   /**

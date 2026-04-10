@@ -526,6 +526,16 @@ namespace moho
      * Applies 3D listener/emitter transform to an active cue.
      */
     static void Calculate3D(const Wm3::Vec3f* worldPos, AudioEngine* engine, IXACTCue* cue);
+
+    /**
+     * Address: unknown (called from HSound::UpdateLoopCompletionState)
+     *
+     * IXACTCue* cue
+     *
+     * What it does:
+     * Queries whether the given cue has stopped playing.
+     */
+    [[nodiscard]] bool IsStopped(IXACTCue* cue) const;
   };
 
   extern SoundConfiguration* sSoundConfiguration;

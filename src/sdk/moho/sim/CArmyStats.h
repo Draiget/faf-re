@@ -86,7 +86,16 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x007107E0 (FUN_007107E0, Moho::CArmyStatItem::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected RTTI for `CArmyStatItem*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x00585B30 (FUN_00585B30, Moho::CArmyStatItem::CArmyStatItem)

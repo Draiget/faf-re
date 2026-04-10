@@ -523,6 +523,7 @@ namespace moho
 {
   gpg::RType* Stats<CArmyStatItem>::sType = nullptr;
   gpg::RType* CArmyStatItem::sType = nullptr;
+  gpg::RType* CArmyStatItem::sPointerType = nullptr;
   gpg::RType* CArmyStats::sType = nullptr;
 
   gpg::RType* CArmyStatItem::StaticGetClass()
@@ -539,6 +540,25 @@ namespace moho
       sType = gpg::LookupRType(typeid(CArmyStats));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x007107E0 (FUN_007107E0, Moho::CArmyStatItem::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches reflected RTTI for `CArmyStatItem*`.
+   */
+  gpg::RType* CArmyStatItem::GetPointerType()
+  {
+    (void)StaticGetClass();
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(CArmyStatItem*));
+      sPointerType = cached;
+    }
+
+    return cached;
   }
 
   /**

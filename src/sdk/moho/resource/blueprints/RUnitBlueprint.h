@@ -676,6 +676,16 @@ namespace moho
     RUnitBlueprintEconomy Economy;     // +0x4E8
 
     /**
+     * Address: 0x0051E980 (FUN_0051E980)
+     * Mangled: ??1RUnitBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Destroys unit-blueprint subsection lanes in reverse order, then
+     * tears down the `REntityBlueprint` base.
+     */
+    ~RUnitBlueprint();
+
+    /**
      * Address: 0x0051EA40 (FUN_0051EA40)
      *
      * What it does:

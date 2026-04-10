@@ -252,6 +252,43 @@ namespace
     "CameraImplZoomLimitView::mMaxZoomMult offset must be 0x850"
   );
 
+  struct CameraFrustumUserEntityStorage
+  {
+    moho::CameraFrustumUserEntityList mView;              // +0x00
+    moho::CameraUserEntityWeakRef mInlineStorage[40]{}; // +0x10
+  };
+
+  static_assert(sizeof(CameraFrustumUserEntityStorage) == 0x150, "CameraFrustumUserEntityStorage size must be 0x150");
+  static_assert(
+    offsetof(CameraFrustumUserEntityStorage, mView) == 0x00,
+    "CameraFrustumUserEntityStorage::mView offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CameraFrustumUserEntityStorage, mInlineStorage) == 0x10,
+    "CameraFrustumUserEntityStorage::mInlineStorage offset must be 0x10"
+  );
+
+  struct CameraImplArmyFrustumView
+  {
+    std::uint8_t mUnknown000To6FF[0x700]{};
+    CameraFrustumUserEntityStorage mArmyUnitsInFrustum; // +0x700
+  };
+
+  static_assert(
+    offsetof(CameraImplArmyFrustumView, mArmyUnitsInFrustum) == 0x700,
+    "CameraImplArmyFrustumView::mArmyUnitsInFrustum offset must be 0x700"
+  );
+  static_assert(
+    offsetof(CameraImplArmyFrustumView, mArmyUnitsInFrustum) + sizeof(CameraFrustumUserEntityStorage) ==
+      offsetof(CameraImplZoomLimitView, mMaxZoomMult),
+    "CameraImplArmyFrustumView::mArmyUnitsInFrustum must end at mMaxZoomMult"
+  );
+
+  [[nodiscard]] CameraImplArmyFrustumView* AsArmyFrustumView(moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<CameraImplArmyFrustumView*>(camera);
+  }
+
   [[nodiscard]] CameraImplZoomLimitView* AsZoomLimitView(moho::CameraImpl* const camera) noexcept
   {
     return reinterpret_cast<CameraImplZoomLimitView*>(camera);
@@ -428,6 +465,18 @@ const char* moho::CameraImpl::CameraGetName() const
 const moho::GeomCamera3& moho::CameraImpl::CameraGetView() const
 {
   return AsRuntimeView(this)->mCam;
+}
+
+/**
+ * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
+ *
+ * What it does:
+ * Returns one cached weak-vector view of focus-army units currently in camera
+ * frustum.
+ */
+moho::CameraFrustumUserEntityList* moho::CameraImpl::GetArmyUnitsInFrustum()
+{
+  return &AsArmyFrustumView(this)->mArmyUnitsInFrustum.mView;
 }
 
 /**
