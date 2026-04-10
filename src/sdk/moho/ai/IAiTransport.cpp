@@ -30,6 +30,15 @@ namespace moho
   class RBroadcasterRType_EAiTransportEvent final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005ECC40 (FUN_005ECC40, moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent)
+     *
+     * What it does:
+     * Constructs and preregisters the broadcaster RTTI lane for
+     * `BroadcasterEventTag<EAiTransportEvent>`.
+     */
+    RBroadcasterRType_EAiTransportEvent();
+
     [[nodiscard]] const char* GetName() const override;
 
     void Init() override
@@ -42,6 +51,15 @@ namespace moho
   class RListenerRType_EAiTransportEvent final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005ECCA0 (FUN_005ECCA0, moho::RListenerRType_EAiTransportEvent::RListenerRType_EAiTransportEvent)
+     *
+     * What it does:
+     * Constructs and preregisters the listener RTTI lane for
+     * `Listener<EAiTransportEvent>`.
+     */
+    RListenerRType_EAiTransportEvent();
+
     [[nodiscard]] const char* GetName() const override;
 
     void Init() override
@@ -520,6 +538,32 @@ const char* moho::RListenerRType_EAiTransportEvent::GetName() const
     (void)std::atexit(&cleanup_RListenerRType_EAiTransportEvent_GetName);
   }
   return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005ECC40 (FUN_005ECC40, moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent)
+ *
+ * What it does:
+ * Constructs and preregisters the broadcaster RTTI lane for
+ * `BroadcasterEventTag<EAiTransportEvent>`.
+ */
+moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(moho::BroadcasterEventTag<moho::EAiTransportEvent>), this);
+}
+
+/**
+ * Address: 0x005ECCA0 (FUN_005ECCA0, moho::RListenerRType_EAiTransportEvent::RListenerRType_EAiTransportEvent)
+ *
+ * What it does:
+ * Constructs and preregisters the listener RTTI lane for
+ * `Listener<EAiTransportEvent>`.
+ */
+moho::RListenerRType_EAiTransportEvent::RListenerRType_EAiTransportEvent()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(moho::Listener<moho::EAiTransportEvent>), this);
 }
 
 /**
@@ -1053,8 +1097,7 @@ Unit* IAiTransport::TransportGetTeleportBeaconForSync() const
  */
 int moho::register_RBroadcasterRType_EAiTransportEvent()
 {
-  auto* const type = AcquireBroadcasterTransportType();
-  gpg::PreRegisterRType(typeid(moho::BroadcasterEventTag<moho::EAiTransportEvent>), type);
+  (void)AcquireBroadcasterTransportType();
   return std::atexit(&cleanup_RBroadcasterRType_EAiTransportEvent);
 }
 
@@ -1067,8 +1110,7 @@ int moho::register_RBroadcasterRType_EAiTransportEvent()
  */
 int moho::register_RListenerRType_EAiTransportEvent()
 {
-  auto* const type = AcquireListenerTransportType();
-  gpg::PreRegisterRType(typeid(moho::Listener<moho::EAiTransportEvent>), type);
+  (void)AcquireListenerTransportType();
   return std::atexit(&cleanup_RListenerRType_EAiTransportEvent);
 }
 

@@ -27,6 +27,7 @@
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
 
@@ -1278,3 +1279,25 @@ const SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyI
 
   return mReconDat.begin() + armyIndex;
 }
+
+/**
+ * Address: 0x005BEE90 (FUN_005BEE90)
+ * Mangled: ?CreateInterface@ReconBlip@Moho@@MAEXPAUSSyncData@2@@Z
+ *
+ * What it does:
+ * Packs `mUnitConstDat` + entity identity fields into a `SCreateUnitParams`
+ * and appends it to `syncData->mNewUnits`, then marks `mInterfaceCreated = 1`.
+ */
+void ReconBlip::CreateInterface(SSyncData* const syncData)
+{
+  SCreateUnitParams createParams{};
+  createParams.mEntityId = id_;
+  createParams.mBlueprint = BluePrint;
+  createParams.mTickCreated = mTickCreated;
+  createParams.mConstDat.mBuildStateTag = mUnitConstDat.mBuildStateTag;
+  createParams.mConstDat.mStatsRoot = mUnitConstDat.mStatsRoot;
+  createParams.mConstDat.mFake = mUnitConstDat.mFake;
+  syncData->mNewUnits.push_back(createParams);
+  mInterfaceCreated = 1u;
+}
+ 

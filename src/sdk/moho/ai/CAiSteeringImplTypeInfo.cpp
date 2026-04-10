@@ -165,6 +165,18 @@ namespace
 CAiSteeringImplTypeInfo::~CAiSteeringImplTypeInfo() = default;
 
 /**
+ * Address: 0x005D21E0 (FUN_005D21E0, ??0CAiSteeringImplTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters `CAiSteeringImpl` RTTI so lookup resolves to this type helper.
+ */
+CAiSteeringImplTypeInfo::CAiSteeringImplTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(CAiSteeringImpl), this);
+}
+
+/**
  * Address: 0x005D2290 (FUN_005D2290, ?GetName@CAiSteeringImplTypeInfo@Moho@@UBEPBDXZ)
  */
 const char* CAiSteeringImplTypeInfo::GetName() const
@@ -192,13 +204,12 @@ void CAiSteeringImplTypeInfo::Init()
  * Address: 0x00BCE480 (FUN_00BCE480, register_CAiSteeringImplTypeInfo)
  *
  * What it does:
- * Registers the `CAiSteeringImpl` RTTI type-info object and installs
+ * Constructs startup-owned `CAiSteeringImplTypeInfo` storage and installs
  * process-exit cleanup.
  */
 int moho::register_CAiSteeringImplTypeInfo()
 {
   CAiSteeringImplTypeInfo* const typeInfo = AcquireCAiSteeringImplTypeInfo();
-  gpg::PreRegisterRType(typeid(CAiSteeringImpl), typeInfo);
   CAiSteeringImpl::sType = typeInfo;
   return std::atexit(&cleanup_CAiSteeringImplTypeInfo);
 }

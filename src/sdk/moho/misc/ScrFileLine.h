@@ -21,6 +21,16 @@ namespace moho
     ScrFileLine(int lineNumberOneBased, const msvc8::string& sourceLineText);
 
     /**
+     * Address: 0x004C6150 (FUN_004C6150, Moho::ScrFileLine::ScrFileLine)
+     *
+     * ScrFileLine const &
+     *
+     * What it does:
+     * Copies vtable, marker state, and both string lanes from the source row.
+     */
+    ScrFileLine(const ScrFileLine&) = default;
+
+    /**
      * Address: 0x004C1E10 (FUN_004C1E10, Moho::ScrFileLine::~ScrFileLine)
      *
      * What it does:

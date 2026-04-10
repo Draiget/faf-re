@@ -35,6 +35,18 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x005E24E0 (FUN_005E24E0, ??0CAiTargetTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters `CAiTarget` RTTI so lookup resolves to this type helper.
+ */
+CAiTargetTypeInfo::CAiTargetTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(CAiTarget), this);
+}
+
+/**
  * Address: 0x005E2570 (FUN_005E2570, scalar deleting thunk)
  */
 CAiTargetTypeInfo::~CAiTargetTypeInfo() = default;
@@ -71,8 +83,6 @@ void CAiTargetTypeInfo::Init()
  */
 int moho::register_CAiTargetTypeInfo()
 {
-  auto* const type = AcquireCAiTargetTypeInfo();
-  gpg::PreRegisterRType(typeid(CAiTarget), type);
-  CAiTarget::sType = type;
+  (void)AcquireCAiTargetTypeInfo();
   return std::atexit(&cleanup_CAiTargetTypeInfo);
 }

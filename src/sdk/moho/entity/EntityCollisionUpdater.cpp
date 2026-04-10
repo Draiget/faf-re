@@ -5,6 +5,7 @@
 #include <limits>
 
 #include "EntityTransformPayload.h"
+#include "gpg/core/utils/Global.h"
 #include "wm3/Distance3.h"
 
 namespace
@@ -677,5 +678,33 @@ namespace moho
   {
     const Wm3::Vec3f delta = *point - mShape.Center;
     return mShape.Radius * mShape.Radius > Wm3::Vector3f::LengthSq(delta);
+  }
+
+  /**
+   * Address: 0x00676A40 (FUN_00676A40, Moho::CColPrimitiveBase::Collide)
+   * Mangled: ?Collide@CColPrimitiveBase@Moho@@QAE_NPAVCColPrimitiveBase@2@PAUCollisionResult@2@@Z
+   *
+   * What it does:
+   * Dispatches shape-vs-shape collision by querying `with` shape type (box vs
+   * sphere), then calling the matching `CollideBox` or `CollideSphere` virtual
+   * on `this`.  Asserts unreachable if `with` has neither shape.
+   */
+  bool EntityCollisionUpdater::Collide(
+    const EntityCollisionUpdater* with,
+    CollisionPairResult* outResult
+  ) const
+  {
+    if (const Wm3::Box3f* box = with->GetBox()) {
+      return CollideBox(box, outResult);
+    }
+    const Wm3::Sphere3f* sphere = with->GetSphere();
+    if (!sphere) {
+      gpg::HandleAssertFailure(
+        "Reached the supposably unreachable.",
+        94,
+        "c:\\work\\rts\\main\\code\\src\\core/ColMain.h"
+      );
+    }
+    return CollideSphere(sphere, outResult);
   }
 } // namespace moho

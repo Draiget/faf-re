@@ -43,6 +43,19 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x005E8320 (FUN_005E8320, ??0CAiTransportImplTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters `CAiTransportImpl` RTTI so lookup resolves to this type
+ * helper.
+ */
+CAiTransportImplTypeInfo::CAiTransportImplTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(CAiTransportImpl), this);
+}
+
+/**
  * Address: 0x005E83B0 (FUN_005E83B0, scalar deleting thunk)
  */
 CAiTransportImplTypeInfo::~CAiTransportImplTypeInfo() = default;
@@ -84,8 +97,6 @@ void CAiTransportImplTypeInfo::Init()
  */
 int moho::register_CAiTransportImplTypeInfo()
 {
-  auto* const type = AcquireCAiTransportImplTypeInfo();
-  gpg::PreRegisterRType(typeid(CAiTransportImpl), type);
-  CAiTransportImpl::sType = type;
+  (void)AcquireCAiTransportImplTypeInfo();
   return std::atexit(&cleanup_CAiTransportImplTypeInfo);
 }

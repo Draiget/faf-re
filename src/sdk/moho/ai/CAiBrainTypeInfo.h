@@ -14,6 +14,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00579B20 (FUN_00579B20, ??0CAiBrainTypeInfo@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Preregisters `CAiBrain` RTTI for this type-info helper.
+     */
+    CAiBrainTypeInfo();
+
+    /**
      * Address: 0x00579BB0 (FUN_00579BB0, scalar deleting thunk)
      *
      * VFTable SLOT: 2

@@ -1123,6 +1123,16 @@ namespace moho
     CMauiMesh(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x0079E100 (FUN_0079E100, Moho::CMauiMesh::OnFrame)
+     *
+     * What it does:
+     * Recreates mesh thumbnail texture-sheet storage when control dimensions
+     * change, then refreshes mesh thumbnail rendering when mesh/rotation lanes
+     * are marked dirty.
+     */
+    void Frame(float deltaSeconds) override;
+
+    /**
      * Address: 0x0079DF40 (FUN_0079DF40, Moho::CMauiMesh::SetMesh)
      *
      * What it does:
@@ -2016,7 +2026,7 @@ namespace moho
   struct CMauiMeshRuntimeView : CMauiControlRuntimeView
   {
     std::uint8_t mUnknown0D4To11B[0x48]{};
-    boost::shared_ptr<CD3DBatchTexture> mTexture; // +0x11C
+    boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
     bool mIsRotated = false; // +0x124
     std::uint8_t mPad125To127[0x3]{};
     RMeshBlueprint* mMeshBlueprint = nullptr; // +0x128

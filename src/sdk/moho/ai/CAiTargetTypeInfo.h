@@ -12,6 +12,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E24E0 (FUN_005E24E0, ??0CAiTargetTypeInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Preregisters `CAiTarget` RTTI so lookup resolves to this type helper.
+     */
+    CAiTargetTypeInfo();
+
+    /**
      * Address: 0x005E2570 (FUN_005E2570, scalar deleting thunk)
      */
     ~CAiTargetTypeInfo() override;

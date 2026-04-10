@@ -188,4 +188,53 @@ namespace moho
     offsetof(CollisionBeamEntity, mCollisionCheckTickCounter) == 0x298,
     "CollisionBeamEntity::mCollisionCheckTickCounter offset must be 0x298"
   );
+
+  /**
+   * VFTABLE: 0x00E26E54
+   * COL: 0x00E994DC
+   */
+  class CollisionBeamEntityTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00673720 (FUN_00673720, Moho::CollisionBeamEntityTypeInfo::CollisionBeamEntityTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters reflected RTTI ownership for `CollisionBeamEntity`.
+     */
+    CollisionBeamEntityTypeInfo();
+
+    /**
+     * Address: 0x006737C0 (FUN_006737C0, Moho::CollisionBeamEntityTypeInfo::dtr)
+     */
+    ~CollisionBeamEntityTypeInfo() override;
+
+    /**
+     * Address: 0x006737B0 (FUN_006737B0, Moho::CollisionBeamEntityTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00673780 (FUN_00673780, Moho::CollisionBeamEntityTypeInfo::Init)
+     */
+    void Init() override;
+
+  private:
+    /**
+     * What it does:
+     * Adds `Entity` as reflected base metadata at offset `0`.
+     */
+    static void AddBase_Entity(gpg::RType* typeInfo);
+  };
+
+  /**
+   * Address: 0x00BD4C40 (FUN_00BD4C40, register_CollisionBeamEntityTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `CollisionBeamEntityTypeInfo` storage and installs
+   * process-exit cleanup.
+   */
+  int register_CollisionBeamEntityTypeInfo();
+
+  static_assert(sizeof(CollisionBeamEntityTypeInfo) == 0x64, "CollisionBeamEntityTypeInfo size must be 0x64");
 } // namespace moho

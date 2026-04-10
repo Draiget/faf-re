@@ -73,12 +73,11 @@ Build:
 
 ```bat
 msbuild src\sdk\sdk.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
-msbuild faf.sln /t:sdk /p:Configuration=Debug /p:Platform=x86
 ```
 
-Both commands are validated in a VS developer shell; expected result is `0 Error(s)` (warnings remain).
+This command is validated in a VS developer shell; expected result is `0 Error(s)` (warnings remain).
 
-Optional hang-safe build wrapper:
+Recommended hang-safe build wrapper:
 
 ```bat
 powershell -ExecutionPolicy Bypass -File scripts\build_sdk_with_timeout.ps1 -TimeoutMinutes 120 -NoOutputTimeoutMinutes 10

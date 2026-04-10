@@ -18,6 +18,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/sim/Sim.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
@@ -83,6 +84,27 @@ namespace
       CUnitCommandQueue::sType = type;
     }
     return type;
+  }
+
+  /**
+   * Address: 0x00409A40 (FUN_00409A40, func_CreateCTaskThread)
+   *
+   * What it does:
+   * Allocates one task-thread on `stage` and links `dispatch` as thread-top
+   * task while preserving prior top linkage.
+   */
+  [[nodiscard]] CTaskThread* CreateTaskThreadForDispatch(CTask* const dispatch, CTaskStage* const stage, const bool autoDelete)
+  {
+    if (!dispatch || !stage) {
+      return nullptr;
+    }
+
+    auto* const taskThread = new CTaskThread(stage);
+    dispatch->mAutoDelete = autoDelete;
+    dispatch->mOwnerThread = taskThread;
+    dispatch->mSubtask = taskThread->mTaskTop;
+    taskThread->mTaskTop = dispatch;
+    return taskThread;
   }
 
   [[nodiscard]] gpg::RRef MakeDispatchObjectRef(IAiCommandDispatchImpl* const object)
@@ -380,9 +402,52 @@ namespace
 gpg::RType* IAiCommandDispatchImpl::sType = nullptr;
 
 /**
- * Address: 0x005990F0 (FUN_005990F0, scalar deleting thunk)
+ * Address: 0x005990B0 (FUN_005990B0, ??0IAiCommandDispatchImpl@Moho@@AAE@XZ)
  */
-IAiCommandDispatchImpl::~IAiCommandDispatchImpl() = default;
+IAiCommandDispatchImpl::IAiCommandDispatchImpl()
+  : CCommandTask()
+  , IAiCommandDispatch()
+  , Listener<EUnitCommandQueueStatus>()
+  , mState(0)
+  , mPadding41{}
+  , mCommandQueue(nullptr)
+{}
+
+/**
+ * Address: 0x00598D00 (FUN_00598D00, ??0IAiCommandDispatchImpl@Moho@@QAE@PAVUnit@1@PAVCTaskThread@1@PAW4EAiResult@1@@Z)
+ */
+IAiCommandDispatchImpl::IAiCommandDispatchImpl(Unit* const unit)
+  : CCommandTask(unit, unit ? unit->SimulationRef : nullptr)
+  , IAiCommandDispatch()
+  , Listener<EUnitCommandQueueStatus>()
+  , mState(0)
+  , mPadding41{}
+  , mCommandQueue(unit ? unit->CommandQueue : nullptr)
+{
+  if (mSim != nullptr) {
+    (void)CreateTaskThreadForDispatch(static_cast<CTask*>(this), &mSim->mTaskStageA, false);
+  }
+
+  if (mCommandQueue != nullptr) {
+    mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(mCommandQueue));
+  }
+}
+
+/**
+ * Address: 0x005990F0 (FUN_005990F0, scalar deleting thunk)
+ * Address: 0x00598DD0 (FUN_00598DD0, non-deleting body)
+ */
+IAiCommandDispatchImpl::~IAiCommandDispatchImpl()
+{
+  mListenerLink.ListUnlink();
+
+  CTaskThread* const taskThread = mOwnerThread;
+  if (taskThread != nullptr) {
+    (void)taskThread->Destroy();
+  }
+
+  mListenerLink.ListUnlink();
+}
 
 /**
  * Address: 0x00599030 (FUN_00599030, ?OnEvent@IAiCommandDispatchImpl@Moho@@UAEXW4EUnitCommandQueueStatus@2@@Z)

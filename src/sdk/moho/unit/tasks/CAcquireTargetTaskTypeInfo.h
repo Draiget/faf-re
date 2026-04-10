@@ -16,7 +16,7 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005D86A0 (??0CAcquireTargetTaskTypeInfo@Moho@@QAE@@Z)
+     * Address: 0x005D86A0 (FUN_005D86A0, ??0CAcquireTargetTaskTypeInfo@Moho@@QAE@@Z)
      *
      * What it does:
      * Preregisters RTTI metadata for `CAcquireTargetTask`.

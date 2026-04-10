@@ -13,6 +13,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -20,6 +21,9 @@
 
 namespace
 {
+  constexpr const char kReflectSharedPtrHeaderPath[] =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/reflect_shared_ptr.h";
+
   class ETriggerOperatorTypeInfo final : public gpg::REnumType
   {
   public:
@@ -597,18 +601,20 @@ namespace
       serSaveFunc_ = &RSharedPointerSTriggerTypeInfo::Serialize;
     }
 
+    /**
+     * Address: 0x0070ECC0 (FUN_0070ECC0, gpg::RSharedPointerType_STrigger::SubscriptIndex)
+     *
+     * What it does:
+     * Asserts `index == 0` and returns the pointee of `boost::shared_ptr<STrigger>` as an `RRef`.
+     */
     gpg::RRef SubscriptIndex(void* const obj, const int ind) const override
     {
-      gpg::RRef out{};
-      out.mType = moho::STrigger::StaticGetClass();
-
-      if (!obj || ind != 0) {
-        return out;
+      if (ind != 0) {
+        gpg::HandleAssertFailure("index == 0", 65, kReflectSharedPtrHeaderPath);
       }
 
       auto* const ptr = static_cast<boost::shared_ptr<moho::STrigger>*>(obj);
-      out.mObj = ptr ? ptr->get() : nullptr;
-      return out;
+      return MakeSTriggerRef(ptr->get());
     }
 
     size_t GetCount(void* const obj) const override

@@ -11,6 +11,8 @@
 
 namespace
 {
+  constexpr const char kReflectWeakPtrHeaderPath[] = "c:\\work\\rts\\main\\code\\src\\core/ReflectWeakPtr.h";
+
   msvc8::string gWeakPtrIUnitTypeName;
   bool gWeakPtrIUnitTypeNameCleanupRegistered = false;
 
@@ -288,16 +290,19 @@ void moho::RWeakPtrType<moho::IUnit>::Init()
   serSaveFunc_ = &SaveWeakPtrIUnit;
 }
 
+/**
+ * Address: 0x005418A0 (FUN_005418A0, Moho::RWeakPtrType_IUnit::SubscriptIndex)
+ *
+ * What it does:
+ * Asserts `index == 0` and returns the pointed `IUnit` as a reflected `RRef`.
+ */
 gpg::RRef moho::RWeakPtrType<moho::IUnit>::SubscriptIndex(void* obj, const int ind) const
 {
-  GPG_ASSERT(ind == 0);
-  auto* const weak = static_cast<moho::WeakPtr<moho::IUnit>*>(obj);
-  if (!weak) {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = CachedIUnitType();
-    return out;
+  if (ind != 0) {
+    gpg::HandleAssertFailure("index == 0", 64, kReflectWeakPtrHeaderPath);
   }
+
+  auto* const weak = static_cast<moho::WeakPtr<moho::IUnit>*>(obj);
   return MakeIUnitRefFromWeakPtr(*weak);
 }
 

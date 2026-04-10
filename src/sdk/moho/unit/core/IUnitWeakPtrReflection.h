@@ -56,7 +56,8 @@ namespace moho
     void Init() override;
 
     /**
-     * Address: 0x00541920 (FA), 0x1012F220 (MohoEngine)
+     * Address: 0x005418A0 (FUN_005418A0, Moho::RWeakPtrType_IUnit::SubscriptIndex)
+     * Address: 0x1012F220 (MohoEngine)
      *
      * What it does:
      * Returns element 0 as `RRef` (asserts on any other index).

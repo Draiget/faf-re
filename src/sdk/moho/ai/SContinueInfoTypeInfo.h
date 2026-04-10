@@ -12,6 +12,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005B2150 (FUN_005B2150, ??0SContinueInfoTypeInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Preregisters `SContinueInfo` RTTI so lookup resolves to this type
+     * helper.
+     */
+    SContinueInfoTypeInfo();
+
+    /**
      * Address: 0x005B21E0 (FUN_005B21E0, scalar deleting thunk)
      */
     ~SContinueInfoTypeInfo() override;
@@ -40,8 +49,8 @@ namespace moho
    * Address: 0x00BCD2D0 (FUN_00BCD2D0, register_SContinueInfoTypeInfo)
    *
    * What it does:
-   * Constructs/preregisters startup RTTI descriptor for `SContinueInfo` and
-   * installs process-exit cleanup.
+   * Constructs startup-owned `SContinueInfoTypeInfo` storage and installs
+   * process-exit cleanup.
    */
   int register_SContinueInfoTypeInfo();
 } // namespace moho

@@ -16,8 +16,7 @@ namespace
   [[nodiscard]] SContinueInfoTypeInfo* AcquireSContinueInfoTypeInfo()
   {
     if (!gSContinueInfoTypeInfoConstructed) {
-      auto* const typeInfo = new (gSContinueInfoTypeInfoStorage) SContinueInfoTypeInfo();
-      gpg::PreRegisterRType(typeid(SContinueInfo), typeInfo);
+      new (gSContinueInfoTypeInfoStorage) SContinueInfoTypeInfo();
       gSContinueInfoTypeInfoConstructed = true;
     }
 
@@ -47,6 +46,18 @@ namespace
 SContinueInfoTypeInfo::~SContinueInfoTypeInfo() = default;
 
 /**
+ * Address: 0x005B2150 (FUN_005B2150, ??0SContinueInfoTypeInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Preregisters `SContinueInfo` RTTI so lookup resolves to this type helper.
+ */
+SContinueInfoTypeInfo::SContinueInfoTypeInfo()
+  : gpg::RType()
+{
+  gpg::PreRegisterRType(typeid(SContinueInfo), this);
+}
+
+/**
  * Address: 0x005B21D0 (FUN_005B21D0)
  */
 const char* SContinueInfoTypeInfo::GetName() const
@@ -68,8 +79,8 @@ void SContinueInfoTypeInfo::Init()
  * Address: 0x00BCD2D0 (FUN_00BCD2D0, register_SContinueInfoTypeInfo)
  *
  * What it does:
- * Constructs/preregisters startup RTTI descriptor for `SContinueInfo` and
- * installs process-exit cleanup.
+ * Constructs startup-owned `SContinueInfoTypeInfo` storage and installs
+ * process-exit cleanup.
  */
 int moho::register_SContinueInfoTypeInfo()
 {

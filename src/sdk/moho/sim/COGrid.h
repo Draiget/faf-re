@@ -41,4 +41,45 @@ namespace moho
     gpg::BitArray2D waterOccupation;
     gpg::BitArray2D mOccupation;
   };
+
+  /**
+   * VFTABLE: 0x00E3192C
+   * COL: 0x00E8E5B4
+   */
+  class COGridTypeInfo final : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00722B80 (FUN_00722B80, Moho::COGridTypeInfo::COGridTypeInfo)
+     *
+     * What it does:
+     * Constructs and preregisters reflected RTTI ownership for `COGrid`.
+     */
+    COGridTypeInfo();
+
+    /**
+     * Address: 0x00722C10 (FUN_00722C10, Moho::COGridTypeInfo::dtr)
+     */
+    ~COGridTypeInfo() override;
+
+    /**
+     * Address: 0x00722C00 (FUN_00722C00, Moho::COGridTypeInfo::GetName)
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x00722BE0 (FUN_00722BE0, Moho::COGridTypeInfo::Init)
+     */
+    void Init() override;
+  };
+
+  /**
+   * Address: 0x00BDAA90 (FUN_00BDAA90, register_COGridTypeInfo)
+   *
+   * What it does:
+   * Materializes startup `COGridTypeInfo` storage and installs process-exit cleanup.
+   */
+  int register_COGridTypeInfo();
+
+  static_assert(sizeof(COGridTypeInfo) == 0x64, "COGridTypeInfo size must be 0x64");
 } // namespace moho

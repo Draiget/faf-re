@@ -4,7 +4,9 @@ Use the timeout wrapper to avoid hanging `cl.exe`/`msbuild` runs.
 
 It enforces both:
 - a total wall-clock timeout (`TimeoutMinutes`)
-- a no-output timeout (`NoOutputTimeoutMinutes`) for frozen tail-hang states
+- a no-activity timeout (`NoOutputTimeoutMinutes`) that tracks output and compiler CPU progress
+
+It also prints periodic heartbeat lines so long compile stretches are visible.
 
 ## Default
 
@@ -19,6 +21,7 @@ Defaults:
 - `Platform`: `x86`
 - `TimeoutMinutes`: `120`
 - `NoOutputTimeoutMinutes`: `10` (`0` disables this check)
+- `HeartbeatSeconds`: `30` (`0` disables heartbeat lines)
 - `PollSeconds`: `2`
 - `MaxCpuCount`: `1`
 - `LogPath`: `msbuild_sdk_timeout.log`
@@ -29,6 +32,7 @@ Defaults:
 powershell -ExecutionPolicy Bypass -File .\scripts\build_sdk_with_timeout.ps1 `
   -TimeoutMinutes 120 `
   -NoOutputTimeoutMinutes 10 `
+  -HeartbeatSeconds 30 `
   -LogPath .\msbuild_sdk_debug_x86_timeout.log
 ```
 
@@ -36,4 +40,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_sdk_with_timeout.ps1 `
 
 - `0`: build succeeded
 - non-zero msbuild exit code: build failed
-- `124`: timed out (total or no-output) and process tree was terminated
+- `124`: timed out (total or no-activity) and process tree was terminated

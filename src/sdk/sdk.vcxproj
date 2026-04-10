@@ -102,6 +102,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -123,6 +124,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -142,6 +144,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -163,6 +166,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/MP4 /FS %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(FafRepoRoot)dependencies\zlib-1.2.3\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\include;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib\msw;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -182,8 +186,12 @@
     <ClCompile Include="gpg\core\containers\BitArray2D.cpp" />
     <ClCompile Include="gpg\core\containers\ReadArchive.cpp" />
     <ClCompile Include="gpg\core\containers\SerSaveLoadHelper_Box3f.cpp" />
-    <ClCompile Include="gpg\core\containers\Set.cpp" />
-    <ClCompile Include="gpg\core\containers\String.cpp" />
+    <ClCompile Include="gpg\core\containers\Set.cpp">
+      <ObjectFileName>$(IntDir)gpg_core_containers_Set.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="gpg\core\containers\String.cpp">
+      <ObjectFileName>$(IntDir)gpg_core_containers_String.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="gpg\core\containers\WriteArchive.cpp" />
     <ClCompile Include="gpg\core\random\Random.cpp" />
     <ClCompile Include="gpg\core\reflection\BadRefCast.cpp" />
@@ -228,8 +236,12 @@
     <ClCompile Include="gpg\gal\backends\d3d9\D3D9Interfaces.cpp" />
     <ClCompile Include="gpg\gal\backends\d3d9\StateManagerD3D9.cpp" />
     <ClCompile Include="legacy\containers\Map.cpp" />
-    <ClCompile Include="legacy\containers\Set.cpp" />
-    <ClCompile Include="legacy\containers\String.cpp" />
+    <ClCompile Include="legacy\containers\Set.cpp">
+      <ObjectFileName>$(IntDir)legacy_containers_Set.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="legacy\containers\String.cpp">
+      <ObjectFileName>$(IntDir)legacy_containers_String.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="legacy\containers\Vector.cpp" />
     <ClCompile Include="lua\LuaAssertion.cpp" />
     <ClCompile Include="lua\LuaObject.cpp" />
@@ -445,6 +457,7 @@
     <ClCompile Include="moho\entity\EVisibilityModeTypeInfo.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamStartupRegistrations.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntity.cpp" />
+    <ClCompile Include="moho\entity\CollisionBeamEntityTypeInfo.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntityConstruct.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntitySaveConstruct.cpp" />
     <ClCompile Include="moho\entity\CollisionBeamEntitySerializer.cpp" />
@@ -826,6 +839,7 @@
     <ClCompile Include="moho\sim\IdPool.cpp" />
     <ClCompile Include="moho\sim\IdPoolTypeInfo.cpp" />
     <ClCompile Include="moho\sim\IdPoolSerializer.cpp" />
+    <ClCompile Include="moho\sim\COGrid.cpp" />
     <ClCompile Include="moho\sim\COGridSerializer.cpp" />
     <ClCompile Include="moho\sim\SMinMaxTypeInfo.cpp" />
     <ClCompile Include="moho\sim\CRandomStream.cpp" />
@@ -1878,9 +1892,139 @@
     <ClInclude Include="wm3\Vector3.h" />
     <ClInclude Include="wm3\WideParity.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="cri\sofdec\SofdecAdxCodecRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecAdxDeclarationsRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecAdxPlatformRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecAdxRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecAdxXeficRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecAdxbBootstrapRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecCvfsRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecFoundationRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecM2aBitstreamRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecM2aDecoderRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecMpaRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecMwPlaybackRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecSfdRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecSvmTransferRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecVirtualDispatchRuntime.cpp" />
+    <ClCompile Include="cri\sofdec\SofdecVirtualDispatchTableRuntime.cpp" />
+    <ClCompile Include="moho\ai\CAiPathSpline.cpp" />
+    <ClCompile Include="moho\app\WxCoreGdiRuntime.cpp" />
+    <ClCompile Include="moho\audio\CSimSoundManagerConstruct.cpp" />
+    <ClCompile Include="moho\audio\CSimSoundManagerSaveConstruct.cpp" />
+    <ClCompile Include="moho\audio\CSimSoundManagerSerializer.cpp" />
+    <ClCompile Include="moho\audio\CSimSoundManagerTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\HSound.cpp" />
+    <ClCompile Include="moho\audio\ISoundManagerSerializer.cpp" />
+    <ClCompile Include="moho\audio\ISoundManagerTypeInfo.cpp" />
+    <ClCompile Include="moho\audio\IUserSoundManager.cpp" />
+    <ClCompile Include="moho\audio\XAudioError.cpp" />
+    <ClCompile Include="moho\entity\MotorSinkAway.cpp" />
+    <ClCompile Include="moho\math\Vector2f.cpp" />
+    <ClCompile Include="moho\math\Vector3f.cpp" />
+    <ClCompile Include="moho\misc\CZipFile.cpp" />
+    <ClCompile Include="moho\misc\ScrDebugWindow.cpp" />
+    <ClCompile Include="moho\misc\ScrGotoDialog.cpp" />
+    <ClCompile Include="moho\render\ID3DDepthStencil.cpp" />
+    <ClCompile Include="moho\render\ID3DIndexSheet.cpp" />
+    <ClCompile Include="moho\render\ID3DRenderTarget.cpp" />
+    <ClCompile Include="moho\render\ID3DVertexFormat.cpp" />
+    <ClCompile Include="moho\render\ID3DVertexSheet.cpp" />
+    <ClCompile Include="moho\render\ID3DVertexStream.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DDepthStencil.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DDevice.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DIndexSheet.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DRenderTarget.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DVertexFormat.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DVertexSheet.cpp" />
+    <ClCompile Include="moho\render\d3d\CD3DVertexStream.cpp" />
+    <ClCompile Include="moho\serialization\SBuildReserveInfo.cpp" />
+    <ClCompile Include="moho\serialization\typeinfo\ECompareTypeTypeInfo.cpp" />
+    <ClCompile Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.cpp" />
+    <ClCompile Include="moho\sim\SPhysBody.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="gpg\gal\AppRuntimeView.h" />
+    <ClInclude Include="moho\ai\CAiPathSpline.h" />
+    <ClInclude Include="moho\ai\EAiAttackerEvent.h" />
+    <ClInclude Include="moho\ai\EAiResult.h" />
+    <ClInclude Include="moho\ai\EAirCombatState.h" />
+    <ClInclude Include="moho\ai\ECompareType.h" />
+    <ClInclude Include="moho\ai\IFormationInstance.h" />
+    <ClInclude Include="moho\ai\SAiReservedTransportBone.h" />
+    <ClInclude Include="moho\ai\SPointVector.h" />
+    <ClInclude Include="moho\animation\CAnimationManipulatorConstruct.h" />
+    <ClInclude Include="moho\animation\CAnimationManipulatorSerializer.h" />
+    <ClInclude Include="moho\animation\CAnimationManipulatorTypeInfo.h" />
+    <ClInclude Include="moho\animation\IAniManipulatorSerializer.h" />
+    <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h" />
+    <ClInclude Include="moho\app\WxCoreGdiRuntime.h" />
+    <ClInclude Include="moho\audio\CSimSoundManagerConstruct.h" />
+    <ClInclude Include="moho\audio\CSimSoundManagerSaveConstruct.h" />
+    <ClInclude Include="moho\audio\CSimSoundManagerSerializer.h" />
+    <ClInclude Include="moho\audio\CSimSoundManagerTypeInfo.h" />
+    <ClInclude Include="moho\audio\ISoundManagerSerializer.h" />
+    <ClInclude Include="moho\audio\ISoundManagerTypeInfo.h" />
+    <ClInclude Include="moho\audio\XAudioError.h" />
+    <ClInclude Include="moho\console\TConVarString.h" />
+    <ClInclude Include="moho\console\TConVarUInt32.h" />
+    <ClInclude Include="moho\console\TConVarUInt8.h" />
+    <ClInclude Include="moho\console\TConVarbool.h" />
+    <ClInclude Include="moho\console\TConVarfloat.h" />
+    <ClInclude Include="moho\console\TConVarint.h" />
+    <ClInclude Include="moho\entity\EntityCategoryHelper.h" />
+    <ClInclude Include="moho\entity\EntityId.h" />
+    <ClInclude Include="moho\entity\MotorSinkAway.h" />
+    <ClInclude Include="moho\entity\SEntAttachInfo.h" />
+    <ClInclude Include="moho\lua\CScrLuaBinderFwd.h" />
+    <ClInclude Include="moho\misc\CZipFile.h" />
+    <ClInclude Include="moho\misc\ID3DDepthStencil.h" />
+    <ClInclude Include="moho\misc\Listener.h" />
+    <ClInclude Include="moho\misc\ScrDebugWindow.h" />
+    <ClInclude Include="moho\misc\ScrGotoDialog.h" />
+    <ClInclude Include="moho\misc\WeakPtr.h" />
+    <ClInclude Include="moho\net\EClientMsg.h" />
+    <ClInclude Include="moho\net\EnumByte.h" />
+    <ClInclude Include="moho\net\NetConstants.h" />
+    <ClInclude Include="moho\net\NetMessageRanges.h" />
+    <ClInclude Include="moho\net\NetTransportEnums.h" />
+    <ClInclude Include="moho\render\ID3DDepthStencil.h" />
+    <ClInclude Include="moho\render\ID3DIndexSheet.h" />
+    <ClInclude Include="moho\render\ID3DRenderTarget.h" />
+    <ClInclude Include="moho\render\ID3DVertexFormat.h" />
+    <ClInclude Include="moho\render\ID3DVertexSheet.h" />
+    <ClInclude Include="moho\render\ID3DVertexStream.h" />
+    <ClInclude Include="moho\render\d3d\CD3DDepthStencil.h" />
+    <ClInclude Include="moho\render\d3d\CD3DDevice.h" />
+    <ClInclude Include="moho\render\d3d\CD3DFontTypes.h" />
+    <ClInclude Include="moho\render\d3d\CD3DIndexSheet.h" />
+    <ClInclude Include="moho\render\d3d\CD3DRenderTarget.h" />
+    <ClInclude Include="moho\render\d3d\CD3DVertexFormat.h" />
+    <ClInclude Include="moho\render\d3d\CD3DVertexSheet.h" />
+    <ClInclude Include="moho\render\d3d\CD3DVertexStream.h" />
+    <ClInclude Include="moho\render\textures\detail\BatchTextureContainerHelpers.h" />
+    <ClInclude Include="moho\resource\PrefetchRuntime.h" />
+    <ClInclude Include="moho\serialization\SBuildReserveInfo.h" />
+    <ClInclude Include="moho\serialization\SaveGameFileHeader.h" />
+    <ClInclude Include="moho\serialization\SavedGameFileHeader.h" />
+    <ClInclude Include="moho\serialization\typeinfo\ECompareTypeTypeInfo.h" />
+    <ClInclude Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.h" />
+    <ClInclude Include="moho\sim\ArmyUnitSet.h" />
+    <ClInclude Include="moho\sim\CBackgroundTaskControl.h" />
+    <ClInclude Include="moho\sim\CSimArmyEconomyInfo.h" />
+    <ClInclude Include="moho\sim\ESquadClass.h" />
+    <ClInclude Include="moho\sim\SMinMax.h" />
+    <ClInclude Include="moho\sim\SRuleFootprintsBlueprint.h" />
+    <ClInclude Include="moho\sim\SSTIArmyConstantData.h" />
+    <ClInclude Include="moho\sim\SpecialFileType.h" />
+    <ClInclude Include="moho\sim\VisibilityRect.h" />
+    <ClInclude Include="moho\ui\SDebugDecal.h" />
+    <ClInclude Include="moho\ui\SDebugScreenText.h" />
+    <ClInclude Include="moho\unit\EUnitCommandQueueStatus.h" />
+    <ClInclude Include="moho\unit\core\SUnitConstructionParams.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
-
-
