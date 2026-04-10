@@ -855,7 +855,11 @@ namespace
       return;
     }
 
-    preferences->SetStringArr(msvc8::string(kDebugRecentFilesPreferenceKey), recentSourceFiles);
+    msvc8::vector<msvc8::string> recentFilesVec;
+    for (const auto& s : recentSourceFiles) {
+      recentFilesVec.push_back(s);
+    }
+    preferences->SetStringArr(msvc8::string(kDebugRecentFilesPreferenceKey), recentFilesVec);
     moho::USER_SavePreferences();
   }
 
@@ -1001,7 +1005,7 @@ namespace
 
     ClearAllSourcePageActiveExecutionMarkers(sourceControl);
 
-    const msvc8::string mountedSourcePathLower = gpg::STR_ToLower(mountedSourcePath);
+    const msvc8::string mountedSourcePathLower = gpg::STR_ToLower(mountedSourcePath.c_str());
     const std::int32_t pageIndex = FindSourcePageIndexByMountedPath(sourceControl, mountedSourcePathLower);
     const std::int32_t pageCount = GetSourceControlPageCount(sourceControl);
     if (pageIndex < 0 || pageIndex >= pageCount) {

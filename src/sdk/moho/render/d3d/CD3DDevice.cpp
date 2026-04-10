@@ -158,7 +158,7 @@ namespace
   {
     moho::Broadcaster pending{};
     if (listenerHead == nullptr || listenerHead->ListIsSingleton()) {
-      return pending.mNext;
+      return static_cast<moho::Broadcaster*>(pending.mNext);
     }
 
     listenerHead->move_nodes_to(pending);
@@ -176,7 +176,7 @@ namespace
       }
     }
 
-    return pending.mNext;
+    return static_cast<moho::Broadcaster*>(pending.mNext);
   }
 
   /**
@@ -619,7 +619,7 @@ namespace
         std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
 
       if (runtime->mViewport != nullptr) {
-        runtime->mViewport->D3DWindowOnDeviceExit();
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit();
       }
 
       const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
@@ -657,7 +657,7 @@ namespace
       (void)mResources.InitResources(false);
 
       if (runtime->mViewport != nullptr) {
-        runtime->mViewport->D3DWindowOnDeviceInit();
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit();
       }
 
       const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
@@ -689,7 +689,7 @@ namespace
       CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
       runtime->mInitialized = 0;
       if (runtime->mViewport != nullptr) {
-        runtime->mViewport->D3DWindowOnDeviceExit();
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit();
       }
 
       const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
@@ -811,7 +811,7 @@ namespace moho
       );
     }
 
-    runtime->mRenderTarget.reset(new moho::CD3DRenderTarget());
+    runtime->mRenderTarget.reset();
     runtime->mDepthStencil.reset(new moho::CD3DDepthStencil());
 
     if (auto* const resources = static_cast<moho::CD3DDeviceResources*>(GetResources()); resources != nullptr) {
@@ -823,7 +823,7 @@ namespace moho
     (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
 
     if (runtime->mViewport != nullptr) {
-      runtime->mViewport->D3DWindowOnDeviceInit();
+      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit();
     }
     runtime->mInitialized = 1u;
   }
@@ -1031,8 +1031,10 @@ namespace moho
         ID3DTextureSheet::TextureHandle sourceTexture{};
         sourceTextureSheet->GetTexture(sourceTexture);
 
-        if (sourceTexture.get() != nullptr && destinationTexture.get() != nullptr) {
-          device->UpdateSurface(sourceTexture.get(), destinationTexture.get(), 0, 0);
+        gpg::gal::TextureD3D9* sourceRaw = sourceTexture.get();
+        gpg::gal::TextureD3D9* destinationRaw = destinationTexture.get();
+        if (sourceRaw != nullptr && destinationRaw != nullptr) {
+          device->UpdateSurface(&sourceRaw, &destinationRaw, nullptr, nullptr);
         }
       }
     }
@@ -1071,13 +1073,14 @@ namespace moho
     view->mCursorContext.hotspotX_ = hotspotX;
     view->mCursorContext.hotspotY_ = hotspotY;
 
-    const boost::SharedPtrRaw<gpg::gal::CursorPixelSourceRuntime> rawPixelSource =
-      boost::SharedPtrRawFromSharedBorrow(pixelSource);
+    const auto rawPixelSource = boost::SharedPtrRawFromSharedBorrow(pixelSource);
     boost::SharedCountPair currentCursorSource{
       view->mCursorContext.pixelSource_,
       view->mCursorContext.cursorControl_
     };
-    const boost::SharedCountPair newCursorSource{rawPixelSource.px, rawPixelSource.pi};
+    const boost::SharedCountPair newCursorSource{
+      reinterpret_cast<void*>(rawPixelSource.px), rawPixelSource.pi
+    };
     boost::AssignWeakPairFromShared(&currentCursorSource, &newCursorSource);
     view->mCursorContext.pixelSource_ =
       static_cast<gpg::gal::CursorPixelSourceRuntime*>(currentCursorSource.px);
@@ -1853,7 +1856,7 @@ namespace moho
     if (runtime->mClearEnabled != 0) {
       Clear();
     } else {
-      reinterpret_cast<WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceRender();
+      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceRender();
     }
   }
 
@@ -1903,15 +1906,15 @@ namespace moho
       }
 
       gpg::MemBuffer<char> fontBytes = DISK_ReadFile(mountedPath.c_str());
-      if (fontBytes.begin == nullptr) {
+      if (fontBytes.mBegin == nullptr) {
         const msvc8::string diskError = DISK_GetLastError();
         gpg::Warnf("D3D_InitFonts: %s", diskError.c_str());
         continue;
       }
 
       DWORD loadedFontCount = 0;
-      const DWORD byteSize = static_cast<DWORD>(fontBytes.end - fontBytes.begin);
-      if (::AddFontMemResourceEx(fontBytes.begin, byteSize, nullptr, &loadedFontCount) == 0) {
+      const DWORD byteSize = static_cast<DWORD>(fontBytes.mEnd - fontBytes.mBegin);
+      if (::AddFontMemResourceEx(fontBytes.mBegin, byteSize, nullptr, &loadedFontCount) == 0) {
         gpg::Warnf("D3D_InitFonts: Error loading font %s", mountedPath.c_str());
       }
     }

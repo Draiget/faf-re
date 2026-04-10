@@ -37,6 +37,7 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
 
     /**
      * Address: 0x006D4100 (FUN_006D4100, sub_6D4100)
@@ -70,6 +71,14 @@ namespace moho
      * Lazily resolves and caches reflected RTTI for `UnitWeapon`.
      */
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x005DCD70 (FUN_005DCD70, Moho::UnitWeapon::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected RTTI for `UnitWeapon*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x006DF3A0 (FUN_006DF3A0, Moho::UnitWeapon::MemberDeserialize)

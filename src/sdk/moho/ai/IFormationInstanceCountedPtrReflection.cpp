@@ -238,6 +238,28 @@ namespace gpg
 namespace moho
 {
   /**
+   * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches the reflection descriptor for
+   * `IFormationInstance*`.
+   */
+  gpg::RType* IFormationInstance::GetPointerType()
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(moho::IFormationInstance));
+    }
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::IFormationInstance*));
+      sPointerType = cached;
+    }
+
+    return cached;
+  }
+
+  /**
    * Address: 0x006EBF30 (FUN_006EBF30, Moho::RCountedPtrType<Moho::IFormationInstance>::RCountedPtrType)
    *
    * What it does:

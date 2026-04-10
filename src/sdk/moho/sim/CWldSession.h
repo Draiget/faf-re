@@ -24,6 +24,7 @@ namespace moho
 {
   class UserArmy;
   class UserUnit;
+  enum EMauiEventModifier : std::uint32_t;
   class EntityCategoryLookupResolver;
   class LaunchInfoBase;
   class RRuleGameRules;
@@ -402,6 +403,33 @@ namespace moho
      * when the selection set changes.
      */
     void SetSelectionUnits(const msvc8::vector<UserUnit*>& units);
+
+    /**
+     * Address: 0x00865830 (FUN_00865830, ?CanSelectUnit@CWldSession@Moho@@QBE_NPAVUserUnit@2@@Z)
+     *
+     * What it does:
+     * Returns whether one unit is selectable for this session using focus-army
+     * ownership rules, with optional cheat override (`UI_SelectAnything`).
+     */
+    [[nodiscard]] bool CanSelectUnit(UserUnit* unit) const;
+
+    /**
+     * Address: 0x00865920 (FUN_00865920, ?ReleaseDrag@CWldSession@Moho@@QAEXW4EMauiEventModifier@2@@Z)
+     *
+     * What it does:
+     * Finalizes click-based unit selection for current cursor hover and input
+     * modifier mask.
+     */
+    void ReleaseDrag(EMauiEventModifier modifiers);
+
+    /**
+     * Address: 0x00865E20 (FUN_00865E20, ?HandleDoubleClickSelection@CWldSession@Moho@@QAEXPAVCameraImpl@2@@Z)
+     *
+     * What it does:
+     * Expands selection to matching units in camera frustum after unit
+     * double-click.
+     */
+    void HandleDoubleClickSelection(CameraImpl* camera);
 
     /**
      * Address: 0x00896780 (FUN_00896780, ?AddToExtraSelectList@CWldSession@Moho@@QAEXPAVUserEntity@2@@Z)

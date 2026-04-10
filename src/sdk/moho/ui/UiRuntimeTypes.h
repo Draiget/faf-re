@@ -10,6 +10,7 @@
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "wm3/Quaternion.h"
 
 struct lua_State;
@@ -2026,7 +2027,7 @@ namespace moho
   struct CMauiMeshRuntimeView : CMauiControlRuntimeView
   {
     std::uint8_t mUnknown0D4To11B[0x48]{};
-    boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
+    boost::shared_ptr<CD3DBatchTexture> mTexture; // +0x11C
     bool mIsRotated = false; // +0x124
     std::uint8_t mPad125To127[0x3]{};
     RMeshBlueprint* mMeshBlueprint = nullptr; // +0x128

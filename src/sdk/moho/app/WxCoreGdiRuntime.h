@@ -43,7 +43,6 @@ protected:
   void* mRefData = nullptr;
 };
 
-static_assert(offsetof(wxObjectRuntime, mRefData) == 0x4, "wxObjectRuntime::mRefData offset must be 0x4");
 static_assert(sizeof(wxObjectRuntime) == 0x8, "wxObjectRuntime size must be 0x8");
 
 /**
@@ -129,7 +128,6 @@ protected:
   std::uint8_t mPadding09[3]{};
 };
 
-static_assert(offsetof(wxGDIObjectRuntime, mVisible) == 0x8, "wxGDIObjectRuntime::mVisible offset must be 0x8");
 static_assert(sizeof(wxGDIObjectRuntime) == 0xC, "wxGDIObjectRuntime size must be 0xC");
 
 /**

@@ -230,6 +230,28 @@ namespace moho
   gpg::RType* ManyToOneListener_EProjectileImpactEvent::sType = nullptr;
   gpg::RType* ManyToOneListener_ECollisionBeamEvent::sType = nullptr;
   gpg::RType* CAcquireTargetTask::sType = nullptr;
+  gpg::RType* CAcquireTargetTask::sPointerType = nullptr;
+
+  /**
+   * Address: 0x005DCDF0 (FUN_005DCDF0, Moho::CAcquireTargetTask::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches reflected RTTI for `CAcquireTargetTask*`.
+   */
+  gpg::RType* CAcquireTargetTask::GetPointerType()
+  {
+    if (!sType) {
+      sType = gpg::LookupRType(typeid(CAcquireTargetTask));
+    }
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(CAcquireTargetTask*));
+      sPointerType = cached;
+    }
+
+    return cached;
+  }
 
   /**
    * Address: 0x005DCC20 (FUN_005DCC20, Moho::InstanceCounter<Moho::CAcquireTargetTask>::GetStatItem)

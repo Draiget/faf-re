@@ -5119,54 +5119,54 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cri\sofdec\SofdecAdxCodecRuntime.cpp">
+    <None Include="cri\sofdec\SofdecAdxCodecRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecAdxDeclarationsRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecAdxDeclarationsRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecAdxPlatformRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecAdxPlatformRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecAdxRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecAdxRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecAdxXeficRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecAdxXeficRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecAdxbBootstrapRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecAdxbBootstrapRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecCvfsRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecCvfsRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecFoundationRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecFoundationRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecM2aBitstreamRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecM2aBitstreamRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecM2aDecoderRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecM2aDecoderRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecMpaRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecMpaRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecMwPlaybackRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecMwPlaybackRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecSfdRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecSfdRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecSvmTransferRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecSvmTransferRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecVirtualDispatchRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecVirtualDispatchRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cri\sofdec\SofdecVirtualDispatchTableRuntime.cpp">
+    </None>
+    <None Include="cri\sofdec\SofdecVirtualDispatchTableRuntime.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
+    </None>
     <ClCompile Include="moho\ai\CAiPathSpline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

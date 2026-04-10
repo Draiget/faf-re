@@ -8,6 +8,7 @@ namespace moho
 {
   gpg::RType* IArmy::sType = nullptr;
   gpg::RType* SimArmy::sType = nullptr;
+  gpg::RType* SimArmy::sPointerType = nullptr;
 
   gpg::RType* IArmy::StaticGetClass()
   {
@@ -23,6 +24,25 @@ namespace moho
       sType = gpg::LookupRType(typeid(SimArmy));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x0074E550 (FUN_0074E550, Moho::SimArmy::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches reflected RTTI for `SimArmy*`.
+   */
+  gpg::RType* SimArmy::GetPointerType()
+  {
+    (void)StaticGetClass();
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(SimArmy*));
+      sPointerType = cached;
+    }
+
+    return cached;
   }
 
   /**

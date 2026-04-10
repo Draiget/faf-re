@@ -95,6 +95,8 @@ namespace
 
 namespace moho
 {
+  gpg::RType* Shield::sPointerType = nullptr;
+
   /**
    * Address: 0x00776E90 (FUN_00776E90, Moho::InstanceCounter<Moho::Shield>::GetStatItem)
    *
@@ -162,6 +164,25 @@ namespace moho
   gpg::RType* Shield::GetClass() const
   {
     return CachedShieldType();
+  }
+
+  /**
+   * Address: 0x0074E5D0 (FUN_0074E5D0, Moho::Shield::GetPointerType)
+   *
+   * What it does:
+   * Lazily resolves and caches reflected RTTI for `Shield*`.
+   */
+  gpg::RType* Shield::GetPointerType()
+  {
+    (void)CachedShieldType();
+
+    gpg::RType* cached = sPointerType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(Shield*));
+      sPointerType = cached;
+    }
+
+    return cached;
   }
 
   /**

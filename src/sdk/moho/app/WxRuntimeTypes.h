@@ -2009,6 +2009,14 @@ public:
    */
   static wxDialogRuntime* DeleteWithFlag(wxDialogRuntime* object, std::uint8_t deleteFlags) noexcept;
 
+  /**
+   * Address: unknown (wxDialog::ShowModal)
+   *
+   * What it does:
+   * Runs the dialog modal loop and returns the result code.
+   */
+  virtual std::int32_t ShowModal();
+
   static void* sm_classInfo[1];
 
   std::uint8_t mUnknown15CTo16F[0x14]{};

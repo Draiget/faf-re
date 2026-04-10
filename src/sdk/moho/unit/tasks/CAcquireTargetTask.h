@@ -53,6 +53,15 @@ namespace moho
   {
   public:
     static gpg::RType* sType;
+    static gpg::RType* sPointerType;
+
+    /**
+     * Address: 0x005DCDF0 (FUN_005DCDF0, Moho::CAcquireTargetTask::GetPointerType)
+     *
+     * What it does:
+     * Lazily resolves and caches reflected RTTI for `CAcquireTargetTask*`.
+     */
+    [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
      * Address: 0x005D8A20 (??0CAcquireTargetTask@Moho@@QAE@@Z)
