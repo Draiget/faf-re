@@ -23,7 +23,7 @@ namespace LuaPlus
 namespace gpg
 {
   class RType;
-  struct RRef;
+  class RRef;
 } // namespace gpg
 
 #ifndef FAF_ENFORCE_STRICT_LAYOUT_ASSERTS
@@ -64,7 +64,7 @@ namespace moho
   class CD3DFont;
   class CD3DPrimBatcher;
   class CD3DBatchTexture;
-  class RMeshBlueprint;
+  struct RMeshBlueprint;
 
   enum EUIState : std::int32_t
   {
@@ -816,6 +816,15 @@ namespace moho
      */
     void SetMaxChars(int newMaxChars);
 
+    /**
+     * Address: 0x0078F280 (FUN_0078F280, Moho::CMauiEdit::Dump)
+     *
+     * What it does:
+     * Logs base CMauiControl state, then logs CMauiEdit-specific colors,
+     * background visibility, max-char limit, and current text content.
+     */
+    void Dump() override;
+
     virtual ~CMauiEdit() = default;
 
   private:
@@ -1010,6 +1019,16 @@ namespace moho
      * `CMauiControl` teardown.
      */
     ~CMauiBitmap() override;
+
+    /**
+     * Address: 0x0077FAD0 (FUN_0077FAD0, Moho::CMauiBitmap::Dump)
+     *
+     * What it does:
+     * Logs base CMauiControl state, then logs CMauiBitmap-specific texture
+     * batch count, current bitmap width/height, UV rectangle, alpha hit-test
+     * flag, and animation playback state.
+     */
+    void Dump() override;
   };
 
   class CMauiHistogram : public CMauiControl

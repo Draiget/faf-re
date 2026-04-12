@@ -18,8 +18,8 @@ namespace gpg
 namespace moho
 {
   class CArmyStatItem;
-  class RBlueprint;
-  class RUnitBlueprint;
+  struct RBlueprint;
+  struct RUnitBlueprint;
 
   enum ETriggerOperator : std::int32_t
   {

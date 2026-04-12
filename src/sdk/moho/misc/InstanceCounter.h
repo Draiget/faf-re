@@ -31,7 +31,7 @@ namespace moho
   class Shield;
   class CDecalHandle;
   class CUnitCommand;
-  class RBlueprint;
+  struct RBlueprint;
   class RRuleGameRules;
 
   template <class T>

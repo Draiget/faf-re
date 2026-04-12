@@ -17,7 +17,7 @@ namespace moho
 {
   class Entity;
   class IEffect;
-  class RBeamBlueprint;
+  struct RBeamBlueprint;
   class Sim;
 
   /**

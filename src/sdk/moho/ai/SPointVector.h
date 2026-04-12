@@ -7,15 +7,15 @@
 
 namespace gpg
 {
-  struct ReadArchive;
-  struct WriteArchive;
+  class ReadArchive;
+  class WriteArchive;
   struct SerHelperBase;
-  struct RRef;
+  class RRef;
 } // namespace gpg
 
 namespace moho
 {
-  struct SPointVectorTypeInfo;
+  class SPointVectorTypeInfo;
 
   struct SPointVector
   {

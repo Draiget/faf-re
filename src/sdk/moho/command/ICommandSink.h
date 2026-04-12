@@ -16,7 +16,7 @@ namespace gpg
 
 namespace moho
 {
-  class SOCellPos;
+  struct SOCellPos;
   using CommandSourceId = uint32_t;
   using CSeqNo = int32_t;
 

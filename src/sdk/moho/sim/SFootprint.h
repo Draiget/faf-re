@@ -17,7 +17,11 @@ namespace moho
     FPFLAG_IgnoreStructures = 0x1,
   };
 
-  enum class EOccupancyCaps : int8_t
+  // OC_ANY = 0xFF is a bitmask sentinel; the underlying type must be unsigned
+  // 8-bit so 0xFF (255) is representable. The struct field that holds this
+  // enum is declared as `EOccupancyCaps mOccupancyCaps; // +0x02` which is a
+  // single byte in the binary, so std::uint8_t preserves the layout.
+  enum class EOccupancyCaps : std::uint8_t
   {
     OC_LAND = 0x1,
     OC_SEABED = 0x2,

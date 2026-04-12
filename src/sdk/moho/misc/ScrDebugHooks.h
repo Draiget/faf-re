@@ -179,6 +179,20 @@ namespace moho
   void DebugLuaHook(lua_State* state, lua_Debug* debugFrame);
 
   /**
+   * Address: 0x004B4890 (FUN_004B4890, ?SCR_DestroyDebugWindow@Moho@@YAXXZ)
+   *
+   * IDA signature:
+   * void __cdecl Moho::SCR_DestroyDebugWindow(void)
+   *
+   * What it does:
+   * Destroys the active script-debug window when present, clears the runtime
+   * window pointer, persists breakpoints, drops the in-memory breakpoint list
+   * and queued paused threads, and clears the cached enabled-breakpoint /
+   * pending-paused-thread flags.
+   */
+  void SCR_DestroyDebugWindow();
+
+  /**
    * Returns whether the script debug window runtime is currently active.
    */
   [[nodiscard]] bool SCR_IsDebugWindowActive();

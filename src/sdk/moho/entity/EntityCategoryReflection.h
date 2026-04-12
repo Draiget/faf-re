@@ -16,8 +16,8 @@ namespace LuaPlus
 
 namespace moho
 {
-  class RBlueprint;
-  class REntityBlueprint;
+  struct RBlueprint;
+  struct REntityBlueprint;
   class CScrLuaInitForm;
 
   /**

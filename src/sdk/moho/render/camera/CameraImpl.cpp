@@ -10,6 +10,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/render/RCamManager.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
@@ -17,6 +18,7 @@
 
 namespace moho
 {
+  int cfunc_GetCameraL(LuaPlus::LuaState* state);
   extern float cam_NearZoom;
   extern float cam_FarFOV;
   extern float cam_FarPitch;
@@ -50,6 +52,9 @@ namespace
 {
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
+  constexpr const char* kGetCameraName = "GetCamera";
+  constexpr const char* kGetCameraHelpText = "GetCamera(name)";
+  constexpr const char* kGlobalLuaClassName = "<global>";
   constexpr const char* kCameraImplLuaClassName = "CameraImpl";
   constexpr const char* kCameraImplResetName = "Reset";
   constexpr const char* kCameraImplResetHelpText = "Camera:Reset()";
@@ -117,7 +122,8 @@ namespace
 
   struct CameraImplRuntimeView
   {
-    std::uint8_t mUnknown000To04F[0x50]{};
+    std::uint8_t mUnknown000To03B[0x3C]{};
+    LuaPlus::LuaObject mLuaObject{};        // +0x03C
     msvc8::string mName{};                   // +0x050
     moho::STIMap* mTerrainMap = nullptr;     // +0x06C
     moho::GeomCamera3 mCam{};                // +0x070
@@ -153,6 +159,10 @@ namespace
     std::int32_t mAccType = 0;               // +0x450
   };
 
+  static_assert(
+    offsetof(CameraImplRuntimeView, mLuaObject) == 0x03C,
+    "CameraImplRuntimeView::mLuaObject offset must be 0x03C"
+  );
   static_assert(
     offsetof(CameraImplRuntimeView, mIsRotated) == 0x33D,
     "CameraImplRuntimeView::mIsRotated offset must be 0x33D"
@@ -566,6 +576,68 @@ float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
 void moho::CameraImpl::SetMaxZoomMult(const float maxZoomMult)
 {
   AsZoomLimitView(this)->mMaxZoomMult = maxZoomMult;
+}
+
+/**
+ * Address: 0x007AB080 (FUN_007AB080, cfunc_GetCamera)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_GetCameraL`.
+ */
+int moho::cfunc_GetCamera(lua_State* const luaContext)
+{
+  return cfunc_GetCameraL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AB0A0 (FUN_007AB0A0, func_GetCamera_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global Lua binder metadata for `GetCamera(name)`.
+ */
+moho::CScrLuaInitForm* moho::func_GetCamera_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kGetCameraName,
+    &moho::cfunc_GetCamera,
+    nullptr,
+    kGlobalLuaClassName,
+    kGetCameraHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x007AB100 (FUN_007AB100, cfunc_GetCameraL)
+ *
+ * What it does:
+ * Resolves one camera name from Lua and pushes the camera script object or
+ * nil when no camera matches.
+ */
+int moho::cfunc_GetCameraL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCameraHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaStackObject cameraNameArg(state, 1);
+  const char* const cameraName = lua_tostring(rawState, 1);
+  if (cameraName == nullptr) {
+    cameraNameArg.TypeError("string");
+  }
+
+  RCamManager* const manager = CAM_GetManager();
+  CameraImpl* const camera = manager->GetCamera(cameraName);
+  if (camera != nullptr) {
+    AsRuntimeView(camera)->mLuaObject.PushStack(state);
+  } else {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+  }
+  return 1;
 }
 
 /**

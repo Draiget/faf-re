@@ -155,6 +155,16 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive);
 
     /**
+     * Address: 0x00436650 (FUN_00436650, Moho::StatItem::Synchronize)
+     *
+     * What it does:
+     * Atomically replaces this stat-item's `mType` field with `EStatType::kInt`
+     * via a load + compare-and-swap retry loop. Used to mark this stat as
+     * holding an integer payload.
+     */
+    void Synchronize();
+
+    /**
      * Address: 0x0040D2D0 (FUN_0040D2D0, Moho::StatItem::Synchronize2)
      */
     void SynchronizeAsInt();

@@ -190,7 +190,7 @@ namespace moho
   struct RMeshBlueprintLOD;
   class RScmResource;
   struct RPropBlueprint;
-  struct REmitterCurveKey;
+  class REmitterCurveKey;
   class REmitterBlueprintCurve;
   struct REmitterBlueprint;
   struct RProjectileBlueprint;

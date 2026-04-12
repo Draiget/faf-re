@@ -15,8 +15,7 @@ namespace
  */
 wxObjectRuntime::wxObjectRuntime()
   : mRefData(nullptr)
-{
-}
+{}
 
 /**
  * Address: 0x0042ADA0 (FUN_0042ADA0)
@@ -67,7 +66,9 @@ bool wxGDIObjectRuntime::RealizeResource()
  * What it does:
  * Default base implementation reports no resource to free.
  */
-bool wxGDIObjectRuntime::FreeResource(const std::uintptr_t resourceHandle)
+bool wxGDIObjectRuntime::FreeResource(
+  const std::uintptr_t resourceHandle
+)
 {
   (void)resourceHandle;
   return false;
@@ -116,7 +117,9 @@ bool wxGDIObjectRuntime::GetVisible() const
  * What it does:
  * Stores one runtime visibility value and returns it.
  */
-bool wxGDIObjectRuntime::SetVisible(const bool visible)
+bool wxGDIObjectRuntime::SetVisible(
+  const bool visible
+)
 {
   mVisible = visible ? 1 : 0;
   return visible;
@@ -141,7 +144,9 @@ const wxClassInfoRuntime* wxGDIObjectRuntime::GetClassInfo() const
  * What it does:
  * Base implementation accepts but ignores anti-aliasing policy.
  */
-void wxFontBaseRuntime::SetNoAntiAliasing(const bool disabled)
+void wxFontBaseRuntime::SetNoAntiAliasing(
+  const bool disabled
+)
 {
   (void)disabled;
 }
@@ -202,6 +207,4 @@ const wxClassInfoRuntime* wxFontRuntimeObject::GetClassInfo() const
   return &gWxFontClassInfo;
 }
 
-void wxFontRuntimeObject::Init() noexcept
-{
-}
+void wxFontRuntimeObject::Init() noexcept {}

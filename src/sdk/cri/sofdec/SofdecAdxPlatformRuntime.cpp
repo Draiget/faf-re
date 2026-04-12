@@ -1115,6 +1115,330 @@
     return 0;
   }
 
+  // Note: FUN_00AC6A20 (mwsfsfx_CnvPictureStructure), FUN_00AC6A60
+  // (mwsfsfx_CnvSfxChromaFormat) and FUN_00AC6AA0 (mwsfsfx_CnvSfxChromaPos) are
+  // implemented later in this translation unit alongside the rest of the
+  // mwsfsfx_SetFrmDetail / MWSFSFX_CnvFrmInfToSfx pipeline.
+
+  // ---------------------------------------------------------------------------
+  // Forward declarations for SFX core lanes used by the MWSFD_/MWSFSFX_ thin
+  // wrappers below. The actual bodies live further down in this same
+  // translation unit (in the MWSFSFX frame-info conversion block) for the
+  // lanes that have been recovered, and remain externs for the lanes whose
+  // SFX-side bodies are still pending recovery. They are gathered here so
+  // that every later wrapper definition can call them without forward-decl
+  // duplication.
+  // ---------------------------------------------------------------------------
+
+  std::int32_t SFX_SetCnvTable(void* sfxHandle, std::int32_t tableId, std::int32_t tableValue);
+  std::int32_t SFX_GetCnvTable(void* sfxHandle, std::int32_t tableId);
+  std::int32_t SFX_SetCompoMode(void* sfxHandle, std::int32_t compositionMode);
+  void SFX_GetTagInf(void* sfxHandle, std::int32_t* outTagId, std::int32_t* outTagContent);
+  std::int32_t SFX_SetSplitField(void* sfxHandle, std::int32_t enableSplitField);
+  std::int32_t SFX_GetSplitField(void* sfxHandle);
+  std::int32_t SFX_SetProgOut(void* sfxHandle, std::int32_t enableProgressiveOut);
+  std::int32_t SFX_GetProgOut(void* sfxHandle);
+
+  // The MWSFD facade thunk for the frame-info conversion pipeline forwards
+  // to MWSFSFX_CnvFrmInfToSfx, whose recovered body lives in the lower half
+  // of this translation unit. Forward-declared here so any caller in the
+  // upper half can reference it.
+  struct MwsfdSfdFrmObj;
+  struct MwsfdSfxFrameInfo;
+  std::int32_t MWSFSFX_CnvFrmInfToSfx(
+    moho::MwsfdPlaybackStateSubobj* ply,
+    MwsfdSfdFrmObj* frm,
+    MwsfdSfxFrameInfo* outSfx
+  );
+
+  /**
+   * Address: 0x00AC6AD0 (FUN_00AC6AD0, _MWSFD_SetSfxCnvTbl)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_SetSfxCnvTbl(int a1, int a2, int a3);
+   *
+   * What it does:
+   * Forwards a SFX `SetCnvTable` write through the bound SFX runtime handle of
+   * one MWSFD playback object.
+   */
+  std::int32_t MWSFD_SetSfxCnvTbl(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t tableId,
+    const std::int32_t tableValue
+  )
+  {
+    return SFX_SetCnvTable(ply->sfxHandle, tableId, tableValue);
+  }
+
+  /**
+   * Address: 0x00AC6AF0 (FUN_00AC6AF0, _MWSFD_GetSfxCnvTbl)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_GetSfxCnvTbl(int a1, int a2);
+   *
+   * What it does:
+   * Reads one SFX `CnvTable` lane from the bound SFX runtime handle of one
+   * MWSFD playback object.
+   */
+  std::int32_t MWSFD_GetSfxCnvTbl(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t tableId)
+  {
+    return SFX_GetCnvTable(ply->sfxHandle, tableId);
+  }
+
+  /**
+   * Address: 0x00AC6CD0 (FUN_00AC6CD0, _MWSFSFX_SetCompoMode)
+   *
+   * IDA signature:
+   * int __cdecl MWSFSFX_SetCompoMode(MWPLY a1, int a2);
+   *
+   * What it does:
+   * Resolves one playback object's bound SFX handle and writes the requested
+   * SFX composition-mode lane.
+   */
+  std::int32_t MWSFSFX_SetCompoMode(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t compositionMode)
+  {
+    void* const sfxHandle = MWSFSFX_GetSfxHn(ply);
+    return SFX_SetCompoMode(sfxHandle, compositionMode);
+  }
+
+  // Typed view of one MWSFCRE malloc-table entry as referenced by
+  // mwsfcre_MallocCompoWork / MWSFTAG_CreateAinfSj. Only the buffer-format
+  // lane (+0x20) is named here; everything else is opaque pending evidence.
+  struct MwsfcreMallocTabBufFmtView
+  {
+    std::uint8_t mUnknown00_1F[0x20]{};
+    std::int32_t buffmt = 0; // +0x20
+  };
+
+  static_assert(
+    offsetof(MwsfcreMallocTabBufFmtView, buffmt) == 0x20,
+    "MwsfcreMallocTabBufFmtView::buffmt offset must be 0x20"
+  );
+
+  // MWSFD buffer-format enum values sampled by MWSFTAG_IsUseAinfSj.
+  constexpr std::int32_t kMwsfdBufFmtDefault = 0;
+  constexpr std::int32_t kMwsfdBufFmtAinfSjOverride = 0x101;
+
+  /**
+   * Address: 0x00AC6F20 (FUN_00AC6F20, _MWSFTAG_IsUseAinfSj)
+   *
+   * IDA signature:
+   * BOOL __cdecl MWSFTAG_IsUseAinfSj(_mwsfcre_MallocTab *a1);
+   *
+   * What it does:
+   * Returns true when the MWSFCRE allocation-table entry is configured for
+   * the default MWSFD buffer format or for the AINF SJ override format
+   * (`0x101`).
+   */
+  BOOL MWSFTAG_IsUseAinfSj(const void* const mallocTableEntry)
+  {
+    const auto* const view = static_cast<const MwsfcreMallocTabBufFmtView*>(mallocTableEntry);
+    const std::int32_t buffmt = view->buffmt;
+    return (buffmt == kMwsfdBufFmtDefault) || (buffmt == kMwsfdBufFmtAinfSjOverride);
+  }
+
+  /**
+   * Address: 0x00AC6F90 (FUN_00AC6F90, _MWSFTAG_DestroyAinfSj)
+   *
+   * IDA signature:
+   * void __cdecl sub_AC6F90(MWPLY a1);
+   *
+   * What it does:
+   * Tears down the AINF SJ ring-buffer handle bound to a playback object via
+   * the typed `sjrbf_Destroy` lane (no-op when no handle is bound).
+   */
+  void MWSFTAG_DestroyAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    if (sjRingHandle != nullptr) {
+      sjrbf_Destroy(sjRingHandle);
+    }
+  }
+
+  /**
+   * Address: 0x00AC6FB0 (FUN_00AC6FB0, _MWSFTAG_SetAinfSj)
+   *
+   * IDA signature:
+   * struct_sofdec_sjrbf *__cdecl MWSFTAG_SetAinfSj(MWPLY a1);
+   *
+   * What it does:
+   * Binds the AINF SJ ring buffer to the playback object's SFD handle as the
+   * lane-2 user SJ source; returns 0 for elementary-video playback or when no
+   * AINF SJ ring is present, and `-1` if the SFD bind call reports an error.
+   */
+  std::int32_t MWSFTAG_SetAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    if (mwsftag_IsPlayVideoElementary(ply) == 1) {
+      return 0;
+    }
+
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    if (sjRingHandle == nullptr) {
+      return 0;
+    }
+
+    const std::int32_t bindResult = SFD_SetUsrSj(
+      static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(ply->handle)),
+      2,
+      static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(sjRingHandle)),
+      0
+    );
+    return -(bindResult != 0);
+  }
+
+  /**
+   * Address: 0x00AC7000 (FUN_00AC7000, _MWSFTAG_InitTagInf)
+   *
+   * IDA signature:
+   * void __cdecl MWSFTAG_InitTagInf(MWPLY a1);
+   *
+   * What it does:
+   * Resets the playback object's AINF tag-info lanes to "no tag pending"
+   * (stamp `-1`, clear ready/address/length).
+   */
+  void MWSFTAG_InitTagInf(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    runtimeView->ainfTagInfoReady = 0;
+    runtimeView->ainfTagInfoDataAddress = 0;
+    runtimeView->ainfTagInfoLength = 0;
+    ply->additionalInfoStamp = -1;
+  }
+
+  /**
+   * Address: 0x00AC7030 (FUN_00AC7030, _MWSFTAG_ResetAinfSj)
+   *
+   * IDA signature:
+   * struct_sofdec_sjrbf *__cdecl sub_AC7030(MWPLY a1);
+   *
+   * What it does:
+   * Resets the playback object's AINF SJ ring-buffer cursors via the typed
+   * `sjrbf_Reset` lane; no-op when no handle is bound.
+   */
+  std::int32_t MWSFTAG_ResetAinfSj(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    auto* const runtimeView = reinterpret_cast<MwsfdTagInfoRuntimeView*>(ply);
+    moho::SofdecSjRingBufferHandle* const sjRingHandle = runtimeView->sjTagRingHandle;
+    if (sjRingHandle == nullptr) {
+      return 0;
+    }
+    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(sjrbf_Reset(sjRingHandle)));
+  }
+
+  /**
+   * Address: 0x00AC7320 (FUN_00AC7320, _MWSFD_GetAinfAll)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_GetAinfAll(int a1, _DWORD *a2, _DWORD *a3);
+   *
+   * What it does:
+   * Reads the cached AINF tag-info data-address and length lanes off a
+   * playback object into caller-provided out-pointers.
+   */
+  std::int32_t MWSFD_GetAinfAll(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    std::int32_t* const outTagDataAddress,
+    std::int32_t* const outTagDataLength
+  )
+  {
+    const auto* const runtimeView = reinterpret_cast<const MwsfdTagInfoRuntimeView*>(ply);
+    *outTagDataAddress = runtimeView->ainfTagInfoDataAddress;
+    *outTagDataLength = runtimeView->ainfTagInfoLength;
+    return runtimeView->ainfTagInfoLength;
+  }
+
+  /**
+   * Address: 0x00AC7340 (FUN_00AC7340, _MWSFD_GetAinfFx)
+   *
+   * IDA signature:
+   * _DWORD *__cdecl MWSFD_GetAinfFx(int a2, _DWORD *arg4, _DWORD *arg8);
+   *
+   * What it does:
+   * Reads the bound SFX runtime tag-info lanes (`SFX_GetTagInf`) for a
+   * playback object and writes the resolved address/length pair into the
+   * caller's out-pointers.
+   */
+  std::int32_t* MWSFD_GetAinfFx(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    std::int32_t* const outTagDataAddress,
+    std::int32_t* const outTagDataLength
+  )
+  {
+    std::int32_t resolvedAddress = 0;
+    std::int32_t resolvedLength = 0;
+    SFX_GetTagInf(ply->sfxHandle, &resolvedAddress, &resolvedLength);
+    *outTagDataAddress = resolvedAddress;
+    *outTagDataLength = resolvedLength;
+    return outTagDataLength;
+  }
+
+  // FUN_00AC7380 (MWSFD_GetZfrmRange), FUN_00AC74B0 (MWSFD_MakeTblZ16) and
+  // FUN_00AC7530 (MWSFD_MakeTblZ32) are implemented later in this translation
+  // unit (after MwsfdSfdFrmObj / MwsfdSfxFrameInfo / MWSFSFX_CnvFrmInfToSfx are
+  // in scope).
+
+  /**
+   * Address: 0x00AC75B0 (FUN_00AC75B0, _MWSFD_SetSplitField)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_SetSplitField(int a1, int a2);
+   *
+   * What it does:
+   * Forwards a `SetSplitField` write to the bound SFX runtime handle of one
+   * MWSFD playback object.
+   */
+  std::int32_t MWSFD_SetSplitField(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t enableSplitField)
+  {
+    return SFX_SetSplitField(ply->sfxHandle, enableSplitField);
+  }
+
+  /**
+   * Address: 0x00AC75D0 (FUN_00AC75D0, _MWSFD_GetSplitField)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_GetSplitField(int a1);
+   *
+   * What it does:
+   * Reads the SFX `SplitField` lane from the bound SFX runtime handle of one
+   * MWSFD playback object.
+   */
+  std::int32_t MWSFD_GetSplitField(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    return SFX_GetSplitField(ply->sfxHandle);
+  }
+
+  /**
+   * Address: 0x00AC75F0 (FUN_00AC75F0, _MWSFD_SetProgOut)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_SetProgOut(int a1, int a2);
+   *
+   * What it does:
+   * Forwards a `SetProgOut` write (progressive output enable) to the bound
+   * SFX runtime handle of one MWSFD playback object.
+   */
+  std::int32_t MWSFD_SetProgOut(moho::MwsfdPlaybackStateSubobj* const ply, const std::int32_t enableProgressiveOutput)
+  {
+    return SFX_SetProgOut(ply->sfxHandle, enableProgressiveOutput);
+  }
+
+  /**
+   * Address: 0x00AC7610 (FUN_00AC7610, _MWSFD_GetProgOut)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_GetProgOut(int a1);
+   *
+   * What it does:
+   * Reads the SFX `ProgOut` lane from the bound SFX runtime handle of one
+   * MWSFD playback object.
+   */
+  std::int32_t MWSFD_GetProgOut(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    return SFX_GetProgOut(ply->sfxHandle);
+  }
+
   /**
    * Address: 0x00AC9A70 (FUN_00AC9A70, _mwsftag_GetTag)
    *
@@ -14648,5 +14972,1242 @@
     SVM_Lock();
     SVM_DelCbSvr(svtype, id);
     SVM_Unlock();
+  }
+
+  // ===========================================================================
+  // CRI Sofdec MWSFSFX / MWSFD frame-info conversion helpers
+  // ===========================================================================
+  //
+  // The block below recovers the cluster of small CRI helpers in the
+  // 0x00AC66D0 .. 0x00AC6AB0 range. They convert one MWSFD-side decoded frame
+  // descriptor (`MwsfdSfdFrmObj`) into the SFX-side `MwsfdSfxFrameInfo` block
+  // that the Sofdec SFX runtime consumes when laying out a single composed
+  // frame. They also expose the public MWSFSFX_/MWSFD_ facade entries used by
+  // the rest of the movie player to bind/destroy SFX handles, query per-stream
+  // colour-adjust state, and select the SFX composition mode.
+  //
+  // The original CRI source organised these as one short helper per concept;
+  // the recovered C++ keeps the same factoring so that callers continue to
+  // dispatch through the same five-step pipeline that the binary does:
+  //
+  //   1. mwsfsfx_CnvFrmFmtTypeToSfx     -- decode buffer-format type
+  //   2. mwsfsfx_SetYcc420plnInfToSfx   -- pack Y/Cb/Cr plane descriptors
+  //   3. mwsfsfx_SetNfrm                -- copy frame count
+  //   4. mwsfsfx_SetSfxInfTag           -- read tag info from SFX handle
+  //   5. mwsfsfx_SetFrmDetail           -- copy MPEG picture-detail lanes
+  //   ... then patch in colour-adjust + FX-type + composition-mode lanes.
+
+  // ---------------------------------------------------------------------------
+  // Forward declarations for direct callees
+  // ---------------------------------------------------------------------------
+  //
+  // These live deeper in the SFX/SFD stacks and are reached only through the
+  // helpers in this block. The forward declarations are kept here (not in
+  // SofdecFoundationRuntime.cpp) because their callers all live in this same
+  // translation unit segment.
+
+  /// SFXZ (depth/Z-blit) handle teardown. Released by `SFX_Destroy` after the
+  /// owning SFX handle's `used` flag has been cleared. The body lives in the
+  /// statically linked SFXZ runtime which has not been recovered yet.
+  void SFXZ_Destroy(void* sfxzHandle);
+
+  /// SFXA (audio) handle teardown. Released by `SFX_Destroy`. The argument is
+  /// the integer handle address that the deeper SFXA layout uses; this matches
+  /// the existing `SFXA_Destroy` definition in SofdecSvmTransferRuntime.cpp.
+  void SFXA_Destroy(std::int32_t sfxaHandleAddress);
+
+  /// SFD-side YCbCr420 plane geometry calculator. Fills four output dwords:
+  /// the addresses of the Y/Cb/Cr planes plus the Y plane stride. Used as a
+  /// stage-1 step in `mwPlyCalcYccPlane`.
+  void SFD_CalcYccPlane(
+    std::int32_t baseAddress,
+    std::int32_t planeWidth,
+    std::int32_t planeHeight,
+    std::int32_t outYccGeometryAddress
+  );
+
+  /// Adapter that copies SFD-side YCbCr plane geometry into the four-dword
+  /// SFX-side layout consumed by `mwsfsfx_SetYcc420plnInfToSfx`. Returns the
+  /// caller-supplied output buffer address.
+  std::int32_t mwl_convYccPlaneFromSFD(
+    std::int32_t sfdGeometryAddress,
+    std::int32_t* outSfxGeometry
+  );
+
+  /// SUD (Sofdec Universal Dispatch) helper that classifies one SFD frame's
+  /// `(constrained_parameters_flag, progressive_sequence)` pair as a
+  /// colour-adjust frame. Returns `1` for colour-adjust frames, `0` otherwise.
+  std::int32_t SUD_AnalyTypeCcs(
+    std::int32_t constrainedParametersFlag,
+    std::int32_t progressiveSequence
+  );
+
+  // ---------------------------------------------------------------------------
+  // Typed views over the MWSFSFX frame-info structs
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Recovered subset of one MWSFD-side decoded frame descriptor.
+   *
+   * The full layout is the SDK's `_MwsfdFrmObj` (a.k.a. `MwsfdFrameInfo` in
+   * other recovered files), but several lanes touched by the MWSFSFX
+   * conversion helpers live past the conservative 0x90-byte size that the
+   * existing `moho::MwsfdFrameInfo` view captures. Until the full struct is
+   * pinned by additional evidence we expose only the lanes proven by the
+   * 0x00AC66D0..0x00AC6AB0 disassembly here, and assert each offset against
+   * the binary so that any future re-typing of the canonical struct stays
+   * compatible.
+   *
+   * Field names mirror the original CRI ones (`buffmt`, `concat_cnt`, ...).
+   */
+  struct MwsfdSfdFrmObj
+  {
+    std::int32_t bufferAddress;                    ///< +0x00 base of decoded frame
+    std::int32_t mUnknown04;                       ///< +0x04
+    std::int32_t buffmt;                           ///< +0x08 buffer-format type
+    std::int32_t planeWidth;                       ///< +0x0C width  (Y plane)
+    std::int32_t planeHeight;                      ///< +0x10 height (Y plane)
+    std::uint8_t mUnknown14[0x1C];                 ///< +0x14
+    std::int32_t concat_cnt;                       ///< +0x30 stream-table index
+    std::int32_t nfrm;                             ///< +0x34 frame count in pool
+    std::uint8_t mUnknown38[0x50];                 ///< +0x38
+    std::int32_t constrained_parameters_flag;      ///< +0x88
+    std::int32_t progressive_sequence;             ///< +0x8C
+    std::int32_t picture_structure_src;            ///< +0x90
+    std::int32_t chroma_format_src;                ///< +0x94
+    std::int32_t picture_detail_unknown_98;        ///< +0x98
+    std::int32_t chroma_pos_lo_src;                ///< +0x9C
+    std::int32_t chroma_pos_hi_src;                ///< +0xA0
+  };
+  static_assert(offsetof(MwsfdSfdFrmObj, buffmt) == 0x08, "MwsfdSfdFrmObj::buffmt offset must be 0x08");
+  static_assert(offsetof(MwsfdSfdFrmObj, planeWidth) == 0x0C, "MwsfdSfdFrmObj::planeWidth offset must be 0x0C");
+  static_assert(offsetof(MwsfdSfdFrmObj, planeHeight) == 0x10, "MwsfdSfdFrmObj::planeHeight offset must be 0x10");
+  static_assert(offsetof(MwsfdSfdFrmObj, concat_cnt) == 0x30, "MwsfdSfdFrmObj::concat_cnt offset must be 0x30");
+  static_assert(offsetof(MwsfdSfdFrmObj, nfrm) == 0x34, "MwsfdSfdFrmObj::nfrm offset must be 0x34");
+  static_assert(
+    offsetof(MwsfdSfdFrmObj, constrained_parameters_flag) == 0x88,
+    "MwsfdSfdFrmObj::constrained_parameters_flag offset must be 0x88"
+  );
+  static_assert(
+    offsetof(MwsfdSfdFrmObj, progressive_sequence) == 0x8C,
+    "MwsfdSfdFrmObj::progressive_sequence offset must be 0x8C"
+  );
+  static_assert(
+    offsetof(MwsfdSfdFrmObj, picture_structure_src) == 0x90,
+    "MwsfdSfdFrmObj::picture_structure_src offset must be 0x90"
+  );
+  static_assert(offsetof(MwsfdSfdFrmObj, chroma_format_src) == 0x94, "MwsfdSfdFrmObj::chroma_format_src offset must be 0x94");
+  static_assert(offsetof(MwsfdSfdFrmObj, chroma_pos_lo_src) == 0x9C, "MwsfdSfdFrmObj::chroma_pos_lo_src offset must be 0x9C");
+  static_assert(offsetof(MwsfdSfdFrmObj, chroma_pos_hi_src) == 0xA0, "MwsfdSfdFrmObj::chroma_pos_hi_src offset must be 0xA0");
+
+  /**
+   * One <address, pitch, height> SFX buffer descriptor written by
+   * `mwsfsfx_SetSfxBufInf` for the Y / Cb / Cr planes.
+   */
+  struct MwsfdSfxBufInf
+  {
+    std::int32_t address;
+    std::int32_t pitch;
+    std::int32_t height;
+  };
+  static_assert(sizeof(MwsfdSfxBufInf) == 0x0C, "MwsfdSfxBufInf must be 12 bytes");
+
+  /**
+   * Recovered SFX-side per-frame info struct populated by
+   * `MWSFSFX_CnvFrmInfToSfx`.
+   *
+   * The exact total size of this struct is not yet pinned (the binary uses it
+   * via raw dword offsets up to at least +0x94); only the lanes touched by
+   * the helpers in this block are typed here. The asserts below pin every
+   * lane the recovered helpers actually write so the byte layout matches the
+   * binary 1:1.
+   */
+  struct MwsfdSfxFrameInfo
+  {
+    std::int32_t compositionMode;                  ///< +0x00 buffer-format type
+    MwsfdSfxBufInf yPlane;                         ///< +0x04
+    MwsfdSfxBufInf cbPlane;                        ///< +0x10
+    MwsfdSfxBufInf crPlane;                        ///< +0x1C
+    std::int32_t planeWidth;                       ///< +0x28 (cached width)
+    std::int32_t planeHeight;                      ///< +0x2C (cached height)
+    std::int32_t mUnknown30;                       ///< +0x30
+    std::int32_t mUnknown34;                       ///< +0x34
+    std::int32_t mUnknown38;                       ///< +0x38
+    std::int32_t mUnknown3C;                       ///< +0x3C
+    std::int32_t mUnknown40;                       ///< +0x40
+    std::int32_t cachedWidth;                      ///< +0x44 (yPlane width copy)
+    std::int32_t cachedHeight;                     ///< +0x48 (yPlane height copy)
+    std::int32_t nfrm;                             ///< +0x4C frame-count copy
+    std::int32_t tagId;                            ///< +0x50 SFX tag id slot
+    std::int32_t tagContent;                       ///< +0x54 SFX tag content slot
+    std::int32_t reservedTag58;                    ///< +0x58
+    std::int32_t reservedTag5C;                    ///< +0x5C
+    std::int32_t pictureStructure;                 ///< +0x60
+    std::int32_t chromaFormat;                     ///< +0x64
+    std::int32_t pictureDetail68;                  ///< +0x68
+    std::int32_t pictureDetail6C;                  ///< +0x6C
+    std::int32_t pictureDetail70;                  ///< +0x70
+    std::int32_t chromaPosLo;                      ///< +0x74
+    std::int32_t chromaPosHi;                      ///< +0x78
+    std::uint8_t mUnknown7C[0x0C];                 ///< +0x7C
+    std::int32_t constrainedParametersFlag;        ///< +0x88 (copied from frmcodec)
+    std::int32_t progressiveSequence;              ///< +0x8C (copied from frmcodec)
+    std::int32_t isColAdjFrame;                    ///< +0x90
+    std::int32_t fxType;                           ///< +0x94
+  };
+  static_assert(offsetof(MwsfdSfxFrameInfo, compositionMode) == 0x00, "MwsfdSfxFrameInfo::compositionMode offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, yPlane) == 0x04, "MwsfdSfxFrameInfo::yPlane offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, cbPlane) == 0x10, "MwsfdSfxFrameInfo::cbPlane offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, crPlane) == 0x1C, "MwsfdSfxFrameInfo::crPlane offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, cachedWidth) == 0x44, "MwsfdSfxFrameInfo::cachedWidth offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, cachedHeight) == 0x48, "MwsfdSfxFrameInfo::cachedHeight offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, nfrm) == 0x4C, "MwsfdSfxFrameInfo::nfrm offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, tagId) == 0x50, "MwsfdSfxFrameInfo::tagId offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, tagContent) == 0x54, "MwsfdSfxFrameInfo::tagContent offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, pictureStructure) == 0x60, "MwsfdSfxFrameInfo::pictureStructure offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, chromaFormat) == 0x64, "MwsfdSfxFrameInfo::chromaFormat offset");
+  static_assert(
+    offsetof(MwsfdSfxFrameInfo, constrainedParametersFlag) == 0x88,
+    "MwsfdSfxFrameInfo::constrainedParametersFlag offset"
+  );
+  static_assert(offsetof(MwsfdSfxFrameInfo, progressiveSequence) == 0x8C, "MwsfdSfxFrameInfo::progressiveSequence offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, isColAdjFrame) == 0x90, "MwsfdSfxFrameInfo::isColAdjFrame offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, fxType) == 0x94, "MwsfdSfxFrameInfo::fxType offset");
+
+  /**
+   * One per-stream entry in the MWSFD library work-area concat-stream table.
+   *
+   * The MWSFD work-area starts at base+0xC0 and contains 8 records of 20
+   * bytes each (`a1 + 20*(concat_cnt % 8) + 192` in the decompiler). Only the
+   * `validFlag` and `fxType` lanes are touched by the helpers in this block.
+   */
+  struct MwsfdSfdConcatStreamRecord
+  {
+    std::int32_t validFlag;     ///< +0x00 (== 1 when the per-stream lane is populated)
+    std::int32_t mUnknown04;    ///< +0x04
+    std::int32_t mUnknown08;    ///< +0x08
+    std::int32_t mUnknown0C;    ///< +0x0C
+    std::int32_t fxType;        ///< +0x10 SFX composition-mode override for this stream
+  };
+  static_assert(sizeof(MwsfdSfdConcatStreamRecord) == 20, "MwsfdSfdConcatStreamRecord must be 20 bytes");
+  static_assert(offsetof(MwsfdSfdConcatStreamRecord, validFlag) == 0x00, "MwsfdSfdConcatStreamRecord::validFlag offset");
+  static_assert(offsetof(MwsfdSfdConcatStreamRecord, fxType) == 0x10, "MwsfdSfdConcatStreamRecord::fxType offset");
+
+  // ---------------------------------------------------------------------------
+  // Internal SFX handle work-area view used by `SFX_Destroy`
+  // ---------------------------------------------------------------------------
+  //
+  // The full SFX handle struct (`struct_sofdec_sfx_hn`) is large and not yet
+  // fully recovered; the lanes below are the ones touched on the teardown
+  // path. The `used` flag and the two child handles are pinned by the asm of
+  // `SFX_Destroy` at 0x00ACC9E0..0x00ACCA0F (decoded as `[esi+0x*]` accesses).
+
+  struct SfxHandleTeardownView
+  {
+    std::int32_t used;          ///< +0x00 lifecycle flag (cleared on Destroy)
+    std::int32_t mUnknown04;    ///< +0x04
+    void*        sfxz;          ///< +0x08 SFXZ child handle
+    std::int32_t sfxa;          ///< +0x0C SFXA child handle (integer address ABI)
+  };
+  static_assert(offsetof(SfxHandleTeardownView, used) == 0x00, "SfxHandleTeardownView::used offset");
+  static_assert(offsetof(SfxHandleTeardownView, sfxz) == 0x08, "SfxHandleTeardownView::sfxz offset");
+  static_assert(offsetof(SfxHandleTeardownView, sfxa) == 0x0C, "SfxHandleTeardownView::sfxa offset");
+
+  // ---------------------------------------------------------------------------
+  // Constants & error strings
+  // ---------------------------------------------------------------------------
+
+  /// Sentinel SFX composition-mode value selected by
+  /// `mwsfsfx_DecideCompoMode` when `MWSFD_GetFxType` returns -1 (no override
+  /// in the per-stream concat table).
+  constexpr std::int32_t kSfxCompoModeOverrideDefault = 0x11;
+
+  /// Per-process counter of currently live SFX handles. Decremented by
+  /// `SFX_Destroy`. Lives next to the SFX library work area; the value is the
+  /// `cur` slot of the larger `_sfx_libwork` struct that the deeper SFX init
+  /// chain owns.
+  std::int32_t gSfxLibWorkLiveHandles = 0;
+
+  constexpr char kSfxErrInvalidBufFmt[] = "E201184 : MwsfdBufFmt value is invalid.";
+  constexpr char kSfxErrInvalidPictureStructure[] = "E301272 : picture_structure is invalid.";
+  constexpr char kSfxErrInvalidChromaFormat[] = "E301273 : chroma_format is invalid.";
+  constexpr char kSfxErrInvalidChromaPos[] = "E301274 : chromapos is invalid.";
+
+  // Forward decls for the helpers below (definition order matches the
+  // address-sorted CRI source).
+  std::int32_t MWSFD_GetFxType(std::int32_t mwsfdLibBase, std::int32_t concatCount);
+  std::int32_t MWSFD_IsColAdjFile(std::int32_t mwsfdLibBase, std::int32_t concatCount);
+  std::int32_t MWSFD_IsColAdjFrame(std::int32_t mwsfdLibBase, MwsfdSfdFrmObj* frm);
+  std::int32_t mwsfsfx_DecideCompoMode(moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfdFrmObj* frm);
+  std::int32_t mwsfsfx_CnvFrmFmtTypeToSfx(std::int32_t buffmt);
+  void mwsfsfx_SetSfxBufInf(MwsfdSfxBufInf* outBufInf, std::int32_t address, std::int32_t pitch, std::int32_t height);
+  MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
+  void mwsfsfx_SetNfrm(const MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
+  void mwsfsfx_SetSfxInfTag(moho::MwsfdPlaybackStateSubobj* ply, MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
+  void mwsfsfx_SetFrmDetail(const MwsfdSfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
+  std::int32_t mwsfsfx_CnvPictureStructure(const MwsfdSfdFrmObj* frm);
+  std::int32_t mwsfsfx_CnvSfxChromaFormat(const MwsfdSfdFrmObj* frm);
+  std::int32_t mwsfsfx_CnvSfxChromaPos(std::int32_t chromaPos);
+
+  // SFX core lanes used by the helpers below.
+  std::int32_t SFX_SetCompoMode(void* sfxHandle, std::int32_t compositionMode);
+  void SFX_GetTagInf(void* sfxHandle, std::int32_t* outTagId, std::int32_t* outTagContent);
+  void SFX_Destroy(void* sfxHandle);
+  std::int32_t mwPlyCalcYccPlane(
+    std::int32_t baseAddress,
+    std::int32_t planeWidth,
+    std::int32_t planeHeight,
+    std::int32_t* outSfxGeometry
+  );
+
+  // ---------------------------------------------------------------------------
+  // SFX handle teardown chain
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Address: 0x00ACC9E0 (FUN_00ACC9E0, _SFX_Destroy)
+   *
+   * IDA signature:
+   * void __cdecl SFX_Destroy(struct_sofdec_sfx_hn* hn);
+   *
+   * What it does:
+   * Releases one SFX handle. Clears the lifecycle `used` flag, tears down the
+   * SFXZ (depth/Z-blit) child handle, tears down the SFXA (audio) child
+   * handle, and decrements the live-handle counter in the SFX library work
+   * area. Null inputs are tolerated and become a no-op (matches the binary's
+   * leading `test esi, esi / jz short loc_*` guard).
+   */
+  void SFX_Destroy(void* const sfxHandle)
+  {
+    if (sfxHandle == nullptr) {
+      return;
+    }
+    auto* const view = static_cast<SfxHandleTeardownView*>(sfxHandle);
+    void* const sfxzChild = view->sfxz;
+    const std::int32_t sfxaChild = view->sfxa;
+    view->used = 0;
+    SFXZ_Destroy(sfxzChild);
+    SFXA_Destroy(sfxaChild);
+    --gSfxLibWorkLiveHandles;
+  }
+
+  /**
+   * Address: 0x00AC66D0 (FUN_00AC66D0, _MWSFSFX_Destroy)
+   *
+   * IDA signature:
+   * void __cdecl MWSFSFX_Destroy(struct_sofdec_sfx_hn* hn);  // attributes: thunk
+   *
+   * What it does:
+   * Public MWSFSFX teardown forwarder. The original binary is a single
+   * tail-jump thunk (`jmp _SFX_Destroy`); the C++ forwarder preserves the
+   * same externally observable behaviour.
+   */
+  void MWSFSFX_Destroy(void* const sfxHandle)
+  {
+    SFX_Destroy(sfxHandle);
+  }
+
+  // ---------------------------------------------------------------------------
+  // SFX handle binding lane
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Address: 0x00AC66F0 (FUN_00AC66F0, _MWSFSFX_SetSfxHn)
+   *
+   * IDA signature:
+   * int __cdecl MWSFSFX_SetSfxHn(MWPLY ply, void* sfxHandle);
+   *
+   * What it does:
+   * Binds one SFX runtime handle to a Sofdec playback object by writing the
+   * `sfxHandle` lane (offset 0xA8) on the playback state. Returns the same
+   * handle for chained-assignment friendliness, matching the binary's
+   * `mov [eax+0xA8], edx / mov eax, edx / ret` epilogue.
+   */
+  void* MWSFSFX_SetSfxHn(moho::MwsfdPlaybackStateSubobj* const ply, void* const sfxHandle)
+  {
+    ply->sfxHandle = sfxHandle;
+    return sfxHandle;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Frame-info conversion pipeline
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Address: 0x00AC6700 (FUN_00AC6700, _MWSFD_CnvFrmInfToSfx)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_CnvFrmInfToSfx(MWPLY ply, MwsfdFrmObj* frm, int* outSfx);
+   * // attributes: thunk
+   *
+   * What it does:
+   * Public MWSFD facade for the frame-info conversion pipeline. The original
+   * binary is a single tail-jump to `_MWSFSFX_CnvFrmInfToSfx`; the C++
+   * forwarder preserves the same externally observable behaviour.
+   */
+  std::int32_t MWSFD_CnvFrmInfToSfx(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    MwsfdSfdFrmObj* const frm,
+    MwsfdSfxFrameInfo* const outSfx
+  )
+  {
+    return MWSFSFX_CnvFrmInfToSfx(ply, frm, outSfx);
+  }
+
+  /**
+   * Address: 0x00AC6710 (FUN_00AC6710, _MWSFSFX_CnvFrmInfToSfx)
+   *
+   * IDA signature:
+   * int __cdecl MWSFSFX_CnvFrmInfToSfx(MWPLY ply, MwsfdFrmObj* frm, int* outSfx);
+   *
+   * What it does:
+   * Converts one MWSFD-side decoded frame descriptor into the SFX-side
+   * `MwsfdSfxFrameInfo` block consumed by the Sofdec SFX runtime. Runs the
+   * canonical 5-step CRI pipeline (format/plane/nfrm/tag/detail) and then
+   * patches the per-frame `constrained_parameters_flag` /
+   * `progressive_sequence` lanes, the per-file colour-adjust flag, the
+   * per-stream FX-type override, and finally pushes the resulting composition
+   * mode into the bound SFX handle via `mwsfsfx_DecideCompoMode`.
+   *
+   * Returns the value reported by `mwsfsfx_DecideCompoMode`, which is the
+   * status code returned by `SFX_SetCompoMode`.
+   */
+  std::int32_t MWSFSFX_CnvFrmInfToSfx(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    MwsfdSfdFrmObj* const frm,
+    MwsfdSfxFrameInfo* const outSfx
+  )
+  {
+    outSfx->compositionMode = mwsfsfx_CnvFrmFmtTypeToSfx(frm->buffmt);
+    (void)mwsfsfx_SetYcc420plnInfToSfx(frm, outSfx);
+    mwsfsfx_SetNfrm(frm, outSfx);
+    mwsfsfx_SetSfxInfTag(ply, frm, outSfx);
+    mwsfsfx_SetFrmDetail(frm, outSfx);
+
+    // Copy the two-dword `frmcodec.u.frmm2v.{constrained_parameters_flag,
+    // progressive_sequence}` pair as a single QWORD load/store, matching the
+    // `mov ecx,[esi+0x88] / mov [edi+0x88], ecx / mov edx,[esi+0x8C] /
+    // mov [edi+0x8C], edx` sequence in the binary.
+    outSfx->constrainedParametersFlag = frm->constrained_parameters_flag;
+    outSfx->progressiveSequence = frm->progressive_sequence;
+
+    const std::int32_t plyAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply));
+    outSfx->isColAdjFrame = MWSFD_IsColAdjFrame(plyAddress, frm);
+    outSfx->fxType = MWSFD_GetFxType(plyAddress, frm->concat_cnt);
+    return mwsfsfx_DecideCompoMode(ply, frm);
+  }
+
+  /**
+   * Address: 0x00AC6790 (FUN_00AC6790, _mwsfsfx_DecideCompoMode)
+   *
+   * IDA signature:
+   * int __cdecl mwsfsfx_DecideCompoMode(MWPLY ply, MwsfdFrmObj* frm);
+   *
+   * What it does:
+   * Selects and applies the SFX composition mode for one playback handle.
+   * If the per-handle override slot has not been pinned by an earlier call
+   * (`sfxCompoModeLocked == 0`), refreshes the override from the per-stream
+   * MWSFD concat table via `MWSFD_GetFxType`. A `-1` lookup result is mapped
+   * to the `kSfxCompoModeOverrideDefault` (0x11) sentinel which selects the
+   * SFX runtime's static default mode. The chosen value is then pushed into
+   * the bound SFX handle via `SFX_SetCompoMode`. Returns whatever
+   * `SFX_SetCompoMode` returns.
+   */
+  std::int32_t mwsfsfx_DecideCompoMode(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    MwsfdSfdFrmObj* const frm
+  )
+  {
+    if (ply->sfxCompoModeLocked == 0) {
+      const std::int32_t plyAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply));
+      const std::int32_t fxType = MWSFD_GetFxType(plyAddress, frm->concat_cnt);
+      if (fxType == -1) {
+        ply->sfxCompoModeOverride = kSfxCompoModeOverrideDefault;
+      } else {
+        ply->sfxCompoModeOverride = fxType;
+      }
+    }
+    const std::int32_t selectedMode = ply->sfxCompoModeOverride;
+    void* const sfxHandle = MWSFSFX_GetSfxHn(ply);
+    return SFX_SetCompoMode(sfxHandle, selectedMode);
+  }
+
+  // ---------------------------------------------------------------------------
+  // MWSFD per-stream concat-table queries
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Helper: locate one MWSFD per-stream record in the lib work area.
+   *
+   * The MWSFD library state stores 8 per-stream records starting at
+   * `base + 0xC0`, each 20 bytes wide. Stream selection wraps via
+   * `concatCount % 8`, matching the original `lea / imul / add` form in the
+   * binary (`a1 + 20*(a2 % 8) + 192`).
+   */
+  [[nodiscard]] inline MwsfdSfdConcatStreamRecord* MwsfdLocateConcatRecord(
+    const std::int32_t mwsfdLibBase,
+    const std::int32_t concatCount
+  )
+  {
+    constexpr std::int32_t kConcatTableBaseOffset = 0xC0;
+    constexpr std::int32_t kConcatTableSize = 8;
+    auto* const tableBase = reinterpret_cast<std::uint8_t*>(
+      static_cast<std::uintptr_t>(mwsfdLibBase) + kConcatTableBaseOffset
+    );
+    const std::int32_t streamSlot = concatCount % kConcatTableSize;
+    return reinterpret_cast<MwsfdSfdConcatStreamRecord*>(
+      tableBase + (streamSlot * sizeof(MwsfdSfdConcatStreamRecord))
+    );
+  }
+
+  /**
+   * Address: 0x00AC67E0 (FUN_00AC67E0, _MWSFD_IsColAdjFrame)
+   *
+   * IDA signature:
+   * BOOL __cdecl MWSFD_IsColAdjFrame(int mwsfdLibBase, MwsfdFrmObj* frm);
+   *
+   * What it does:
+   * Returns 1 when the supplied frame is a colour-adjust frame.
+   * The decision is two-stage: first the per-file colour-adjust enable
+   * (`MWSFD_IsColAdjFile`) is checked; then, if the frame carries a
+   * non-zero `constrained_parameters_flag`, the SUD type analyser
+   * (`SUD_AnalyTypeCcs`) is consulted with the constrained-parameters lane
+   * and the progressive-sequence lane.
+   */
+  std::int32_t MWSFD_IsColAdjFrame(const std::int32_t mwsfdLibBase, MwsfdSfdFrmObj* const frm)
+  {
+    const std::int32_t isColAdjFile = MWSFD_IsColAdjFile(mwsfdLibBase, frm->concat_cnt);
+    const std::int32_t constrainedParametersFlag = frm->constrained_parameters_flag;
+    const std::int32_t fileResult = (isColAdjFile == 1) ? 1 : 0;
+    if (constrainedParametersFlag != 0) {
+      return SUD_AnalyTypeCcs(constrainedParametersFlag, frm->progressive_sequence);
+    }
+    return fileResult;
+  }
+
+  /**
+   * Address: 0x00AC6820 (FUN_00AC6820, _MWSFD_IsColAdjFile)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_IsColAdjFile(int mwsfdLibBase, int concatCount);
+   *
+   * What it does:
+   * Looks up the per-stream MWSFD concat record for `concatCount` and, when
+   * the record is populated (`validFlag == 1`), returns the colour-adjust
+   * file lane stored 50 dwords into the per-stream sub-block. Otherwise
+   * returns 0. The dword index `4 * (5 * (concatCount % 8) + 50)` in the
+   * decompiler resolves to the same byte the original CRI source labelled
+   * `g_mwsfdInf.streams[idx].colorAdjFileFlag`.
+   */
+  std::int32_t MWSFD_IsColAdjFile(const std::int32_t mwsfdLibBase, const std::int32_t concatCount)
+  {
+    const MwsfdSfdConcatStreamRecord* const record = MwsfdLocateConcatRecord(mwsfdLibBase, concatCount);
+    if (record->validFlag != 1) {
+      return 0;
+    }
+    constexpr std::int32_t kColorAdjFileFlagDwordIndex = 50;
+    constexpr std::int32_t kColorAdjFileFlagOffset = 4 * kColorAdjFileFlagDwordIndex;
+    const auto* const colorAdjFileFlag = reinterpret_cast<const std::int32_t*>(
+      reinterpret_cast<const std::uint8_t*>(mwsfdLibBase) + kColorAdjFileFlagOffset
+    );
+    // The original asm walks `mwsfdLibBase + (5 * (concatCount % 8) + 50) * 4`
+    // which combines a per-stream stride of 5 dwords with the +50-dword base.
+    const std::int32_t streamSlot = concatCount % 8;
+    return colorAdjFileFlag[5 * streamSlot];
+  }
+
+  /**
+   * Address: 0x00AC6850 (FUN_00AC6850, _MWSFD_GetFxType)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_GetFxType(int mwsfdLibBase, int concatCount);
+   *
+   * What it does:
+   * Returns the per-stream SFX composition-mode override for `concatCount`,
+   * or the default (`0x11`) sentinel when the per-stream record is not
+   * populated (`validFlag != 1`). The override lives at offset 0x10 of the
+   * 20-byte per-stream record at `base + 0xC0 + 20 * (concatCount % 8)`.
+   */
+  std::int32_t MWSFD_GetFxType(const std::int32_t mwsfdLibBase, const std::int32_t concatCount)
+  {
+    const MwsfdSfdConcatStreamRecord* const record = MwsfdLocateConcatRecord(mwsfdLibBase, concatCount);
+    if (record->validFlag != 1) {
+      return kSfxCompoModeOverrideDefault;
+    }
+    return record->fxType;
+  }
+
+  /**
+   * Address: 0x00AC6880 (FUN_00AC6880, _mwsfsfx_CnvFrmFmtTypeToSfx)
+   *
+   * IDA signature:
+   * int __cdecl mwsfsfx_CnvFrmFmtTypeToSfx(int buffmt);
+   *
+   * What it does:
+   * Maps an MWSFD `buffmt` (1, 2, 3) to the matching SFX buffer-format type.
+   * The mapping is intentionally identity for the supported values; any
+   * other input is reported via the Sofdec-SVM error channel and silently
+   * remapped to type `3` to keep the SFX pipeline alive.
+   */
+  std::int32_t mwsfsfx_CnvFrmFmtTypeToSfx(const std::int32_t buffmt)
+  {
+    if (buffmt == 1) {
+      return 1;
+    }
+    if (buffmt == 2) {
+      return 2;
+    }
+    if (buffmt != 3) {
+      MWSFSVM_Error(kSfxErrInvalidBufFmt);
+    }
+    return 3;
+  }
+
+  /**
+   * Address: 0x00AC68B0 (FUN_00AC68B0, _mwsfsfx_SetYcc420plnInfToSfx)
+   *
+   * IDA signature:
+   * _DWORD* __cdecl mwsfsfx_SetYcc420plnInfToSfx(MwsfdFrmObj* frm,
+   *                                              MwsfdSfxFrameInfo* outSfx);
+   *
+   * What it does:
+   * Packs the Y / Cb / Cr plane descriptors for one decoded frame into the
+   * SFX-side info block. For non-YCC420 buffer formats only the cached
+   * width/height lanes (`+0x44` / `+0x48`) are written and the Y plane is
+   * filled with the original base address. For YCC420 the
+   * `mwPlyCalcYccPlane` helper computes per-plane <address, pitch> pairs and
+   * the Cb / Cr planes get their height divided by two (chroma subsampling).
+   *
+   * Returns the address of the last `MwsfdSfxBufInf` written, matching the
+   * original CRI return convention used by the chained `mwsfsfx_SetSfxBufInf`
+   * calls in the binary.
+   */
+  MwsfdSfxBufInf* mwsfsfx_SetYcc420plnInfToSfx(MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
+  {
+    const std::int32_t planeWidth = frm->planeWidth;
+    const std::int32_t planeHeight = frm->planeHeight;
+    outSfx->cachedWidth = planeWidth;
+    outSfx->cachedHeight = planeHeight;
+
+    const std::int32_t bufferAddress = frm->bufferAddress;
+    if (frm->buffmt != 3) {
+      mwsfsfx_SetSfxBufInf(&outSfx->yPlane, bufferAddress, planeWidth, planeHeight);
+      return &outSfx->yPlane;
+    }
+
+    // YCC 4:2:0: derive per-plane <address, pitch> pairs and lay out the
+    // chroma planes with half-height.
+    std::int32_t yccGeometry[4]{};
+    (void)mwPlyCalcYccPlane(bufferAddress, planeWidth, planeHeight, yccGeometry);
+
+    mwsfsfx_SetSfxBufInf(&outSfx->yPlane, yccGeometry[0], yccGeometry[3], planeHeight);
+    const std::int32_t chromaHeight = planeHeight / 2;
+    mwsfsfx_SetSfxBufInf(&outSfx->cbPlane, yccGeometry[1], yccGeometry[3], chromaHeight);
+    mwsfsfx_SetSfxBufInf(&outSfx->crPlane, yccGeometry[2], yccGeometry[3], chromaHeight);
+    return &outSfx->crPlane;
+  }
+
+  /**
+   * Address: 0x00AC6950 (FUN_00AC6950, _mwsfsfx_SetNfrm)
+   *
+   * IDA signature:
+   * void __cdecl mwsfsfx_SetNfrm(const MwsfdFrmObj* frm, MwsfdSfxFrameInfo* outSfx);
+   *
+   * What it does:
+   * Copies the per-frame frame-count slot from the SFD frame descriptor into
+   * the matching slot of the SFX frame-info block. The original C source
+   * returned the input pointer (compiler artefact); the recovered version
+   * keeps the side effect and drops the discard return.
+   */
+  void mwsfsfx_SetNfrm(const MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
+  {
+    outSfx->nfrm = frm->nfrm;
+  }
+
+  /**
+   * Address: 0x00AC6960 (FUN_00AC6960, _mwsfsfx_SetSfxBufInf)
+   *
+   * IDA signature:
+   * void __cdecl mwsfsfx_SetSfxBufInf(MwsfdSfxBufInf* dst, int address, int pitch, int height);
+   *
+   * What it does:
+   * Three-store helper used by the YCC plane setup to fill one
+   * `<address, pitch, height>` SFX buffer descriptor.
+   */
+  void mwsfsfx_SetSfxBufInf(
+    MwsfdSfxBufInf* const outBufInf,
+    const std::int32_t address,
+    const std::int32_t pitch,
+    const std::int32_t height
+  )
+  {
+    outBufInf->address = address;
+    outBufInf->pitch = pitch;
+    outBufInf->height = height;
+  }
+
+  /**
+   * Address: 0x00AC6980 (FUN_00AC6980, _mwsfsfx_SetSfxInfTag)
+   *
+   * IDA signature:
+   * void __cdecl mwsfsfx_SetSfxInfTag(MWPLY ply, MwsfdFrmObj* frm,
+   *                                   MwsfdSfxFrameInfo* outSfx);
+   *
+   * What it does:
+   * Reads the active SFX-side tag <id, content> pair from the playback
+   * object's bound SFX handle (`SFX_GetTagInf`) and stores them into the
+   * SFX frame-info block, then zeroes the two reserved tag-trailer slots
+   * (`+0x58` / `+0x5C`).
+   *
+   * Note: the binary always reads the SFX handle directly from
+   * `MWPLY->sfxHandle` (`[edx + 0xA8]`) — `frm` is on the call signature
+   * (matching the original CRI ABI) but is not actually consumed by the
+   * SFX_GetTagInf path. We keep it on the C++ signature for fidelity.
+   */
+  void mwsfsfx_SetSfxInfTag(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    MwsfdSfdFrmObj* const /*frm*/,
+    MwsfdSfxFrameInfo* const outSfx
+  )
+  {
+    std::int32_t tagId = 0;
+    std::int32_t tagContent = 0;
+    SFX_GetTagInf(ply->sfxHandle, &tagId, &tagContent);
+    outSfx->tagId = tagId;
+    outSfx->tagContent = tagContent;
+    outSfx->reservedTag58 = 0;
+    outSfx->reservedTag5C = 0;
+  }
+
+  /**
+   * Address: 0x00AC69C0 (FUN_00AC69C0, _mwsfsfx_SetFrmDetail)
+   *
+   * IDA signature:
+   * void __cdecl mwsfsfx_SetFrmDetail(const MwsfdFrmObj* frm,
+   *                                   MwsfdSfxFrameInfo* outSfx);
+   *
+   * What it does:
+   * Copies the picture-detail lanes from one MWSFD frame descriptor into the
+   * matching slots of the SFX frame-info block. Three of the lanes go through
+   * the small `mwsfsfx_Cnv*` validators which fault to default values via
+   * `MWSFSVM_Error` when the source value is out of range.
+   */
+  void mwsfsfx_SetFrmDetail(const MwsfdSfdFrmObj* const frm, MwsfdSfxFrameInfo* const outSfx)
+  {
+    outSfx->pictureStructure = mwsfsfx_CnvPictureStructure(frm);
+    outSfx->chromaFormat = mwsfsfx_CnvSfxChromaFormat(frm);
+    outSfx->pictureDetail68 = frm->picture_structure_src;
+    outSfx->pictureDetail6C = frm->chroma_format_src;
+    outSfx->pictureDetail70 = frm->picture_detail_unknown_98;
+    outSfx->chromaPosLo = mwsfsfx_CnvSfxChromaPos(frm->chroma_pos_lo_src);
+    outSfx->chromaPosHi = mwsfsfx_CnvSfxChromaPos(frm->chroma_pos_hi_src);
+  }
+
+  /**
+   * Address: 0x00AC6A20 (FUN_00AC6A20, _mwsfsfx_CnvPictureStructure)
+   *
+   * IDA signature:
+   * int __cdecl mwsfsfx_CnvPictureStructure(const MwsfdFrmObj* frm);
+   *
+   * What it does:
+   * Validates one MPEG `picture_structure` lane (1 = top field,
+   * 2 = bottom field, 3 = frame). Out-of-range values are reported via the
+   * Sofdec-SVM error channel and remapped to `3` to keep playback alive.
+   */
+  std::int32_t mwsfsfx_CnvPictureStructure(const MwsfdSfdFrmObj* const frm)
+  {
+    const std::int32_t pictureStructure = frm->constrained_parameters_flag; // +0x88 in the binary
+    if (pictureStructure == 1) {
+      return 1;
+    }
+    if (pictureStructure == 2) {
+      return 2;
+    }
+    if (pictureStructure != 3) {
+      MWSFSVM_Error(kSfxErrInvalidPictureStructure);
+    }
+    return 3;
+  }
+
+  /**
+   * Address: 0x00AC6A60 (FUN_00AC6A60, _mwsfsfx_CnvSfxChromaFormat)
+   *
+   * IDA signature:
+   * int __cdecl mwsfsfx_CnvSfxChromaFormat(const MwsfdFrmObj* frm);
+   *
+   * What it does:
+   * Validates one MPEG `chroma_format` lane (1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4).
+   * Out-of-range values are reported through the Sofdec-SVM error channel and
+   * remapped to `1` (4:2:0).
+   */
+  std::int32_t mwsfsfx_CnvSfxChromaFormat(const MwsfdSfdFrmObj* const frm)
+  {
+    const std::int32_t chromaFormat = frm->progressive_sequence; // +0x8C in the binary
+    switch (chromaFormat) {
+      case 1: return 1;
+      case 2: return 2;
+      case 3: return 3;
+      default:
+        MWSFSVM_Error(kSfxErrInvalidChromaFormat);
+        return 1;
+    }
+  }
+
+  /**
+   * Address: 0x00AC6AA0 (FUN_00AC6AA0, _mwsfsfx_CnvSfxChromaPos)
+   *
+   * IDA signature:
+   * int __cdecl mwsfsfx_CnvSfxChromaPos(int chromaPos);
+   *
+   * What it does:
+   * Validates one chroma-position lane (0 or 1). Anything else is reported
+   * through the Sofdec-SVM error channel and remapped to `1`.
+   */
+  std::int32_t mwsfsfx_CnvSfxChromaPos(const std::int32_t chromaPos)
+  {
+    if (chromaPos == 0) {
+      return 0;
+    }
+    if (chromaPos != 1) {
+      MWSFSVM_Error(kSfxErrInvalidChromaPos);
+    }
+    return 1;
+  }
+
+  // ---------------------------------------------------------------------------
+  // SFX core helpers reached only from this block
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Address: 0x00ACCD30 (FUN_00ACCD30, _SFX_SetCompoMode)
+   *
+   * IDA signature:
+   * int __cdecl SFX_SetCompoMode(struct_sofdec_sfx_hn* hn, int mode);
+   *
+   * What it does:
+   * Stores one composition-mode value into the SFX handle's mode lane (offset
+   * +0x04) and returns the value for chained-assignment friendliness. The
+   * binary is a three-instruction body (`mov / mov / mov / ret`) with no
+   * validation; the recovered version preserves that 1:1.
+   */
+  std::int32_t SFX_SetCompoMode(void* const sfxHandle, const std::int32_t compositionMode)
+  {
+    auto* const view = static_cast<SfxHandleTeardownView*>(sfxHandle);
+    view->mUnknown04 = compositionMode;
+    return compositionMode;
+  }
+
+  /**
+   * Address: 0x00ACCE60 (FUN_00ACCE60, _SFX_GetTagInf)
+   *
+   * IDA signature:
+   * void __cdecl SFX_GetTagInf(struct_sofdec_sfx_hn* hn, int* outTagId,
+   *                            int* outTagContent);
+   *
+   * What it does:
+   * Reports the SFX handle's currently latched tag pair. When the
+   * tag-valid flag (`+0x14`, decompiler `v5`) is `1` the cached id (`+0x18`)
+   * and content (`+0x1C`) lanes are returned; otherwise both outputs are
+   * cleared. The binary returns one of the two output pointers as a compiler
+   * artefact; the C++ recovery drops the unused return value.
+   */
+  void SFX_GetTagInf(void* const sfxHandle, std::int32_t* const outTagId, std::int32_t* const outTagContent)
+  {
+    // Layout: tagValid lives at +0x14, tagId at +0x18, tagContent at +0x1C.
+    // The lanes are pinned by the asm at 0x00ACCE60..0x00ACCE7C; we keep the
+    // raw byte view here because the surrounding SFX handle struct is still
+    // being recovered. Note: this matches the v5/v6/v7 fields used by
+    // hex-rays in the FUN_00ACCE60.c export.
+    auto* const handleBytes = static_cast<std::uint8_t*>(sfxHandle);
+    const std::int32_t tagValid = *reinterpret_cast<std::int32_t*>(handleBytes + 0x14);
+    if (tagValid == 1) {
+      *outTagId = *reinterpret_cast<std::int32_t*>(handleBytes + 0x18);
+      *outTagContent = *reinterpret_cast<std::int32_t*>(handleBytes + 0x1C);
+      return;
+    }
+    *outTagId = 0;
+    *outTagContent = 0;
+  }
+
+  /**
+   * Address: 0x00ACA5B0 (FUN_00ACA5B0, _mwPlyCalcYccPlane)
+   *
+   * IDA signature:
+   * int __cdecl mwPlyCalcYccPlane(int baseAddress, int planeWidth,
+   *                               int planeHeight, _DWORD* outSfxGeometry);
+   *
+   * What it does:
+   * Two-step plane geometry calculator used by `mwsfsfx_SetYcc420plnInfToSfx`
+   * for the YCC 4:2:0 buffer-format path. Stage 1 (`SFD_CalcYccPlane`) writes
+   * the SFD-side geometry into a 16-byte stack scratchpad. Stage 2
+   * (`mwl_convYccPlaneFromSFD`) repacks that scratchpad into the SFX-side
+   * 4-dword geometry buffer. Returns whatever `mwl_convYccPlaneFromSFD`
+   * returns (typically the output buffer address).
+   */
+  std::int32_t mwPlyCalcYccPlane(
+    const std::int32_t baseAddress,
+    const std::int32_t planeWidth,
+    const std::int32_t planeHeight,
+    std::int32_t* const outSfxGeometry
+  )
+  {
+    std::uint8_t sfdGeometry[16]{};
+    SFD_CalcYccPlane(
+      baseAddress,
+      planeWidth,
+      planeHeight,
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sfdGeometry))
+    );
+    return mwl_convYccPlaneFromSFD(
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sfdGeometry)),
+      outSfxGeometry
+    );
+  }
+
+  // ===========================================================================
+  // CRI Sofdec SFX leaf accessors and frame-table helpers
+  // ===========================================================================
+  //
+  // The block below recovers the SFX-side leaf functions in the
+  // 0x00ACCD60 .. 0x00ACE8F0 range that are reached from the MWSFD wrappers
+  // earlier in this translation unit (MWSFD_SetSfxCnvTbl, MWSFD_SetSplitField,
+  // MWSFD_SetProgOut, MWSFD_GetZfrmRange, MWSFD_MakeTblZ16, MWSFD_MakeTblZ32).
+  //
+  // The SFX runtime handle is a larger CRI struct whose full layout has not
+  // been recovered yet; the lanes touched here live at offsets +0x04, +0x24,
+  // +0x34, +0x38..+0x4C, +0x58, +0x5C and the per-table cnv array beginning at
+  // +0x38 (4 bytes per slot). Each lane is exposed via a typed view rather
+  // than open `+ 0xNN` pointer arithmetic.
+  //
+  // Deeper helpers (`SFXZ_*`, `sfxcnv_*`, `SFXLIB_Error`) live in the SFXZ /
+  // SFX-library translation units which have not been pulled into this TU
+  // yet; they are forward-declared here as `extern` symbols. The bodies of
+  // those functions live in their own subsystem files and will be recovered
+  // by their dedicated batches.
+
+  /// Typed view of one CRI Sofdec SFX runtime handle. Only lanes proven by
+  /// the SFX leaf accessors below are named; the rest is opaque pending
+  /// further evidence. Field comments cite the offsets observed in the
+  /// FUN_00ACCD60..FUN_00ACE8F0 disassembly.
+  struct SfxHandleSettingsView
+  {
+    std::uint8_t mUnknown00_03[0x04]{};       ///< +0x00..+0x03 (used flag etc.)
+    std::int32_t compositionMode = 0;          ///< +0x04 SFX_SetCompoMode lane
+    std::uint8_t mUnknown08_1F[0x18]{};        ///< +0x08..+0x1F
+    std::int32_t sfxzChildAddress = 0;         ///< +0x20 SFXZ child handle ptr
+    std::int32_t sfxzHandleSlot = 0;           ///< +0x24 alternate SFXZ slot
+    std::uint8_t mUnknown28_33[0x0C]{};        ///< +0x28..+0x33
+    std::int32_t tblPattern = 0;               ///< +0x34 SFXSET_SetTblPtn lane
+    std::int32_t cnvTable[6]{};                ///< +0x38..+0x4F (cnv table slots)
+    std::uint8_t mUnknown50_57[0x08]{};        ///< +0x50..+0x57
+    std::int32_t splitField = 0;               ///< +0x58 SFX_SetSplitField lane
+    std::int32_t progOut = 0;                  ///< +0x5C SFX_SetProgOut lane
+  };
+  static_assert(
+    offsetof(SfxHandleSettingsView, compositionMode) == 0x04,
+    "SfxHandleSettingsView::compositionMode offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SfxHandleSettingsView, sfxzHandleSlot) == 0x24,
+    "SfxHandleSettingsView::sfxzHandleSlot offset must be 0x24"
+  );
+  static_assert(
+    offsetof(SfxHandleSettingsView, tblPattern) == 0x34,
+    "SfxHandleSettingsView::tblPattern offset must be 0x34"
+  );
+  static_assert(
+    offsetof(SfxHandleSettingsView, cnvTable) == 0x38,
+    "SfxHandleSettingsView::cnvTable offset must be 0x38"
+  );
+  static_assert(
+    offsetof(SfxHandleSettingsView, splitField) == 0x58,
+    "SfxHandleSettingsView::splitField offset must be 0x58"
+  );
+  static_assert(
+    offsetof(SfxHandleSettingsView, progOut) == 0x5C,
+    "SfxHandleSettingsView::progOut offset must be 0x5C"
+  );
+
+  // Forward declarations for deeper SFX library helpers (recovered in their
+  // own SFXZ / SFXLIB subsystem batches; only the address-block doc lives
+  // here next to the leaf accessors that depend on them).
+  std::int32_t SFXZ_IsSetZclip(std::int32_t sfxzHandleAddress);
+  std::int32_t SFX_SetZbit(void* sfxHandle, std::int32_t zBitDepth);
+  std::int32_t sfxcnv_MakeZTbl(void* sfxHandle, MwsfdSfxFrameInfo* sfxFrameInfo);
+  char* SFXZ_GetZfrmRange(
+    char* sfxzWorkBuffer,
+    std::int32_t entryStrideBytes,
+    char** outRangeStart,
+    std::int32_t* outRangeEnd
+  );
+
+  // Externally-visible error strings sampled by SFX_MakeTblZ16/32.
+  constexpr char kSfxErrMakeTblZ32NoZclip[] = "E202281: SFX_MakeTblZ32: Zclip is not set.";
+  constexpr char kSfxErrMakeTblZ16NoZclip[] = "E202282: SFX_MakeTblZ16: Zclip is not set.";
+
+  /**
+   * Address: 0x00ACCDD0 (FUN_00ACCDD0, _SFXSET_SetTblPtn)
+   *
+   * IDA signature:
+   * int __cdecl SFXSET_SetTblPtn(int a1, int a2);
+   *
+   * What it does:
+   * Stores one SFX table-pattern selector lane (`+0x34`) on a CRI Sofdec SFX
+   * handle and returns the stored value for chained-assignment friendliness.
+   */
+  std::int32_t SFXSET_SetTblPtn(void* const sfxHandle, const std::int32_t tablePattern)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    view->tblPattern = tablePattern;
+    return tablePattern;
+  }
+
+  /**
+   * Address: 0x00ACCDA0 (FUN_00ACCDA0, _SFX_SetCnvTable)
+   *
+   * IDA signature:
+   * int __cdecl SFX_SetCnvTable(int a1, int a2, int a3);
+   *
+   * What it does:
+   * Pins the SFX table-pattern selector to mode `100` and writes one slot of
+   * the SFX cnv-table array (`+0x38 + 4*tableId`); returns the written value.
+   */
+  std::int32_t SFX_SetCnvTable(void* const sfxHandle, const std::int32_t tableId, const std::int32_t tableValue)
+  {
+    (void)SFXSET_SetTblPtn(sfxHandle, 100);
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    view->cnvTable[tableId] = tableValue;
+    return tableValue;
+  }
+
+  /**
+   * Address: 0x00ACCDC0 (FUN_00ACCDC0, _SFX_GetCnvTable)
+   *
+   * IDA signature:
+   * int __cdecl SFX_GetCnvTable(int a1, int a2);
+   *
+   * What it does:
+   * Reads one slot of the SFX cnv-table array (`+0x38 + 4*tableId`) on a CRI
+   * Sofdec SFX handle.
+   */
+  std::int32_t SFX_GetCnvTable(void* const sfxHandle, const std::int32_t tableId)
+  {
+    const auto* const view = static_cast<const SfxHandleSettingsView*>(sfxHandle);
+    return view->cnvTable[tableId];
+  }
+
+  /**
+   * Address: 0x00ACCF90 (FUN_00ACCF90, _SFX_SetSplitField)
+   *
+   * IDA signature:
+   * int __cdecl SFX_SetSplitField(int a1, int a2);
+   *
+   * What it does:
+   * Stores one SFX split-field flag (`+0x58`) on a CRI Sofdec SFX handle and
+   * returns the stored value.
+   */
+  std::int32_t SFX_SetSplitField(void* const sfxHandle, const std::int32_t enableSplitField)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    view->splitField = enableSplitField;
+    return enableSplitField;
+  }
+
+  /**
+   * Address: 0x00ACCFA0 (FUN_00ACCFA0, _SFX_GetSplitField)
+   *
+   * IDA signature:
+   * int __cdecl SFX_GetSplitField(int a1);
+   *
+   * What it does:
+   * Reads the SFX split-field flag (`+0x58`) from a CRI Sofdec SFX handle.
+   */
+  std::int32_t SFX_GetSplitField(void* const sfxHandle)
+  {
+    const auto* const view = static_cast<const SfxHandleSettingsView*>(sfxHandle);
+    return view->splitField;
+  }
+
+  /**
+   * Address: 0x00ACCFB0 (FUN_00ACCFB0, _SFX_SetProgOut)
+   *
+   * IDA signature:
+   * int __cdecl SFX_SetProgOut(int a1, int a2);
+   *
+   * What it does:
+   * Stores one SFX progressive-output flag (`+0x5C`) on a CRI Sofdec SFX
+   * handle and returns the stored value.
+   */
+  std::int32_t SFX_SetProgOut(void* const sfxHandle, const std::int32_t enableProgressiveOutput)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    view->progOut = enableProgressiveOutput;
+    return enableProgressiveOutput;
+  }
+
+  /**
+   * Address: 0x00ACCFC0 (FUN_00ACCFC0, _SFX_GetProgOut)
+   *
+   * IDA signature:
+   * int __cdecl SFX_GetProgOut(int a1);
+   *
+   * What it does:
+   * Reads the SFX progressive-output flag (`+0x5C`) from a CRI Sofdec SFX
+   * handle.
+   */
+  std::int32_t SFX_GetProgOut(void* const sfxHandle)
+  {
+    const auto* const view = static_cast<const SfxHandleSettingsView*>(sfxHandle);
+    return view->progOut;
+  }
+
+  /**
+   * Address: 0x00ACCF10 (FUN_00ACCF10, _SFX_GetZfrmRange)
+   *
+   * IDA signature:
+   * int __cdecl SFX_GetZfrmRange(int a1, int a2, int a3, int a4);
+   *
+   * What it does:
+   * Forwards a `GetZfrmRange` query through the SFXZ child handle bound at
+   * SFX +0x24 using the SFX-side frame-info nfrm lane (+0x4C / `MwsfdSfxFrameInfo::nfrm`).
+   */
+  std::int32_t SFX_GetZfrmRange(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    char* startBuffer = nullptr;
+    std::int32_t endValue = 0;
+    (void)SFXZ_GetZfrmRange(
+      reinterpret_cast<char*>(static_cast<std::intptr_t>(view->sfxzHandleSlot)),
+      sfxFrameInfo->nfrm,
+      &startBuffer,
+      &endValue
+    );
+    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(startBuffer));
+  }
+
+  /**
+   * Address: 0x00ACE8A0 (FUN_00ACE8A0, _SFX_MakeTblZ16)
+   *
+   * IDA signature:
+   * void __cdecl SFX_MakeTblZ16(int a1, int a2);
+   *
+   * What it does:
+   * Builds the 16-bit Z-table for one frame: requires the SFXZ child handle
+   * at SFX +0x24 to have a Zclip range pinned, sets the SFX Z-bit-depth lane
+   * to 16 via `SFX_SetZbit`, and forwards to `sfxcnv_MakeZTbl`. Reports
+   * `E202282` via `SFXLIB_Error` if no Zclip range is configured.
+   */
+  void SFX_MakeTblZ16(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    if (SFXZ_IsSetZclip(view->sfxzHandleSlot) == 1) {
+      (void)SFX_SetZbit(sfxHandle, 16);
+      (void)sfxcnv_MakeZTbl(sfxHandle, sfxFrameInfo);
+      return;
+    }
+    SFXLIB_Error(nullptr, nullptr, kSfxErrMakeTblZ16NoZclip);
+  }
+
+  /**
+   * Address: 0x00ACE8F0 (FUN_00ACE8F0, _SFX_MakeTblZ32)
+   *
+   * IDA signature:
+   * void __cdecl SFX_MakeTblZ32(int a1, int a2);
+   *
+   * What it does:
+   * Builds the 32-bit Z-table for one frame: requires the SFXZ child handle
+   * at SFX +0x24 to have a Zclip range pinned, sets the SFX Z-bit-depth lane
+   * to 32 via `SFX_SetZbit`, and forwards to `sfxcnv_MakeZTbl`. Reports
+   * `E202281` via `SFXLIB_Error` if no Zclip range is configured.
+   */
+  void SFX_MakeTblZ32(void* const sfxHandle, MwsfdSfxFrameInfo* const sfxFrameInfo)
+  {
+    auto* const view = static_cast<SfxHandleSettingsView*>(sfxHandle);
+    if (SFXZ_IsSetZclip(view->sfxzHandleSlot) == 1) {
+      (void)SFX_SetZbit(sfxHandle, 32);
+      (void)sfxcnv_MakeZTbl(sfxHandle, sfxFrameInfo);
+      return;
+    }
+    SFXLIB_Error(nullptr, nullptr, kSfxErrMakeTblZ32NoZclip);
+  }
+
+  // ---------------------------------------------------------------------------
+  // MWSFD frame-info -> SFX scratch wrappers (use MwsfdSfdFrmObj which is in
+  // scope here at the end of the SFX-cluster block).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Address: 0x00AC7380 (FUN_00AC7380, _MWSFD_GetZfrmRange)
+   *
+   * IDA signature:
+   * int __cdecl MWSFD_GetZfrmRange(MWPLY a1, MwsfdFrmObj *a2);
+   *
+   * What it does:
+   * Converts one MWSFD-side decoded frame descriptor into the SFX-side
+   * `MwsfdSfxFrameInfo` block via `MWSFSFX_CnvFrmInfToSfx`, then queries the
+   * bound SFX runtime handle for the zoom-frame range covering it.
+   */
+  std::int32_t MWSFD_GetZfrmRange(moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfdFrmObj* const frm)
+  {
+    void* const sfxHandle = MWSFSFX_GetSfxHn(ply);
+    MwsfdSfxFrameInfo sfxFrameInfo{};
+    (void)MWSFSFX_CnvFrmInfToSfx(ply, frm, &sfxFrameInfo);
+    return SFX_GetZfrmRange(sfxHandle, &sfxFrameInfo);
+  }
+
+  /**
+   * Address: 0x00AC74B0 (FUN_00AC74B0, _MWSFD_MakeTblZ16)
+   *
+   * IDA signature:
+   * void __cdecl MWSFD_MakeTblZ16(MWPLY a1, _DWORD *a2);
+   *
+   * What it does:
+   * Builds the 16-bit Z-table for one frame on the bound SFX runtime handle
+   * after converting the MWSFD frame descriptor into the SFX-side scratch
+   * layout; reports `E202283`/`E202284` for invalid handle / null get-frame.
+   */
+  void MWSFD_MakeTblZ16(moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfdFrmObj* const frm)
+  {
+    if (MWSFD_IsEnableHndl(ply) != 1) {
+      (void)MWSFSVM_Error(kMwsfdErrMakeTblZ16InvalidHandle);
+      return;
+    }
+    if (frm->bufferAddress == 0) {
+      (void)MWSFSVM_Error(kMwsfdErrMakeTblZ16GetFrmFailed);
+      return;
+    }
+
+    void* const sfxHandle = MWSFSFX_GetSfxHn(ply);
+    MwsfdSfxFrameInfo sfxFrameInfo{};
+    (void)MWSFSFX_CnvFrmInfToSfx(ply, frm, &sfxFrameInfo);
+    SFX_MakeTblZ16(sfxHandle, &sfxFrameInfo);
+  }
+
+  /**
+   * Address: 0x00AC7530 (FUN_00AC7530, _MWSFD_MakeTblZ32)
+   *
+   * IDA signature:
+   * void __cdecl MWSFD_MakeTblZ32(MWPLY a1, _DWORD *a2);
+   *
+   * What it does:
+   * Builds the 32-bit Z-table for one frame on the bound SFX runtime handle
+   * after converting the MWSFD frame descriptor into the SFX-side scratch
+   * layout; reports `E202285`/`E202286` for invalid handle / null get-frame.
+   */
+  void MWSFD_MakeTblZ32(moho::MwsfdPlaybackStateSubobj* const ply, MwsfdSfdFrmObj* const frm)
+  {
+    if (MWSFD_IsEnableHndl(ply) != 1) {
+      (void)MWSFSVM_Error(kMwsfdErrMakeTblZ32InvalidHandle);
+      return;
+    }
+    if (frm->bufferAddress == 0) {
+      (void)MWSFSVM_Error(kMwsfdErrMakeTblZ32GetFrmFailed);
+      return;
+    }
+
+    void* const sfxHandle = MWSFSFX_GetSfxHn(ply);
+    MwsfdSfxFrameInfo sfxFrameInfo{};
+    (void)MWSFSFX_CnvFrmInfToSfx(ply, frm, &sfxFrameInfo);
+    SFX_MakeTblZ32(sfxHandle, &sfxFrameInfo);
   }
 

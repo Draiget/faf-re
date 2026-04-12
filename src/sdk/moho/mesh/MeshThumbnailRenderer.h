@@ -15,7 +15,7 @@ namespace moho
   class ID3DTextureSheet;
   class TextureD3D9;
   class MeshInstance;
-  class RMeshBlueprint;
+  struct RMeshBlueprint;
 
   struct MeshThumbnailNode
   {

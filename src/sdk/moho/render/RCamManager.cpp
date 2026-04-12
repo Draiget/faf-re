@@ -85,6 +85,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x007AA9C0 (FUN_007AA9C0, ?CreateCamera@RCamManager@Moho@@QAEPAVRCamCamera@2@VStrArg@gpg@@ABVSTIMap@2@PAVLuaState@LuaPlus@@@Z)
+   */
+  CameraImpl* RCamManager::CreateCamera(
+    const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const luaState
+  )
+  {
+    CameraImpl* camera = nullptr;
+    CameraImpl* const storage = static_cast<CameraImpl*>(::operator new(sizeof(CameraImpl), std::nothrow));
+    if (storage != nullptr) {
+      try {
+        camera = new (storage) CameraImpl(name, map, luaState);
+      } catch (...) {
+        ::operator delete(storage);
+        throw;
+      }
+    }
+
+    mCams.push_back(camera);
+    return camera;
+  }
+
+  /**
    * Address: 0x007AAAF0 (FUN_007AAAF0, ?GetCamera@RCamManager@Moho@@QAEPAVCameraImpl@2@VStrArg@gpg@@@Z)
    */
   CameraImpl* RCamManager::GetCamera(const gpg::StrArg name)
@@ -202,6 +224,56 @@ namespace moho
     }
 
     return gCamManager;
+  }
+
+  /**
+   * Address: 0x007AACD0 (FUN_007AACD0, ?CAM_CreateCamera@Moho@@YAPAVRCamCamera@1@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z)
+   *
+   * What it does:
+   * Routes camera creation to the process-global camera manager.
+   */
+  CameraImpl* CAM_CreateCamera(const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const luaState)
+  {
+    RCamManager* const manager = CAM_GetManager();
+    return manager->CreateCamera(name, map, luaState);
+  }
+
+  /**
+   * Address: 0x007AAD00 (FUN_007AAD00, ?CAM_GetCamera@Moho@@YAPAVRCamCamera@1@VStrArg@gpg@@@Z)
+   *
+   * What it does:
+   * Routes camera lookup by name to the process-global camera manager.
+   */
+  CameraImpl* CAM_GetCamera(const gpg::StrArg name)
+  {
+    RCamManager* const manager = CAM_GetManager();
+    return manager->GetCamera(name);
+  }
+
+  /**
+   * Address: 0x007AAEC0 (FUN_007AAEC0, ?CAM_ResetAllCameras@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Resets every registered camera through the manager camera list.
+   */
+  void CAM_ResetAllCameras()
+  {
+    RCamManager* const manager = CAM_GetManager();
+    for (CameraImpl* const camera : manager->mCams) {
+      camera->CameraReset();
+    }
+  }
+
+  /**
+   * Address: 0x007AAF00 (FUN_007AAF00, ?CAM_Frame@Moho@@YAXMM@Z)
+   *
+   * What it does:
+   * Executes one frame tick on the process-global camera manager.
+   */
+  void CAM_Frame(const float simDeltaSeconds, const float frameSeconds)
+  {
+    RCamManager* const manager = CAM_GetManager();
+    manager->Frame(simDeltaSeconds, frameSeconds);
   }
 } // namespace moho
 

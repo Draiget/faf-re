@@ -6,7 +6,7 @@
 
 namespace moho
 {
-  class RResId;
+  struct RResId;
 
   /**
    * VFTABLE: 0x00E073BC

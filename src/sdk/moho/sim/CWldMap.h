@@ -21,7 +21,7 @@ namespace LuaPlus
 
 namespace moho
 {
-  class CBackgroundTaskControl;
+  struct CBackgroundTaskControl;
   class ID3DTextureSheet;
   class IWldTerrainRes;
 

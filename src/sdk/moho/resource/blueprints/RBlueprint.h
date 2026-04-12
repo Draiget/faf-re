@@ -21,6 +21,7 @@ namespace LuaPlus
 namespace moho
 {
   class RRuleGameRules;
+  struct RResId;
 
   /**
    * Address: 0x0050DC10 (FUN_0050DC10)
@@ -38,6 +39,24 @@ namespace moho
     msvc8::string mDescription;     // +0x24
     msvc8::string mSource;          // +0x40
     std::int32_t mBlueprintOrdinal; // +0x5C
+
+    /**
+     * Address: 0x0050DD60 (FUN_0050DD60)
+     * Mangled: ??0RBlueprint@Moho@@QAE@PAVRRuleGameRules@1@ABVRResId@1@@Z
+     *
+     * IDA signature:
+     * Moho::RBlueprint *__thiscall Moho::RBlueprint::RBlueprint(
+     *         Moho::RBlueprint *this@<ecx>,
+     *         Moho::RRuleGameRules *rules,
+     *         Moho::RResId const &resId);
+     *
+     * What it does:
+     * Initializes a base `RBlueprint` from a (rules, resource id) pair: bumps the
+     * shared instance counter, captures the owning `RRuleGameRules` pointer, copies
+     * the resource id string into `mBlueprintId`, default-initializes the description
+     * and source strings, and assigns a unique blueprint ordinal from the rules.
+     */
+    RBlueprint(RRuleGameRules* owner, const RResId& resId);
 
     /**
      * Address: 0x0050DBA0 (FUN_0050DBA0)

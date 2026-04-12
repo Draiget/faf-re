@@ -68,7 +68,7 @@ namespace moho
   enum ELayer : std::int32_t;
   typedef std::int32_t EntId;
   class IUnit;
-  class RUnitBlueprint;
+  struct RUnitBlueprint;
   class STIMap;
   class StatItem;
   class Unit;

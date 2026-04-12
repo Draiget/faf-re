@@ -27,12 +27,12 @@ python skills/fa-recovery-iteration/scripts/recovered_progress.py bulk-mark --na
 
 Progress snapshot:
 
-- Total FAF functions (IDA index): `67,153`
-- Recovered so far (`completed`): `28,620`
-- Pending: `36,493`
-- Blocked: `2,117`
-- In progress: `0`
-- **Coverage (of recovered functions): `42.61%`**
+- Total FAF functions (IDA index): `67,171`
+- Recovered so far (`completed`): `31,096`
+- Pending: `32,243`
+- Blocked: `3,776`
+- In progress: `115`
+- **Coverage (of recovered functions): `46.30%`**
 
 Namespace families:
 

@@ -12,7 +12,10 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/RangeExtractor.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
 
 namespace
 {
@@ -38,6 +41,20 @@ namespace
   };
 
   static_assert(sizeof(RangeRingHullSampleDirection) == 0x08, "RangeRingHullSampleDirection size must be 0x08");
+
+  /**
+   * Address: 0x007EC320 (FUN_007EC320, func_GetRangeEffect)
+   *
+   * What it does:
+   * Resolves one `"range"` D3D effect from device resources and returns
+   * its base GAL effect handle.
+   */
+  [[nodiscard, maybe_unused]] boost::shared_ptr<gpg::gal::EffectD3D9> AcquireRangeRingBaseEffect()
+  {
+    moho::ID3DDeviceResources* const resources = moho::D3D_GetDevice()->GetResources();
+    moho::CD3DEffect* const effect = resources->FindEffect("range");
+    return effect->GetBaseEffect();
+  }
 
   // Applied from FAForever/FA-Binary-Patches PR #150 ("Add range ring hull cull
   // for dense crowd FPS recovery"), by M3RT1N99 (Apr 9-10, 2026).

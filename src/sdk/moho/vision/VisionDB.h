@@ -236,6 +236,30 @@ namespace moho
     VisionDB();
 
     /**
+     * Address: 0x0081AF00 (FUN_0081AF00, Moho::VisionDB::Init)
+     *
+     * What it does:
+     * Allocates the root pooled-node entry covering a circle whose center is
+     * `(width/2, height/2)` and radius is `2 * sqrt((width/2)^2 + (height/2)^2)`,
+     * stores it as the vision tree root, and recursively subdivides the area
+     * via `GenerateQuadTree`.
+     */
+    void Init(float width, float height);
+
+    /**
+     * Address: 0x0081B080 (FUN_0081B080, Moho::VisionDB::GenerateQuadTree)
+     *
+     * What it does:
+     * Recursively subdivides `parent` into four quadrant child nodes (NW, SW,
+     * NE, SE) when `level < maxLevel`. Each child covers a (width/2, height/2)
+     * sub-rectangle centered at the corresponding offset from the parent's
+     * stored circle center, with bounding-circle radius equal to the
+     * sub-rectangle's diagonal half-length. New nodes are linked into the
+     * parent's `mContained` chain.
+     */
+    void GenerateQuadTree(Pool::PooledNode* parent, const Wm3::Vector2f& size, int level, int maxLevel);
+
+    /**
      * Address: 0x0081AFD0 (FUN_0081AFD0, Moho::VisionDB::NewHandle)
      *
      * What it does:

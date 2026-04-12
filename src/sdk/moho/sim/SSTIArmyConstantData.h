@@ -8,6 +8,7 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class WriteArchive;
 }
 
@@ -44,6 +45,16 @@ namespace moho
      * `CIntelGrid` pointer lanes to a write archive.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00550FC0 (FUN_00550FC0, Moho::SSTIArmyConstantData::MemberDeserialize)
+     *
+     * What it does:
+     * Reads `mArmyIndex` (uint), `mArmyName`, `mPlayerName`, `mIsCivilian`,
+     * then eight tracked-shared `CIntelGrid` pointers from a read archive in
+     * field-declaration order.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     std::int32_t mArmyIndex;                          // +0x00
     msvc8::string mArmyName;                          // +0x04

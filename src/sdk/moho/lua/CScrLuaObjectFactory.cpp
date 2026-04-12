@@ -187,7 +187,7 @@ namespace
    * What it does:
    * Returns one mapped-file chunk exactly once for `lua_load`, then reports EOF.
    */
-  [[maybe_unused]] const char* func_LuaFileLoader(
+  const char* func_LuaFileLoader(
     lua_State* const state, void* const userData, std::size_t* const outSize
   )
   {
@@ -693,6 +693,87 @@ namespace moho
       }
 
       gpg::Warnf("Error running lua command: %s", errorText != nullptr ? errorText : "<unknown>");
+      lua_settop(rawState, savedTop);
+      return false;
+    }
+
+    lua_settop(rawState, savedTop);
+    return true;
+  }
+
+  /**
+   * Address: 0x004CE020 (FUN_004CE020, ?SCR_LuaDoFile@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
+   *
+   * IDA signature:
+   * bool __usercall Moho::SCR_LuaDoFile@<al>(LuaPlus::LuaState *state@<edi>, const char *filename, LuaPlus::LuaObject *env);
+   *
+   * What it does:
+   * Memory-maps `filename` via DISK_MemoryMapFile, builds an `@filename` chunk
+   * label, lua_loads the buffer through the single-shot file loader, optionally
+   * sets a caller fenv, runs the chunk, and restores the saved Lua stack top
+   * on every exit path. Logs Warnf with file context for open / load / run
+   * failures and returns false in those cases.
+   */
+  bool SCR_LuaDoFile(LuaPlus::LuaState* const state, const char* const filename, LuaPlus::LuaObject* const env)
+  {
+    if (state == nullptr || state->m_state == nullptr || filename == nullptr) {
+      return false;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int savedTop = lua_gettop(rawState);
+
+    // Map the script source into memory.
+    gpg::MemBuffer<const char> mappedFile = moho::DISK_MemoryMapFile(filename);
+    if (mappedFile.mBegin == nullptr) {
+      gpg::Warnf("Can't open lua file \"%s\"", filename);
+      lua_settop(rawState, savedTop);
+      return false;
+    }
+
+    // Drive lua_load with the single-shot file loader.
+    LuaFileLoaderDat loaderData{};
+    loaderData.buf = mappedFile;
+    loaderData.done = false;
+
+    const msvc8::string chunkName = gpg::STR_Printf("@%s", filename);
+    const int loadStatus = lua_load(
+      rawState,
+      reinterpret_cast<lua_Chunkreader>(func_LuaFileLoader),
+      &loaderData,
+      chunkName.c_str()
+    );
+
+    if (loadStatus != 0) {
+      LuaPlus::LuaStackObject errorObject{};
+      errorObject.m_state = state;
+      errorObject.m_stackIndex = -1;
+
+      const char* errorText = lua_tostring(rawState, -1);
+      if (errorText == nullptr) {
+        LuaPlus::LuaStackObject::TypeError(&errorObject, "string");
+      }
+
+      gpg::Warnf("Loading \"%s\" failed: %s", filename, errorText);
+      lua_settop(rawState, savedTop);
+      return false;
+    }
+
+    if (env != nullptr) {
+      env->PushStack(state);
+      lua_setfenv(rawState, -2);
+    }
+
+    // Note: the FA binary links against a modified Lua where `lua_call` returns
+    // a status code. Our project headers (vanilla LuaPlus 1081) declare it void,
+    // so we model the same protected execution via `lua_pcall` to keep the
+    // error-reporting branch faithful.
+    if (lua_pcall(rawState, 0, 0, 0) != 0) {
+      LuaPlus::LuaStackObject errorStackObject{};
+      errorStackObject.m_state = state;
+      errorStackObject.m_stackIndex = -1;
+      const char* const errorText = errorStackObject.GetString();
+      gpg::Warnf("Running \"%s\" failed: %s", filename, errorText);
       lua_settop(rawState, savedTop);
       return false;
     }

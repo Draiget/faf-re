@@ -48,7 +48,7 @@ namespace moho
   class CSndParams;
   struct REntityBlueprint;
   struct RMeshBlueprint;
-  class RUnitBlueprint;
+  struct RUnitBlueprint;
   class RRuleGameRules;
   class ReconBlip;
   class IUnit;

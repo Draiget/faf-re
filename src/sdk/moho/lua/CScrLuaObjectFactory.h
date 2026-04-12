@@ -121,6 +121,20 @@ namespace moho
   [[nodiscard]] bool SCR_LuaDoString(const char* scriptText, LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x004CE020 (FUN_004CE020, ?SCR_LuaDoFile@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
+   *
+   * IDA signature:
+   * bool __usercall Moho::SCR_LuaDoFile@<al>(LuaPlus::LuaState *state@<edi>, const char *filename, LuaPlus::LuaObject *env);
+   *
+   * What it does:
+   * Memory-maps one Lua source file, runs it through `lua_load` with the
+   * single-shot file loader, optionally swaps in a caller-provided fenv,
+   * and executes the resulting chunk. Saved/restored stack top and warns
+   * with file context on every failure path.
+   */
+  [[nodiscard]] bool SCR_LuaDoFile(LuaPlus::LuaState* state, const char* filename, LuaPlus::LuaObject* env);
+
+  /**
    * Address: 0x004CEA20 (FUN_004CEA20, ?SCR_LuaDoScript@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
    *
    * What it does:

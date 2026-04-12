@@ -20,19 +20,19 @@ namespace gpg
 
 namespace moho
 {
-  class CategoryWordRangeView;
+  struct CategoryWordRangeView;
   struct RResId;
 
-  class RBlueprint;
-  class REntityBlueprint;
-  class RUnitBlueprint;
-  class RPropBlueprint;
-  class RMeshBlueprint;
-  class RProjectileBlueprint;
-  class REmitterBlueprint;
-  class RBeamBlueprint;
-  class RTrailBlueprint;
-  class REffectBlueprint;
+  struct RBlueprint;
+  struct REntityBlueprint;
+  struct RUnitBlueprint;
+  struct RPropBlueprint;
+  struct RMeshBlueprint;
+  struct RProjectileBlueprint;
+  struct REmitterBlueprint;
+  struct RBeamBlueprint;
+  struct RTrailBlueprint;
+  struct REffectBlueprint;
 
   struct RRuleGameRulesBlueprintNode : msvc8::Tree<RRuleGameRulesBlueprintNode>
   {

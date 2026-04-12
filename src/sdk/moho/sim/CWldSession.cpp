@@ -2619,6 +2619,74 @@ namespace moho
   }
 
   /**
+   * Address: 0x0066ADD0 (FUN_0066ADD0, Moho::WeakSet_UserEntity::Iterator::inc)
+   *
+   * What it does:
+   * Standard MSVC red-black tree successor iterator. If the current node has
+   * a non-sentinel right subtree, descends to its leftmost descendant. Otherwise
+   * climbs ancestors until reaching one whose right child is not the current
+   * traversal path. No-op when already at the sentinel.
+   */
+  void SSelectionSetUserEntity::Iterator_inc(SSelectionNodeUserEntity** const cursor)
+  {
+    SSelectionNodeUserEntity* node = *cursor;
+    if (node->mIsSentinel != 0u) {
+      return;
+    }
+
+    SSelectionNodeUserEntity* right = node->mRight;
+    if (right->mIsSentinel != 0u) {
+      // No right subtree: climb until we find an ancestor that we came from the left of.
+      SSelectionNodeUserEntity* parent = node->mParent;
+      while (parent->mIsSentinel == 0u) {
+        if (*cursor != parent->mRight) {
+          break;
+        }
+        *cursor = parent;
+        parent = parent->mParent;
+      }
+      *cursor = parent;
+    } else {
+      // Has right subtree: leftmost descendant of right child is the successor.
+      SSelectionNodeUserEntity* leftmost = right->mLeft;
+      while (leftmost->mIsSentinel == 0u) {
+        right = leftmost;
+        leftmost = leftmost->mLeft;
+      }
+      *cursor = right;
+    }
+  }
+
+  /**
+   * Address: 0x0066A330 (FUN_0066A330, Moho::WeakSet_UserEntity::find)
+   *
+   * What it does:
+   * Walks forward from `start` through the RB-tree using `Iterator_inc`,
+   * skipping tombstone entries (whose embedded `WeakObject_IUnit*` is null
+   * or the sentinel `(void*)8`), and returns the first live entry or `mHead`
+   * (sentinel) if none remains. Result is also written to `*outNode`.
+   */
+  SSelectionNodeUserEntity* SSelectionSetUserEntity::find(
+    SSelectionSetUserEntity* const set,
+    SSelectionNodeUserEntity* const start,
+    SSelectionNodeUserEntity** const outNode)
+  {
+    SSelectionNodeUserEntity* node = start;
+    SSelectionNodeUserEntity* cursor = nullptr;
+    while (node != set->mHead) {
+      void* const ent = node->mEnt.mOwnerLinkSlot;
+      if (ent != nullptr && ent != reinterpret_cast<void*>(8)) {
+        break;
+      }
+      cursor = node;
+      Iterator_inc(&cursor);
+      node = cursor;
+    }
+    *outNode = node;
+    return node;
+  }
+
+  /**
    * Address: 0x00896F00 init path (FUN_00896F00 -> sub_89A930).
    */
   SSessionSaveData::SSessionSaveData()

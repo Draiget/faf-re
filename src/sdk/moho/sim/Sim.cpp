@@ -8623,9 +8623,13 @@ int Sim::SimWarn(
  *
  * What it does:
  * Joins command args #1..N with spaces and terminates with
- * `gpg::Die("%s", ...)`.
+ * `gpg::Die("%s", ...)`. Returns `int` because it's invoked as a Lua C
+ * function (which require an `int` return slot for the result count); the
+ * function is in practice noreturn via `gpg::Die`/`std::abort` but the
+ * `[[noreturn]]` attribute can't be applied to non-void return types
+ * (C4646), so it is omitted here.
  */
-[[noreturn]] int Sim::SimError(
+int Sim::SimError(
   Sim* const sim,
   CSimConCommand::ParsedCommandArgs* const commandArgs,
   Wm3::Vector3f* const worldPos,

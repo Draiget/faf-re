@@ -72,6 +72,36 @@ void STransportPickUpInfo::RemoveUnit(Unit* const unit) noexcept
   }
 }
 
+/**
+ * Address: 0x005EBA40 (FUN_005EBA40, Moho::STransportPickUpInfo::MemberDeserialize)
+ *
+ * What it does:
+ * Reads the fallback position (SCoordsVec2), orientation (Quaternionf),
+ * world position (Vector3f), unit set (EntitySetTemplate<Unit>), and
+ * has-space flag from the archive via cached RType lookups.
+ */
+void STransportPickUpInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  static gpg::RType* const coordsType = gpg::LookupRType(typeid(SCoordsVec2));
+  static gpg::RType* const quatType = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
+  static gpg::RType* const vecType = gpg::LookupRType(typeid(Wm3::Vector3<float>));
+  static gpg::RType* const unitsType = gpg::LookupRType(typeid(SEntitySetTemplateUnit));
+
+  const gpg::RRef ownerRef{};
+  archive->Read(coordsType, &mFallbackPos, ownerRef);
+  archive->Read(quatType, &mOri, ownerRef);
+  archive->Read(vecType, &mPos, ownerRef);
+  archive->Read(unitsType, &mUnits, ownerRef);
+
+  bool hasSpace = false;
+  archive->ReadBool(&hasSpace);
+  mHasSpace = static_cast<std::uint8_t>(hasSpace ? 1 : 0);
+}
+
 namespace
 {
   gpg::RType* gIAiTransportType = nullptr;

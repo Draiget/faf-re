@@ -11,6 +11,9 @@
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
 
 namespace
 {
@@ -20,6 +23,20 @@ namespace
   constexpr float kVisionAngleStep = 0.13962634f;                                 // 2*pi/45
   constexpr float kVisionMaxMapHeight = 256.0f;
   constexpr float kVisionMinMapHeight = -256.0f;
+
+  /**
+   * Address: 0x007D0460 (FUN_007D0460, func_GetVisionEffect)
+   *
+   * What it does:
+   * Resolves one `"vision"` D3D effect from device resources and returns
+   * its base GAL effect handle.
+   */
+  [[nodiscard, maybe_unused]] boost::shared_ptr<gpg::gal::EffectD3D9> AcquireVisionBaseEffect()
+  {
+    moho::ID3DDeviceResources* const resources = moho::D3D_GetDevice()->GetResources();
+    moho::CD3DEffect* const effect = resources->FindEffect("vision");
+    return effect->GetBaseEffect();
+  }
 }
 
 namespace moho

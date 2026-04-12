@@ -58,6 +58,24 @@ namespace moho
     WeakPtr<STaskEventLinkage>::kOwnerLinkOffset == 0x08, "STaskEventLinkage weak-owner slot offset must be 0x08"
   );
 
+  /**
+   * Wrapper namespace for free helpers operating on `WeakPtr<STaskEventLinkage>`
+   * instances. Mirrors the binary's `Moho::WeakPtr_STaskEventLinkage::*` static
+   * function lane.
+   */
+  struct WeakPtr_STaskEventLinkage
+  {
+    /**
+     * Address: 0x004078B0 (FUN_004078B0, Moho::WeakPtr_STaskEventLinkage::SetObject)
+     *
+     * What it does:
+     * Atomically rebinds an intrusive `WeakPtr<STaskEventLinkage>` slot to a
+     * new linkage, unlinking from the prior owner's chain and inserting at
+     * the new owner's chain head. No-op if the target object is unchanged.
+     */
+    static WeakPtr<STaskEventLinkage>* SetObject(WeakPtr<STaskEventLinkage>* slot, STaskEventLinkage* linkage) noexcept;
+  };
+
   class STaskEventLinkageSerializer
   {
   public:

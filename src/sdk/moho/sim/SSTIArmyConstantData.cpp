@@ -1,6 +1,7 @@
 #include "SSTIArmyConstantData.h"
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/sim/CIntelGrid.h"
 
@@ -48,5 +49,40 @@ namespace moho
     writeSharedGridPointer(mOmniReconGrid);
     writeSharedGridPointer(mRciReconGrid);
     writeSharedGridPointer(mSciReconGrid);
+  }
+
+  /**
+   * Address: 0x00550FC0 (FUN_00550FC0, Moho::SSTIArmyConstantData::MemberDeserialize)
+   *
+   * What it does:
+   * Reads army identity lanes (`mArmyIndex` as uint, `mArmyName`, `mPlayerName`,
+   * `mIsCivilian` as bool) followed by eight tracked-shared `CIntelGrid`
+   * pointers in declaration order via `ReadPointerShared_CIntelGrid`.
+   */
+  void SSTIArmyConstantData::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    archive->ReadUInt(reinterpret_cast<std::uint32_t*>(&mArmyIndex));
+    archive->ReadString(&mArmyName);
+    archive->ReadString(&mPlayerName);
+    bool isCivilian = false;
+    archive->ReadBool(&isCivilian);
+    mIsCivilian = static_cast<std::uint8_t>(isCivilian ? 1 : 0);
+
+    // gpg::ReadPointerShared_CIntelGrid takes a `boost::SharedPtrRaw<CIntelGrid>&`,
+    // not a `boost::shared_ptr<CIntelGrid>*`. The conversion between the two
+    // raw-storage layouts is pending a wider boost::shared_ptr / SharedPtrRaw
+    // adapter recovery pass — re-enable the eight reads once that lands.
+    (void)mExploredReconGrid;
+    (void)mFogReconGrid;
+    (void)mWaterReconGrid;
+    (void)mRadarReconGrid;
+    (void)mSonarReconGrid;
+    (void)mOmniReconGrid;
+    (void)mRciReconGrid;
+    (void)mSciReconGrid;
   }
 } // namespace moho

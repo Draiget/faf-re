@@ -19,7 +19,7 @@ namespace LuaPlus
 
 namespace moho
 {
-  class SSTIEntityVariableData;
+  struct SSTIEntityVariableData;
   class UserEntity;
   struct UserUnitManager;
   class UserUnitWeapon;

@@ -1,5 +1,7 @@
 #include "moho/vision/VisionDB.h"
 
+#include <cmath>
+
 using namespace moho;
 
 namespace
@@ -417,6 +419,118 @@ VisionDB::VisionDB()
   : pool_()
   , rootNode_(nullptr)
 {}
+
+namespace
+{
+  /**
+   * Helper used by both `Init` quadtree expansion and `GenerateQuadTree`:
+   * appends a freshly-allocated child node to the tail of the parent's
+   * `mContained` chain. Mirrors the binary insertion pattern at FUN_0081B080.
+   */
+  void AppendChildToParent(VisionDB::Pool::PooledNode* const parent, VisionDB::Pool::PooledNode* const child) noexcept
+  {
+    if (parent->mContained == nullptr) {
+      parent->mContained = child;
+      child->mParent = parent;
+      return;
+    }
+
+    VisionDB::Pool::PooledNode* const head = parent->mContained;
+    if (head->mNext != nullptr) {
+      EntryAddToChain(head->mNext, child);
+    } else {
+      head->mNext = child;
+      child->mParent = head->mParent;
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x0081AF00 (FUN_0081AF00, Moho::VisionDB::Init)
+ *
+ * What it does:
+ * Allocates the root pooled-node entry covering a circle whose center is
+ * `(width/2, height/2)` and bounding radius `2*sqrt((width/2)^2 + (height/2)^2)`,
+ * stores the root in `rootNode_`, and recursively subdivides the area via
+ * `GenerateQuadTree` starting at level 0 with maxLevel 1.
+ */
+void VisionDB::Init(const float width, const float height)
+{
+  rootNode_ = nullptr;
+
+  const Wm3::Vector2f halfSize{width * 0.5f, height * 0.5f};
+  const float halfDiag = std::sqrt((halfSize.x * halfSize.x) + (halfSize.y * halfSize.y));
+
+  // Root node covers the full area; the binary stores doubled radius.
+  Pool::EntryCircle rootCircle{};
+  rootCircle.x = halfSize.x;
+  rootCircle.y = halfSize.y;
+  rootCircle.radius = halfDiag * 2.0f;
+
+  Pool::PooledNode* const rootEntry = pool_.NewEntry(rootCircle, rootCircle, false);
+  rootNode_ = rootEntry;
+
+  GenerateQuadTree(rootEntry, halfSize, 0, 1);
+}
+
+/**
+ * Address: 0x0081B080 (FUN_0081B080, Moho::VisionDB::GenerateQuadTree)
+ *
+ * What it does:
+ * Recursively subdivides `parent` into four quadrant child nodes (NW, SW, NE,
+ * SE) when `level < maxLevel`. Each child covers a half-size sub-rectangle
+ * centered at the corresponding quadrant offset from the parent's stored
+ * circle center, with bounding-circle radius equal to the half-diagonal of
+ * the new sub-rectangle. New nodes are linked into the parent's `mContained`
+ * chain via `AppendChildToParent`, then recursively subdivided themselves.
+ */
+void VisionDB::GenerateQuadTree(
+  Pool::PooledNode* const parent,
+  const Wm3::Vector2f& size,
+  const int level,
+  const int maxLevel)
+{
+  if (level >= maxLevel) {
+    return;
+  }
+
+  const Wm3::Vector2f halfSize{size.x * 0.5f, size.y * 0.5f};
+  const float halfDiag = std::sqrt((halfSize.x * halfSize.x) + (halfSize.y * halfSize.y));
+  const float parentX = parent->mPrevCircle.x;
+  const float parentY = parent->mPrevCircle.y;
+  const int nextLevel = level + 1;
+
+  Pool::EntryCircle childCircle{};
+  childCircle.radius = halfDiag;
+
+  // NW quadrant: (-halfSize.x, -halfSize.y)
+  childCircle.x = parentX - halfSize.x;
+  childCircle.y = parentY - halfSize.y;
+  Pool::PooledNode* const nw = pool_.NewEntry(childCircle, childCircle, false);
+  AppendChildToParent(parent, nw);
+  GenerateQuadTree(nw, halfSize, nextLevel, maxLevel);
+
+  // SW quadrant: (-halfSize.x, +halfSize.y)
+  childCircle.x = parentX - halfSize.x;
+  childCircle.y = parentY + halfSize.y;
+  Pool::PooledNode* const sw = pool_.NewEntry(childCircle, childCircle, false);
+  AppendChildToParent(parent, sw);
+  GenerateQuadTree(sw, halfSize, nextLevel, maxLevel);
+
+  // NE quadrant: (+halfSize.x, -halfSize.y)
+  childCircle.x = parentX + halfSize.x;
+  childCircle.y = parentY - halfSize.y;
+  Pool::PooledNode* const ne = pool_.NewEntry(childCircle, childCircle, false);
+  AppendChildToParent(parent, ne);
+  GenerateQuadTree(ne, halfSize, nextLevel, maxLevel);
+
+  // SE quadrant: (+halfSize.x, +halfSize.y)
+  childCircle.x = parentX + halfSize.x;
+  childCircle.y = parentY + halfSize.y;
+  Pool::PooledNode* const se = pool_.NewEntry(childCircle, childCircle, false);
+  AppendChildToParent(parent, se);
+  GenerateQuadTree(se, halfSize, nextLevel, maxLevel);
+}
 
 /**
  * Address: 0x0081AFD0 (FUN_0081AFD0, Moho::VisionDB::NewHandle)

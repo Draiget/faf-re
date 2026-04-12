@@ -1,13 +1,19 @@
 #include "RBlueprint.h"
 
+#include <Windows.h>
+
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
 #include "moho/misc/InstanceCounter.h"
+#include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
+#include "moho/resource/RResId.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace
 {
@@ -76,6 +82,14 @@ namespace
     return &typeInfo->fields_.back();
   }
 
+  void AddRBlueprintInstanceCounterDelta(moho::StatItem* const statItem, const long delta)
+  {
+    if (!statItem) {
+      return;
+    }
+    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
+  }
+
   void AddRObjectBase(gpg::RType* const typeInfo)
   {
     gpg::RType* const rObjectType = CachedRObjectType();
@@ -116,6 +130,43 @@ namespace moho
     const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::RBlueprint).name());
     sStatItem = engineStats->GetItem(statPath.c_str(), true);
     return sStatItem;
+  }
+
+  /**
+   * Address: 0x0050DD60 (FUN_0050DD60)
+   * Mangled: ??0RBlueprint@Moho@@QAE@PAVRRuleGameRules@1@ABVRResId@1@@Z
+   *
+   * IDA signature:
+   * Moho::RBlueprint *__thiscall Moho::RBlueprint::RBlueprint(
+   *         Moho::RBlueprint *this@<ecx>,
+   *         Moho::RRuleGameRules *rules,
+   *         Moho::RResId const &resId);
+   *
+   * What it does:
+   * Initializes a base `RBlueprint` from `(rules, resId)`: bumps the
+   * shared `InstanceCounter<RBlueprint>` slot, captures the owning rules,
+   * copies the resource id string into `mBlueprintId` (uses `strlen` of the
+   * resource id buffer to honor the original byte-exact behavior),
+   * default-initializes `mDescription` and `mSource`, and assigns the next
+   * blueprint ordinal from the rules' virtual `AssignNextOrdinal` slot.
+   */
+  RBlueprint::RBlueprint(RRuleGameRules* const owner, const RResId& resId)
+    : mVTable(nullptr)
+    , mOwner(owner)
+    , mBlueprintId()
+    , mDescription()
+    , mSource()
+    , mBlueprintOrdinal(0)
+  {
+    AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), 1L);
+
+    // The original ctor reads the source-id buffer with `strlen`, so a string
+    // containing embedded null bytes truncates exactly the same way.
+    const char* const sourceData = resId.name.c_str();
+    const std::size_t sourceLen = std::strlen(sourceData);
+    mBlueprintId.assign(sourceData, sourceLen);
+
+    mBlueprintOrdinal = owner->AssignNextOrdinal();
   }
 
   /**

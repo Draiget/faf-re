@@ -22,6 +22,7 @@
 #include "moho/misc/PausedThread.h"
 #include "moho/misc/ScrActivation.h"
 #include "moho/misc/ScrBreakpoint.h"
+#include "moho/misc/ScrDebugWindow.h"
 #include "moho/misc/ScrPauseEvent.h"
 #include "moho/misc/ScrWatch.h"
 #include "moho/misc/StartupHelpers.h"
@@ -804,6 +805,44 @@ void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
 
   if (shouldPauseForBreakpoint) {
     PauseLuaThreadAtSource(luaState, mountedSource, currentLine, debugFrame);
+  }
+}
+
+/**
+ * Address: 0x004B4890 (FUN_004B4890, ?SCR_DestroyDebugWindow@Moho@@YAXXZ)
+ *
+ * IDA signature:
+ * void __cdecl Moho::SCR_DestroyDebugWindow(void)
+ *
+ * What it does:
+ * When a script-debug window is active, requests its destruction through the
+ * runtime, clears the runtime window pointer, persists current breakpoints,
+ * empties the in-memory breakpoint list, clears the cached has-enabled-
+ * breakpoints flag, drops queued paused script threads, and clears the
+ * cached has-pending-paused-threads flag.
+ */
+void moho::SCR_DestroyDebugWindow()
+{
+  ScrDebugRuntime& runtime = GetScrDebugRuntime();
+  if (runtime.debugWindow == nullptr) {
+    return;
+  }
+
+  auto* const debugWindow = static_cast<moho::ScrDebugWindow*>(runtime.debugWindow);
+  (void)debugWindow->Destroy();
+  runtime.debugWindow = nullptr;
+
+  {
+    boost::mutex::scoped_lock breakpointLock(runtime.breakpointMutex);
+    SaveBreakpointsUnlocked(runtime);
+    runtime.breakpoints.clear();
+    runtime.hasEnabledBreakpoints = false;
+  }
+
+  {
+    boost::mutex::scoped_lock pausedQueueLock(runtime.pausedQueueMutex);
+    runtime.pausedThreads.clear();
+    runtime.hasPendingSingleStepRoots = false;
   }
 }
 

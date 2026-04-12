@@ -1,5 +1,6 @@
 #include "VTransform.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -9,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/math/VMatrix4.h"
 #include "wm3/Vector3.h"
 
 namespace
@@ -137,6 +139,69 @@ namespace moho
     : orient_(orientation)
     , pos_(position)
   {}
+
+  /**
+   * Address: 0x004F0440 (FUN_004F0440)
+   * Mangled: ??0VTransform@Moho@@QAE@ABUVMatrix4@1@@Z
+   *
+   * Moho::VMatrix4 const&
+   *
+   * IDA signature:
+   * int __usercall Moho::VTransform::VTransform@<eax>(int a1@<edi>, int esi0@<esi>);
+   *
+   * What it does:
+   * Builds the upper-left 3x3 from the matrix's first three rows (stride 16),
+   * runs the standard trace/max-diagonal quaternion decomposition, then copies
+   * the translation lane (last row .xyz) verbatim into pos_.
+   */
+  VTransform::VTransform(const VMatrix4& matrix) noexcept
+  {
+    // Lift the 3x3 rotation block out of the row-major matrix.
+    const float m[3][3] = {
+      {matrix.r[0].x, matrix.r[0].y, matrix.r[0].z},
+      {matrix.r[1].x, matrix.r[1].y, matrix.r[1].z},
+      {matrix.r[2].x, matrix.r[2].y, matrix.r[2].z},
+    };
+
+    // Standard rotation-matrix to quaternion conversion.
+    const float trace = m[0][0] + m[1][1] + m[2][2];
+    if (trace > 0.0f) {
+      const float root = std::sqrt(trace + 1.0f);
+      const float invHalfRoot = 0.5f / root;
+      orient_.w = root * 0.5f;
+      orient_.x = (m[2][1] - m[1][2]) * invHalfRoot;
+      orient_.y = (m[0][2] - m[2][0]) * invHalfRoot;
+      orient_.z = (m[1][0] - m[0][1]) * invHalfRoot;
+    } else {
+      // Pick the largest diagonal element to avoid numeric loss.
+      static constexpr int kNext[3] = {1, 2, 0};
+      int i = 0;
+      if (m[1][1] > m[0][0]) {
+        i = 1;
+      }
+      if (m[2][2] > m[i][i]) {
+        i = 2;
+      }
+      const int j = kNext[i];
+      const int k = kNext[j];
+
+      const float root = std::sqrt((m[i][i] - m[j][j] - m[k][k]) + 1.0f);
+      const float invHalfRoot = 0.5f / root;
+
+      float quat[3]{};
+      quat[i] = root * 0.5f;
+      orient_.w = (m[k][j] - m[j][k]) * invHalfRoot;
+      quat[j] = (m[j][i] + m[i][j]) * invHalfRoot;
+      quat[k] = (m[k][i] + m[i][k]) * invHalfRoot;
+      orient_.x = quat[0];
+      orient_.y = quat[1];
+      orient_.z = quat[2];
+    }
+
+    pos_.x = matrix.r[3].x;
+    pos_.y = matrix.r[3].y;
+    pos_.z = matrix.r[3].z;
+  }
 
   /**
    * Address: 0x0046FC90 (FUN_0046FC90)

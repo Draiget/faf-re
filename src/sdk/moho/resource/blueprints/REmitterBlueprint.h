@@ -173,6 +173,22 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0050E750 (FUN_0050E750)
+     * Mangled: ??0REmitterBlueprint@Moho@@QAE@XZ
+     *
+     * IDA signature:
+     * Moho::REmitterBlueprint *__thiscall Moho::REmitterBlueprint::REmitterBlueprint(
+     *   Moho::REmitterBlueprint *this);
+     *
+     * What it does:
+     * Default-constructs an emitter blueprint: zero-initializes the 21 curve
+     * subobjects, resets emitter flag bytes to their defaults, sets the
+     * texture-strip count to 1.0, the LOD cutoff to 100.0, and clears both
+     * texture-name strings to empty SSO state.
+     */
+    REmitterBlueprint();
+
+    /**
      * Address: 0x0050E710 (FUN_0050E710)
      * Mangled: ?GetClass@REmitterBlueprint@Moho@@UBEPAVRType@gpg@@XZ
      *

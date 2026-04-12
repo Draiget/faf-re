@@ -26,7 +26,7 @@ namespace moho
   class CD3DDynamicTextureSheet;
   class ID3DRenderTarget;
   class ID3DDepthStencil;
-  class RMeshBlueprint;
+  struct RMeshBlueprint;
   struct RMeshBlueprintLOD;
   class RScmResource;
   struct GeomCamera3;

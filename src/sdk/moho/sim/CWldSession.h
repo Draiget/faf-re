@@ -208,6 +208,29 @@ namespace moho
      * RB-tree lane.
      */
     [[nodiscard]] std::int32_t size() const;
+
+    /**
+     * Address: 0x0066A330 (FUN_0066A330, Moho::WeakSet_UserEntity::find)
+     *
+     * What it does:
+     * Walks forward from `start` through the RB-tree using `next`, skipping
+     * tombstone entries (whose embedded `WeakObject_IUnit*` is null or the
+     * sentinel `(void*)8`), and returns the first live entry or `mHead`
+     * (sentinel) if none remains. Result is written to `*outNode`.
+     */
+    [[nodiscard]] static SSelectionNodeUserEntity*
+      find(SSelectionSetUserEntity* set, SSelectionNodeUserEntity* start, SSelectionNodeUserEntity** outNode);
+
+    /**
+     * Address: 0x0066ADD0 (FUN_0066ADD0, Moho::WeakSet_UserEntity::Iterator::inc)
+     *
+     * What it does:
+     * Standard MSVC red-black tree successor: if the current node has a right
+     * child, descends to its leftmost descendant; otherwise climbs ancestors
+     * until reaching one whose right child is not the current path. No-op when
+     * the current node is already the sentinel.
+     */
+    static void Iterator_inc(SSelectionNodeUserEntity** cursor);
   };
 
   static_assert(sizeof(SSelectionSetUserEntity) == 0x10, "SSelectionSetUserEntity size must be 0x10");
