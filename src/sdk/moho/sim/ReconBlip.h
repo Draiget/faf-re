@@ -15,7 +15,7 @@
 namespace gpg
 {
   class ReadArchive;
-  struct RRef;
+  class RRef;
   class SerConstructResult;
   class WriteArchive;
   class RType;
@@ -25,7 +25,7 @@ namespace moho
 {
   class CAniPose;
   class CArmyImpl;
-  class RMeshBlueprint;
+  struct RMeshBlueprint;
   class RScmResource;
   class Sim;
   class Unit;

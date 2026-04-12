@@ -20,7 +20,7 @@ struct lua_State;
 namespace moho
 {
   class CScrLuaInitForm;
-  class SSTICommandSource;
+  struct SSTICommandSource;
 
   class INetConnector;
   class INetConnection;

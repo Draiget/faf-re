@@ -41,9 +41,18 @@ public:
     {
     }
 
+    /**
+     * Address: 0x00904A60 (FUN_00904A60, BinaryWriteArchive::WriteBytes)
+     *
+     * What it does:
+     * Writes one raw byte lane (`fwrite(bytes, byteCount, 1, stream)`) and
+     * throws `SerializationError("nowrite")` when the stream write fails.
+     */
     void WriteBytes(char* bytes, size_t byteCount) override
     {
-        WriteRaw(bytes, byteCount);
+        if (std::fwrite(bytes, byteCount, 1u, mFile.get()) != 1u) {
+            ThrowSerializationError("nowrite");
+        }
     }
 
     /**
@@ -67,64 +76,148 @@ public:
         }
     }
 
+    /**
+     * Address: 0x00905A80 (FUN_00905A80, BinaryWriteArchive::WriteFloat)
+     *
+     * What it does:
+     * Writes one 32-bit float lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteFloat(float value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 4u);
     }
 
+    /**
+     * Address: 0x00905A40 (FUN_00905A40, BinaryWriteArchive::WriteUInt64)
+     *
+     * What it does:
+     * Writes one 64-bit unsigned lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteUInt64(uint64_t value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 8u);
     }
 
+    /**
+     * Address: 0x00905A00 (FUN_00905A00, BinaryWriteArchive::WriteInt64)
+     *
+     * What it does:
+     * Writes one 64-bit signed lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteInt64(int64_t value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 8u);
     }
 
+    /**
+     * Address: 0x009059C0 (FUN_009059C0, BinaryWriteArchive::WriteULong)
+     *
+     * What it does:
+     * Writes one unsigned long lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteULong(unsigned long value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 4u);
     }
 
+    /**
+     * Address: 0x00905980 (FUN_00905980, BinaryWriteArchive::WriteLong)
+     *
+     * What it does:
+     * Writes one signed long lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteLong(long value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 4u);
     }
 
+    /**
+     * Address: 0x00905940 (FUN_00905940, BinaryWriteArchive::WriteUInt)
+     *
+     * What it does:
+     * Writes one 32-bit unsigned lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteUInt(unsigned int value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 4u);
     }
 
+    /**
+     * Address: 0x00905900 (FUN_00905900, BinaryWriteArchive::WriteInt)
+     *
+     * What it does:
+     * Writes one 32-bit signed lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteInt(int value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 4u);
     }
 
+    /**
+     * Address: 0x009058C0 (FUN_009058C0, BinaryWriteArchive::WriteUShort)
+     *
+     * What it does:
+     * Writes one unsigned 16-bit lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteUShort(unsigned short value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 2u);
     }
 
+    /**
+     * Address: 0x00905880 (FUN_00905880, BinaryWriteArchive::WriteShort)
+     *
+     * What it does:
+     * Writes one signed 16-bit lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteShort(short value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 2u);
     }
 
+    /**
+     * Address: 0x00905840 (FUN_00905840, BinaryWriteArchive::WriteUByte)
+     *
+     * What it does:
+     * Writes one unsigned byte lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteUByte(unsigned __int8 value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 1u);
     }
 
+    /**
+     * Address: 0x00905800 (FUN_00905800, BinaryWriteArchive::WriteByte)
+     *
+     * What it does:
+     * Writes one signed byte lane and throws `SerializationError("nowrite")`
+     * when the stream write fails.
+     */
     void WriteByte(__int8 value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 1u);
     }
 
+    /**
+     * Address: 0x009057C0 (FUN_009057C0, BinaryWriteArchive::WriteBool)
+     *
+     * What it does:
+     * Writes one boolean lane as one byte and throws
+     * `SerializationError("nowrite")` when the stream write fails.
+     */
     void WriteBool(bool value) override
     {
-        WritePod(value);
+        WriteScalarNowrite(value, 1u);
     }
 
     /**
@@ -146,24 +239,10 @@ public:
 
 private:
     template <typename T>
-    void WritePod(const T& value)
+    void WriteScalarNowrite(const T& value, std::size_t elementSize)
     {
-        WriteRaw(&value, sizeof(value));
-    }
-
-    void WriteRaw(const void* bytes, size_t byteCount)
-    {
-        std::FILE* const file = mFile.get();
-        if (!file) {
-            ThrowSerializationError("Error while creating archive: invalid output stream.");
-        }
-
-        if (byteCount == 0) {
-            return;
-        }
-
-        if (std::fwrite(bytes, byteCount, 1, file) != 1) {
-            ThrowSerializationError("Error while creating archive: unable to write stream bytes.");
+        if (std::fwrite(&value, elementSize, 1u, mFile.get()) != 1u) {
+            ThrowSerializationError("nowrite");
         }
     }
 

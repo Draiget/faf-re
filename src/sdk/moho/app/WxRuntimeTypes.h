@@ -2658,7 +2658,7 @@ namespace moho
   struct WWinManagedDialog;
   class IUserPrefs;
   class CWinLogTarget;
-  class WWinLogWindow;
+  struct WWinLogWindow;
   class WWinLogTextBuilder;
   struct CWinLogLine;
 

@@ -580,7 +580,9 @@ namespace moho
      * Joins command args #1..N with spaces and terminates via
      * `gpg::Die("%s", ...)`.
      */
-    [[noreturn]] static int SimError(
+    // Returns int (Lua C function ABI) but body always exits via gpg::Die.
+    // Cannot be [[noreturn]] (C4646) — the attribute requires a void return.
+    static int SimError(
       Sim* sim,
       CSimConCommand::ParsedCommandArgs* commandArgs,
       Wm3::Vector3f* worldPos,

@@ -190,6 +190,7 @@ namespace
 	{
 		const TObject* luaH_get(Table* t, const TObject* key);
 		const TObject* luaH_getnum(Table* t, int key);
+		const TObject* luaH_getstr(Table* t, TString* key);
 		TObject* luaH_set(lua_State* L, Table* t, const TObject* key);
 		TObject* luaH_setnum(lua_State* L, Table* t, int key);
 		TObject* luaA_index(lua_State* L, int index);
@@ -216,6 +217,7 @@ namespace
 		void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
 		void correctstack(lua_State* L, TObject* oldstack);
 		extern const char* luaT_typenames[];
+		extern const TObject luaO_nilobject;
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
 
@@ -3342,6 +3344,18 @@ LuaObject::LuaObject()
 {
 }
 
+/**
+ * Address: 0x005280D0 (FUN_005280D0, ??0LuaObject@LuaPlus@@QAE@@Z)
+ *
+ * What it does:
+ * Casts one raw C Lua state pointer to the owning `LuaState` wrapper and
+ * forwards construction to the stack-lane constructor with index `-1`.
+ */
+LuaObject::LuaObject(lua_State* const state)
+	: LuaObject(LuaState::CastState(state), -1)
+{
+}
+
 LuaObject::LuaObject(LuaState* state)
 	: LuaObject()
 {
@@ -3925,6 +3939,26 @@ LuaState* LuaObject::GetActiveState() const
 lua_State* LuaObject::GetActiveCState() const
 {
 	return m_state->m_state->l_G->lstate;
+}
+
+/**
+ * Address: 0x0091E200 (FUN_0091E200, func_SerializeLuaObjectName)
+ *
+ * What it does:
+ * Resolves one serialized-name lookup lane from globals key
+ * `"__serialize_object_for_name"` and returns the matching table entry for
+ * `key`, or Lua's canonical nil object lane when the globals slot is not a
+ * table.
+ */
+[[maybe_unused, nodiscard]] const TObject* ResolveSerializedObjectNameEntry(lua_State* const state, TString* const key)
+{
+	TString* const serializeMapName = luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu);
+	const TObject* const serializeMapObject = luaH_getstr(static_cast<Table*>(state->_gt.value.p), serializeMapName);
+	if (serializeMapObject->tt == LUA_TTABLE) {
+		return luaH_getstr(static_cast<Table*>(serializeMapObject->value.p), key);
+	}
+
+	return &luaO_nilobject;
 }
 
 /**

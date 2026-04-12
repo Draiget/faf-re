@@ -8,6 +8,7 @@ __pycache__/
 .tmp/
 .tmp*/
 .tmp*
+tmp/
 bin/
 decomp/
 buildstage/
@@ -18,6 +19,8 @@ dependencies/zlib-1.2.3/**/*
 dependencies/LuaPlus_Build1081/**/*
 dependencies/boost_1_34_1/**/*
 dependencies/wxWindows-2.4.2/**/*
+dependencies/WildMagic3p8/**/*
+dependencies/*.7z
 *.pdb
 *.log
 *.obj
@@ -27,5 +30,6 @@ CLAUDE.md
 mcp/
 skills/
 
+.claude/**/*
 .github/copilot-instructions.md
 .github/instructions/**/*

@@ -21,9 +21,9 @@ namespace gpg
 
 namespace moho
 {
-  class RUnitBlueprint;
-  class SCoordsVec2;
-  class SOCellPos;
+  struct RUnitBlueprint;
+  struct SCoordsVec2;
+  struct SOCellPos;
 
   enum class ETransportClass : std::int32_t
   {
@@ -65,6 +65,16 @@ namespace moho
 
     [[nodiscard]] bool HasUnit(const Unit* unit) const noexcept;
     void RemoveUnit(Unit* unit) noexcept;
+
+    /**
+     * Address: 0x005EBA40 (FUN_005EBA40, Moho::STransportPickUpInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Reads `mFallbackPos` (SCoordsVec2), `mOri` (Quaternionf), `mPos` (Vector3f),
+     * `mUnits` (EntitySetTemplate<Unit>), and `mHasSpace` (bool) from the archive
+     * via cached RType lookups.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     SCoordsVec2 mFallbackPos;        // +0x00
     Wm3::Quatf mOri;                 // +0x08

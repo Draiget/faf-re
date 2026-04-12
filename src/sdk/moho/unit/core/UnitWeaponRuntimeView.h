@@ -7,7 +7,7 @@
 
 namespace moho
 {
-  class RProjectileBlueprint;
+  struct RProjectileBlueprint;
   class UnitWeapon;
 
   /**

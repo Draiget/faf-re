@@ -16,9 +16,9 @@ namespace gpg
 
 namespace moho
 {
-  class RUnitBlueprint;
-  class SCoordsVec2;
-  class SOCellPos;
+  struct RUnitBlueprint;
+  struct SCoordsVec2;
+  struct SOCellPos;
 
   /**
    * Address: 0x005E3DD0 (FUN_005E3DD0)

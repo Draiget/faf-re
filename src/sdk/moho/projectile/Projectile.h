@@ -20,7 +20,7 @@ namespace gpg
 namespace moho
 {
   class CArmyImpl;
-  class RProjectileBlueprint;
+  struct RProjectileBlueprint;
   class Sim;
   class VTransform;
 

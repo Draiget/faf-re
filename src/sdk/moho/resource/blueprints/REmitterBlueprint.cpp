@@ -117,6 +117,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050E750 (FUN_0050E750)
+   * Mangled: ??0REmitterBlueprint@Moho@@QAE@XZ
+   *
+   * IDA signature:
+   * Moho::REmitterBlueprint *__thiscall Moho::REmitterBlueprint::REmitterBlueprint(
+   *   Moho::REmitterBlueprint *this);
+   *
+   * What it does:
+   * Default-constructs an emitter blueprint. The base `REffectBlueprint` ctor
+   * runs first to install the `RObject` vftable, clear `mOwnerRules`, and
+   * default-construct `BlueprintId` (empty SSO `msvc8::string`); the 21
+   * `REmitterBlueprintCurve` subobjects each install their `RObject` vftable
+   * and zero their key-storage triplets via the curve's default ctor; finally
+   * the in-class field initializers set the fidelity flags, emitter behavior
+   * flags, scalar timings, and the two texture-name strings to empty SSO.
+   * Behavior matches the binary writes at 0x0050E750..0x0050EAD4 1:1.
+   */
+  REmitterBlueprint::REmitterBlueprint() = default;
+
+  /**
    * Address: 0x0050E710 (FUN_0050E710)
    * Mangled: ?GetClass@REmitterBlueprint@Moho@@UBEPAVRType@gpg@@XZ
    *

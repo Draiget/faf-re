@@ -9,7 +9,7 @@
 
 namespace gpg
 {
-  class MD5Context;
+  struct MD5Context;
   class SerConstructResult;
   struct SerHelperBase;
   class SerSaveConstructArgsResult;

@@ -39,8 +39,8 @@ namespace moho
   class CollisionBeamEntity;
   class Projectile;
   class Prop;
-  class RResId;
-  class RMeshBlueprint;
+  struct RResId;
+  struct RMeshBlueprint;
   class ReconBlip;
   class Shield;
   class Sim;
@@ -665,7 +665,7 @@ namespace moho
      * What it does:
      * Applies mesh resource id (usually from blueprint) and optional mesh override.
      */
-    virtual void SetMesh(const RResId&, class RMeshBlueprint*, bool);
+    virtual void SetMesh(const RResId&, struct RMeshBlueprint*, bool);
 
     /**
      * Address: 0x005BDBD0

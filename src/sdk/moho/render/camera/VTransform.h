@@ -16,6 +16,8 @@ namespace gpg
 
 namespace moho
 {
+  struct VMatrix4;
+
   class VTransform
   {
   public:
@@ -33,6 +35,23 @@ namespace moho
      * Initializes orientation and translation lanes in binary storage order.
      */
     VTransform(const Wm3::Vec3f& position, const Wm3::Quatf& orientation) noexcept;
+
+    /**
+     * Address: 0x004F0440 (FUN_004F0440)
+     * Mangled: ??0VTransform@Moho@@QAE@ABUVMatrix4@1@@Z
+     *
+     * Moho::VMatrix4 const&
+     *
+     * IDA signature:
+     * int __usercall Moho::VTransform::VTransform@<eax>(int a1@<edi>, int esi0@<esi>);
+     *
+     * What it does:
+     * Constructs a transform from the upper-left 3x3 rotation block of a row-major
+     * 4x4 matrix and the translation row. The rotation is converted to a quaternion
+     * via the standard "trace > 0" / "max diagonal" decomposition; the translation
+     * row (m.r[3].xyz) is copied verbatim into pos_.
+     */
+    explicit VTransform(const VMatrix4& matrix) noexcept;
 
     /**
      * Address: 0x0046FC90 (FUN_0046FC90)

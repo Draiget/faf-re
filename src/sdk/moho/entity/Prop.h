@@ -15,7 +15,7 @@ namespace gpg
 
 namespace moho
 {
-  class RPropBlueprint;
+  struct RPropBlueprint;
   class Sim;
   class VTransform;
 

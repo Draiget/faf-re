@@ -11,7 +11,7 @@
 namespace moho
 {
   class CSndParams;
-  class RMeshBlueprint;
+  struct RMeshBlueprint;
   class RScmResource;
 
   enum class EUserEntityVisibilityMode : std::int32_t

@@ -8,7 +8,7 @@
 
 namespace moho
 {
-  class RBlueprint;
+  struct RBlueprint;
 
   template <class T, class U>
   class BVSetRType;

@@ -18,7 +18,7 @@ namespace gpg::gal
 
 namespace moho
 {
-  class GeomCamera3;
+  struct GeomCamera3;
   class ID3DIndexSheet;
   struct ParticleBucketTreeNodeRuntime;
   struct TrailBucketTreeNodeRuntime;

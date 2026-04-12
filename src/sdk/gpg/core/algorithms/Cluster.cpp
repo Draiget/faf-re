@@ -68,6 +68,127 @@ namespace
     };
     static_assert(offsetof(ClusterCacheTreeLayout, mSubclusterTree) == 0x2C, "Cluster cache subcluster tree offset must be 0x2C");
 
+    struct SubclusterTreeHeader
+    {
+        std::uint32_t mCompareToken;
+        void* mHead;
+        std::uint32_t mSize;
+    };
+
+    struct SubclusterBucketVectorStorage
+    {
+        void* mIteratorProxy;
+        std::uint32_t* mFirst;
+        std::uint32_t* mLast;
+        std::uint32_t* mEnd;
+    };
+
+    struct SubclusterCacheVectorState
+    {
+        bool mBool;
+        std::uint8_t pad_01[3];
+        SubclusterTreeHeader mList;
+        SubclusterBucketVectorStorage mVec;
+        std::uint32_t mMask;
+        std::uint32_t mMaxIndex;
+
+        /**
+         * Address: 0x00934B60 (FUN_00934B60, ??0vector_SubclusterData@@QAE@@Z)
+         * Mangled: ??0vector_SubclusterData@@QAE@@Z
+         *
+         * What it does:
+         * Initializes subcluster-cache lookup lanes with one tree sentinel,
+         * nine sentinel-token bucket entries, and default mask/max values.
+         */
+        SubclusterCacheVectorState(bool* cacheEnabledFlag, int stackAnchorHint);
+    };
+
+    static_assert(sizeof(SubclusterTreeHeader) == 0x0C, "SubclusterTreeHeader size must be 0x0C");
+    static_assert(sizeof(SubclusterBucketVectorStorage) == 0x10, "SubclusterBucketVectorStorage size must be 0x10");
+    static_assert(sizeof(SubclusterCacheVectorState) == 0x28, "SubclusterCacheVectorState size must be 0x28");
+    static_assert(offsetof(SubclusterCacheVectorState, mList) == 0x04, "SubclusterCacheVectorState::mList offset must be 0x04");
+    static_assert(offsetof(SubclusterCacheVectorState, mVec) == 0x10, "SubclusterCacheVectorState::mVec offset must be 0x10");
+    static_assert(
+        offsetof(SubclusterCacheVectorState, mMask) == 0x20, "SubclusterCacheVectorState::mMask offset must be 0x20"
+    );
+    static_assert(
+        offsetof(SubclusterCacheVectorState, mMaxIndex) == 0x24, "SubclusterCacheVectorState::mMaxIndex offset must be 0x24"
+    );
+
+    /**
+     * Address: 0x009327E0 (FUN_009327E0, sub_9327E0)
+     *
+     * What it does:
+     * Allocates and seeds one tree-head sentinel node for the subcluster cache.
+     */
+    [[nodiscard]] void* AllocateSubclusterTreeHead()
+    {
+        auto* const node = static_cast<std::uint8_t*>(::operator new(0x50u));
+        *reinterpret_cast<void**>(node + 0x00) = node;
+        *reinterpret_cast<void**>(node + 0x04) = node;
+        return node;
+    }
+
+    /**
+     * Address: 0x00932A80 (FUN_00932A80, sub_932A80)
+     *
+     * What it does:
+     * Fills one 32-bit value range with the same sentinel token.
+     */
+    void FillU32Range(std::uint32_t* dst, const unsigned int count, const std::uint32_t value)
+    {
+        for (unsigned int i = 0; i < count; ++i) {
+            dst[i] = value;
+        }
+    }
+
+    /**
+     * Address: 0x00934250 (FUN_00934250, sub_934250)
+     *
+     * What it does:
+     * Initializes 32-bit bucket-vector lanes used by subcluster cache buckets.
+     */
+    void InitializeSubclusterBucketVector(
+        SubclusterBucketVectorStorage& vectorStorage, const unsigned int count, const std::uint32_t* const fillValueRef
+    )
+    {
+        vectorStorage.mFirst = nullptr;
+        vectorStorage.mLast = nullptr;
+        vectorStorage.mEnd = nullptr;
+
+        if (count == 0u) {
+            return;
+        }
+        if (count > 0x3FFFFFFFu) {
+            throw std::bad_alloc();
+        }
+
+        auto* const values =
+            static_cast<std::uint32_t*>(::operator new(static_cast<std::size_t>(count) * sizeof(std::uint32_t)));
+        vectorStorage.mFirst = values;
+        vectorStorage.mLast = values;
+        vectorStorage.mEnd = values + count;
+
+        FillU32Range(values, count, *fillValueRef);
+        vectorStorage.mLast = values + count;
+    }
+
+    /**
+     * Address: 0x00934B60 (FUN_00934B60, ??0vector_SubclusterData@@QAE@@Z)
+     */
+    SubclusterCacheVectorState::SubclusterCacheVectorState(bool* const cacheEnabledFlag, const int /*stackAnchorHint*/)
+    {
+        mBool = *cacheEnabledFlag;
+        mList.mHead = AllocateSubclusterTreeHead();
+        mList.mSize = 0;
+
+        const auto treeHeadToken = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(mList.mHead));
+        InitializeSubclusterBucketVector(mVec, 9u, &treeHeadToken);
+
+        mMask = 1u;
+        mMaxIndex = 1u;
+    }
+
     struct OccupationCacheKey
     {
         std::array<std::uint8_t, 0x12> mBytes{};

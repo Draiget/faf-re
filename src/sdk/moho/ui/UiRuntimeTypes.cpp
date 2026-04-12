@@ -16207,6 +16207,70 @@ void moho::CMauiEdit::SetMaxChars(const int newMaxChars)
 }
 
 /**
+ * Address: 0x0077FAD0 (FUN_0077FAD0, Moho::CMauiBitmap::Dump)
+ *
+ * What it does:
+ * Logs base CMauiControl state, then logs CMauiBitmap-specific texture batch
+ * count, current bitmap width/height (from script lazy vars), UV rectangle,
+ * alpha hit-test flag, animation frame count, frame rate, playback state,
+ * and current frame index.
+ */
+void moho::CMauiBitmap::Dump()
+{
+  CMauiControl::Dump();
+  gpg::Logf("CMauiBitmap");
+
+  const CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
+
+  const int textureCount = static_cast<int>(bitmapView->mTextureBatches.size());
+
+  // The binary fetches height first then width on the FPU stack — preserve order.
+  const float bitmapHeight = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapHeightLV);
+  const float bitmapWidth = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapWidthLV);
+  gpg::Logf("Num Textures = %d Width = %.3f Height = %.3f", textureCount, bitmapWidth, bitmapHeight);
+  gpg::Logf("uv = %.3f,%.3f %.3f,%.3f", bitmapView->mU0, bitmapView->mV0, bitmapView->mU1, bitmapView->mV1);
+
+  const char* const alphaHitTest = bitmapView->mUseAlphaHitTest ? "true" : "false";
+  gpg::Logf("Alpha Hit Test = %s", alphaHitTest);
+
+  const char* const playing = bitmapView->mIsPlaying ? "true" : "false";
+  const int frameCount = static_cast<int>(bitmapView->mFrames.size());
+  gpg::Logf(
+    "Num frames = %d Frame rate = %.3f Playing = %s Current Frame = %d",
+    frameCount,
+    bitmapView->mFrameDurationSeconds,
+    playing,
+    bitmapView->mCurrentFrame
+  );
+}
+
+/**
+ * Address: 0x0078F280 (FUN_0078F280, Moho::CMauiEdit::Dump)
+ *
+ * What it does:
+ * Logs the base CMauiControl state, then logs CMauiEdit-specific colors,
+ * background visibility, max-char limit, and the current text content.
+ */
+void moho::CMauiEdit::Dump()
+{
+  CMauiControl::Dump();
+  gpg::Logf("CMauiEdit");
+
+  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  const char* const showBackground = editView->mBackgroundVisible ? "true" : "false";
+  gpg::Logf(
+    "FG Color = %#08X BG Color = %#08X HLFG Color = %#08X HLBG Color = %#08X Show BG = %s MaxChars = %d",
+    editView->mForegroundColor,
+    editView->mBackgroundColor,
+    editView->mHighlightForegroundColor,
+    editView->mHighlightBackgroundColor,
+    showBackground,
+    editView->mMaxChars
+  );
+  gpg::Logf("Current Text = %s", editView->mText.c_str());
+}
+
+/**
  * Address: 0x00786B40 (FUN_00786B40, Moho::CMauiControl::Dump)
  *
  * What it does:

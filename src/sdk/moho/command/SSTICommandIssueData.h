@@ -12,7 +12,7 @@ namespace moho
 {
   class CUnitCommand;
   class CUnitCommandQueue;
-  class RUnitBlueprint;
+  struct RUnitBlueprint;
 
   enum class EUnitCommandType : int32_t
   {

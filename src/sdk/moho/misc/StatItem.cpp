@@ -2183,6 +2183,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00436650 (FUN_00436650, Moho::StatItem::Synchronize)
+   *
+   * What it does:
+   * Atomically replaces this stat-item's `mType` field with `EStatType::kInt`
+   * (value 2) using a load + compare-and-swap retry loop. Functionally
+   * identical to `SynchronizeAsInt`, but emitted as a separate function in
+   * the binary, so we keep it as a distinct method.
+   */
+  void StatItem::Synchronize()
+  {
+    AtomicStoreI32(reinterpret_cast<volatile std::int32_t*>(&mType), static_cast<std::int32_t>(EStatType::kInt));
+  }
+
+  /**
    * Address: 0x0040D2D0 (FUN_0040D2D0, Moho::StatItem::Synchronize2)
    */
   void StatItem::SynchronizeAsInt()

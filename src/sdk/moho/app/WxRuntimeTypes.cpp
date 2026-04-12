@@ -4,15 +4,14 @@
 #include <shellapi.h>
 
 #include <algorithm>
-#include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
-#include <filesystem>
 #include <fcntl.h>
-#include <io.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -20,12 +19,13 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <io.h>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
-#include "moho/misc/StartupHelpers.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
 
 class wxClassInfo;
@@ -53,18 +53,21 @@ public:
   [[nodiscard]] wxClassInfo* Get(const wchar_t* key) const;
 
 private:
-  std::int32_t mKeyType = 0; // +0x00
-  std::int32_t mBucketHint = 0; // +0x04
+  std::int32_t mKeyType = 0;                                          // +0x00
+  std::int32_t mBucketHint = 0;                                       // +0x04
   std::unordered_map<std::wstring, wxClassInfo*>* mEntries = nullptr; // +0x08
-  std::uint8_t mReserved0C[0x18]{}; // +0x0C
+  std::uint8_t mReserved0C[0x18]{};                                   // +0x0C
 };
 
 static_assert(sizeof(wxHashTableRuntime) == 0x24, "wxHashTableRuntime size must be 0x24");
 
-wxHashTableRuntime::wxHashTableRuntime(const std::int32_t keyType, const std::int32_t bucketHint)
-  : mKeyType(keyType),
-    mBucketHint(bucketHint),
-    mEntries(new std::unordered_map<std::wstring, wxClassInfo*>())
+wxHashTableRuntime::wxHashTableRuntime(
+  const std::int32_t keyType,
+  const std::int32_t bucketHint
+)
+  : mKeyType(keyType)
+  , mBucketHint(bucketHint)
+  , mEntries(new std::unordered_map<std::wstring, wxClassInfo*>())
 {
   if (mEntries != nullptr) {
     mEntries->reserve(static_cast<std::size_t>(bucketHint));
@@ -83,7 +86,10 @@ wxHashTableRuntime::~wxHashTableRuntime()
  * What it does:
  * Inserts one class-info pointer into the runtime class-name lookup lane.
  */
-void wxHashTableRuntime::Put(const wchar_t* const key, wxClassInfo* const classInfo)
+void wxHashTableRuntime::Put(
+  const wchar_t* const key,
+  wxClassInfo* const classInfo
+)
 {
   if (mEntries == nullptr || key == nullptr) {
     return;
@@ -98,7 +104,9 @@ void wxHashTableRuntime::Put(const wchar_t* const key, wxClassInfo* const classI
  * What it does:
  * Resolves one class-info pointer from the runtime class-name lookup lane.
  */
-wxClassInfo* wxHashTableRuntime::Get(const wchar_t* const key) const
+wxClassInfo* wxHashTableRuntime::Get(
+  const wchar_t* const key
+) const
 {
   if (mEntries == nullptr || key == nullptr) {
     return nullptr;
@@ -139,13 +147,13 @@ public:
   static wxClassInfo* sm_first;
   static wxHashTableRuntime* sm_classTable;
 
-  const wchar_t* m_className = nullptr; // +0x00
+  const wchar_t* m_className = nullptr;      // +0x00
   const wchar_t* m_baseClassName1 = nullptr; // +0x04
   const wchar_t* m_baseClassName2 = nullptr; // +0x08
-  std::uint8_t mReserved0C[0x8]{}; // +0x0C
-  wxClassInfo* m_baseInfo1 = nullptr; // +0x14
-  wxClassInfo* m_baseInfo2 = nullptr; // +0x18
-  wxClassInfo* m_next = nullptr; // +0x1C
+  std::uint8_t mReserved0C[0x8]{};           // +0x0C
+  wxClassInfo* m_baseInfo1 = nullptr;        // +0x14
+  wxClassInfo* m_baseInfo2 = nullptr;        // +0x18
+  wxClassInfo* m_next = nullptr;             // +0x1C
 };
 
 static_assert(offsetof(wxClassInfo, m_className) == 0x00, "wxClassInfo::m_className offset must be 0x00");
@@ -231,7 +239,10 @@ namespace
 
   WxWindowHandleHashRuntime* wxWinHandleHash = nullptr;
 
-  void* WxWindowHandleHashRuntime::Get(const int, void*)
+  void* WxWindowHandleHashRuntime::Get(
+    const int,
+    void*
+  )
   {
     return nullptr;
   }
@@ -274,7 +285,10 @@ namespace
     return gSuppressDeferredCommandMessages;
   }
 
-  void QueueDeferredThreadMessage(const MSG& message, const unsigned int repeatCount)
+  void QueueDeferredThreadMessage(
+    const MSG& message,
+    const unsigned int repeatCount
+  )
   {
     if (repeatCount == 0u) {
       return;
@@ -288,7 +302,9 @@ namespace
     }
   }
 
-  void DispatchDeferredThreadMessages(wxApp& app)
+  void DispatchDeferredThreadMessages(
+    wxApp& app
+  )
   {
     if (gIsDispatchingDeferredMessages) {
       return;
@@ -343,7 +359,10 @@ namespace
     std::uint8_t mArrayStringLane1[0x10]{};
   };
 
-  static_assert(offsetof(WxImageRefDataRuntime, mRefCount) == 0x4, "WxImageRefDataRuntime::mRefCount offset must be 0x4");
+  static_assert(
+    offsetof(WxImageRefDataRuntime, mRefCount) == 0x4,
+    "WxImageRefDataRuntime::mRefCount offset must be 0x4"
+  );
   static_assert(offsetof(WxImageRefDataRuntime, mWidth) == 0x8, "WxImageRefDataRuntime::mWidth offset must be 0x8");
   static_assert(offsetof(WxImageRefDataRuntime, mHeight) == 0xC, "WxImageRefDataRuntime::mHeight offset must be 0xC");
   static_assert(
@@ -363,7 +382,9 @@ namespace
    * Shared wx-object unref tail used by destructor paths that only clear
    * ref-data ownership.
    */
-  void RunWxObjectUnrefTail(WxObjectRuntimeView* const object) noexcept
+  void RunWxObjectUnrefTail(
+    WxObjectRuntimeView* const object
+  ) noexcept
   {
     if (object == nullptr) {
       return;
@@ -371,7 +392,9 @@ namespace
     object->refData = nullptr;
   }
 
-  void ReleaseWxStringSharedPayload(wxStringRuntime& value) noexcept
+  void ReleaseWxStringSharedPayload(
+    wxStringRuntime& value
+  ) noexcept
   {
     std::int32_t* const sharedPrefixWords = reinterpret_cast<std::int32_t*>(value.m_pchData) - 3;
     const std::int32_t sharedRefCount = sharedPrefixWords[0];
@@ -393,7 +416,9 @@ namespace
   std::mutex gOwnedWxStringLock{};
   std::unordered_set<void*> gOwnedWxStringHeaders{};
 
-  [[nodiscard]] wxStringRuntime AllocateOwnedWxString(const std::wstring& value)
+  [[nodiscard]] wxStringRuntime AllocateOwnedWxString(
+    const std::wstring& value
+  )
   {
     const std::size_t payloadBytes = sizeof(WxOwnedStringHeader) + (value.size() + 1) * sizeof(wchar_t);
     auto* const raw = static_cast<std::uint8_t*>(::operator new(payloadBytes));
@@ -416,7 +441,9 @@ namespace
     return runtime;
   }
 
-  [[nodiscard]] bool IsOwnedWxString(const wxStringRuntime& value) noexcept
+  [[nodiscard]] bool IsOwnedWxString(
+    const wxStringRuntime& value
+  ) noexcept
   {
     if (value.m_pchData == nullptr) {
       return false;
@@ -427,7 +454,9 @@ namespace
     return gOwnedWxStringHeaders.find(header) != gOwnedWxStringHeaders.end();
   }
 
-  void ReleaseOwnedWxString(wxStringRuntime& value) noexcept
+  void ReleaseOwnedWxString(
+    wxStringRuntime& value
+  ) noexcept
   {
     if (!IsOwnedWxString(value)) {
       value.m_pchData = nullptr;
@@ -449,7 +478,10 @@ namespace
     value.m_pchData = nullptr;
   }
 
-  void AssignOwnedWxString(wxStringRuntime* const outValue, const std::wstring& value)
+  void AssignOwnedWxString(
+    wxStringRuntime* const outValue,
+    const std::wstring& value
+  )
   {
     if (outValue == nullptr) {
       return;
@@ -459,7 +491,10 @@ namespace
     *outValue = AllocateOwnedWxString(value);
   }
 
-  void PrependOwnedWxString(wxStringRuntime* const target, const wxStringRuntime& prefix)
+  void PrependOwnedWxString(
+    wxStringRuntime* const target,
+    const wxStringRuntime& prefix
+  )
   {
     if (target == nullptr) {
       return;
@@ -478,7 +513,9 @@ namespace
    * refcount is greater than 1, it decrements the old header refcount and
    * allocates/copies a private payload for the caller.
    */
-  [[nodiscard]] bool EnsureUniqueOwnedWxStringBuffer(wxStringRuntime* const value)
+  [[nodiscard]] bool EnsureUniqueOwnedWxStringBuffer(
+    wxStringRuntime* const value
+  )
   {
     if (value == nullptr || value->m_pchData == nullptr || !IsOwnedWxString(*value)) {
       return false;
@@ -504,7 +541,9 @@ namespace
    * Tears down one `wxListItemAttr` payload by releasing the embedded font and
    * colour wxObject ref-data lanes in reverse construction order.
    */
-  void DestroyWxListItemAttrRuntime(wxListItemAttrRuntime* const attr) noexcept
+  void DestroyWxListItemAttrRuntime(
+    wxListItemAttrRuntime* const attr
+  ) noexcept
   {
     if (attr == nullptr) {
       return;
@@ -515,7 +554,9 @@ namespace
     RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(&attr->mTextColour));
   }
 
-  void ReleaseD3DDeviceRef(void* const device) noexcept
+  void ReleaseD3DDeviceRef(
+    void* const device
+  ) noexcept
   {
     if (device == nullptr) {
       return;
@@ -531,7 +572,9 @@ namespace
     release(device, 1u);
   }
 
-  [[nodiscard]] bool IsInlineHeadLinkSentinel(moho::ManagedWindowSlot** const ownerHeadLink) noexcept
+  [[nodiscard]] bool IsInlineHeadLinkSentinel(
+    moho::ManagedWindowSlot** const ownerHeadLink
+  ) noexcept
   {
     return reinterpret_cast<std::uintptr_t>(ownerHeadLink) < kInlineHeadLinkSentinelMax;
   }
@@ -594,7 +637,9 @@ namespace
     }
   }
 
-  void DetachSlotWithoutClearing(moho::ManagedWindowSlot& slot) noexcept
+  void DetachSlotWithoutClearing(
+    moho::ManagedWindowSlot& slot
+  ) noexcept
   {
     if (slot.ownerHeadLink == nullptr || IsInlineHeadLinkSentinel(slot.ownerHeadLink)) {
       return;
@@ -610,7 +655,10 @@ namespace
     }
   }
 
-  void RelinkSlotToOwner(moho::ManagedWindowSlot& slot, moho::ManagedWindowSlot** const ownerHeadLink) noexcept
+  void RelinkSlotToOwner(
+    moho::ManagedWindowSlot& slot,
+    moho::ManagedWindowSlot** const ownerHeadLink
+  ) noexcept
   {
     if (slot.ownerHeadLink == ownerHeadLink) {
       return;
@@ -628,14 +676,17 @@ namespace
   }
 
   template <typename TOwnerRuntime>
-  [[nodiscard]] bool IsReusableManagedSlot(const moho::ManagedWindowSlot& slot)
+  [[nodiscard]] bool IsReusableManagedSlot(
+    const moho::ManagedWindowSlot& slot
+  )
   {
     return slot.ownerHeadLink == nullptr || slot.ownerHeadLink == TOwnerRuntime::NullManagedSlotHeadLinkSentinel();
   }
 
   template <typename TOwnerRuntime>
   [[nodiscard]] bool TryReuseManagedSlot(
-    msvc8::vector<moho::ManagedWindowSlot>& slots, moho::ManagedWindowSlot** const ownerHeadLink
+    msvc8::vector<moho::ManagedWindowSlot>& slots,
+    moho::ManagedWindowSlot** const ownerHeadLink
   )
   {
     moho::ManagedWindowSlot* const slotStorage = slots.data();
@@ -659,7 +710,8 @@ namespace
 
   template <typename TOwnerRuntime>
   void AppendManagedSlot(
-    msvc8::vector<moho::ManagedWindowSlot>& slots, moho::ManagedWindowSlot** const ownerHeadLink
+    msvc8::vector<moho::ManagedWindowSlot>& slots,
+    moho::ManagedWindowSlot** const ownerHeadLink
   )
   {
     if (ownerHeadLink == nullptr) {
@@ -688,7 +740,8 @@ namespace
 
   template <typename TOwnerRuntime>
   void RegisterManagedOwnerSlotImpl(
-    msvc8::vector<moho::ManagedWindowSlot>& slots, moho::ManagedWindowSlot** const ownerHeadLink
+    msvc8::vector<moho::ManagedWindowSlot>& slots,
+    moho::ManagedWindowSlot** const ownerHeadLink
   )
   {
     if (ownerHeadLink == nullptr) {
@@ -702,7 +755,9 @@ namespace
     AppendManagedSlot<TOwnerRuntime>(slots, ownerHeadLink);
   }
 
-  void ReleaseManagedOwnerSlotChain(moho::ManagedWindowSlot*& ownerHead) noexcept
+  void ReleaseManagedOwnerSlotChain(
+    moho::ManagedWindowSlot*& ownerHead
+  ) noexcept
   {
     while (ownerHead != nullptr) {
       moho::ManagedWindowSlot* const slot = ownerHead;
@@ -712,7 +767,9 @@ namespace
   }
 
   template <typename TOwnerRuntime>
-  void DestroyManagedRuntimeCollection(msvc8::vector<moho::ManagedWindowSlot>& slots)
+  void DestroyManagedRuntimeCollection(
+    msvc8::vector<moho::ManagedWindowSlot>& slots
+  )
   {
     for (std::size_t index = 0;; ++index) {
       moho::ManagedWindowSlot* slotStorage = slots.data();
@@ -863,7 +920,9 @@ namespace
     gCtlColorBrushByColor.clear();
   }
 
-  [[nodiscard]] HBRUSH GetOrCreateCtlColorBrush(const COLORREF color) noexcept
+  [[nodiscard]] HBRUSH GetOrCreateCtlColorBrush(
+    const COLORREF color
+  ) noexcept
   {
     const auto existing = gCtlColorBrushByColor.find(color);
     if (existing != gCtlColorBrushByColor.end() && existing->second != nullptr) {
@@ -930,8 +989,7 @@ namespace
       : wxEventRuntime(0, EnsureWxEvtIdleRuntimeType())
       , mRequestMore(false)
       , mPadding21To23{0, 0, 0}
-    {
-    }
+    {}
 
     WxIdleEventRuntime* Clone() const override
     {
@@ -969,8 +1027,7 @@ namespace
   public:
     WxDropFilesEventRuntime()
       : wxEventRuntime(0, EnsureWxEvtDropFilesRuntimeType())
-    {
-    }
+    {}
 
     ~WxDropFilesEventRuntime()
     {
@@ -1000,11 +1057,12 @@ namespace
       return clone;
     }
 
-    void PopulateFromDropHandle(const HDROP dropHandle)
+    void PopulateFromDropHandle(
+      const HDROP dropHandle
+    )
     {
-      const std::uint32_t fileCount = static_cast<std::uint32_t>(
-        ::DragQueryFileW(dropHandle, 0xFFFFFFFFu, nullptr, 0u)
-      );
+      const std::uint32_t fileCount =
+        static_cast<std::uint32_t>(::DragQueryFileW(dropHandle, 0xFFFFFFFFu, nullptr, 0u));
       AllocateFileArray(fileCount);
       for (std::uint32_t fileIndex = 0; fileIndex < mFileCount; ++fileIndex) {
         const UINT fileNameLength = ::DragQueryFileW(dropHandle, fileIndex, nullptr, 0u);
@@ -1025,7 +1083,9 @@ namespace
     wxStringRuntime* mFiles = nullptr;
 
   private:
-    void AllocateFileArray(const std::uint32_t fileCount)
+    void AllocateFileArray(
+      const std::uint32_t fileCount
+    )
     {
       ReleaseFileArray();
       if (fileCount == 0u) {
@@ -1047,7 +1107,10 @@ namespace
       }
     }
 
-    void AssignFiles(const wxStringRuntime* const files, const std::uint32_t fileCount)
+    void AssignFiles(
+      const wxStringRuntime* const files,
+      const std::uint32_t fileCount
+    )
     {
       if (files == nullptr || fileCount == 0u) {
         return;
@@ -1075,8 +1138,7 @@ namespace
           mFiles[index].m_pchData = nullptr;
         }
 
-        void* const storage =
-          reinterpret_cast<std::uint8_t*>(mFiles) - sizeof(WxDropFilesArrayStorage);
+        void* const storage = reinterpret_cast<std::uint8_t*>(mFiles) - sizeof(WxDropFilesArrayStorage);
         ::operator delete(storage);
       }
 
@@ -1111,15 +1173,13 @@ namespace
       const std::int32_t eventType,
       wxWindowMswRuntime* const previousCapture
     )
-      : wxEventRuntime(eventId, eventType),
-        mPreviousCapture(previousCapture)
-    {
-    }
+      : wxEventRuntime(eventId, eventType)
+      , mPreviousCapture(previousCapture)
+    {}
 
     WxMouseCaptureChangedEventRuntime* Clone() const override
     {
-      auto* const clone = new (std::nothrow)
-        WxMouseCaptureChangedEventRuntime(mEventId, mEventType, mPreviousCapture);
+      auto* const clone = new (std::nothrow) WxMouseCaptureChangedEventRuntime(mEventId, mEventType, mPreviousCapture);
       if (clone == nullptr) {
         return nullptr;
       }
@@ -1154,7 +1214,9 @@ namespace
     return handle;
   }
 
-  [[nodiscard]] SupComFrameState* FindSupComFrameState(const WSupComFrame* const frame) noexcept
+  [[nodiscard]] SupComFrameState* FindSupComFrameState(
+    const WSupComFrame* const frame
+  ) noexcept
   {
     const auto it = gSupComFrameStateByFrame.find(frame);
     return it != gSupComFrameStateByFrame.end() ? &it->second : nullptr;
@@ -1175,12 +1237,16 @@ namespace
     return gWxTopLevelWindowRuntimeStateByWindow[window];
   }
 
-  [[nodiscard]] WxDialogRuntimeState& EnsureWxDialogRuntimeState(const wxDialogRuntime* const dialog)
+  [[nodiscard]] WxDialogRuntimeState& EnsureWxDialogRuntimeState(
+    const wxDialogRuntime* const dialog
+  )
   {
     return gWxDialogRuntimeStateByDialog[dialog];
   }
 
-  [[nodiscard]] WxTreeListRuntimeState& EnsureWxTreeListRuntimeState(const wxTreeListCtrlRuntime* const treeControl)
+  [[nodiscard]] WxTreeListRuntimeState& EnsureWxTreeListRuntimeState(
+    const wxTreeListCtrlRuntime* const treeControl
+  )
   {
     return gWxTreeListRuntimeStateByControl[treeControl];
   }
@@ -1212,12 +1278,16 @@ namespace
     return rawNode;
   }
 
-  [[nodiscard]] WxTreeListNodeRuntimeState* ResolveTreeListNode(const wxTreeItemIdRuntime& item) noexcept
+  [[nodiscard]] WxTreeListNodeRuntimeState* ResolveTreeListNode(
+    const wxTreeItemIdRuntime& item
+  ) noexcept
   {
     return static_cast<WxTreeListNodeRuntimeState*>(item.mNode);
   }
 
-  [[nodiscard]] const WxTreeListNodeRuntimeState* ResolveTreeListNodeConst(const wxTreeItemIdRuntime& item) noexcept
+  [[nodiscard]] const WxTreeListNodeRuntimeState* ResolveTreeListNodeConst(
+    const wxTreeItemIdRuntime& item
+  ) noexcept
   {
     return static_cast<const WxTreeListNodeRuntimeState*>(item.mNode);
   }
@@ -1230,17 +1300,23 @@ namespace
     return it != gWxWindowBaseStateByWindow.end() ? &it->second : nullptr;
   }
 
-  [[nodiscard]] WxWindowBaseRuntimeState& EnsureWxWindowBaseRuntimeState(const wxWindowBase* const window)
+  [[nodiscard]] WxWindowBaseRuntimeState& EnsureWxWindowBaseRuntimeState(
+    const wxWindowBase* const window
+  )
   {
     return gWxWindowBaseStateByWindow[window];
   }
 
-  [[nodiscard]] WxTextCtrlRuntimeState& EnsureWxTextCtrlRuntimeState(const wxTextCtrlRuntime* const control)
+  [[nodiscard]] WxTextCtrlRuntimeState& EnsureWxTextCtrlRuntimeState(
+    const wxTextCtrlRuntime* const control
+  )
   {
     return gWxTextCtrlStateByControl[control];
   }
 
-  [[nodiscard]] SupComFrameState& EnsureSupComFrameState(const WSupComFrame* const frame)
+  [[nodiscard]] SupComFrameState& EnsureSupComFrameState(
+    const WSupComFrame* const frame
+  )
   {
     return gSupComFrameStateByFrame[frame];
   }
@@ -1281,26 +1357,34 @@ namespace
       return true;
     }
 
-    bool Show(const bool show) override
+    bool Show(
+      const bool show
+    ) override
     {
       EnsureSupComFrameState(this).visible = show;
       return true;
     }
 
-    void SetTitle(const wxStringRuntime& title) override
+    void SetTitle(
+      const wxStringRuntime& title
+    ) override
     {
       SupComFrameState& state = EnsureSupComFrameState(this);
       state.title.assign(title.c_str());
     }
 
-    void SetName(const wxStringRuntime& name) override
+    void SetName(
+      const wxStringRuntime& name
+    ) override
     {
       wxWindowBase::SetName(name);
       SupComFrameState& state = EnsureSupComFrameState(this);
       state.name.assign(name.c_str());
     }
 
-    void SetWindowStyleFlag(const long style) override
+    void SetWindowStyleFlag(
+      const long style
+    ) override
     {
       EnsureSupComFrameState(this).windowStyle = static_cast<std::int32_t>(style);
     }
@@ -1347,7 +1431,10 @@ namespace
       return state != nullptr ? static_cast<unsigned long>(state->pseudoWindowHandle) : 0u;
     }
 
-    void DoGetClientSize(std::int32_t* const outWidth, std::int32_t* const outHeight) const override
+    void DoGetClientSize(
+      std::int32_t* const outWidth,
+      std::int32_t* const outHeight
+    ) const override
     {
       if (outWidth != nullptr) {
         *outWidth = 0;
@@ -1369,7 +1456,10 @@ namespace
       }
     }
 
-    void DoSetClientSize(const std::int32_t width, const std::int32_t height) override
+    void DoSetClientSize(
+      const std::int32_t width,
+      const std::int32_t height
+    ) override
     {
       SupComFrameState& state = EnsureSupComFrameState(this);
       const std::int32_t requestedWidth = width > 0 ? width : 0;
@@ -1378,7 +1468,10 @@ namespace
       state.clientHeight = requestedHeight > state.minHeight ? requestedHeight : state.minHeight;
     }
 
-    void DoGetPosition(std::int32_t* const x, std::int32_t* const y) const override
+    void DoGetPosition(
+      std::int32_t* const x,
+      std::int32_t* const y
+    ) const override
     {
       if (x != nullptr) {
         *x = 0;
@@ -1416,7 +1509,9 @@ namespace
       DoSetClientSize(width, height);
     }
 
-    void Maximize(const bool maximize) override
+    void Maximize(
+      const bool maximize
+    ) override
     {
       SupComFrameState& state = EnsureSupComFrameState(this);
       state.maximized = maximize;
@@ -1424,7 +1519,9 @@ namespace
       mPersistedMaximizeSync = maximize ? 1 : 0;
     }
 
-    void Iconize(const bool iconize) override
+    void Iconize(
+      const bool iconize
+    ) override
     {
       EnsureSupComFrameState(this).iconized = iconize;
     }
@@ -1441,7 +1538,9 @@ namespace
       return state != nullptr && state->iconized;
     }
 
-    void SetIcon(const void* const icon) override
+    void SetIcon(
+      const void* const icon
+    ) override
     {
       SupComFrameState& state = EnsureSupComFrameState(this);
       state.iconResourceAssigned = icon != nullptr;
@@ -1452,7 +1551,9 @@ namespace
       }
     }
 
-    void SetIcons(const void* const iconBundle) override
+    void SetIcons(
+      const void* const iconBundle
+    ) override
     {
       SetIcon(iconBundle);
     }
@@ -1472,7 +1573,9 @@ namespace
    * What it does:
    * Returns the leading 32-bit lane from one unknown runtime pod view.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneA(const DwordLaneRuntimeView* const view) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneA(
+    const DwordLaneRuntimeView* const view
+  ) noexcept
   {
     return view->lane00;
   }
@@ -1483,7 +1586,9 @@ namespace
    * What it does:
    * Returns the leading 32-bit lane from one unknown runtime pod view.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneB(const DwordLaneRuntimeView* const view) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadRuntimeDwordLaneB(
+    const DwordLaneRuntimeView* const view
+  ) noexcept
   {
     return view->lane00;
   }
@@ -1504,7 +1609,9 @@ namespace
    * What it does:
    * Clears one four-dword runtime block used by wx region rectangle vectors.
    */
-  [[maybe_unused]] void ClearFourDwordBlock(FourDwordBlockRuntimeView* const view) noexcept
+  [[maybe_unused]] void ClearFourDwordBlock(
+    FourDwordBlockRuntimeView* const view
+  ) noexcept
   {
     view->lane00 = 0;
     view->lane04 = 0;
@@ -1515,17 +1622,19 @@ namespace
   class SplashScreenRuntimeImpl final : public moho::SplashScreenRuntime
   {
   public:
-    SplashScreenRuntimeImpl(const msvc8::string& imagePath, const wxSize& size)
+    SplashScreenRuntimeImpl(
+      const msvc8::string& imagePath,
+      const wxSize& size
+    )
       : mImagePath(imagePath)
       , mSize(size)
-    {
-    }
+    {}
 
-    void GetClassInfo() override
-    {
-    }
+    void GetClassInfo() override {}
 
-    void DeleteObject(const std::uint32_t flags) override
+    void DeleteObject(
+      const std::uint32_t flags
+    ) override
     {
       if ((flags & 1u) != 0u) {
         delete this;
@@ -1544,7 +1653,9 @@ namespace
  * What it does:
  * Enters one Win32 critical-section lane.
  */
-void wxENTER_CRIT_SECT(_RTL_CRITICAL_SECTION* const criticalSection)
+void wxENTER_CRIT_SECT(
+  _RTL_CRITICAL_SECTION* const criticalSection
+)
 {
   ::EnterCriticalSection(criticalSection);
 }
@@ -1555,7 +1666,9 @@ void wxENTER_CRIT_SECT(_RTL_CRITICAL_SECTION* const criticalSection)
  * What it does:
  * Leaves one Win32 critical-section lane.
  */
-void wxLEAVE_CRIT_SECT(_RTL_CRITICAL_SECTION* const criticalSection)
+void wxLEAVE_CRIT_SECT(
+  _RTL_CRITICAL_SECTION* const criticalSection
+)
 {
   ::LeaveCriticalSection(criticalSection);
 }
@@ -1567,7 +1680,10 @@ void wxLEAVE_CRIT_SECT(_RTL_CRITICAL_SECTION* const criticalSection)
  * Caches Win32 platform-id and major/minor version lanes and returns the wx
  * OS-family enum value.
  */
-int wxGetOsVersion(int* const majorVsn, int* const minorVsn)
+int wxGetOsVersion(
+  int* const majorVsn,
+  int* const minorVsn
+)
 {
   int result = gWxGetOsVersionCache;
   if (gWxGetOsVersionCache == -1) {
@@ -1613,9 +1729,10 @@ int wxGetOsVersion(int* const majorVsn, int* const minorVsn)
  * What it does:
  * Preserves wx debug-log callsites as a no-op lane.
  */
-void wxLogDebug(...)
-{
-}
+void wxLogDebug(
+  ...
+)
+{}
 
 /**
  * Address: 0x009CD1D0 (FUN_009CD1D0, wx::copystring)
@@ -1624,7 +1741,9 @@ void wxLogDebug(...)
  * Allocates one heap-owned UTF-16 copy of the input string and falls back to
  * an empty literal when the source pointer is null.
  */
-wchar_t* wx::copystring(const wchar_t* const text)
+wchar_t* wx::copystring(
+  const wchar_t* const text
+)
 {
   const wchar_t* const source = (text != nullptr) ? text : L"";
   std::size_t length = 0;
@@ -1657,9 +1776,7 @@ wxClientDataRuntime::wxClientDataRuntime()
  * What it does:
  * Rebinds this object to the `wxClientData` runtime vtable lane.
  */
-void wxClientDataRuntime::ResetRuntimeVTable() noexcept
-{
-}
+void wxClientDataRuntime::ResetRuntimeVTable() noexcept {}
 
 /**
  * Address: 0x004A36B0 (FUN_004A36B0)
@@ -1709,7 +1826,9 @@ wxTopLevelWindowRuntime::wxTopLevelWindowRuntime()
  * Runs base visibility transition and raises this window (or parent when
  * hiding) when native-handle lanes are present in runtime state.
  */
-bool wxTopLevelWindowRuntime::Show(const bool show)
+bool wxTopLevelWindowRuntime::Show(
+  const bool show
+)
 {
   if (!wxWindowBase::Show(show)) {
     return false;
@@ -1760,7 +1879,9 @@ bool wxTopLevelWindowRuntime::IsTopLevel() const
  * What it does:
  * Base implementation reports the queried window as not one of frame bars.
  */
-bool wxTopLevelWindowRuntime::IsOneOfBars(const void* const window) const
+bool wxTopLevelWindowRuntime::IsOneOfBars(
+  const void* const window
+) const
 {
   (void)window;
   return false;
@@ -1846,7 +1967,9 @@ wxTopLevelWindowRootRuntime* wxTopLevelWindowRootRuntime::DestroyWithoutDelete(
   return DeleteWithFlag(object, 0);
 }
 
-void wxControlContainerRuntime::Initialize(const bool acceptsFocusRecursion) noexcept
+void wxControlContainerRuntime::Initialize(
+  const bool acceptsFocusRecursion
+) noexcept
 {
   mAcceptsFocusRecursion = acceptsFocusRecursion ? 1 : 0;
 }
@@ -1868,9 +1991,7 @@ wxDialogBaseRuntime::wxDialogBaseRuntime()
   InitRuntime();
 }
 
-void wxDialogBaseRuntime::InitRuntime() noexcept
-{
-}
+void wxDialogBaseRuntime::InitRuntime() noexcept {}
 
 /**
  * Address: 0x004A38C0 (FUN_004A38C0)
@@ -1878,7 +1999,9 @@ void wxDialogBaseRuntime::InitRuntime() noexcept
  * What it does:
  * Runs non-deleting teardown for dialog-base runtime lanes.
  */
-wxDialogBaseRuntime* wxDialogBaseRuntime::DestroyWithoutDelete(wxDialogBaseRuntime* const object) noexcept
+wxDialogBaseRuntime* wxDialogBaseRuntime::DestroyWithoutDelete(
+  wxDialogBaseRuntime* const object
+) noexcept
 {
   return reinterpret_cast<wxDialogBaseRuntime*>(
     wxTopLevelWindowRuntime::DeleteWithFlag(reinterpret_cast<wxTopLevelWindowRuntime*>(object), 0)
@@ -1902,10 +2025,7 @@ wxDialogBaseRuntime* wxDialogBaseRuntime::DeleteWithFlag(
 
   gWxDialogRuntimeStateByDialog.erase(reinterpret_cast<const wxDialogRuntime*>(object));
   return reinterpret_cast<wxDialogBaseRuntime*>(
-    wxTopLevelWindowRuntime::DeleteWithFlag(
-      reinterpret_cast<wxTopLevelWindowRuntime*>(object),
-      deleteFlags
-    )
+    wxTopLevelWindowRuntime::DeleteWithFlag(reinterpret_cast<wxTopLevelWindowRuntime*>(object), deleteFlags)
   );
 }
 
@@ -1968,7 +2088,10 @@ void* wxDialogRuntime::GetClassInfo() const
  * What it does:
  * Implements deleting-dtor thunk semantics for dialog runtime lanes.
  */
-wxDialogRuntime* wxDialogRuntime::DeleteWithFlag(wxDialogRuntime* const object, const std::uint8_t deleteFlags) noexcept
+wxDialogRuntime* wxDialogRuntime::DeleteWithFlag(
+  wxDialogRuntime* const object,
+  const std::uint8_t deleteFlags
+) noexcept
 {
   if (object == nullptr) {
     return nullptr;
@@ -2053,7 +2176,9 @@ wxTreeItemDataRuntime* wxTreeItemDataRuntime::DeleteWithFlag(
  * What it does:
  * Copies the primary tree-item-id lane into `outItem`.
  */
-void wxTreeEventRuntime::GetItem(wxTreeItemIdRuntime* const outItem) const noexcept
+void wxTreeEventRuntime::GetItem(
+  wxTreeItemIdRuntime* const outItem
+) const noexcept
 {
   if (outItem != nullptr) {
     *outItem = mItem;
@@ -2177,7 +2302,9 @@ wxTreeListCtrlRuntime::wxTreeListCtrlRuntime(
  * What it does:
  * Runs non-deleting teardown for one tree-list control runtime lane.
  */
-wxTreeListCtrlRuntime* wxTreeListCtrlRuntime::DestroyWithoutDelete(wxTreeListCtrlRuntime* const object) noexcept
+wxTreeListCtrlRuntime* wxTreeListCtrlRuntime::DestroyWithoutDelete(
+  wxTreeListCtrlRuntime* const object
+) noexcept
 {
   if (object == nullptr) {
     return nullptr;
@@ -2202,14 +2329,7 @@ void wxTreeListCtrlRuntime::AddColumn(
 )
 {
   WxTreeListRuntimeState& state = EnsureWxTreeListRuntimeState(this);
-  state.columns.emplace_back(
-    title,
-    static_cast<std::int32_t>(width),
-    this,
-    shown ? 1u : 0u,
-    alignment,
-    0
-  );
+  state.columns.emplace_back(title, static_cast<std::int32_t>(width), this, shown ? 1u : 0u, alignment, 0);
 }
 
 /**
@@ -2260,7 +2380,9 @@ wxTreeListCtrlRuntime* wxTreeListCtrlRuntime::DeleteWithFlag(
   return object;
 }
 
-wxTreeItemIdRuntime wxTreeListCtrlRuntime::AddRoot(const wxStringRuntime& text)
+wxTreeItemIdRuntime wxTreeListCtrlRuntime::AddRoot(
+  const wxStringRuntime& text
+)
 {
   WxTreeListRuntimeState& state = EnsureWxTreeListRuntimeState(this);
   wxTreeItemIdRuntime item{};
@@ -2288,7 +2410,9 @@ wxTreeItemIdRuntime wxTreeListCtrlRuntime::AppendItem(
   return item;
 }
 
-void wxTreeListCtrlRuntime::Expand(const wxTreeItemIdRuntime& item) noexcept
+void wxTreeListCtrlRuntime::Expand(
+  const wxTreeItemIdRuntime& item
+) noexcept
 {
   WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
   if (node == nullptr) {
@@ -2297,7 +2421,9 @@ void wxTreeListCtrlRuntime::Expand(const wxTreeItemIdRuntime& item) noexcept
   node->isExpanded = true;
 }
 
-void wxTreeListCtrlRuntime::Collapse(const wxTreeItemIdRuntime& item) noexcept
+void wxTreeListCtrlRuntime::Collapse(
+  const wxTreeItemIdRuntime& item
+) noexcept
 {
   WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
   if (node == nullptr) {
@@ -2306,13 +2432,17 @@ void wxTreeListCtrlRuntime::Collapse(const wxTreeItemIdRuntime& item) noexcept
   node->isExpanded = false;
 }
 
-bool wxTreeListCtrlRuntime::IsExpanded(const wxTreeItemIdRuntime& item) const noexcept
+bool wxTreeListCtrlRuntime::IsExpanded(
+  const wxTreeItemIdRuntime& item
+) const noexcept
 {
   const WxTreeListNodeRuntimeState* const node = ResolveTreeListNodeConst(item);
   return node != nullptr && node->isExpanded;
 }
 
-bool wxTreeListCtrlRuntime::HasChildren(const wxTreeItemIdRuntime& item) const noexcept
+bool wxTreeListCtrlRuntime::HasChildren(
+  const wxTreeItemIdRuntime& item
+) const noexcept
 {
   const WxTreeListNodeRuntimeState* const node = ResolveTreeListNodeConst(item);
   if (node == nullptr) {
@@ -2322,7 +2452,9 @@ bool wxTreeListCtrlRuntime::HasChildren(const wxTreeItemIdRuntime& item) const n
   return node->hasChildrenFlag || !node->children.empty();
 }
 
-void wxTreeListCtrlRuntime::SortChildren(const wxTreeItemIdRuntime& item)
+void wxTreeListCtrlRuntime::SortChildren(
+  const wxTreeItemIdRuntime& item
+)
 {
   WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
   if (node == nullptr || node->children.size() < 2u) {
@@ -2333,15 +2465,18 @@ void wxTreeListCtrlRuntime::SortChildren(const wxTreeItemIdRuntime& item)
     node->children.begin(),
     node->children.end(),
     [](const WxTreeListNodeRuntimeState* const lhs, const WxTreeListNodeRuntimeState* const rhs) {
-      static const msvc8::string kEmptyText{};
-      const msvc8::string& lhsText = (lhs != nullptr && !lhs->columnText.empty()) ? lhs->columnText[0] : kEmptyText;
-      const msvc8::string& rhsText = (rhs != nullptr && !rhs->columnText.empty()) ? rhs->columnText[0] : kEmptyText;
-      return lhsText < rhsText;
-    }
+    static const msvc8::string kEmptyText{};
+    const msvc8::string& lhsText = (lhs != nullptr && !lhs->columnText.empty()) ? lhs->columnText[0] : kEmptyText;
+    const msvc8::string& rhsText = (rhs != nullptr && !rhs->columnText.empty()) ? rhs->columnText[0] : kEmptyText;
+    return lhsText < rhsText;
+  }
   );
 }
 
-void wxTreeListCtrlRuntime::SetItemData(const wxTreeItemIdRuntime& item, wxTreeItemDataRuntime* const itemData)
+void wxTreeListCtrlRuntime::SetItemData(
+  const wxTreeItemIdRuntime& item,
+  wxTreeItemDataRuntime* const itemData
+)
 {
   WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
   if (node == nullptr) {
@@ -2350,13 +2485,18 @@ void wxTreeListCtrlRuntime::SetItemData(const wxTreeItemIdRuntime& item, wxTreeI
   node->itemData = itemData;
 }
 
-wxTreeItemDataRuntime* wxTreeListCtrlRuntime::GetItemData(const wxTreeItemIdRuntime& item) const noexcept
+wxTreeItemDataRuntime* wxTreeListCtrlRuntime::GetItemData(
+  const wxTreeItemIdRuntime& item
+) const noexcept
 {
   const WxTreeListNodeRuntimeState* const node = ResolveTreeListNodeConst(item);
   return node != nullptr ? node->itemData : nullptr;
 }
 
-void wxTreeListCtrlRuntime::SetItemHasChildren(const wxTreeItemIdRuntime& item, const bool hasChildren) noexcept
+void wxTreeListCtrlRuntime::SetItemHasChildren(
+  const wxTreeItemIdRuntime& item,
+  const bool hasChildren
+) noexcept
 {
   WxTreeListNodeRuntimeState* const node = ResolveTreeListNode(item);
   if (node == nullptr) {
@@ -2401,7 +2541,9 @@ void** WX_FrameBaseGetClassInfo() noexcept
  * What it does:
  * Runs non-deleting frame-runtime teardown for frame-derived windows.
  */
-wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(wxTopLevelWindowRuntime* const frame) noexcept
+wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(
+  wxTopLevelWindowRuntime* const frame
+) noexcept
 {
   if (frame == nullptr) {
     return nullptr;
@@ -2432,15 +2574,16 @@ void* wxWindowBase::GetClassInfo() const
  * Resolves one native HWND lane through `wxWinHandleHash` and returns the
  * associated wxWindow runtime pointer when present.
  */
-wxWindowMswRuntime* wxFindWinFromHandle(const int nativeHandle)
+wxWindowMswRuntime* wxFindWinFromHandle(
+  const int nativeHandle
+)
 {
   if (wxWinHandleHash == nullptr) {
     return nullptr;
   }
 
-  void* const hashEntry = wxWinHandleHash->Get(
-    nativeHandle, reinterpret_cast<void*>(static_cast<std::uintptr_t>(nativeHandle))
-  );
+  void* const hashEntry =
+    wxWinHandleHash->Get(nativeHandle, reinterpret_cast<void*>(static_cast<std::uintptr_t>(nativeHandle)));
   if (hashEntry == nullptr) {
     return nullptr;
   }
@@ -2564,9 +2707,7 @@ unsigned int* wxWindowMswRuntime::UnpackCtlColor(
  * What it does:
  * Base window runtime lane has no additional destroy-stage behavior.
  */
-void wxWindowMswRuntime::MSWDestroyWindow()
-{
-}
+void wxWindowMswRuntime::MSWDestroyWindow() {}
 
 /**
  * Address: 0x0042B830 (FUN_0042B830)
@@ -2575,7 +2716,9 @@ void wxWindowMswRuntime::MSWDestroyWindow()
  * What it does:
  * Base implementation reports the queried native handle as not contained.
  */
-bool wxWindowMswRuntime::ContainsHWND(const unsigned long nativeHandle) const
+bool wxWindowMswRuntime::ContainsHWND(
+  const unsigned long nativeHandle
+) const
 {
   (void)nativeHandle;
   return false;
@@ -2612,10 +2755,12 @@ void* wxWindowMswRuntime::GetClassInfo() const
  * Converts wx-style lanes into Win32 style/ex-style masks, including auto-3D
  * upgrades for controls and child/non-child parent-background behavior.
  */
-unsigned long wxWindowMswRuntime::MSWGetStyle(const long style, unsigned long* const extendedStyle) const
+unsigned long wxWindowMswRuntime::MSWGetStyle(
+  const long style,
+  unsigned long* const extendedStyle
+) const
 {
-  unsigned long nativeStyle =
-    (style & kWxWindowStyleClipChildren) != 0 ? kMswStyleClipChildren : kMswStyleBase;
+  unsigned long nativeStyle = (style & kWxWindowStyleClipChildren) != 0 ? kMswStyleClipChildren : kMswStyleBase;
 
   if ((style & kWxWindowStyleRaisedBorder) != 0) {
     nativeStyle |= kMswStyleRaisedBorder;
@@ -2655,8 +2800,7 @@ unsigned long wxWindowMswRuntime::MSWGetStyle(const long style, unsigned long* c
     *extendedStyle |= kMswExStyleClientEdge;
     nativeStyle &= ~kMswStyleNo3DBit;
   } else if (
-    styleMaskLane == kWxWindowStyleSimpleBorder ||
-    styleMaskLane == kWxWindowStyleDoubleBorderLegacy ||
+    styleMaskLane == kWxWindowStyleSimpleBorder || styleMaskLane == kWxWindowStyleDoubleBorderLegacy ||
     styleMaskLane == kWxWindowStyleSimpleBorderAlt
   ) {
     *extendedStyle |= kMswExStyleDlgModalFrame;
@@ -2702,13 +2846,17 @@ namespace
     return new (std::nothrow) TWindow();
   }
 
-  [[nodiscard]] bool EqualsWindowClassName(const wchar_t* const className, const wchar_t* const expected) noexcept
+  [[nodiscard]] bool EqualsWindowClassName(
+    const wchar_t* const className,
+    const wchar_t* const expected
+  ) noexcept
   {
     return className != nullptr && expected != nullptr && ::_wcsicmp(className, expected) == 0;
   }
 
   [[nodiscard]] bool TryParseRichEditMajorVersion(
-    const wchar_t* const className, std::int32_t* const outMajorVersion
+    const wchar_t* const className,
+    std::int32_t* const outMajorVersion
   ) noexcept
   {
     if (className == nullptr || outMajorVersion == nullptr) {
@@ -2725,7 +2873,9 @@ namespace
     return true;
   }
 
-  [[nodiscard]] wxWindowMswRuntime* CreateButtonRuntimeFromStyle(const signed char styleLane) noexcept
+  [[nodiscard]] wxWindowMswRuntime* CreateButtonRuntimeFromStyle(
+    const signed char styleLane
+  ) noexcept
   {
     if (styleLane == 5 || styleLane == 6 || styleLane == 3 || styleLane == 2) {
       return AllocateWxMswWindowRuntime<wxCheckBoxRuntime>();
@@ -2737,13 +2887,13 @@ namespace
 
     if (styleLane >= 0) {
       switch (styleLane) {
-        case 11:
-        case 0:
-        case 1:
-        case 7:
-          return AllocateWxMswWindowRuntime<wxControlRuntime>();
-        default:
-          return nullptr;
+      case 11:
+      case 0:
+      case 1:
+      case 7:
+        return AllocateWxMswWindowRuntime<wxControlRuntime>();
+      default:
+        return nullptr;
       }
     }
 
@@ -2767,10 +2917,10 @@ namespace
       return AllocateWxMswWindowRuntime<wxTextCtrlRuntime>();
     }
 
-    if (EqualsWindowClassName(className, L"LISTBOX") ||
-        EqualsWindowClassName(className, L"SCROLLBAR") ||
-        EqualsWindowClassName(className, L"MSCTLS_UPDOWN32") ||
-        EqualsWindowClassName(className, L"MSCTLS_TRACKBAR32")) {
+    if (
+      EqualsWindowClassName(className, L"LISTBOX") || EqualsWindowClassName(className, L"SCROLLBAR") ||
+      EqualsWindowClassName(className, L"MSCTLS_UPDOWN32") || EqualsWindowClassName(className, L"MSCTLS_TRACKBAR32")
+    ) {
       return AllocateWxMswWindowRuntime<wxControlRuntime>();
     }
 
@@ -2793,7 +2943,10 @@ namespace
  * Adapts one native Win32 HWND into the closest recovered wx runtime control
  * wrapper and adopts HWND-derived attributes.
  */
-void* wxWindowMswRuntime::CreateWindowFromHWND(void* const parent, const unsigned long nativeHandle)
+void* wxWindowMswRuntime::CreateWindowFromHWND(
+  void* const parent,
+  const unsigned long nativeHandle
+)
 {
   const HWND nativeWindow = reinterpret_cast<HWND>(nativeHandle);
   if (nativeWindow == nullptr) {
@@ -2802,9 +2955,7 @@ void* wxWindowMswRuntime::CreateWindowFromHWND(void* const parent, const unsigne
 
   wchar_t windowClassName[64] = {};
   const int classNameLength = ::GetClassNameW(
-    nativeWindow,
-    windowClassName,
-    static_cast<int>(sizeof(windowClassName) / sizeof(windowClassName[0]))
+    nativeWindow, windowClassName, static_cast<int>(sizeof(windowClassName) / sizeof(windowClassName[0]))
   );
   if (classNameLength <= 0) {
     return nullptr;
@@ -2844,15 +2995,15 @@ void* wxWindowMswRuntime::CreateWindowFromHWND(void* const parent, const unsigne
  * from the native handle lane, and dispatches the event through the active
  * window event-handler lane.
  */
-bool wxWindowMswRuntime::HandleCaptureChanged(const int nativeHandle)
+bool wxWindowMswRuntime::HandleCaptureChanged(
+  const int nativeHandle
+)
 {
   WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
   wxWindowMswRuntime* const previousCapture = wxFindWinFromHandle(nativeHandle);
 
   WxMouseCaptureChangedEventRuntime captureEvent(
-    state.windowId,
-    EnsureWxEvtMouseCaptureChangedRuntimeType(),
-    previousCapture
+    state.windowId, EnsureWxEvtMouseCaptureChangedRuntimeType(), previousCapture
   );
   captureEvent.mEventObject = this;
 
@@ -2871,7 +3022,9 @@ bool wxWindowMswRuntime::HandleCaptureChanged(const int nativeHandle)
  * Converts one Win32 HDROP payload into a drop-files event and dispatches it
  * through the window event-handler lane.
  */
-bool wxWindowMswRuntime::HandleDropFiles(void* const hDrop)
+bool wxWindowMswRuntime::HandleDropFiles(
+  void* const hDrop
+)
 {
   const HDROP dropHandle = reinterpret_cast<HDROP>(hDrop);
 
@@ -2915,11 +3068,8 @@ void wxTextCtrlRuntime::AdoptAttributesFromHWND()
   const long nativeStyle = static_cast<long>(::GetWindowLongW(nativeWindow, GWL_STYLE));
 
   wchar_t className[64] = {};
-  const int classNameLength = ::GetClassNameW(
-    nativeWindow,
-    className,
-    static_cast<int>(sizeof(className) / sizeof(className[0]))
-  );
+  const int classNameLength =
+    ::GetClassNameW(nativeWindow, className, static_cast<int>(sizeof(className) / sizeof(className[0])));
   if (classNameLength > 0) {
     if (EqualsWindowClassName(className, L"EDIT")) {
       textState.richEditMajorVersion = 0;
@@ -2985,13 +3135,12 @@ unsigned long wxTextCtrlRuntime::OnCtlColor(
   }
 
   const HDC nativeDc = reinterpret_cast<HDC>(hdc);
-  const int backgroundMode =
-    (parentState != nullptr && (parentState->bitfields & 0x2u) != 0u) ? TRANSPARENT : OPAQUE;
+  const int backgroundMode = (parentState != nullptr && (parentState->bitfields & 0x2u) != 0u) ? TRANSPARENT : OPAQUE;
   (void)::SetBkMode(nativeDc, backgroundMode);
 
   wxColourRuntime backgroundColour = GetBackgroundColour();
-  const bool useWindowBackgroundColour =
-    thisState == nullptr || (thisState->bitfields & 0x4u) != 0u || (GetWindowStyleFlag() & kWxTextCtrlStyleMultiline) != 0;
+  const bool useWindowBackgroundColour = thisState == nullptr || (thisState->bitfields & 0x4u) != 0u ||
+    (GetWindowStyleFlag() & kWxTextCtrlStyleMultiline) != 0;
   if (!useWindowBackgroundColour) {
     const COLORREF systemFace = ::GetSysColor(COLOR_3DFACE);
     backgroundColour = wxColourRuntime::FromRgb(
@@ -3001,11 +3150,8 @@ unsigned long wxTextCtrlRuntime::OnCtlColor(
     );
   }
 
-  const COLORREF backgroundColorRef = RGB(
-    backgroundColour.mStorage[0],
-    backgroundColour.mStorage[1],
-    backgroundColour.mStorage[2]
-  );
+  const COLORREF backgroundColorRef =
+    RGB(backgroundColour.mStorage[0], backgroundColour.mStorage[1], backgroundColour.mStorage[2]);
   (void)::SetBkColor(nativeDc, backgroundColorRef);
 
   const COLORREF textColorRef = ::GetSysColor(COLOR_WINDOWTEXT);
@@ -3022,7 +3168,9 @@ unsigned long wxTextCtrlRuntime::OnCtlColor(
  * What it does:
  * Forwards one command-event dispatch into `ProcessCommand`.
  */
-void wxControlRuntime::Command(void* const commandEvent)
+void wxControlRuntime::Command(
+  void* const commandEvent
+)
 {
   ProcessCommand(commandEvent);
 }
@@ -3034,7 +3182,9 @@ void wxControlRuntime::Command(void* const commandEvent)
  * What it does:
  * Base implementation reports that no owner-draw handling was performed.
  */
-bool wxControlRuntime::MSWOnDraw(void** const drawStruct)
+bool wxControlRuntime::MSWOnDraw(
+  void** const drawStruct
+)
 {
   (void)drawStruct;
   return false;
@@ -3047,7 +3197,9 @@ bool wxControlRuntime::MSWOnDraw(void** const drawStruct)
  * What it does:
  * Base implementation reports that no owner-measure handling was performed.
  */
-bool wxControlRuntime::MSWOnMeasure(void** const measureStruct)
+bool wxControlRuntime::MSWOnMeasure(
+  void** const measureStruct
+)
 {
   (void)measureStruct;
   return false;
@@ -3060,7 +3212,9 @@ bool wxControlRuntime::MSWOnMeasure(void** const measureStruct)
  * What it does:
  * Base implementation accepts but ignores title updates.
  */
-void wxWindowBase::SetTitle(const wxStringRuntime& title)
+void wxWindowBase::SetTitle(
+  const wxStringRuntime& title
+)
 {
   (void)title;
 }
@@ -3084,7 +3238,9 @@ wxStringRuntime wxWindowBase::GetTitle() const
  * What it does:
  * Forwards label updates to `SetTitle`.
  */
-void wxWindowBase::SetLabel(const wxStringRuntime& label)
+void wxWindowBase::SetLabel(
+  const wxStringRuntime& label
+)
 {
   SetTitle(label);
 }
@@ -3108,7 +3264,9 @@ wxStringRuntime wxWindowBase::GetLabel() const
  * What it does:
  * Stores one runtime window-name value.
  */
-void wxWindowBase::SetName(const wxStringRuntime& name)
+void wxWindowBase::SetName(
+  const wxStringRuntime& name
+)
 {
   EnsureWxWindowBaseRuntimeState(this).windowName.assign(name.c_str());
 }
@@ -3234,7 +3392,9 @@ wxSize wxWindowBase::GetBestVirtualSize() const
  * Toggles the base visible-state bit (0x02) and reports whether the bit
  * changed for this call.
  */
-bool wxWindowBase::Show(const bool show)
+bool wxWindowBase::Show(
+  const bool show
+)
 {
   WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
   const bool currentlyVisible = (state.bitfields & 0x2u) != 0u;
@@ -3258,7 +3418,9 @@ bool wxWindowBase::Show(const bool show)
  * Toggles the base enabled-state bit (0x04) and reports whether the bit
  * changed for this call.
  */
-bool wxWindowBase::Enable(const bool enable)
+bool wxWindowBase::Enable(
+  const bool enable
+)
 {
   WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
   const bool currentlyEnabled = (state.bitfields & 0x4u) != 0u;
@@ -3278,7 +3440,9 @@ bool wxWindowBase::Enable(const bool enable)
  * Address: 0x0042B5B0 (FUN_0042B5B0)
  * Mangled: ?SetWindowStyleFlag@wxWindowBase@@UAEXJ@Z
  */
-void wxWindowBase::SetWindowStyleFlag(const long style)
+void wxWindowBase::SetWindowStyleFlag(
+  const long style
+)
 {
   EnsureWxWindowBaseRuntimeState(this).windowStyle = style;
 }
@@ -3306,7 +3470,9 @@ bool wxWindowBase::IsRetained() const
  * Address: 0x0042B600 (FUN_0042B600)
  * Mangled: ?SetExtraStyle@wxWindowBase@@UAEXJ@Z
  */
-void wxWindowBase::SetExtraStyle(const long style)
+void wxWindowBase::SetExtraStyle(
+  const long style
+)
 {
   EnsureWxWindowBaseRuntimeState(this).extraStyle = style;
 }
@@ -3315,7 +3481,9 @@ void wxWindowBase::SetExtraStyle(const long style)
  * Address: 0x0042B610 (FUN_0042B610)
  * Mangled: ?SetThemeEnabled@wxWindowBase@@UAEX_N@Z
  */
-void wxWindowBase::SetThemeEnabled(const bool enabled)
+void wxWindowBase::SetThemeEnabled(
+  const bool enabled
+)
 {
   EnsureWxWindowBaseRuntimeState(this).themeEnabled = enabled;
 }
@@ -3376,7 +3544,9 @@ void* wxWindowBase::GetDefaultItem() const
  * Address: 0x0042B680 (FUN_0042B680)
  * Mangled: ?SetDefaultItem@wxWindowBase@@UAEPAVwxWindow@@PAV2@@Z
  */
-void* wxWindowBase::SetDefaultItem(void* const defaultItem)
+void* wxWindowBase::SetDefaultItem(
+  void* const defaultItem
+)
 {
   (void)defaultItem;
   return nullptr;
@@ -3386,7 +3556,9 @@ void* wxWindowBase::SetDefaultItem(void* const defaultItem)
  * Address: 0x0042B690 (FUN_0042B690)
  * Mangled: ?SetTmpDefaultItem@wxWindowBase@@UAEXPAVwxWindow@@@Z
  */
-void wxWindowBase::SetTmpDefaultItem(void* const defaultItem)
+void wxWindowBase::SetTmpDefaultItem(
+  void* const defaultItem
+)
 {
   (void)defaultItem;
 }
@@ -3433,29 +3605,25 @@ void wxWindowBase::CaptureMouse()
 /**
  * Address: 0x0042B700 (FUN_0042B700)
  */
-void wxWindowBase::Update()
-{
-}
+void wxWindowBase::Update() {}
 
 /**
  * Address: 0x0042B710 (FUN_0042B710)
  */
-void wxWindowBase::Freeze()
-{
-}
+void wxWindowBase::Freeze() {}
 
 /**
  * Address: 0x0042B720 (FUN_0042B720)
  */
-void wxWindowBase::Thaw()
-{
-}
+void wxWindowBase::Thaw() {}
 
 /**
  * Address: 0x0042B730 (FUN_0042B730)
  * Mangled: ?PrepareDC@wxWindowBase@@UAEXAAVwxDC@@@Z
  */
-void wxWindowBase::PrepareDC(void* const deviceContext)
+void wxWindowBase::PrepareDC(
+  void* const deviceContext
+)
 {
   (void)deviceContext;
 }
@@ -3463,7 +3631,9 @@ void wxWindowBase::PrepareDC(void* const deviceContext)
 /**
  * Address: 0x0042B740 (FUN_0042B740)
  */
-bool wxWindowBase::ScrollLines(const std::int32_t lines)
+bool wxWindowBase::ScrollLines(
+  const std::int32_t lines
+)
 {
   (void)lines;
   return false;
@@ -3472,13 +3642,17 @@ bool wxWindowBase::ScrollLines(const std::int32_t lines)
 /**
  * Address: 0x0042B750 (FUN_0042B750)
  */
-bool wxWindowBase::ScrollPages(const std::int32_t pages)
+bool wxWindowBase::ScrollPages(
+  const std::int32_t pages
+)
 {
   (void)pages;
   return false;
 }
 
-void wxWindowBase::SetDropTarget(void* const dropTarget)
+void wxWindowBase::SetDropTarget(
+  void* const dropTarget
+)
 {
   EnsureWxWindowBaseRuntimeState(this).dropTarget = dropTarget;
 }
@@ -3585,16 +3759,23 @@ msvc8::vector<moho::ManagedWindowSlot> moho::managedFrames{};
 wxWindowBase* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
 
-moho::wxDCRuntime::wxDCRuntime(wxWindowBase* const ownerWindow) noexcept : mOwnerWindow(ownerWindow)
-{
-}
+moho::wxDCRuntime::wxDCRuntime(
+  wxWindowBase* const ownerWindow
+) noexcept
+  : mOwnerWindow(ownerWindow)
+{}
 
-void moho::wxDCRuntime::SetBrush(const void* const brushToken) noexcept
+void moho::wxDCRuntime::SetBrush(
+  const void* const brushToken
+) noexcept
 {
   mActiveBrush = brushToken;
 }
 
-void moho::wxDCRuntime::DoGetSize(std::int32_t* const outWidth, std::int32_t* const outHeight) const noexcept
+void moho::wxDCRuntime::DoGetSize(
+  std::int32_t* const outWidth,
+  std::int32_t* const outHeight
+) const noexcept
 {
   if (mOwnerWindow != nullptr) {
     mOwnerWindow->DoGetSize(outWidth, outHeight);
@@ -3623,9 +3804,11 @@ void moho::wxDCRuntime::DoDrawRectangle(
   (void)mActiveBrush;
 }
 
-moho::wxPaintDCRuntime::wxPaintDCRuntime(wxWindowBase* const ownerWindow) noexcept : wxDCRuntime(ownerWindow)
-{
-}
+moho::wxPaintDCRuntime::wxPaintDCRuntime(
+  wxWindowBase* const ownerWindow
+) noexcept
+  : wxDCRuntime(ownerWindow)
+{}
 
 moho::wxPaintDCRuntime::~wxPaintDCRuntime() = default;
 
@@ -3640,7 +3823,10 @@ bool moho::WX_EnsureSplashPngHandler()
   return true;
 }
 
-moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(const char* const filename, const wxSize& size)
+moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
+  const char* const filename,
+  const wxSize& size
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     return nullptr;
@@ -3711,30 +3897,22 @@ moho::WD3DViewport::~WD3DViewport()
 /**
  * Address: 0x0042BAF0 (FUN_0042BAF0)
  */
-void moho::WD3DViewport::D3DWindowOnDeviceInit()
-{
-}
+void moho::WD3DViewport::D3DWindowOnDeviceInit() {}
 
 /**
  * Address: 0x0042BB00 (FUN_0042BB00)
  */
-void moho::WD3DViewport::D3DWindowOnDeviceRender()
-{
-}
+void moho::WD3DViewport::D3DWindowOnDeviceRender() {}
 
 /**
  * Address: 0x0042BB10 (FUN_0042BB10)
  */
-void moho::WD3DViewport::D3DWindowOnDeviceExit()
-{
-}
+void moho::WD3DViewport::D3DWindowOnDeviceExit() {}
 
 /**
  * Address: 0x0042BB20 (FUN_0042BB20)
  */
-void moho::WD3DViewport::RenderPreviewImage()
-{
-}
+void moho::WD3DViewport::RenderPreviewImage() {}
 
 /**
  * Address: 0x0042BB30 (FUN_0042BB30)
@@ -3770,7 +3948,9 @@ namespace
   constexpr std::uintptr_t kWxNullBrushToken = 0u;
   constexpr std::uint16_t kClientHitTestCode = 1u;
 
-  void DrawBackgroundFill(moho::wxDCRuntime& deviceContext)
+  void DrawBackgroundFill(
+    moho::wxDCRuntime& deviceContext
+  )
   {
     std::int32_t width = 0;
     std::int32_t height = 0;
@@ -3799,7 +3979,9 @@ namespace
    * Draws viewport background into the supplied paint DC when D3D device is
    * missing or still in background-fallback mode.
    */
-  [[maybe_unused]] void WD3DViewportPaintBackgroundFallback(WD3DViewportPaintCallbackFrame* const callbackFrame)
+  [[maybe_unused]] void WD3DViewportPaintBackgroundFallback(
+    WD3DViewportPaintCallbackFrame* const callbackFrame
+  )
   {
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
     if (callbackFrame == nullptr || callbackFrame->mDeviceContext == nullptr) {
@@ -3819,7 +4001,9 @@ namespace
  * What it does:
  * Fills the viewport paint DC with a solid black rectangle.
  */
-void moho::WD3DViewport::DrawBackgroundImage(wxDCRuntime& deviceContext)
+void moho::WD3DViewport::DrawBackgroundImage(
+  wxDCRuntime& deviceContext
+)
 {
   DrawBackgroundFill(deviceContext);
 }
@@ -3832,7 +4016,9 @@ void moho::WD3DViewport::DrawBackgroundImage(wxDCRuntime& deviceContext)
  * Builds one paint DC, then renders through active D3D device when ready or
  * draws fallback background.
  */
-void moho::WD3DViewport::OnPaint(wxPaintEventRuntime& paintEvent)
+void moho::WD3DViewport::OnPaint(
+  wxPaintEventRuntime& paintEvent
+)
 {
   (void)paintEvent;
   wxPaintDCRuntime paintDc(this);
@@ -3857,7 +4043,9 @@ void moho::WD3DViewport::OnPaint(wxPaintEventRuntime& paintEvent)
  * unhandled messages to base window dispatch.
  */
 long moho::WD3DViewport::MSWWindowProc(
-  const unsigned int message, const unsigned int wParam, const long lParam
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
 )
 {
   CD3DDevice* const device = D3D_GetDevice();
@@ -3889,7 +4077,8 @@ long moho::WD3DViewport::MSWWindowProc(
  * Deleting-dtor thunk lane for `WD3DViewport`.
  */
 static moho::WD3DViewport* DeleteWD3DViewportThunk(
-  moho::WD3DViewport* const viewport, const std::uint8_t deleteFlags
+  moho::WD3DViewport* const viewport,
+  const std::uint8_t deleteFlags
 )
 {
   if (viewport == nullptr) {
@@ -3934,30 +4123,32 @@ namespace
   constexpr std::int32_t kLogWindowSetSizeFlags = 3;
 
   [[nodiscard]] wxTextAttrRuntime BuildTextStyleFromRgb(
-    const std::uint8_t red, const std::uint8_t green, const std::uint8_t blue
+    const std::uint8_t red,
+    const std::uint8_t green,
+    const std::uint8_t blue
   ) noexcept
   {
     return wxTextAttrRuntime(
-      wxColourRuntime::FromRgb(red, green, blue),
-      wxColourRuntime::Null(),
-      wxFontRuntime::Null()
+      wxColourRuntime::FromRgb(red, green, blue), wxColourRuntime::Null(), wxFontRuntime::Null()
     );
   }
 
-  [[nodiscard]] wxTextAttrRuntime DefaultTextStyleForCategory(const std::uint32_t category) noexcept
+  [[nodiscard]] wxTextAttrRuntime DefaultTextStyleForCategory(
+    const std::uint32_t category
+  ) noexcept
   {
     switch (category) {
-      case 0u:
-        return BuildTextStyleFromRgb(0x80, 0x80, 0x80);
-      case kWarningCategoryValue:
-        return BuildTextStyleFromRgb(0xF7, 0xA1, 0x00);
-      case kErrorCategoryValue:
-        return BuildTextStyleFromRgb(0xFF, 0x00, 0x00);
-      default:
-        return BuildTextStyleFromRgb(0x00, 0x00, 0x00);
+    case 0u:
+      return BuildTextStyleFromRgb(0x80, 0x80, 0x80);
+    case kWarningCategoryValue:
+      return BuildTextStyleFromRgb(0xF7, 0xA1, 0x00);
+    case kErrorCategoryValue:
+      return BuildTextStyleFromRgb(0xFF, 0x00, 0x00);
+    default:
+      return BuildTextStyleFromRgb(0x00, 0x00, 0x00);
     }
   }
-}
+} // namespace
 
 wxStreamBase::wxStreamBase() = default;
 
@@ -3974,8 +4165,7 @@ wxInputStream::wxInputStream()
   , m_wback(0)
   , m_wbackcur(0)
   , m_wbacksize(0)
-{
-}
+{}
 
 /**
  * Address: 0x009DDDE0 (FUN_009DDDE0, wxFileExists)
@@ -3984,7 +4174,9 @@ wxInputStream::wxInputStream()
  * Returns true when the provided wx-string path resolves to an existing file
  * path that is not a directory.
  */
-bool wxFileExists(const wxStringRuntime* const fileName)
+bool wxFileExists(
+  const wxStringRuntime* const fileName
+)
 {
   if (fileName == nullptr || fileName->m_pchData == nullptr) {
     return false;
@@ -4001,7 +4193,10 @@ bool wxFileExists(const wxStringRuntime* const fileName)
  * What it does:
  * Initializes one file lane and opens the provided wide path with read mode.
  */
-wxFile::wxFile(const wchar_t* const fileName, const OpenMode mode)
+wxFile::wxFile(
+  const wchar_t* const fileName,
+  const OpenMode mode
+)
   : m_fd(-1)
   , m_error(0)
 {
@@ -4024,7 +4219,9 @@ wxFile::~wxFile()
  * Builds one temporary wx-string from a wide path and probes whether it maps
  * to an existing non-directory file.
  */
-bool wxFile::Exists(const wchar_t* const fileName)
+bool wxFile::Exists(
+  const wchar_t* const fileName
+)
 {
   wxStringRuntime path = AllocateOwnedWxString(fileName != nullptr ? std::wstring(fileName) : std::wstring());
   const bool exists = wxFileExists(&path);
@@ -4032,7 +4229,11 @@ bool wxFile::Exists(const wchar_t* const fileName)
   return exists;
 }
 
-bool wxFile::Open(const wchar_t* const fileName, const OpenMode mode, const std::int32_t permissions)
+bool wxFile::Open(
+  const wchar_t* const fileName,
+  const OpenMode mode,
+  const std::int32_t permissions
+)
 {
   (void)mode;
   if (m_fd != -1) {
@@ -4058,7 +4259,9 @@ bool wxFile::Open(const wchar_t* const fileName, const OpenMode mode, const std:
  * Builds one file-backed input stream from a path string by allocating a
  * `wxFile` lane and marking it as stream-owned for destruction.
  */
-wxFileInputStream::wxFileInputStream(const wxStringRuntime& fileName)
+wxFileInputStream::wxFileInputStream(
+  const wxStringRuntime& fileName
+)
   : wxInputStream()
 {
   if (wxFile* const file = new (std::nothrow) wxFile(fileName.c_str(), wxFile::OpenRead); file != nullptr) {
@@ -4129,7 +4332,10 @@ void wxFileName::SplitPath(
  * What it does:
  * Builds one normalized volume-prefix text lane used by `SplitPath_0`.
  */
-wxStringRuntime wxGetVolumeString(const wxStringRuntime& volume, const wchar_t* const formatHint)
+wxStringRuntime wxGetVolumeString(
+  const wxStringRuntime& volume,
+  const wchar_t* const formatHint
+)
 {
   const std::wstring volumeText(volume.c_str());
   if (volumeText.empty()) {
@@ -4230,7 +4436,9 @@ wxMemoryDC::wxMemoryDC()
  * Address: 0x009D4430 (FUN_009D4430)
  * Mangled: ?CreateCompatible@wxMemoryDC@@QAE_NPAVwxDC@@@Z
  */
-bool wxMemoryDC::CreateCompatible(wxDC* const sourceDc)
+bool wxMemoryDC::CreateCompatible(
+  wxDC* const sourceDc
+)
 {
   HDC sourceHandle = nullptr;
   if (sourceDc != nullptr) {
@@ -4240,7 +4448,8 @@ bool wxMemoryDC::CreateCompatible(wxDC* const sourceDc)
   HDC const compatibleDc = ::CreateCompatibleDC(sourceHandle);
   m_bOwnsDC |= 1u;
   m_hDC = compatibleDc;
-  m_flags = static_cast<std::uint8_t>((m_flags & static_cast<std::uint8_t>(~0x2u)) | (compatibleDc != nullptr ? 0x2u : 0u));
+  m_flags =
+    static_cast<std::uint8_t>((m_flags & static_cast<std::uint8_t>(~0x2u)) | (compatibleDc != nullptr ? 0x2u : 0u));
   return (m_flags & 0x2u) != 0u;
 }
 
@@ -4259,12 +4468,16 @@ void wxMemoryDC::Init()
   (void)::SetBkMode(reinterpret_cast<HDC>(m_hDC), 1);
 }
 
-void wxMemoryDC::SetBrush(void* const brushToken)
+void wxMemoryDC::SetBrush(
+  void* const brushToken
+)
 {
   m_oldBrush = brushToken;
 }
 
-void wxMemoryDC::SetPen(void* const penToken)
+void wxMemoryDC::SetPen(
+  void* const penToken
+)
 {
   m_oldPen = penToken;
 }
@@ -4292,7 +4505,10 @@ msvc8::string wxStringRuntime::ToUtf8Lower() const
  * Selects first-or-last wide-char search over this string lane and returns
  * a zero-based character index, or `-1` when no match exists.
  */
-std::int32_t wxStringRuntime::FindCharacterIndex(const wchar_t needle, const bool findFromRight) const noexcept
+std::int32_t wxStringRuntime::FindCharacterIndex(
+  const wchar_t needle,
+  const bool findFromRight
+) const noexcept
 {
   wchar_t* const text = m_pchData;
   wchar_t* const match =
@@ -4311,7 +4527,9 @@ std::int32_t wxStringRuntime::FindCharacterIndex(const wchar_t needle, const boo
  * Truncates one wx string to `newLength` when shortening is requested and the
  * target payload is writable after copy-before-write checks.
  */
-wxStringRuntime* wxStringRuntime::Empty(const std::uint32_t newLength)
+wxStringRuntime* wxStringRuntime::Empty(
+  const std::uint32_t newLength
+)
 {
   if (m_pchData == nullptr || !IsOwnedWxString(*this)) {
     return this;
@@ -4329,7 +4547,9 @@ wxStringRuntime* wxStringRuntime::Empty(const std::uint32_t newLength)
   return this;
 }
 
-wxStringRuntime wxStringRuntime::Borrow(const wchar_t* const text) noexcept
+wxStringRuntime wxStringRuntime::Borrow(
+  const wchar_t* const text
+) noexcept
 {
   wxStringRuntime runtime{};
   runtime.m_pchData = const_cast<wchar_t*>(text != nullptr ? text : L"");
@@ -4377,7 +4597,9 @@ void* wxImageHandlerRuntime::GetClassInfo() const
   return gWxImageHandlerClassInfoTable;
 }
 
-void wxImageHandlerRuntime::ReleaseSharedWxString(wxStringRuntime& value) noexcept
+void wxImageHandlerRuntime::ReleaseSharedWxString(
+  wxStringRuntime& value
+) noexcept
 {
   // Runtime wrappers keep wxString lanes as borrowed views; dropping one lane
   // is represented by clearing the pointer.
@@ -4460,7 +4682,10 @@ void wxImageRuntime::ReleaseRefData() noexcept
  * Drops previous shared image ref-data, allocates one fresh image ref-data
  * object, then allocates/clears 24-bit RGB storage for `width*height`.
  */
-void wxImageRuntime::Create(const std::int32_t width, const std::int32_t height)
+void wxImageRuntime::Create(
+  const std::int32_t width,
+  const std::int32_t height
+)
 {
   ReleaseRefData();
 
@@ -4490,7 +4715,9 @@ void wxImageRuntime::Create(const std::int32_t width, const std::int32_t height)
 }
 
 wxColourRuntime wxColourRuntime::FromRgb(
-  const std::uint8_t red, const std::uint8_t green, const std::uint8_t blue
+  const std::uint8_t red,
+  const std::uint8_t green,
+  const std::uint8_t blue
 ) noexcept
 {
   wxColourRuntime color{};
@@ -4528,8 +4755,7 @@ wxTextAttrRuntime::wxTextAttrRuntime(
   : mForegroundColour(foreground)
   , mBackgroundColour(background)
   , mFont(font)
-{
-}
+{}
 
 /**
  * Address: 0x004F63B0 (FUN_004F63B0)
@@ -4549,19 +4775,25 @@ msvc8::string wxTextCtrlRuntime::GetValueUtf8Lower() const
   return GetValue().ToUtf8Lower();
 }
 
-void wxTextCtrlRuntime::SetValueUtf8(const msvc8::string& value)
+void wxTextCtrlRuntime::SetValueUtf8(
+  const msvc8::string& value
+)
 {
   const std::wstring wideValue = gpg::STR_Utf8ToWide(value.c_str());
   SetValue(wxStringRuntime::Borrow(wideValue.c_str()));
 }
 
-void wxTextCtrlRuntime::AppendUtf8(const msvc8::string& text)
+void wxTextCtrlRuntime::AppendUtf8(
+  const msvc8::string& text
+)
 {
   const std::wstring wideText = gpg::STR_Utf8ToWide(text.c_str());
   AppendText(wxStringRuntime::Borrow(wideText.c_str()));
 }
 
-void wxTextCtrlRuntime::AppendWide(const std::wstring& text)
+void wxTextCtrlRuntime::AppendWide(
+  const std::wstring& text
+)
 {
   AppendText(wxStringRuntime::Borrow(text.c_str()));
 }
@@ -4590,7 +4822,9 @@ const std::wstring& moho::WWinLogTextBuilder::Finalize() const noexcept
   return mText;
 }
 
-void moho::WWinLogTextBuilder::SetFieldWidth(const std::size_t width) noexcept
+void moho::WWinLogTextBuilder::SetFieldWidth(
+  const std::size_t width
+) noexcept
 {
   mFieldWidth = width;
 }
@@ -4610,7 +4844,9 @@ void moho::WWinLogTextBuilder::Clear() noexcept
  * Emits one code-point with optional field-width padding and clears transient
  * width state.
  */
-void moho::WWinLogTextBuilder::WriteCodePoint(const wchar_t codePoint)
+void moho::WWinLogTextBuilder::WriteCodePoint(
+  const wchar_t codePoint
+)
 {
   const std::wstring oneCodePoint(1, codePoint);
   WriteWideText(oneCodePoint);
@@ -4623,7 +4859,9 @@ void moho::WWinLogTextBuilder::WriteCodePoint(const wchar_t codePoint)
  * Emits one wide string with optional field-width padding and clears transient
  * width state.
  */
-void moho::WWinLogTextBuilder::WriteWideText(const std::wstring& text)
+void moho::WWinLogTextBuilder::WriteWideText(
+  const std::wstring& text
+)
 {
   const std::size_t paddingCount = mFieldWidth > text.size() ? mFieldWidth - text.size() : 0;
   if (!mLeftAlign && paddingCount != 0) {
@@ -4645,7 +4883,9 @@ void moho::WWinLogTextBuilder::WriteWideText(const std::wstring& text)
  * What it does:
  * Emits one wide-string literal with width/padding behavior.
  */
-void moho::WWinLogTextBuilder::WriteWideLiteral(const wchar_t* const text)
+void moho::WWinLogTextBuilder::WriteWideLiteral(
+  const wchar_t* const text
+)
 {
   WriteWideText(text != nullptr ? std::wstring(text) : std::wstring{});
 }
@@ -4656,7 +4896,9 @@ void moho::WWinLogTextBuilder::WriteWideLiteral(const wchar_t* const text)
  * What it does:
  * Emits one UTF-8 fragment by widening it then appending with width behavior.
  */
-void moho::WWinLogTextBuilder::WriteUtf8Text(const msvc8::string& text)
+void moho::WWinLogTextBuilder::WriteUtf8Text(
+  const msvc8::string& text
+)
 {
   WriteWideText(gpg::STR_Utf8ToWide(text.c_str()));
 }
@@ -4667,7 +4909,9 @@ void moho::WWinLogTextBuilder::WriteUtf8Text(const msvc8::string& text)
  * What it does:
  * Emits one decoded wide code-point.
  */
-void moho::WWinLogTextBuilder::WriteDecodedCodePoint(const wchar_t codePoint)
+void moho::WWinLogTextBuilder::WriteDecodedCodePoint(
+  const wchar_t codePoint
+)
 {
   WriteCodePoint(codePoint);
 }
@@ -4678,7 +4922,9 @@ void moho::WWinLogTextBuilder::WriteDecodedCodePoint(const wchar_t codePoint)
  * What it does:
  * Emits one run of space code-points.
  */
-void moho::WWinLogTextBuilder::WriteSpaces(std::size_t count)
+void moho::WWinLogTextBuilder::WriteSpaces(
+  std::size_t count
+)
 {
   while (count > 0) {
     WriteCodePoint(L' ');
@@ -4699,14 +4945,14 @@ bool moho::CWinLogLine::IsMessageEntry() const noexcept
 const wchar_t* moho::CWinLogLine::SeverityPrefix() const noexcept
 {
   switch (categoryMask) {
-    case 0u:
-      return L"DEBUG: ";
-    case kWarningCategoryValue:
-      return L"WARNING: ";
-    case kErrorCategoryValue:
-      return L"ERROR: ";
-    default:
-      return L"INFO: ";
+  case 0u:
+    return L"DEBUG: ";
+  case kWarningCategoryValue:
+    return L"WARNING: ";
+  case kErrorCategoryValue:
+    return L"ERROR: ";
+  default:
+    return L"INFO: ";
   }
 }
 
@@ -4717,7 +4963,10 @@ const wchar_t* moho::CWinLogLine::SeverityPrefix() const noexcept
  * Initializes one wxEvent runtime payload from `(eventId, eventType)` and
  * clears ref/object/timestamp/flag lanes.
  */
-wxEventRuntime::wxEventRuntime(const std::int32_t eventId, const std::int32_t eventType)
+wxEventRuntime::wxEventRuntime(
+  const std::int32_t eventId,
+  const std::int32_t eventType
+)
   : mRefData(nullptr)
   , mEventObject(nullptr)
   , mEventType(eventType)
@@ -4728,8 +4977,7 @@ wxEventRuntime::wxEventRuntime(const std::int32_t eventId, const std::int32_t ev
   , mIsCommandEvent(0)
   , mReserved1E(0)
   , mReserved1F(0)
-{
-}
+{}
 
 /**
  * Address: 0x00979090 (FUN_00979090, ??0wxCommandEvent@@QAE@@Z)
@@ -4738,7 +4986,10 @@ wxEventRuntime::wxEventRuntime(const std::int32_t eventId, const std::int32_t ev
  * Initializes one wxCommandEvent payload on top of wxEvent runtime state and
  * sets the command-event marker flag.
  */
-wxCommandEventRuntime::wxCommandEventRuntime(const std::int32_t commandType, const std::int32_t eventId)
+wxCommandEventRuntime::wxCommandEventRuntime(
+  const std::int32_t commandType,
+  const std::int32_t eventId
+)
   : wxEventRuntime(eventId, commandType)
   , mCommandString(wxStringRuntime::Borrow(L""))
   , mCommandInt(0)
@@ -4789,7 +5040,9 @@ wxListItemRuntime::~wxListItemRuntime()
  * Builds one stack `wxListItem` request payload (mask=0x8 for data lane),
  * queries the row through `GetItem`, and returns row user-data on success.
  */
-long wxListCtrlRuntime::GetItemData(const std::int32_t itemId)
+long wxListCtrlRuntime::GetItemData(
+  const std::int32_t itemId
+)
 {
   wxListItemRuntime item{};
   item.mMask = 0x8;
@@ -4895,8 +5148,7 @@ moho::CLogAdditionEvent* moho::CLogAdditionEvent::Clone() const
  */
 moho::CWinLogTarget::CWinLogTarget()
   : gpg::LogTarget(true)
-{
-}
+{}
 
 /**
  * Address: 0x004F39B0 (FUN_004F39B0)
@@ -4913,7 +5165,9 @@ moho::CWinLogTarget::~CWinLogTarget() = default;
  * What it does:
  * Appends one line record into the pending queue.
  */
-void moho::CWinLogTarget::AppendPendingLine(const CWinLogLine& line)
+void moho::CWinLogTarget::AppendPendingLine(
+  const CWinLogLine& line
+)
 {
   mPendingLines.push_back(line);
 }
@@ -4940,12 +5194,16 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * What it does:
  * Replaces committed-line storage with a copy of `nextCommittedLines`.
  */
-void moho::CWinLogTarget::ReplaceCommittedLines(const msvc8::vector<CWinLogLine>& nextCommittedLines)
+void moho::CWinLogTarget::ReplaceCommittedLines(
+  const msvc8::vector<CWinLogLine>& nextCommittedLines
+)
 {
   mCommittedLines = nextCommittedLines;
 }
 
-void moho::CWinLogTarget::SnapshotCommittedLines(msvc8::vector<CWinLogLine>* const outLines)
+void moho::CWinLogTarget::SnapshotCommittedLines(
+  msvc8::vector<CWinLogLine>* const outLines
+)
 {
   if (outLines == nullptr) {
     return;
@@ -4955,7 +5213,9 @@ void moho::CWinLogTarget::SnapshotCommittedLines(msvc8::vector<CWinLogLine>* con
   *outLines = mCommittedLines;
 }
 
-void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(const msvc8::vector<msvc8::string>& replayLines)
+void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(
+  const msvc8::vector<msvc8::string>& replayLines
+)
 {
   boost::mutex::scoped_lock scopedLock(lock);
 
@@ -5075,18 +5335,17 @@ void moho::WWinLogWindow::InitializeFromUserPreferences()
   RestoreGeometryFromPreferences(preferences);
 }
 
-void moho::WWinLogWindow::RestoreCategoryStateFromPreferences(IUserPrefs* const preferences)
+void moho::WWinLogWindow::RestoreCategoryStateFromPreferences(
+  IUserPrefs* const preferences
+)
 {
   mEnabledCategoriesMask = 0;
 
   const auto checkBoxes = CategoryCheckBoxes();
   for (std::size_t index = 0; index < checkBoxes.size(); ++index) {
     const bool enabled = preferences != nullptr
-                           ? preferences->GetBoolean(
-                               msvc8::string(kLogCategoryPreferenceKeys[index]),
-                               kLogCategoryPreferenceDefaults[index]
-                             )
-                           : kLogCategoryPreferenceDefaults[index];
+      ? preferences->GetBoolean(msvc8::string(kLogCategoryPreferenceKeys[index]), kLogCategoryPreferenceDefaults[index])
+      : kLogCategoryPreferenceDefaults[index];
 
     if (enabled) {
       mEnabledCategoriesMask |= (1u << static_cast<std::uint32_t>(index));
@@ -5098,7 +5357,9 @@ void moho::WWinLogWindow::RestoreCategoryStateFromPreferences(IUserPrefs* const 
   }
 }
 
-void moho::WWinLogWindow::RestoreFilterFromPreferences(IUserPrefs* const preferences)
+void moho::WWinLogWindow::RestoreFilterFromPreferences(
+  IUserPrefs* const preferences
+)
 {
   const msvc8::string fallback(kLogFilterPreferenceDefault);
   if (preferences != nullptr) {
@@ -5112,7 +5373,9 @@ void moho::WWinLogWindow::RestoreFilterFromPreferences(IUserPrefs* const prefere
   }
 }
 
-void moho::WWinLogWindow::RestoreGeometryFromPreferences(IUserPrefs* const preferences)
+void moho::WWinLogWindow::RestoreGeometryFromPreferences(
+  IUserPrefs* const preferences
+)
 {
   if (preferences == nullptr) {
     return;
@@ -5144,7 +5407,9 @@ moho::WWinLogWindow::~WWinLogWindow()
   ReleaseManagedOwnerSlots();
 }
 
-void moho::WWinLogWindow::SetOwnerTarget(CWinLogTarget* const ownerTarget) noexcept
+void moho::WWinLogWindow::SetOwnerTarget(
+  CWinLogTarget* const ownerTarget
+) noexcept
 {
   mOwnerTarget = ownerTarget;
 }
@@ -5209,7 +5474,9 @@ void moho::WWinLogWindow::ResetCommittedLinesFromBuffer()
   mOwnerTarget->ResetCommittedLinesFromReplayBuffer(mBufferedLines);
 }
 
-bool moho::WWinLogWindow::ShouldDisplayCommittedLine(const CWinLogLine& line) const
+bool moho::WWinLogWindow::ShouldDisplayCommittedLine(
+  const CWinLogLine& line
+) const
 {
   if (line.categoryMask < 32) {
     const std::uint32_t categoryBit = 1u << line.categoryMask;
@@ -5226,7 +5493,9 @@ bool moho::WWinLogWindow::ShouldDisplayCommittedLine(const CWinLogLine& line) co
   return std::strstr(loweredLineText.c_str(), mFilterText.c_str()) != nullptr;
 }
 
-std::wstring moho::WWinLogWindow::BuildReplayFlushText(const std::size_t startIndex) const
+std::wstring moho::WWinLogWindow::BuildReplayFlushText(
+  const std::size_t startIndex
+) const
 {
   WWinLogTextBuilder replayBuilder{};
   for (std::size_t index = startIndex; index < mBufferedLines.size(); ++index) {
@@ -5238,7 +5507,9 @@ std::wstring moho::WWinLogWindow::BuildReplayFlushText(const std::size_t startIn
   return replayBuilder.Finalize();
 }
 
-std::wstring moho::WWinLogWindow::BuildFormattedCommittedLineText(const CWinLogLine& line) const
+std::wstring moho::WWinLogWindow::BuildFormattedCommittedLineText(
+  const CWinLogLine& line
+) const
 {
   WWinLogTextBuilder lineBuilder{};
   const std::wstring severityPrefix(line.SeverityPrefix());
@@ -5323,7 +5594,9 @@ void moho::WWinLogWindow::RebuildVisibleLinesFromControls()
  * Applies one committed line against category/filter visibility and appends
  * replay/text output with preserved indentation behavior.
  */
-void moho::WWinLogWindow::AppendCommittedLine(const CWinLogLine& line)
+void moho::WWinLogWindow::AppendCommittedLine(
+  const CWinLogLine& line
+)
 {
   while (mBufferedLines.size() > line.sequenceIndex) {
     mBufferedLines.pop_back();
@@ -5376,7 +5649,9 @@ void moho::WWinLogWindow::AppendCommittedLine(const CWinLogLine& line)
  * Merges pending lines into committed history and refreshes output when the
  * committed count changed.
  */
-void moho::WWinLogWindow::OnTargetPendingLinesChanged(const CLogAdditionEvent& event)
+void moho::WWinLogWindow::OnTargetPendingLinesChanged(
+  const CLogAdditionEvent& event
+)
 {
   (void)event;
   if (mOwnerTarget == nullptr) {
@@ -5406,7 +5681,10 @@ void moho::WWinLogWindow::OnTargetPendingLinesChanged()
  * min-drag size hints, and startup icon-resource assignment.
  */
 WSupComFrame* WX_CreateSupComFrame(
-  const char* const title, const wxPoint& position, const wxSize& size, const std::int32_t style
+  const char* const title,
+  const wxPoint& position,
+  const wxSize& size,
+  const std::int32_t style
 )
 {
   auto* const frame = new WSupComFrameRuntime(title, position, size, style);
@@ -5441,7 +5719,9 @@ namespace
    * the active viewport, then rebuilds one GAL context head and reinitializes
    * D3D device state.
    */
-  void SyncSupComFrameClientSizeAndViewport(WSupComFrame& frame)
+  void SyncSupComFrameClientSizeAndViewport(
+    WSupComFrame& frame
+  )
   {
     std::int32_t width = 0;
     std::int32_t height = 0;
@@ -5514,11 +5794,10 @@ namespace
     RECT clipRect{};
     RECT* clipRectPtr = nullptr;
     if (
-      context.GetHeadCount() == 1 && head.mWindowed
-      && moho::OPTIONS_GetInt(kSupComFrameCursorLockPreferenceKey) == 1 && moho::sMainWindow != nullptr
+      context.GetHeadCount() == 1 && head.mWindowed && moho::OPTIONS_GetInt(kSupComFrameCursorLockPreferenceKey) == 1 &&
+      moho::sMainWindow != nullptr
     ) {
-      const HWND mainWindowHandle =
-        reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+      const HWND mainWindowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
       if (mainWindowHandle != nullptr) {
         ::GetWindowRect(mainWindowHandle, &clipRect);
         clipRectPtr = &clipRect;
@@ -5536,7 +5815,9 @@ namespace
  * Persists SupCom frame position lanes to user preferences while device-lock
  * is disabled and the frame is not iconized.
  */
-void WSupComFrame::OnMove(wxMoveEventRuntime& event)
+void WSupComFrame::OnMove(
+  wxMoveEventRuntime& event
+)
 {
   (void)event;
   if (moho::sDeviceLock || IsIconized()) {
@@ -5567,7 +5848,11 @@ void WSupComFrame::OnMove(wxMoveEventRuntime& event)
  * persists window preference keys, and forwards unhandled messages to base
  * frame dispatch.
  */
-long WSupComFrame::MSWWindowProc(const unsigned int message, const unsigned int wParam, const long lParam)
+long WSupComFrame::MSWWindowProc(
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
 {
   auto dispatchBase = [this, message, wParam, lParam]() -> long {
     return wxTopLevelWindowRuntime::MSWWindowProc(message, wParam, lParam);
@@ -5576,8 +5861,10 @@ long WSupComFrame::MSWWindowProc(const unsigned int message, const unsigned int 
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
   if (!moho::sDeviceLock && moho::ren_Viewport != nullptr && gpg::gal::Device::IsReady()) {
     if (gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance(); galDevice != nullptr) {
-      if (gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
-          activeContext != nullptr && activeContext->GetHeadCount() > 0) {
+      if (
+        gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
+        activeContext != nullptr && activeContext->GetHeadCount() > 0
+      ) {
         (void)activeContext->GetHead(0);
       }
     }
@@ -5706,7 +5993,9 @@ void moho::ManagedWindowSlot::Clear() noexcept
   nextInOwnerChain = nullptr;
 }
 
-moho::WWinManagedDialog* moho::WWinManagedDialog::FromManagedSlotHeadLink(ManagedWindowSlot** const ownerHeadLink) noexcept
+moho::WWinManagedDialog* moho::WWinManagedDialog::FromManagedSlotHeadLink(
+  ManagedWindowSlot** const ownerHeadLink
+) noexcept
 {
   if (ownerHeadLink == nullptr || ownerHeadLink == NullManagedSlotHeadLinkSentinel()) {
     return nullptr;
@@ -5738,7 +6027,9 @@ std::size_t moho::WWinManagedDialog::ManagedSlotCount()
  * What it does:
  * Appends one dialog-managed registry slot and links it to `ownerHeadLink`.
  */
-void moho::WWinManagedDialog::AppendManagedSlotForOwner(ManagedWindowSlot** const ownerHeadLink)
+void moho::WWinManagedDialog::AppendManagedSlotForOwner(
+  ManagedWindowSlot** const ownerHeadLink
+)
 {
   AppendManagedSlot<WWinManagedDialog>(managedWindows, ownerHeadLink);
 }
@@ -5765,12 +6056,16 @@ void moho::WWinManagedDialog::ReleaseManagedOwnerSlots()
   ReleaseManagedOwnerSlotChain(mManagedSlotsHead);
 }
 
-void moho::WWinManagedDialog::DestroyManagedOwners(msvc8::vector<ManagedWindowSlot>& slots)
+void moho::WWinManagedDialog::DestroyManagedOwners(
+  msvc8::vector<ManagedWindowSlot>& slots
+)
 {
   DestroyManagedRuntimeCollection<WWinManagedDialog>(slots);
 }
 
-moho::WWinManagedFrame* moho::WWinManagedFrame::FromManagedSlotHeadLink(ManagedWindowSlot** const ownerHeadLink) noexcept
+moho::WWinManagedFrame* moho::WWinManagedFrame::FromManagedSlotHeadLink(
+  ManagedWindowSlot** const ownerHeadLink
+) noexcept
 {
   if (ownerHeadLink == nullptr || ownerHeadLink == NullManagedSlotHeadLinkSentinel()) {
     return nullptr;
@@ -5802,7 +6097,9 @@ std::size_t moho::WWinManagedFrame::ManagedSlotCount()
  * What it does:
  * Appends one frame-managed registry slot and links it to `ownerHeadLink`.
  */
-void moho::WWinManagedFrame::AppendManagedSlotForOwner(ManagedWindowSlot** const ownerHeadLink)
+void moho::WWinManagedFrame::AppendManagedSlotForOwner(
+  ManagedWindowSlot** const ownerHeadLink
+)
 {
   AppendManagedSlot<WWinManagedFrame>(managedFrames, ownerHeadLink);
 }
@@ -5829,7 +6126,9 @@ void moho::WWinManagedFrame::ReleaseManagedOwnerSlots()
   ReleaseManagedOwnerSlotChain(mManagedSlotsHead);
 }
 
-void moho::WWinManagedFrame::DestroyManagedOwners(msvc8::vector<ManagedWindowSlot>& slots)
+void moho::WWinManagedFrame::DestroyManagedOwners(
+  msvc8::vector<ManagedWindowSlot>& slots
+)
 {
   DestroyManagedRuntimeCollection<WWinManagedFrame>(slots);
 }

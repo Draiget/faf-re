@@ -17,6 +17,7 @@ namespace LuaPlus
 namespace moho
 {
   class CScrLuaInitForm;
+  class STIMap;
 
   struct CameraUserEntityWeakRef
   {
@@ -60,6 +61,16 @@ namespace moho
   class CameraImpl
   {
   public:
+    /**
+     * Address: 0x007A7950 (FUN_007A7950, ??0CameraImpl@Moho@@QAE@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z)
+     * Mangled: ??0CameraImpl@Moho@@QAE@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z
+     *
+     * What it does:
+     * Builds one runtime camera instance bound to terrain-map context and
+     * optional Lua state ownership.
+     */
+    CameraImpl(gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* luaState);
+
     /**
      * Address context: called from `RCamManager::Frame` (`0x007AABB0`) camera-loop lane.
      *
@@ -144,7 +155,10 @@ namespace moho
      * Starts manual camera movement toward `position` with heading/pitch lanes
      * and transition controls.
      */
-    virtual void TargetManual(const Wm3::Vec3f& position, float heading, float pitch, float zoom, float seconds) = 0;
+    // Originally a regular virtual: `RCamManager::CreateCamera` constructs
+    // `CameraImpl` directly via placement-new, so the binary cannot have left
+    // this slot pure-virtual. The body is pending recovery.
+    virtual void TargetManual(const Wm3::Vec3f& position, float heading, float pitch, float zoom, float seconds);
 
     /**
      * Address: 0x007A6C80 (Moho::CameraImpl::CameraGetOffset)
@@ -201,6 +215,31 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<CameraImpl>) == 0x08,
     "CScrLuaMetatableFactory<CameraImpl> size must be 0x08"
   );
+
+  /**
+   * Address: 0x007AB080 (FUN_007AB080, cfunc_GetCamera)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_GetCameraL`.
+   */
+  int cfunc_GetCamera(lua_State* luaContext);
+
+  /**
+   * Address: 0x007AB0A0 (FUN_007AB0A0, func_GetCamera_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder metadata for `GetCamera(name)`.
+   */
+  CScrLuaInitForm* func_GetCamera_LuaFuncDef();
+
+  /**
+   * Address: 0x007AB100 (FUN_007AB100, cfunc_GetCameraL)
+   *
+   * What it does:
+   * Resolves one camera name from Lua and pushes the camera script object or
+   * nil when no camera matches.
+   */
+  int cfunc_GetCameraL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007AB4E0 (FUN_007AB4E0, cfunc_CameraImplSnapTo)

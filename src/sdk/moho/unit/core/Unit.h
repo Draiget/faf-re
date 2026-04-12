@@ -29,7 +29,7 @@ namespace moho
   enum EUnitState : std::int32_t;
   struct CEconRequest;
   class CIntel;
-  class RUnitBlueprint;
+  struct RUnitBlueprint;
   class ReconBlip;
   class StatItem;
   class UserUnit;

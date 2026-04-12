@@ -90,7 +90,10 @@ struct LocVar
 	int endpc;
 };
 
-struct __declspec(align(4)) Proto
+// Proto's `int64_t reserved8` forces a natural 8-byte alignment, so any
+// `align(4)` here would be silently ignored (C4359). Don't add an alignment
+// specifier — the natural alignment is correct and matches the binary layout.
+struct Proto
 {
 	GCObject* next;
 	lu_byte tt;

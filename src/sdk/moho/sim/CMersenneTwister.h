@@ -5,7 +5,7 @@
 
 namespace gpg
 {
-  class MD5Context;
+  struct MD5Context;
   class RType;
   class ReadArchive;
   class WriteArchive;

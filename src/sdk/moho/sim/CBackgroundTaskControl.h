@@ -4,7 +4,7 @@
 
 namespace moho
 {
-  class SWldScenarioLoadControl;
+  struct SWldScenarioLoadControl;
 
   /**
    * Address context:

@@ -597,6 +597,25 @@ STaskEventLinkage::~STaskEventLinkage()
 }
 
 /**
+ * Address: 0x004078B0 (FUN_004078B0, Moho::WeakPtr_STaskEventLinkage::SetObject)
+ *
+ * What it does:
+ * Atomically rebinds an intrusive `WeakPtr<STaskEventLinkage>` slot to a new
+ * linkage. Walks the prior owner's weak chain to remove `slot`, then inserts
+ * at the new owner's chain head. No-op when `slot->ownerLinkSlot` already
+ * matches the new target.
+ */
+WeakPtr<STaskEventLinkage>* WeakPtr_STaskEventLinkage::SetObject(
+  WeakPtr<STaskEventLinkage>* const slot,
+  STaskEventLinkage* const linkage) noexcept
+{
+  if (slot != nullptr) {
+    slot->ResetFromObject(linkage);
+  }
+  return slot;
+}
+
+/**
  * Address: 0x00406C70 (FUN_00406C70, ??1CTaskEvent@Moho@@UAE@XZ)
  *
  * What it does:

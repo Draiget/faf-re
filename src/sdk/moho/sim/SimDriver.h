@@ -41,7 +41,7 @@ namespace moho
   class LaunchInfoBase;
   class CMarshaller;
   class CDecoder;
-  class REntityBlueprint;
+  struct REntityBlueprint;
   class StatItem;
 
   struct SSyncPublishedCommandPacket

@@ -1,6 +1,8 @@
 #include "moho/lua/SCR_String.h"
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/FileWaitHandleSet.h"
@@ -23,6 +25,28 @@ namespace
   }
 
 } // namespace
+
+/**
+ * Address: 0x004D3110 (FUN_004D3110, ?SCR_FromString@Moho@@YA?AVLuaObject@LuaPlus@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PAVLuaState@3@@Z)
+ *
+ * IDA signature:
+ * LuaPlus::LuaObject *__cdecl Moho::SCR_FromString(LuaPlus::LuaObject *out, std::string const& src, LuaPlus::LuaState *state);
+ *
+ * What it does:
+ * Drops the source string into a 256-byte initial MemBufferStream, wraps that
+ * stream in a BinaryReader, and forwards to SCR_FromByteStream so the caller
+ * receives a fully populated LuaObject. Lifetime is managed by RAII.
+ */
+LuaPlus::LuaObject* moho::SCR_FromString(
+    LuaPlus::LuaObject* const outObject, const msvc8::string& source, LuaPlus::LuaState* const state)
+{
+  gpg::MemBufferStream stream{0x100u};
+  stream.Write(source.c_str(), source.size());
+
+  gpg::BinaryReader reader{&stream};
+  outObject->SCR_FromByteStream(*outObject, state, &reader);
+  return outObject;
+}
 
 /**
  * Address: 0x004D3470 (FUN_004D3470, cfunc_STR_xtoi)

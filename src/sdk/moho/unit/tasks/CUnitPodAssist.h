@@ -6,6 +6,12 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/task/CCommandTask.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class Unit;
@@ -35,6 +41,25 @@ namespace moho
     [[nodiscard]] static CUnitPodAssist* Create(CCommandTask* dispatchTask);
 
     int Execute() override;
+
+    /**
+     * Address: 0x0061E970 (FUN_0061E970, Moho::CUnitPodAssist::MemberDeserialize)
+     *
+     * What it does:
+     * Reads the CCommandTask base via the cached `CCommandTask` RType, then
+     * reads the dispatch-task pointer (`mDispatchTask`) and the assist-target
+     * `WeakPtr<Unit>` from the archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0061EA10 (FUN_0061EA10, Moho::CUnitPodAssist::MemberSerialize)
+     *
+     * What it does:
+     * Writes the CCommandTask base, then writes the dispatch-task as an
+     * UNOWNED raw pointer ref, then writes the assist-target weak ref.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     CCommandTask* mDispatchTask;   // 0x30

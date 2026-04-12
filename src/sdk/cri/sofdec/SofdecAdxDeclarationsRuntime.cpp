@@ -3857,6 +3857,10 @@ namespace
   constexpr char kMwsfdErrGetSyncModeInvalidHandle[] = "E2010802: mwPlyGetSyncMode: handle is invalid.";
   constexpr char kMwsfdErrGetSyncModeInvalidMode[] = "E2010803: mwPlyGetSyncMode: mode is invalid.";
   constexpr char kMwsfdErrSetOutBufSizeInvalidHandle[] = "E306091 MWSFSFX_SetOutBufSize: invalid handle";
+  constexpr char kMwsfdErrMakeTblZ16InvalidHandle[] = "E202283: MWSFD_MakeTblZ16: handle is invalid.";
+  constexpr char kMwsfdErrMakeTblZ16GetFrmFailed[] = "E202284: MWSFD_MakeTblZ16: getfrm is failed.";
+  constexpr char kMwsfdErrMakeTblZ32InvalidHandle[] = "E202285: MWSFD_MakeTblZ32: handle is invalid.";
+  constexpr char kMwsfdErrMakeTblZ32GetFrmFailed[] = "E202286: MWSFD_MakeTblZ32: getfrm is failed.";
   constexpr char kMwsfdErrMallocCountOver[] = "E2053001 MWSFD_Malloc: cnt over.";
   constexpr std::int32_t kMwsfdErrCodeInvalidHandle = -12;
   constexpr char kMwsfcreErrAttachPicUsrBufInternal[] = "E02120501: Internal Error: mwsfcre_AttachPicUsrBuf().";
