@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "wm3/Box3.h"
+#include "Wm3Box3.h"
 
 namespace gpg
 {

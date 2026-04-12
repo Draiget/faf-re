@@ -683,12 +683,7 @@ namespace
 
   [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::CategoryWordRangeView& range) noexcept
   {
-    static_assert(
-      offsetof(moho::CategoryWordRangeView, mStartWordIndex) == 0x08,
-      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
-    );
-    static_assert(sizeof(moho::BVIntSet) == 0x20, "BVIntSet size must be 0x20");
-    return *reinterpret_cast<moho::BVIntSet*>(&range.mStartWordIndex);
+    return range.mBits;
   }
 
   void MarkAllArmyUnitsNeedSyncGameData(moho::CArmyImpl& army)

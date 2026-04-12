@@ -8,7 +8,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace LuaPlus
 {

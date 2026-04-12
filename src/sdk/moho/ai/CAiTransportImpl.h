@@ -10,7 +10,7 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/ArmyUnitSet.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace gpg
 {

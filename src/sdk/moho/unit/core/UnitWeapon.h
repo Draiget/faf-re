@@ -14,7 +14,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/serialization/SBlackListInfo.h"
 #include "moho/unit/core/CWeaponAttributes.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 struct lua_State;
 namespace LuaPlus

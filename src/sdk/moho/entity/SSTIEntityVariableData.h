@@ -6,7 +6,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/render/camera/VTransform.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

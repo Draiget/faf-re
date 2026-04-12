@@ -5,6 +5,11 @@
 
 #include "moho/containers/TDatList.h"
 
+namespace gpg
+{
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class CEconStorage;
@@ -30,6 +35,19 @@ namespace moho
     SEconPair mLastUseRequested;
     SEconPair mLastUseActual;
     SEconStoragePair mMaxStorage;
+
+    /**
+     * Address: 0x00564320 (FUN_00564320, Moho::SEconTotals::MemberSerialize)
+     *
+     * IDA signature:
+     * void __usercall Moho::SEconTotals::MemberSerialize(BinaryWriteArchive *a1@<edi>, Moho::SEconTotals *a2@<esi>);
+     *
+     * What it does:
+     * Writes the five SEconPair resource lanes via the reflected SEconValue
+     * serializer, then emits the u64 energy/mass max-storage fields through
+     * the archive's WriteUInt64 virtual slot.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive);
   };
 
   class CSimArmyEconomyInfo

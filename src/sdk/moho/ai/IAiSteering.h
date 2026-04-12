@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

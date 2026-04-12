@@ -43,7 +43,7 @@
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/textures/DeviceExitListener.h"
-#include "wm3/Vector2.h"
+#include "Wm3Vector2.h"
 
 namespace
 {

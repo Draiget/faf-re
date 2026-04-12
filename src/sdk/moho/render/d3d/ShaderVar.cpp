@@ -229,6 +229,36 @@ namespace moho
   }
 
   /**
+   * Address: 0x004380D0 (FUN_004380D0, struct_ShaderVar::SetFloat)
+   *
+   * What it does:
+   * Guards on `Exists()` and forwards one float value to the bound
+   * effect variable.
+   */
+  ShaderVar* ShaderVar::SetFloat(const float value)
+  {
+    if (Exists()) {
+      mEffectVariable->SetFloat(value);
+    }
+    return this;
+  }
+
+  /**
+   * Address: 0x00438100 (FUN_00438100, struct_ShaderVar::SetMatrix4x4)
+   *
+   * What it does:
+   * Guards on `Exists()` and forwards one 4x4 matrix pointer to the bound
+   * effect variable.
+   */
+  ShaderVar* ShaderVar::SetMatrix4x4(const void* const matrix4x4)
+  {
+    if (Exists()) {
+      mEffectVariable->SetMatrix4x4(matrix4x4);
+    }
+    return this;
+  }
+
+  /**
    * Address: 0x004381B0 (FUN_004381B0, ??1struct_ShaderVar@@QAE@@Z)
    *
    * What it does:

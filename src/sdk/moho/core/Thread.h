@@ -8,7 +8,7 @@
 #define NOMINMAX
 #endif
 #include "boost/function.h"
-#include "wm3/AABB.h"
+#include "Wm3AxisAlignedBox3.h"
 #include <winsock2.h>
 #include <Windows.h>
 

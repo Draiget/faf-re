@@ -51,7 +51,7 @@ External dependency status (progress):
 
 - `wxWidgets`: `1,260/1,359 (92.72%)`
 - `MSVC STL/CRT`: `0/398 (0.00%)`
-- `WildMagic`: `0/387 (0.00%)`
+- `WildMagic`: `378/387 (97.67%)` — consolidated as upstream `external_dependency` (see [`dependencies/patches/wildmagic3p8_faf_required.md`](dependencies/patches/wildmagic3p8_faf_required.md))
 - `LuaPlus/Lua`: `0/184 (0.00%)`
 
 ## Patch + Build Quickstart

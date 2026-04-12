@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <new>
-#include <utility>
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Tree.h"
@@ -11,101 +9,9 @@
 
 namespace
 {
-  constexpr std::size_t kInlineWordCapacity = 2u;
-
-  void SaveInlineCapacityHeader(moho::CategoryWordRangeView& range) noexcept
-  {
-    // Mirrors FastVectorN::SaveInlineCapacity_ layout contract used by BVIntSet.
-    *reinterpret_cast<std::uint32_t**>(&range.mWordsInlineStorage[0]) = &range.mWordsInlineStorage[kInlineWordCapacity];
-  }
-
-  [[nodiscard]] moho::BVIntSet& AsWordBitset(moho::CategoryWordRangeView& range) noexcept
-  {
-    static_assert(
-      offsetof(moho::CategoryWordRangeView, mStartWordIndex) == 0x08,
-      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
-    );
-    static_assert(sizeof(moho::BVIntSet) == 0x20, "BVIntSet size must be 0x20");
-    return *reinterpret_cast<moho::BVIntSet*>(&range.mStartWordIndex);
-  }
-
-  [[nodiscard]] const moho::BVIntSet& AsWordBitset(const moho::CategoryWordRangeView& range) noexcept
-  {
-    static_assert(
-      offsetof(moho::CategoryWordRangeView, mStartWordIndex) == 0x08,
-      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
-    );
-    static_assert(sizeof(moho::BVIntSet) == 0x20, "BVIntSet size must be 0x20");
-    return *reinterpret_cast<const moho::BVIntSet*>(&range.mStartWordIndex);
-  }
-
-  void ResetInlineWordStorage(moho::CategoryWordRangeView& range) noexcept
-  {
-    range.mWordsInlineBase = &range.mWordsInlineStorage[0];
-    range.mWordsBegin = range.mWordsInlineBase;
-    range.mWordsEnd = range.mWordsInlineBase;
-    range.mWordsCapacityEnd = range.mWordsInlineBase + kInlineWordCapacity;
-    SaveInlineCapacityHeader(range);
-  }
-
-  void ReleaseWordStorage(moho::CategoryWordRangeView& range) noexcept
-  {
-    if (range.mWordsBegin != nullptr && range.mWordsBegin != range.mWordsInlineBase) {
-      delete[] range.mWordsBegin;
-    }
-    ResetInlineWordStorage(range);
-  }
-
-  void EnsureWordCapacity(moho::CategoryWordRangeView& range, const std::size_t requestedWordCapacity)
-  {
-    const std::size_t currentWordCapacity = static_cast<std::size_t>(range.mWordsCapacityEnd - range.mWordsBegin);
-    if (currentWordCapacity >= requestedWordCapacity) {
-      return;
-    }
-
-    auto* const newWords = new std::uint32_t[requestedWordCapacity];
-    const std::size_t currentWordCount = range.WordCount();
-    if (currentWordCount > 0u) {
-      std::copy(range.cbegin(), range.cend(), newWords);
-    }
-
-    if (range.mWordsBegin == range.mWordsInlineBase) {
-      // Preserve inline-capacity header before leaving inline storage.
-      SaveInlineCapacityHeader(range);
-    }
-
-    if (range.mWordsBegin != range.mWordsInlineBase) {
-      delete[] range.mWordsBegin;
-    }
-
-    range.mWordsBegin = newWords;
-    range.mWordsEnd = newWords + currentWordCount;
-    range.mWordsCapacityEnd = newWords + requestedWordCapacity;
-  }
-
-  void ResizeWordCount(moho::CategoryWordRangeView& range, const std::size_t wordCount)
-  {
-    EnsureWordCapacity(range, wordCount);
-    range.mWordsEnd = range.mWordsBegin + wordCount;
-  }
-
-  void CopyCategoryWordRange(moho::CategoryWordRangeView& dst, const moho::CategoryWordRangeView& src)
-  {
-    dst.mWordUniverseHandle = src.mWordUniverseHandle;
-    dst.mReserved04 = src.mReserved04;
-    dst.mStartWordIndex = src.mStartWordIndex;
-    dst.mReserved0C = src.mReserved0C;
-
-    const std::size_t wordCount = src.WordCount();
-    ResizeWordCount(dst, wordCount);
-    if (wordCount > 0u) {
-      std::copy(src.cbegin(), src.cend(), dst.begin());
-    }
-  }
-
   void IntersectCategoryWordRanges(moho::CategoryWordRangeView& lhs, const moho::CategoryWordRangeView& rhs)
   {
-    AsWordBitset(lhs).IntersectWith(&AsWordBitset(rhs));
+    lhs.mBits.IntersectWith(&rhs.mBits);
   }
 
   void UnionCategoryWordRanges(moho::CategoryWordRangeView& lhs, const moho::CategoryWordRangeView& rhs)
@@ -114,11 +20,11 @@ namespace
       return;
     }
     if (lhs.Empty()) {
-      CopyCategoryWordRange(lhs, rhs);
+      lhs = rhs;
       return;
     }
 
-    AsWordBitset(lhs).AddAllFrom(&AsWordBitset(rhs));
+    lhs.mBits.AddAllFrom(&rhs.mBits);
   }
 
   struct CategoryNameMapNodeView : msvc8::Tree<CategoryNameMapNodeView>
@@ -321,172 +227,6 @@ namespace
 
 namespace moho
 {
-  CategoryWordRangeView::CategoryWordRangeView() noexcept
-    : mWordUniverseHandle(0u)
-    , mReserved04(0u)
-    , mStartWordIndex(0u)
-    , mReserved0C(0u)
-    , mWordsBegin(nullptr)
-    , mWordsEnd(nullptr)
-    , mWordsCapacityEnd(nullptr)
-    , mWordsInlineBase(nullptr)
-    , mWordsInlineStorage{0u, 0u}
-  {
-    ResetInlineWordStorage(*this);
-  }
-
-  CategoryWordRangeView::CategoryWordRangeView(const CategoryWordRangeView& other)
-    : CategoryWordRangeView()
-  {
-    CopyCategoryWordRange(*this, other);
-  }
-
-  CategoryWordRangeView& CategoryWordRangeView::operator=(const CategoryWordRangeView& other)
-  {
-    if (this == &other) {
-      return *this;
-    }
-
-    CopyCategoryWordRange(*this, other);
-    return *this;
-  }
-
-  CategoryWordRangeView::CategoryWordRangeView(CategoryWordRangeView&& other) noexcept
-    : CategoryWordRangeView()
-  {
-    *this = std::move(other);
-  }
-
-  CategoryWordRangeView& CategoryWordRangeView::operator=(CategoryWordRangeView&& other) noexcept
-  {
-    if (this == &other) {
-      return *this;
-    }
-
-    ReleaseWordStorage(*this);
-
-    mWordUniverseHandle = other.mWordUniverseHandle;
-    mReserved04 = other.mReserved04;
-    mStartWordIndex = other.mStartWordIndex;
-    mReserved0C = other.mReserved0C;
-
-    if (other.mWordsBegin == other.mWordsInlineBase) {
-      const std::size_t wordCount = other.WordCount();
-      ResetInlineWordStorage(*this);
-      if (wordCount > 0u) {
-        std::copy(other.cbegin(), other.cend(), begin());
-      }
-      mWordsEnd = mWordsBegin + wordCount;
-    } else {
-      mWordsInlineBase = &mWordsInlineStorage[0];
-      mWordsBegin = other.mWordsBegin;
-      mWordsEnd = other.mWordsEnd;
-      mWordsCapacityEnd = other.mWordsCapacityEnd;
-
-      ResetInlineWordStorage(other);
-      other.mWordUniverseHandle = 0u;
-      other.mReserved04 = 0u;
-      other.mStartWordIndex = 0u;
-      other.mReserved0C = 0u;
-      other.mWordsInlineStorage[0] = 0u;
-      other.mWordsInlineStorage[1] = 0u;
-    }
-
-    return *this;
-  }
-
-  CategoryWordRangeView::~CategoryWordRangeView()
-  {
-    ReleaseWordStorage(*this);
-  }
-
-  void CategoryWordRangeView::ResetToEmpty(const std::uint32_t universeHandle) noexcept
-  {
-    mWordUniverseHandle = universeHandle;
-    mReserved04 = 0u;
-    mStartWordIndex = 0u;
-    mReserved0C = 0u;
-    ReleaseWordStorage(*this);
-  }
-
-  std::size_t CategoryWordRangeView::WordCount() const noexcept
-  {
-    if (!mWordsBegin || !mWordsEnd || mWordsEnd < mWordsBegin) {
-      return 0u;
-    }
-    return static_cast<std::size_t>(mWordsEnd - mWordsBegin);
-  }
-
-  bool CategoryWordRangeView::Empty() const noexcept
-  {
-    return WordCount() == 0u;
-  }
-
-  const std::uint32_t* CategoryWordRangeView::WordData() const noexcept
-  {
-    return mWordsBegin;
-  }
-
-  std::uint32_t* CategoryWordRangeView::WordData() noexcept
-  {
-    return mWordsBegin;
-  }
-
-  CategoryWordRangeView::iterator CategoryWordRangeView::begin() noexcept
-  {
-    return mWordsBegin;
-  }
-
-  CategoryWordRangeView::iterator CategoryWordRangeView::end() noexcept
-  {
-    return mWordsEnd;
-  }
-
-  CategoryWordRangeView::const_iterator CategoryWordRangeView::begin() const noexcept
-  {
-    return mWordsBegin;
-  }
-
-  CategoryWordRangeView::const_iterator CategoryWordRangeView::end() const noexcept
-  {
-    return mWordsEnd;
-  }
-
-  CategoryWordRangeView::const_iterator CategoryWordRangeView::cbegin() const noexcept
-  {
-    return begin();
-  }
-
-  CategoryWordRangeView::const_iterator CategoryWordRangeView::cend() const noexcept
-  {
-    return end();
-  }
-
-  CategoryWordRangeView::const_iterator
-  CategoryWordRangeView::FindWord(const std::uint32_t absoluteWordIndex) const noexcept
-  {
-    if (absoluteWordIndex < mStartWordIndex) {
-      return cend();
-    }
-
-    const std::size_t localWordIndex = static_cast<std::size_t>(absoluteWordIndex - mStartWordIndex);
-    if (localWordIndex >= WordCount()) {
-      return cend();
-    }
-
-    return cbegin() + localWordIndex;
-  }
-
-  bool CategoryWordRangeView::ContainsBit(const std::uint32_t categoryBitIndex) const noexcept
-  {
-    const CategoryWordRangeView::const_iterator wordIt = FindWord(categoryBitIndex >> 5u);
-    if (wordIt == cend()) {
-      return false;
-    }
-
-    return (((*wordIt) >> (categoryBitIndex & 0x1Fu)) & 1u) != 0u;
-  }
-
   /**
    * Address: 0x0052B1E0 (FUN_0052B1E0)
    *
@@ -564,7 +304,7 @@ namespace moho
         }
 
         if (!hasResolvedClauseTerm) {
-          CopyCategoryWordRange(clauseAccum, node->value);
+          clauseAccum = node->value;
           hasResolvedClauseTerm = true;
         } else {
           IntersectCategoryWordRanges(clauseAccum, node->value);

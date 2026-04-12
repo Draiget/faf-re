@@ -2,9 +2,9 @@
 #include <cstdint>
 
 #include "gpg/core/containers/FastVector.h"
-#include "wm3/AABB.h"
-#include "wm3/Box3.h"
-#include "wm3/Plane3.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "Wm3Box3.h"
+#include "Wm3Plane3.h"
 
 namespace moho
 {

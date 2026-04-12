@@ -6,7 +6,7 @@
 #include "moho/animation/IAniManipulator.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace LuaPlus
 {

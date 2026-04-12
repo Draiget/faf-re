@@ -3,7 +3,7 @@
 #pragma once
 
 #include "moho/lua/CScrLuaBinderFwd.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 #include <cstddef>
 #include <cstdint>

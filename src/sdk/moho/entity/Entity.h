@@ -17,9 +17,9 @@
 #include "moho/math/Vector4f.h"
 #include "REntityBlueprint.h"
 #include "SEntAttachInfo.h"
-#include "wm3/Box3.h"
-#include "wm3/Quaternion.h"
-#include "wm3/Vector3.h"
+#include "Wm3Box3.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector3.h"
 
 struct lua_State;
 

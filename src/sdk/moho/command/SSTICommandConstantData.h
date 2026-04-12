@@ -4,7 +4,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace moho
 {

@@ -1026,17 +1026,8 @@
     <ClCompile Include="moho\unit\EUnitCommandQueueStatusTypeInfo.cpp" />
     <ClCompile Include="moho\unit\CUnitCommand.cpp" />
     <ClCompile Include="moho\vision\VisionDB.cpp" />
-    <ClCompile Include="wm3\Distance3.cpp" />
-    <ClCompile Include="wm3\AABB.cpp" />
-    <ClCompile Include="wm3\System.cpp" />
-    <ClCompile Include="wm3\TInteger16.cpp" />
-    <ClCompile Include="wm3\TInteger32.cpp" />
-    <ClCompile Include="wm3\TInteger64.cpp" />
-    <ClCompile Include="wm3\TRational16.cpp" />
-    <ClCompile Include="wm3\TRational32.cpp" />
-    <ClCompile Include="wm3\TRational64.cpp" />
-    <ClCompile Include="wm3\Vector2.cpp" />
-    <ClCompile Include="wm3\Vector3.cpp" />
+    <ClCompile Include="moho\math\Wm3DistanceFafExtras.cpp" />
+    <ClCompile Include="moho\math\Wm3AxisAlignedBox3FafExtras.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
@@ -1984,26 +1975,8 @@
     <ClInclude Include="util\Debug.h" />
     <ClInclude Include="moho\misc\TypeInfo.h" />
     <ClInclude Include="util\VTCall.h" />
-    <ClInclude Include="wm3\AABB.h" />
-    <ClInclude Include="wm3\Box3.h" />
-    <ClInclude Include="wm3\Capsule3.h" />
-    <ClInclude Include="wm3\Distance3.h" />
-    <ClInclude Include="wm3\Line3.h" />
-    <ClInclude Include="wm3\Mat34.h" />
-    <ClInclude Include="wm3\Plane3.h" />
-    <ClInclude Include="wm3\Quaternion.h" />
-    <ClInclude Include="wm3\Segment3.h" />
-    <ClInclude Include="wm3\Sphere3.h" />
-    <ClInclude Include="wm3\System.h" />
-    <ClInclude Include="wm3\TInteger16.h" />
-    <ClInclude Include="wm3\TInteger32.h" />
-    <ClInclude Include="wm3\TInteger64.h" />
-    <ClInclude Include="wm3\TRational16.h" />
-    <ClInclude Include="wm3\TRational32.h" />
-    <ClInclude Include="wm3\TRational64.h" />
-    <ClInclude Include="wm3\Vector2.h" />
-    <ClInclude Include="wm3\Vector3.h" />
-    <ClInclude Include="wm3\WideParity.h" />
+    <ClInclude Include="moho\math\Wm3DistanceFafExtras.h" />
+    <ClInclude Include="moho\math\Wm3AxisAlignedBox3FafExtras.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cri\sofdec\SofdecAdxCodecRuntime.cpp" />

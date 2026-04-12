@@ -5,7 +5,8 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
-#include "wm3/AABB.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "moho/math/Wm3AxisAlignedBox3FafExtras.h"
 
 namespace gpg
 {

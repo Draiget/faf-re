@@ -15,7 +15,7 @@
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/containers/TDatList.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 struct lua_State;
 

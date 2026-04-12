@@ -1,10 +1,16 @@
 #pragma once
-
-#include "Box3.h"
-#include "Line3.h"
-#include "Segment3.h"
-#include "Sphere3.h"
-#include "Vector3.h"
+// FAF SDK distance/intersection helpers — recovered from the FA binary as
+// free function wrappers around upstream Wm3 distance/intersection classes.
+// These are NOT in upstream Wm3, but they are recovered FA functions
+// (FA addresses preserved in the per-helper Doxygen blocks).
+//
+// Lives outside dependencies/WildMagic3p8/ because they're FAF SDK glue, not
+// Wild Magic library code. Used to live at src/sdk/wm3/Distance3.h.
+#include "Wm3Box3.h"
+#include "Wm3Line3.h"
+#include "Wm3Segment3.h"
+#include "Wm3Sphere3.h"
+#include "Wm3Vector3.h"
 
 namespace Wm3
 {

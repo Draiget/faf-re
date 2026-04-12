@@ -144,7 +144,7 @@
 #include "moho/unit/tasks/CFireWeaponTask.h"
 #include "lua/LuaRuntimeTypes.h"
 #include "lua/LuaObject.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 using namespace gpg;
 
 namespace

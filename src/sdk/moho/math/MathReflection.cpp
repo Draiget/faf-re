@@ -319,7 +319,7 @@ namespace moho
   Vector2iTypeInfo::Vector2iTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(Wm3::IVector2<int>), this);
+    gpg::PreRegisterRType(typeid(Wm3::Vector2i), this);
   }
 
   /**
@@ -391,7 +391,7 @@ namespace moho
   Vector3iTypeInfo::Vector3iTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(Wm3::IVector3<int>), this);
+    gpg::PreRegisterRType(typeid(Wm3::Vector3i), this);
   }
 
   /**

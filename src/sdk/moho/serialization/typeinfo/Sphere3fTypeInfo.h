@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/reflection/Reflection.h"
-#include "wm3/Sphere3.h"
+#include "Wm3Sphere3.h"
 
 namespace moho
 {

@@ -8,7 +8,7 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

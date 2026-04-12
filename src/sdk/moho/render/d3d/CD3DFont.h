@@ -12,7 +12,7 @@
 #include "moho/math/Vector3f.h"
 #include "moho/misc/CountedObject.h"
 #include "moho/render/d3d/CD3DFontTypes.h"
-#include "wm3/Vector2.h"
+#include "Wm3Vector2.h"
 
 namespace moho
 {

@@ -1597,9 +1597,18 @@ namespace
       return TryGetStringFromLuaValue(optionObject, outOption);
     }
 
-    void* GetPreferenceTable() override
+    /**
+     * Address: 0x008C8020 (FUN_008C8020, Moho::CUserPrefs::GetPreferenceTable)
+     *
+     * IDA signature:
+     * LuaPlus::LuaObject *__thiscall GetPreferenceTable(CUserPrefs *this, LuaPlus::LuaObject *retBuf);
+     *
+     * What it does:
+     * Copy-constructs a LuaObject from mRoot into the caller's return buffer.
+     */
+    LuaPlus::LuaObject GetPreferenceTable() override
     {
-      return &mRoot;
+      return mRoot;
     }
 
     void SetObject(const msvc8::string& key, void* const valueObject) override
@@ -2732,10 +2741,8 @@ int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
   preferenceObject.AssignNil(state);
 
   if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
-    LuaPlus::LuaObject* const preferenceTable = static_cast<LuaPlus::LuaObject*>(preferences->GetPreferenceTable());
-    if (preferenceTable != nullptr) {
-      preferenceObject = preferenceTable->Lookup(key.c_str());
-    }
+    const LuaPlus::LuaObject preferenceTable = preferences->GetPreferenceTable();
+    preferenceObject = preferenceTable.Lookup(key.c_str());
   }
 
   if (preferenceObject.IsNil()) {

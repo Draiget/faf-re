@@ -3,9 +3,9 @@
 #include "gpg/core/containers/Rect2.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/SPointVector.h"
-#include "wm3/Quaternion.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

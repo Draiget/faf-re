@@ -11,7 +11,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/unit/EUnitMotionEnums.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace gpg
 {

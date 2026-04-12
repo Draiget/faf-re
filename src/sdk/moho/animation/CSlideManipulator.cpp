@@ -15,7 +15,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace
 {

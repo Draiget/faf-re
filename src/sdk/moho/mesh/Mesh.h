@@ -12,10 +12,10 @@
 #include "moho/containers/TDatList.h"
 #include "moho/resource/CResourceWatcher.h"
 #include "moho/render/camera/VTransform.h"
-#include "wm3/AABB.h"
-#include "wm3/Box3.h"
-#include "wm3/Sphere3.h"
-#include "wm3/Vector2.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "Wm3Box3.h"
+#include "Wm3Sphere3.h"
+#include "Wm3Vector2.h"
 
 namespace moho
 {

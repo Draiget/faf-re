@@ -6,7 +6,7 @@
 #include "lua/LuaObject.h"
 #include "moho/sim/SOCellPos.h"
 #include "SSTITarget.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace moho
 {

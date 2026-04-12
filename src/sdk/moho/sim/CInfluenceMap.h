@@ -6,7 +6,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/Vector.h"
-#include "wm3/Vector3.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "Wm3Vector3.h"
 
 namespace LuaPlus
 {
@@ -17,7 +18,6 @@ namespace moho
 {
   class CArmyImpl;
   class Sim;
-  struct CategoryWordRangeView;
   struct RUnitBlueprint;
 
   enum EThreatType : std::int32_t

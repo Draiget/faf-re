@@ -627,7 +627,7 @@ namespace moho
    */
   float CArmyStatItem::SumCategory(const EntityCategorySet* const categorySet) const
   {
-    if (categorySet == nullptr || categorySet->mBitsHeader == nullptr) {
+    if (categorySet == nullptr || categorySet->mUniverse.mWordUniverseHandle == 0u) {
       return 0.0f;
     }
 

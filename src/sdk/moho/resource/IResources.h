@@ -8,8 +8,8 @@
 #include "legacy/containers/Vector.h"
 #include "moho/math/GridPos.h"
 #include "ResourceDeposit.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

@@ -7,7 +7,7 @@
 #include "legacy/containers/String.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/SSTIArmyVariableData.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace LuaPlus
 {

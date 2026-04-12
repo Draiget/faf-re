@@ -436,26 +436,11 @@ void CAiTarget::UpdateTargetIsMobile(Sim* const sim)
   }
 
   const CategoryWordRangeView* const mobileRange = sim->mRules->GetEntityCategory("MOBILE");
-  if (!mobileRange || !mobileRange->mWordsBegin || mobileRange->mWordsEnd < mobileRange->mWordsBegin) {
+  if (!mobileRange || mobileRange->Empty()) {
     return;
   }
 
-  const std::uint32_t blueprintOrdinal = entity->BluePrint->mCategoryBitIndex;
-  const std::uint32_t absoluteWordIndex = blueprintOrdinal >> 5u;
-  if (absoluteWordIndex < mobileRange->mStartWordIndex) {
-    targetIsMobile = false;
-    return;
-  }
-
-  const std::size_t localWordIndex = static_cast<std::size_t>(absoluteWordIndex - mobileRange->mStartWordIndex);
-  const std::size_t wordCount = static_cast<std::size_t>(mobileRange->mWordsEnd - mobileRange->mWordsBegin);
-  if (localWordIndex >= wordCount) {
-    targetIsMobile = false;
-    return;
-  }
-
-  const std::uint32_t word = mobileRange->mWordsBegin[localWordIndex];
-  targetIsMobile = ((word >> (blueprintOrdinal & 0x1Fu)) & 1u) != 0u;
+  targetIsMobile = mobileRange->ContainsBit(entity->BluePrint->mCategoryBitIndex);
 }
 
 /**

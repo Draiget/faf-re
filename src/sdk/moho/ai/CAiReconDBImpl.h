@@ -13,8 +13,8 @@
 #include "moho/entity/Entity.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/STIMap.h"
-#include "wm3/Box3.h"
-#include "wm3/Vector3.h"
+#include "Wm3Box3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

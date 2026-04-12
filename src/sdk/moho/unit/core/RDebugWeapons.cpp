@@ -13,8 +13,8 @@
 #include "moho/ui/SDebugWorldText.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeaponRuntimeView.h"
-#include "wm3/Quaternion.h"
-#include "wm3/Vector3.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector3.h"
 
 namespace
 {

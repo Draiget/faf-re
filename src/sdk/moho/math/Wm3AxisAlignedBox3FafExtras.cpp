@@ -1,9 +1,15 @@
-#include "AABB.h"
+#include "Wm3AxisAlignedBox3.h"
 
 #include <limits>
 
+// FAF SDK helper recovered from FA at FUN_00472BB0. Lives outside
+// dependencies/WildMagic3p8/ because it's FAF SDK glue. Used to live at
+// src/sdk/wm3/AABB.cpp.
 namespace moho
 {
+    template <class T>
+    [[nodiscard]] const T& Empty();
+
     /**
      * Address: 0x00472BB0 (FUN_00472BB0, Moho::Empty<Wm3::AxisAlignedBox3<float>>)
      */

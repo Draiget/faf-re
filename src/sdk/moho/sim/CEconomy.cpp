@@ -5,6 +5,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
 
 namespace
@@ -131,5 +132,32 @@ namespace moho
 
     archive->WriteBool(mResourceSharing != 0u);
     SerializeRequests(archive);
+  }
+
+  /**
+   * Address: 0x00564320 (FUN_00564320, Moho::SEconTotals::MemberSerialize)
+   *
+   * IDA signature:
+   * void __usercall Moho::SEconTotals::MemberSerialize(BinaryWriteArchive *a1@<edi>, Moho::SEconTotals *a2@<esi>);
+   *
+   * What it does:
+   * Writes the five SEconPair resource lanes (stored, income, reclaimed,
+   * requested, actual) using the cached SEconValue RType, then emits the
+   * u64 max-storage energy/mass fields through the archive's WriteUInt64
+   * virtual slot. Mirrors the binary's lazy LookupRType caching sequence.
+   */
+  void SEconTotals::MemberSerialize(gpg::WriteArchive* const archive)
+  {
+    const gpg::RRef nullOwner{};
+
+    gpg::RType* const econValueType = CachedSEconValueType();
+    archive->Write(econValueType, &mStored, nullOwner);
+    archive->Write(econValueType, &mIncome, nullOwner);
+    archive->Write(econValueType, &mReclaimed, nullOwner);
+    archive->Write(econValueType, &mLastUseRequested, nullOwner);
+    archive->Write(econValueType, &mLastUseActual, nullOwner);
+
+    archive->WriteUInt64(mMaxStorage.ENERGY);
+    archive->WriteUInt64(mMaxStorage.MASS);
   }
 } // namespace moho

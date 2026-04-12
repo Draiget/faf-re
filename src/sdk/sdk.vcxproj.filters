@@ -690,6 +690,12 @@
     <ClCompile Include="moho\math\MathReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\math\Wm3DistanceFafExtras.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\math\Wm3AxisAlignedBox3FafExtras.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\render\camera\CameraImpl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -721,21 +727,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\particles\SWorldParticle.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="wm3\Distance3.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="wm3\AABB.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="wm3\System.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="wm3\Vector2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="wm3\Vector3.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\net\CMessage.cpp">
@@ -2343,11 +2334,6 @@
     <ClCompile Include="moho\audio\SofdecMpaFrameRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\audio\SofdecMpaDecodeRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="moho\sim\CEconomy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3002,6 +2988,12 @@
     <ClInclude Include="moho\math\MathReflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\math\Wm3DistanceFafExtras.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\math\Wm3AxisAlignedBox3FafExtras.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\math\Angle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3045,33 +3037,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\collision\RDebugCollisionTypeInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Box3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Capsule3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Distance3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Line3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Mat34.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Vector3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Sphere3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\System.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\AABB.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\resource\RScmResource.h">
@@ -3192,9 +3157,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\core\containers\Rect2.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Vector2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\math\GridPos.h">
@@ -3563,15 +3525,6 @@
     <ClInclude Include="moho\particles\SWorldParticle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="wm3\Quaternion.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Segment3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\WideParity.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\math\VMatrix4.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3585,9 +3538,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\tess\CTesselator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="wm3\Plane3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gpg\gal\D3D9Utils.h">

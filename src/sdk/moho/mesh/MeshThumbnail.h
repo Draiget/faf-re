@@ -6,7 +6,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/Rect2.h"
 #include "moho/render/camera/GeomCamera3.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace moho
 {

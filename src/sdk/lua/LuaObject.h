@@ -961,6 +961,7 @@ namespace LuaPlus
 		/**
 		 * Address: 0x0041F910 (FUN_0041F910, ??0LuaFunction@LuaPlus@@QAE@@Z_0)
 		 * Address: 0x0052C950 (FUN_0052C950, ??0LuaFunction@LuaPlus@@QAE@@Z_2)
+		 * Address: 0x0057E950 (FUN_0057E950, ??0LuaFunction@LuaPlus@@QAE@@Z_4)
 		 * Address: 0x005D0B60 (FUN_005D0B60, ??0LuaFunction@LuaPlus@@QAE@@Z_3)
 		 *
 		 * What it does:

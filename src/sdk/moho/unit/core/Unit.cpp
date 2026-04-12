@@ -1740,33 +1740,18 @@ namespace
     "CArmyBuildCategoryFilterRuntimeView::mBuildCategoryFilterSet offset must be 0x198"
   );
 
+  // RUnitBlueprintEconomyCategoryCache is a flat-field view of the same 0x28
+  // BVSet payload that backs CategoryWordRangeView. Cross-check the binary
+  // offsets via the canonical BVSet field path so the duplicate flat-view
+  // type stays in lockstep with the canonical BVSet layout.
   static_assert(
     sizeof(RUnitBlueprintEconomyCategoryCache) == sizeof(CategoryWordRangeView),
     "RUnitBlueprintEconomyCategoryCache layout must match CategoryWordRangeView size"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, RuntimeWord08) == offsetof(CategoryWordRangeView, mStartWordIndex),
-    "RUnitBlueprintEconomyCategoryCache::RuntimeWord08 offset must match CategoryWordRangeView::mStartWordIndex"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, First) == offsetof(CategoryWordRangeView, mWordsBegin),
-    "RUnitBlueprintEconomyCategoryCache::First offset must match CategoryWordRangeView::mWordsBegin"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, Last) == offsetof(CategoryWordRangeView, mWordsEnd),
-    "RUnitBlueprintEconomyCategoryCache::Last offset must match CategoryWordRangeView::mWordsEnd"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, End) == offsetof(CategoryWordRangeView, mWordsCapacityEnd),
-    "RUnitBlueprintEconomyCategoryCache::End offset must match CategoryWordRangeView::mWordsCapacityEnd"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, InlineStoragePtr) == offsetof(CategoryWordRangeView, mWordsInlineBase),
-    "RUnitBlueprintEconomyCategoryCache::InlineStoragePtr offset must match CategoryWordRangeView::mWordsInlineBase"
-  );
-  static_assert(
-    offsetof(RUnitBlueprintEconomyCategoryCache, InlineStorage) == offsetof(CategoryWordRangeView, mWordsInlineStorage),
-    "RUnitBlueprintEconomyCategoryCache::InlineStorage offset must match CategoryWordRangeView::mWordsInlineStorage"
+    offsetof(RUnitBlueprintEconomyCategoryCache, RuntimeWord08)
+      == offsetof(CategoryWordRangeView, mBits) + offsetof(BVIntSet, mFirstWordIndex),
+    "RUnitBlueprintEconomyCategoryCache::RuntimeWord08 offset must match BVSet::mBits.mFirstWordIndex"
   );
 
   [[nodiscard]] const CategoryWordRangeView&
@@ -1777,12 +1762,7 @@ namespace
 
   [[nodiscard]] BVIntSet& AsCategoryWordBitset(CategoryWordRangeView& range) noexcept
   {
-    static_assert(
-      offsetof(CategoryWordRangeView, mStartWordIndex) == 0x08,
-      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
-    );
-    static_assert(sizeof(BVIntSet) == 0x20, "BVIntSet size must be 0x20");
-    return *reinterpret_cast<BVIntSet*>(&range.mStartWordIndex);
+    return range.mBits;
   }
 
   [[nodiscard]] CategoryWordRangeView& UnitBuildRestrictionCategoryWords(Unit& unit) noexcept
@@ -1793,15 +1773,7 @@ namespace
 
   void ResetCategoryWordRange(CategoryWordRangeView& range) noexcept
   {
-    AsCategoryWordBitset(range).mFirstWordIndex = 0u;
-
-    if (std::uint32_t* const wordsBegin = range.mWordsBegin; wordsBegin != range.mWordsInlineBase) {
-      delete[] wordsBegin;
-      range.mWordsBegin = range.mWordsInlineBase;
-      range.mWordsCapacityEnd = range.mWordsInlineBase + 2;
-    }
-
-    range.mWordsEnd = range.mWordsBegin;
+    range.mBits = BVIntSet{};
   }
 
   [[nodiscard]] std::int32_t PickUniformIndexFromU32(const std::uint32_t randomValue, const std::uint32_t count) noexcept
@@ -10871,7 +10843,7 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
 
   Wm3::Vec3f velocity = Entity::GetVelocity();
   const Wm3::Vec3f upAxis(0.0f, 1.0f, 0.0f);
-  const Wm3::Quaternionf rollRotation = Wm3::Quaternionf::FromAxisAngle(upAxis, impulse.y * 0.1f);
+  const Wm3::Quaternionf rollRotation = Wm3::Quaternionf::MakeFromAxisAngle(upAxis, impulse.y * 0.1f);
 
   float stepsRemaining = precision * 10.0f;
   while (stepsRemaining > 0.0f) {

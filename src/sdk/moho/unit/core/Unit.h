@@ -22,7 +22,7 @@
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/WeakPtr.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

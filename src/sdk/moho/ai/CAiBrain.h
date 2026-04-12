@@ -9,8 +9,8 @@
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/script/CScriptObject.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 struct lua_State;
 
@@ -183,6 +183,17 @@ namespace moho
      * Draws AI debug grid lines and per-attack-vector direction markers.
      */
     static CAiBrain* DrawDebug(CAiBrain* brain);
+
+    /**
+     * Address: 0x0057A510 (FUN_0057A510, Moho::CAiBrain::CenterOfArmy)
+     *
+     * What it does:
+     * Computes the average position of all live, non-destroying mobile units
+     * (`MOBILE - STRUCTURE` category) belonging to this brain's army and writes
+     * the result into `outPosition`. When the army has no qualifying units,
+     * `outPosition` is left at the zero vector.
+     */
+    Wm3::Vec3f* CenterOfArmy(Wm3::Vec3f* outPosition);
 
     /**
      * Address: 0x0057BDB0 (FUN_0057BDB0, Moho::CAiBrain::ProcessAttackVectors)
@@ -1622,6 +1633,58 @@ namespace moho
    * Returns current no-rush timer ticks for the brain owning army.
    */
   int cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058EB40 (FUN_0058EB40, cfunc_CAiBrainSetUpAttackVectorsToArmy)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainSetUpAttackVectorsToArmyL`.
+   */
+  int cfunc_CAiBrainSetUpAttackVectorsToArmy(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058EB60 (FUN_0058EB60, func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:SetUpAttackVectorsToArmy()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef();
+
+  /**
+   * Address: 0x0058EBC0 (FUN_0058EBC0, cfunc_CAiBrainSetUpAttackVectorsToArmyL)
+   *
+   * What it does:
+   * Sets the brain's attack-vector category filter (defaulting to
+   * `MOBILE - STRUCTURE`) and rebuilds attack vectors.
+   */
+  int cfunc_CAiBrainSetUpAttackVectorsToArmyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058E830 (FUN_0058E830, cfunc_CAiBrainFindClosestArmyWithBase)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainFindClosestArmyWithBaseL`.
+   */
+  int cfunc_CAiBrainFindClosestArmyWithBase(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058E850 (FUN_0058E850, func_CAiBrainFindClosestArmyWithBase_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:FindClosestArmyWithBase()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainFindClosestArmyWithBase_LuaFuncDef();
+
+  /**
+   * Address: 0x0058E8B0 (FUN_0058E8B0, cfunc_CAiBrainFindClosestArmyWithBaseL)
+   *
+   * What it does:
+   * Returns the brain of the closest enemy/allied/neutral army that owns at
+   * least one structure, or nil when no such army exists.
+   */
+  int cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* state);
 } // namespace moho
 
 /**

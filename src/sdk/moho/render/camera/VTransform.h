@@ -5,8 +5,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "wm3/Plane3.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Plane3.h"
+#include "Wm3Quaternion.h"
 
 namespace gpg
 {

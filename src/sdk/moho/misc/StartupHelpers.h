@@ -135,7 +135,16 @@ namespace moho
     virtual void SetStringArr(const msvc8::string& key, const msvc8::vector<msvc8::string>& values) = 0;
     virtual bool LookupCurrentOption(msvc8::string* outOption, const msvc8::string& key) = 0;
     virtual bool LookupKey(msvc8::string* outOption, const msvc8::string& key) = 0;
-    virtual void* GetPreferenceTable() = 0;
+    /**
+     * Address: 0x008C8020 (FUN_008C8020, Moho::CUserPrefs::GetPreferenceTable)
+     *
+     * IDA signature:
+     * LuaPlus::LuaObject *__thiscall GetPreferenceTable(CUserPrefs *this, LuaPlus::LuaObject *retBuf);
+     *
+     * What it does:
+     * Returns a copy of the root preference table Lua object.
+     */
+    virtual LuaPlus::LuaObject GetPreferenceTable() = 0;
     virtual void SetObject(const msvc8::string& key, void* valueObject) = 0;
     virtual void* GetState() = 0;
   };
