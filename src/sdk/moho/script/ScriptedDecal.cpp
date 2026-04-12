@@ -17,7 +17,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/script/CScriptEvent.h"
-#include "wm3/Vector2.h"
+#include "Wm3Vector2.h"
 
 using namespace moho;
 

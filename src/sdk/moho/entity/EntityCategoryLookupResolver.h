@@ -3,65 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/entity/EntityCategoryReflection.h"
+
 namespace moho
 {
-  struct EntityCategoryHelper;
   struct SFootprint;
   struct SNamedFootprint;
   struct SRuleFootprintsBlueprint;
-
-  struct CategoryWordRangeView
-  {
-    using iterator = std::uint32_t*;
-    using const_iterator = const std::uint32_t*;
-
-    std::uint32_t mWordUniverseHandle;    // +0x00
-    std::uint32_t mReserved04;            // +0x04
-    std::uint32_t mStartWordIndex;        // +0x08
-    std::uint32_t mReserved0C;            // +0x0C
-    std::uint32_t* mWordsBegin;           // +0x10
-    std::uint32_t* mWordsEnd;             // +0x14
-    std::uint32_t* mWordsCapacityEnd;     // +0x18
-    std::uint32_t* mWordsInlineBase;      // +0x1C
-    std::uint32_t mWordsInlineStorage[2]; // +0x20
-
-    CategoryWordRangeView() noexcept;
-    CategoryWordRangeView(const CategoryWordRangeView& other);
-    CategoryWordRangeView& operator=(const CategoryWordRangeView& other);
-    CategoryWordRangeView(CategoryWordRangeView&& other) noexcept;
-    CategoryWordRangeView& operator=(CategoryWordRangeView&& other) noexcept;
-    ~CategoryWordRangeView();
-
-    void ResetToEmpty(std::uint32_t universeHandle) noexcept;
-    [[nodiscard]] std::size_t WordCount() const noexcept;
-    [[nodiscard]] bool Empty() const noexcept;
-    [[nodiscard]] const std::uint32_t* WordData() const noexcept;
-    [[nodiscard]] std::uint32_t* WordData() noexcept;
-    [[nodiscard]] iterator begin() noexcept;
-    [[nodiscard]] iterator end() noexcept;
-    [[nodiscard]] const_iterator begin() const noexcept;
-    [[nodiscard]] const_iterator end() const noexcept;
-    [[nodiscard]] const_iterator cbegin() const noexcept;
-    [[nodiscard]] const_iterator cend() const noexcept;
-    [[nodiscard]] const_iterator FindWord(std::uint32_t absoluteWordIndex) const noexcept;
-    [[nodiscard]] bool ContainsBit(std::uint32_t categoryBitIndex) const noexcept;
-  };
-
-  static_assert(sizeof(CategoryWordRangeView) == 0x28, "CategoryWordRangeView size must be 0x28");
-  static_assert(
-    offsetof(CategoryWordRangeView, mStartWordIndex) == 0x08,
-    "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CategoryWordRangeView, mWordsBegin) == 0x10, "CategoryWordRangeView::mWordsBegin offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CategoryWordRangeView, mWordsEnd) == 0x14, "CategoryWordRangeView::mWordsEnd offset must be 0x14"
-  );
-  static_assert(
-    offsetof(CategoryWordRangeView, mWordsInlineStorage) == 0x20,
-    "CategoryWordRangeView::mWordsInlineStorage offset must be 0x20"
-  );
 
   /**
    * Interface view for Sim::mRules vtable walk used by Entity::IsInCategory.

@@ -11,8 +11,8 @@
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SMinMax.h"
-#include "wm3/AABB.h"
-#include "wm3/Vector2.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "Wm3Vector2.h"
 
 namespace moho
 {

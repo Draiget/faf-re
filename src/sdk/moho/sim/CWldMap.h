@@ -6,7 +6,7 @@
 #include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
 #include "moho/sim/VisibilityRect.h"
-#include "wm3/Vector2.h"
+#include "Wm3Vector2.h"
 
 namespace gpg
 {

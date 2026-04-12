@@ -6,7 +6,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/Rect2.h"
 #include "moho/mesh/MeshThumbnail.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

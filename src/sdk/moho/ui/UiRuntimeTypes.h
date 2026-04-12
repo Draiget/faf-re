@@ -11,7 +11,7 @@
 #include "moho/math/VMatrix4.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 struct lua_State;
 

@@ -1,5 +1,5 @@
-#include "Distance3.h"
-#include "Capsule3.h"
+#include "moho/math/Wm3DistanceFafExtras.h"
+#include "Wm3Capsule3.h"
 
 #include <algorithm>
 #include <cmath>

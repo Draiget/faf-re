@@ -10,7 +10,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

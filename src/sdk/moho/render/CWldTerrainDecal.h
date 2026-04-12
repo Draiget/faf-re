@@ -8,8 +8,8 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/CountedObject.h"
 #include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

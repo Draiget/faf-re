@@ -56,6 +56,24 @@ namespace moho
      */
     ShaderVar* GetTexture(const boost::weak_ptr<gpg::gal::TextureD3D9>& textureHandle);
 
+    /**
+     * Address: 0x004380D0 (FUN_004380D0, struct_ShaderVar::SetFloat)
+     *
+     * What it does:
+     * If the shader-var has a bound effect variable, writes one float value
+     * into it through the effect-variable virtual dispatch.
+     */
+    ShaderVar* SetFloat(float value);
+
+    /**
+     * Address: 0x00438100 (FUN_00438100, struct_ShaderVar::SetMatrix4x4)
+     *
+     * What it does:
+     * If the shader-var has a bound effect variable, writes one 4x4 matrix
+     * pointer into it through the effect-variable virtual dispatch.
+     */
+    ShaderVar* SetMatrix4x4(const void* matrix4x4);
+
   public:
     msvc8::string mVariableName{};                             // +0x00
     msvc8::string mEffectFileName{};                           // +0x1C

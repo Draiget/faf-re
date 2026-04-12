@@ -5,6 +5,7 @@
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Tree.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
 namespace LuaPlus
@@ -20,7 +21,6 @@ namespace gpg
 
 namespace moho
 {
-  struct CategoryWordRangeView;
   struct RResId;
 
   struct RBlueprint;

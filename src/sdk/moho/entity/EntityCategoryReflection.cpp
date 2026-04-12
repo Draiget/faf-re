@@ -243,7 +243,7 @@ namespace moho
     const EntityCategorySet* const rhs
   )
   {
-    out->mBitsHeader = lhs->mBitsHeader;
+    out->mUniverse = lhs->mUniverse;
     BVIntSet unionBits{};
     (void)lhs->mBits.Union(&unionBits, &rhs->mBits);
     out->mBits = unionBits;
@@ -268,7 +268,7 @@ namespace moho
   EntityCategorySet*
     EntityCategory::Sub(EntityCategorySet* const out, const EntityCategorySet* const lhs, const EntityCategorySet* const rhs)
   {
-    out->mBitsHeader = lhs->mBitsHeader;
+    out->mUniverse = lhs->mUniverse;
     BVIntSet subtractionBits{};
     (void)lhs->mBits.Subtract(&subtractionBits, &rhs->mBits);
     out->mBits = subtractionBits;
@@ -281,7 +281,7 @@ namespace moho
   EntityCategorySet*
     EntityCategory::Mul(EntityCategorySet* const out, const EntityCategorySet* const lhs, const EntityCategorySet* const rhs)
   {
-    out->mBitsHeader = lhs->mBitsHeader;
+    out->mUniverse = lhs->mUniverse;
     BVIntSet intersectionBits{};
     (void)lhs->mBits.Intersect(&intersectionBits, &rhs->mBits);
     out->mBits = intersectionBits;

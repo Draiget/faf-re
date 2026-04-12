@@ -3,9 +3,9 @@
 #include <cstdint>
 
 #include "legacy/containers/Vector.h"
-#include "wm3/Box3.h"
-#include "wm3/Quaternion.h"
-#include "wm3/Vector2.h"
+#include "Wm3Box3.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector2.h"
 #include "moho/math/Vector3f.h"
 #include "moho/ui/SDebugDecal.h"
 #include "moho/ui/SDebugLine.h"

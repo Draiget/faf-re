@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 #include "gpg/core/reflection/Reflection.h"
 
 namespace gpg

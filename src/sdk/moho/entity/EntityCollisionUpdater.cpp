@@ -6,7 +6,7 @@
 
 #include "EntityTransformPayload.h"
 #include "gpg/core/utils/Global.h"
-#include "wm3/Distance3.h"
+#include "moho/math/Wm3DistanceFafExtras.h"
 
 namespace
 {

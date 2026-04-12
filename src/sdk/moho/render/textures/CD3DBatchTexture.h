@@ -7,7 +7,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "moho/containers/TDatList.h"
-#include "wm3/Vector2.h"
+#include "Wm3Vector2.h"
 
 namespace moho
 {

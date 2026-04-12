@@ -21,7 +21,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Quaternion.h"
 
 namespace
 {

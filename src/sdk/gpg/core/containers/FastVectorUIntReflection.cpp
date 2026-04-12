@@ -6,7 +6,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

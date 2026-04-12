@@ -2379,11 +2379,7 @@ namespace
 
   [[nodiscard]] const BVIntSet& CategoryWordRangeAsBVIntSet(const CategoryWordRangeView& range) noexcept
   {
-    static_assert(
-      offsetof(CategoryWordRangeView, mStartWordIndex) == 0x08,
-      "CategoryWordRangeView::mStartWordIndex offset must be 0x08"
-    );
-    return *reinterpret_cast<const BVIntSet*>(&range.mStartWordIndex);
+    return range.mBits;
   }
 
   /**
@@ -4768,7 +4764,7 @@ namespace
   VTransform BuildUnitSpawnTransform(const SCoordsVec2& pos, const float heading)
   {
     const Wm3::Vec3f headingAxis{0.0f, 1.0f, 0.0f};
-    const Wm3::Quatf orientation = Wm3::Quatf::FromAxisAngle(headingAxis, heading);
+    const Wm3::Quatf orientation = Wm3::Quatf::MakeFromAxisAngle(headingAxis, heading);
     const Wm3::Vec3f worldPosition{pos.x, 0.0f, pos.z};
     return VTransform(worldPosition, orientation);
   }
@@ -9455,34 +9451,43 @@ namespace
     return ResolveRulesImpl(state);
   }
 
-  [[nodiscard]] moho::RUnitBlueprint*
-  func_CreateRUnitBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
-
-  [[nodiscard]] moho::RPropBlueprint*
-  func_CreateRPropBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
-
-  [[nodiscard]] moho::RProjectileBlueprint*
-  func_CreateRProjectileBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
-
-  void func_RegisterBlueprint(moho::RBlueprint* blueprint, moho::RRuleGameRulesImpl* rules, const char* categoryName);
-
-  int func_RegisterMeshBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
-  int func_RegisterTrailEmitterBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
-  int func_RegisterEmitterBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
-  int func_RegisterBeamBlueprint(LuaPlus::LuaState* state, moho::RRuleGameRulesBlueprintMap* destinationMap);
+  // Recovery state: the FA binary delegates blueprint creation and
+  // registration through eight `func_*` helpers at the addresses listed
+  // below. They are currently `blocked` recovery (decomp pseudocode and
+  // raw asm exist in decomp/recovery/disasm/fa_full_2026_03_26/FUN_*.{c,md}
+  // but require recovering RUnitBlueprint::mCategories layout, the
+  // RRuleGameRulesImpl::unk1 field at +0xC4, and the sub_5555C0 registry
+  // insert helper before bodies can be reconstructed safely):
+  //
+  //   func_RegisterBlueprint              -> FUN_005289D0
+  //   func_CreateRUnitBlueprint           -> FUN_00531D80
+  //   func_CreateRPropBlueprint           -> FUN_00532080
+  //   func_CreateRProjectileBlueprint     -> FUN_00532380
+  //   func_RegisterMeshBlueprint          -> FUN_00532680
+  //   func_RegisterTrailEmitterBlueprint  -> FUN_00532980
+  //   func_RegisterEmitterBlueprint       -> FUN_00532C10
+  //   func_RegisterBeamBlueprint          -> FUN_00532EC0
+  //
+  // We previously forward-declared these helpers in this anonymous namespace
+  // and called into them from the wrappers below. That triggered C5046 at
+  // every TU compile (declared with internal linkage but never defined) and
+  // would have failed at exe-link time. The wrappers below now early-return
+  // with a deferred-recovery comment until those helpers land.
 
   /**
    * Address: 0x00528B90 (FUN_00528B90)
    *
    * What it does:
-   * Fast-path helper that registers one unit blueprint from an already-cast
-   * Lua state into the rules unit-blueprint map and category lookup.
+   * Fast-path helper that, in the FA binary, registers one unit blueprint
+   * from an already-cast Lua state into the rules unit-blueprint map and
+   * category lookup. Currently a no-op because the func_CreateRUnitBlueprint
+   * (FUN_00531D80) and func_RegisterBlueprint (FUN_005289D0) helpers it
+   * delegates to are blocked recovery — see the comment in the anonymous
+   * namespace above for the full block list.
    */
   int RegisterUnitBlueprintFromState(LuaPlus::LuaState* const state)
   {
-    RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-    RUnitBlueprint* const blueprint = func_CreateRUnitBlueprint(state, &rules->mUnitBlueprints);
-    func_RegisterBlueprint(reinterpret_cast<RBlueprint*>(blueprint), rules, "ALLUNITS");
+    (void)state;
     return 0;
   }
 
@@ -9490,14 +9495,13 @@ namespace
    * Address: 0x00528C60 (FUN_00528C60)
    *
    * What it does:
-   * Fast-path helper that registers one prop blueprint from an already-cast
-   * Lua state and updates category lookup lanes.
+   * Fast-path helper that, in the FA binary, registers one prop blueprint
+   * from an already-cast Lua state and updates category lookup lanes.
+   * Currently a no-op for the same reason as RegisterUnitBlueprintFromState.
    */
   int RegisterPropBlueprintFromState(LuaPlus::LuaState* const state)
   {
-    RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-    RPropBlueprint* const blueprint = func_CreateRPropBlueprint(state, &rules->mPropBlueprints);
-    func_RegisterBlueprint(reinterpret_cast<RBlueprint*>(blueprint), rules, nullptr);
+    (void)state;
     return 0;
   }
 
@@ -9505,14 +9509,14 @@ namespace
    * Address: 0x00528D30 (FUN_00528D30)
    *
    * What it does:
-   * Fast-path helper that registers one projectile blueprint from an already-cast
-   * Lua state into the projectile map and category lookup.
+   * Fast-path helper that, in the FA binary, registers one projectile
+   * blueprint from an already-cast Lua state into the projectile map and
+   * category lookup. Currently a no-op for the same reason as
+   * RegisterUnitBlueprintFromState.
    */
   int RegisterProjectileBlueprintFromState(LuaPlus::LuaState* const state)
   {
-    RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-    RProjectileBlueprint* const blueprint = func_CreateRProjectileBlueprint(state, &rules->mProjectileBlueprints);
-    func_RegisterBlueprint(reinterpret_cast<RBlueprint*>(blueprint), rules, "ALLPROJECTILES");
+    (void)state;
     return 0;
   }
 } // namespace
@@ -9562,9 +9566,12 @@ int moho::cfunc_RegisterProjectileBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_RegisterMeshBlueprint(lua_State* const luaContext)
 {
-  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
-  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-  (void)func_RegisterMeshBlueprint(state, &rules->mMeshBlueprints);
+  // Body delegates to func_RegisterMeshBlueprint at FUN_00532680 (blocked
+  // recovery; see the deferred-helper block in the anonymous namespace
+  // above). Until that helper is reconstructed, this Lua C function is a
+  // no-op — mesh blueprints registered through this entry point silently
+  // drop.
+  (void)luaContext;
   return 0;
 }
 
@@ -9577,9 +9584,12 @@ int moho::cfunc_RegisterMeshBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_RegisterTrailEmitterBlueprint(lua_State* const luaContext)
 {
-  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
-  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-  return func_RegisterTrailEmitterBlueprint(state, &rules->mTrailBlueprints);
+  // Body delegates to func_RegisterTrailEmitterBlueprint at FUN_00532980
+  // (blocked recovery; see the deferred-helper block in the anonymous
+  // namespace above). Until that helper is reconstructed, this Lua C
+  // function is a no-op.
+  (void)luaContext;
+  return 0;
 }
 
 /**
@@ -9591,9 +9601,12 @@ int moho::cfunc_RegisterTrailEmitterBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_RegisterEmitterBlueprint(lua_State* const luaContext)
 {
-  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
-  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-  return func_RegisterEmitterBlueprint(state, &rules->mEmitterBlueprints);
+  // Body delegates to func_RegisterEmitterBlueprint at FUN_00532C10
+  // (blocked recovery; see the deferred-helper block in the anonymous
+  // namespace above). Until that helper is reconstructed, this Lua C
+  // function is a no-op.
+  (void)luaContext;
+  return 0;
 }
 
 /**
@@ -9605,9 +9618,12 @@ int moho::cfunc_RegisterEmitterBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_RegisterBeamBlueprint(lua_State* const luaContext)
 {
-  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
-  RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
-  return func_RegisterBeamBlueprint(state, &rules->mBeamBlueprints);
+  // Body delegates to func_RegisterBeamBlueprint at FUN_00532EC0 (blocked
+  // recovery; see the deferred-helper block in the anonymous namespace
+  // above). Until that helper is reconstructed, this Lua C function is a
+  // no-op.
+  (void)luaContext;
+  return 0;
 }
 
 /**
@@ -10162,15 +10178,10 @@ int moho::cfunc_ParseEntityCategorySimL(LuaPlus::LuaState* const state)
     categoryText = "";
   }
 
-  const CategoryWordRangeView parsedCategory = rules->ParseEntityCategory(categoryText);
-
-  EntityCategorySet category{};
-  category.mBitsHeader = reinterpret_cast<BVSetBitsHeader*>(static_cast<std::uintptr_t>(parsedCategory.mWordUniverseHandle));
-  category.mFlags = parsedCategory.mReserved04;
-  category.mBits = CategoryWordRangeAsBVIntSet(parsedCategory);
+  EntityCategorySet parsedCategory = rules->ParseEntityCategory(categoryText);
 
   LuaPlus::LuaObject out;
-  (void)func_NewEntityCategory(state, &out, &category);
+  (void)func_NewEntityCategory(state, &out, &parsedCategory);
   out.PushStack(state);
   return 1;
 }
@@ -10203,15 +10214,10 @@ int moho::cfunc_ParseEntityCategoryUserL(LuaPlus::LuaState* const state)
     categoryText = "";
   }
 
-  const CategoryWordRangeView parsedCategory = rules->ParseEntityCategory(categoryText);
-
-  EntityCategorySet category{};
-  category.mBitsHeader = reinterpret_cast<BVSetBitsHeader*>(static_cast<std::uintptr_t>(parsedCategory.mWordUniverseHandle));
-  category.mFlags = parsedCategory.mReserved04;
-  category.mBits = CategoryWordRangeAsBVIntSet(parsedCategory);
+  EntityCategorySet parsedCategory = rules->ParseEntityCategory(categoryText);
 
   LuaPlus::LuaObject out;
-  (void)func_NewEntityCategory(state, &out, &category);
+  (void)func_NewEntityCategory(state, &out, &parsedCategory);
   out.PushStack(state);
   return 1;
 }

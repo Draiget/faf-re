@@ -8,10 +8,10 @@
 #include "moho/math/Vector2f.h"
 #include "moho/math/Vector3f.h"
 #include "moho/math/Vector4f.h"
-#include "wm3/AABB.h"
-#include "wm3/Quaternion.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3AxisAlignedBox3.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

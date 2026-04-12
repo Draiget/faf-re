@@ -6,7 +6,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/resource/SScmFile.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace
 {

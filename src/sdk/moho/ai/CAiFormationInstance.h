@@ -8,8 +8,8 @@
 #include "legacy/containers/String.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/containers/TDatList.h"
-#include "wm3/Quaternion.h"
-#include "wm3/Vector3.h"
+#include "Wm3Quaternion.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

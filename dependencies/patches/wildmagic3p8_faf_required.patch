@@ -1,0 +1,770 @@
+diff --git a/Foundation/Math/Wm3AxisAlignedBox3.h b/Foundation/Math/Wm3AxisAlignedBox3.h
+--- a/Foundation/Math/Wm3AxisAlignedBox3.h
++++ b/Foundation/Math/Wm3AxisAlignedBox3.h
+@@ -13,6 +13,8 @@
+ 
+ #include "Wm3FoundationLIB.h"
+ #include "Wm3System.h"
++// FAF MOD: needed for the Vector3<Real>-typed Min/Max members below.
++#include "Wm3Vector3.h"
+ 
+ namespace Wm3
+ {
+@@ -29,6 +31,11 @@ public:
+     AxisAlignedBox3 (Real fXMin, Real fXMax, Real fYMin, Real fYMax,
+         Real fZMin, Real fZMax);
+ 
++    // FAF MOD: brace-init-friendly two-vector constructor for the FAF SDK
++    // helpers that build empty/invalid sentinels via `{min_vec, max_vec}`.
++    AxisAlignedBox3 (const Vector3<Real>& rkMin, const Vector3<Real>& rkMax)
++        : Min(rkMin), Max(rkMax) {}
++
+     // Overlap testing is in the strict sense.  If the two boxes are just
+     // touching along a common edge, the boxes are reported as overlapping.
+     bool HasXOverlap (const AxisAlignedBox3& rkBox) const;
+@@ -42,8 +49,14 @@ public:
+     bool FindIntersection (const AxisAlignedBox3& rkBox,
+         AxisAlignedBox3& rkIntr) const;
+ 
+-    Real Min[3];
+-    Real Max[3];
++    // FAF MOD: store Min/Max as Vector3<Real> instead of Real[3]. Same
++    // memory layout (Vector3<Real> wraps Real[3] via the union added in
++    // Wm3Vector3.h), so all the inl methods that do `Min[0]`/`Min[1]` etc.
++    // continue to work via Vector3<Real>::operator[]. But now the FAF SDK
++    // consumers can also write `bounds.Min.x` (the field-style access they
++    // were originally written against).
++    Vector3<Real> Min;
++    Vector3<Real> Max;
+ };
+ 
+ #include "Wm3AxisAlignedBox3.inl"
+diff --git a/Foundation/Math/Wm3Box3.h b/Foundation/Math/Wm3Box3.h
+--- a/Foundation/Math/Wm3Box3.h
++++ b/Foundation/Math/Wm3Box3.h
+@@ -14,6 +14,13 @@
+ #include "Wm3FoundationLIB.h"
+ #include "Wm3Vector3.h"
+ 
++// FAF MOD: forward decls for the FAF reflection serialize hooks added below.
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
++
+ namespace Wm3
+ {
+ 
+@@ -34,11 +41,65 @@ public:
+         const Vector3<Real>& rkAxis1, const Vector3<Real>& rkAxis2,
+         Real fExtent0, Real fExtent1, Real fExtent2);
+ 
++    // FAF MOD: 5-arg ctor that takes the three extents packed into a single
++    // Vector3<Real>, matching the FAF SDK's hand-recovered constructor.
++    Box3 (const Vector3<Real>& rkCenter,
++          const Vector3<Real>& rkAxis0,
++          const Vector3<Real>& rkAxis1,
++          const Vector3<Real>& rkAxis2,
++          const Vector3<Real>& rkExtent)
++        : Center(rkCenter)
++    {
++        Axis[0] = rkAxis0;
++        Axis[1] = rkAxis1;
++        Axis[2] = rkAxis2;
++        Extent[0] = rkExtent.x;
++        Extent[1] = rkExtent.y;
++        Extent[2] = rkExtent.z;
++    }
++
+     void ComputeVertices (Vector3<Real> akVertex[8]) const;
+ 
++    // FAF MOD: alias for the FAF SDK's hand-recovered name. Same body as
++    // ComputeVertices, just exposes the local API surface.
++    void GetCorners (Vector3<Real> akVertex[8]) const { ComputeVertices(akVertex); }
++
++    // FAF MOD: ComputeAABB — derive a world-space AABB from this OBB. Used
++    // by EntityCollisionUpdater::GetBoundingBox.
++    void ComputeAABB (Vector3<Real>& outMin, Vector3<Real>& outMax) const
++    {
++        const Vector3<Real> r(
++            std::fabs(Axis[0].x) * Extent[0] + std::fabs(Axis[1].x) * Extent[1] + std::fabs(Axis[2].x) * Extent[2],
++            std::fabs(Axis[0].y) * Extent[0] + std::fabs(Axis[1].y) * Extent[1] + std::fabs(Axis[2].y) * Extent[2],
++            std::fabs(Axis[0].z) * Extent[0] + std::fabs(Axis[1].z) * Extent[1] + std::fabs(Axis[2].z) * Extent[2]);
++        outMin = Vector3<Real>(Center.x - r.x, Center.y - r.y, Center.z - r.z);
++        outMax = Vector3<Real>(Center.x + r.x, Center.y + r.y, Center.z + r.z);
++    }
++
++    // FAF MOD: Point-in-OBB containment test from the FAF SDK's
++    // hand-recovered Box3.h. Matches the FA routine semantics — projects
++    // the point onto each box axis and checks |projection| <= half-extent.
++    bool ContainsPoint (const Vector3<Real>& point) const
++    {
++        const Vector3<Real> delta(point.x - Center.x, point.y - Center.y, point.z - Center.z);
++        for (int i = 0; i < 3; ++i)
++        {
++            const Real dp = Axis[i].x * delta.x + Axis[i].y * delta.y + Axis[i].z * delta.z;
++            if (dp > Extent[i] || dp < -Extent[i])
++                return false;
++        }
++        return true;
++    }
++
+     Vector3<Real> Center;
+     Vector3<Real> Axis[3];  // must be an orthonormal set of vectors
+     Real Extent[3];         // must be nonnegative
++
++    // FAF MOD: serialize hooks used by the FAF reflection system. The float
++    // specializations are defined in
++    // src/sdk/moho/collision/CColPrimitiveBox3f.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
+ };
+ 
+ #include "Wm3Box3.inl"
+diff --git a/Foundation/Math/Wm3Quaternion.h b/Foundation/Math/Wm3Quaternion.h
+--- a/Foundation/Math/Wm3Quaternion.h
++++ b/Foundation/Math/Wm3Quaternion.h
+@@ -13,6 +13,8 @@
+ 
+ #include "Wm3FoundationLIB.h"
+ #include "Wm3Matrix3.h"
++// FAF MOD: needed by the static helpers added below.
++#include <cmath>
+ 
+ namespace Wm3
+ {
+@@ -25,8 +27,11 @@ public:
+     // necessarily a unit length vector in 4D.
+ 
+     // construction
+-    Quaternion ();
+-    Quaternion (Real fW, Real fX, Real fY, Real fZ);
++    // FAF MOD: see Wm3Vector3.h. Default and (Real, Real, Real, Real) ctors
++    // are now inline constexpr.
++    constexpr Quaternion () noexcept : m_afTuple{Real(0), Real(0), Real(0), Real(0)} {}
++    constexpr Quaternion (Real fW, Real fX, Real fY, Real fZ) noexcept
++        : m_afTuple{fW, fX, fY, fZ} {}
+     Quaternion (const Quaternion& rkQ);
+ 
+     // quaternion for the input rotation matrix
+@@ -138,9 +143,169 @@ public:
+     WM3_ITEM static const Quaternion IDENTITY;  // the identity rotation
+     WM3_ITEM static const Quaternion ZERO;
+ 
+-private:
+-    Real m_afTuple[4];
++    // FAF MOD: see Wm3Vector3.h. Same union trick to expose `w, x, y, z`
++    // alongside the upstream `m_afTuple[4]` storage. Field order matches
++    // the upstream constructor and Wm3Quaternion.inl access pattern
++    // (m_afTuple[0]=w, [1]=x, [2]=y, [3]=z).
++public:
++    union
++    {
++        Real m_afTuple[4];
++        struct
++        {
++            Real w;
++            Real x;
++            Real y;
++            Real z;
++        };
++    };
++
++    // FAF MOD: SDK-side static helpers from the hand-recovered Quaternion API.
++    static Quaternion Identity () noexcept
++    {
++        return Quaternion(Real(1), Real(0), Real(0), Real(0));
++    }
++    static Real LengthSq (const Quaternion& q) noexcept
++    {
++        return q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
++    }
++    static Real Length (const Quaternion& q) noexcept
++    {
++        return std::sqrt(LengthSq(q));
++    }
++    static Real Dot (const Quaternion& a, const Quaternion& b) noexcept
++    {
++        return a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z;
++    }
++    static Quaternion Conjugate (const Quaternion& q) noexcept
++    {
++        return Quaternion(q.w, -q.x, -q.y, -q.z);
++    }
++    static Quaternion Inverse (const Quaternion& q) noexcept
++    {
++        const Real lsq = LengthSq(q);
++        if (lsq == Real(0)) return Identity();
++        const Real inv = Real(1) / lsq;
++        return Quaternion(q.w * inv, -q.x * inv, -q.y * inv, -q.z * inv);
++    }
++    static Quaternion Multiply (const Quaternion& a, const Quaternion& b) noexcept
++    {
++        return Quaternion(
++            a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
++            a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
++            a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
++            a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w);
++    }
++    // Note: upstream has an INSTANCE method `FromAxisAngle(axis, angle)`
++    // that mutates *this. The FAF SDK consumers call the static form,
++    // so we expose this as `MakeFromAxisAngle` and migrate the few call
++    // sites to it (or call upstream's instance method).
++    static Quaternion MakeFromAxisAngle (const Vector3<Real>& axis, Real angle) noexcept
++    {
++        const Real half = angle * Real(0.5);
++        const Real s = std::sin(half);
++        const Real c = std::cos(half);
++        return Quaternion(c, axis.x * s, axis.y * s, axis.z * s);
++    }
++    static Quaternion FromEulerXYZ (Real roll, Real pitch, Real yaw) noexcept
++    {
++        const Real cx = std::cos(roll * Real(0.5));
++        const Real sx = std::sin(roll * Real(0.5));
++        const Real cy = std::cos(pitch * Real(0.5));
++        const Real sy = std::sin(pitch * Real(0.5));
++        const Real cz = std::cos(yaw * Real(0.5));
++        const Real sz = std::sin(yaw * Real(0.5));
++        Quaternion q;
++        q.w = cz * cy * cx + sz * sy * sx;
++        q.x = cz * cy * sx - sz * sy * cx;
++        q.y = cz * sy * cx + sz * cy * sx;
++        q.z = sz * cy * cx - cz * sy * sx;
++        return q;
++    }
++    static Quaternion Nlerp (const Quaternion& a, const Quaternion& b, Real t) noexcept
++    {
++        Quaternion q1 = a;
++        Quaternion q2 = b;
++        if (Dot(q1, q2) < Real(0)) {
++            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = -q2.z;
++        }
++        Quaternion out(
++            q1.w + (q2.w - q1.w) * t,
++            q1.x + (q2.x - q1.x) * t,
++            q1.y + (q2.y - q1.y) * t,
++            q1.z + (q2.z - q1.z) * t);
++        const Real len = Length(out);
++        if (len > Real(1e-6)) {
++            const Real inv = Real(1) / len;
++            out.w *= inv; out.x *= inv; out.y *= inv; out.z *= inv;
++        } else {
++            out = Identity();
++        }
++        return out;
++    }
++    // Note: differs from upstream's instance method `Slerp` (which returns
++    // *this&). This is the FAF SDK static-form returning a fresh Quaternion.
++    // Note: upstream has an instance `Rotate(const Vector3<Real>&)` already
++    // (declared in Wm3Quaternion.h, defined in Wm3Quaternion.inl). The FAF
++    // SDK's hand-recovered Quaternion::Rotate matches that signature, so we
++    // simply use the upstream one.
++
++    // FAF MOD: ToMat3 — fill a raw row-major 3x3 matrix from this quaternion.
++    // Same shape as the FAF SDK's hand-recovered Quaternion::ToMat3 helper.
++    void ToMat3 (Real m[3][3]) const
++    {
++        const Real xx = x + x, yy = y + y, zz = z + z;
++        const Real xy = x * yy, xz = x * zz, yz = y * zz;
++        const Real wx = w * xx, wy = w * yy, wz = w * zz;
++        const Real xx2 = x * xx, yy2 = y * yy, zz2 = z * zz;
++        m[0][0] = Real(1) - (yy2 + zz2);
++        m[0][1] = xy - wz;
++        m[0][2] = xz + wy;
++        m[1][0] = xy + wz;
++        m[1][1] = Real(1) - (xx2 + zz2);
++        m[1][2] = yz - wx;
++        m[2][0] = xz - wy;
++        m[2][1] = yz + wx;
++        m[2][2] = Real(1) - (xx2 + yy2);
++    }
++
++    static Quaternion Slerp (const Quaternion& a, const Quaternion& b, Real t, Real eps = Real(1e-5)) noexcept
++    {
++        // Normalize copies
++        Quaternion q1 = a;
++        Quaternion q2 = b;
++        {
++            const Real l1 = Length(q1);
++            if (l1 > eps) { const Real inv = Real(1) / l1; q1.w *= inv; q1.x *= inv; q1.y *= inv; q1.z *= inv; }
++            const Real l2 = Length(q2);
++            if (l2 > eps) { const Real inv = Real(1) / l2; q2.w *= inv; q2.x *= inv; q2.y *= inv; q2.z *= inv; }
++        }
++        Real cosTheta = Dot(q1, q2);
++        if (cosTheta < Real(0)) {
++            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = -q2.z;
++            cosTheta = -cosTheta;
++        }
++        if (cosTheta > Real(1) - eps) {
++            return Nlerp(q1, q2, t);
++        }
++        const Real theta = std::acos(cosTheta);
++        const Real s = std::sin(theta);
++        const Real w1 = std::sin((Real(1) - t) * theta) / s;
++        const Real w2 = std::sin(t * theta) / s;
++        Quaternion out(
++            q1.w * w1 + q2.w * w2,
++            q1.x * w1 + q2.x * w2,
++            q1.y * w1 + q2.y * w2,
++            q1.z * w1 + q2.z * w2);
++        const Real len = Length(out);
++        if (len > eps) {
++            const Real inv = Real(1) / len;
++            out.w *= inv; out.x *= inv; out.y *= inv; out.z *= inv;
++        }
++        return out;
++    }
+ 
++private:
+     // support for comparisons
+     int CompareArrays (const Quaternion& rkQ) const;
+ 
+@@ -155,6 +320,27 @@ Quaternion<Real> operator* (Real fScalar, const Quaternion<Real>& rkQ);
+ 
+ typedef Quaternion<float> Quaternionf;
+ typedef Quaternion<double> Quaterniond;
++// FAF MOD: short alias used by FAF SDK consumers.
++template <class Real> using Quat = Quaternion<Real>;
++typedef Quaternion<float> Quatf;
++
++// FAF MOD: free function `Wm3::MultiplyQuaternionVector(dest, vec, quat)`
++// recovered from the FA binary at FUN_00452D40. Converts the quaternion to
++// a 3x3 basis and rotates the vector through it, writing into *dest. Used
++// pervasively by FAF SDK code (~10 sites) as a free function.
++inline Vector3<float>* MultiplyQuaternionVector (
++    Vector3<float>* dest,
++    const Vector3<float>& vec,
++    const Quaternion<float>& quat) noexcept
++{
++    if (!dest) return nullptr;
++    float matrix[3][3]{};
++    quat.ToMat3(matrix);
++    dest->x = vec.x * matrix[0][0] + vec.y * matrix[0][1] + vec.z * matrix[0][2];
++    dest->y = vec.x * matrix[1][0] + vec.y * matrix[1][1] + vec.z * matrix[1][2];
++    dest->z = vec.x * matrix[2][0] + vec.y * matrix[2][1] + vec.z * matrix[2][2];
++    return dest;
++}
+ 
+ }
+ 
+diff --git a/Foundation/Math/Wm3Quaternion.inl b/Foundation/Math/Wm3Quaternion.inl
+--- a/Foundation/Math/Wm3Quaternion.inl
++++ b/Foundation/Math/Wm3Quaternion.inl
+@@ -8,25 +8,8 @@
+ // and may not be copied or disclosed except in accordance with the terms
+ // of that agreement.
+ 
+-//----------------------------------------------------------------------------
+-template <class Real>
+-Quaternion<Real>::Quaternion ()
+-{
+-    // the identity quaternion
+-    m_afTuple[0] = (Real)1.0;
+-    m_afTuple[1] = (Real)0.0;
+-    m_afTuple[2] = (Real)0.0;
+-    m_afTuple[3] = (Real)0.0;
+-}
+-//----------------------------------------------------------------------------
+-template <class Real>
+-Quaternion<Real>::Quaternion (Real fW, Real fX, Real fY, Real fZ)
+-{
+-    m_afTuple[0] = fW;
+-    m_afTuple[1] = fX;
+-    m_afTuple[2] = fY;
+-    m_afTuple[3] = fZ;
+-}
++// FAF MOD: default ctor and (Real, Real, Real, Real) ctor moved into
++// Wm3Quaternion.h as inline constexpr.
+ //----------------------------------------------------------------------------
+ template <class Real>
+ Quaternion<Real>::Quaternion (const Quaternion& rkQ)
+diff --git a/Foundation/Math/Wm3Sphere3.h b/Foundation/Math/Wm3Sphere3.h
+--- a/Foundation/Math/Wm3Sphere3.h
++++ b/Foundation/Math/Wm3Sphere3.h
+@@ -14,6 +14,14 @@
+ #include "Wm3FoundationLIB.h"
+ #include "Wm3Vector3.h"
+ 
++// FAF MOD: forward declarations for the FAF reflection-system serialize hooks
++// added below.
++namespace gpg
++{
++    class ReadArchive;
++    class WriteArchive;
++}
++
+ namespace Wm3
+ {
+ 
+@@ -33,6 +41,12 @@ public:
+ 
+     Vector3<Real> Center;
+     Real Radius;
++
++    // FAF MOD: serialize hooks used by the FAF reflection system. The
++    // float specializations are defined in
++    // src/sdk/moho/collision/CColPrimitiveSphere3f.cpp.
++    void MemberDeserialize (gpg::ReadArchive* archive);
++    void MemberSerialize (gpg::WriteArchive* archive) const;
+ };
+ 
+ #include "Wm3Sphere3.inl"
+diff --git a/Foundation/Math/Wm3Vector2.h b/Foundation/Math/Wm3Vector2.h
+--- a/Foundation/Math/Wm3Vector2.h
++++ b/Foundation/Math/Wm3Vector2.h
+@@ -13,6 +13,8 @@
+ 
+ #include "Wm3FoundationLIB.h"
+ #include "Wm3Math.h"
++// FAF MOD: needed by the static helpers added below.
++#include <cmath>
+ 
+ namespace Wm3
+ {
+@@ -22,8 +24,10 @@ class Vector2
+ {
+ public:
+     // construction
+-    Vector2 ();
+-    Vector2 (Real fX, Real fY);
++    // FAF MOD: see Wm3Vector3.h. Default and (Real, Real) ctors are now
++    // inline constexpr.
++    constexpr Vector2 () noexcept : m_afTuple{Real(0), Real(0)} {}
++    constexpr Vector2 (Real fX, Real fY) noexcept : m_afTuple{fX, fY} {}
+     Vector2 (const Real* afTuple);
+     Vector2 (const Vector2& rkV);
+ 
+@@ -102,11 +106,44 @@ public:
+     WM3_ITEM static const Vector2 UNIT_X;
+     WM3_ITEM static const Vector2 UNIT_Y;
+ 
++    // FAF MOD: see Wm3Vector3.h for the rationale. Same union trick to
++    // expose `x, y` alongside the upstream `m_afTuple[2]` storage.
++public:
++    union
++    {
++        Real m_afTuple[2];
++        struct
++        {
++            Real x;
++            Real y;
++        };
++    };
++
++    // FAF MOD: SDK-side static helpers from the hand-recovered Vector2 API.
++    static Vector2 Zero () noexcept { return Vector2(Real(0), Real(0)); }
++    static Real Dot (const Vector2& a, const Vector2& b) noexcept
++    {
++        return a.x * b.x + a.y * b.y;
++    }
++    static Real LengthSq (const Vector2& v) noexcept
++    {
++        return v.x * v.x + v.y * v.y;
++    }
++    static Real Length (const Vector2& v) noexcept
++    {
++        return std::sqrt(LengthSq(v));
++    }
++    static Vector2 NormalizeOrZero (const Vector2& v, Real minLenSq = Real(1e-6)) noexcept
++    {
++        const Real lenSq = LengthSq(v);
++        if (lenSq <= minLenSq) return Zero();
++        const Real inv = Real(1) / std::sqrt(lenSq);
++        return Vector2(v.x * inv, v.y * inv);
++    }
++
+ private:
+     // support for comparisons
+     int CompareArrays (const Vector2& rkV) const;
+-
+-    Real m_afTuple[2];
+ };
+ 
+ // arithmetic operations
+@@ -121,6 +158,11 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector2<Real>& rkV);
+ 
+ typedef Vector2<float> Vector2f;
+ typedef Vector2<double> Vector2d;
++// FAF MOD: aliases used by FAF SDK consumers.
++typedef Vector2<int> Vector2i;
++template <class Real> using Vec2 = Vector2<Real>;
++typedef Vector2<float> Vec2f;
++typedef Vector2<int> Vec2i;
+ 
+ }
+ 
+diff --git a/Foundation/Math/Wm3Vector2.inl b/Foundation/Math/Wm3Vector2.inl
+--- a/Foundation/Math/Wm3Vector2.inl
++++ b/Foundation/Math/Wm3Vector2.inl
+@@ -8,19 +8,8 @@
+ // and may not be copied or disclosed except in accordance with the terms
+ // of that agreement.
+ 
+-//----------------------------------------------------------------------------
+-template <class Real>
+-Vector2<Real>::Vector2 ()
+-{
+-    // the vector is uninitialized
+-}
+-//----------------------------------------------------------------------------
+-template <class Real>
+-Vector2<Real>::Vector2 (Real fX, Real fY)
+-{
+-    m_afTuple[0] = fX;
+-    m_afTuple[1] = fY;
+-}
++// FAF MOD: default ctor and (Real, Real) ctor moved into Wm3Vector2.h as
++// inline constexpr.
+ //----------------------------------------------------------------------------
+ template <class Real>
+ Vector2<Real>::Vector2 (const Real* afTuple)
+diff --git a/Foundation/Math/Wm3Vector3.h b/Foundation/Math/Wm3Vector3.h
+--- a/Foundation/Math/Wm3Vector3.h
++++ b/Foundation/Math/Wm3Vector3.h
+@@ -13,6 +13,9 @@
+ 
+ #include "Wm3FoundationLIB.h"
+ #include "Wm3Math.h"
++// FAF MOD: needed by the static helpers added below.
++#include <cmath>
++#include <limits>
+ 
+ namespace Wm3
+ {
+@@ -22,8 +25,11 @@ class Vector3
+ {
+ public:
+     // construction
+-    Vector3 ();
+-    Vector3 (Real fX, Real fY, Real fZ);
++    // FAF MOD: default ctor and (Real, Real, Real) ctor are now defined inline
++    // and `constexpr` so consumer code can write `constexpr Wm3::Vec3f v{...};`.
++    // The rest of the upstream ctors stay defined in Wm3Vector3.inl.
++    constexpr Vector3 () noexcept : m_afTuple{Real(0), Real(0), Real(0)} {}
++    constexpr Vector3 (Real fX, Real fY, Real fZ) noexcept : m_afTuple{fX, fY, fZ} {}
+     Vector3 (const Real* afTuple);
+     Vector3 (const Vector3& rkV);
+ 
+@@ -106,11 +112,152 @@ public:
+     WM3_ITEM static const Vector3 UNIT_Y;
+     WM3_ITEM static const Vector3 UNIT_Z;
+ 
++    // FAF MOD: expose the underlying storage as both `m_afTuple[3]` (the
++    // upstream WildMagic name used by every Wm3Vector3.inl method) and as a
++    // public `x, y, z` struct (used by the FAF SDK consumer code originally
++    // written against the local hand-recovered Wm3::Vector3 layout). The
++    // `m_afTuple[3]` and `struct { x, y, z }` overlay the same memory, so
++    // sizeof and binary layout are unchanged. The union is `public` so
++    // both names are addressable from outside the class.
++public:
++    union
++    {
++        Real m_afTuple[3];
++        struct
++        {
++            Real x;
++            Real y;
++            Real z;
++        };
++    };
++
++    // FAF MOD: SDK-side static helpers from the hand-recovered Vector3 API.
++    // These mirror the static-method shape consumers expect
++    // (Vector3f::Zero(), Vector3f::Add(a,b), etc.). They overload — but do
++    // not collide with — the upstream instance methods (Length, Dot,
++    // Normalize, Cross) because the static forms take an extra Vector3
++    // argument.
++    static constexpr Vector3 Zero () noexcept { return Vector3(Real(0), Real(0), Real(0)); }
++    static Vector3 NaN () noexcept
++    {
++        const Real qnan = std::numeric_limits<Real>::quiet_NaN();
++        return Vector3(qnan, qnan, qnan);
++    }
++    static constexpr Vector3 Add (const Vector3& a, const Vector3& b) noexcept
++    {
++        return Vector3(a.x + b.x, a.y + b.y, a.z + b.z);
++    }
++    static constexpr Vector3 Sub (const Vector3& a, const Vector3& b) noexcept
++    {
++        return Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
++    }
++    static constexpr Vector3 Scale (const Vector3& v, Real s) noexcept
++    {
++        return Vector3(v.x * s, v.y * s, v.z * s);
++    }
++    static constexpr Real Dot (const Vector3& a, const Vector3& b) noexcept
++    {
++        return a.x * b.x + a.y * b.y + a.z * b.z;
++    }
++    static constexpr Vector3 Cross (const Vector3& a, const Vector3& b) noexcept
++    {
++        return Vector3(a.y * b.z - a.z * b.y,
++                       a.z * b.x - a.x * b.z,
++                       a.x * b.y - a.y * b.x);
++    }
++    static constexpr Real LengthSq (const Vector3& v) noexcept
++    {
++        return v.x * v.x + v.y * v.y + v.z * v.z;
++    }
++    static Real Length (const Vector3& v) noexcept
++    {
++        return std::sqrt(LengthSq(v));
++    }
++    static Real Normalize (Vector3& v, Real eps = Real(1e-6)) noexcept
++    {
++        const Real len = Length(v);
++        if (len > eps) {
++            const Real inv = Real(1) / len;
++            v.x *= inv; v.y *= inv; v.z *= inv;
++        } else {
++            v.x = Real(0); v.y = Real(0); v.z = Real(0);
++        }
++        return len;
++    }
++    static Real Normalize (Vector3* v, Real eps = Real(1e-6)) noexcept
++    {
++        if (!v) return Real(0);
++        return Normalize(*v, eps);
++    }
++    static Vector3 NormalizeOrZero (const Vector3& v, Real minLenSq = Real(1e-6)) noexcept
++    {
++        if (LengthSq(v) <= minLenSq) return Zero();
++        Vector3 out = v;
++        Normalize(out);
++        return out;
++    }
++    static Vector3* NormalizeInto (const Vector3& source, Vector3* dest, Real eps = Real(1e-6)) noexcept
++    {
++        if (!dest) return nullptr;
++        const Real len = Length(source);
++        if (len > eps) {
++            const Real inv = Real(1) / len;
++            dest->x = source.x * inv;
++            dest->y = source.y * inv;
++            dest->z = source.z * inv;
++        } else {
++            dest->x = Real(0); dest->y = Real(0); dest->z = Real(0);
++        }
++        return dest;
++    }
++    static Real DistanceSq3D (const Vector3& a, const Vector3& b) noexcept
++    {
++        const Real dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
++        return dx * dx + dy * dy + dz * dz;
++    }
++    static Real DistanceSqXZ (const Vector3& a, const Vector3& b) noexcept
++    {
++        const Real dx = a.x - b.x, dz = a.z - b.z;
++        return dx * dx + dz * dz;
++    }
++    static void LimitLengthTo (Vector3& v, Real maxLen, Real eps = Real(1e-6)) noexcept
++    {
++        const Real lenSq = LengthSq(v);
++        if (lenSq <= (maxLen * maxLen) || lenSq <= (eps * eps)) return;
++        const Real invLen = maxLen / std::sqrt(lenSq);
++        v.x *= invLen; v.y *= invLen; v.z *= invLen;
++    }
++    static bool IsntNaN (const Vector3* value) noexcept
++    {
++        if (!value) return false;
++        return !std::isnan(value->x) && !std::isnan(value->y) && !std::isnan(value->z);
++    }
++    static bool IsntNaN (const Vector3& value) noexcept
++    {
++        return IsntNaN(&value);
++    }
++    static bool IsInvalid (const Vector3& value) noexcept
++    {
++        return !IsntNaN(value);
++    }
++    // Returns true when the vectors DIFFER beyond `eps`. Matches the FAF
++    // SDK's hand-recovered semantics (used as a "not equal" test).
++    static bool Compare (const Vector3* lhs, const Vector3* rhs, Real eps = Real(1e-5)) noexcept
++    {
++        if (lhs == nullptr || rhs == nullptr) return lhs != rhs;
++        return std::fabs(lhs->x - rhs->x) > eps
++            || std::fabs(lhs->y - rhs->y) > eps
++            || std::fabs(lhs->z - rhs->z) > eps;
++    }
++    bool IsntNaN () const noexcept { return Vector3::IsntNaN(this); }
++    void LimitLengthTo (Real maxLen, Real eps = Real(1e-6)) noexcept
++    {
++        Vector3::LimitLengthTo(*this, maxLen, eps);
++    }
++
+ private:
+     // support for comparisons
+     int CompareArrays (const Vector3& rkV) const;
+-
+-    Real m_afTuple[3];
+ };
+ 
+ // arithmetic operations
+@@ -125,6 +272,27 @@ std::ostream& operator<< (std::ostream& rkOStr, const Vector3<Real>& rkV);
+ 
+ typedef Vector3<float> Vector3f;
+ typedef Vector3<double> Vector3d;
++// FAF MOD: aliases that the FAF SDK's hand-recovered code originally used.
++typedef Vector3<int> Vector3i;
++template <class Real> using Vec3 = Vector3<Real>;
++typedef Vector3<float> Vec3f;
++typedef Vector3<int> Vec3i;
++
++// FAF MOD: free function helpers from the FAF SDK's hand-recovered Vector3 API.
++// Preserved here so consumer code calling them as free functions continues
++// to compile after `src/sdk/wm3/` is removed.
++inline bool Vector3fIsntNaN (const Vector3<float>* value) noexcept
++{
++    return Vector3<float>::IsntNaN(value);
++}
++
++// `Wm3::SqrtfBinary` was a thin std::sqrt wrapper recovered from the FA
++// binary at FUN_00452FC0. The FAF SDK's hand-recovered code calls it
++// pervasively as a free function.
++inline float SqrtfBinary (float value) noexcept
++{
++    return std::sqrt(value);
++}
+ 
+ }
+ 
+diff --git a/Foundation/Math/Wm3Vector3.inl b/Foundation/Math/Wm3Vector3.inl
+--- a/Foundation/Math/Wm3Vector3.inl
++++ b/Foundation/Math/Wm3Vector3.inl
+@@ -8,20 +8,8 @@
+ // and may not be copied or disclosed except in accordance with the terms
+ // of that agreement.
+ 
+-//----------------------------------------------------------------------------
+-template <class Real>
+-Vector3<Real>::Vector3 ()
+-{
+-    // the vector is uninitialized
+-}
+-//----------------------------------------------------------------------------
+-template <class Real>
+-Vector3<Real>::Vector3 (Real fX, Real fY, Real fZ)
+-{
+-    m_afTuple[0] = fX;
+-    m_afTuple[1] = fY;
+-    m_afTuple[2] = fZ;
+-}
++// FAF MOD: default ctor and (Real, Real, Real) ctor moved into Wm3Vector3.h
++// as inline constexpr so consumers can use them in constant expressions.
+ //----------------------------------------------------------------------------
+ template <class Real>
+ Vector3<Real>::Vector3 (const Real* afTuple)
+diff --git a/Renderers/Dx9Renderer/Wm3Dx9Utility.h b/Renderers/Dx9Renderer/Wm3Dx9Utility.h
+--- a/Renderers/Dx9Renderer/Wm3Dx9Utility.h
++++ b/Renderers/Dx9Renderer/Wm3Dx9Utility.h
+@@ -16,7 +16,8 @@
+ #include <d3d9.h>
+ #include <d3dx9math.h>
+ #include <d3dx9tex.h>
+-#include <dxerr9.h>
++// dxerr9.h was renamed to DxErr.h in the June 2010 DirectX SDK.
++#include <DxErr.h>
+ 
+ namespace Wm3
+ {

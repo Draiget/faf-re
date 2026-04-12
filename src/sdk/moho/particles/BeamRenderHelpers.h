@@ -11,7 +11,7 @@
 #include "moho/particles/SWorldBeam.h"
 #include "moho/particles/SWorldParticle.h"
 #include "moho/resource/CParticleTexture.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

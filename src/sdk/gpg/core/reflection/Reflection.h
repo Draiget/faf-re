@@ -30,7 +30,7 @@ namespace boost
 namespace Wm3
 {
   template <class T>
-  struct Vector3;
+  class Vector3;
   using Vector3f = Vector3<float>;
 } // namespace Wm3
 

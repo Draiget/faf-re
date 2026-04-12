@@ -6,7 +6,7 @@
 #include "moho/containers/TDatList.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/sim/SOCellPos.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

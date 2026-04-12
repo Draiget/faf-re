@@ -107,16 +107,16 @@ namespace Wm3
     gpg::RType* const vector3Type = CachedVector3fType();
 
     gpg::RRef ownerRef{};
-    archive->Read(vector3Type, reinterpret_cast<Wm3::Vector3<float>*>(&Center[0]), ownerRef);
+    archive->Read(vector3Type, &Center, ownerRef);
 
     gpg::RRef axis0OwnerRef{};
-    archive->Read(vector3Type, reinterpret_cast<Wm3::Vector3<float>*>(&Axis[0][0]), axis0OwnerRef);
+    archive->Read(vector3Type, &Axis[0], axis0OwnerRef);
 
     gpg::RRef axis1OwnerRef{};
-    archive->Read(vector3Type, reinterpret_cast<Wm3::Vector3<float>*>(&Axis[1][0]), axis1OwnerRef);
+    archive->Read(vector3Type, &Axis[1], axis1OwnerRef);
 
     gpg::RRef axis2OwnerRef{};
-    archive->Read(vector3Type, reinterpret_cast<Wm3::Vector3<float>*>(&Axis[2][0]), axis2OwnerRef);
+    archive->Read(vector3Type, &Axis[2], axis2OwnerRef);
 
     archive->ReadFloat(&Extent[0]);
     archive->ReadFloat(&Extent[1]);
@@ -132,16 +132,16 @@ namespace Wm3
     gpg::RType* const vector3Type = CachedVector3fType();
 
     gpg::RRef ownerRef{};
-    archive->Write(vector3Type, reinterpret_cast<const Wm3::Vector3<float>*>(&Center[0]), ownerRef);
+    archive->Write(vector3Type, &Center, ownerRef);
 
     gpg::RRef axis0OwnerRef{};
-    archive->Write(vector3Type, reinterpret_cast<const Wm3::Vector3<float>*>(&Axis[0][0]), axis0OwnerRef);
+    archive->Write(vector3Type, &Axis[0], axis0OwnerRef);
 
     gpg::RRef axis1OwnerRef{};
-    archive->Write(vector3Type, reinterpret_cast<const Wm3::Vector3<float>*>(&Axis[1][0]), axis1OwnerRef);
+    archive->Write(vector3Type, &Axis[1], axis1OwnerRef);
 
     gpg::RRef axis2OwnerRef{};
-    archive->Write(vector3Type, reinterpret_cast<const Wm3::Vector3<float>*>(&Axis[2][0]), axis2OwnerRef);
+    archive->Write(vector3Type, &Axis[2], axis2OwnerRef);
 
     archive->WriteFloat(Extent[0]);
     archive->WriteFloat(Extent[1]);

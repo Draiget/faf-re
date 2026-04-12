@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <initializer_list>
+#include <limits>
 #include <new>
 #include <string>
 #include <typeinfo>
@@ -13,6 +14,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/CAiPersonality.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
@@ -33,6 +35,7 @@
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
@@ -164,6 +167,12 @@ namespace
   constexpr const char* kAiBrainLuaClassName = "CAiBrain";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgRangeWarning = "%s\n  expected between %d and %d args, but got %d";
+  constexpr const char* kAiBrainSetUpAttackVectorsToArmyName = "SetUpAttackVectorsToArmy";
+  constexpr const char* kAiBrainSetUpAttackVectorsToArmyHelpText = "CAiBrain:SetUpAttackVectorsToArmy()";
+  constexpr const char* kAiBrainFindClosestArmyWithBaseName = "FindClosestArmyWithBase";
+  constexpr const char* kAiBrainFindClosestArmyWithBaseHelpText =
+    "CAiBrain:FindClosestArmyWithBase(allianceState) - returns the brain of the closest "
+    "army (filtered by alliance with this brain) that owns at least one structure, or nil";
   constexpr std::int32_t kAiDebugGridStep = 32;
   constexpr std::int32_t kAiDebugGridLineDepth = static_cast<std::int32_t>(0xFF7FFF7Fu);
   constexpr std::int32_t kAiDebugAttackLineDepth = static_cast<std::int32_t>(0xFFFFFF00u);
@@ -642,8 +651,8 @@ namespace
       return;
     }
 
-    const std::uint32_t lhsBeginWord = lhs.mStartWordIndex;
-    const std::uint32_t rhsBeginWord = rhs.mStartWordIndex;
+    const std::uint32_t lhsBeginWord = lhs.mBits.mFirstWordIndex;
+    const std::uint32_t rhsBeginWord = rhs.mBits.mFirstWordIndex;
     const std::uint32_t lhsEndWord = lhsBeginWord + static_cast<std::uint32_t>(lhsCount);
     const std::uint32_t rhsEndWord = rhsBeginWord + static_cast<std::uint32_t>(rhsCount);
 
@@ -1552,7 +1561,7 @@ SEntitySetTemplateUnit* CAiBrain::GetAvailableFactories(
       SubtractCategoryWordRange(candidateCategory, *mobileCategory);
     }
   } else if (mobileCategory != nullptr) {
-    candidateCategory.ResetToEmpty(mobileCategory->mWordUniverseHandle);
+    candidateCategory.ResetToEmpty(mobileCategory->mUniverse);
   }
 
   SEntitySetTemplateUnit foundUnits{};
@@ -4792,5 +4801,255 @@ int moho::cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* const state)
 
   lua_pushnumber(rawState, static_cast<float>(brain->mArmy->NoRushTicks));
   (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x0057A510 (FUN_0057A510, Moho::CAiBrain::CenterOfArmy)
+ *
+ * What it does:
+ * Iterates the brain's mobile (non-structure) army units, sums their world
+ * positions, and writes the average into `outPosition`. Mirrors the
+ * recovered ProcessAttackVectors traversal pattern.
+ */
+Wm3::Vec3f* moho::CAiBrain::CenterOfArmy(Wm3::Vec3f* const outPosition)
+{
+  outPosition->x = 0.0f;
+  outPosition->y = 0.0f;
+  outPosition->z = 0.0f;
+
+  if (mArmy == nullptr || mSim == nullptr || mSim->mRules == nullptr) {
+    return outPosition;
+  }
+
+  RRuleGameRules* const rules = mSim->mRules;
+  const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
+  const CategoryWordRangeView* const structureCategory = rules->GetEntityCategory("STRUCTURE");
+
+  EntityCategorySet mobileMinusStructure{};
+  EntityCategory::Sub(&mobileMinusStructure, mobileCategory, structureCategory);
+
+  SEntitySetTemplateUnit candidateUnits{};
+  mArmy->GetUnits(&candidateUnits, &mobileMinusStructure);
+
+  std::uint32_t aliveUnitCount = 0u;
+  for (Entity* const* unitIt = candidateUnits.mVec.begin(); unitIt != candidateUnits.mVec.end(); ++unitIt) {
+    Unit* const candidateUnit = SEntitySetTemplateUnit::UnitFromEntry(*unitIt);
+    if (candidateUnit == nullptr || candidateUnit->IsDead() || candidateUnit->DestroyQueued()) {
+      continue;
+    }
+
+    const Wm3::Vec3f& unitPosition = candidateUnit->GetPosition();
+    outPosition->x += unitPosition.x;
+    outPosition->y += unitPosition.y;
+    outPosition->z += unitPosition.z;
+    ++aliveUnitCount;
+  }
+
+  if (aliveUnitCount == 0u) {
+    return outPosition;
+  }
+
+  const float invCount = 1.0f / static_cast<float>(aliveUnitCount);
+  outPosition->x *= invCount;
+  outPosition->y *= invCount;
+  outPosition->z *= invCount;
+  return outPosition;
+}
+
+/**
+ * Address: 0x0058EB40 (FUN_0058EB40, cfunc_CAiBrainSetUpAttackVectorsToArmy)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainSetUpAttackVectorsToArmyL`.
+ */
+int moho::cfunc_CAiBrainSetUpAttackVectorsToArmy(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainSetUpAttackVectorsToArmyL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058EB60 (FUN_0058EB60, func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:SetUpAttackVectorsToArmy()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainSetUpAttackVectorsToArmyName,
+    &moho::cfunc_CAiBrainSetUpAttackVectorsToArmy,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainSetUpAttackVectorsToArmyHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058EBC0 (FUN_0058EBC0, cfunc_CAiBrainSetUpAttackVectorsToArmyL)
+ *
+ * What it does:
+ * Updates the brain's attack-vector category filter from an explicit category
+ * argument or, when none is supplied, the default `MOBILE - STRUCTURE`
+ * category, then rebuilds the brain attack vectors.
+ */
+int moho::cfunc_CAiBrainSetUpAttackVectorsToArmyL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 1 || argumentCount > 2) {
+    LuaPlus::LuaState::Error(
+      state,
+      kLuaExpectedArgRangeWarning,
+      kAiBrainSetUpAttackVectorsToArmyHelpText,
+      1,
+      2,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  if (argumentCount > 1 && lua_type(rawState, 2) != 0) {
+    const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
+    EntityCategorySet* const explicitCategory = func_GetCObj_EntityCategory(categoryObject);
+    brain->mBuildCategoryRange = *explicitCategory;
+  } else {
+    RRuleGameRules* const rules = brain->mSim->mRules;
+    const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
+    const CategoryWordRangeView* const structureCategory = rules->GetEntityCategory("STRUCTURE");
+
+    EntityCategorySet defaultCategory{};
+    EntityCategory::Sub(&defaultCategory, mobileCategory, structureCategory);
+    brain->mBuildCategoryRange = defaultCategory;
+  }
+
+  brain->ProcessAttackVectors();
+  return 1;
+}
+
+/**
+ * Address: 0x0058E830 (FUN_0058E830, cfunc_CAiBrainFindClosestArmyWithBase)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainFindClosestArmyWithBaseL`.
+ */
+int moho::cfunc_CAiBrainFindClosestArmyWithBase(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainFindClosestArmyWithBaseL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058E850 (FUN_0058E850, func_CAiBrainFindClosestArmyWithBase_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:FindClosestArmyWithBase()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainFindClosestArmyWithBase_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainFindClosestArmyWithBaseName,
+    &moho::cfunc_CAiBrainFindClosestArmyWithBase,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainFindClosestArmyWithBaseHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058E8B0 (FUN_0058E8B0, cfunc_CAiBrainFindClosestArmyWithBaseL)
+ *
+ * What it does:
+ * Walks the army's recon-blip list, filters to live units of the requested
+ * alliance state that own at least one `STRUCTURE` blueprint bit, then
+ * returns the Lua object of the closest qualifying army's brain (or nil).
+ */
+int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiBrainFindClosestArmyWithBaseHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  EAlliance requestedAlliance{};
+  gpg::RRef enumRef{};
+  (void)gpg::RRef_EAlliance(&enumRef, &requestedAlliance);
+
+  const LuaPlus::LuaStackObject allianceArg(state, 2);
+  const char* const allianceName = lua_tostring(rawState, 2);
+  if (!allianceName) {
+    allianceArg.TypeError("string");
+  }
+  SCR_GetEnum(state, allianceName, enumRef);
+
+  Wm3::Vec3f searchPosition{};
+  brain->CenterOfArmy(&searchPosition);
+
+  CArmyImpl* closestArmy = nullptr;
+  float closestDistance = std::numeric_limits<float>::infinity();
+
+  CAiReconDBImpl* const reconDB = brain->mArmy->GetReconDB();
+  if (reconDB == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  const CategoryWordRangeView* const structureCategory = brain->mSim->mRules->GetEntityCategory("STRUCTURE");
+
+  const msvc8::vector<ReconBlip*>& blips = reconDB->ReconGetBlips();
+  for (ReconBlip* const blip : blips) {
+    if (blip == nullptr) {
+      continue;
+    }
+
+    Unit* const sourceUnit = blip->GetCreator();
+    if (sourceUnit == nullptr || sourceUnit->IsDead()) {
+      continue;
+    }
+
+    CArmyImpl* const sourceArmy = sourceUnit->ArmyRef;
+    const IArmy* const sourceArmyBase = sourceArmy != nullptr ? static_cast<const IArmy*>(sourceArmy) : nullptr;
+    if (brain->mArmy->GetAllianceWith(sourceArmyBase) != requestedAlliance) {
+      continue;
+    }
+
+    if (structureCategory == nullptr) {
+      continue;
+    }
+    if (!structureCategory->ContainsBit(static_cast<std::uint32_t>(sourceUnit->GetBlueprint()->mCategoryBitIndex))) {
+      continue;
+    }
+
+    const Wm3::Vec3f& unitPosition = sourceUnit->GetPosition();
+    const float dx = searchPosition.x - unitPosition.x;
+    const float dy = searchPosition.y - unitPosition.y;
+    const float dz = searchPosition.z - unitPosition.z;
+    const float distanceSq = (dx * dx) + (dy * dy) + (dz * dz);
+    if (distanceSq < closestDistance) {
+      closestDistance = distanceSq;
+      closestArmy = sourceArmy;
+    }
+  }
+
+  if (closestArmy == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  CAiBrain* const closestBrain = closestArmy->GetArmyBrain();
+  closestBrain->mLuaObj.PushStack(state);
   return 1;
 }

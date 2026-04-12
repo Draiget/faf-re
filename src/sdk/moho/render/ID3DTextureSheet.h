@@ -4,8 +4,8 @@
 
 #include "boost/shared_ptr.h"
 #include "platform/Platform.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 #if defined(_WIN32)
 #include <d3d9types.h>

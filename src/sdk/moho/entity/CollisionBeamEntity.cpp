@@ -17,7 +17,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
-#include "wm3/Box3.h"
+#include "Wm3Box3.h"
 
 namespace gpg
 {

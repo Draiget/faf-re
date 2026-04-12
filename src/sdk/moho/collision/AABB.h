@@ -1,6 +1,6 @@
 #pragma once
 
-#include "wm3/AABB.h"
+#include "Wm3AxisAlignedBox3.h"
 
 namespace moho
 {

@@ -11,7 +11,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/VMatrix4.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace
 {

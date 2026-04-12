@@ -6,8 +6,8 @@
 #include "gpg/gal/TextureContext.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/render/ID3DTextureSheet.h"
-#include "wm3/Vector2.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector2.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

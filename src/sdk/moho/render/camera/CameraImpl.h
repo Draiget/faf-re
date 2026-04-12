@@ -5,7 +5,7 @@
 #include "gpg/core/containers/String.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/render/camera/GeomCamera3.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 struct lua_State;
 

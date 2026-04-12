@@ -10,8 +10,8 @@
 #include "moho/math/Vector3f.h"
 #include "moho/render/d3d/CD3DFontTypes.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
-#include "wm3/Box3.h"
-#include "wm3/Quaternion.h"
+#include "Wm3Box3.h"
+#include "Wm3Quaternion.h"
 
 namespace moho
 {

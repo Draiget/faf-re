@@ -8,7 +8,7 @@
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/misc/WeakObject.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

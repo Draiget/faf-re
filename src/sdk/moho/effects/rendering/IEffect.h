@@ -7,7 +7,7 @@
 #include "moho/containers/TDatList.h"
 #include "moho/math/Vector4f.h"
 #include "moho/script/CScriptObject.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {

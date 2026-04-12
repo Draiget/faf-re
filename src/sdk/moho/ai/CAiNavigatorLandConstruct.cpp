@@ -56,11 +56,12 @@ namespace
   }
 
   /**
-   * Address: 0x005A4730 (FUN_005A4730, construct callback)
+   * Address: 0x005A4740 (FUN_005A4740, func_registerCAiNavigatorLandRType)
    *
    * What it does:
-   * Allocates one `CAiNavigatorLand` and publishes it as unowned construct
-   * result payload.
+   * Allocates one `CAiNavigatorLand`, wraps it in a typed `gpg::RRef`, and
+   * publishes it through `SerConstructResult::SetUnowned` as the construct
+   * callback payload.
    */
   void ConstructAiNavigatorLandForResult(gpg::SerConstructResult* const result)
   {
@@ -104,7 +105,11 @@ namespace
 } // namespace
 
 /**
- * Address: 0x005A4730 (FUN_005A4730, construct callback)
+ * Address: 0x005A4730 (FUN_005A4730, CAiNavigatorLandConstruct::Construct)
+ *
+ * What it does:
+ * Null-checks the construct-result payload and forwards to the typed
+ * allocation helper.
  */
 void CAiNavigatorLandConstruct::Construct(
   gpg::ReadArchive* const,

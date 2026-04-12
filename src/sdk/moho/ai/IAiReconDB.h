@@ -6,8 +6,8 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/Vector.h"
-#include "wm3/Box3.h"
-#include "wm3/Vector3.h"
+#include "Wm3Box3.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {

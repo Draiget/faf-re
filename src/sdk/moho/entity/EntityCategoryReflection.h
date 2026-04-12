@@ -43,6 +43,14 @@ namespace moho
   static_assert(sizeof(EntityCategorySet) == 0x28, "EntityCategorySet size must be 0x28");
 
   /**
+   * Canonical alias: the binary "category word range view" lane is the same
+   * 0x28-byte BVSet payload as `EntityCategorySet`. Both names model the
+   * same binary type, kept here so all category-set call sites share one
+   * canonical layout (no duplicate flat-field rewrites).
+   */
+  using CategoryWordRangeView = EntityCategorySet;
+
+  /**
    * Address family:
    * - 0x005567F0 (FUN_005567F0, SerSave)
    * - 0x00556870 (FUN_00556870, SerLoad)

@@ -23,7 +23,7 @@ namespace gpg::gal
 namespace Wm3
 {
   template <class T>
-  struct Vector2;
+  class Vector2;
   using Vector2i = Vector2<int>;
 } // namespace Wm3
 

@@ -8,7 +8,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/unit/Broadcaster.h"
-#include "wm3/Vector3.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {
