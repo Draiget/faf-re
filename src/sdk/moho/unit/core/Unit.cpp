@@ -1481,6 +1481,31 @@ namespace
     return static_cast<Unit*>(unitRef.mObj);
   }
 
+  /**
+   * Address: 0x006D2490 (FUN_006D2490, func_CastUnitOpt)
+   *
+   * What it does:
+   * Performs optional Lua `_c_object` to `Unit*` conversion: returns null for
+   * missing/destroyed/non-unit payloads without raising Lua conversion errors.
+   */
+  [[nodiscard]] Unit* CastUnitOptionalFromLuaObject(const LuaPlus::LuaObject& unitObject)
+  {
+    const LuaPlus::LuaObject copiedObject(unitObject);
+    CScriptObject** const scriptObjectSlot = SCR_FromLua_CScriptObject(copiedObject);
+    if (!scriptObjectSlot) {
+      return nullptr;
+    }
+
+    CScriptObject* const scriptObject = *scriptObjectSlot;
+    if (!scriptObject) {
+      return nullptr;
+    }
+
+    const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
+    const gpg::RRef unitRef = gpg::REF_UpcastPtr(sourceRef, CachedUnitRType());
+    return static_cast<Unit*>(unitRef.mObj);
+  }
+
   [[nodiscard]] Unit* ResolveUnitBridge(UserUnit* const userUnit) noexcept
   {
     return userUnit ? reinterpret_cast<Unit*>(userUnit->mIUnitAndScriptBridge) : nullptr;
@@ -2135,6 +2160,31 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x00593970 (FUN_00593970, func_GetUnitOpt)
+ *
+ * What it does:
+ * Public wrapper that mirrors the anonymous-namespace `GetUnitOptional`
+ * helper: non-throwing conversion from Lua payload to `Unit*`, returning
+ * null when the payload is missing or of a non-unit runtime type.
+ */
+moho::Unit* moho::SCR_GetUnitOptional(const LuaPlus::LuaObject& unitObject)
+{
+  static gpg::RType* sUnitType = nullptr;
+  if (sUnitType == nullptr) {
+    sUnitType = gpg::LookupRType(typeid(Unit));
+  }
+
+  CScriptObject* const scriptObject = SCR_GetScriptObjectFromLuaObject(unitObject);
+  if (scriptObject == nullptr) {
+    return nullptr;
+  }
+
+  const gpg::RRef sourceRef = scriptObject->GetDerivedObjectRef();
+  const gpg::RRef unitRef = gpg::REF_UpcastPtr(sourceRef, sUnitType);
+  return static_cast<Unit*>(unitRef.mObj);
+}
+
+/**
  * Address: 0x006AEBF0 (FUN_006AEBF0, Moho::InstanceCounter<Moho::Unit>::GetStatItem)
  *
  * What it does:
@@ -2170,6 +2220,21 @@ LuaPlus::LuaObject CScrLuaMetatableFactory<Unit>::Create(LuaPlus::LuaState* cons
 {
   return SCR_CreateSimpleMetatable(state);
 }
+
+namespace
+{
+  /**
+   * Address: 0x00564970 (FUN_00564970, func_StringLinkedListCpyRange)
+   *
+   * What it does:
+   * Clones one legacy MSVC8 string list into another, preserving the original
+   * element order and producing a fresh destination list.
+   */
+  void CopyStringListRange(msvc8::list<msvc8::string>& destination, const msvc8::list<msvc8::string>& source)
+  {
+    destination = source;
+  }
+} // namespace
 
 /**
  * Address: 0x00564660 (FUN_00564660, ?ARMOR_GetArmorDefinations@Moho@@YA?AV?$list@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PAVLuaState@LuaPlus@@VStrArg@gpg@@@Z)
@@ -2222,7 +2287,9 @@ msvc8::list<msvc8::string> moho::ARMOR_GetArmorDefinations(
     break;
   }
 
-  return definitions;
+  msvc8::list<msvc8::string> copiedDefinitions{};
+  CopyStringListRange(copiedDefinitions, definitions);
+  return copiedDefinitions;
 }
 
 /**
@@ -4942,15 +5009,7 @@ int moho::cfunc_UnitIsIdleStateL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
-
-  bool isIdle = true;
-  if (const CUnitCommandQueue* const commandQueue = unit->CommandQueue;
-      commandQueue != nullptr && !commandQueue->mCommandVec.empty()) {
-    const CUnitCommand* const command = commandQueue->mCommandVec.front().GetObjectPtr();
-    if (command != nullptr && reinterpret_cast<std::uintptr_t>(command) != kInvalidWeakCommandSentinel) {
-      isIdle = false;
-    }
-  }
+  const bool isIdle = (unit == nullptr) || unit->IsIdleState();
 
   lua_pushboolean(rawState, isIdle ? 1 : 0);
   (void)lua_gettop(rawState);
@@ -9786,7 +9845,7 @@ int moho::cfunc_UnitCanPathToL(LuaPlus::LuaState* const state)
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
   const LuaPlus::LuaObject destinationObject(LuaPlus::LuaStackObject(state, 2));
-  Unit* const destinationUnit = GetUnitOptional(destinationObject);
+  Unit* const destinationUnit = CastUnitOptionalFromLuaObject(destinationObject);
 
   Wm3::Vector3f destinationPosition{};
   if (destinationUnit != nullptr) {
@@ -10379,7 +10438,79 @@ namespace
     const auto& sourceView = gpg::AsFastVectorRuntimeView<T>(&source);
     gpg::FastVectorRuntimeCopyAssign(destinationView, sourceView);
   }
+
+  [[nodiscard]] gpg::RType* CachedELayerType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(ELayer));
+    }
+    return cached;
+  }
 } // namespace
+
+/**
+ * Address: 0x0055D170 (FUN_0055D170, ??1UnitWeaponInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Releases both UI visual-id strings and restores category bitset fastvector
+ * lanes to their inline storage windows.
+ */
+UnitWeaponInfo::~UnitWeaponInfo()
+{
+  mUIMaxRangeVisualId.tidy(true, 0U);
+  mUIMinRangeVisualId.tidy(true, 0U);
+  mCat2.mBits.mWords.ResetStorageToInline();
+  mCat1.mBits.mWords.ResetStorageToInline();
+}
+
+/**
+ * Address: 0x0055DA10 (FUN_0055DA10, Moho::UnitWeaponInfo::MemberDeserialize)
+ *
+ * What it does:
+ * Loads category masks, layer/radius lanes, and both UI range visual-id
+ * strings from one archive payload.
+ */
+void UnitWeaponInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Read(CachedEntityCategorySetType(), &mCat1, ownerRef);
+  archive->Read(CachedEntityCategorySetType(), &mCat2, ownerRef);
+  archive->Read(CachedELayerType(), &mLayer, ownerRef);
+  archive->ReadFloat(&mMinRadius);
+  archive->ReadFloat(&mMaxRadius);
+  archive->ReadFloat(&mEffectiveRadius);
+  archive->ReadString(&mUIMinRangeVisualId);
+  archive->ReadString(&mUIMaxRangeVisualId);
+}
+
+/**
+ * Address: 0x0055DB00 (FUN_0055DB00, Moho::UnitWeaponInfo::MemberSerialize)
+ *
+ * What it does:
+ * Stores category masks, layer/radius lanes, and both UI range visual-id
+ * strings into one archive payload.
+ */
+void UnitWeaponInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef ownerRef{};
+  archive->Write(CachedEntityCategorySetType(), &mCat1, ownerRef);
+  archive->Write(CachedEntityCategorySetType(), &mCat2, ownerRef);
+  archive->Write(CachedELayerType(), &mLayer, ownerRef);
+  archive->WriteFloat(mMinRadius);
+  archive->WriteFloat(mMaxRadius);
+  archive->WriteFloat(mEffectiveRadius);
+  archive->WriteString(const_cast<msvc8::string*>(&mUIMinRangeVisualId));
+  archive->WriteString(const_cast<msvc8::string*>(&mUIMaxRangeVisualId));
+}
 
 /**
  * Address: 0x005BD7A0 (FUN_005BD7A0, ??0SSTIUnitVariableData@Moho@@QAE@@Z)
@@ -10895,6 +11026,25 @@ void Unit::InitializeArmor()
 }
 
 /**
+ * Address: 0x006A9D60 (FUN_006A9D60, ?ProcessArmorOnDamage@Unit@Moho@@QBEMMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+ *
+ * What it does:
+ * Applies one armor multiplier lane to incoming damage when the incoming
+ * damage-type token exists in `ArmorMultipliers`.
+ */
+float Unit::ProcessArmorOnDamage(const float amount, const msvc8::string damageType) const
+{
+  float scaledAmount = amount;
+  if (const SArmorMultiplierMapNode* const match =
+        FindArmorMultiplierNode(ArmorMultipliers, std::string_view(damageType.c_str()));
+      match != nullptr) {
+    scaledAmount *= match->armorMultiplier;
+  }
+
+  return scaledAmount;
+}
+
+/**
  * Address: 0x006A7D10 (FUN_006A7D10, Moho::Unit::IsBusy)
  *
  * What it does:
@@ -10912,6 +11062,23 @@ bool Unit::IsBusy() const
   }
 
   return true;
+}
+
+/**
+ * Address: 0x006A7D60 (FUN_006A7D60, ?IsIdleState@Unit@Moho@@QBE_NXZ)
+ *
+ * What it does:
+ * Returns true when the command queue has no valid head command.
+ */
+bool Unit::IsIdleState() const
+{
+  const CUnitCommandQueue* const commandQueue = CommandQueue;
+  if (commandQueue == nullptr || commandQueue->mCommandVec.empty()) {
+    return true;
+  }
+
+  const CUnitCommand* const headCommand = commandQueue->mCommandVec.front().GetObjectPtr();
+  return headCommand == nullptr || reinterpret_cast<std::uintptr_t>(headCommand) == kInvalidWeakCommandSentinel;
 }
 
 /**

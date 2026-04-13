@@ -4,12 +4,15 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiTarget.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/task/CCommandTask.h"
+#include "Wm3Quaternion.h"
 
 namespace moho
 {
   class Unit;
+  class VTransform;
 
   class CUnitCallTeleport : public CCommandTask
   {
@@ -46,6 +49,13 @@ namespace moho
      */
     static void MemberSerialize(gpg::WriteArchive* archive, const CUnitCallTeleport* task, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x006013D0 (FUN_006013D0, Moho::CUnitCallTeleport::TaskTick)
+     *
+     * What it does:
+     * Runs teleport-call state transitions between pickup staging, attach
+     * movement, and teleport-task spawn while keeping O-grid occupancy state.
+     */
     int Execute() override;
 
   public:
@@ -67,6 +77,73 @@ namespace moho
   static_assert(
     offsetof(CUnitCallTeleport, mIsOccupying) == 0x39,
     "CUnitCallTeleport::mIsOccupying offset must be 0x39"
+  );
+
+  class CUnitTeleportTask : public CCommandTask
+  {
+  public:
+    /**
+     * Address: 0x0060AB20 (FUN_0060AB20, Moho::CUnitTeleportTask::CUnitTeleportTask)
+     *
+     * What it does:
+     * Initializes one teleport execution task with copied target payload,
+     * weak-linked beacon lane, and source orientation snapshot.
+     */
+    CUnitTeleportTask(
+      CCommandTask* parentTask,
+      const CAiTarget& target,
+      Unit* teleportBeaconUnit,
+      const VTransform& sourceTransform
+    );
+
+    /**
+     * Address: 0x0060AEC0 (FUN_0060AEC0, Moho::CUnitTeleportTask::~CUnitTeleportTask)
+     *
+     * What it does:
+     * Clears unit teleport state, publishes dispatch result, restores motion
+     * collision processing, and unlinks beacon/target weak references.
+     */
+    ~CUnitTeleportTask() override;
+
+    /**
+     * Address: 0x0060AAC0 (FUN_0060AAC0, Moho::CUnitTeleportTask::operator new)
+     *
+     * What it does:
+     * Allocates one teleport execution task and forwards constructor arguments
+     * into in-place construction.
+     */
+    static CUnitTeleportTask* Create(
+      CAiTarget* target,
+      CCommandTask* parentTask,
+      Unit* teleportBeaconUnit,
+      const VTransform* sourceTransform
+    );
+
+    /**
+     * Address: 0x0060AC00 (FUN_0060AC00, Moho::CUnitTeleportTask::TaskTick)
+     *
+     * What it does:
+     * Runs teleport execution state transitions, validating beacon readiness,
+     * reserving teleport placement viability, and dispatching script callback
+     * payloads for teleport application.
+     */
+    int Execute() override;
+
+  public:
+    CAiTarget mTarget;              // 0x30
+    WeakPtr<Unit> mTeleportBeaconUnit; // 0x50
+    Wm3::Quaternionf mOrientation;  // 0x58
+  };
+
+  static_assert(sizeof(CUnitTeleportTask) == 0x68, "CUnitTeleportTask size must be 0x68");
+  static_assert(offsetof(CUnitTeleportTask, mTarget) == 0x30, "CUnitTeleportTask::mTarget offset must be 0x30");
+  static_assert(
+    offsetof(CUnitTeleportTask, mTeleportBeaconUnit) == 0x50,
+    "CUnitTeleportTask::mTeleportBeaconUnit offset must be 0x50"
+  );
+  static_assert(
+    offsetof(CUnitTeleportTask, mOrientation) == 0x58,
+    "CUnitTeleportTask::mOrientation offset must be 0x58"
   );
 } // namespace moho
 

@@ -8,6 +8,27 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
 namespace moho
 {
   /**
+   * Address: 0x0062FB50 (FUN_0062FB50, func_NormalizeAngle)
+   *
+   * What it does:
+   * Wraps an angle in radians into the signed range `[-pi, pi]`.
+   */
+  float NormalizeAngleSignedRadians(const float angleRadians) noexcept
+  {
+    constexpr float kPi = 3.1415927f;
+    constexpr float kTwoPi = 6.2831855f;
+
+    const float wrapped = static_cast<float>(std::fmod(angleRadians, static_cast<double>(kTwoPi)));
+    if (wrapped < -kPi) {
+      return wrapped + kTwoPi;
+    }
+    if (wrapped > kPi) {
+      return wrapped - kTwoPi;
+    }
+    return wrapped;
+  }
+
+  /**
    * Address: 0x004EDED0 (FUN_004EDED0, func_QuatsNearEqual)
    *
    * IDA signature:

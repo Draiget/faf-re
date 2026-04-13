@@ -21,6 +21,7 @@
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/WeakPtr.h"
 #include "Wm3Vector3.h"
 
@@ -354,10 +355,64 @@ namespace moho
   };
   static_assert(sizeof(SSTIUnitEconomyPair) == 0x08, "SSTIUnitEconomyPair size must be 0x08");
 
-  struct SSTIUnitWeaponInfoSnapshot
+  struct UnitWeaponInfo
   {
-    std::uint8_t storage[0x98];
+    /**
+     * Address: 0x0055D170 (FUN_0055D170, ??1UnitWeaponInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Releases UI range-id strings and restores both category bitset lanes to
+     * inline storage ownership.
+     */
+    ~UnitWeaponInfo();
+
+    /**
+     * Address: 0x0055DA10 (FUN_0055DA10, Moho::UnitWeaponInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Loads weapon category masks, layer/radius lanes, and UI visual-id strings
+     * from one archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0055DB00 (FUN_0055DB00, Moho::UnitWeaponInfo::MemberSerialize)
+     *
+     * What it does:
+     * Saves weapon category masks, layer/radius lanes, and UI visual-id strings
+     * into one archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    EntityCategorySet mCat1;                // +0x00
+    EntityCategorySet mCat2;                // +0x28
+    ELayer mLayer;                          // +0x50
+    float mMinRadius;                       // +0x54
+    float mMaxRadius;                       // +0x58
+    float mEffectiveRadius;                 // +0x5C
+    msvc8::string mUIMinRangeVisualId;      // +0x60
+    msvc8::string mUIMaxRangeVisualId;      // +0x7C
   };
+  static_assert(sizeof(UnitWeaponInfo) == 0x98, "UnitWeaponInfo size must be 0x98");
+  static_assert(offsetof(UnitWeaponInfo, mCat1) == 0x00, "UnitWeaponInfo::mCat1 offset must be 0x00");
+  static_assert(offsetof(UnitWeaponInfo, mCat2) == 0x28, "UnitWeaponInfo::mCat2 offset must be 0x28");
+  static_assert(offsetof(UnitWeaponInfo, mLayer) == 0x50, "UnitWeaponInfo::mLayer offset must be 0x50");
+  static_assert(offsetof(UnitWeaponInfo, mMinRadius) == 0x54, "UnitWeaponInfo::mMinRadius offset must be 0x54");
+  static_assert(offsetof(UnitWeaponInfo, mMaxRadius) == 0x58, "UnitWeaponInfo::mMaxRadius offset must be 0x58");
+  static_assert(
+    offsetof(UnitWeaponInfo, mEffectiveRadius) == 0x5C,
+    "UnitWeaponInfo::mEffectiveRadius offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(UnitWeaponInfo, mUIMinRangeVisualId) == 0x60,
+    "UnitWeaponInfo::mUIMinRangeVisualId offset must be 0x60"
+  );
+  static_assert(
+    offsetof(UnitWeaponInfo, mUIMaxRangeVisualId) == 0x7C,
+    "UnitWeaponInfo::mUIMaxRangeVisualId offset must be 0x7C"
+  );
+
+  using SSTIUnitWeaponInfoSnapshot = UnitWeaponInfo;
   static_assert(sizeof(SSTIUnitWeaponInfoSnapshot) == 0x98, "SSTIUnitWeaponInfoSnapshot size must be 0x98");
 
   using SSTIUnitWeaponInfoVector = gpg::fastvector_n<SSTIUnitWeaponInfoSnapshot, 1>;
@@ -614,6 +669,15 @@ namespace moho
     void InitializeArmor();
 
     /**
+     * Address: 0x006A9D60 (FUN_006A9D60, ?ProcessArmorOnDamage@Unit@Moho@@QBEMMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     *
+     * What it does:
+     * Looks up one armor multiplier by damage-type token and returns scaled
+     * damage when a matching lane exists.
+     */
+    [[nodiscard]] float ProcessArmorOnDamage(float amount, msvc8::string damageType) const;
+
+    /**
      * Address: 0x006A7DC0
      * Slot: 14
      * Demangled: public: virtual bool __thiscall moho::Unit::IsNavigatorIdle(void)const
@@ -628,6 +692,14 @@ namespace moho
      * reports busy.
      */
     [[nodiscard]] bool IsBusy() const;
+
+    /**
+     * Address: 0x006A7D60 (FUN_006A7D60, ?IsIdleState@Unit@Moho@@QBE_NXZ)
+     *
+     * What it does:
+     * Returns true when the command queue has no valid front command.
+     */
+    [[nodiscard]] bool IsIdleState() const;
 
     /**
      * Address: 0x006AC940 (FUN_006AC940, ?UpdateSpeedThroughStatus@Unit@Moho@@QAEXXZ)
@@ -1098,7 +1170,13 @@ namespace moho
     std::int32_t ReservedOgridRectMinZ;              // 0x05AC
     std::int32_t ReservedOgridRectMaxX;              // 0x05B0
     std::int32_t ReservedOgridRectMaxZ;              // 0x05B4
-    // Built by FUN_006ADE50: fastvector_n with 8-byte elements and inline capacity 20.
+    /**
+     * Address: 0x006ADE50 (FUN_006ADE50, gpg::fastvector_n2_WeakPtr_Entity::fastvector_n2_WeakPtr_Entity)
+     *
+     * What it does:
+     * Initializes the `mBlipsInRange` small-buffer vector to its inline
+     * storage window and leaves the lane empty for range updates.
+     */
     gpg::core::FastVectorN<SWeakRefSlot, 20> mBlipsInRange; // 0x05B8
     // External findings name; xrefs in current export set are still limited.
     std::int32_t mBlipLastUpdateTick; // 0x0668

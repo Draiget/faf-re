@@ -90,6 +90,15 @@ namespace moho
     SSTIEntityVariableData& operator=(const SSTIEntityVariableData& rhs);
 
     /**
+     * Address: 0x00560150 (FUN_00560150, Moho::SSTIEntityVariableData::cpy)
+     *
+     * What it does:
+     * Copies one variable payload lane from this object into `destination`
+     * and returns the destination pointer.
+     */
+    SSTIEntityVariableData* cpy(SSTIEntityVariableData* destination) const;
+
+    /**
      * Address: 0x00559E00 (FUN_00559E00, Moho::SSTIEntityVariableData::MemberSerialize)
      *
      * What it does:

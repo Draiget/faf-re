@@ -33,3 +33,5 @@ skills/
 .claude/**/*
 .github/copilot-instructions.md
 .github/instructions/**/*
+
+build_sdk.bat

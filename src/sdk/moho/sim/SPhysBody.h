@@ -42,6 +42,16 @@ namespace moho
      * then reconstructs the resulting world impulse vector.
      */
     Wm3::Vec3f* GetImpulse(Wm3::Vec3f* out) const;
+
+    /**
+     * Address: 0x00697D10 (FUN_00697D10, Moho::SPhysBody::AddLocalImpulse)
+     *
+     * What it does:
+     * Rotates one local impulse and local-application point into world space,
+     * updates linear velocity by inverse-mass scaling, and accumulates angular
+     * world impulse via the position/impulse cross product.
+     */
+    void AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint);
   };
 
   static_assert(offsetof(SPhysBody, mConstants) == 0x00, "SPhysBody::mConstants offset must be 0x00");

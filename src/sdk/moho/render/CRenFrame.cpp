@@ -5,6 +5,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/ID3DVertexStream.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
@@ -53,6 +54,15 @@ namespace moho
   CRenFrame::~CRenFrame()
   {
     ResetTransientResources();
+  }
+
+  /**
+   * Address: 0x007F5D00 (FUN_007F5D00, Moho::CRenFrame::SetTexture)
+   */
+  void CRenFrame::SetTexture(const unsigned int textureSlot, boost::shared_ptr<ID3DRenderTarget> texture)
+  {
+    (void)textureSlot;
+    mFrameTexture1 = texture;
   }
 
   /**

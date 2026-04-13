@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
 #include "legacy/containers/String.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/mesh/Mesh.h"
@@ -13,6 +14,7 @@
 
 namespace moho
 {
+  class ID3DTextureSheet;
   class IWldTerrainRes;
 
   struct CWldTerrainDecalLink
@@ -62,6 +64,17 @@ namespace moho
      * Updates the decal's named texture lanes and per-slot name metadata.
      */
     virtual void SetName(const msvc8::string& name, int slot);
+
+    /**
+     * Address: 0x0089DB50 (FUN_0089DB50, Moho::CWldTerrainDecal::GetTexture)
+     *
+     * What it does:
+     * Resolves one animated decal texture lane by slot using frame phase
+     * `(frameSeed + phaseOffset) * mFadeDistance * 0.1 + mUnknown94`, and
+     * returns one retained texture-sheet handle.
+     */
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet>
+      GetTexture(int slot, float phaseOffset, int frameSeed) const;
 
     /**
      * Address: 0x0089D9C0 (Moho::CWldTerrainDecal::ComputeCorner)

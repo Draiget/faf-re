@@ -239,6 +239,16 @@ namespace moho
   Unit* SCR_FromLua_Unit(const LuaPlus::LuaObject& object);
 
   /**
+   * Address: 0x00593970 (FUN_00593970, func_GetUnitOpt)
+   *
+   * What it does:
+   * Converts one Lua object to `Unit*` without throwing conversion errors:
+   * returns null when the payload is missing or of a non-unit runtime type.
+   */
+  [[nodiscard]]
+  Unit* SCR_GetUnitOptional(const LuaPlus::LuaObject& object);
+
+  /**
    * Address: 0x00623FF0 (FUN_00623FF0, Moho::SCR_FromLua_CUnitScriptTask)
    *
    * What it does:

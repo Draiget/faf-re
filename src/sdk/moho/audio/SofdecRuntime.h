@@ -2385,12 +2385,34 @@ std::int32_t
 SFD_GetCond(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t* outConditionValue);
 
 /**
+ * Address: 0x00AD1900 (FUN_00AD1900, _SFD_SetMpvCond)
+ *
+ * What it does:
+ * Applies one MPV condition callback lane for a specific SFD work-control
+ * handle (or global lane when handle is null).
+ */
+std::int32_t SFD_SetMpvCond(
+  moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
+  std::int32_t conditionId,
+  std::int32_t (*conditionCallback)()
+);
+
+/**
  * Address: 0x00AD6DE0 (FUN_00AD6DE0, _SFPLY_Init)
  *
  * What it does:
  * Initializes SFPLY runtime defaults and clears record-get-frame counter.
  */
 std::int32_t SFPLY_Init();
+
+/**
+ * Address: 0x00AD9290 (FUN_00AD9290, _mwSfdVsync)
+ *
+ * What it does:
+ * Advances MWSFD vsync counters, enters SFD vertical-blank lane under
+ * `MWSFSVM_TestAndSet(initLatch)` guard, then releases the latch.
+ */
+std::int32_t mwSfdVsync();
 
 /**
  * Address: 0x00AD6E00 (FUN_00AD6E00, _SFD_VbIn)

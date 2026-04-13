@@ -47,6 +47,7 @@ namespace gpg::gal
         using lock_rect_fn = HRESULT(__stdcall*)(void*, int, void*, const RECT*, unsigned int);
         using unlock_rect_fn = HRESULT(__stdcall*)(void*, int);
         using get_surface_level_fn = HRESULT(__stdcall*)(void*, unsigned int, void**);
+        using get_cube_map_surface_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void**);
         using d3dx_create_buffer_fn = HRESULT(WINAPI*)(unsigned int, void**);
         using d3dx_save_surface_to_file_in_memory_fn = HRESULT(WINAPI*)(void**, unsigned int, void*, const void*, const RECT*);
         using d3dx_save_surface_to_file_a_fn = HRESULT(WINAPI*)(const char*, unsigned int, void*, const void*, const RECT*);
@@ -1154,6 +1155,18 @@ namespace gpg::gal
             auto** const vtable = *reinterpret_cast<void***>(texture);
             auto* const getSurfaceLevel = reinterpret_cast<get_surface_level_fn>(vtable[18]);
             return getSurfaceLevel(texture, level, outSurface);
+        }
+
+        HRESULT InvokeGetCubeMapSurface(
+            void* const cubeTexture,
+            const unsigned int cubeFace,
+            const unsigned int level,
+            void** const outSurface
+        )
+        {
+            auto** const vtable = *reinterpret_cast<void***>(cubeTexture);
+            auto* const getCubeMapSurface = reinterpret_cast<get_cube_map_surface_fn>(vtable[18]);
+            return getCubeMapSurface(cubeTexture, cubeFace, level, outSurface);
         }
 
         HRESULT InvokeTextureGetLevelDesc(
@@ -3260,6 +3273,34 @@ namespace gpg::gal
         }
 
         /**
+         * Address: 0x00941390 (FUN_00941390)
+         * Mangled: sub_941390
+         *
+         * What it does:
+         * Resets cube-target state, applies one context + cube-texture payload,
+         * and acquires one level-0 face surface for each cube face.
+         */
+        void AssignCubeRenderTargetD3D9State(
+            CubeRenderTargetD3D9* const cubeRenderTarget,
+            const CubeRenderTargetContext* const context,
+            void* const cubeTexture
+        ) noexcept
+        {
+            ResetCubeRenderTargetD3D9State(cubeRenderTarget);
+
+            cubeRenderTarget->context_.dimension_ = context->dimension_;
+            cubeRenderTarget->context_.format_ = context->format_;
+            cubeRenderTarget->cubeTexture_ = cubeTexture;
+
+            for (unsigned int faceIndex = 0; faceIndex < kCubeFaceCount; ++faceIndex)
+            {
+                void* faceSurface = nullptr;
+                static_cast<void>(InvokeGetCubeMapSurface(cubeRenderTarget->cubeTexture_, faceIndex, 0U, &faceSurface));
+                cubeRenderTarget->faceSurfaces_[faceIndex] = faceSurface;
+            }
+        }
+
+        /**
          * Address: 0x008F3A20 (FUN_008F3A20)
          * Mangled: ??1EffectTechniqueD3D9@gal@gpg@@QAE@XZ
          *
@@ -3600,10 +3641,11 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008F0040 (FUN_008F0040)
+     * Address: 0x00940C90 (FUN_00940C90)
+     * Scalar-deleting wrapper: 0x008F0040 (FUN_008F0040)
      *
      * What it does:
-     * Scalar-deleting destructor thunk owner for adapter wrapper instances.
+     * Destroys adapter mode list and all descriptive string lanes.
      */
     AdapterD3D9::~AdapterD3D9() = default;
 
@@ -3945,9 +3987,9 @@ namespace gpg::gal
             renderTarget->renderSurface_ = backBuffer.release();
             outputHeads[headIndex].renderTarget.reset(renderTarget);
 
-            DepthStencilTargetD3D9* const depthStencilTarget = new DepthStencilTargetD3D9();
-            depthStencilTarget->context_ = DepthStencilTargetContext(surfaceDesc.width, surfaceDesc.height, 3U, false);
-            depthStencilTarget->depthStencilSurface_ = depthStencilSurface.release();
+            const DepthStencilTargetContext depthStencilContext(surfaceDesc.width, surfaceDesc.height, 3U, false);
+            DepthStencilTargetD3D9* const depthStencilTarget =
+                new DepthStencilTargetD3D9(&depthStencilContext, depthStencilSurface.release());
             outputHeads[headIndex].depthStencil.reset(depthStencilTarget);
         }
     }
@@ -4573,13 +4615,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 521, createResult);
         }
 
-        CubeRenderTargetD3D9* const cubeRenderTarget = new CubeRenderTargetD3D9();
-        cubeRenderTarget->context_ = *context;
-        cubeRenderTarget->cubeTexture_ = cubeTexture;
-        for (void*& faceSurface : cubeRenderTarget->faceSurfaces_)
-        {
-            faceSurface = nullptr;
-        }
+        CubeRenderTargetD3D9* const cubeRenderTarget = new CubeRenderTargetD3D9(context, cubeTexture);
 
         outCubeRenderTarget->reset(cubeRenderTarget);
         return outCubeRenderTarget;
@@ -4615,9 +4651,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 534, createResult);
         }
 
-        DepthStencilTargetD3D9* const depthStencilTarget = new DepthStencilTargetD3D9();
-        depthStencilTarget->context_ = *context;
-        depthStencilTarget->depthStencilSurface_ = depthStencilSurface;
+        DepthStencilTargetD3D9* const depthStencilTarget = new DepthStencilTargetD3D9(context, depthStencilSurface);
         outDepthStencilTarget->reset(depthStencilTarget);
         return outDepthStencilTarget;
     }
@@ -6759,6 +6793,23 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E8110 (FUN_008E8110, gpg::gal::DepthStencilTargetD3D9::DepthStencilTargetD3D9)
+     *
+     * What it does:
+     * Initializes one depth-stencil target object, default-constructs the
+     * embedded context lane, and binds the provided context/surface payload.
+     */
+    DepthStencilTargetD3D9::DepthStencilTargetD3D9(
+        const DepthStencilTargetContext* const context,
+        void* const depthStencilSurface
+    )
+        : context_()
+        , depthStencilSurface_(nullptr)
+    {
+        (void)SetSurface(context, depthStencilSurface);
+    }
+
+    /**
      * Address: 0x008E80F0 (FUN_008E80F0)
      *
      * What it does:
@@ -6789,6 +6840,53 @@ namespace gpg::gal
     void* DepthStencilTargetD3D9::GetSurface() const
     {
         return depthStencilSurface_;
+    }
+
+    /**
+     * Address: 0x008E8070 (FUN_008E8070, gpg::gal::DepthStencilTargetD3D9::SetSurface)
+     *
+     * What it does:
+     * Releases the previously retained depth-stencil surface (if any),
+     * resets context lanes to defaults, then installs the provided
+     * context/surface payload.
+     */
+    void* DepthStencilTargetD3D9::SetSurface(
+        const DepthStencilTargetContext* const context,
+        void* const depthStencilSurface
+    )
+    {
+        ReleaseComLike(depthStencilSurface_);
+
+        const DepthStencilTargetContext resetContext{};
+        context_.width_ = resetContext.width_;
+        context_.height_ = resetContext.height_;
+        context_.format_ = resetContext.format_;
+        context_.field0x10_ = resetContext.field0x10_;
+
+        context_.width_ = context->width_;
+        context_.height_ = context->height_;
+        context_.format_ = context->format_;
+        context_.field0x10_ = context->field0x10_;
+        depthStencilSurface_ = depthStencilSurface;
+        return depthStencilSurface_;
+    }
+
+    /**
+     * Address: 0x00941450 (FUN_00941450, gpg::gal::CubeRenderTargetD3D9::CubeRenderTargetD3D9)
+     *
+     * What it does:
+     * Initializes cube-target state, applies one context/texture payload, and
+     * acquires one face-surface handle per cube face.
+     */
+    CubeRenderTargetD3D9::CubeRenderTargetD3D9(
+        const CubeRenderTargetContext* const context,
+        void* const cubeTexture
+    )
+        : context_()
+        , cubeTexture_(nullptr)
+        , faceSurfaces_{}
+    {
+        AssignCubeRenderTargetD3D9State(this, context, cubeTexture);
     }
 
     /**

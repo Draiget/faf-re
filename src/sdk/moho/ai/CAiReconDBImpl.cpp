@@ -1026,6 +1026,18 @@ gpg::RType* SReconKey::sType = nullptr;
 gpg::RType* CAiReconDBImpl::sType = nullptr;
 
 /**
+ * Address: 0x005C0290 (FUN_005C0290, ??0CAiReconDBImpl@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Builds an empty recon DB instance with no owning army and all recon grids
+ * released.
+ */
+CAiReconDBImpl::CAiReconDBImpl()
+  : CAiReconDBImpl(nullptr, false)
+{
+}
+
+/**
  * Address: 0x005BFF90 (FUN_005BFF90, ??0CAiReconDBImpl@Moho@@QAE@PAVSimArmy@1@_N1@Z)
  */
 CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :

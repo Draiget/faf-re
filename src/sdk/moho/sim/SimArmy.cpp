@@ -1,11 +1,26 @@
 #include "SimArmy.h"
 
+#include <cstddef>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/sim/SSTIArmyConstantData.h"
 
 namespace moho
 {
+  namespace
+  {
+    struct IArmyConstructionView
+    {
+      SSTIArmyConstantData mConstDat; // +0x00
+      SSTIArmyVariableData mVarDat;   // +0x80
+    };
+
+    static_assert(offsetof(IArmyConstructionView, mConstDat) == 0x00, "IArmyConstructionView::mConstDat offset must be 0x00");
+    static_assert(offsetof(IArmyConstructionView, mVarDat) == 0x80, "IArmyConstructionView::mVarDat offset must be 0x80");
+  } // namespace
+
   gpg::RType* IArmy::sType = nullptr;
   gpg::RType* SimArmy::sType = nullptr;
   gpg::RType* SimArmy::sPointerType = nullptr;
@@ -16,6 +31,19 @@ namespace moho
       sType = gpg::LookupRType(typeid(IArmy));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x006FD520 (FUN_006FD520, Moho::IArmy::IArmy)
+   *
+   * What it does:
+   * Constructs IArmy's serialized base payload lanes in-place.
+   */
+  IArmy::IArmy()
+  {
+    auto* const view = reinterpret_cast<IArmyConstructionView*>(this);
+    ::new (&view->mConstDat) SSTIArmyConstantData();
+    ::new (&view->mVarDat) SSTIArmyVariableData();
   }
 
   gpg::RType* SimArmy::StaticGetClass()

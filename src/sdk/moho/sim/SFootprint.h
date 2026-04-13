@@ -112,6 +112,27 @@ namespace moho
   static_assert(offsetof(SFootprintSerializer, mSerialize) == 0x10, "SFootprintSerializer::mSerialize offset must be 0x10");
   static_assert(sizeof(SFootprintSerializer) == 0x14, "SFootprintSerializer size must be 0x14");
 
+  /**
+   * Address context:
+   * - 0x005652E0 (`Moho::OCCUPY_Check`) fills this out-struct with the
+   *   resolved footprint-origin world position and the remaining allowable
+   *   layer bitmask for a candidate build location.
+   * - 0x00720D90 (`func_LocationIsFree`) reads and further narrows `layers`
+   *   based on occupancy bitmap intersection checks.
+   *
+   * Size is 0x10 bytes: one `ELayer` bitmask word (stored as `int32_t` to
+   * avoid a cyclic include with the entity header) followed by one
+   * `Wm3::Vec3f` world position.
+   */
+  struct SOccupationResult
+  {
+    std::int32_t layers;     // +0x00 (ELayer bitmask)
+    Wm3::Vec3f pos;          // +0x04
+  };
+  static_assert(offsetof(SOccupationResult, layers) == 0x00, "SOccupationResult::layers offset must be 0x00");
+  static_assert(offsetof(SOccupationResult, pos) == 0x04, "SOccupationResult::pos offset must be 0x04");
+  static_assert(sizeof(SOccupationResult) == 0x10, "SOccupationResult size must be 0x10");
+
   static_assert(offsetof(SFootprint, mSizeX) == 0x00, "SFootprint::mSizeX offset must be 0x00");
   static_assert(offsetof(SFootprint, mSizeZ) == 0x01, "SFootprint::mSizeZ offset must be 0x01");
   static_assert(offsetof(SFootprint, mOccupancyCaps) == 0x02, "SFootprint::mOccupancyCaps offset must be 0x02");

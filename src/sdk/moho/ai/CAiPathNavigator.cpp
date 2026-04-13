@@ -437,6 +437,53 @@ const CAiPathNavigator* CAiPathNavigator::FromListenerLink(const Broadcaster* co
 }
 
 /**
+ * Address: 0x005AD5C0 (FUN_005AD5C0, default ctor used by RTTI NewRef/CtrRef)
+ *
+ * What it does:
+ * Initializes one detached navigator object for reflection construction paths.
+ */
+CAiPathNavigator::CAiPathNavigator()
+  : mListenerLink{}
+  , mState(AIPATHNAVSTATE_Idle)
+  , mPathFinder(nullptr)
+  , mPath{}
+  , mCurrentPos{0, 0}
+  , mTargetPos{0, 0}
+  , mLastBlockedCell(0)
+  , mGoal{}
+  , mLastPathLayerToken(0u)
+  , mSim(nullptr)
+  , mLastPathNodeIndex(-1)
+  , mPathSearchFailCount(0)
+  , mPathRetryDelayFrames(0)
+  , mNoForwardDistanceFailCount(0)
+  , mRepathDistanceThreshold(std::numeric_limits<float>::infinity())
+  , mLastRepathTick(0)
+  , mNoProgressTickCount(0)
+  , mLastFormationSyncTick(0)
+  , mLeaderLink{}
+  , mLeaderTargetPos(Wm3::Vector3f::Zero())
+  , mIsInFormation(0)
+  , mLeaderBusy(0)
+  , mHasLeaderTargetPos(0)
+  , mHasForwardProbe(0)
+  , mRepathRequested(0)
+  , mUseExtendedPathProbe(0)
+  , mTargetWithinOneCell(0)
+  , mPad97(0)
+  , mPathRequestMode(0)
+  , mPathRequestCountdown(0)
+  , mTickBucket7(0)
+  , mTickBucket13(0)
+{
+  mListenerLink.ListResetLinks();
+  mPath.reserved0 = 0;
+  mPath.start = nullptr;
+  mPath.finish = nullptr;
+  mPath.capacity = nullptr;
+}
+
+/**
  * Address: 0x005AD3E0 (FUN_005AD3E0, unit ctor)
  */
 CAiPathNavigator::CAiPathNavigator(Unit* const unit)

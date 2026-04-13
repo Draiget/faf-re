@@ -1,9 +1,20 @@
 #include "moho/unit/tasks/CUnitSacrificeTaskTypeInfo.h"
 
+#include <cstdlib>
+#include <cstdint>
+#include <new>
+#include <typeinfo>
+
+#include "moho/misc/Listener.h"
+#include "moho/misc/WeakPtr.h"
+#include "moho/task/CCommandTask.h"
+#include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitSacrificeTask.h"
 
-#include <cstdlib>
-#include <typeinfo>
+namespace moho
+{
+  class CUnitCommand;
+}
 
 namespace
 {
@@ -20,6 +31,92 @@ namespace
     }
 
     return *reinterpret_cast<TypeInfo*>(gTypeInfoStorage);
+  }
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedListenerECommandEventType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedCUnitSacrificeTaskType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::CUnitSacrificeTask));
+    }
+    return cached;
+  }
+
+  struct CUnitSacrificeTaskListenerPad
+  {
+    std::uint32_t mListenerPad{};
+  };
+
+  static_assert(sizeof(CUnitSacrificeTaskListenerPad) == 0x04, "CUnitSacrificeTask listener pad must be 0x04");
+
+  class CUnitSacrificeTaskRuntimeView final
+    : public moho::CCommandTask
+    , public CUnitSacrificeTaskListenerPad
+    , public moho::Listener<moho::ECommandEvent>
+  {
+  public:
+    moho::CUnitCommand* mCommand;       // 0x40
+    moho::WeakPtr<moho::Unit> mTarget;  // 0x44
+
+    CUnitSacrificeTaskRuntimeView()
+      : CCommandTask()
+      , CUnitSacrificeTaskListenerPad{}
+      , Listener<moho::ECommandEvent>()
+      , mCommand(nullptr)
+      , mTarget{}
+    {
+      mListenerPad = 0;
+      mTarget.ownerLinkSlot = nullptr;
+      mTarget.nextInOwner = nullptr;
+
+      auto& listenerLink = static_cast<moho::Listener<moho::ECommandEvent>&>(*this).mListenerLink;
+      listenerLink.mPrev = &listenerLink;
+      listenerLink.mNext = &listenerLink;
+    }
+
+    ~CUnitSacrificeTaskRuntimeView() override
+    {
+      mTarget.UnlinkFromOwnerChain();
+    }
+
+    int Execute() override
+    {
+      return -1;
+    }
+
+    void OnEvent(moho::ECommandEvent) override {}
+  };
+
+  static_assert(sizeof(CUnitSacrificeTaskRuntimeView) == 0x4C, "CUnitSacrificeTaskRuntimeView size must be 0x4C");
+  static_assert(
+    offsetof(CUnitSacrificeTaskRuntimeView, mCommand) == 0x40, "CUnitSacrificeTaskRuntimeView::mCommand offset must be 0x40"
+  );
+  static_assert(
+    offsetof(CUnitSacrificeTaskRuntimeView, mTarget) == 0x44, "CUnitSacrificeTaskRuntimeView::mTarget offset must be 0x44"
+  );
+
+  [[nodiscard]] CUnitSacrificeTaskRuntimeView* ToRuntimeView(moho::CUnitSacrificeTask* const task) noexcept
+  {
+    return reinterpret_cast<CUnitSacrificeTaskRuntimeView*>(task);
   }
 
   void cleanup()
@@ -64,7 +161,7 @@ namespace moho
    * Address: 0x005FAFC0 (FUN_005FAFC0)
    *
    * What it does:
-   * Sets the reflected size (0x4C) and wires base/allocator callbacks.
+   * Sets the reflected size (0x4C) and wires base / allocator callbacks.
    */
   void CUnitSacrificeTaskTypeInfo::Init()
   {
@@ -80,7 +177,111 @@ namespace moho
   }
 
   /**
+   * Address: 0x005FD4A0 (FUN_005FD4A0, Moho::CUnitSacrificeTaskTypeInfo::AddBase_CCommandTask)
+   *
+   * What it does:
+   * Registers `CCommandTask` as the primary reflection base for
+   * `CUnitSacrificeTask`.
+   */
+  void __stdcall CUnitSacrificeTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  {
+    gpg::RType* const baseType = CachedCCommandTaskType();
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x005FD500 (FUN_005FD500, Moho::CUnitSacrificeTaskTypeInfo::AddBase_Listener_ECommandEvent)
+   *
+   * What it does:
+   * Registers `Listener<ECommandEvent>` as the secondary reflection base for
+   * `CUnitSacrificeTask`.
+   */
+  void __stdcall CUnitSacrificeTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  {
+    gpg::RType* const baseType = CachedListenerECommandEventType();
+
+    gpg::RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0x34;
+    baseField.v4 = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x005FC5A0 (FUN_005FC5A0, Moho::CUnitSacrificeTaskTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates and initializes one `CUnitSacrificeTask` for reflection use,
+   * then returns its typed reflection reference.
+   */
+  gpg::RRef CUnitSacrificeTaskTypeInfo::NewRef()
+  {
+    auto* const task = new (std::nothrow) CUnitSacrificeTaskRuntimeView();
+    if (!task) {
+      return gpg::RRef{nullptr, CachedCUnitSacrificeTaskType()};
+    }
+
+    return gpg::RRef{reinterpret_cast<CUnitSacrificeTask*>(task), CachedCUnitSacrificeTaskType()};
+  }
+
+  /**
+   * Address: 0x005FC660 (FUN_005FC660, Moho::CUnitSacrificeTaskTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Constructs one `CUnitSacrificeTask` in caller-provided storage and
+   * returns its typed reflection reference.
+   */
+  gpg::RRef CUnitSacrificeTaskTypeInfo::CtrRef(void* const objectStorage)
+  {
+    auto* const task = static_cast<CUnitSacrificeTaskRuntimeView*>(objectStorage);
+    if (task) {
+      new (task) CUnitSacrificeTaskRuntimeView();
+    }
+
+    return gpg::RRef{reinterpret_cast<CUnitSacrificeTask*>(task), CachedCUnitSacrificeTaskType()};
+  }
+
+  /**
+   * Address: 0x005FC640 (FUN_005FC640, Moho::CUnitSacrificeTaskTypeInfo::Delete)
+   *
+   * What it does:
+   * Deletes a `CUnitSacrificeTask` through its deleting-destructor path.
+   */
+  void CUnitSacrificeTaskTypeInfo::Delete(void* const objectStorage)
+  {
+    delete ToRuntimeView(static_cast<CUnitSacrificeTask*>(objectStorage));
+  }
+
+  /**
+   * Address: 0x005FC700 (FUN_005FC700, Moho::CUnitSacrificeTaskTypeInfo::Destruct)
+   *
+   * What it does:
+   * Runs the non-deleting `CUnitSacrificeTask` destructor body on placement
+   * storage.
+   */
+  void CUnitSacrificeTaskTypeInfo::Destruct(void* const objectStorage)
+  {
+    if (!objectStorage) {
+      return;
+    }
+
+    ToRuntimeView(static_cast<CUnitSacrificeTask*>(objectStorage))->~CUnitSacrificeTaskRuntimeView();
+  }
+
+  /**
    * Address: 0x00BCF9F0 (FUN_00BCF9F0, register_CUnitSacrificeTaskTypeInfo)
+   *
+   * What it does:
+   * Constructs the global type-info owner and schedules process-exit cleanup.
    */
   int register_CUnitSacrificeTaskTypeInfo()
   {

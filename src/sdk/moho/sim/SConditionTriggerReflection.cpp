@@ -674,6 +674,70 @@ namespace
       const int size = list ? static_cast<int>(list->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
+
+    /**
+     * Address: 0x00710620 (FUN_00710620, gpg::RListType_shared_ptr_STrigger::SerLoad)
+     *
+     * What it does:
+     * Clears one reflected `list<shared_ptr<STrigger>>` and loads `count`
+     * shared-pointer lanes from archive stream order.
+     */
+    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      auto* const list = reinterpret_cast<std::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
+      if (archive == nullptr || list == nullptr) {
+        return;
+      }
+
+      unsigned int count = 0;
+      archive->ReadUInt(&count);
+      list->clear();
+
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (unsigned int index = 0; index < count; ++index) {
+        boost::SharedPtrRaw<moho::STrigger> raw{};
+        gpg::ReadPointerShared_STrigger(raw, archive, owner);
+        list->push_back(boost::SharedPtrFromRawRetained(raw));
+      }
+    }
+
+    /**
+     * Address: 0x00710720 (FUN_00710720, gpg::RListType_shared_ptr_STrigger::SerSave)
+     *
+     * What it does:
+     * Writes list element count then serializes each `shared_ptr<STrigger>`
+     * element as a tracked shared pointer.
+     */
+    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      const auto* const list = reinterpret_cast<const std::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
+      if (archive == nullptr || list == nullptr) {
+        return;
+      }
+
+      archive->WriteUInt(static_cast<unsigned int>(list->size()));
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (const boost::shared_ptr<moho::STrigger>& value : *list) {
+        gpg::RRef pointerRef{};
+        gpg::RRef_STrigger(&pointerRef, value.get());
+        gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Shared, owner);
+      }
+    }
+
+    /**
+     * Address: 0x0070F400 (FUN_0070F400, gpg::RListType_shared_ptr_STrigger::Init)
+     *
+     * What it does:
+     * Configures reflected list layout/version lanes and installs
+     * shared-pointer list load/save callbacks.
+     */
+    void Init() override
+    {
+      size_ = 0x0C;
+      version_ = 1;
+      serLoadFunc_ = &RListSharedPtrSTriggerTypeInfo::SerLoad;
+      serSaveFunc_ = &RListSharedPtrSTriggerTypeInfo::SerSave;
+    }
   };
   static_assert(sizeof(RListSharedPtrSTriggerTypeInfo) == 0x64, "RListSharedPtrSTriggerTypeInfo size must be 0x64");
 

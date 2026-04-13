@@ -144,6 +144,13 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x00510B10 (FUN_00510B10, Moho::REmitterBlueprintTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates one `REmitterBlueprint`, runs constructor initialization, and
+   * returns a typed reflection reference.
+   */
   [[nodiscard]] gpg::RRef NewEmitterBlueprintRef()
   {
     return MakeEmitterBlueprintRef(new moho::REmitterBlueprint());

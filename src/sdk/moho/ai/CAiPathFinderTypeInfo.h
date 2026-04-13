@@ -34,6 +34,41 @@ namespace moho
      * VFTable SLOT: 9
      */
     void Init() override;
+
+    /**
+     * Address: 0x005AB870 (FUN_005AB870, Moho::CAiPathFinderTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates and constructs one `CAiPathFinder` object for reflection use,
+     * then returns its typed reflection reference.
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x005AB8E0 (FUN_005AB8E0, Moho::CAiPathFinderTypeInfo::Delete)
+     *
+     * What it does:
+     * Deletes one heap-owned `CAiPathFinder` object.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x005AB900 (FUN_005AB900, Moho::CAiPathFinderTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Placement-constructs one `CAiPathFinder` object in caller-provided
+     * storage, then returns its typed reflection reference.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x005AB970 (FUN_005AB970, Moho::CAiPathFinderTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs in-place destructor for one `CAiPathFinder` object without freeing
+     * storage.
+     */
+    static void Destruct(void* objectStorage);
   };
 
   static_assert(sizeof(CAiPathFinderTypeInfo) == 0x64, "CAiPathFinderTypeInfo size must be 0x64");

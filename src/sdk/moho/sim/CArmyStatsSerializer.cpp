@@ -1,50 +1,9 @@
 #include "moho/sim/CArmyStatsSerializer.h"
 
-#include <cstdint>
-#include <typeinfo>
-
 #include "moho/sim/CArmyStats.h"
 
 namespace
 {
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  struct ArmyNameIndexMapRuntime
-  {
-    std::uint32_t meta0;
-    moho::ArmyNameIndexNode* head;
-    std::uint32_t size;
-  };
-  static_assert(sizeof(ArmyNameIndexMapRuntime) == 0x0C, "ArmyNameIndexMapRuntime size must be 0x0C");
-
-  struct ArmyTriggerListRuntime
-  {
-    void* proxy;
-    moho::ArmyTriggerNode* head;
-    std::uint32_t size;
-  };
-  static_assert(sizeof(ArmyTriggerListRuntime) == 0x0C, "ArmyTriggerListRuntime size must be 0x0C");
-
-  [[nodiscard]] ArmyNameIndexMapRuntime* NameIndexView(moho::CArmyStats* const object)
-  {
-    return reinterpret_cast<ArmyNameIndexMapRuntime*>(&object->mNameIndex);
-  }
-
-  [[nodiscard]] ArmyTriggerListRuntime* TriggerListView(moho::CArmyStats* const object)
-  {
-    return reinterpret_cast<ArmyTriggerListRuntime*>(&object->mNameIndex.metaC);
-  }
-
-  gpg::RType* gArmyStatsBaseType = nullptr;
-  gpg::RType* gArmyNameIndexType = nullptr;
-  gpg::RType* gArmyTriggerListType = nullptr;
   moho::CArmyStatsSerializer gCArmyStatsSerializer;
 } // namespace
 
@@ -52,10 +11,13 @@ namespace moho
 {
   /**
    * Address: 0x0070E1F0 (FUN_0070E1F0, Moho::CArmyStatsSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load callback that forwards archive-load flow into
+   * `CArmyStats::MemberDeserialize`.
    */
   void CArmyStatsSerializer::Deserialize(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-  )
+    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
   {
     auto* const object = reinterpret_cast<CArmyStats*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -64,18 +26,18 @@ namespace moho
       return;
     }
 
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(object), owner);
-    archive->Read(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexView(object), owner);
-    archive->Read(CachedType<ArmyTriggerListRuntime>(gArmyTriggerListType), TriggerListView(object), owner);
+    object->MemberDeserialize(archive);
   }
 
   /**
    * Address: 0x0070E200 (FUN_0070E200, Moho::CArmyStatsSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save callback that forwards archive-save flow into
+   * `CArmyStats::MemberSerialize`.
    */
   void CArmyStatsSerializer::Serialize(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-  )
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
   {
     auto* const object = reinterpret_cast<CArmyStats*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -84,10 +46,7 @@ namespace moho
       return;
     }
 
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(object), owner);
-    archive->Write(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexView(object), owner);
-    archive->Write(CachedType<ArmyTriggerListRuntime>(gArmyTriggerListType), TriggerListView(object), owner);
+    object->MemberSerialize(archive);
   }
 
   /**

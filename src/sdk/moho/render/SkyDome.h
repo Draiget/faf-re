@@ -125,6 +125,14 @@ namespace moho
     void CreateDomeFormat();
 
     /**
+     * Address: 0x00818630 (FUN_00818630, ?CreateDecalFormat@SkyDome@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Creates the two vertex-format descriptors used by sky decal geometry.
+     */
+    void CreateDecalFormat();
+
+    /**
      * Address: 0x00818170 (FUN_00818170, ?CreateDomeVertexBuffer@SkyDome@Moho@@AAEXMMMHH@Z)
      *
      * What it does:

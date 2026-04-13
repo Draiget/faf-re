@@ -81,20 +81,80 @@ const char* LAiAttackerImplTypeInfo::GetName() const
  */
 void LAiAttackerImplTypeInfo::Init()
 {
-  size_ = 0x20;
+  size_ = sizeof(LAiAttackerImpl);
+  newRefFunc_ = &LAiAttackerImplTypeInfo::NewRef;
+  ctorRefFunc_ = &LAiAttackerImplTypeInfo::CtrRef;
+  deleteFunc_ = &LAiAttackerImplTypeInfo::Delete;
+  dtrFunc_ = &LAiAttackerImplTypeInfo::Destruct;
   gpg::RType::Init();
+  AddBase_CTask(this);
+  Finish();
+}
 
-  if (gpg::RType* const baseType = CachedCTaskType()) {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0x00;
-    baseField.v4 = 0;
-    baseField.mDesc = nullptr;
-    AddBase(baseField);
+/**
+ * Address: 0x005DEA30 (FUN_005DEA30, Moho::LAiAttackerImplTypeInfo::AddBase_CTask)
+ */
+void __stdcall LAiAttackerImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+{
+  gpg::RType* const baseType = CachedCTaskType();
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
+ * Address: 0x005DD850 (FUN_005DD850, Moho::LAiAttackerImplTypeInfo::NewRef)
+ *
+ * What it does:
+ * Allocates one `LAiAttackerImpl` with null owner lane and returns a typed
+ * reflection reference.
+ */
+gpg::RRef LAiAttackerImplTypeInfo::NewRef()
+{
+  auto* const task = new (std::nothrow) LAiAttackerImpl(nullptr);
+  gpg::RRef out{};
+  gpg::RRef_LAiAttackerImpl(&out, task);
+  return out;
+}
+
+/**
+ * Address: 0x005DD8E0 (FUN_005DD8E0, Moho::LAiAttackerImplTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Constructs one `LAiAttackerImpl` with null owner lane in caller-provided
+ * storage and returns a typed reflection reference.
+ */
+gpg::RRef LAiAttackerImplTypeInfo::CtrRef(void* const objectStorage)
+{
+  auto* const task = static_cast<LAiAttackerImpl*>(objectStorage);
+  if (task) {
+    new (task) LAiAttackerImpl(nullptr);
   }
 
-  Finish();
+  gpg::RRef out{};
+  gpg::RRef_LAiAttackerImpl(&out, task);
+  return out;
+}
+
+/**
+ * Address: 0x005DD8C0 (FUN_005DD8C0, Moho::LAiAttackerImplTypeInfo::Delete)
+ */
+void LAiAttackerImplTypeInfo::Delete(void* const objectStorage)
+{
+  delete static_cast<LAiAttackerImpl*>(objectStorage);
+}
+
+/**
+ * Address: 0x005DD950 (FUN_005DD950, Moho::LAiAttackerImplTypeInfo::Destruct)
+ */
+void LAiAttackerImplTypeInfo::Destruct(void* const objectStorage)
+{
+  static_cast<LAiAttackerImpl*>(objectStorage)->~LAiAttackerImpl();
 }
 
 /**

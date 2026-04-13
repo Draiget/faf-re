@@ -1,0 +1,143 @@
+#include "moho/sim/CSquad.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <new>
+
+#include "moho/containers/TDatList.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/entity/REntityBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CPlatoon.h"
+#include "moho/sim/Sim.h"
+#include "moho/unit/core/Unit.h"
+
+#ifdef _MSC_VER
+#  include <string.h>
+#  define MOHO_STRICMP _stricmp
+#else
+#  include <strings.h>
+#  define MOHO_STRICMP strcasecmp
+#endif
+
+namespace moho
+{
+  gpg::RType* CSquad::sType = nullptr;
+
+  /**
+   * Address: 0x00723E70 (FUN_00723E70, Moho::CSquad::CSquad)
+   *
+   * IDA signature:
+   * Moho::CSquad *__usercall Moho::CSquad::CSquad@<eax>(
+   *   Moho::ESquadClass squadClass@<edx>,
+   *   Moho::CSquad *this,
+   *   Moho::Sim *sim,
+   *   const char *name);
+   *
+   * What it does:
+   * Initializes the squad's unit-set storage to its inline state, captures
+   * the squad-class tag and optional name, then intrusively links the
+   * unit-set node into the sim's `mEntityDB->mRegisteredEntitySets` ring at
+   * the back (so per-squad unit-set updates participate in the global entity
+   * iteration lane).
+   */
+  CSquad::CSquad(const ESquadClass squadClass, Sim* const sim, const char* const name)
+    : mSim(sim), mSquadClass(squadClass)
+  {
+    mUnits.ListResetLinks();
+    if (name != nullptr) {
+      mName.assign(name, std::strlen(name));
+    }
+
+    // Insert this squad's unit-set node at the back of the sim's registered
+    // entity-set ring. The binary's `entityDB += 3` walks 3 list-pair words
+    // (24 bytes) into CEntityDb to reach `mRegisteredEntitySets`.
+    auto* const sentinel =
+      reinterpret_cast<TDatListItem<SEntitySetTemplateUnit, void>*>(&sim->mEntityDB->mRegisteredEntitySets);
+    mUnits.ListLinkBefore(reinterpret_cast<SEntitySetTemplateUnit*>(sentinel));
+  }
+
+  /**
+   * Address: 0x00723F70 (FUN_00723F70, Moho::CSquad::~CSquad)
+   *
+   * IDA signature:
+   * Moho::TDatListItem_EntitySetTemplate_Unit *__usercall
+   *   Moho::CSquad::~CSquad@<eax>(Moho::CSquad *this@<eax>);
+   *
+   * What it does:
+   * The fastvector and string members destruct in declaration order; this
+   * destructor only needs to clear the category vector and unlink the
+   * intrusive unit-set node. The compiler-generated member dtors handle
+   * `mUnits.mVec`, `mName`, and `mCats` heap teardown via `~SEntitySetTemplateUnit`,
+   * `~msvc8::string`, and `~msvc8::vector` respectively.
+   */
+  CSquad::~CSquad() = default;
+
+  /**
+   * Address: 0x00725580 (FUN_00725580, Moho::CSquad::operator new)
+   *
+   * IDA signature:
+   * Moho::CSquad *__userpurge Moho::CSquad::operator new@<eax>(
+   *   Moho::CPlatoon *parentPlatoon@<esi>,
+   *   Moho::ESquadClass squadClass,
+   *   char *name);
+   *
+   * What it does:
+   * Heap-allocates one squad object, runs the constructor with the parent
+   * platoon's `mSim`, and pushes the new squad pointer onto the platoon's
+   * `mSquadList` fastvector (growing it via the legacy InsertAt path when at
+   * capacity). Also clears `mHasLuaList` so any cached Lua unit list will be
+   * recomputed on next request.
+   */
+  CSquad* CSquad::AllocateOnPlatoon(
+    CPlatoon* const parentPlatoon, const ESquadClass squadClass, const char* const name
+  )
+  {
+    parentPlatoon->mHasLuaList = 0;
+
+    void* const storage = ::operator new(sizeof(CSquad));
+    auto* const newSquad = ::new (storage) CSquad(squadClass, parentPlatoon->mSim, name);
+
+    parentPlatoon->mSquadList.PushBack(newSquad);
+    return newSquad;
+  }
+
+  /**
+   * Address: 0x00724350 (FUN_00724350, Moho::CSquad::AppendUnitsWithBP)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CSquad::AppendUnitsWithBP(
+   *   Moho::CSquad *this,
+   *   const char *bpName,
+   *   int upto,
+   *   std::map_uint_Entity *intoVec);
+   *
+   * What it does:
+   * Iterates this squad's unit-set, filters out dead/destroying/under-build
+   * units, then matches the remaining units' blueprint id (case-insensitive)
+   * against `blueprintId` and adds them to `outUnits` until `maxCount`
+   * matches have been collected.
+   */
+  void CSquad::AppendUnitsWithBP(const char* const blueprintId, const int maxCount, SEntitySetTemplateUnit& outUnits)
+  {
+    int matchCount = 0;
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
+        continue;
+      }
+
+      const msvc8::string& bpId = unit->GetBlueprint()->mBlueprintId;
+      const char* const bpIdData = (bpId.myRes < 0x10u) ? &bpId.bx.buf[0] : bpId.bx.ptr;
+      if (MOHO_STRICMP(bpIdData, blueprintId) != 0) {
+        continue;
+      }
+
+      (void)outUnits.AddUnit(unit);
+      if (++matchCount >= maxCount) {
+        break;
+      }
+    }
+  }
+} // namespace moho

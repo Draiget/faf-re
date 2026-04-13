@@ -20,7 +20,14 @@ namespace gpg::gal
     class EffectContext
     {
     public:
-        EffectContext() = default;
+        /**
+         * Address: 0x0093FBE0 (FUN_0093FBE0, gpg::gal::EffectContext::EffectContext)
+         *
+         * What it does:
+         * Initializes effect-context source/cache paths, source-buffer ownership,
+         * and macro-vector lanes to empty defaults.
+         */
+        EffectContext();
 
         /**
          * Address: 0x009428F0 (FUN_009428F0)

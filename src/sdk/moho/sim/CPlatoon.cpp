@@ -25,6 +25,7 @@
 #include "moho/ai/CAiPersonality.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/ArmyUnitSet.h"
+#include "moho/sim/CSquad.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
@@ -784,6 +785,26 @@ namespace moho
     auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
     CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, squadClass);
     return reinterpret_cast<CSquad*>(squadView);
+  }
+
+  /**
+   * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
+   *
+   * What it does:
+   * Looks up this platoon's `SQUADCLASS_Unassigned` squad (if any) and
+   * forwards the blueprint-id filter and `maxCount` cap to
+   * `CSquad::AppendUnitsWithBP`, which appends the matching live units into
+   * `outUnits`. No-op when the platoon has no unassigned squad.
+   */
+  void CPlatoon::GetUnassignedUnitsWithBP(
+    const char* const blueprintId, const int maxCount, SEntitySetTemplateUnit& outUnits
+  )
+  {
+    CSquad* const unassignedSquad = GetSquad(ESquadClass::Unassigned);
+    if (unassignedSquad == nullptr) {
+      return;
+    }
+    unassignedSquad->AppendUnitsWithBP(blueprintId, maxCount, outUnits);
   }
 
   /**

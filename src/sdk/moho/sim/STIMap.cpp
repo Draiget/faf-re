@@ -11,11 +11,16 @@
 #include <utility>
 
 #include "moho/collision/CGeomSolid3.h"
+#include "moho/entity/Entity.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/CSimResources.h"
+#include "moho/resource/ISimResources.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
+#include "moho/misc/StartupHelpers.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaTableIterator.h"
@@ -3915,5 +3920,354 @@ namespace moho
   float STIMap::GetWaterElevation() const noexcept
   {
     return mWaterElevation;
+  }
+
+  namespace
+  {
+    // Terrain samples in CHeightField are stored as quantized uint16 values;
+    // 1.0f world unit = 128 quantized units, so one sample scaled by 1/128
+    // (0.0078125f) gives the real elevation.
+    constexpr float kHeightSampleToWorld = 1.0f / 128.0f;
+    // Decompiled value at `func_Rect2fToInt16`: world-to-collision-cell quantization.
+    constexpr int kWorldToCollisionCellShift = 2;
+    constexpr int kCollisionCellMax = 0xFFFF;
+
+    [[nodiscard]] float SampleClampedElevation(
+      const CHeightField& field, const int cellX, const int cellZ
+    ) noexcept
+    {
+      const int clampedX = std::clamp(cellX, 0, field.width - 1);
+      const int clampedZ = std::clamp(cellZ, 0, field.height - 1);
+      const std::uint16_t raw = field.data[static_cast<std::size_t>(clampedX) + static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(field.width)];
+      return static_cast<float>(raw) * kHeightSampleToWorld;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x005651F0 (FUN_005651F0, Moho::OCCUPY_CheckAreaFlatness)
+   *
+   * IDA signature:
+   * bool __usercall Moho::OCCUPY_CheckAreaFlatness@<al>(
+   *   gpg::Rect2f *rect@<eax>,
+   *   Moho::RUnitBlueprint *blueprint,
+   *   Moho::STIMap *map,
+   *   float *outMinHeight,
+   *   float *outMaxHeight);
+   *
+   * What it does:
+   * Scans every quantized heightfield sample inside `rect` (inclusive on
+   * both axes), tracks min and max elevation, writes them to
+   * `outMinHeight`/`outMaxHeight`, and returns whether the range is within
+   * `blueprint->Physics.MaxGroundVariation`.
+   */
+  bool OCCUPY_CheckAreaFlatness(
+    const gpg::Rect2f& rect,
+    const RUnitBlueprint& blueprint,
+    const STIMap& map,
+    float* const outMinHeight,
+    float* const outMaxHeight
+  )
+  {
+    const int x0 = static_cast<int>(rect.x0);
+    const int x1 = static_cast<int>(rect.x1);
+    const int z0 = static_cast<int>(rect.z0);
+    const int z1 = static_cast<int>(rect.z1);
+
+    float minHeight = std::numeric_limits<float>::max();
+    float maxHeight = -std::numeric_limits<float>::max();
+
+    const CHeightField* const field = map.mHeightField.get();
+    for (int cellX = x0; cellX <= x1; ++cellX) {
+      for (int cellZ = z0; cellZ <= z1; ++cellZ) {
+        const float elevation = SampleClampedElevation(*field, cellX, cellZ);
+        if (elevation < minHeight) {
+          minHeight = elevation;
+        }
+        if (elevation > maxHeight) {
+          maxHeight = elevation;
+        }
+      }
+    }
+
+    *outMinHeight = minHeight;
+    *outMaxHeight = maxHeight;
+    return blueprint.Physics.MaxGroundVariation >= (maxHeight - minHeight);
+  }
+
+  /**
+   * Address: 0x00564F80 (FUN_00564F80, Moho::OCCUPY_CheckEdgeFlatness)
+   *
+   * IDA signature:
+   * bool __usercall Moho::OCCUPY_CheckEdgeFlatness@<al>(
+   *   gpg::Rect2f *rect@<eax>,
+   *   __m128i pivotArg@<xmm0>,
+   *   __m128i xmm1Slot@<xmm1>,
+   *   Moho::RUnitBlueprint *blueprint,
+   *   Moho::STIMap *map,
+   *   float *outMinHeight,
+   *   float *outMaxHeight);
+   *
+   * What it does:
+   * Walks only the 1-cell-wider perimeter of `rect` (the horizontal bands at
+   * `y0-1` and `y1+1`, then the vertical bands at `x0-1` and `x1+1`), finds
+   * min/max elevation along the edge, and checks whether the largest
+   * one-sided deviation from `pivot = ceil(pivotArg)` fits within
+   * `blueprint->Physics.MaxGroundVariation`. Used for `FlattenSkirt`
+   * blueprints that flatten the interior at placement time and only need the
+   * skirt boundary to be flat.
+   *
+   * Callers always pass `(0.0f, 0.5f)` for the two XMM slots; `xmm1Slot` is
+   * unused as an input in the binary (IDA picked it up via calling convention
+   * but no loads observe it).
+   */
+  bool OCCUPY_CheckEdgeFlatness(
+    const gpg::Rect2f& rect,
+    const float pivotArg,
+    [[maybe_unused]] const float xmm1Slot,
+    const RUnitBlueprint& blueprint,
+    const STIMap& map,
+    float* const outMinHeight,
+    float* const outMaxHeight
+  )
+  {
+    const int x0 = static_cast<int>(rect.x0);
+    const int x1 = static_cast<int>(rect.x1);
+    const int z0 = static_cast<int>(rect.z0);
+    const int z1 = static_cast<int>(rect.z1);
+
+    float minHeight = std::numeric_limits<float>::max();
+    float maxHeight = -std::numeric_limits<float>::max();
+
+    const CHeightField* const field = map.mHeightField.get();
+
+    // Horizontal perimeter bands at (y0 - 1) and (y1 + 1), walked from
+    // (x0 - 1) through (x1 + 1).
+    for (int cellX = x0 - 1; cellX <= x1 + 1; ++cellX) {
+      const float topSample = SampleClampedElevation(*field, cellX, z0 - 1);
+      const float bottomSample = SampleClampedElevation(*field, cellX, z1 + 1);
+      minHeight = std::min({minHeight, topSample, bottomSample});
+      maxHeight = std::max({maxHeight, topSample, bottomSample});
+    }
+
+    // Vertical perimeter bands at (x0 - 1) and (x1 + 1), walked from z0
+    // through z1 (inclusive).
+    for (int cellZ = z0; cellZ <= z1; ++cellZ) {
+      const float leftSample = SampleClampedElevation(*field, x0 - 1, cellZ);
+      const float rightSample = SampleClampedElevation(*field, x1 + 1, cellZ);
+      minHeight = std::min({minHeight, leftSample, rightSample});
+      maxHeight = std::max({maxHeight, leftSample, rightSample});
+    }
+
+    *outMinHeight = minHeight;
+    *outMaxHeight = maxHeight;
+
+    const float pivot = std::ceil(pivotArg);
+    const float deviationFromPivot = std::max(maxHeight - pivot, pivot - minHeight);
+    return blueprint.Physics.MaxGroundVariation >= deviationFromPivot;
+  }
+
+  /**
+   * Address: 0x005652E0 (FUN_005652E0, Moho::OCCUPY_Check)
+   *
+   * IDA signature:
+   * bool callcnv_F3 Moho::OCCUPY_Check@<al>(
+   *   Moho::STIMap *map@<eax>,
+   *   Moho::RUnitBlueprint *blueprint,
+   *   Moho::SCoordsVec2 *worldPos,
+   *   Moho::ISimResources *resources,
+   *   struct_Occupation *dest);
+   *
+   * What it does:
+   * Picks the right placement check for `blueprint` at `worldPos`:
+   *
+   * - For mobile blueprints, snaps to the footprint-origin cell, computes
+   *   dynamic occupancy caps via `OCCUPY_MobileCheck`, writes the snapped
+   *   world position into `dest->pos`, and returns whether the caps are
+   *   non-empty.
+   * - For static structures, computes the integer footprint rect, runs
+   *   `OCCUPY_CheckAreaFlatness` (or `OCCUPY_CheckEdgeFlatness` when the
+   *   blueprint flattens its skirt), narrows the blueprint's
+   *   `BuildOnLayerCaps` based on measured min/max elevation vs water
+   *   elevation + `mMinWaterDepth`, applies the `BuildRestriction` (no mass
+   *   overlap, no hydrocarbon overlap, or the opposite — must be on one of
+   *   those), and writes the resolved world-center position + surviving
+   *   layer mask into `dest`.
+   */
+  bool OCCUPY_Check(
+    STIMap& map,
+    const RUnitBlueprint& blueprint,
+    const SCoordsVec2& worldPos,
+    ISimResources& resources,
+    SOccupationResult& dest
+  )
+  {
+    if (blueprint.IsMobile()) {
+      const SOCellPos originCell{
+        static_cast<std::int16_t>(static_cast<int>(worldPos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f))),
+        static_cast<std::int16_t>(static_cast<int>(worldPos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f))),
+      };
+      const EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(blueprint.mFootprint, map, originCell);
+      dest.pos = COORDS_GridSnap(&map, worldPos, blueprint.mFootprint, static_cast<ELayer>(static_cast<std::uint8_t>(mobileCaps)));
+      dest.layers = static_cast<std::int32_t>(mobileCaps);
+      return static_cast<std::int32_t>(mobileCaps) != LAYER_None;
+    }
+
+    // Static structure path.
+    dest.layers = LAYER_None;
+
+    const SOCellPos originCell{
+      static_cast<std::int16_t>(static_cast<int>(worldPos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f))),
+      static_cast<std::int16_t>(static_cast<int>(worldPos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f))),
+    };
+    dest.pos = COORDS_ToWorldPos(
+      &map,
+      originCell,
+      static_cast<ELayer>(static_cast<std::uint8_t>(blueprint.mFootprint.mOccupancyCaps)),
+      static_cast<int>(blueprint.mFootprint.mSizeX),
+      static_cast<int>(blueprint.mFootprint.mSizeZ)
+    );
+
+    const gpg::Rect2f skirtWorldRect = blueprint.GetSkirtRect(worldPos);
+
+    // Integer skirt rect: floor the top-left and ceil the bottom-right for
+    // the map-bounds check.
+    const std::int32_t skirtCellX0 = static_cast<std::int32_t>(std::floor(skirtWorldRect.x0));
+    const std::int32_t skirtCellZ0 = static_cast<std::int32_t>(std::floor(skirtWorldRect.z0));
+    const std::int32_t skirtCellX1 = static_cast<std::int32_t>(std::ceil(skirtWorldRect.x1));
+    const std::int32_t skirtCellZ1 = static_cast<std::int32_t>(std::ceil(skirtWorldRect.z1));
+
+    const CHeightField* const field = map.mHeightField.get();
+    if (skirtCellX0 < 0 || skirtCellX1 > (field->width - 1) ||
+        skirtCellZ0 < 0 || skirtCellZ1 > (field->height - 1)) {
+      return false;
+    }
+
+    float skirtMinHeight = 0.0f;
+    float skirtMaxHeight = 0.0f;
+    const bool flatnessOk =
+      blueprint.Physics.FlattenSkirt != 0u
+        ? OCCUPY_CheckEdgeFlatness(skirtWorldRect, 0.0f, 0.5f, blueprint, map, &skirtMinHeight, &skirtMaxHeight)
+        : OCCUPY_CheckAreaFlatness(skirtWorldRect, blueprint, map, &skirtMinHeight, &skirtMaxHeight);
+
+    std::int32_t layerCaps = blueprint.Physics.BuildOnLayerCapsMask;
+    if (!flatnessOk) {
+      layerCaps &= ~(static_cast<std::int32_t>(LAYER_Land) | static_cast<std::int32_t>(LAYER_Seabed));
+    }
+
+    const float effectiveWaterElevation = map.mWaterEnabled != 0u ? map.mWaterElevation : -10000.0f;
+    if (effectiveWaterElevation > skirtMinHeight) {
+      layerCaps &= ~static_cast<std::int32_t>(LAYER_Land);
+    }
+    if (skirtMaxHeight > (effectiveWaterElevation - blueprint.mFootprint.mMinWaterDepth)) {
+      layerCaps &= ~(static_cast<std::int32_t>(LAYER_Seabed) | static_cast<std::int32_t>(LAYER_Sub) | static_cast<std::int32_t>(LAYER_Water));
+    }
+    if (layerCaps == 0) {
+      return false;
+    }
+    dest.layers = layerCaps;
+
+    switch (blueprint.Physics.BuildRestriction) {
+    case RULEUBR_OnMassDeposit: {
+      if (CFG_GetArgOption("/nomass", 0u, nullptr)) {
+        return true;
+      }
+      gpg::Rect2i footprintRect{};
+      (void)COORDS_ToGridRect(&footprintRect, worldPos, blueprint.mFootprint);
+      return resources.DepositIsInArea(kMass, &footprintRect);
+    }
+    case RULEUBR_OnHydrocarbonDeposit: {
+      gpg::Rect2i footprintRect{};
+      (void)COORDS_ToGridRect(&footprintRect, worldPos, blueprint.mFootprint);
+      return resources.DepositIsInArea(kHydrocarbon, &footprintRect);
+    }
+    default: {
+      gpg::Rect2f skirtCheckRect = blueprint.GetSkirtRect(worldPos);
+      if (resources.AreaHasDeposit(kMass, &skirtCheckRect)) {
+        return false;
+      }
+      skirtCheckRect = blueprint.GetSkirtRect(worldPos);
+      if (resources.AreaHasDeposit(kHydrocarbon, &skirtCheckRect)) {
+        return false;
+      }
+      return true;
+    }
+    }
+  }
+
+  /**
+   * Address: 0x00720D90 (FUN_00720D90, Moho::func_LocationIsFree)
+   *
+   * IDA signature:
+   * bool __userpurge func_LocationIsFree@<al>(
+   *   Moho::RUnitBlueprint *bp@<eax>,
+   *   Moho::COGrid *grid,
+   *   Moho::SCoordsVec2 *pos,
+   *   struct_Occupation *dest);
+   *
+   * What it does:
+   * Decides whether `blueprint` can be placed at `pos` on `grid` and fills
+   * `dest` with the resolved placement. First runs `OCCUPY_Check`; then,
+   * for mobile blueprints, narrows the layer mask against the terrain/water
+   * occupancy bitmaps of the footprint rect; for static blueprints, re-runs
+   * `OCCUPY_Check` against a scratch result, verifies the skirt rect isn't
+   * blocked by any existing static unit, and then narrows the layer mask
+   * the same way.
+   */
+  bool func_LocationIsFree(
+    const RUnitBlueprint& blueprint, COGrid& grid, const SCoordsVec2& pos, SOccupationResult& dest
+  )
+  {
+    ISimResources* const resources = static_cast<ISimResources*>(grid.sim->mSimResources.px);
+    STIMap* const map = grid.sim->mMapData;
+    if (resources == nullptr || map == nullptr) {
+      return false;
+    }
+
+    if (!OCCUPY_Check(*map, blueprint, pos, *resources, dest)) {
+      return false;
+    }
+
+    // Integer footprint rect at the resolved dest position.
+    const int footprintX0 =
+      static_cast<int>(dest.pos.x - (static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f));
+    const int footprintZ0 =
+      static_cast<int>(dest.pos.z - (static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f));
+    const int footprintWidth = static_cast<int>(blueprint.mFootprint.mSizeX);
+    const int footprintHeight = static_cast<int>(blueprint.mFootprint.mSizeZ);
+
+    if (blueprint.IsMobile()) {
+      if ((dest.layers & (LAYER_Land | LAYER_Seabed)) != 0 &&
+          grid.terrainOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, true)) {
+        dest.layers &= ~(LAYER_Land | LAYER_Seabed);
+      }
+      if ((dest.layers & LAYER_Water) != 0 &&
+          grid.waterOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, true)) {
+        dest.layers &= ~LAYER_Water;
+      }
+      return dest.layers != LAYER_None;
+    }
+
+    // Static path: second OCCUPY_Check into a scratch buffer gives us the
+    // snapped skirt position to query units against.
+    SOccupationResult scratchResult{};
+    if (!OCCUPY_Check(*map, blueprint, pos, *resources, scratchResult)) {
+      return false;
+    }
+
+    const SCoordsVec2 scratchPosXZ{scratchResult.pos.x, scratchResult.pos.z};
+    const gpg::Rect2f skirtRect = blueprint.GetSkirtRect(scratchPosXZ);
+    if (COGrid_RectHasBlockingUnit(skirtRect, grid)) {
+      return false;
+    }
+
+    if ((dest.layers & (LAYER_Land | LAYER_Seabed)) != 0 &&
+        grid.terrainOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, false)) {
+      dest.layers &= ~(LAYER_Land | LAYER_Seabed);
+    }
+    if ((dest.layers & LAYER_Water) != 0 &&
+        grid.waterOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, false)) {
+      dest.layers &= ~LAYER_Water;
+    }
+    return dest.layers != LAYER_None;
   }
 } // namespace moho

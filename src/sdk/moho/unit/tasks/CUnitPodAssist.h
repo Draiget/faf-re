@@ -9,6 +9,7 @@
 namespace gpg
 {
   class ReadArchive;
+  class RType;
   class WriteArchive;
 }
 
@@ -22,6 +23,8 @@ namespace moho
   class CUnitPodAssist : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x0061D3B0 (FUN_0061D3B0, ??0CUnitPodAssist@Moho@@QAE@@Z)
      *
@@ -40,7 +43,36 @@ namespace moho
      */
     [[nodiscard]] static CUnitPodAssist* Create(CCommandTask* dispatchTask);
 
+    /**
+     * Address: 0x0061D4F0 (FUN_0061D4F0, ??1CUnitPodAssist@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Executes pod-assist teardown by calling `Kill`, clearing the assisting
+     * unit-state bit, unlinking assist-target weak-chain ownership, and
+     * delegating final cleanup to `CCommandTask`.
+     */
+    ~CUnitPodAssist() override;
+
     int Execute() override;
+
+    /**
+     * Address: 0x0061D820 (FUN_0061D820, Moho::CUnitPodAssist::Kill)
+     *
+     * What it does:
+     * Terminates active pod-assist transport linkage, detaches/removes pickup
+     * reservations as needed, stops owner unit motion, and returns the task to
+     * preparing state.
+     */
+    void Kill();
+
+    /**
+     * Address: 0x0061D9C0 (FUN_0061D9C0, Moho::CUnitPodAssist::HasNextCommand)
+     *
+     * What it does:
+     * Returns true when owner command queue has at least two entries and the
+     * next queued command weak slot resolves to a live command object.
+     */
+    [[nodiscard]] bool HasNextCommand() const;
 
     /**
      * Address: 0x0061E970 (FUN_0061E970, Moho::CUnitPodAssist::MemberDeserialize)
@@ -70,3 +102,15 @@ namespace moho
   static_assert(offsetof(CUnitPodAssist, mDispatchTask) == 0x30, "CUnitPodAssist::mDispatchTask offset must be 0x30");
   static_assert(offsetof(CUnitPodAssist, mAssistTarget) == 0x34, "CUnitPodAssist::mAssistTarget offset must be 0x34");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x0061E7C0 (FUN_0061E7C0, gpg::RRef_CUnitPodAssist)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitPodAssist*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitPodAssist(gpg::RRef* outRef, moho::CUnitPodAssist* value);
+} // namespace gpg

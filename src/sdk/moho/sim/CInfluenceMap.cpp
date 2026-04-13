@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/algorithms/MD5.h"
@@ -913,6 +914,53 @@ namespace moho
   {
     threats.clear();
     entries.clear();
+  }
+
+  /**
+   * Address: 0x0071EA00 (FUN_0071EA00, std::vector_InfluenceGrid::~vector_InfluenceGrid)
+   *
+   * What it does:
+   * Destroys one contiguous range of `InfluenceGrid` elements by releasing
+   * per-grid threat vectors and entry maps.
+   */
+  [[maybe_unused]] static void DestroyInfluenceGridRange(InfluenceGrid* const start, InfluenceGrid* const end)
+  {
+    for (InfluenceGrid* cursor = start; cursor != end; ++cursor) {
+      cursor->threats.clear();
+      cursor->entries.clear();
+    }
+  }
+
+  /**
+   * Address: 0x0071D4B0 (FUN_0071D4B0, func_NewArray_SThreat)
+   *
+   * What it does:
+   * Allocates contiguous storage for `count` `SThreat` elements with the same
+   * overflow guard semantics as the original VC8 array-allocation helper.
+   */
+  [[maybe_unused]] static SThreat* func_NewArray_SThreat(const unsigned int count)
+  {
+    if (count != 0u && (0xFFFFFFFFu / count) < sizeof(SThreat)) {
+      throw std::bad_alloc{};
+    }
+
+    return static_cast<SThreat*>(::operator new(sizeof(SThreat) * static_cast<std::size_t>(count)));
+  }
+
+  /**
+   * Address: 0x0071D5E0 (FUN_0071D5E0, func_NewArray_InfluenceMap)
+   *
+   * What it does:
+   * Allocates contiguous storage for `count` `InfluenceGrid` elements with the
+   * same overflow guard semantics as the original VC8 array-allocation helper.
+   */
+  [[maybe_unused]] static InfluenceGrid* func_NewArray_InfluenceMap(const unsigned int count)
+  {
+    if (count != 0u && (0xFFFFFFFFu / count) < sizeof(InfluenceGrid)) {
+      throw std::bad_alloc{};
+    }
+
+    return static_cast<InfluenceGrid*>(::operator new(sizeof(InfluenceGrid) * static_cast<std::size_t>(count)));
   }
 
   /**

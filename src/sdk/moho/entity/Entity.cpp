@@ -19,6 +19,7 @@
 #include "moho/audio/CSndParams.h"
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/CAiTarget.h"
+#include "moho/entity/CTextureScroller.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
@@ -225,34 +226,8 @@ namespace
     Thread = 3,
   };
 
-  struct TextureScrollerDefinition
-  {
-    std::int32_t mType;
-    float mFloat04;
-    float mFloat08;
-    float mFloat0C;
-    float mFloat10;
-    Wm3::Vector2f mScroll1;
-    Wm3::Vector2f mScroll2;
-    float mFloat24;
-    float mFloat28;
-  };
-
-  static_assert(sizeof(TextureScrollerDefinition) == 0x2C, "TextureScrollerDefinition size must be 0x2C");
-
-  struct TextureScrollerRuntimeView
-  {
-    moho::Entity* mOwner; // +0x00
-    TextureScrollerDefinition mScroller; // +0x04
-    std::uint8_t mDir[2]; // +0x30
-    std::uint8_t mPad32[2];
-    std::int32_t mSpeed[2]; // +0x34
-  };
-
-  static_assert(sizeof(TextureScrollerRuntimeView) == 0x3C, "TextureScrollerRuntimeView size must be 0x3C");
-  static_assert(offsetof(TextureScrollerRuntimeView, mScroller) == 0x04, "TextureScrollerRuntimeView::mScroller offset must be 0x04");
-  static_assert(offsetof(TextureScrollerRuntimeView, mDir) == 0x30, "TextureScrollerRuntimeView::mDir offset must be 0x30");
-  static_assert(offsetof(TextureScrollerRuntimeView, mSpeed) == 0x34, "TextureScrollerRuntimeView::mSpeed offset must be 0x34");
+  using TextureScrollerDefinition = moho::SScroller;
+  using TextureScrollerRuntimeView = moho::CTextureScroller;
 
   struct EntityLuaBindingRuntimeView
   {
@@ -287,7 +262,7 @@ namespace
 
   void InitializeTextureScrollerRuntime(TextureScrollerRuntimeView& scroller, moho::Entity* const owner) noexcept
   {
-    scroller.mOwner = owner;
+    scroller.mEntity = owner;
     scroller.mScroller.mType = static_cast<std::int32_t>(TextureScrollerMode::None);
     scroller.mScroller.mFloat04 = 0.0f;
     scroller.mScroller.mFloat08 = 0.0f;
@@ -976,7 +951,7 @@ namespace
       return nullptr;
     }
 
-    auto* const rawEntityGrid = reinterpret_cast<std::uint8_t*>(&sim->mOGrid->entityGrid);
+    auto* const rawEntityGrid = reinterpret_cast<std::uint8_t*>(&sim->mOGrid->mEntityOccupationManager);
     return reinterpret_cast<moho::EntityCollisionSpatialGrid*>(rawEntityGrid + 0x04);
   }
 
@@ -6618,6 +6593,48 @@ namespace moho
       return LAYER_Air;
     }
     return _stricmp(layerName, "Orbit") == 0 ? LAYER_Orbit : LAYER_None;
+  }
+
+  /**
+   * Address: 0x0050AFA0 (FUN_0050AFA0, Moho::COORDS_ToGridRect)
+   *
+   * IDA signature:
+   * _DWORD *__usercall Moho::COORDS_ToGridRect@<eax>(
+   *   _DWORD *result@<eax>, float *centerXZ@<ecx>, int sizeX@<edi>, int sizeZ@<esi>);
+   *
+   * What it does:
+   * Computes the axis-aligned integer grid rectangle that a footprint of
+   * dimensions `sizeX × sizeZ` occupies when centered at world coordinates
+   * `centerXZ`. The result corner coordinates are truncated to `int16`
+   * range (mirroring the binary's `WORD` cast).
+   */
+  gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* const result, const SCoordsVec2& centerXZ, const int sizeX, const int sizeZ)
+  {
+    const std::int16_t halfSizeX = static_cast<std::int16_t>(static_cast<int>(centerXZ.x - (static_cast<float>(sizeX) * 0.5f)));
+    const std::int16_t halfSizeZ = static_cast<std::int16_t>(static_cast<int>(centerXZ.z - (static_cast<float>(sizeZ) * 0.5f)));
+    result->x0 = halfSizeX;
+    result->z0 = halfSizeZ;
+    result->x1 = sizeX + halfSizeX;
+    result->z1 = sizeZ + halfSizeZ;
+    return result;
+  }
+
+  /**
+   * Address: 0x0050B010 (FUN_0050B010, Moho::COORDS_ToGridRect)
+   *
+   * IDA signature:
+   * gpg::Rect2i *callcnv_F3 Moho::COORDS_ToGridRect@<eax>(
+   *   gpg::Rect2i *result@<eax>, Moho::SCoordsVec2 *centerXZ@<edx>, Moho::SFootprint *footprint@<ecx>);
+   *
+   * What it does:
+   * Footprint-typed overload of `COORDS_ToGridRect`: delegates to the raw
+   * integer-dimensions overload using the footprint's `mSizeX`/`mSizeZ`.
+   */
+  gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* const result, const SCoordsVec2& centerXZ, const SFootprint& footprint)
+  {
+    return COORDS_ToGridRect(
+      result, centerXZ, static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ)
+    );
   }
 
   /**

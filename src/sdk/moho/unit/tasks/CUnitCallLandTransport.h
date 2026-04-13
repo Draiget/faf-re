@@ -63,6 +63,13 @@ namespace moho
     static void
     MemberSerialize(gpg::WriteArchive* archive, const CUnitCallLandTransport* task, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x00600880 (FUN_00600880, Moho::CUnitCallLandTransport::TaskTick)
+     *
+     * What it does:
+     * Runs land-transport call task state transitions from pickup assignment,
+     * through beam-up alignment, to final transport attach completion.
+     */
     int Execute() override;
 
   public:

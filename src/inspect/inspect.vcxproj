@@ -70,25 +70,29 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <Wm3FoundationDir>$(SolutionDir)dependencies\WildMagic3p8\Foundation</Wm3FoundationDir>
+    <Wm3IncludePath>$(Wm3FoundationDir);$(Wm3FoundationDir)\Approximation;$(Wm3FoundationDir)\Collision;$(Wm3FoundationDir)\Containment;$(Wm3FoundationDir)\Controllers;$(Wm3FoundationDir)\Curves;$(Wm3FoundationDir)\Detail;$(Wm3FoundationDir)\Distance;$(Wm3FoundationDir)\Effects;$(Wm3FoundationDir)\ImageAnalysis;$(Wm3FoundationDir)\Interpolation;$(Wm3FoundationDir)\Intersection;$(Wm3FoundationDir)\Math;$(Wm3FoundationDir)\Meshes;$(Wm3FoundationDir)\Miscellaneous;$(Wm3FoundationDir)\Numerics;$(Wm3FoundationDir)\ObjectSystem;$(Wm3FoundationDir)\Physics;$(Wm3FoundationDir)\RationalArithmetic;$(Wm3FoundationDir)\SceneGraph;$(Wm3FoundationDir)\Shaders;$(Wm3FoundationDir)\SharedArrays;$(Wm3FoundationDir)\Sorting;$(Wm3FoundationDir)\Surfaces;$(Wm3FoundationDir)\System;$(Wm3FoundationDir)\Terrain;$(Wm3FoundationDir)\Tessellation;$(SolutionDir)dependencies\WildMagic3p8\Renderers\Dx9Renderer;$(SolutionDir)dependencies\WildMagic3p8\Applications</Wm3IncludePath>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
-    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\sdk;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(SolutionDir)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(SolutionDir)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

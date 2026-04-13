@@ -43,6 +43,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005AD5C0 (FUN_005AD5C0, default ctor used by RTTI NewRef/CtrRef)
+     *
+     * What it does:
+     * Initializes one detached navigator object with null pathfinder/sim lanes
+     * for reflection-managed construction paths.
+     */
+    CAiPathNavigator();
+
+    /**
      * Address: 0x005AD3E0 (FUN_005AD3E0, unit ctor)
      */
     explicit CAiPathNavigator(Unit* unit);

@@ -13,6 +13,13 @@ namespace
   alignas(SSessionSaveDataTypeInfo) unsigned char gSSessionSaveDataTypeInfoStorage[sizeof(SSessionSaveDataTypeInfo)];
   bool gSSessionSaveDataTypeInfoConstructed = false;
 
+  [[nodiscard]] gpg::RRef MakeSSessionSaveDataRef(SSessionSaveData* const object)
+  {
+    gpg::RRef out{};
+    gpg::RRef_SSessionSaveData(&out, object);
+    return out;
+  }
+
   [[nodiscard]] SSessionSaveDataTypeInfo& AcquireSSessionSaveDataTypeInfo()
   {
     if (!gSSessionSaveDataTypeInfoConstructed) {
@@ -66,7 +73,54 @@ void SSessionSaveDataTypeInfo::Init()
 {
   size_ = 0x0C;
   gpg::RType::Init();
+  newRefFunc_ = &SSessionSaveDataTypeInfo::NewRef;
+  ctorRefFunc_ = &SSessionSaveDataTypeInfo::CtrRef;
+  deleteFunc_ = &SSessionSaveDataTypeInfo::Delete;
+  dtrFunc_ = &SSessionSaveDataTypeInfo::Destruct;
   Finish();
+}
+
+/**
+ * Address: 0x0089A2E0 (FUN_0089A2E0, Moho::SSessionSaveDataTypeInfo::NewRef)
+ */
+gpg::RRef SSessionSaveDataTypeInfo::NewRef()
+{
+  SSessionSaveData* const object = new (std::nothrow) SSessionSaveData();
+  return MakeSSessionSaveDataRef(object);
+}
+
+/**
+ * Address: 0x0089A3C0 (FUN_0089A3C0, Moho::SSessionSaveDataTypeInfo::CtrRef)
+ */
+gpg::RRef SSessionSaveDataTypeInfo::CtrRef(void* const objectStorage)
+{
+  auto* const object = static_cast<SSessionSaveData*>(objectStorage);
+  if (object != nullptr) {
+    new (object) SSessionSaveData();
+  }
+  return MakeSSessionSaveDataRef(object);
+}
+
+/**
+ * Address: 0x0089A380 (FUN_0089A380, Moho::SSessionSaveDataTypeInfo::Delete)
+ */
+void SSessionSaveDataTypeInfo::Delete(void* const objectStorage)
+{
+  auto* const object = static_cast<SSessionSaveData*>(objectStorage);
+  if (object == nullptr) {
+    return;
+  }
+
+  delete object;
+}
+
+/**
+ * Address: 0x0089A450 (FUN_0089A450, Moho::SSessionSaveDataTypeInfo::Destruct)
+ */
+void SSessionSaveDataTypeInfo::Destruct(void* const objectStorage)
+{
+  auto* const object = static_cast<SSessionSaveData*>(objectStorage);
+  object->~SSessionSaveData();
 }
 
 /**

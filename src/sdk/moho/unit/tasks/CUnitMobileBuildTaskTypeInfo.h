@@ -43,12 +43,57 @@ namespace moho
      */
     void Init() override;
 
-    static void AddBase_CCommandTask(gpg::RType* typeInfo);
-    static void AddBase_Listener_ECommandEvent(gpg::RType* typeInfo);
+    /**
+     * Address: 0x005FC120 (FUN_005FC120, Moho::CUnitMobileBuildTaskTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates one `CUnitMobileBuildTask` and returns its typed reflection
+     * reference.
+     */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x005FC1C0 (FUN_005FC1C0, Moho::CUnitMobileBuildTaskTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CUnitMobileBuildTask` in caller-provided storage and
+     * returns its typed reflection reference.
+     */
     static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x005FC1A0 (FUN_005FC1A0, Moho::CUnitMobileBuildTaskTypeInfo::Delete)
+     *
+     * What it does:
+     * Deletes one heap-owned `CUnitMobileBuildTask`.
+     */
     static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x005FC230 (FUN_005FC230, Moho::CUnitMobileBuildTaskTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs the non-deleting `CUnitMobileBuildTask` destructor body on
+     * placement storage.
+     */
     static void Destruct(void* objectStorage);
+
+    /**
+     * Address: 0x005FCF00 (FUN_005FCF00, Moho::CUnitMobileBuildTaskTypeInfo::AddBase_CCommandTask)
+     *
+     * What it does:
+     * Registers `CCommandTask` as the primary reflection base.
+     */
+    static void __stdcall AddBase_CCommandTask(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005FCF60 (FUN_005FCF60, Moho::CUnitMobileBuildTaskTypeInfo::AddBase_Listener_ECommandEvent)
+     *
+     * What it does:
+     * Registers `Listener<ECommandEvent>` as the secondary reflection base at
+     * offset `0x34`.
+     */
+    static void __stdcall AddBase_Listener_ECommandEvent(gpg::RType* typeInfo);
   };
 
   /**

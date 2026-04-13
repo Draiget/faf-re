@@ -28,6 +28,26 @@ namespace moho
      * Address: 0x00897360 (Moho::SSessionSaveDataTypeInfo::Init)
      */
     void Init() override;
+
+    /**
+     * Address: 0x0089A2E0 (FUN_0089A2E0, Moho::SSessionSaveDataTypeInfo::NewRef)
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x0089A3C0 (FUN_0089A3C0, Moho::SSessionSaveDataTypeInfo::CtrRef)
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x0089A380 (FUN_0089A380, Moho::SSessionSaveDataTypeInfo::Delete)
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x0089A450 (FUN_0089A450, Moho::SSessionSaveDataTypeInfo::Destruct)
+     */
+    static void Destruct(void* objectStorage);
   };
 
   static_assert(sizeof(SSessionSaveDataTypeInfo) == 0x64, "SSessionSaveDataTypeInfo size must be 0x64");

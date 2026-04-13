@@ -6,6 +6,7 @@
  */
 
 #include <cstdint>
+#include <cstddef>
 #include <cstring>
 
 // ---------------------------------------------------------------------------
@@ -16,6 +17,42 @@ extern "C" {
   std::int32_t SFLIB_SetErr(std::int32_t errorObjectAddress, std::int32_t errorCode);
   std::int32_t UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
   std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue);
+  void SFTIM_UpdateItime(void* timerState, std::int32_t interpolationTime);
+  std::int32_t SFTIM_GetNextItime(void* timerState, std::int32_t interpolationTime);
+  void SFTIM_GetTime(std::int32_t workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
+  std::int32_t SFTIM_GetSpeed(std::int32_t workctrlAddress);
+  std::int32_t UTY_CmpTime(
+    std::int32_t lhsMajor,
+    std::int32_t lhsMinor,
+    std::int32_t rhsMajor,
+    std::int32_t rhsMinor
+  );
+  void sfmpv_GetDtime(
+    std::int32_t workctrlAddress,
+    std::int32_t mode,
+    std::int32_t* outDeltaMajor,
+    std::int32_t* outDeltaMinor
+  );
+  void sfmpv_SetSkipTtu(std::int32_t workctrlAddress);
+  std::int32_t m2v_SkipFrm(std::int32_t decoderHandle, std::int32_t streamBufferAddress);
+  std::int32_t SJRBF_GetFlowCnt(std::int32_t streamBufferAddress, std::int32_t lane0, std::int32_t lane1);
+  std::int32_t sfmpv_ChkMpvErr(
+    std::int32_t workctrlAddress,
+    std::int32_t decodeResult,
+    std::int32_t consumedBytes,
+    std::int32_t errorCode
+  );
+  std::int32_t sfmpv_AddRtotSj(std::int32_t workctrlAddress, std::int32_t consumedBytes);
+  std::int32_t SFPLY_AddSkipPic(
+    std::int32_t workctrlAddress,
+    std::int32_t skippedPictureDelta,
+    std::int32_t callbackContext
+  );
+  std::int32_t sfmpvf_GetVfrmDataFromFrmInf(std::int32_t workctrlAddress, std::int32_t frameInfoIndex);
+  std::int32_t SFMPVF_SearchFrmObj(std::int32_t workctrlAddress, std::int32_t frameInfoIndex);
+  std::int32_t SFMPVF_SearchFrmObjFromId(std::int32_t workctrlAddress, std::int32_t frameObjectId);
+  std::int32_t SFMPVF_SearchVfrmData(std::int32_t workctrlAddress, std::int32_t frameObjectAddress);
+  void SFMPVF_EndDrawFrm(std::int32_t frameObjectAddress);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +120,119 @@ struct SfmpvPicUsr
   PicUsrEntry entries[16]; // +0x14  -- zeroed by init
 };
 
+/**
+ * Per-handle timing lane consumed by MPV late/skip decision helpers.
+ *
+ * Evidence:
+ * - `FUN_00AD4100` accesses this subobject at workctrl offset `+0x0D30`.
+ */
+struct SfmpvTimingLane
+{
+  using IsLateCallback =
+    std::int32_t(__cdecl*)(std::int32_t workctrlAddress, std::int32_t mode, std::int32_t interpolationTime, std::int32_t baseFraction);
+
+  std::uint8_t mUnknown00To17[0x18]{}; // +0x00
+  IsLateCallback isLateCallback = nullptr; // +0x18
+  std::uint8_t mUnknown1CToE3[0xC8]{}; // +0x1C
+  std::int32_t baseInterpolationTime = 0; // +0xE4
+  std::int32_t baseFraction = 0; // +0xE8
+  std::uint8_t mUnknownECTo117[0x2C]{}; // +0xEC
+  std::int32_t interpolationEnabled = 0; // +0x118
+  std::uint8_t mUnknown11CTo13B[0x20]{}; // +0x11C
+  std::int32_t frameInterpolationTime = 0; // +0x13C
+  std::uint8_t mUnknown140To163[0x24]{}; // +0x140
+  std::int32_t decodeProgressTime = 0; // +0x164
+};
+
+static_assert(offsetof(SfmpvTimingLane, isLateCallback) == 0x18, "SfmpvTimingLane::isLateCallback offset must be 0x18");
+static_assert(
+  offsetof(SfmpvTimingLane, baseInterpolationTime) == 0xE4,
+  "SfmpvTimingLane::baseInterpolationTime offset must be 0xE4"
+);
+static_assert(offsetof(SfmpvTimingLane, baseFraction) == 0xE8, "SfmpvTimingLane::baseFraction offset must be 0xE8");
+static_assert(
+  offsetof(SfmpvTimingLane, interpolationEnabled) == 0x118,
+  "SfmpvTimingLane::interpolationEnabled offset must be 0x118"
+);
+static_assert(
+  offsetof(SfmpvTimingLane, frameInterpolationTime) == 0x13C,
+  "SfmpvTimingLane::frameInterpolationTime offset must be 0x13C"
+);
+static_assert(
+  offsetof(SfmpvTimingLane, decodeProgressTime) == 0x164,
+  "SfmpvTimingLane::decodeProgressTime offset must be 0x164"
+);
+
+/**
+ * MPV info lane addressed from one workctrl via pointer at offset `+0x1FC0`.
+ */
+struct SfmpvInfoRuntimeView
+{
+  std::int32_t decoderHandle = 0; // +0x00
+  std::uint8_t mUnknown04To6F[0x6C]{}; // +0x04
+  std::int32_t activeFrameObjectAddress = 0; // +0x70
+  std::uint8_t mUnknown74To83[0x10]{}; // +0x74
+  std::int32_t lateFrameCounter = 0; // +0x84
+  std::uint8_t mUnknown88ToA3[0x1C]{}; // +0x88
+  std::int32_t skipPicCallbackContext = 0; // +0xA4
+  std::uint8_t mUnknownA8ToE3[0x3C]{}; // +0xA8
+  std::uint8_t disableSkipLatch = 0; // +0xE4
+  std::uint8_t mUnknownE5To16B[0x87]{}; // +0xE5
+  std::int32_t skipIssuedFlag = 0; // +0x16C
+};
+
+static_assert(offsetof(SfmpvInfoRuntimeView, decoderHandle) == 0x00, "SfmpvInfoRuntimeView::decoderHandle offset must be 0x00");
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, activeFrameObjectAddress) == 0x70,
+  "SfmpvInfoRuntimeView::activeFrameObjectAddress offset must be 0x70"
+);
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, lateFrameCounter) == 0x84,
+  "SfmpvInfoRuntimeView::lateFrameCounter offset must be 0x84"
+);
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, skipPicCallbackContext) == 0xA4,
+  "SfmpvInfoRuntimeView::skipPicCallbackContext offset must be 0xA4"
+);
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, disableSkipLatch) == 0xE4,
+  "SfmpvInfoRuntimeView::disableSkipLatch offset must be 0xE4"
+);
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, skipIssuedFlag) == 0x16C,
+  "SfmpvInfoRuntimeView::skipIssuedFlag offset must be 0x16C"
+);
+
+/**
+ * Workctrl runtime view used by recovered MPV helper lanes.
+ */
+struct SfmpvHandleRuntimeView
+{
+  std::uint8_t mUnknown00To57[0x58]{}; // +0x00
+  std::int32_t decodePathMode = 0; // +0x58
+  std::uint8_t mUnknown5CToAA3[0xA48]{}; // +0x5C
+  std::int32_t lateFrameGateThreshold = 0; // +0xAA4
+  std::uint8_t mUnknownAA8ToD2F[0x288]{}; // +0xAA8
+  SfmpvTimingLane timingLane{}; // +0xD30
+  std::uint8_t mUnknownE98To1FBF[0x1128]{}; // +0xE98
+  SfmpvInfoRuntimeView* mpvInfo = nullptr; // +0x1FC0
+};
+
+static_assert(offsetof(SfmpvHandleRuntimeView, decodePathMode) == 0x58, "SfmpvHandleRuntimeView::decodePathMode offset must be 0x58");
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, lateFrameGateThreshold) == 0xAA4,
+  "SfmpvHandleRuntimeView::lateFrameGateThreshold offset must be 0xAA4"
+);
+static_assert(offsetof(SfmpvHandleRuntimeView, timingLane) == 0xD30, "SfmpvHandleRuntimeView::timingLane offset must be 0xD30");
+static_assert(offsetof(SfmpvHandleRuntimeView, mpvInfo) == 0x1FC0, "SfmpvHandleRuntimeView::mpvInfo offset must be 0x1FC0");
+
+struct SfmpvfVfrmDataRuntime
+{
+  std::int32_t drawState = 0; // +0x00
+};
+
+static_assert(offsetof(SfmpvfVfrmDataRuntime, drawState) == 0x00, "SfmpvfVfrmDataRuntime::drawState offset must be 0x00");
+
 // ---------------------------------------------------------------------------
 // Global CRI MPV state variables (BSS)
 // ---------------------------------------------------------------------------
@@ -102,6 +252,16 @@ namespace
 {
   /** MPV parameter validation failure code. */
   constexpr std::int32_t kSfmpvErrInvalidPara = -16773355; // 0xFF000F15
+  constexpr std::int32_t kSfmpvErrSkipFrameFailed = -16773369; // 0xFF000F07
+  constexpr std::int32_t kSfmpvErrFrameObjectMissingById = -16773345; // 0xFF000F1F
+  constexpr std::int32_t kSfmpvErrInvalidVfrmDrawState = -16773362; // 0xFF000F0E
+  constexpr std::int32_t kSfmpvErrFrameObjectMismatch = -16773361; // 0xFF000F0F
+
+  template <typename T>
+  [[nodiscard]] T* AddressToPointer(const std::int32_t address) noexcept
+  {
+    return reinterpret_cast<T*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(address)));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +491,141 @@ std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, std::uint32_t* infoBlock)
     slotPtr += 58;
   }
 
+  return 0;
+}
+
+/**
+ * Address: 0x00AD4100 (FUN_00AD4100, _sfmpv_IsLate)
+ *
+ * What it does:
+ * Computes one MPV late-frame condition using current interpolation/time lanes,
+ * optional callback override, and per-handle late-frame gate counters.
+ */
+std::int32_t sfmpv_IsLate(const std::int32_t workctrlAddress, const std::int32_t updateMode)
+{
+  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  SfmpvTimingLane* const timingLane = &workctrl->timingLane;
+  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+
+  std::int32_t interpolationTime = 0;
+  if (timingLane->interpolationEnabled != 0) {
+    interpolationTime = timingLane->baseInterpolationTime + timingLane->decodeProgressTime - timingLane->frameInterpolationTime;
+  }
+
+  const auto lateCallback = timingLane->isLateCallback;
+  const std::int32_t baseFraction = timingLane->baseFraction;
+  if (lateCallback != nullptr) {
+    return lateCallback(workctrlAddress, updateMode, interpolationTime, baseFraction);
+  }
+
+  if (updateMode == 1) {
+    SFTIM_UpdateItime(timingLane, interpolationTime);
+    interpolationTime = SFTIM_GetNextItime(timingLane, interpolationTime);
+  } else if (updateMode == 2) {
+    interpolationTime = SFTIM_GetNextItime(timingLane, interpolationTime);
+  }
+
+  if (SFTIM_GetSpeed(workctrlAddress) <= 1000 && mpvInfo->lateFrameCounter >= workctrl->lateFrameGateThreshold) {
+    return 0;
+  }
+
+  std::int32_t currentTimeMajor = 0;
+  std::int32_t currentTimeMinor = 0;
+  SFTIM_GetTime(workctrlAddress, &currentTimeMajor, &currentTimeMinor);
+  if (currentTimeMajor < 0) {
+    return 0;
+  }
+
+  std::int32_t frameDeltaMajor = 0;
+  std::int32_t frameDeltaMinor = 0;
+  sfmpv_GetDtime(workctrlAddress, updateMode, &frameDeltaMajor, &frameDeltaMinor);
+  if (
+    UTY_CmpTime(
+      currentTimeMajor,
+      currentTimeMinor,
+      interpolationTime - (baseFraction * frameDeltaMajor) / frameDeltaMinor,
+      baseFraction
+    ) != 0
+  ) {
+    return 0;
+  }
+
+  ++mpvInfo->lateFrameCounter;
+  return 1;
+}
+
+/**
+ * Address: 0x00AD4260 (FUN_00AD4260, _sfmpv_SkipFrm)
+ *
+ * What it does:
+ * Runs one MPV frame-skip decode step, updates consumed-stream counters, and
+ * records one skipped-picture callback when skip succeeds.
+ */
+std::int32_t sfmpv_SkipFrm(const std::int32_t workctrlAddress, const std::int32_t streamBufferAddress)
+{
+  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+
+  sfmpv_SetSkipTtu(workctrlAddress);
+  const std::int32_t flowCountBefore = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1);
+  const std::int32_t skipDecodeResult = m2v_SkipFrm(mpvInfo->decoderHandle, streamBufferAddress);
+  const std::int32_t consumedBytes = SJRBF_GetFlowCnt(streamBufferAddress, 0, 1) - flowCountBefore;
+
+  const std::int32_t checkedResult =
+    sfmpv_ChkMpvErr(workctrlAddress, skipDecodeResult, consumedBytes, kSfmpvErrSkipFrameFailed);
+  sfmpv_AddRtotSj(workctrlAddress, consumedBytes);
+  if (checkedResult != 0) {
+    return checkedResult;
+  }
+
+  if (mpvInfo->disableSkipLatch == 0) {
+    mpvInfo->skipIssuedFlag = 1;
+  }
+
+  SFPLY_AddSkipPic(workctrlAddress, 1, mpvInfo->skipPicCallbackContext);
+  return 0;
+}
+
+/**
+ * Address: 0x00AD52E0 (FUN_00AD52E0, _sfmpvf_AddReadSub)
+ *
+ * What it does:
+ * Validates one frame-read completion lane, clears the frame draw-state, and
+ * finalizes the associated frame-object draw owner.
+ */
+std::int32_t sfmpvf_AddReadSub(
+  const std::int32_t workctrlAddress,
+  const std::int32_t frameInfoIndex,
+  const std::int32_t frameObjectId
+)
+{
+  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  const SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+
+  std::int32_t frameObjectAddress = 0;
+  SfmpvfVfrmDataRuntime* vfrmData = nullptr;
+
+  if (workctrl->decodePathMode == 2) {
+    frameObjectAddress = SFMPVF_SearchFrmObjFromId(workctrlAddress, frameObjectId);
+    if (frameObjectAddress == 0) {
+      return SFLIB_SetErr(workctrlAddress, kSfmpvErrFrameObjectMissingById);
+    }
+
+    vfrmData = AddressToPointer<SfmpvfVfrmDataRuntime>(SFMPVF_SearchVfrmData(workctrlAddress, frameObjectAddress));
+  } else {
+    vfrmData = AddressToPointer<SfmpvfVfrmDataRuntime>(sfmpvf_GetVfrmDataFromFrmInf(workctrlAddress, frameInfoIndex));
+    if (vfrmData->drawState != 1) {
+      return SFLIB_SetErr(workctrlAddress, kSfmpvErrInvalidVfrmDrawState);
+    }
+
+    frameObjectAddress = SFMPVF_SearchFrmObj(workctrlAddress, frameInfoIndex);
+    if (mpvInfo->activeFrameObjectAddress != frameObjectAddress) {
+      return SFLIB_SetErr(workctrlAddress, kSfmpvErrFrameObjectMismatch);
+    }
+  }
+
+  vfrmData->drawState = 0;
+  SFMPVF_EndDrawFrm(frameObjectAddress);
   return 0;
 }
 

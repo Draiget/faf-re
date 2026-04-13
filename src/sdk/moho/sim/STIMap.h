@@ -828,4 +828,84 @@ namespace moho
     const SFootprint& footprint,
     EOccupancyCaps occupancyCaps
   );
+
+  struct RUnitBlueprint;
+  struct SOccupationResult;
+  class ISimResources;
+  struct SCoordsVec2;
+
+  /**
+   * Address: 0x005651F0 (FUN_005651F0, Moho::OCCUPY_CheckAreaFlatness)
+   *
+   * What it does:
+   * Scans every cell in `rect`, records min/max elevation, writes them to
+   * `*outMinHeight`/`*outMaxHeight`, and returns whether the range fits
+   * within `blueprint.Physics.MaxGroundVariation`.
+   */
+  [[nodiscard]]
+  bool OCCUPY_CheckAreaFlatness(
+    const gpg::Rect2f& rect,
+    const RUnitBlueprint& blueprint,
+    const STIMap& map,
+    float* outMinHeight,
+    float* outMaxHeight
+  );
+
+  /**
+   * Address: 0x00564F80 (FUN_00564F80, Moho::OCCUPY_CheckEdgeFlatness)
+   *
+   * What it does:
+   * `FlattenSkirt`-mode flatness check: walks only the 1-cell-wider
+   * perimeter of `rect`, finds min/max elevation, writes them to the out
+   * params, and checks whether the deviation from `ceil(pivotArg)` fits
+   * within `blueprint.Physics.MaxGroundVariation`. Binary always passes
+   * `(pivotArg = 0.0f, xmm1Slot = 0.5f)`; `xmm1Slot` is a register-slot
+   * artifact and has no observed input use.
+   */
+  [[nodiscard]]
+  bool OCCUPY_CheckEdgeFlatness(
+    const gpg::Rect2f& rect,
+    float pivotArg,
+    float xmm1Slot,
+    const RUnitBlueprint& blueprint,
+    const STIMap& map,
+    float* outMinHeight,
+    float* outMaxHeight
+  );
+
+  /**
+   * Address: 0x005652E0 (FUN_005652E0, Moho::OCCUPY_Check)
+   *
+   * What it does:
+   * Resolves whether `blueprint` can be placed at `worldPos` and fills
+   * `dest` with the chosen world-center position plus the remaining layer
+   * bitmask that still passes every check (mobile snapping, flatness,
+   * water-depth, build-layer caps, mass/hydrocarbon restriction).
+   */
+  [[nodiscard]]
+  bool OCCUPY_Check(
+    STIMap& map,
+    const RUnitBlueprint& blueprint,
+    const SCoordsVec2& worldPos,
+    ISimResources& resources,
+    SOccupationResult& dest
+  );
+
+  /**
+   * Address: 0x00720D90 (FUN_00720D90, Moho::func_LocationIsFree)
+   *
+   * What it does:
+   * Full placement check for `blueprint` at `pos` on `grid`. Wraps
+   * `OCCUPY_Check` with additional occupancy-bitmap intersection checks on
+   * the footprint rect (for mobile blueprints) plus an existing-unit skirt
+   * overlap check (for static blueprints), and writes the resolved
+   * placement into `dest`.
+   */
+  [[nodiscard]]
+  bool func_LocationIsFree(
+    const RUnitBlueprint& blueprint,
+    COGrid& grid,
+    const SCoordsVec2& pos,
+    SOccupationResult& dest
+  );
 } // namespace moho

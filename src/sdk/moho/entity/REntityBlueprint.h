@@ -23,6 +23,7 @@ namespace LuaPlus
 namespace moho
 {
   class CD3DBatchTexture;
+  struct RResId;
   class RRuleGameRules;
   struct RUnitBlueprint;
 
@@ -61,7 +62,24 @@ namespace moho
     std::int32_t mDesiredShooterCap;                          // +0xD4
     SFootprint mFootprint;                                    // +0xD8
     SFootprint mAltFootprint;                                 // +0xE8
-    std::uint8_t pad_00F8_013C[0x44];                         // +0xF8
+    std::uint8_t mLifeBarRender;                              // +0xF8
+    std::uint8_t mLifeBarPadding00F9_00FB[3];                 // +0xF9
+    float mLifeBarOffset;                                     // +0xFC
+    float mLifeBarSize;                                       // +0x100
+    float mLifeBarHeight;                                     // +0x104
+    float mSelectionSizeX;                                    // +0x108
+    float mSelectionSizeY;                                    // +0x10C
+    float mSelectionSizeZ;                                    // +0x110
+    float mSelectionCenterOffsetX;                            // +0x114
+    float mSelectionCenterOffsetY;                            // +0x118
+    float mSelectionCenterOffsetZ;                            // +0x11C
+    float mSelectionYOffset;                                  // +0x120
+    float mSelectionMeshScaleX;                               // +0x124
+    float mSelectionMeshScaleY;                               // +0x128
+    float mSelectionMeshScaleZ;                               // +0x12C
+    float mSelectionMeshUseTopAmount;                         // +0x130
+    float mSelectionThickness;                                // +0x134
+    float mUseOOBTestZoom;                                    // +0x138
     msvc8::string mStrategicIconName;                         // +0x13C
     std::uint32_t mStrategicIconRuntimeWord;                  // +0x158 (runtime word; semantics unresolved)
     boost::weak_ptr<CD3DBatchTexture> mStrategicIconRest;     // +0x15C
@@ -70,6 +88,22 @@ namespace moho
     boost::weak_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
 
     static gpg::RType* sType;
+
+    /**
+     * Local source compatibility constructor for scratch/entity-copy lanes
+     * that need default-initialized storage.
+     */
+    REntityBlueprint();
+
+    /**
+     * Address: 0x00511C30 (FUN_00511C30)
+     * Mangled: ??0REntityBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Runs base blueprint construction and seeds entity-blueprint physical,
+     * footprint, life-bar, selection, and strategic-icon defaults.
+     */
+    REntityBlueprint(RRuleGameRules* owner, const RResId& resId);
 
     /**
      * Address: 0x00511E80 (FUN_00511E80)
@@ -147,6 +181,29 @@ namespace moho
   static_assert(offsetof(REntityBlueprint, mFootprint) == 0xD8, "REntityBlueprint::mFootprint offset must be 0xD8");
   static_assert(
     offsetof(REntityBlueprint, mAltFootprint) == 0xE8, "REntityBlueprint::mAltFootprint offset must be 0xE8"
+  );
+  static_assert(offsetof(REntityBlueprint, mLifeBarRender) == 0xF8, "REntityBlueprint::mLifeBarRender offset must be 0xF8");
+  static_assert(offsetof(REntityBlueprint, mLifeBarOffset) == 0xFC, "REntityBlueprint::mLifeBarOffset offset must be 0xFC");
+  static_assert(offsetof(REntityBlueprint, mLifeBarSize) == 0x100, "REntityBlueprint::mLifeBarSize offset must be 0x100");
+  static_assert(offsetof(REntityBlueprint, mLifeBarHeight) == 0x104, "REntityBlueprint::mLifeBarHeight offset must be 0x104");
+  static_assert(offsetof(REntityBlueprint, mSelectionSizeX) == 0x108, "REntityBlueprint::mSelectionSizeX offset must be 0x108");
+  static_assert(
+    offsetof(REntityBlueprint, mSelectionCenterOffsetX) == 0x114,
+    "REntityBlueprint::mSelectionCenterOffsetX offset must be 0x114"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mSelectionYOffset) == 0x120, "REntityBlueprint::mSelectionYOffset offset must be 0x120"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mSelectionMeshScaleX) == 0x124,
+    "REntityBlueprint::mSelectionMeshScaleX offset must be 0x124"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mSelectionMeshUseTopAmount) == 0x130,
+    "REntityBlueprint::mSelectionMeshUseTopAmount offset must be 0x130"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mUseOOBTestZoom) == 0x138, "REntityBlueprint::mUseOOBTestZoom offset must be 0x138"
   );
   static_assert(
     offsetof(REntityBlueprint, mStrategicIconName) == 0x13C, "REntityBlueprint::mStrategicIconName offset must be 0x13C"

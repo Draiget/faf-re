@@ -7,6 +7,7 @@
 #include <new>
 #include <string>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
@@ -35,6 +36,8 @@
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CPlatoon.h"
+#include "moho/sim/CSquad.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -173,6 +176,27 @@ namespace
   constexpr const char* kAiBrainFindClosestArmyWithBaseHelpText =
     "CAiBrain:FindClosestArmyWithBase(allianceState) - returns the brain of the closest "
     "army (filtered by alliance with this brain) that owns at least one structure, or nil";
+  constexpr const char* kAiBrainBuildPlatoonName = "BuildPlatoon";
+  constexpr const char* kAiBrainBuildPlatoonHelpText =
+    "CAiBrain:BuildPlatoon(buildPlanTable, builderTable, countMultiplier) - issues build "
+    "commands for each `(blueprintId, ?, baseCount)` row, multiplied by `countMultiplier`, "
+    "rotating across `builderTable` builders";
+  constexpr const char* kAiBrainAssignUnitsToPlatoonName = "AssignUnitsToPlatoon";
+  constexpr const char* kAiBrainAssignUnitsToPlatoonHelpText =
+    "CAiBrain:AssignUnitsToPlatoon(platoonOrName, unitTable, squadClass, squadName) - moves "
+    "every unit from `unitTable` into the named platoon's `squadClass` squad (creating the "
+    "squad if it doesn't exist), removing them from any other platoon they currently belong to";
+  constexpr const char* kAiBrainMakePlatoonName = "MakePlatoon";
+  constexpr const char* kAiBrainMakePlatoonHelpText =
+    "CAiBrain:MakePlatoon(nameOrTable, plan?) - creates a platoon from a (name, plan) pair "
+    "of strings, or builds a multi-squad platoon from a table of "
+    "{platoonName, planName, [bp, ?, count, squadClass, squadName]...} entries";
+  constexpr const char* kAiBrainCanBuildPlatoonName = "CanBuildPlatoon";
+  constexpr const char* kAiBrainCanBuildPlatoonHelpText =
+    "CAiBrain:CanBuildPlatoon(platoonTemplate, suggestedFactories?) - returns either nil "
+    "(cannot build) or a table of concrete factory units that can collectively build every "
+    "row of the template; optionally restricted to `suggestedFactories`";
+  constexpr const char* kAiBrainSuggestedFactoryListNotTable = "Suggested factory list is not a table!";
   constexpr std::int32_t kAiDebugGridStep = 32;
   constexpr std::int32_t kAiDebugGridLineDepth = static_cast<std::int32_t>(0xFF7FFF7Fu);
   constexpr std::int32_t kAiDebugAttackLineDepth = static_cast<std::int32_t>(0xFFFFFF00u);
@@ -1041,6 +1065,55 @@ namespace
   };
 
   [[maybe_unused]] CAiBrainStartupBootstrap gCAiBrainStartupBootstrap;
+
+  /**
+   * Address: 0x005919F0 (FUN_005919F0, sub_5919F0)
+   *
+   * IDA signature:
+   * _DWORD *__stdcall sub_5919F0(int destSet, LuaPlus::LuaObject sourceTable);
+   *
+   * What it does:
+   * Walks one Lua table top-to-bottom, resolves each entry through
+   * `SCR_FromLua_Unit`, and appends every successfully-resolved unit's
+   * `Entity*` lane into the destination unit-set fastvector. Used by the
+   * Platoon Lua bindings to pull a Lua-side unit list into a typed unit set
+   * before issuing army-side reassignment / squad-add operations.
+   */
+  void PopulateUnitSetFromLuaList(SEntitySetTemplateUnit& destSet, const LuaPlus::LuaObject& sourceTable)
+  {
+    const int rowCount = sourceTable.GetCount();
+    for (int row = 1; row <= rowCount; ++row) {
+      const LuaPlus::LuaObject rowObject = sourceTable[row];
+      Unit* const unit = SCR_FromLua_Unit(rowObject);
+      if (unit != nullptr) {
+        destSet.mVec.PushBack(static_cast<Entity*>(unit));
+      }
+    }
+  }
+
+  /**
+   * Address: 0x006934E0 (FUN_006934E0, func_FillLuaTableWithEntities)
+   *
+   * What it does:
+   * Initializes `outTable` as a Lua array sized to `entities` and fills slots
+   * `1..N` with each entity's script object lane in storage order.
+   */
+  LuaPlus::LuaObject* FillLuaTableWithEntities(
+    const SEntitySetTemplateUnit& entities,
+    LuaPlus::LuaObject* const outTable,
+    LuaPlus::LuaState* const state
+  )
+  {
+    outTable->AssignNewTable(state, static_cast<std::int32_t>(entities.mVec.Size()), 0);
+
+    std::int32_t tableIndex = 1;
+    for (Entity* const* entitySlot = entities.mVec.begin(); entitySlot != entities.mVec.end(); ++entitySlot) {
+      outTable->Insert(tableIndex, (*entitySlot)->mLuaObj);
+      ++tableIndex;
+    }
+
+    return outTable;
+  }
 } // namespace
 
 gpg::RType* CAiBrain::sType = nullptr;
@@ -1596,6 +1669,84 @@ SEntitySetTemplateUnit* CAiBrain::GetAvailableFactories(
   }
 
   return outSet;
+}
+
+/**
+ * Address: 0x0057AC30 (FUN_0057AC30, Moho::FindAvailableFactory)
+ *
+ * IDA signature:
+ * Moho::Unit *__fastcall Moho::FindAvailableFactory(
+ *   gpg::fastvector_Unit *candidateList,
+ *   const char *blueprintId,
+ *   Moho::CAiBrain *brain);
+ *
+ * What it does:
+ * Returns the first builder unit (from a caller-supplied candidate list or,
+ * if that list is empty, every non-mobile `FACTORY` owned by the brain's
+ * army) that is live, idle, fully built, and capable of building the unit
+ * blueprint identified by `blueprintId`. Returns null when the blueprint
+ * cannot be resolved or no matching builder exists.
+ */
+moho::Unit* moho::FindAvailableFactory(
+  gpg::core::FastVector<Unit*>& candidateList, const char* const blueprintId, CAiBrain* const brain
+)
+{
+  // Resolve target blueprint once (by normalized filename).
+  RResId blueprintResId{};
+  (void)gpg::STR_InitFilename(&blueprintResId.name, blueprintId);
+
+  RRuleGameRules* const rules = brain->mSim->mRules;
+  const RUnitBlueprint* const targetBlueprint = rules->GetUnitBlueprint(blueprintResId);
+  if (targetBlueprint == nullptr) {
+    if (blueprintId != nullptr) {
+      gpg::Warnf("Passed in a bad unit blueprint name (%s) to FindAvailableFactory!", blueprintId);
+    }
+    return nullptr;
+  }
+
+  // If caller didn't pre-populate `candidateList`, harvest all static
+  // factories owned by this brain's army.
+  if (candidateList.start_ == candidateList.end_) {
+    const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
+    const CategoryWordRangeView* const factoryCategory = rules->GetEntityCategory("FACTORY");
+
+    CategoryWordRangeView staticFactoryCategory{};
+    if (factoryCategory != nullptr) {
+      staticFactoryCategory = *factoryCategory;
+      if (mobileCategory != nullptr) {
+        SubtractCategoryWordRange(staticFactoryCategory, *mobileCategory);
+      }
+    }
+
+    SEntitySetTemplateUnit foundFactories{};
+    brain->mArmy->GetUnits(&foundFactories, &staticFactoryCategory);
+
+    for (Entity* const* slot = foundFactories.mVec.begin(); slot != foundFactories.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit != nullptr) {
+        candidateList.PushBack(unit);
+      }
+    }
+  }
+
+  // Linear walk for the first builder that passes every buildability gate.
+  for (Unit* const* it = candidateList.start_; it != candidateList.end_; ++it) {
+    Unit* const candidate = *it;
+    if (candidate == nullptr) {
+      continue;
+    }
+    if (candidate->IsDead() || candidate->DestroyQueued() || candidate->IsBeingBuilt()) {
+      continue;
+    }
+    if (candidate->IsBusy()) {
+      continue;
+    }
+    if (!candidate->CanBuild(targetBlueprint)) {
+      continue;
+    }
+    return candidate;
+  }
+  return nullptr;
 }
 
 /**
@@ -2807,19 +2958,8 @@ int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
     (void)filteredUnits.AddUnit(unit);
   }
 
-  LuaPlus::LuaObject outUnits;
-  outUnits.AssignNewTable(state, static_cast<std::int32_t>(filteredUnits.Size()), 0u);
-
-  std::int32_t luaIndex = 1;
-  for (Entity* const* it = filteredUnits.mVec.begin(); it != filteredUnits.mVec.end(); ++it) {
-    Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
-    if (unit == nullptr) {
-      continue;
-    }
-
-    outUnits.Insert(luaIndex, unit->GetLuaObject());
-    ++luaIndex;
-  }
+  LuaPlus::LuaObject outUnits{};
+  (void)FillLuaTableWithEntities(filteredUnits, &outUnits, state);
 
   outUnits.PushStack(state);
   return 1;
@@ -5051,5 +5191,464 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
 
   CAiBrain* const closestBrain = closestArmy->GetArmyBrain();
   closestBrain->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0058C490 (FUN_0058C490, cfunc_CAiBrainBuildPlatoon)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_CAiBrainBuildPlatoonL`.
+ */
+int moho::cfunc_CAiBrainBuildPlatoon(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainBuildPlatoonL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058C4B0 (FUN_0058C4B0, func_CAiBrainBuildPlatoon_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:BuildPlatoon()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainBuildPlatoon_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainBuildPlatoonName,
+    &moho::cfunc_CAiBrainBuildPlatoon,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainBuildPlatoonHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058C510 (FUN_0058C510, cfunc_CAiBrainBuildPlatoonL)
+ *
+ * What it does:
+ * Issues `BuildUnit(blueprintId, brain, builder, scaledCount)` for every
+ * `(blueprintId, ?, baseCount)` row in the build-plan table, scaling each row
+ * count by the supplied multiplier (rounded down) and rotating across the
+ * builder table for each plan row.
+ */
+int moho::cfunc_CAiBrainBuildPlatoonL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiBrainBuildPlatoonHelpText, 4, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject buildPlanTable(LuaPlus::LuaStackObject(state, 2));
+  const LuaPlus::LuaObject builderTable(LuaPlus::LuaStackObject(state, 3));
+  const LuaPlus::LuaObject countMultiplierObj(LuaPlus::LuaStackObject(state, 4));
+
+  if (!buildPlanTable.IsTable() || !builderTable.IsTable()) {
+    return 0;
+  }
+
+  const int planRowCount = buildPlanTable.GetCount();
+  const int builderRowCount = builderTable.GetCount();
+  if (planRowCount < 1) {
+    return 0;
+  }
+
+  int builderIndex = 1;
+  for (int planRow = 1; planRow <= planRowCount; ++planRow) {
+    if (builderIndex > builderRowCount) {
+      builderIndex = 1;
+    }
+
+    const LuaPlus::LuaObject planRowObject = buildPlanTable[planRow];
+    if (!planRowObject.IsTable()) {
+      continue;
+    }
+
+    const LuaPlus::LuaObject blueprintIdObject = planRowObject[1];
+    const LuaPlus::LuaObject baseCountObject = planRowObject[3];
+
+    const float baseCount = static_cast<float>(baseCountObject.GetInteger());
+    const float scaledCountFloat = static_cast<float>(countMultiplierObj.GetNumber()) * baseCount;
+    const int scaledCount = static_cast<int>(std::floor(scaledCountFloat));
+
+    const LuaPlus::LuaObject builderUnitObject = builderTable[builderIndex];
+    Unit* const builderUnit = SCR_FromLua_Unit(builderUnitObject);
+
+    if (builderUnit != nullptr) {
+      const char* const blueprintId = blueprintIdObject.GetString();
+      (void)CAiBrain::BuildUnit(blueprintId, brain, builderUnit, scaledCount);
+    }
+
+    ++builderIndex;
+  }
+
+  return 0;
+}
+
+/**
+ * Address: 0x0058DC60 (FUN_0058DC60, cfunc_CAiBrainAssignUnitsToPlatoon)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to
+ * `cfunc_CAiBrainAssignUnitsToPlatoonL`.
+ */
+int moho::cfunc_CAiBrainAssignUnitsToPlatoon(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainAssignUnitsToPlatoonL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058DC80 (FUN_0058DC80, func_CAiBrainAssignUnitsToPlatoon_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:AssignUnitsToPlatoon()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainAssignUnitsToPlatoon_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainAssignUnitsToPlatoonName,
+    &moho::cfunc_CAiBrainAssignUnitsToPlatoon,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainAssignUnitsToPlatoonHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058DCE0 (FUN_0058DCE0, cfunc_CAiBrainAssignUnitsToPlatoonL)
+ *
+ * What it does:
+ * Pulls the requested unit list out of Lua, removes those units from any
+ * platoon they currently belong to, looks up (or creates) the destination
+ * squad on the target platoon, range-adds the units into the squad's
+ * unit-set, then dispatches the `OnUnitsAddedToPlatoon` script callback.
+ *
+ * Argument layout: `(brain, platoonOrName, unitTable, squadClassName, squadName)`.
+ * `platoonOrName` accepts either a Lua string (looked up via
+ * `IArmy::GetPlatoonByName`) or a CPlatoon userdata.
+ */
+int moho::cfunc_CAiBrainAssignUnitsToPlatoonL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 5) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiBrainAssignUnitsToPlatoonHelpText, 5, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject platoonOrNameObject(LuaPlus::LuaStackObject(state, 2));
+  const LuaPlus::LuaObject unitTableObject(LuaPlus::LuaStackObject(state, 3));
+
+  ESquadClass squadClass{};
+  gpg::RRef squadClassRef{};
+  (void)gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+
+  const LuaPlus::LuaStackObject squadClassArg(state, 4);
+  const char* const squadClassName = lua_tostring(rawState, 4);
+  if (!squadClassName) {
+    squadClassArg.TypeError("string");
+  }
+  SCR_GetEnum(state, squadClassName, squadClassRef);
+
+  const LuaPlus::LuaObject squadNameObject(LuaPlus::LuaStackObject(state, 5));
+
+  if (!unitTableObject.IsTable()) {
+    return 1;
+  }
+
+  CPlatoon* targetPlatoon = nullptr;
+  if (platoonOrNameObject.IsString()) {
+    targetPlatoon = brain->mArmy->GetPlatoonByName(platoonOrNameObject.GetString());
+  } else {
+    targetPlatoon = SCR_FromLua_CPlatoon(platoonOrNameObject, state);
+  }
+
+  if (targetPlatoon == nullptr) {
+    return 1;
+  }
+
+  SEntitySetTemplateUnit incomingUnits{};
+  PopulateUnitSetFromLuaList(incomingUnits, unitTableObject);
+
+  brain->mArmy->RemoveUnitsFromPlatoons(&incomingUnits);
+
+  CSquad* destinationSquad = targetPlatoon->GetSquad(squadClass);
+  if (destinationSquad == nullptr) {
+    destinationSquad = CSquad::AllocateOnPlatoon(targetPlatoon, squadClass, squadNameObject.GetString());
+  }
+
+  destinationSquad->mUnits.AddRange(incomingUnits.mVec.begin(), incomingUnits.mVec.end());
+
+  targetPlatoon->mHasLuaList = 0;
+  (void)targetPlatoon->RunScript("OnUnitsAddedToPlatoon");
+  return 1;
+}
+
+/**
+ * Address: 0x0058D650 (FUN_0058D650, cfunc_CAiBrainMakePlatoon)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_CAiBrainMakePlatoonL`.
+ */
+int moho::cfunc_CAiBrainMakePlatoon(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainMakePlatoonL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058D670 (FUN_0058D670, func_CAiBrainMakePlatoon_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:MakePlatoon()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainMakePlatoon_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainMakePlatoonName,
+    &moho::cfunc_CAiBrainMakePlatoon,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainMakePlatoonHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058D6D0 (FUN_0058D6D0, cfunc_CAiBrainMakePlatoonL)
+ *
+ * What it does:
+ * Two-mode platoon constructor:
+ *
+ * - String form `(brain, name, planName)`: directly calls `IArmy::MakePlatoon`
+ *   and pushes the result, returning nil if creation fails.
+ *
+ * - Table form `(brain, configTable)`: looks up the army-pool platoon, reads
+ *   the new platoon's name and plan from `configTable[1]/[2]`, creates the
+ *   platoon, then walks every table row in `configTable` and for each
+ *   `[bpName, ?, count, squadClassName, squadName]` config row pulls
+ *   `count` matching live units out of the army-pool's unassigned squad,
+ *   removes them from any prior platoon, and inserts them into the requested
+ *   squad on the new platoon (creating the squad if needed).
+ */
+int moho::cfunc_CAiBrainMakePlatoonL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgRangeWarning, kAiBrainMakePlatoonHelpText, 2, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject nameOrConfigObject(LuaPlus::LuaStackObject(state, 2));
+
+  if (!nameOrConfigObject.IsTable()) {
+    // String form: arg2 = platoon name, arg3 = plan name.
+    if (nameOrConfigObject.IsString() && argumentCount > 2) {
+      const LuaPlus::LuaObject planObject(LuaPlus::LuaStackObject(state, 3));
+      if (planObject.IsString()) {
+        CPlatoon* const newPlatoon =
+          brain->mArmy->MakePlatoon(nameOrConfigObject.GetString(), planObject.GetString());
+        if (newPlatoon != nullptr) {
+          newPlatoon->mLuaObj.PushStack(state);
+          return 1;
+        }
+      }
+    }
+
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  // Table form: full multi-squad platoon configuration.
+  CPlatoon* const armyPool = brain->mArmy->GetPlatoonByName("ArmyPool");
+  if (armyPool == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  const int configRowCount = nameOrConfigObject.GetCount();
+  const LuaPlus::LuaObject platoonNameRow = nameOrConfigObject[1];
+  const LuaPlus::LuaObject platoonPlanRow = nameOrConfigObject[2];
+
+  // Cache name/plan into local strings since the Lua-side strings may be
+  // invalidated by subsequent table lookups.
+  msvc8::string platoonName;
+  platoonName.assign(platoonNameRow.GetString());
+  msvc8::string platoonPlan;
+  platoonPlan.assign(platoonPlanRow.GetString());
+
+  CPlatoon* const newPlatoon = brain->mArmy->MakePlatoon(platoonName.c_str(), platoonPlan.c_str());
+  if (newPlatoon == nullptr) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  for (int row = 1; row <= configRowCount; ++row) {
+    const LuaPlus::LuaObject squadConfigRow = nameOrConfigObject[row];
+    if (!squadConfigRow.IsTable()) {
+      continue;
+    }
+
+    const LuaPlus::LuaObject blueprintIdObject = squadConfigRow[1];
+    const LuaPlus::LuaObject countObject = squadConfigRow[3];
+    const LuaPlus::LuaObject squadNameObject = squadConfigRow[5];
+    const LuaPlus::LuaObject squadClassNameObject = squadConfigRow[4];
+
+    ESquadClass squadClass{};
+    gpg::RRef squadClassRef{};
+    (void)gpg::RRef_ESquadClass(&squadClassRef, &squadClass);
+    SCR_GetEnum(state, squadClassNameObject.GetString(), squadClassRef);
+
+    SEntitySetTemplateUnit pulledUnits{};
+    armyPool->GetUnassignedUnitsWithBP(blueprintIdObject.GetString(), countObject.GetInteger(), pulledUnits);
+    brain->mArmy->RemoveUnitsFromPlatoons(&pulledUnits);
+
+    CSquad* destinationSquad = newPlatoon->GetSquad(squadClass);
+    if (destinationSquad == nullptr) {
+      destinationSquad = CSquad::AllocateOnPlatoon(newPlatoon, squadClass, squadNameObject.GetString());
+    }
+
+    destinationSquad->mUnits.AddRange(pulledUnits.mVec.begin(), pulledUnits.mVec.end());
+    newPlatoon->mHasLuaList = 0;
+  }
+
+  newPlatoon->mLuaObj.PushStack(state);
+  return 1;
+}
+
+/**
+ * Address: 0x0058BF80 (FUN_0058BF80, cfunc_CAiBrainCanBuildPlatoon)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_CAiBrainCanBuildPlatoonL`.
+ */
+int moho::cfunc_CAiBrainCanBuildPlatoon(lua_State* const luaContext)
+{
+  return cfunc_CAiBrainCanBuildPlatoonL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x0058BFA0 (FUN_0058BFA0, func_CAiBrainCanBuildPlatoon_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `CAiBrain:CanBuildPlatoon()` Lua binder.
+ */
+CScrLuaInitForm* moho::func_CAiBrainCanBuildPlatoon_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiBrainCanBuildPlatoonName,
+    &moho::cfunc_CAiBrainCanBuildPlatoon,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiBrainLuaClassName,
+    kAiBrainCanBuildPlatoonHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x0058C000 (FUN_0058C000, cfunc_CAiBrainCanBuildPlatoonL)
+ *
+ * What it does:
+ * Decides whether the brain's army can currently construct every blueprint
+ * row in a platoon template table, optionally using only a caller-supplied
+ * subset of factories. On success, returns a Lua array of the concrete
+ * factory units used (one per template row). On failure (any row has no
+ * available factory, or the suggested factory list is empty after
+ * filtering), pushes nil.
+ *
+ * Lua signature: `CAiBrain:CanBuildPlatoon(platoonTemplate [, suggestedFactories])`.
+ */
+int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgRangeWarning, kAiBrainCanBuildPlatoonHelpText, 2, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
+  CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
+
+  const LuaPlus::LuaObject templateTable(LuaPlus::LuaStackObject(state, 2));
+  if (!templateTable.IsTable()) {
+    lua_pushnil(rawState);
+    (void)lua_gettop(rawState);
+    return 1;
+  }
+
+  gpg::core::FastVector<Unit*> candidateFactories;
+
+  if (argumentCount > 2) {
+    const LuaPlus::LuaObject suggestedObject(LuaPlus::LuaStackObject(state, 3));
+    if (!suggestedObject.IsTable()) {
+      LuaPlus::LuaState::Error(state, kAiBrainSuggestedFactoryListNotTable);
+    }
+
+    const int suggestedCount = suggestedObject.GetCount();
+    for (int row = 1; row <= suggestedCount; ++row) {
+      const LuaPlus::LuaObject rowObject = suggestedObject[row];
+      if (Unit* const unit = SCR_GetUnitOptional(rowObject); unit != nullptr) {
+        candidateFactories.PushBack(unit);
+      }
+    }
+
+    // Binary preserves a "no usable slots" bail here. In modern terms, this
+    // translates to an empty candidate list once filtering is done.
+    const std::size_t candidateSize = static_cast<std::size_t>(candidateFactories.end_ - candidateFactories.start_);
+    const std::size_t candidateCap = static_cast<std::size_t>(candidateFactories.capacity_ - candidateFactories.start_);
+    if (candidateSize == 0u || candidateSize == candidateCap) {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+      return 1;
+    }
+  }
+
+  // For each template row, look up an available factory and collect the
+  // chosen unit. Any row that can't be satisfied aborts the whole platoon
+  // check with a nil result.
+  std::vector<Unit*> chosenFactories;
+  const int templateCount = templateTable.GetCount();
+  for (int row = 1; row <= templateCount; ++row) {
+    const LuaPlus::LuaObject rowObject = templateTable[row];
+    if (!rowObject.IsTable()) {
+      continue;
+    }
+
+    const LuaPlus::LuaObject blueprintIdObject = rowObject[1];
+    const char* const blueprintId = blueprintIdObject.GetString();
+
+    Unit* const availableBuilder = FindAvailableFactory(candidateFactories, blueprintId, brain);
+    if (availableBuilder == nullptr) {
+      lua_pushnil(rawState);
+      (void)lua_gettop(rawState);
+      return 1;
+    }
+    chosenFactories.push_back(availableBuilder);
+  }
+
+  // All rows satisfied — emit a Lua array of the concrete factory units.
+  LuaPlus::LuaObject resultArray;
+  resultArray.AssignNewTable(state, static_cast<std::int32_t>(chosenFactories.size()), 0);
+  for (std::size_t index = 0; index < chosenFactories.size(); ++index) {
+    const LuaPlus::LuaObject unitLuaObject = chosenFactories[index]->GetLuaObject();
+    resultArray.Insert(static_cast<std::int32_t>(index + 1u), unitLuaObject);
+  }
+  resultArray.PushStack(state);
   return 1;
 }

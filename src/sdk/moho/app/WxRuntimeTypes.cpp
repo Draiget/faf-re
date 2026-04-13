@@ -215,7 +215,14 @@ namespace
   std::uint32_t gDoMessageStateFlags = 0u;
   bool gIsDispatchingDeferredMessages = false;
   bool gSuppressDeferredCommandMessages = false;
-  DWORD gGuiOwnerThreadId = ::GetCurrentThreadId();
+  DWORD gs_idMainThread = ::GetCurrentThreadId();
+  CRITICAL_SECTION gCritSectGui{};
+  CRITICAL_SECTION gCritSectWaitingForGui{};
+  _RTL_CRITICAL_SECTION* gs_critsectGui = nullptr;
+  _RTL_CRITICAL_SECTION* gs_critsectWaitingForGui = nullptr;
+  std::once_flag gGuiMutexInitOnce{};
+  std::int32_t gs_nWaitingForGui = 0;
+  std::uint8_t gs_bGuiOwnedByMainThread = 1;
   std::vector<MSG*>* gDeferredThreadMessages = nullptr;
   int gWxGetOsVersionCache = -1;
   int gWxGetOsVersionMajor = -1;
@@ -275,9 +282,31 @@ namespace
     std::atexit(&DestroyDeferredThreadMessages);
   }
 
+  void EnsureGuiMutexRuntimeInitialized() noexcept
+  {
+    std::call_once(gGuiMutexInitOnce, []() {
+      ::InitializeCriticalSection(&gCritSectGui);
+      ::InitializeCriticalSection(&gCritSectWaitingForGui);
+      gs_critsectGui = reinterpret_cast<_RTL_CRITICAL_SECTION*>(&gCritSectGui);
+      gs_critsectWaitingForGui = reinterpret_cast<_RTL_CRITICAL_SECTION*>(&gCritSectWaitingForGui);
+    });
+  }
+
+  [[nodiscard]] _RTL_CRITICAL_SECTION* GuiCriticalSection() noexcept
+  {
+    EnsureGuiMutexRuntimeInitialized();
+    return gs_critsectGui;
+  }
+
+  [[nodiscard]] _RTL_CRITICAL_SECTION* WaitingForGuiCriticalSection() noexcept
+  {
+    EnsureGuiMutexRuntimeInitialized();
+    return gs_critsectWaitingForGui;
+  }
+
   [[nodiscard]] bool IsGuiOwnedByMainThread() noexcept
   {
-    return ::GetCurrentThreadId() == gGuiOwnerThreadId;
+    return wxGuiOwnedByMainThread();
   }
 
   [[nodiscard]] bool ShouldSuppressDeferredCommandMessages() noexcept
@@ -1671,6 +1700,90 @@ void wxLEAVE_CRIT_SECT(
 )
 {
   ::LeaveCriticalSection(criticalSection);
+}
+
+/**
+ * Address: 0x009AD330 (FUN_009AD330, wxThread::IsMain)
+ *
+ * What it does:
+ * Returns whether the current Win32 thread matches the stored wx main-thread id.
+ */
+bool wxThreadIsMain()
+{
+  return ::GetCurrentThreadId() == gs_idMainThread;
+}
+
+/**
+ * Address: 0x009AD660 (FUN_009AD660, wxGuiOwnedByMainThread)
+ *
+ * What it does:
+ * Returns the wx GUI-ownership flag managed by the GUI mutex helpers.
+ */
+bool wxGuiOwnedByMainThread()
+{
+  EnsureGuiMutexRuntimeInitialized();
+  return gs_bGuiOwnedByMainThread != 0;
+}
+
+/**
+ * Address: 0x009AD670 (FUN_009AD670, wxWakeUpMainThread)
+ *
+ * What it does:
+ * Posts one wake-up message (`WM_NULL`) to the stored wx main-thread id.
+ */
+bool wxWakeUpMainThread()
+{
+  return ::PostThreadMessageW(gs_idMainThread, 0u, 0u, 0) != FALSE;
+}
+
+/**
+ * Address: 0x009ADC20 (FUN_009ADC20, wxMutexGuiLeave)
+ *
+ * What it does:
+ * Releases GUI ownership for the calling lane and unlocks wx GUI/waiting
+ * critical sections with the original runtime ordering.
+ */
+void wxMutexGuiLeave()
+{
+  _RTL_CRITICAL_SECTION* const waitingForGuiCriticalSection = WaitingForGuiCriticalSection();
+  wxENTER_CRIT_SECT(waitingForGuiCriticalSection);
+
+  if (wxThreadIsMain()) {
+    gs_bGuiOwnedByMainThread = 0;
+  } else {
+    --gs_nWaitingForGui;
+    (void)wxWakeUpMainThread();
+  }
+
+  wxLEAVE_CRIT_SECT(GuiCriticalSection());
+  wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
+}
+
+/**
+ * Address: 0x009ADC70 (FUN_009ADC70, wxMutexGuiLeaveOrEnter)
+ *
+ * What it does:
+ * Reconciles GUI ownership against waiting-thread state, leaving or entering
+ * the wx GUI critical section as required by the original runtime contract.
+ */
+void wxMutexGuiLeaveOrEnter()
+{
+  _RTL_CRITICAL_SECTION* const waitingForGuiCriticalSection = WaitingForGuiCriticalSection();
+  wxENTER_CRIT_SECT(waitingForGuiCriticalSection);
+
+  const bool guiOwnedByMainThread = wxGuiOwnedByMainThread();
+  if (gs_nWaitingForGui != 0) {
+    if (guiOwnedByMainThread) {
+      wxMutexGuiLeave();
+    }
+  } else if (!guiOwnedByMainThread) {
+    wxENTER_CRIT_SECT(GuiCriticalSection());
+    gs_bGuiOwnedByMainThread = 1;
+    wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
+    return;
+  }
+
+  wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
 }
 
 /**

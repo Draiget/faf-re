@@ -26,6 +26,24 @@ namespace moho
   // Address-backed process-wide random stream used by math helper lanes.
   extern CRandomStream& math_GlobalRandomStream;
 
+  /**
+   * Address: 0x007A6460 (FUN_007A6460, sub_7A6460)
+   *
+   * What it does:
+   * Returns one process-global random sample in `[0, scale)` under
+   * `math_GlobalRandomMutex`.
+   */
+  [[nodiscard]] double MathGlobalRandomUnitScaled(float scale);
+
+  /**
+   * Address: 0x007A64B0 (FUN_007A64B0, func_DRand)
+   *
+   * What it does:
+   * Returns one process-global random sample in `[minValue, maxValue)` under
+   * `math_GlobalRandomMutex`.
+   */
+  [[nodiscard]] double MathGlobalRandomRange(float minValue, float maxValue);
+
   struct VEulers3
   {
     float r; // +0x00

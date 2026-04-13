@@ -6,6 +6,12 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/task/CCommandTask.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class IAiCommandDispatchImpl;
@@ -17,6 +23,8 @@ namespace moho
   class CUnitRefuel : public CCommandTask
   {
   public:
+    static gpg::RType* sType;
+
     /**
      * Address: 0x00620F50 (FUN_00620F50, ??0CUnitRefuel@Moho@@QAE@@Z)
      *
@@ -37,6 +45,24 @@ namespace moho
      */
     ~CUnitRefuel() override;
 
+    /**
+     * Address: 0x00622680 (FUN_00622680, Moho::CUnitRefuel::MemberDeserialize)
+     *
+     * What it does:
+     * Loads `CCommandTask` base state, then deserializes target-unit weak link
+     * and both refuel task runtime flags from the archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00622710 (FUN_00622710, Moho::CUnitRefuel::MemberSerialize)
+     *
+     * What it does:
+     * Saves `CCommandTask` base state, then serializes target-unit weak link
+     * and both refuel task runtime flags into the archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     int Execute() override;
 
   public:
@@ -54,3 +80,15 @@ namespace moho
   );
   static_assert(offsetof(CUnitRefuel, mIsCarrier) == 0x39, "CUnitRefuel::mIsCarrier offset must be 0x39");
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Address: 0x006224D0 (FUN_006224D0, gpg::RRef_CUnitRefuel)
+   *
+   * What it does:
+   * Builds one typed reflection reference for `moho::CUnitRefuel*`,
+   * preserving dynamic-derived ownership and base-offset adjustment.
+   */
+  gpg::RRef* RRef_CUnitRefuel(gpg::RRef* outRef, moho::CUnitRefuel* value);
+} // namespace gpg

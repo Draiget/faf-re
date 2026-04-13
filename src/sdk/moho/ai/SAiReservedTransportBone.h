@@ -9,6 +9,8 @@
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 }
 
 namespace moho
@@ -28,6 +30,24 @@ namespace moho
   struct SAiReservedTransportBone
   {
     static gpg::RType* sType;
+
+    /**
+     * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
+     *
+     * What it does:
+     * Loads transport/attach indices, reserved unit weak link, and reserved
+     * attach-bone list from one archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005EB8F0 (FUN_005EB8F0, Moho::SAiReservedTransportBone::MemberSerialize)
+     *
+     * What it does:
+     * Saves transport/attach indices, reserved unit weak link, and reserved
+     * attach-bone list into one archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     std::uint32_t transportBoneIndex; // +0x00
     std::uint32_t attachBoneIndex;    // +0x04

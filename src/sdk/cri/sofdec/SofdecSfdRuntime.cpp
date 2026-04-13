@@ -57,6 +57,61 @@
     return 0;
   }
 
+  struct SfmpvInfoRuntimeView
+  {
+    std::int32_t decoderHandle; // +0x00
+  };
+
+  struct SfdMpvHandleRuntimeView
+  {
+    std::uint8_t reserved00[0x1FC0]; // +0x00
+    SfmpvInfoRuntimeView* mpvInfo; // +0x1FC0
+  };
+  static_assert(offsetof(SfdMpvHandleRuntimeView, mpvInfo) == 0x1FC0, "SfdMpvHandleRuntimeView::mpvInfo offset must be 0x1FC0");
+
+  extern "C" std::int32_t MPV_SetCond(
+    std::int32_t handleAddress,
+    std::int32_t conditionId,
+    std::int32_t (*conditionCallback)()
+  );
+
+  /**
+   * Address: 0x00AD1900 (FUN_00AD1900, _SFD_SetMpvCond)
+   *
+   * What it does:
+   * Resolves one MPV handle from an optional SFD work-control handle, applies
+   * one MPV condition callback, and reports SFLIB error codes on failure.
+   */
+  std::int32_t SFD_SetMpvCond(
+    moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj,
+    const std::int32_t conditionId,
+    std::int32_t (*conditionCallback)()
+  )
+  {
+    constexpr std::int32_t kSflibErrInvalidHandleSetMpvCond = static_cast<std::int32_t>(0xFF000181u);
+    constexpr std::int32_t kSfmpvErrSetCondFailed = static_cast<std::int32_t>(0xFF000F12u);
+
+    std::int32_t decoderHandle = 0;
+    if (workctrlSubobj != nullptr) {
+      if (SFLIB_CheckHn(workctrlSubobj) != 0) {
+        return SFLIB_SetErr(0, kSflibErrInvalidHandleSetMpvCond);
+      }
+
+      const auto* const runtimeView = reinterpret_cast<const SfdMpvHandleRuntimeView*>(workctrlSubobj);
+      if (runtimeView->mpvInfo != nullptr) {
+        decoderHandle = runtimeView->mpvInfo->decoderHandle;
+      }
+    }
+
+    std::int32_t (*const callback)() = (conditionId == 5) ? nullptr : conditionCallback;
+    if (MPV_SetCond(decoderHandle, conditionId, callback) != 0) {
+      const auto workctrlAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj));
+      return SFLIB_SetErr(workctrlAddress, kSfmpvErrSetCondFailed);
+    }
+
+    return 0;
+  }
+
   /**
    * Address: 0x00ADFB70 (FUN_00ADFB70, _sftrn_ConnTrnBuf0)
    */
@@ -495,6 +550,41 @@
     return SFLIB_SetErr(errorObjectAddress, errorCode);
   }
 
+  std::int32_t sfmps_GetStmNum(
+    std::int32_t workctrlAddress,
+    std::int32_t* outVideoStreamIndex,
+    std::int32_t* outAudioStreamIndex
+  );
+  std::int32_t sfmps_ChkPrepFlg(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  std::int32_t sfmps_SetMvInf(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  std::int32_t sfmps_AdjustAvPlay(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  std::int32_t sfmps_SetMpsHd(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  std::int32_t sfmps_SetAudioStreamType(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+
+  /**
+   * Address: 0x00AD6460 (FUN_00AD6460, _sfmps_ProcPrep)
+   *
+   * What it does:
+   * Runs stream-parser preparation flow in fixed order: stream-number resolve,
+   * prep-flag validation, movie-info setup, AV-play adjustment, MPS header
+   * setup, then audio-stream type selection.
+   */
+  std::int32_t sfmps_ProcPrep(moho::SofdecSfdWorkctrlSubobj* const workctrlSubobj)
+  {
+    std::int32_t videoStreamIndex = 0;
+    std::int32_t audioStreamIndex = 0;
+    (void)sfmps_GetStmNum(
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(workctrlSubobj)),
+      &videoStreamIndex,
+      &audioStreamIndex
+    );
+    (void)sfmps_ChkPrepFlg(workctrlSubobj);
+    (void)sfmps_SetMvInf(workctrlSubobj);
+    (void)sfmps_AdjustAvPlay(workctrlSubobj);
+    (void)sfmps_SetMpsHd(workctrlSubobj);
+    return sfmps_SetAudioStreamType(workctrlSubobj);
+  }
+
   /**
    * Address: 0x00AD8DB0 (FUN_00AD8DB0, _SFD_SetErrFn)
    *
@@ -609,6 +699,34 @@
   std::int32_t sfply_ChkCondDfl()
   {
     return SFLIB_SetErr(0, kSflibErrDefaultConditionMissing);
+  }
+
+  /**
+   * Address: 0x00AD9290 (FUN_00AD9290, _mwSfdVsync)
+   *
+   * What it does:
+   * Advances MWSFD vsync counters, enters one SFD vertical-blank lane while
+   * holding `MwsfdLibWork::initLatch`, then releases the latch.
+   */
+  std::int32_t mwSfdVsync()
+  {
+    ++mwg_vcnt;
+    ++mwsfd_vsync_dispatch_count;
+
+    std::int32_t result = mwsfd_init_flag;
+    if (mwsfd_init_flag == 1) {
+      auto* const libWork = MWSFLIB_GetLibWorkPtr();
+      std::int32_t* const initLatch = &libWork->initLatch;
+      result = MWSFSVM_TestAndSet(initLatch);
+      if (result == 1) {
+        if (mwsfd_init_flag == 1) {
+          result = SFD_VbIn();
+        }
+        *initLatch = 0;
+      }
+    }
+
+    return result;
   }
 
   /**

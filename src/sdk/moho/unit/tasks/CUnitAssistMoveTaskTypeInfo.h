@@ -43,10 +43,47 @@ namespace moho
      */
     void Init() override;
 
+    /**
+     * Address: 0x005F1CB0 (FUN_005F1CB0, Moho::CUnitAssistMoveTaskTypeInfo::AddBase_CCommandTask)
+     *
+     * What it does:
+     * Registers `CCommandTask` as the reflected base lane.
+     */
     static void AddBase_CCommandTask(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005F1B20 (FUN_005F1B20, Moho::CUnitAssistMoveTaskTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates one `CUnitAssistMoveTask` and returns typed reflection
+     * reference for it.
+     */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x005F1BF0 (FUN_005F1BF0, Moho::CUnitAssistMoveTaskTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Placement-constructs one `CUnitAssistMoveTask` in caller-provided
+     * storage and returns typed reflection reference for it.
+     */
     static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x005F1BD0 (FUN_005F1BD0, Moho::CUnitAssistMoveTaskTypeInfo::Delete)
+     *
+     * What it does:
+     * Deletes one heap-owned `CUnitAssistMoveTask`.
+     */
     static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x005F1CA0 (FUN_005F1CA0, Moho::CUnitAssistMoveTaskTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs in-place destructor for one `CUnitAssistMoveTask` without
+     * deallocating storage.
+     */
     static void Destruct(void* objectStorage);
   };
 

@@ -63,6 +63,13 @@ namespace moho
      */
     static void MemberSerialize(gpg::WriteArchive* archive, const CUnitCallTransport* task, int version, gpg::RRef* ownerRef);
 
+    /**
+     * Address: 0x005FFC70 (FUN_005FFC70, Moho::CUnitCallTransport::TaskTick)
+     *
+     * What it does:
+     * Runs transport-call state transitions from pickup staging through beamup
+     * interpolation and final transport attach handoff.
+     */
     int Execute() override;
 
   public:

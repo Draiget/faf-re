@@ -14,6 +14,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x008E8110 (FUN_008E8110, gpg::gal::DepthStencilTargetD3D9::DepthStencilTargetD3D9)
+         *
+         * What it does:
+         * Initializes one depth-stencil target object, default-constructs the
+         * embedded context lane, and binds the provided context/surface payload.
+         */
+        DepthStencilTargetD3D9(const DepthStencilTargetContext* context, void* depthStencilSurface);
+
+        /**
          * Address: 0x008E80F0 (FUN_008E80F0)
          *
          * What it does:
@@ -36,6 +45,16 @@ namespace gpg::gal
          * Returns the retained native depth-stencil surface lane at `this+0x18`.
          */
         void* GetSurface() const;
+
+        /**
+         * Address: 0x008E8070 (FUN_008E8070, gpg::gal::DepthStencilTargetD3D9::SetSurface)
+         *
+         * What it does:
+         * Releases the previously retained depth-stencil surface (if any),
+         * resets context lanes to defaults, then installs the provided
+         * context/surface payload.
+         */
+        void* SetSurface(const DepthStencilTargetContext* context, void* depthStencilSurface);
 
     public:
         DepthStencilTargetContext context_{}; // +0x04

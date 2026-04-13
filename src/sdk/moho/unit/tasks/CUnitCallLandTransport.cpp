@@ -1,18 +1,55 @@
 #include "moho/unit/tasks/CUnitCallLandTransport.h"
 
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <typeinfo>
 
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiTransport.h"
+#include "moho/entity/Entity.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/path/SNavGoal.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
+#include "moho/sim/Sim.h"
+#include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitMoveTask.h"
 
 namespace
 {
   constexpr std::uint64_t kUnitStateMaskCallLandTransportPending = 0x0000000000000100ull;
   constexpr std::uint64_t kUnitStateMaskWaitingForTransport = 0x0000000000000080ull;
   constexpr std::uint64_t kUnitStateMaskTeleporting = 0x0000000000080000ull;
+  constexpr float kPi = 3.1415927f;
+  constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
+
+  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  {
+    return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
+  }
+
+  [[nodiscard]] bool IsValidCellPos(const moho::SOCellPos& cellPos) noexcept
+  {
+    return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
+  }
+
+  [[nodiscard]] gpg::Rect2i BuildOgridRectFromWorldPos(const moho::Unit* const unit, const Wm3::Vector3f& worldPos) noexcept
+  {
+    const moho::SFootprint& footprint = unit->GetFootprint();
+    const moho::SOCellPos cellPos = footprint.ToCellPos(worldPos);
+
+    return gpg::Rect2i{
+      static_cast<std::int32_t>(cellPos.x),
+      static_cast<std::int32_t>(cellPos.z),
+      static_cast<std::int32_t>(cellPos.x) + static_cast<std::int32_t>(footprint.mSizeX),
+      static_cast<std::int32_t>(cellPos.z) + static_cast<std::int32_t>(footprint.mSizeZ),
+    };
+  }
 
   [[nodiscard]] gpg::RType* CachedCUnitCallLandTransportType()
   {
@@ -124,9 +161,119 @@ namespace moho
     mTargetTransportUnit.UnlinkFromOwnerChain();
   }
 
+  /**
+   * Address: 0x00600880 (FUN_00600880, Moho::CUnitCallLandTransport::TaskTick)
+   *
+   * What it does:
+   * Runs land-transport call task state transitions from pickup assignment,
+   * through beam-up alignment, to final transport attach completion.
+   */
   int CUnitCallLandTransport::Execute()
   {
-    return -1;
+    if (mUnit->IsDead()) {
+      return -1;
+    }
+
+    if (mUnit->UnitMotion == nullptr) {
+      return -1;
+    }
+
+    Unit* const transportUnit = mTargetTransportUnit.GetObjectPtr();
+    if (transportUnit == nullptr || transportUnit->IsDead()) {
+      return -1;
+    }
+
+    if (mTaskState != TASKSTATE_Preparing && !transportUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+      return -1;
+    }
+
+    IAiTransport* const transport = transportUnit->AiTransport;
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        const bool transportLoading = transportUnit->IsUnitState(UNITSTATE_TransportLoading);
+        const bool commandHeadsMatch =
+          transportUnit->CommandQueue->GetCurrentCommand() == mUnit->CommandQueue->GetCurrentCommand();
+        const bool transportAssistMoving = transportUnit->IsUnitState(UNITSTATE_AssistMoving);
+        if (transportLoading && (commandHeadsMatch || transportAssistMoving)) {
+          mTaskState = NextTaskState(mTaskState);
+          return 3;
+        }
+        return 10;
+      }
+
+      case TASKSTATE_Waiting: {
+        if (!transport->TransportIsUnitAssignedForPickup(mUnit)) {
+          return -1;
+        }
+
+        mUnit->UnitStateMask |= kUnitStateMaskWaitingForTransport;
+        if (transport->TransportIsReadyForUnit(mUnit)) {
+          SOCellPos pickupCell = transport->TransportGetAttachPosition(mUnit);
+          if (!IsValidCellPos(pickupCell)) {
+            pickupCell = transportUnit->GetFootprint().ToCellPos(transportUnit->GetPosition());
+          }
+          if (!IsValidCellPos(pickupCell) || mSim == nullptr || mSim->mMapData == nullptr) {
+            return -1;
+          }
+
+          const Wm3::Vector3f pickupWorldPos = COORDS_ToWorldPos(mSim->mMapData, pickupCell, mUnit->GetFootprint());
+          mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, pickupWorldPos));
+          mTaskState = NextTaskState(mTaskState);
+          mIsOccupying = true;
+          NewMoveTask(SNavGoal(pickupCell), this, 0, nullptr, 0);
+        }
+        return 10;
+      }
+
+      case TASKSTATE_Starting: {
+        if (transport->TransportIsReadyForUnit(mUnit)) {
+          static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
+          mUnit->UnitMotion->SetFacing(kZeroFacing);
+          mUnit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
+
+          mSourceTransform = mUnit->GetTransform();
+          mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
+          mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
+          mUnit->UnitStateMask |= kUnitStateMaskTeleporting;
+          mTaskState = NextTaskState(mTaskState);
+        }
+        return 1;
+      }
+
+      case TASKSTATE_Processing: {
+        if (mBeamupTime > 1.0f) {
+          const float blend = (std::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+          mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
+          if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
+            mDestinationTransform.pos_.y -= blueprint->mSizeY;
+          }
+
+          VTransform interpolated{};
+          interpolated.pos_.x =
+            mSourceTransform.pos_.x + ((mDestinationTransform.pos_.x - mSourceTransform.pos_.x) * blend);
+          interpolated.pos_.y =
+            mSourceTransform.pos_.y + ((mDestinationTransform.pos_.y - mSourceTransform.pos_.y) * blend);
+          interpolated.pos_.z =
+            mSourceTransform.pos_.z + ((mDestinationTransform.pos_.z - mSourceTransform.pos_.z) * blend);
+          (void)SLERP(&mDestinationTransform.orient_, &mSourceTransform.orient_, &interpolated.orient_, blend);
+
+          mUnit->SetPendingTransform(interpolated, 1.0f);
+          mUnit->AdvanceCoords();
+          mBeamupTime -= 1.0f;
+          return 1;
+        }
+
+        (void)mUnit->RunScript("OnStopTransportBeamUp");
+        mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+        if (transport->TransportAttachUnit(mUnit)) {
+          mHasBeamupDestination = true;
+        }
+        return -1;
+      }
+
+      default:
+        return 1;
+    }
   }
 
   /**

@@ -38,6 +38,15 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
     /**
+     * Address: 0x006FD520 (FUN_006FD520, Moho::IArmy::IArmy)
+     *
+     * What it does:
+     * Constructs the fixed serialized base lanes:
+     * `SSTIArmyConstantData` (+0x00) and `SSTIArmyVariableData` (+0x80).
+     */
+    IArmy();
+
+    /**
      * Address: 0x005517A0 (FUN_005517A0, Moho::IArmy::MemberDeserialize)
      *
      * What it does:

@@ -3137,6 +3137,8 @@
   extern std::int32_t crierr_callback_obj;
   extern char crierr_err_msg[0x100];
   extern std::int32_t mwsfd_init_flag;
+  extern std::int32_t mwg_vcnt;
+  extern std::int32_t mwsfd_vsync_dispatch_count;
 
   std::int16_t adxb_def_k0 = 0;
   std::int16_t adxb_def_km = 0;
@@ -3144,6 +3146,8 @@
   std::int32_t adxb_dec_err_mode = 0;
   std::int32_t adx_decode_output_mono_flag = 0;
   std::int32_t adxt_output_mono_flag = 0;
+  std::int32_t mwg_vcnt = 0;
+  std::int32_t mwsfd_vsync_dispatch_count = 0;
   std::int32_t adxt_tsvr_enter_cnt = 0;
   std::int32_t adxsje_init_cnt = 0;
   std::int32_t adxsmp_init_cnt = 0;

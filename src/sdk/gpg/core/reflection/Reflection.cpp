@@ -7718,6 +7718,23 @@ RRef RType::GetDerivedObjectRef()
 }
 
 /**
+ * Address: 0x008DC130 (FUN_008DC130, gpg::RType::NewRef)
+ *
+ * What it does:
+ * Invokes the registered default-constructor callback and returns the
+ * produced reference, or throws `BadRefCast` when no constructor callback is
+ * registered for this type.
+ */
+RRef RType::NewRef() const
+{
+  if (!newRefFunc_) {
+    throw gpg::BadRefCast("NewRef() on a type without a registered constructor");
+  }
+
+  return newRefFunc_();
+}
+
+/**
  * Address: 0x008DB100 (FUN_008DB100)
  * Demangled: gpg::RType::GetLexical
  *

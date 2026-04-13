@@ -77,6 +77,21 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(EUIState) == 0x4, "moho::EUIState size must be 0x4");
 
   extern EUIState sUIState;
+  /**
+   * Address: 0x010A645F (?cam_Free@Moho@@3_NA)
+   *
+   * What it does:
+   * Global camera free-look toggle used by world-view dragger logic.
+   */
+  extern bool cam_Free;
+  /**
+   * Address: 0x010A6464 (?ui_DisableCursorFixing@Moho@@3_NA)
+   *
+   * What it does:
+   * Global toggle lane that disables mouse recentering while UI drag-scrub
+   * mode is active.
+   */
+  extern bool ui_DisableCursorFixing;
   extern CScriptObject* sWldUIProvider;
 
   enum EMauiEventType : std::int32_t
@@ -232,6 +247,15 @@ namespace moho
   class CMauiCursor
   {
   public:
+    /**
+     * Address: 0x0078CB50 (FUN_0078CB50, Moho::CMauiCursor::CMauiCursor)
+     *
+     * What it does:
+     * Initializes cursor texture/hotspot runtime lanes and binds one Lua object
+     * back-reference.
+     */
+    explicit CMauiCursor(LuaPlus::LuaObject* luaObject);
+
     /**
      * Address: 0x0078CCA0 (FUN_0078CCA0, Moho::CMauiCursor::SetTexture)
      *
@@ -773,12 +797,29 @@ namespace moho
     CMauiEdit(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x0078F720 (FUN_0078F720, Moho::CMauiEdit::Frame)
+     *
+     * What it does:
+     * Dispatches script `OnFrame(delta)` and updates the caret blink-phase
+     * alpha lane from configured on/off alpha cycle parameters.
+     */
+    void Frame(float deltaSeconds) override;
+
+    /**
      * Address: 0x0078EDD0 (FUN_0078EDD0, Moho::CMauiEdit::GetText)
      *
      * What it does:
      * Returns one copy of the current edit text lane.
      */
     [[nodiscard]] msvc8::string GetText();
+
+    /**
+     * Address: 0x007906F0 (FUN_007906F0, Moho::CMauiEdit::GetSelection)
+     *
+     * What it does:
+     * Returns the currently selected UTF-8 substring from the edit text lane.
+     */
+    [[nodiscard]] msvc8::string GetSelection();
 
     /**
      * Address: 0x0078F380 (FUN_0078F380, Moho::CMauiEdit::SetText)
@@ -862,6 +903,15 @@ namespace moho
      * posting dragger capture, and updating caret/word-selection lanes.
      */
     void HandleClickEvent(SMauiEventData* eventData);
+
+    /**
+     * Address: 0x007914C0 (FUN_007914C0, Moho::CMauiEdit::DragRelease)
+     *
+     * What it does:
+     * Computes release hit-testing against the clipped edit text and clears the
+     * selection lane when the drag did not move away from its start position.
+     */
+    void DragRelease(const SMauiEventData* eventData);
 
     /**
      * Address: 0x00794F20 (FUN_00794F20, Moho::CMauiEdit::TextChanged)
@@ -1762,10 +1812,11 @@ namespace moho
     bool mCaretVisible = false;         // +0x160
     std::uint8_t mUnknown161To163[0x3]{};
     std::uint32_t mCaretColor = 0;      // +0x164
+    std::uint32_t mCaretCycleCurrentAlpha = 0; // +0x168
     float mCaretCycleSeconds = 0.0f;    // +0x16C
     std::uint32_t mCaretCycleOnAlpha = 0; // +0x170
     std::uint32_t mCaretCycleOffAlpha = 0; // +0x174
-    std::uint8_t mUnknown178To17B[0x4]{};
+    float mCaretCycleTime = 0.0f;       // +0x178
     std::int32_t mClipOffset = 0;         // +0x17C
     std::int32_t mClipLength = 0;         // +0x180
     std::int32_t mSelectionStart = 0;     // +0x184
@@ -1824,6 +1875,10 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mCaretVisible) == 0x160, "CMauiEditRuntimeView::mCaretVisible offset must be 0x160");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mCaretColor) == 0x164, "CMauiEditRuntimeView::mCaretColor offset must be 0x164");
   FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CMauiEditRuntimeView, mCaretCycleCurrentAlpha) == 0x168,
+    "CMauiEditRuntimeView::mCaretCycleCurrentAlpha offset must be 0x168"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CMauiEditRuntimeView, mCaretCycleSeconds) == 0x16C,
     "CMauiEditRuntimeView::mCaretCycleSeconds offset must be 0x16C"
   );
@@ -1834,6 +1889,10 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CMauiEditRuntimeView, mCaretCycleOffAlpha) == 0x174,
     "CMauiEditRuntimeView::mCaretCycleOffAlpha offset must be 0x174"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CMauiEditRuntimeView, mCaretCycleTime) == 0x178,
+    "CMauiEditRuntimeView::mCaretCycleTime offset must be 0x178"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CMauiEditRuntimeView, mClipOffset) == 0x17C,

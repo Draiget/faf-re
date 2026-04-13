@@ -3,11 +3,89 @@
 #include <cmath>
 
 #include "lua/LuaObject.h"
+#include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 
 namespace moho
 {
   gpg::RType* REntityBlueprint::sType = nullptr;
+
+  REntityBlueprint::REntityBlueprint()
+    : REntityBlueprint(nullptr, RResId{})
+  {}
+
+  /**
+   * Address: 0x00511C30 (FUN_00511C30)
+   * Mangled: ??0REntityBlueprint@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Runs base blueprint construction and seeds entity-blueprint physical,
+   * footprint, life-bar, selection, and strategic-icon defaults.
+   */
+  REntityBlueprint::REntityBlueprint(RRuleGameRules* const owner, const RResId& resId)
+    : mVTable(nullptr)
+    , mOwner(nullptr)
+    , mBlueprintId()
+    , mBlueprintLabel()
+    , mSource()
+    , mCategoryBitIndex(0)
+    , mCategories()
+    , mScriptModule()
+    , mScriptClass()
+    , mCollisionShape(ECollisionShape::COLSHAPE_Box)
+    , mSizeX(1.0f)
+    , mSizeY(1.0f)
+    , mSizeZ(1.0f)
+    , mAverageDensity(0.49000001f)
+    , mInertiaTensorX(0.0f)
+    , mInertiaTensorY(0.0f)
+    , mInertiaTensorZ(0.0f)
+    , mCollisionOffsetX(0.0f)
+    , mCollisionOffsetY(0.0f)
+    , mCollisionOffsetZ(0.0f)
+    , mDesiredShooterCap(3)
+    , mFootprint{0, 0, static_cast<EOccupancyCaps>(0), EFootprintFlags::FPFLAG_None, 0.0f, 0.0f, 0.0f}
+    , mAltFootprint{0, 0, static_cast<EOccupancyCaps>(0), EFootprintFlags::FPFLAG_None, 0.0f, 0.0f, 0.0f}
+    , mLifeBarRender(0)
+    , mLifeBarPadding00F9_00FB{0, 0, 0}
+    , mLifeBarOffset(0.0f)
+    , mLifeBarSize(1.0f)
+    , mLifeBarHeight(0.1f)
+    , mSelectionSizeX(1.0f)
+    , mSelectionSizeY(1.0f)
+    , mSelectionSizeZ(1.0f)
+    , mSelectionCenterOffsetX(0.0f)
+    , mSelectionCenterOffsetY(0.0f)
+    , mSelectionCenterOffsetZ(0.0f)
+    , mSelectionYOffset(0.5f)
+    , mSelectionMeshScaleX(1.0f)
+    , mSelectionMeshScaleY(1.0f)
+    , mSelectionMeshScaleZ(1.0f)
+    , mSelectionMeshUseTopAmount(0.0f)
+    , mSelectionThickness(0.0f)
+    , mUseOOBTestZoom(0.0f)
+    , mStrategicIconName()
+    , mStrategicIconRuntimeWord(0)
+    , mStrategicIconRest()
+    , mStrategicIconSelected()
+    , mStrategicIconOver()
+    , mStrategicIconSelectedOver()
+  {
+    if (owner) {
+      const RBlueprint base(owner, resId);
+      mOwner = base.mOwner;
+      mBlueprintId = base.mBlueprintId;
+      mBlueprintLabel = base.mDescription;
+      mSource = base.mSource;
+      mCategoryBitIndex = static_cast<std::uint32_t>(base.mBlueprintOrdinal);
+    } else {
+      mOwner = nullptr;
+      mBlueprintId.clear();
+      mBlueprintLabel.clear();
+      mSource.clear();
+      mCategoryBitIndex = 0;
+    }
+  }
 
   /**
    * Address: 0x00511E80 (FUN_00511E80)

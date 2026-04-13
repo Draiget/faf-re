@@ -8,6 +8,7 @@
 namespace moho
 {
   class ID3DVertexSheet;
+  class ID3DRenderTarget;
 
   class CRenFrame
   {
@@ -27,6 +28,14 @@ namespace moho
      * Releases dynamic frame-sheet ownership and destroys frame-pass texture slots.
      */
     ~CRenFrame();
+
+    /**
+     * Address: 0x007F5D00 (FUN_007F5D00, Moho::CRenFrame::SetTexture)
+     *
+     * What it does:
+     * Assigns the frame pass render-target texture into the primary texture lane.
+     */
+    void SetTexture(unsigned int textureSlot, boost::shared_ptr<ID3DRenderTarget> texture);
 
     /**
      * Address: 0x007F5DA0 (FUN_007F5DA0, Moho::CRenFrame::InitTransformedVerts)
@@ -51,10 +60,10 @@ namespace moho
     ID3DVertexSheet* mVertexSheet = nullptr; // +0x1C
     float mWidth = 0.0f;                   // +0x20
     float mHeight = 0.0f;                  // +0x24
-    boost::shared_ptr<void> mFrameTexture1; // +0x28
-    boost::shared_ptr<void> mFrameTexture2; // +0x30
-    boost::shared_ptr<void> mFrameTexture3; // +0x38
-    boost::shared_ptr<void> mFrameTexture4; // +0x40
+    boost::shared_ptr<ID3DRenderTarget> mFrameTexture1; // +0x28
+    boost::shared_ptr<ID3DRenderTarget> mFrameTexture2; // +0x30
+    boost::shared_ptr<ID3DRenderTarget> mFrameTexture3; // +0x38
+    boost::shared_ptr<ID3DRenderTarget> mFrameTexture4; // +0x40
   };
 
   static_assert(offsetof(CRenFrame, mName) == 0x00, "CRenFrame::mName offset must be 0x00");

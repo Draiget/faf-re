@@ -1,14 +1,115 @@
 #include "moho/unit/tasks/CUnitCallTeleport.h"
 
 #include <cstdint>
+#include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/ai/IAiNavigator.h"
+#include "moho/ai/IAiTransport.h"
+#include "moho/containers/SCoordsVec2.h"
+#include "moho/lua/SCR_ToLua.h"
+#include "moho/path/SNavGoal.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/sim/SOCellPos.h"
+#include "moho/sim/Sim.h"
+#include "moho/unit/CUnitCommandQueue.h"
+#include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitMoveTask.h"
+
+namespace moho
+{
+  /**
+   * Address: 0x0062B200 (FUN_0062B200, func_TryBuildStructureAt)
+   *
+   * What it does:
+   * Validates one structure footprint placement around `tryPos` against map
+   * bounds and occupancy constraints and optionally coerces to nearby cells.
+   */
+  [[nodiscard]] bool TryBuildStructureAt(
+    SCoordsVec2* tryPos,
+    const RUnitBlueprint* blueprint,
+    Sim* sim,
+    int border,
+    bool wholeMap,
+    bool doCoerce,
+    bool useSkirt
+  );
+
+  /**
+   * Address: 0x0062B780 (FUN_0062B780, Moho::PrepareMove)
+   *
+   * What it does:
+   * Coerces one world-space move destination into a valid passable location
+   * for `unit`, optionally producing skirt extents for footprint alignment.
+   */
+  [[nodiscard]]
+  bool PrepareMove(int moveFlags, Unit* unit, Wm3::Vector3f* inOutPos, gpg::Rect2f* outSkirtRect, bool useWholeMap);
+} // namespace moho
 
 namespace
 {
   constexpr std::uint64_t kUnitStateMaskTeleportPending = 0x0000000000000100ull;
+  constexpr std::uint64_t kUnitStateMaskWaitingForTransport = 0x0000000000000080ull;
+  constexpr std::uint64_t kUnitStateMaskTeleporting = 0x0000000000080000ull;
+  constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
+
+  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  {
+    return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
+  }
+
+  [[nodiscard]] bool IsZeroVector(const Wm3::Vector3f& value) noexcept
+  {
+    return value.x == 0.0f && value.y == 0.0f && value.z == 0.0f;
+  }
+
+  [[nodiscard]] bool IsValidCellPos(const moho::SOCellPos& cellPos) noexcept
+  {
+    return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
+  }
+
+  [[nodiscard]] gpg::Rect2f ZeroRect2f() noexcept
+  {
+    return gpg::Rect2f{0.0f, 0.0f, 0.0f, 0.0f};
+  }
+
+  [[nodiscard]] gpg::Rect2i BuildOgridRectFromWorldPos(const moho::Unit* const unit, const Wm3::Vector3f& worldPos) noexcept
+  {
+    const moho::SFootprint& footprint = unit->GetFootprint();
+    const moho::SOCellPos cellPos = footprint.ToCellPos(worldPos);
+
+    return gpg::Rect2i{
+      static_cast<std::int32_t>(cellPos.x),
+      static_cast<std::int32_t>(cellPos.z),
+      static_cast<std::int32_t>(cellPos.x) + static_cast<std::int32_t>(footprint.mSizeX),
+      static_cast<std::int32_t>(cellPos.z) + static_cast<std::int32_t>(footprint.mSizeZ),
+    };
+  }
+
+  [[nodiscard]] moho::CAiTarget BuildGroundTarget(const Wm3::Vector3f& worldPos) noexcept
+  {
+    moho::CAiTarget target{};
+    target.targetType = moho::EAiTargetType::AITARGET_Ground;
+    target.targetEntity.ClearLinkState();
+    target.position = worldPos;
+    target.targetPoint = -1;
+    target.targetIsMobile = false;
+    return target;
+  }
+
+  [[nodiscard]] int FailTeleportCallTaskTick(moho::CUnitCallTeleport* const task) noexcept
+  {
+    if (task != nullptr && task->mTaskState == moho::TASKSTATE_Complete) {
+      task->mCompletedSuccessfully = true;
+    }
+    return -1;
+  }
 
   [[nodiscard]] gpg::RType* CachedCUnitCallTeleportType()
   {
@@ -74,9 +175,114 @@ namespace moho
 {
   gpg::RType* CUnitCallTeleport::sType = nullptr;
 
+  /**
+   * Address: 0x006013D0 (FUN_006013D0, Moho::CUnitCallTeleport::TaskTick)
+   *
+   * What it does:
+   * Runs teleport-call state transitions between pickup staging, attach move,
+   * and teleport-task spawn while keeping O-grid occupancy state.
+   */
   int CUnitCallTeleport::Execute()
   {
-    return -1;
+    if (mUnit->IsDead()) {
+      return FailTeleportCallTaskTick(this);
+    }
+
+    Unit* const transportUnit = mTargetTransportUnit.GetObjectPtr();
+    if (transportUnit == nullptr || transportUnit->IsDead()) {
+      return FailTeleportCallTaskTick(this);
+    }
+
+    if (mTaskState != TASKSTATE_Preparing && !transportUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+      return FailTeleportCallTaskTick(this);
+    }
+
+    IAiTransport* const transport = transportUnit->AiTransport;
+    Wm3::Vector3f teleportDestination = transport->TransportGetTeleportDest();
+    if (IsZeroVector(teleportDestination)) {
+      return FailTeleportCallTaskTick(this);
+    }
+
+    const bool isAssignedForPickup = transport->TransportIsUnitAssignedForPickup(mUnit);
+    switch (mTaskState) {
+      case TASKSTATE_Preparing: {
+        if (!transportUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+          return 10;
+        }
+
+        if (transportUnit->CommandQueue->GetCurrentCommand() != mUnit->CommandQueue->GetCurrentCommand()) {
+          return 10;
+        }
+
+        mTaskState = NextTaskState(mTaskState);
+        return 3;
+      }
+
+      case TASKSTATE_Waiting: {
+        if (!isAssignedForPickup) {
+          Wm3::Vector3f pickupPos = transportUnit->GetPosition();
+          gpg::Rect2f moveSkirt = ZeroRect2f();
+          const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+          if (!PrepareMove(0, mUnit, &pickupPos, &moveSkirt, useWholeMap)) {
+            return -1;
+          }
+
+          mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, pickupPos));
+          mIsOccupying = true;
+          NewMoveTask(SNavGoal(mUnit->GetFootprint().ToCellPos(pickupPos)), this, 0, nullptr, 0);
+        }
+
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
+      }
+
+      case TASKSTATE_Starting: {
+        if (mIsOccupying) {
+          mUnit->FreeOgridRect();
+          mIsOccupying = false;
+        }
+
+        if (!isAssignedForPickup) {
+          return 1;
+        }
+
+        mUnit->UnitStateMask |= kUnitStateMaskWaitingForTransport;
+        const SOCellPos attachCell = transport->TransportGetAttachPosition(mUnit);
+        if (!IsValidCellPos(attachCell)) {
+          return -1;
+        }
+
+        NewMoveTask(SNavGoal(attachCell), this, 0, nullptr, 0);
+        mTaskState = NextTaskState(mTaskState);
+        return 0;
+      }
+
+      case TASKSTATE_Processing: {
+        if (!transport->TransportIsTeleportBeaconReady()) {
+          return 10;
+        }
+
+        transport->TransportAttachUnit(mUnit);
+        teleportDestination = transport->TransportGetTeleportDest();
+
+        gpg::Rect2f moveSkirt = ZeroRect2f();
+        const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+        (void)PrepareMove(0, mUnit, &teleportDestination, &moveSkirt, useWholeMap);
+
+        mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, teleportDestination));
+        mIsOccupying = true;
+
+        CAiTarget teleportTarget = BuildGroundTarget(teleportDestination);
+        const VTransform& sourceTransform = mUnit->GetTransform();
+        (void)CUnitTeleportTask::Create(&teleportTarget, this, transportUnit, &sourceTransform);
+
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
+      }
+
+      default:
+        return 1;
+    }
   }
 
   /**
@@ -93,6 +299,153 @@ namespace moho
     if (mUnit) {
       mUnit->UnitStateMask |= kUnitStateMaskTeleportPending;
     }
+  }
+
+  /**
+   * Address: 0x0060AAC0 (FUN_0060AAC0, Moho::CUnitTeleportTask::operator new)
+   *
+   * What it does:
+   * Allocates one teleport execution task and forwards constructor arguments
+   * into in-place construction.
+   */
+  CUnitTeleportTask* CUnitTeleportTask::Create(
+    CAiTarget* const target,
+    CCommandTask* const parentTask,
+    Unit* const teleportBeaconUnit,
+    const VTransform* const sourceTransform
+  )
+  {
+    void* const storage = ::operator new(sizeof(CUnitTeleportTask));
+    if (!storage) {
+      return nullptr;
+    }
+
+    try {
+      return ::new (storage) CUnitTeleportTask(parentTask, *target, teleportBeaconUnit, *sourceTransform);
+    } catch (...) {
+      ::operator delete(storage);
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x0060AB20 (FUN_0060AB20, Moho::CUnitTeleportTask::CUnitTeleportTask)
+   *
+   * What it does:
+   * Initializes one teleport execution task with copied target payload,
+   * weak-linked beacon lane, and source orientation snapshot.
+   */
+  CUnitTeleportTask::CUnitTeleportTask(
+    CCommandTask* const parentTask,
+    const CAiTarget& target,
+    Unit* const teleportBeaconUnit,
+    const VTransform& sourceTransform
+  )
+    : CCommandTask(parentTask)
+    , mTarget(target)
+    , mTeleportBeaconUnit{}
+    , mOrientation(sourceTransform.orient_)
+  {
+    mTeleportBeaconUnit.BindObjectUnlinked(teleportBeaconUnit);
+    (void)mTeleportBeaconUnit.LinkIntoOwnerChainHeadUnlinked();
+
+    if (mUnit && mUnit->AiNavigator) {
+      mUnit->AiNavigator->AbortMove();
+    }
+  }
+
+  /**
+   * Address: 0x0060AEC0 (FUN_0060AEC0, Moho::CUnitTeleportTask::~CUnitTeleportTask)
+   *
+   * What it does:
+   * Clears unit teleport state, publishes dispatch result, restores motion
+   * collision processing, and unlinks beacon weak references.
+   */
+  CUnitTeleportTask::~CUnitTeleportTask()
+  {
+    mUnit->UnitStateMask &= ~kUnitStateMaskTeleporting;
+
+    if (mTaskState == TASKSTATE_Starting) {
+      *mDispatchResult = static_cast<EAiResult>(1);
+    } else {
+      *mDispatchResult = static_cast<EAiResult>(2);
+      (void)mUnit->RunScript("OnFailedTeleport");
+    }
+
+    if (CUnitMotion* const unitMotion = mUnit->UnitMotion; unitMotion != nullptr) {
+      unitMotion->mProcessSurfaceCollision = true;
+    }
+
+    mTeleportBeaconUnit.UnlinkFromOwnerChain();
+  }
+
+  /**
+   * Address: 0x0060AC00 (FUN_0060AC00, Moho::CUnitTeleportTask::TaskTick)
+   *
+   * What it does:
+   * Runs teleport execution state transitions, validating beacon readiness,
+   * reserving teleport placement viability, and dispatching script callback
+   * payloads for teleport application.
+   */
+  int CUnitTeleportTask::Execute()
+  {
+    if (mTaskState != TASKSTATE_Preparing) {
+      if (mTaskState == TASKSTATE_Waiting) {
+        Unit* const beaconUnit = mTeleportBeaconUnit.GetObjectPtr();
+        if (beaconUnit != nullptr && !beaconUnit->IsDead() && !beaconUnit->IsBeingBuilt()) {
+          const bool readyForFinalize =
+            (mUnit == beaconUnit)
+            || (beaconUnit->AiTransport == nullptr)
+            || beaconUnit->AiTransport->TransportIsTeleportBeaconReady();
+          if (readyForFinalize) {
+            if (mUnit != nullptr && mUnit->IsUnitState(UNITSTATE_Immobile)) {
+              return 1;
+            }
+
+            mTaskState = NextTaskState(mTaskState);
+          }
+        }
+      }
+
+      return -1;
+    }
+
+    const Wm3::Vector3f teleportTargetPos = mTarget.GetTargetPosGun(false);
+    SCoordsVec2 tryPos{};
+    tryPos.x = teleportTargetPos.x;
+    tryPos.z = teleportTargetPos.z;
+
+    const SFootprint& footprint = mUnit->GetFootprint();
+    int border = static_cast<int>(footprint.mSizeZ);
+    if (static_cast<int>(footprint.mSizeX) > border) {
+      border = static_cast<int>(footprint.mSizeX);
+    }
+
+    if (!TryBuildStructureAt(&tryPos, mUnit->GetBlueprint(), mUnit->SimulationRef, border, true, false, false)) {
+      return -1;
+    }
+
+    mUnit->UnitStateMask |= kUnitStateMaskTeleporting;
+
+    Unit* const beaconUnit = mTeleportBeaconUnit.GetObjectPtr();
+    if (beaconUnit == nullptr || beaconUnit->IsDead()) {
+      return -1;
+    }
+
+    const LuaPlus::LuaObject orientationObject =
+      SCR_ToLua<Wm3::Quaternion<float>>(mUnit->SimulationRef->mLuaState, mOrientation);
+
+    Wm3::Vector3f teleportScriptPos{};
+    teleportScriptPos.x = tryPos.x;
+    teleportScriptPos.y = 0.0f;
+    teleportScriptPos.z = tryPos.z;
+    const LuaPlus::LuaObject positionObject =
+      SCR_ToLua<Wm3::Vector3<float>>(mUnit->SimulationRef->mLuaState, teleportScriptPos);
+    const LuaPlus::LuaObject beaconObject = beaconUnit->GetLuaObject();
+
+    mUnit->RunScriptOnTeleportUnit(beaconObject, positionObject, orientationObject);
+    mTaskState = NextTaskState(mTaskState);
+    return 1;
   }
 
   /**

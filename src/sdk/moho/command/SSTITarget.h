@@ -5,10 +5,34 @@
 #include "moho/ai/EAiTargetType.h"
 #include "Wm3Vector3.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   struct SSTITarget
   {
+    /**
+     * Address: 0x0055B3A0 (FUN_0055B3A0, Moho::SSTITarget::MemberDeserialize)
+     *
+     * What it does:
+     * Reads target-kind enum, then conditionally deserializes either entity-id
+     * payload or ground-position payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x0055B460 (FUN_0055B460, Moho::SSTITarget::MemberSerialize)
+     *
+     * What it does:
+     * Writes target-kind enum, then conditionally serializes either entity-id
+     * payload or ground-position payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     EAiTargetType mType;     // +0x00
     std::uint32_t mEntityId; // +0x04 (serialized raw id for AITARGET_Entity)
     Wm3::Vec3f mPos;         // +0x08

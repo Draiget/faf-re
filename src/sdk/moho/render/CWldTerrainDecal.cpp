@@ -292,6 +292,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x0089DB50 (FUN_0089DB50, Moho::CWldTerrainDecal::GetTexture)
+   *
+   * What it does:
+   * Samples one animated decal texture for `slot` using binary-equivalent frame
+   * phase math and returns one retained texture-sheet handle.
+   */
+  boost::shared_ptr<ID3DTextureSheet>
+  CWldTerrainDecal::GetTexture(const int slot, const float phaseOffset, const int frameSeed) const
+  {
+    CountedObject* const resource = mResourceRefs[slot].tex;
+    if (resource == nullptr) {
+      return {};
+    }
+
+    CAnimTexture::FrameRef frame{};
+    const float framePhase = ((static_cast<float>(frameSeed) + phaseOffset) * mFadeDistance * 0.1f) + mUnknown94;
+    static_cast<const CAnimTexture*>(resource)->GetFrameAt(frame, framePhase);
+    return boost::SharedPtrFromRawRetained(frame);
+  }
+
+  /**
    * Address: 0x0089D9C0 (FUN_0089D9C0, Moho::CWldTerrainDecal::ComputeCorner)
    *
    * What it does:

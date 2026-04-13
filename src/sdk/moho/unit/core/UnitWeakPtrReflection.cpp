@@ -138,7 +138,7 @@ namespace moho
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    weak->ResetFromObject(ReadPointerUnit(archive, owner));
+    weak->Set(ReadPointerUnit(archive, owner));
   }
 
   /**

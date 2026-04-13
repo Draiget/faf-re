@@ -4572,6 +4572,14 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x006F14D0 (FUN_006F14D0, Moho::UNIT_IssueFactoryCommand)
+   *
+   * What it does:
+   * Iterates selected factories, rejects invalid/no-rush/transported lanes,
+   * lazily allocates one shared command, then enqueues it into each eligible
+   * factory builder queue (optionally clearing queue first).
+   */
   [[nodiscard]] CUnitCommand* IssueFactoryCommandToSelectedUnits(
     Sim* const sim,
     const SEntitySetTemplateUnit& selectedUnits,

@@ -2,57 +2,26 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries.
 
-## Recovery Coverage (2026-04-10, `fa_full_2026_03_26`)
-
-Coverage is computed from:
-
-1. `decomp/recovery/fa_function_names_*.json` (IDA function universe)
-2. `Address: 0x...` annotations found under `src/sdk/**`
-
-Run:
-
-```bat
-python scripts/recovery_coverage.py
-python scripts/recovery_coverage.py --dump-excluded-external-csv decomp/recovery/reports/boost_function_inventory_2026-03-26.csv
-python scripts/detect_boost_patch_version.py --mode binary --binary-file bin/external/ForgedAlliance.exe
-```
-
-Pending-reconstruction guard (prevents "forgotten partial lifts"):
-
-```bat
-python scripts/recovery_pending_audit.py --namespace fa_full_2026_03_26 --include-untracked
-python scripts/recovery_pending_audit.py --namespace fa_full_2026_03_26 --include-untracked --queue-out decomp/recovery/queues/pending_reconstruction_mismatches.txt
-python skills/fa-recovery-iteration/scripts/recovered_progress.py bulk-mark --namespace fa_full_2026_03_26 --functions-file decomp/recovery/queues/pending_reconstruction_mismatches.txt --status needs_evidence --note "Source contains pending reconstruction marker; keep tracked as unfinished."
-```
+## Recovery Coverage (2026-04-13, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
-- Total FAF functions (IDA index): `67,171`
-- Recovered so far (`completed`): `31,096`
-- Pending: `32,243`
-- Blocked: `3,776`
-- In progress: `115`
-- **Coverage (of recovered functions): `46.30%`**
+- Total FAF functions (IDA index): `67,153`
+- Recovered so far (source annotations, in-scope families): `7,312`
+- **Coverage (moho + gpg + external): `55.32%`**
 
 Namespace families:
 
-- `moho`: `5,105/8,717 (58.56%)`
-- `gpg`: `1,392/2,172 (64.09%)`
-- `external`: `378/2,328 (16.24%)`
-
-External dependency split:
-
-- `wxWidgets`: `124/1,359 (9.12%)`
-- `MSVC STL/CRT`: `49/398 (12.31%)`
-- `WildMagic`: `52/387 (13.44%)`
-- `LuaPlus/Lua`: `153/184 (83.15%)`
+- `moho`: `5,520/8,717 (63.32%)`
+- `gpg`: `1,417/2,172 (65.24%)`
+- `external`: `375/2,328 (16.11%)`
 
 External dependency status (progress):
 
-- `wxWidgets`: `1,260/1,359 (92.72%)`
-- `MSVC STL/CRT`: `0/398 (0.00%)`
-- `WildMagic`: `378/387 (97.67%)` — consolidated as upstream `external_dependency` (see [`dependencies/patches/wildmagic3p8_faf_required.md`](dependencies/patches/wildmagic3p8_faf_required.md))
-- `LuaPlus/Lua`: `0/184 (0.00%)`
+- `wxWidgets`: `125/1,359 (9.20%)`
+- `MSVC STL/CRT`: `51/398 (12.81%)`
+- `WildMagic`: `42/387 (10.85%)` — consolidated as upstream `external_dependency` (see [`dependencies/patches/wildmagic3p8_faf_required.md`](dependencies/patches/wildmagic3p8_faf_required.md))
+- `LuaPlus/Lua`: `157/184 (85.33%)`
 
 ## Patch + Build Quickstart
 

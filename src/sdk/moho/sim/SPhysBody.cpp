@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -298,6 +299,47 @@ namespace moho
     out->y = (basisX.y * impulseX) + (basisY.y * impulseY) + (basisZ.y * impulseZ);
     out->z = (basisX.z * impulseX) + (basisY.z * impulseY) + (basisZ.z * impulseZ);
     return out;
+  }
+
+  /**
+   * Address: 0x00697D10 (FUN_00697D10, Moho::SPhysBody::AddLocalImpulse)
+   *
+   * What it does:
+   * Applies one local-space impulse at one local-space point to this body's
+   * linear velocity and accumulated world angular impulse.
+   */
+  void SPhysBody::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint)
+  {
+    const Wm3::Vec3f rotatedCollisionOffset = mOrientation.Rotate(mCollisionOffset);
+    const Wm3::Vec3f transformOrigin{
+      mPos.x - rotatedCollisionOffset.x,
+      mPos.y - rotatedCollisionOffset.y,
+      mPos.z - rotatedCollisionOffset.z
+    };
+
+    const Wm3::Vec3f rotatedPoint = mOrientation.Rotate(localPoint);
+    const Wm3::Vec3f worldPoint{
+      rotatedPoint.x + transformOrigin.x,
+      rotatedPoint.y + transformOrigin.y,
+      rotatedPoint.z + transformOrigin.z
+    };
+
+    const Wm3::Vec3f worldImpulse = mOrientation.Rotate(localImpulse);
+    const float inverseMassOrMax = (mMass == 0.0f) ? std::numeric_limits<float>::max() : (1.0f / mMass);
+
+    mVelocity.x += worldImpulse.x * inverseMassOrMax;
+    mVelocity.y += worldImpulse.y * inverseMassOrMax;
+    mVelocity.z += worldImpulse.z * inverseMassOrMax;
+
+    const Wm3::Vec3f lever{
+      worldPoint.x - mPos.x,
+      worldPoint.y - mPos.y,
+      worldPoint.z - mPos.z
+    };
+
+    mWorldImpulse.x += (lever.y * worldImpulse.z) - (lever.z * worldImpulse.y);
+    mWorldImpulse.y += (lever.z * worldImpulse.x) - (lever.x * worldImpulse.z);
+    mWorldImpulse.z += (lever.x * worldImpulse.y) - (lever.y * worldImpulse.x);
   }
 
   /**
