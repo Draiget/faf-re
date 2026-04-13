@@ -20,6 +20,8 @@
 #include "moho/render/d3d/CD3DVertexFormat.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/ID3DVertexStream.h"
+#include "moho/render/d3d/D3DSingletonCleanup.h"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/particles/CWorldParticles.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/resource/CParticleTexture.h"
@@ -2853,3 +2855,281 @@ namespace
 
   [[maybe_unused]] BeamRenderHelpersStartupBootstrap gBeamRenderHelpersStartupBootstrap;
 } // namespace
+
+namespace moho
+{
+  namespace
+  {
+    /// Fetches the first stream of `sheet` through its typed virtual
+    /// `GetVertStream(0)` slot, matching the binary's slot-8 dispatch.
+    [[nodiscard]] ID3DVertexStream* FetchPrimaryVertexStream(CD3DVertexSheet* const sheet)
+    {
+      return sheet->GetVertStream(0u);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0043C3D0 (FUN_0043C3D0, sub_43C3D0)
+   *
+   * IDA signature:
+   * int __usercall sub_43C3D0@<eax>(_DWORD *a1@<esi>);
+   *
+   * What it does:
+   * Locks the first vertex stream of `context.sheet` for exclusive
+   * write access over the full requested vertex count, stores the
+   * returned map pointer into the context write cursor, and resets
+   * the running quad count to zero.
+   */
+  void BeamDrawContextBeginMap(BeamDrawContextRuntime& context)
+  {
+    ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
+    void* const mapped = stream->Lock(0, context.maxVertexCount, true, true);
+    context.writeCursor = static_cast<float*>(mapped);
+    context.quadCount = 0;
+  }
+
+  /**
+   * Address: 0x0043C400 (FUN_0043C400, sub_43C400)
+   *
+   * IDA signature:
+   * void __usercall sub_43C400(_DWORD *a1@<esi>);
+   *
+   * What it does:
+   * If the context currently holds a live write cursor, unlocks the
+   * first vertex stream of `context.sheet` and clears the cursor.
+   */
+  void BeamDrawContextEndMap(BeamDrawContextRuntime& context)
+  {
+    if (context.writeCursor != nullptr) {
+      ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
+      stream->Unlock();
+      context.writeCursor = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x0043C390 (FUN_0043C390, sub_43C390)
+   *
+   * IDA signature:
+   * void __usercall sub_43C390(_DWORD *a1@<esi>);
+   *
+   * What it does:
+   * Ends any active map session, then releases the owning vertex
+   * sheet through its deleting-destructor thunk (vtable slot 0 with
+   * `deleteFlag = 1`, matching the binary) and nulls the sheet
+   * pointer so the context is safe to reinitialize.
+   */
+  void BeamDrawContextTeardown(BeamDrawContextRuntime& context)
+  {
+    BeamDrawContextEndMap(context);
+    if (context.sheet != nullptr) {
+      delete context.sheet;
+      context.sheet = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x0043C430 (FUN_0043C430, sub_43C430)
+   *
+   * IDA signature:
+   * float *__userpurge sub_43C430@<eax>(
+   *   float *a1@<eax>, int a2@<ecx>, float a3, float a4, float a5);
+   *
+   * What it does:
+   * Builds four translated vertices from one unit-box corner pair
+   * and writes them into the active write cursor in the order the
+   * binary emits:
+   *   v0 = ( boxCorners[0] + dx, boxCorners[4] + dy, boxCorners[2] + dz )
+   *   v1 = ( boxCorners[3] + dx, boxCorners[4] + dy, boxCorners[2] + dz )
+   *   v2 = ( boxCorners[3] + dx, boxCorners[1] + dy, boxCorners[5] + dz )
+   *   v3 = ( boxCorners[0] + dx, boxCorners[1] + dy, boxCorners[5] + dz )
+   * The cursor is then advanced by 48 bytes (four 3-float vertices)
+   * and the running quad count is bumped.
+   */
+  float* BeamDrawContextWriteTranslatedQuad(
+    BeamDrawContextRuntime& context,
+    const float* const boxCorners,
+    const float dx,
+    const float dy,
+    const float dz)
+  {
+    const float boxX0 = boxCorners[0];
+    const float boxY0 = boxCorners[1];
+    const float boxZ0 = boxCorners[2];
+    const float boxX1 = boxCorners[3];
+    const float boxY1 = boxCorners[4];
+    const float boxZ1 = boxCorners[5];
+
+    float* v0 = context.writeCursor;
+    v0[0] = boxX0 + dx;
+    v0[1] = boxY1 + dy;
+    v0[2] = boxZ0 + dz;
+
+    float* v1 = context.writeCursor + 3;
+    v1[0] = boxX1 + dx;
+    v1[1] = boxY1 + dy;
+    v1[2] = boxZ0 + dz;
+
+    float* v2 = context.writeCursor + 6;
+    v2[0] = boxX1 + dx;
+    v2[1] = boxY0 + dy;
+    v2[2] = boxZ1 + dz;
+
+    float* v3 = context.writeCursor + 9;
+    v3[0] = boxX0 + dx;
+    v3[1] = boxY0 + dy;
+    v3[2] = boxZ1 + dz;
+
+    context.writeCursor += 12;
+    ++context.quadCount;
+    return v3;
+  }
+
+  /**
+   * Address: 0x0043C510 (FUN_0043C510, sub_43C510)
+   *
+   * IDA signature:
+   * float *__usercall sub_43C510@<eax>(float *result@<eax>, int a2@<ecx>);
+   *
+   * What it does:
+   * Copies four packed 3-float vertices (12 floats, 48 bytes) from
+   * `packedQuad` into the active write cursor, advances the cursor
+   * by 48 bytes, and bumps the running quad count.
+   */
+  const float* BeamDrawContextWritePackedQuad(
+    BeamDrawContextRuntime& context,
+    const float* const packedQuad)
+  {
+    for (std::size_t i = 0; i < 12; ++i) {
+      context.writeCursor[i] = packedQuad[i];
+    }
+    context.writeCursor += 12;
+    ++context.quadCount;
+    return packedQuad;
+  }
+
+  namespace
+  {
+    [[nodiscard]] bool FlushBeamQuadDrawImpl(BeamDrawContextRuntime& context, const int quadCount)
+    {
+      if (context.writeCursor != nullptr) {
+        ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
+        stream->Unlock();
+        context.writeCursor = nullptr;
+      }
+
+      CD3DVertexSheetViewRuntime vertexView{};
+      vertexView.sheet = context.sheet;
+      vertexView.startVertex = 0;
+      vertexView.baseVertex = 0;
+      vertexView.endVertex = (4 * quadCount) - 1;
+
+      CD3DIndexSheetViewRuntime indexView{};
+      indexView.sheet = GetSharedTrailQuadIndexSheet();
+      indexView.startIndex = 0;
+      indexView.indexCount = 6 * quadCount;
+
+      std::int32_t primitiveType = 4; // D3DPT_TRIANGLELIST
+      CD3DDevice* const device = D3D_GetDevice();
+      return device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0043C580 (FUN_0043C580, sub_43C580)
+   *
+   * IDA signature:
+   * int __usercall sub_43C580@<eax>(_DWORD *a1@<eax>);
+   *
+   * What it does:
+   * Ends any pending write session on the context (unlocking the
+   * vertex stream when mapped) and submits one indexed triangle-list
+   * draw covering `context.quadCount` quads through the shared
+   * `sIndexSheet`.
+   */
+  bool BeamDrawContextFlushQuadDraw(BeamDrawContextRuntime& context)
+  {
+    return FlushBeamQuadDrawImpl(context, context.quadCount);
+  }
+
+  /**
+   * Address: 0x0043C610 (FUN_0043C610, sub_43C610)
+   *
+   * IDA signature:
+   * int __usercall sub_43C610@<eax>(int a1@<edi>, _DWORD *a2@<esi>);
+   *
+   * What it does:
+   * Same as `BeamDrawContextFlushQuadDraw` but uses a caller-supplied
+   * `quadCount` for the view bounds instead of the context's own
+   * running count.
+   */
+  bool BeamDrawContextFlushQuadDrawWithCount(BeamDrawContextRuntime& context, const int quadCount)
+  {
+    return FlushBeamQuadDrawImpl(context, quadCount);
+  }
+
+  /**
+   * Address: 0x0043C760 (FUN_0043C760, sub_43C760)
+   *
+   * IDA signature:
+   * int (__thiscall ***__usercall sub_43C760@<eax>(int a1@<edi>))(_DWORD, int);
+   *
+   * What it does:
+   * Fetches vertex format 3 from the device resources, ensures the
+   * shared `sVertexStream` singleton is live (creating it via
+   * `func_CreateSharedVertexStream` on first miss), then builds one
+   * new vertex sheet from the `[nullptr, sVertexStream]` stream pair
+   * and the fetched format through `ID3DDeviceResources::Func6`. The
+   * new sheet replaces `context.sheet`; the previous sheet (when
+   * different and non-null) is released through its deleting dtor.
+   */
+  CD3DVertexSheet* BeamDrawContextCreateVertexSheet(BeamDrawContextRuntime& context)
+  {
+    CD3DDevice* const device = D3D_GetDevice();
+    ID3DDeviceResources* const resources = device->GetResources();
+    CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(3);
+
+    if (SharedVertexStreamSlot() == nullptr) {
+      func_CreateSharedVertexStream(vertexFormat);
+    }
+
+    CD3DVertexStream* streamArray[2]{nullptr, SharedVertexStreamSlot()};
+    CD3DDevice* const device2 = D3D_GetDevice();
+    ID3DDeviceResources* const resources2 = device2->GetResources();
+    CD3DVertexSheet* const newSheet = resources2->Func6(
+      1u,
+      context.maxVertexCount,
+      vertexFormat,
+      streamArray);
+
+    CD3DVertexSheet* const oldSheet = context.sheet;
+    if (newSheet != oldSheet && oldSheet != nullptr) {
+      delete oldSheet;
+    }
+    context.sheet = newSheet;
+    return oldSheet;
+  }
+
+  /**
+   * Address: 0x0043C360 (FUN_0043C360, sub_43C360)
+   *
+   * IDA signature:
+   * void __usercall sub_43C360(int a1@<eax>, _DWORD *a2@<ecx>);
+   *
+   * What it does:
+   * Lazy first-use initializer: when the context has no sheet, seeds
+   * the quad-count / vertex-count / cursor lanes, builds the shared
+   * vertex sheet, and primes the shared index sheet.
+   */
+  void BeamDrawContextInitialize(BeamDrawContextRuntime& context, const int quadCount)
+  {
+    if (context.sheet != nullptr) {
+      return;
+    }
+    context.field_0x04 = quadCount;
+    context.maxVertexCount = 4 * quadCount;
+    context.writeCursor = nullptr;
+    (void)BeamDrawContextCreateVertexSheet(context);
+    func_InitSharedIndexSheet();
+  }
+} // namespace moho

@@ -14,15 +14,23 @@
 #include "INetTCPServer.h"
 #include "INetTCPSocket.h"
 #include "moho/app/CWaitHandleSet.h"
+#include "moho/app/WinApp.h"
+#include "moho/app/WxRuntimeTypes.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "platform/Platform.h"
+#include <array>
+#include <float.h>
+#include <shellapi.h>
+#include <wchar.h>
+#include <windows.h>
 
 using namespace moho;
 
@@ -1338,4 +1346,126 @@ void CGpgNetInterface::EnqueueCommand(
   command.mArgs = args;
   command.mVal = val;
   mCommands.push_back(command);
+}
+
+namespace
+{
+  constexpr const char* kLaunchGPGNetName = "LaunchGPGNet";
+  constexpr const char* kLaunchGPGNetHelpText = "LaunchGPGNet()";
+  constexpr const wchar_t* kGPGNetDefaultPath =
+    L"c:\\Program Files\\THQ\\Gas Powered Games\\GPGNet\\GPG.Multiplayer.Client.exe";
+  constexpr const wchar_t* kGPGNetDevExePath =
+    L"C:\\work\\rts\\main\\code\\src\\Multiplayer\\MultiplayerClient\\bin\\Debug\\MultiplayerClient.exe";
+  constexpr const wchar_t* kGPGNetDevParams =
+    L"/luapath=\"C:\\work\\rts\\main\\code\\src\\Multiplayer\\MultiplayerClient\\\"";
+  constexpr const wchar_t* kGPGNetDevWorkingDir =
+    L"C:\\work\\rts\\main\\code\\src\\Multiplayer\\MultiplayerClient\\bin\\Debug\\";
+
+  [[nodiscard]] bool TryLoadGPGNetPathFromRegistry(const char* const keyPath, std::wstring& outPath)
+  {
+    std::array<std::uint8_t, 256> buffer{};
+    const std::uint32_t length = moho::PLAT_GetRegistryValue(keyPath, buffer.data(), static_cast<std::uint32_t>(buffer.size()));
+    if (length == 0) {
+      return false;
+    }
+
+    outPath.assign(length, L'\0');
+    std::mbstowcs(outPath.data(), reinterpret_cast<const char*>(buffer.data()), length);
+
+    return GetFileAttributesW(outPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+  }
+} // namespace
+
+/**
+ * Address: 0x007BA340 (FUN_007BA340, cfunc_LaunchGPGNetL)
+ *
+ * What it does:
+ * Resolves the GPGNet client executable path (developer override via
+ * `/gpgnetdev`, then `HKCU\Software\GPG\GPGNet\GPGNetPath`, then
+ * `HKLM\Software\GPG\GPGNet\GPGNetPath`, then a hardcoded default) and
+ * launches it via `ShellExecuteExW` with the main window as owner.
+ * Restores the x87 control word afterward and pushes the boolean launch
+ * result back to Lua.
+ */
+int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLaunchGPGNetHelpText, 0, argumentCount);
+  }
+
+  HWND ownerWindow = nullptr;
+  if (moho::sMainWindow != nullptr) {
+    ownerWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+  }
+
+  SHELLEXECUTEINFOW execInfo{};
+  execInfo.cbSize = sizeof(execInfo);
+  execInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+  execInfo.hwnd = ownerWindow;
+  execInfo.lpVerb = L"open";
+  execInfo.nShow = SW_SHOWDEFAULT;
+
+  std::wstring resolvedPath;
+  if (moho::CFG_GetArgOption(gpg::StrArg{"/gpgnetdev"}, 0u, nullptr)) {
+    execInfo.lpFile = kGPGNetDevExePath;
+    execInfo.lpParameters = kGPGNetDevParams;
+    execInfo.lpDirectory = kGPGNetDevWorkingDir;
+  } else {
+    if (TryLoadGPGNetPathFromRegistry("HKEY_CURRENT_USER\\Software\\GPG\\GPGNet\\GPGNetPath", resolvedPath)) {
+      execInfo.lpFile = resolvedPath.c_str();
+    } else if (TryLoadGPGNetPathFromRegistry("HKEY_LOCAL_MACHINE\\Software\\GPG\\GPGNet\\GPGNetPath", resolvedPath)) {
+      execInfo.lpFile = resolvedPath.c_str();
+    } else {
+      execInfo.lpFile = kGPGNetDefaultPath;
+    }
+    execInfo.lpParameters = L"";
+    execInfo.lpDirectory = L"";
+  }
+
+  const BOOL launched = ShellExecuteExW(&execInfo);
+
+  // ShellExecuteExW can perturb the x87 FPU control word; restore the engine's
+  // preferred precision/rounding configuration before returning to Lua.
+  _controlfp(_PC_64, _MCW_PC);
+
+  lua_pushboolean(rawState, launched ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x007BA2C0 (FUN_007BA2C0, cfunc_LaunchGPGNet)
+ *
+ * What it does:
+ * Unwraps the raw `lua_State` callback context and forwards to
+ * `cfunc_LaunchGPGNetL`.
+ */
+int moho::cfunc_LaunchGPGNet(lua_State* const luaContext)
+{
+  return cfunc_LaunchGPGNetL(SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007BA2E0 (FUN_007BA2E0, func_LaunchGPGNet_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the `LaunchGPGNet()` binder into the user Lua init set.
+ */
+moho::CScrLuaInitForm* moho::func_LaunchGPGNet_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kLaunchGPGNetName,
+    &moho::cfunc_LaunchGPGNet,
+    nullptr,
+    "<global>",
+    kLaunchGPGNetHelpText
+  );
+  return &binder;
 }

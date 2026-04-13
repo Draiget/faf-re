@@ -3,6 +3,7 @@
 #include <string>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/Stats.h"
 
@@ -17,6 +18,26 @@ namespace moho
       }
 
       return CScrLuaMetatableFactory<CDecalHandle>::Instance().Get(state);
+    }
+
+    [[nodiscard]] gpg::RType* CachedCScriptObjectType()
+    {
+      gpg::RType* type = CScriptObject::sType;
+      if (type == nullptr) {
+        type = gpg::LookupRType(typeid(CScriptObject));
+        CScriptObject::sType = type;
+      }
+      return type;
+    }
+
+    [[nodiscard]] gpg::RType* CachedSDecalInfoType()
+    {
+      gpg::RType* type = SDecalInfo::sType;
+      if (type == nullptr) {
+        type = gpg::LookupRType(typeid(SDecalInfo));
+        SDecalInfo::sType = type;
+      }
+      return type;
     }
   } // namespace
 
@@ -107,6 +128,28 @@ namespace moho
   {
     ++InstanceCounter<CDecalHandle>::s_count;
     mInfo.mObj = objectId;
+  }
+
+  /**
+   * Address: 0x0077F1E0 (FUN_0077F1E0, Moho::CDecalHandle::MemberDeserialize)
+   *
+   * What it does:
+   * Loads CScriptObject base lanes, then decal payload and decal visibility
+   * tick fields from one archive stream.
+   */
+  void CDecalHandle::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef baseOwnerRef{};
+    archive->Read(CachedCScriptObjectType(), static_cast<CScriptObject*>(this), baseOwnerRef);
+
+    const gpg::RRef decalOwnerRef{};
+    archive->Read(CachedSDecalInfoType(), &mInfo, decalOwnerRef);
+
+    archive->ReadUInt(&mArmyVisibilityFlags);
+
+    int createdAtTick = 0;
+    archive->ReadInt(&createdAtTick);
+    mCreatedAtTick = static_cast<std::uint32_t>(createdAtTick);
   }
 
   /**

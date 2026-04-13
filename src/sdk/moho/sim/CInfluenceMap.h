@@ -247,6 +247,43 @@ namespace moho
      */
     void Update();
 
+    /**
+     * Address: 0x00716B00 (FUN_00716B00, ?AssignThreatAtPosition@CInfluenceMap@Moho@@QAEXABV?$Vector3@M@Wm3@@W4EThreatType@2@MM@Z)
+     *
+     * What it does:
+     * Adds `assignedThreat` to the per-type threat lane of the cell
+     * containing `position`, then writes the resulting accumulated
+     * threat multiplied by `assignedDecay` into the matching decay
+     * lane. When `assignedDecay` is negative the binary substitutes a
+     * default `0.01` rate. `THREATTYPE_Overall` and `THREATTYPE_Unknown`
+     * both map to the cell's `unknownInfluence` lane in the binary.
+     */
+    void AssignThreatAtPosition(
+      const Wm3::Vec3f& position,
+      EThreatType threatType,
+      float assignedThreat,
+      float assignedDecay
+    );
+
+    /**
+     * Address: 0x00716FC0 (FUN_00716FC0, ?GetHighestThreatPosition@CInfluenceMap@Moho@@QBE?AV?$Vector3@M@Wm3@@AAMHHW4EThreatType@2@H@Z)
+     *
+     * What it does:
+     * Scans the influence grid (optionally restricted to the playable
+     * map rect / a single army) for the cell with the highest threat
+     * value of the requested type within `radius` steps and returns
+     * the cell's world-space center. The corresponding peak threat
+     * value is written to `outThreat`.
+     */
+    Wm3::Vec3f* GetHighestThreatPosition(
+      Wm3::Vec3f* outPosition,
+      float* outThreat,
+      int radius,
+      bool onMap,
+      EThreatType threatType,
+      int armyIndex
+    );
+
   private:
     using BlipCellSet = msvc8::set<InfluenceMapCellIndex, InfluenceMapCellIndexLess>;
 

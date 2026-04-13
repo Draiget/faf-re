@@ -616,8 +616,7 @@ void CAiBuilderImpl::BuilderSetUpInitialRally()
   BVSet<EntId, EntIdUniverse> factorySet{};
   (void)factorySet.mBits.Add(static_cast<unsigned int>(mOwnerUnit->id_));
 
-  SSTICommandIssueData issueData{};
-  issueData.mCommandType = EUnitCommandType::UNITCOMMAND_Move;
+  SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Move);
   issueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
   issueData.mTarget.mEntityId = 0xF0000000u;
   issueData.mTarget.mPos = rallyWorldPos;

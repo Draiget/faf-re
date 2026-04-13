@@ -20,6 +20,152 @@ namespace moho
   class CD3DVertexFormat;
   class CD3DVertexSheet;
 
+  /**
+   * Runtime view over one stack-allocated beam/particle draw context
+   * used by the quad-emit helpers around 0x0043C3D0..0x0043C610.
+   *
+   * The binary treats this as a 5-dword block passed via `esi`:
+   *   +0x00: owning `CD3DVertexSheet*` whose first vertex stream
+   *          is locked/unlocked for writing.
+   *   +0x04: scratch integer lane (not touched by the recovered
+   *          members; semantics not yet pinned down).
+   *   +0x08: maximum vertex count requested at `Lock` time.
+   *   +0x0C: running quad count, bumped once per emitted quad.
+   *   +0x10: active write cursor into the locked vertex buffer;
+   *          null before `BeginMap` / after `EndMap`.
+   *
+   * Kept as a typed view rather than a first-class class because the
+   * owning allocator and the surrounding render pass have not yet
+   * been recovered.
+   */
+  struct BeamDrawContextRuntime
+  {
+    CD3DVertexSheet* sheet = nullptr; // +0x00
+    std::int32_t field_0x04 = 0;       // +0x04 - unproven
+    std::int32_t maxVertexCount = 0;   // +0x08
+    std::int32_t quadCount = 0;        // +0x0C
+    float* writeCursor = nullptr;      // +0x10
+  };
+
+  static_assert(offsetof(BeamDrawContextRuntime, sheet) == 0x00, "BeamDrawContextRuntime::sheet offset must be 0x00");
+  static_assert(offsetof(BeamDrawContextRuntime, field_0x04) == 0x04, "BeamDrawContextRuntime::field_0x04 offset must be 0x04");
+  static_assert(offsetof(BeamDrawContextRuntime, maxVertexCount) == 0x08, "BeamDrawContextRuntime::maxVertexCount offset must be 0x08");
+  static_assert(offsetof(BeamDrawContextRuntime, quadCount) == 0x0C, "BeamDrawContextRuntime::quadCount offset must be 0x0C");
+  static_assert(offsetof(BeamDrawContextRuntime, writeCursor) == 0x10, "BeamDrawContextRuntime::writeCursor offset must be 0x10");
+  static_assert(sizeof(BeamDrawContextRuntime) == 0x14, "BeamDrawContextRuntime size must be 0x14");
+
+  /**
+   * Address: 0x0043C3D0 (FUN_0043C3D0, sub_43C3D0)
+   *
+   * What it does:
+   * Locks the first vertex stream of `context.sheet` for writing the
+   * full requested vertex count, stores the returned map pointer into
+   * `context.writeCursor`, and resets `context.quadCount` to zero.
+   */
+  void BeamDrawContextBeginMap(BeamDrawContextRuntime& context);
+
+  /**
+   * Address: 0x0043C400 (FUN_0043C400, sub_43C400)
+   *
+   * What it does:
+   * If the context currently holds a live map pointer, unlocks the
+   * first vertex stream of `context.sheet` and clears the write
+   * cursor.
+   */
+  void BeamDrawContextEndMap(BeamDrawContextRuntime& context);
+
+  /**
+   * Address: 0x0043C390 (FUN_0043C390, sub_43C390)
+   *
+   * What it does:
+   * Ends any active map session, then releases the owning vertex
+   * sheet through its vtable-0 slot (deleting dtor thunk) and nulls
+   * the sheet pointer.
+   */
+  void BeamDrawContextTeardown(BeamDrawContextRuntime& context);
+
+  /**
+   * Address: 0x0043C430 (FUN_0043C430, sub_43C430)
+   *
+   * What it does:
+   * Reads four corner offsets from the caller's 6-float "unit quad"
+   * box (`boxCorners[0..5]`), adds a per-call XYZ translation to each
+   * corner, writes four consecutive 3-float vertices into the
+   * active write cursor, advances the cursor by 48 bytes, and bumps
+   * `quadCount`.
+   */
+  float* BeamDrawContextWriteTranslatedQuad(
+    BeamDrawContextRuntime& context,
+    const float* boxCorners,
+    float dx,
+    float dy,
+    float dz);
+
+  /**
+   * Address: 0x0043C510 (FUN_0043C510, sub_43C510)
+   *
+   * What it does:
+   * Copies four packed 3-float vertices (12 floats) from `packedQuad`
+   * into the active write cursor, advances the cursor by 48 bytes,
+   * and bumps `quadCount`.
+   */
+  const float* BeamDrawContextWritePackedQuad(
+    BeamDrawContextRuntime& context,
+    const float* packedQuad);
+
+  /**
+   * Address: 0x0043C580 (FUN_0043C580, sub_43C580)
+   *
+   * What it does:
+   * Flushes any pending write session on the context (unlocking the
+   * vertex stream when still mapped), then submits one indexed
+   * triangle-list draw covering `context.quadCount` quads. The call
+   * builds the vertex-sheet view from the context's sheet and quad
+   * count (4 vertices per quad), the index-sheet view from the
+   * shared `sIndexSheet` singleton (6 indices per quad), and issues
+   * the call through `CD3DDevice::DrawTriangleList` with primitive
+   * type 4 (D3DPT_TRIANGLELIST).
+   */
+  bool BeamDrawContextFlushQuadDraw(BeamDrawContextRuntime& context);
+
+  /**
+   * Address: 0x0043C610 (FUN_0043C610, sub_43C610)
+   *
+   * What it does:
+   * Same flush/draw shape as `BeamDrawContextFlushQuadDraw` but uses
+   * a caller-supplied quad count instead of the context's own
+   * running count. The context's `quadCount` field is not read for
+   * view bounds on this path.
+   */
+  bool BeamDrawContextFlushQuadDrawWithCount(BeamDrawContextRuntime& context, int quadCount);
+
+  /**
+   * Address: 0x0043C760 (FUN_0043C760, sub_43C760)
+   *
+   * What it does:
+   * Fetches vertex format 3 from the device resources, ensures the
+   * shared `sVertexStream` singleton is initialized, then calls
+   * `ID3DDeviceResources::Func6` to build a new vertex sheet from
+   * the `[null, sVertexStream]` stream pair and the format, stores
+   * the returned sheet into `context.sheet`, and releases the prior
+   * sheet (if different and non-null) through its deleting dtor
+   * thunk.
+   */
+  CD3DVertexSheet* BeamDrawContextCreateVertexSheet(BeamDrawContextRuntime& context);
+
+  /**
+   * Address: 0x0043C360 (FUN_0043C360, sub_43C360)
+   *
+   * What it does:
+   * Lazy first-use initializer for a beam draw context: when the
+   * context's sheet slot is empty, records the caller-supplied quad
+   * count into `field_0x04`, derives `maxVertexCount` as `4 *
+   * quadCount`, clears the write cursor, builds one shared vertex
+   * sheet through `BeamDrawContextCreateVertexSheet`, and ensures
+   * the shared index sheet is live through `func_InitSharedIndexSheet`.
+   */
+  void BeamDrawContextInitialize(BeamDrawContextRuntime& context, int quadCount);
+
   using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
 
   /**

@@ -3,8 +3,27 @@
 #include "moho/render/MapImager.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
+
+namespace
+{
+  constexpr const char* kMapBorderClearName = "MapBorderClear";
+  constexpr const char* kMapBorderClearHelpText = "MapBorderClear()";
+  constexpr const char* kGlobalLuaClassName = "<global>";
+
+  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
+  {
+    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
+      return *set;
+    }
+
+    static moho::CScrLuaInitFormSet fallbackSet("User");
+    return fallbackSet;
+  }
+} // namespace
 
 namespace moho
 {
@@ -71,6 +90,26 @@ int cfunc_MapBorderClear(lua_State* rawState)
   (void)ren_Viewport;
 
   return 0;
+}
+
+/**
+ * Address: 0x00848420 (FUN_00848420, func_MapBorderClear_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes global Lua binder metadata for `MapBorderClear()` into the user
+ * init set.
+ */
+CScrLuaInitForm* func_MapBorderClear_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    kMapBorderClearName,
+    &moho::cfunc_MapBorderClear,
+    nullptr,
+    kGlobalLuaClassName,
+    kMapBorderClearHelpText
+  );
+  return &binder;
 }
 
 } // namespace moho

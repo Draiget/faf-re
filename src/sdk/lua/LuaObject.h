@@ -2682,3 +2682,21 @@ namespace LuaPlus
 	}
 #pragma pack(pop)
 }
+
+namespace gpg::core
+{
+	template <class T>
+	struct fastvector_runtime_view;
+}
+
+namespace LuaPlus
+{
+	/**
+	 * Address: 0x004C7C70 (FUN_004C7C70, gpg::fastvector_LuaObject::clear)
+	 *
+	 * Destroys every live element in one fastvector runtime view over
+	 * `LuaPlus::LuaObject`, then rebinds storage back to the inline
+	 * lane, freeing the active heap buffer when present.
+	 */
+	void ClearAndResetLuaObjectFastVector(gpg::core::fastvector_runtime_view<LuaPlus::LuaObject>& view) noexcept;
+}

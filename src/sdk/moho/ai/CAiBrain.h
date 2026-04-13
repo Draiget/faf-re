@@ -1359,6 +1359,129 @@ namespace moho
   CScrLuaInitForm* func_CAiBrainBuildStructure_LuaFuncDef();
 
   /**
+   * Address: 0x0058BCB0 (FUN_0058BCB0, cfunc_CAiBrainGetAvailableFactories)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetAvailableFactoriesL`.
+   */
+  int cfunc_CAiBrainGetAvailableFactories(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058BD30 (FUN_0058BD30, cfunc_CAiBrainGetAvailableFactoriesL)
+   *
+   * What it does:
+   * Reads `(brain[, referencePosition, maxDistance])` from the Lua stack,
+   * collects this brain's available factory units (filtered by XZ
+   * distance when supplied), and returns them as a Lua table.
+   */
+  int cfunc_CAiBrainGetAvailableFactoriesL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058BCD0 (FUN_0058BCD0, func_CAiBrainGetAvailableFactories_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetAvailableFactories([referencePosition[, maxDistance]])`
+   * Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetAvailableFactories_LuaFuncDef();
+
+  /**
+   * Address: 0x00590280 (FUN_00590280, cfunc_CAiBrainGetThreatAtPosition)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetThreatAtPositionL`.
+   */
+  int cfunc_CAiBrainGetThreatAtPosition(lua_State* luaContext);
+
+  /**
+   * Address: 0x005902E0 (FUN_005902E0, cfunc_CAiBrainGetThreatAtPositionL)
+   *
+   * What it does:
+   * Reads `(brain, position, ringRadius, restrictToOnMap[, threatType,
+   * armyIndex])` from the Lua stack, samples the army influence map
+   * around `position`, and pushes the aggregated threat value back on
+   * the stack.
+   */
+  int cfunc_CAiBrainGetThreatAtPositionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00590300 (FUN_00590300, func_CAiBrainGetThreatAtPosition_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetThreatAtPosition(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetThreatAtPosition_LuaFuncDef();
+
+  /**
+   * Address: 0x005905D0 (FUN_005905D0, cfunc_CAiBrainGetThreatBetweenPositions)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainGetThreatBetweenPositionsL`.
+   */
+  int cfunc_CAiBrainGetThreatBetweenPositions(lua_State* luaContext);
+
+  /**
+   * Address: 0x00590630 (FUN_00590630, cfunc_CAiBrainGetThreatBetweenPositionsL)
+   *
+   * What it does:
+   * Reads `(brain, positionA, positionB, useRingMode[, threatType,
+   * armyIndex])` from the Lua stack and returns the aggregated threat
+   * along the grid-aligned path between the two positions.
+   */
+  int cfunc_CAiBrainGetThreatBetweenPositionsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005905F0 (FUN_005905F0, func_CAiBrainGetThreatBetweenPositions_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:GetThreatBetweenPositions(...)` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainGetThreatBetweenPositions_LuaFuncDef();
+
+  /**
+   * Address: 0x0058FFA0 (FUN_0058FFA0, cfunc_CAiBrainAssignThreatAtPosition)
+   */
+  int cfunc_CAiBrainAssignThreatAtPosition(lua_State* luaContext);
+
+  /**
+   * Address: 0x00590000 (FUN_00590000, cfunc_CAiBrainAssignThreatAtPositionL)
+   *
+   * What it does:
+   * Reads `(brain, position, threatValue[, decayRate, threatType])`
+   * from the Lua stack and assigns the resulting threat through
+   * `CInfluenceMap::AssignThreatAtPosition`.
+   */
+  int cfunc_CAiBrainAssignThreatAtPositionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058FFC0 (FUN_0058FFC0, func_CAiBrainAssignThreatAtPosition_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CAiBrainAssignThreatAtPosition_LuaFuncDef();
+
+  /**
+   * Address: 0x005908F0 (FUN_005908F0, cfunc_CAiBrainGetHighestThreatPosition)
+   */
+  int cfunc_CAiBrainGetHighestThreatPosition(lua_State* luaContext);
+
+  /**
+   * Address: 0x00590950 (FUN_00590950, cfunc_CAiBrainGetHighestThreatPositionL)
+   *
+   * What it does:
+   * Reads `(brain, radius, restrictToOnMap[, threatType, armyIndex])`,
+   * scans the influence map for the highest-threat cell, and pushes
+   * `(position, threatValue)` back onto the Lua stack.
+   */
+  int cfunc_CAiBrainGetHighestThreatPositionL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00590910 (FUN_00590910, func_CAiBrainGetHighestThreatPosition_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CAiBrainGetHighestThreatPosition_LuaFuncDef();
+
+  /**
    * Address: 0x0058BA40 (FUN_0058BA40, cfunc_CAiBrainNumCurrentlyBuilding)
    *
    * What it does:

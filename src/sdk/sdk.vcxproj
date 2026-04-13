@@ -949,6 +949,7 @@
     <ClCompile Include="moho\task\CTaskThreadWeakPtrReflection.cpp" />
     <ClCompile Include="moho\task\CWaitForTask.cpp" />
     <ClCompile Include="moho\terrain\StratumMaterial.cpp" />
+    <ClCompile Include="moho\terrain\splat\CWldSplat.cpp" />
     <ClCompile Include="moho\terrain\TerrainCommon.cpp" />
     <ClCompile Include="moho\terrain\water\CWaterShaderProperties.cpp" />
     <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp" />
@@ -987,6 +988,8 @@
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitGuardTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitRepairTask.cpp" />
@@ -1900,6 +1903,7 @@
     <ClInclude Include="moho\task\ScrDiskWatcherTask.h" />
     <ClInclude Include="moho\task\CWaitForTask.h" />
     <ClInclude Include="moho\terrain\StratumMaterial.h" />
+    <ClInclude Include="moho\terrain\splat\CWldSplat.h" />
     <ClInclude Include="moho\terrain\water\CWaterShaderProperties.h" />
     <ClInclude Include="moho\terrain\water\LowFidelityWater.h" />
     <ClInclude Include="moho\ui\CMauiControlTypeInfo.h" />

@@ -292,8 +292,7 @@ namespace
       return;
     }
 
-    moho::SSTICommandIssueData commandIssueData{};
-    commandIssueData.mCommandType = commandType;
+    moho::SSTICommandIssueData commandIssueData(commandType);
     sim->IssueCommand(selectedUnits, commandIssueData, false);
   }
 

@@ -14,6 +14,23 @@ namespace moho
   struct RMeshBlueprint;
   class RScmResource;
 
+  /**
+   * Recovered placeholder for `Moho::SSTIEntityAttachInfo` — used by
+   * `gpg::RRef_SSTIEntityAttachInfo` (FUN_00559790) and the
+   * `gpg::fastvector<SSTIEntityAttachInfo>` lane embedded in
+   * `SSTIEntityVariableData`. The complete-object size and field
+   * layout have not yet been confirmed from binary evidence; the
+   * struct is given a single `std::uintptr_t` body so it remains a
+   * complete C++ type (so `typeid()` works) while keeping the
+   * placeholder explicit. Replace the body with the real layout
+   * once owner-side evidence is available.
+   */
+  struct SSTIEntityAttachInfo
+  {
+    static gpg::RType* sType;
+    std::uintptr_t mPlaceholderState{};
+  };
+
   enum class EUserEntityVisibilityMode : std::int32_t
   {
     Hidden = 1,

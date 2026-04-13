@@ -59,6 +59,7 @@ namespace moho
   struct SAssignedLocInfo;
   struct SPickUpInfo;
   struct SAttachPoint;
+  struct SSTIEntityAttachInfo;
   class IAiFormationDB;
   class IPathTraveler;
   class PathTables;
@@ -1483,6 +1484,24 @@ namespace gpg
    * Builds a reflected reference for one `WeakPtr<IUnit>` wrapper value.
    */
   RRef* RRef_WeakPtr_IUnit(RRef* out, moho::WeakPtr<moho::IUnit>* value);
+
+  /**
+   * Address: 0x00559790 (FUN_00559790, gpg::RRef_SSTIEntityAttachInfo)
+   *
+   * What it does:
+   * Builds a reflection reference for `moho::SSTIEntityAttachInfo`
+   * using cached RTTI lookups and derived-type normalization.
+   */
+  RRef* RRef_SSTIEntityAttachInfo(RRef* out, moho::SSTIEntityAttachInfo* value);
+
+  /**
+   * Address: 0x005ACCA0 (FUN_005ACCA0, gpg::RRef_PathQueue)
+   *
+   * What it does:
+   * Builds a reflection reference for `moho::PathQueue` using cached
+   * RTTI lookups and derived-type normalization.
+   */
+  RRef* RRef_PathQueue(RRef* out, moho::PathQueue* value);
 
   /**
    * Address: 0x00526C80 (FUN_00526C80, gpg::RRef_RUnitBlueprint)

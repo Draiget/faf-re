@@ -262,6 +262,20 @@ namespace moho
 
   struct SoundConfiguration
   {
+    /**
+     * Address: 0x004D84D0 (FUN_004D84D0, ?? Moho::SoundConfiguration::SoundConfiguration)
+     *
+     * What it does:
+     * Default-initializes one freshly allocated `SoundConfiguration`:
+     * default-constructs the embedded timer, zeros the engine vector
+     * lanes, zeros the global settings memory buffer lanes, sets the
+     * speaker configuration to `3` (5.1 default), and clears all
+     * remaining flag/state fields. Matches the binary's
+     * `func_SoundConfigInit` lane on a fresh `operator new` storage
+     * slot.
+     */
+    SoundConfiguration() noexcept;
+
     gpg::time::Timer mTime;            // +0x00
     AudioEngineRefVector mEngines;     // +0x08
     gpg::MemBuffer<char> mGlobalSettingsBuffer; // +0x18
@@ -600,6 +614,19 @@ namespace moho
    * changes, GUI connection state, and wavebank preparation failures.
    */
   void __stdcall func_HandleSoundEvent(const std::uint8_t* eventData);
+
+  /**
+   * Address: 0x004D8C00 (FUN_004D8C00, func_InitSound)
+   *
+   * What it does:
+   * Builds and installs the process-global `SoundConfiguration`
+   * singleton: allocates a fresh slot, runs the default ctor, replaces
+   * any existing global, parses the `/audition` and `/nosound` CLI
+   * flags, then (when sound is enabled) primes the global settings
+   * buffer from the `/sounds/SupCom.xgs` VFS path and detects the
+   * DirectSound speaker channel mode.
+   */
+  void func_InitSound();
 
   /**
    * Address: 0x004D8EE0 (FUN_004D8EE0, ?SND_Shutdown@Moho@@YAXXZ)

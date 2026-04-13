@@ -1119,6 +1119,135 @@ ScopedLogContext::~ScopedLogContext()
     mTls = nullptr;
 }
 
+// ---------------------------------------------------------------------------
+// Global log-scope depth lanes.
+//
+// The two integer counters and the shared padding string back the nested
+// logging indentation used by `gpg::LogScopeEntry` and by a handful of
+// engine init paths (e.g. `Moho::CWldTerrainRes::Load`) that call the
+// Increase/Decrease helpers directly.
+//
+// Binary lanes:
+//   dword_10A6630  -> g_LogScopeDepth
+//   dword_10A6634  -> g_LogScopeDepthScale
+//   stru_10A6614   -> g_LogScopePadding
+// ---------------------------------------------------------------------------
+int gpg::g_LogScopeDepth = 0;
+int gpg::g_LogScopeDepthScale = 0;
+msvc8::string gpg::g_LogScopePadding{};
+
+namespace {
+
+/// Rebuilds `gpg::g_LogScopePadding` to `width` space characters, using the
+/// owning-copy lane so the embedded SSO limit of `msvc8::string` is not a
+/// cap. Matches the original binary's `std::string::assign_1(tmp, width, 0x20)
+/// -> std::string::assign(global, tmp, 0, -1)` flow behaviourally, without
+/// the decompiler-shaped raw-byte ctor/dtor dance.
+void RefreshLogScopePadding(const unsigned int width)
+{
+    if (width == 0u) {
+        gpg::g_LogScopePadding.assign_owned(std::string_view{});
+        return;
+    }
+
+    const std::string spaces(width, ' ');
+    gpg::g_LogScopePadding.assign_owned(std::string_view(spaces.data(), spaces.size()));
+}
+
+} // namespace
+
+/**
+ * Address: 0x00406110 (FUN_00406110, sub_406110)
+ *
+ * IDA signature:
+ * std::string *sub_406110();
+ *
+ * What it does:
+ * Bumps the global log-scope depth counter, multiplies it by the
+ * per-level scale, rebuilds the global padding string to that many
+ * space characters, and returns a pointer to the refreshed global
+ * padding string.
+ */
+msvc8::string* gpg::IncreaseLogScopeDepth()
+{
+    const unsigned int width =
+        static_cast<unsigned int>(++g_LogScopeDepth) *
+        static_cast<unsigned int>(g_LogScopeDepthScale);
+
+    RefreshLogScopePadding(width);
+    return &g_LogScopePadding;
+}
+
+/**
+ * Address: 0x004061B0 (FUN_004061B0, sub_4061B0)
+ *
+ * IDA signature:
+ * std::string *sub_4061B0();
+ *
+ * What it does:
+ * Mirror of `IncreaseLogScopeDepth`: decrements the depth counter,
+ * refreshes the shared padding string, and returns the global padding
+ * pointer.
+ */
+msvc8::string* gpg::DecreaseLogScopeDepth()
+{
+    const unsigned int width =
+        static_cast<unsigned int>(--g_LogScopeDepth) *
+        static_cast<unsigned int>(g_LogScopeDepthScale);
+
+    RefreshLogScopePadding(width);
+    return &g_LogScopePadding;
+}
+
+/**
+ * Address: 0x00406280 (FUN_00406280, ??0StrArg@gpg@@QAE@@Z)
+ * Mangled: gpg::StrArg::StrArg
+ *
+ * IDA signature:
+ * std::string *__stdcall gpg::StrArg::StrArg(std::string *a1, std::string *a2);
+ *
+ * What it does:
+ * Initializes the embedded body string to empty SSO state, assigns the
+ * full contents of `fmt` into the body via the owning-copy lane, zeroes
+ * the severity field, and bumps the global log-scope depth through
+ * `IncreaseLogScopeDepth`.
+ */
+gpg::LogScopeEntry::LogScopeEntry(const msvc8::string& fmt)
+{
+    body.assign_owned(fmt.view());
+    severity = LogSeverity::Debug;
+    (void)IncreaseLogScopeDepth();
+}
+
+/**
+ * Address: 0x004062E0 (FUN_004062E0, func_Log)
+ *
+ * IDA signature:
+ * void __stdcall func_Log(std::string *a1);
+ *
+ * What it does:
+ * Decrements the global log-scope depth, formats the stored body string
+ * with `gpg::STR_Printf` using an integer width argument derived from
+ * `field_0x38`, dispatches the result through `gpg::LogMessage` at the
+ * stored severity, then resets the embedded body string to empty SSO
+ * state.
+ *
+ * Note: the binary loads the STR_Printf width argument from an
+ * uninitialized stack local that the compiler happens to have zeroed
+ * via a preceding 52-byte memset. The behaviorally-equivalent source is
+ * `width = 0u - field_0x38`.
+ */
+void gpg::LogScopeEntry::Emit()
+{
+    (void)DecreaseLogScopeDepth();
+
+    const unsigned int widthArg = 0u - field_0x38;
+    const msvc8::string formatted = STR_Printf(body.c_str(), widthArg);
+    LogMessage(severity, formatted);
+
+    body.clear();
+}
+
 /**
  * Address: 0x00937C00 (FUN_00937C00, gpg::LogMessage)
  *

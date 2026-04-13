@@ -16,6 +16,7 @@
 #include "LuaAssertion.h"
 #include "LuaTableIterator.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/BadRefCast.h"
@@ -5760,4 +5761,31 @@ bool LuaObject::ToByteStream(gpg::Stream& stream)
 	typeTag = 2;
 	stream.Write(typeTag);
 	return false;
+}
+
+namespace LuaPlus
+{
+	/**
+	 * Address: 0x004C7C70 (FUN_004C7C70, gpg::fastvector_LuaObject::clear)
+	 *
+	 * IDA signature:
+	 * LuaPlus::LuaObject *__usercall std::vector_LuaObject::clear@<eax>(
+	 *   gpg::fastvector_LuaObject *this@<edi>);
+	 *
+	 * What it does:
+	 * Destroys every live `LuaPlus::LuaObject` element in one
+	 * fastvector runtime view, then either keeps inline storage (when
+	 * the active buffer matches the saved inline-origin pointer) or
+	 * frees the active heap buffer and rebinds the view back to its
+	 * inline lane, reading the saved inline-capacity sentinel from the
+	 * first pointer slot of the inline buffer.
+	 */
+	void ClearAndResetLuaObjectFastVector(gpg::fastvector_runtime_view<LuaPlus::LuaObject>& view) noexcept
+	{
+		for (LuaPlus::LuaObject* it = view.begin; it != view.end; ++it) {
+			it->~LuaObject();
+		}
+
+		gpg::FastVectorRuntimeResetToInline(view);
+	}
 }

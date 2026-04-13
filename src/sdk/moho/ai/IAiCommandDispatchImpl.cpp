@@ -24,6 +24,7 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitGetBuiltTask.h"
 #include "moho/unit/tasks/CUnitCallAirStagingPlatform.h"
 #include "moho/unit/tasks/CUnitCallLandTransport.h"
 #include "moho/unit/tasks/CUnitCallTeleport.h"
@@ -45,6 +46,8 @@ namespace
   class IAiCommandDispatchImplConstructed final : public IAiCommandDispatchImpl
   {
   public:
+    using IAiCommandDispatchImpl::IAiCommandDispatchImpl;
+
     int Execute() override
     {
       return static_cast<int>(TaskTick());
@@ -400,6 +403,21 @@ namespace
 } // namespace
 
 gpg::RType* IAiCommandDispatchImpl::sType = nullptr;
+
+/**
+ * Address: 0x00599470 (FUN_00599470, ?AI_CreateCommandDispatch@Moho@@YAPAVIAiCommandDispatch@1@PAVUnit@1@_N@Z)
+ *
+ * What it does:
+ * Allocates one command-dispatch implementation lane for `unit`, then runs
+ * the startup built-task child allocation lane used by command queue dispatch
+ * initialization.
+ */
+IAiCommandDispatch* moho::AI_CreateCommandDispatch(Unit* const unit)
+{
+  auto* const dispatch = new (std::nothrow) IAiCommandDispatchImplConstructed(unit);
+  (void)new (std::nothrow) CUnitGetBuiltTask(static_cast<CCommandTask*>(dispatch));
+  return dispatch ? static_cast<IAiCommandDispatch*>(dispatch) : nullptr;
+}
 
 /**
  * Address: 0x005990B0 (FUN_005990B0, ??0IAiCommandDispatchImpl@Moho@@AAE@XZ)

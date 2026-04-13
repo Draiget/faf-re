@@ -1059,6 +1059,28 @@ namespace moho
     void ReserveOgridRect(const gpg::Rect2i& ogridRect);
 
     /**
+     * Address: 0x0062BEE0 (FUN_0062BEE0, Moho::Unit::HasMeleeSpaceAroundSmallTarget)
+     *
+     * What it does:
+     * Scans perimeter candidate cells around `target` using this unit footprint,
+     * filters by occupancy/pathability checks, and writes nearest valid melee
+     * destination into `inOutCell`.
+     */
+    [[nodiscard]]
+    bool HasMeleeSpaceAroundSmallTarget(Unit* target, SOCellPos* inOutCell);
+
+    /**
+     * Address: 0x0062C340 (FUN_0062C340, Moho::Unit::HasMeleeSpaceAroundLargeTarget)
+     *
+     * What it does:
+     * Scans a collision-bounds search window around `target`, applies shell
+     * collision probes plus occupancy/pathability checks, and writes nearest
+     * valid melee destination into `inOutCell`.
+     */
+    [[nodiscard]]
+    bool HasMeleeSpaceAroundLargeTarget(Unit* target, SOCellPos* inOutCell, int targetSize);
+
+    /**
      * Address: 0x006AB760 (FUN_006AB760, ?FreeOgridRect@Unit@Moho@@QAEXXZ)
      *
      * What it does:

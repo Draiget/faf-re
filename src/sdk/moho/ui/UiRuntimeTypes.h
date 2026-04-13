@@ -5,12 +5,14 @@
 #include <string>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/script/CScriptObject.h"
 #include "Wm3Quaternion.h"
 
 struct lua_State;
@@ -45,6 +47,7 @@ namespace moho
   class CLuaWldUIProvider;
   class CUIWorldMesh;
   class RD3DTextureResource;
+  class PrefetchData;
   class ID3DTextureSheet;
   class CMauiCursor;
   class CMauiBitmap;
@@ -60,11 +63,209 @@ namespace moho
   class CMauiScrollbar;
   class CMauiText;
   class CUIMapPreview;
-  class CScriptObject;
   class CD3DFont;
   class CD3DPrimBatcher;
   class CD3DBatchTexture;
   struct RMeshBlueprint;
+
+  class IWldUIProvider
+  {
+  public:
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 0
+     */
+    virtual ~IWldUIProvider() = default;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 1
+     */
+    virtual void StartLoadingDialog() = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 2
+     */
+    virtual void UpdateLoadingDialog(float deltaSeconds) = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 3
+     */
+    virtual void StopLoadingDialog() = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 4
+     */
+    virtual void StartWaitingDialog() = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 5
+     */
+    virtual void UpdateWaitingDialog(float deltaSeconds) = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 6
+     */
+    virtual void StopWaitingDialog() = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 7
+     */
+    virtual void OnStart() = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 8
+     */
+    virtual void CreateGameInterface(bool createGameInterface) = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * VFTable SLOT: 9
+     */
+    virtual void DestroyGameInterface() = 0;
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(IWldUIProvider) == 0x4, "moho::IWldUIProvider size must be 0x4");
+
+  /**
+   * Lua-backed world UI provider that delegates lifecycle hooks into script.
+   */
+  class CLuaWldUIProvider final : public IWldUIProvider, public CScriptObject
+  {
+  public:
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x0086A530 (??0CLuaWldUIProvider@Moho@@QAE@@Z, Moho::CLuaWldUIProvider::CLuaWldUIProvider)
+     *
+     * What it does:
+     * Constructs one world-UI provider, binds the embedded script object, and
+     * seeds the prefetch-texture cache lane to empty.
+     */
+    explicit CLuaWldUIProvider(LuaPlus::LuaObject* luaObject);
+
+    /**
+     * Address: 0x0086A5D0 (??1CLuaWldUIProvider@Moho@@QAE@@Z, Moho::CLuaWldUIProvider::~CLuaWldUIProvider)
+     * Deleting destructor thunk: 0x0086A5A0 (Moho::CLuaWldUIProvider::dtr)
+     *
+     * What it does:
+     * Releases cached prefetch handles, tears down the script subobject, and
+     * restores the base provider vtable lane.
+     */
+    ~CLuaWldUIProvider() override;
+
+    /**
+     * Address: 0x0086A3A0 (FUN_0086A3A0, Moho::CLuaWldUIProvider::GetClass)
+     *
+     * What it does:
+     * Returns the cached RTTI descriptor for this provider class.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const;
+
+    /**
+     * Address: 0x0086A3C0 (FUN_0086A3C0, Moho::CLuaWldUIProvider::GetDerivedObjectRef)
+     *
+     * What it does:
+     * Builds one reflected reference for this provider instance.
+     */
+    gpg::RRef GetDerivedObjectRef();
+
+    /**
+     * Address: 0x0086A650 (FUN_0086A650, Moho::CLuaWldUIProvider::StartLoadingDialog)
+     *
+     * What it does:
+     * Dispatches the `StartLoadingDialog` Lua callback on the embedded script object.
+     */
+    void StartLoadingDialog() override;
+
+    /**
+     * Address: 0x0086A660 (FUN_0086A660, Moho::CLuaWldUIProvider::UpdateLoadingDialog)
+     *
+     * What it does:
+     * Dispatches the `UpdateLoadingDialog` Lua callback with one float lane.
+     */
+    void UpdateLoadingDialog(float deltaSeconds) override;
+
+    /**
+     * Address: 0x0086A680 (FUN_0086A680, Moho::CLuaWldUIProvider::StopLoadingDialog)
+     *
+     * What it does:
+     * Dispatches the `StopLoadingDialog` Lua callback on the embedded script object.
+     */
+    void StopLoadingDialog() override;
+
+    /**
+     * Address: 0x0086A690 (FUN_0086A690, Moho::CLuaWldUIProvider::StartWaitingDialog)
+     *
+     * What it does:
+     * Dispatches the `StartWaitingDialog` Lua callback on the embedded script object.
+     */
+    void StartWaitingDialog() override;
+
+    /**
+     * Address: 0x0086A6A0 (FUN_0086A6A0, Moho::CLuaWldUIProvider::UpdateWaitingDialog)
+     *
+     * What it does:
+     * Dispatches the `UpdateWaitingDialog` Lua callback with one float lane.
+     */
+    void UpdateWaitingDialog(float deltaSeconds) override;
+
+    /**
+     * Address: 0x0086A6C0 (FUN_0086A6C0, Moho::CLuaWldUIProvider::StopWaitingDialog)
+     *
+     * What it does:
+     * Dispatches the `StopWaitingDialog` Lua callback on the embedded script object.
+     */
+    void StopWaitingDialog() override;
+
+    /**
+     * Address: 0x0086A6D0 (FUN_0086A6D0, Moho::CLuaWldUIProvider::OnStart)
+     *
+     * What it does:
+     * Dispatches the `OnStart` Lua callback on the embedded script object.
+     */
+    void OnStart() override;
+
+    /**
+     * Address: 0x0086A6E0 (FUN_0086A6E0, Moho::CLuaWldUIProvider::CreateGameInterface)
+     *
+     * What it does:
+     * Loads prefetch texture handles from Lua, caches them locally, then
+     * dispatches the `CreateGameInterface` callback.
+     */
+    void CreateGameInterface(bool createGameInterface) override;
+
+    /**
+     * Address: 0x0086A8C0 (FUN_0086A8C0, Moho::CLuaWldUIProvider::DestroyGameInterface)
+     *
+     * What it does:
+     * Dispatches the `DestroyGameInterface` Lua callback on the embedded script object.
+     */
+    void DestroyGameInterface() override;
+
+  public:
+    std::uint8_t mUnknown38[0x4]{}; // +0x38
+    gpg::core::FastVector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x3C
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CLuaWldUIProvider, mUnknown38) == 0x38, "CLuaWldUIProvider::mUnknown38 offset must be 0x38");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CLuaWldUIProvider, mPrefetchData) == 0x3C, "CLuaWldUIProvider::mPrefetchData offset must be 0x3C");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CLuaWldUIProvider) == 0x48, "CLuaWldUIProvider size must be 0x48");
 
   enum EUIState : std::int32_t
   {

@@ -10,7 +10,12 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityTransformPayload.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/script/CScriptEvent.h"
+#include "lua/LuaObject.h"
+#include "lua/LuaRuntimeTypes.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/CSimConVarBase.h"
@@ -675,6 +680,115 @@ namespace moho
   int register_CScrLuaMetatableFactory_MotorFallDown_Index()
   {
     return InitializeMotorFallDownLuaFactoryIndex();
+  }
+
+  namespace
+  {
+    constexpr const char* kMotorFallDownLuaClassName = "MotorFallDown";
+    constexpr const char* kMotorFallDownWhackName = "Whack";
+    constexpr const char* kMotorFallDownWhackHelpText = "MotorFallDown:Whack(nx,ny,nz,f,dobreak)";
+
+    [[nodiscard]] CScrLuaInitFormSet& MotorFallDownSimLuaInitSet()
+    {
+      if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("sim"); set != nullptr) {
+        return *set;
+      }
+
+      static CScrLuaInitFormSet fallbackSet("sim");
+      return fallbackSet;
+    }
+
+    [[nodiscard]] float ReadLuaNumberArg(LuaPlus::LuaState* const state, const int stackIndex)
+    {
+      LuaPlus::LuaStackObject arg(state, stackIndex);
+      if (lua_type(state->m_state, stackIndex) != LUA_TNUMBER) {
+        LuaPlus::LuaStackObject::TypeError(&arg, "number");
+      }
+      return static_cast<float>(lua_tonumber(state->m_state, stackIndex));
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00695720 (FUN_00695720, cfunc_MotorFallDownWhack)
+   *
+   * What it does:
+   * Unwraps the raw `lua_State` callback context and forwards to
+   * `cfunc_MotorFallDownWhackL`.
+   */
+  int cfunc_MotorFallDownWhack(lua_State* const luaContext)
+  {
+    return cfunc_MotorFallDownWhackL(SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006957A0 (FUN_006957A0, cfunc_MotorFallDownWhackL)
+   *
+   * What it does:
+   * Parses `MotorFallDown:Whack(nx, ny, nz, force, dobreak)`. On the first
+   * whack the motor captures the XZ-plane fall direction from
+   * `atan2(nx, nz)` and latches the `dobreak` flag into `mBreakOnWhack`,
+   * which switches the update loop from the spring-return path to the
+   * gravity-accelerated fall path. Every call adds `force` to the motor's
+   * angular-velocity accumulator (`mFallDepth`). The `ny` argument
+   * (vertical component of the hit normal) is intentionally ignored —
+   * only the horizontal XZ direction drives the fall orientation.
+   */
+  int cfunc_MotorFallDownWhackL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 6) {
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected %d args, but got %d", kMotorFallDownWhackHelpText, 6, argumentCount
+      );
+    }
+
+    const LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
+    MotorFallDown* const motor = SCR_FromLua_MotorFallDown(selfObject, state);
+    if (!motor) {
+      return 0;
+    }
+
+    const float normalX = ReadLuaNumberArg(state, 2);
+    (void)ReadLuaNumberArg(state, 3); // ny: hit-normal vertical — unused for XZ fall direction.
+    const float normalZ = ReadLuaNumberArg(state, 4);
+    const float force = ReadLuaNumberArg(state, 5);
+
+    LuaPlus::LuaStackObject dobreakArg(state, 6);
+    const bool dobreak = LuaPlus::LuaStackObject::GetBoolean(&dobreakArg);
+
+    if (!motor->mBreakOnWhack) {
+      motor->mFallDirectionRadians = std::atan2(normalX, normalZ);
+      motor->mBreakOnWhack = dobreak;
+    }
+
+    motor->mFallDepth += force;
+
+    lua_settop(rawState, 1);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00695740 (FUN_00695740, func_MotorFallDownWhack_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes `MotorFallDown:Whack()` into the sim Lua init set.
+   */
+  CScrLuaInitForm* func_MotorFallDownWhack_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      MotorFallDownSimLuaInitSet(),
+      kMotorFallDownWhackName,
+      &cfunc_MotorFallDownWhack,
+      &CScrLuaMetatableFactory<MotorFallDown>::Instance(),
+      kMotorFallDownLuaClassName,
+      kMotorFallDownWhackHelpText
+    );
+    return &binder;
   }
 } // namespace moho
 

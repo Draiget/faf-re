@@ -53,6 +53,8 @@ namespace
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgsRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kPlaySoundHelpText = "handle = PlaySound(sndParams,prepareOnly)";
+  constexpr const char* kPauseSoundHelpText = "PauseSound(categoryString,bPause)";
+  constexpr const char* kPauseVoiceHelpText = "PauseVoice(categoryString,bPause)";
   constexpr const char* kSoundIsPreparedHelpText = "bool = SoundIsPrepared(handle)";
   constexpr const char* kStartSoundHelpText = "StartSound(handle)";
   constexpr const char* kSetVolumeHelpText = "SetVolume(category, volume)";
@@ -1879,6 +1881,134 @@ namespace moho
     }
 
     return 1;
+  }
+
+  /**
+   * Address: 0x008ACDA0 (FUN_008ACDA0, cfunc_PauseSound)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_PauseSoundL`.
+   */
+  int cfunc_PauseSound(lua_State* const luaContext)
+  {
+    return cfunc_PauseSoundL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x008ACDC0 (FUN_008ACDC0, func_PauseSound_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `PauseSound(category, bPause)`.
+   */
+  CScrLuaInitForm* func_PauseSound_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText);
+    return &binder;
+  }
+
+  /**
+   * Address: 0x008ACE20 (FUN_008ACE20, cfunc_PauseSoundL)
+   *
+   * What it does:
+   * Resolves `(categoryString, bPause)` from Lua and forwards the pause
+   * request to the user sound manager's voice-engine instance when
+   * present. The FA binder names this entry point `PauseSound` but
+   * actually routes through `mVoiceEngine`, not the tutorial engine.
+   */
+  int cfunc_PauseSoundL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPauseSoundHelpText, 2, argumentCount);
+    }
+
+    LuaPlus::LuaStackObject categoryArg(state, 1);
+    const char* const categoryPtr = lua_tostring(rawState, 1);
+    if (!categoryPtr) {
+      LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
+    }
+    const msvc8::string category(categoryPtr);
+
+    LuaPlus::LuaStackObject pausedArg(state, 2);
+    const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);
+
+    auto* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
+    if (userSound != nullptr) {
+      if (AudioEngine* const voiceEngine = userSound->mVoiceEngine.get(); voiceEngine != nullptr) {
+        voiceEngine->SetPaused(gpg::StrArg{category.c_str()}, paused);
+      }
+    }
+
+    return 0;
+  }
+
+  /**
+   * Address: 0x008ACF50 (FUN_008ACF50, cfunc_PauseVoice)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_PauseVoiceL`.
+   */
+  int cfunc_PauseVoice(lua_State* const luaContext)
+  {
+    return cfunc_PauseVoiceL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x008ACF70 (FUN_008ACF70, func_PauseVoice_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `PauseVoice(category, bPause)`.
+   */
+  CScrLuaInitForm* func_PauseVoice_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText);
+    return &binder;
+  }
+
+  /**
+   * Address: 0x008ACFD0 (FUN_008ACFD0, cfunc_PauseVoiceL)
+   *
+   * What it does:
+   * Resolves `(categoryString, bPause)` from Lua and forwards the pause
+   * request to the user sound manager's tutorial-engine instance when
+   * present. The FA binder names this entry point `PauseVoice` but
+   * routes through `mTutorialEngine`.
+   */
+  int cfunc_PauseVoiceL(LuaPlus::LuaState* const state)
+  {
+    if (!state || !state->m_state) {
+      return 0;
+    }
+
+    lua_State* const rawState = state->m_state;
+    const int argumentCount = lua_gettop(rawState);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPauseVoiceHelpText, 2, argumentCount);
+    }
+
+    LuaPlus::LuaStackObject categoryArg(state, 1);
+    const char* const categoryPtr = lua_tostring(rawState, 1);
+    if (!categoryPtr) {
+      LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
+    }
+    const msvc8::string category(categoryPtr);
+
+    LuaPlus::LuaStackObject pausedArg(state, 2);
+    const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);
+
+    auto* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
+    if (userSound != nullptr) {
+      if (AudioEngine* const tutorialEngine = userSound->mTutorialEngine.get(); tutorialEngine != nullptr) {
+        tutorialEngine->SetPaused(gpg::StrArg{category.c_str()}, paused);
+      }
+    }
+
+    return 0;
   }
 
   /**

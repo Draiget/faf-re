@@ -466,4 +466,30 @@ namespace moho
    * one command through active process-global GPGNet interface (if present).
    */
   int cfunc_GpgNetSendL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007BA2C0 (FUN_007BA2C0, cfunc_LaunchGPGNet)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_LaunchGPGNetL`.
+   */
+  int cfunc_LaunchGPGNet(lua_State* luaContext);
+
+  /**
+   * Address: 0x007BA2E0 (FUN_007BA2E0, func_LaunchGPGNet_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `LaunchGPGNet()` binder into the user Lua init set.
+   */
+  CScrLuaInitForm* func_LaunchGPGNet_LuaFuncDef();
+
+  /**
+   * Address: 0x007BA340 (FUN_007BA340, cfunc_LaunchGPGNetL)
+   *
+   * What it does:
+   * Resolves the GPGNet client executable path (dev override, registry,
+   * fallback) and launches it via `ShellExecuteExW`, pushing the boolean
+   * launch result back to Lua.
+   */
+  int cfunc_LaunchGPGNetL(LuaPlus::LuaState* state);
 } // namespace moho

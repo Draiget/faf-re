@@ -6052,6 +6052,76 @@ void CDebugCanvas::DebugDrawLine(const SDebugLine& line)
   lines.push_back(line);
 }
 
+namespace
+{
+  /**
+   * Generic (end_ - first_) / sizeof(T) size helper used by the
+   * three non-inlined `size()` thunks the binary emits for the
+   * `SDebugWorldText`, `SDebugScreenText`, and `SDebugDecal` debug
+   * vector specializations. The first-pointer null-guard mirrors
+   * the binary's early-out for uninitialized vectors.
+   */
+  template <class TDebugRecord>
+  [[nodiscard]] std::size_t DebugVectorSizeThunk(const msvc8::vector<TDebugRecord>* const vec) noexcept
+  {
+    const TDebugRecord* const first = vec ? vec->data() : nullptr;
+    if (first == nullptr) {
+      return 0u;
+    }
+    return vec->size();
+  }
+} // namespace
+
+/**
+ * Address: 0x00452110 (FUN_00452110, sub_452110)
+ *
+ * IDA signature:
+ * int __thiscall sub_452110(int *this);
+ *
+ * What it does:
+ * Out-of-line `msvc8::vector<SDebugWorldText>::size()` specialization
+ * thunk used by `CDebugCanvas::worldText`. Returns zero when the
+ * vector's `first_` pointer is still null, matching the binary's
+ * early-out; otherwise returns `(last_ - first_) / sizeof(SDebugWorldText)`
+ * (element size `0x30`).
+ */
+std::size_t GetDebugWorldTextCount(const msvc8::vector<SDebugWorldText>* const worldText) noexcept
+{
+  return DebugVectorSizeThunk<SDebugWorldText>(worldText);
+}
+
+/**
+ * Address: 0x00452160 (FUN_00452160, sub_452160)
+ *
+ * IDA signature:
+ * int __thiscall sub_452160(int *this);
+ *
+ * What it does:
+ * Out-of-line `msvc8::vector<SDebugScreenText>::size()` specialization
+ * thunk (element size `0x48`). Same shape as
+ * `GetDebugWorldTextCount`.
+ */
+std::size_t GetDebugScreenTextCount(const msvc8::vector<SDebugScreenText>* const screenText) noexcept
+{
+  return DebugVectorSizeThunk<SDebugScreenText>(screenText);
+}
+
+/**
+ * Address: 0x004521B0 (FUN_004521B0, sub_4521B0)
+ *
+ * IDA signature:
+ * int __thiscall sub_4521B0(int *this);
+ *
+ * What it does:
+ * Out-of-line `msvc8::vector<SDebugDecal>::size()` specialization
+ * thunk (element size `0x34`). Same shape as
+ * `GetDebugWorldTextCount`.
+ */
+std::size_t GetDebugDecalCount(const msvc8::vector<SDebugDecal>* const decals) noexcept
+{
+  return DebugVectorSizeThunk<SDebugDecal>(decals);
+}
+
 /**
  * Address: 0x006531D0 (FUN_006531D0, helper used by Moho::RDebugWeapons::OnTick)
  */

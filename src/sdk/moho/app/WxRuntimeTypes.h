@@ -3041,12 +3041,25 @@ namespace moho
    */
   struct WRenViewport : wxWindowMswRuntime
   {
-    std::uint8_t mUnknown04To1C[0x19];
+    std::uint8_t mUnknown04To0C[0x08];
+    std::int32_t mRenderState0C = -1;
+    std::uint8_t mUnknown10To1D[0x0D];
     std::uint8_t mEnabled = 0;
     std::uint8_t mUnknown1ETo2B[0x0E];
     wxWindowBase* m_parent;
+
+    /**
+     * Address: 0x00453AA0 (FUN_00453AA0, sub_453AA0)
+     *
+     * What it does:
+     * Resets `mRenderState0C` to `-1` as part of the viewport's
+     * per-frame render prep; callers live in the render-camera
+     * outline path (`RenderCameraOutline` at 0x007F98A0).
+     */
+    void ResetRenderState0C() noexcept;
   };
 
+  static_assert(offsetof(WRenViewport, mRenderState0C) == 0x0C, "moho::WRenViewport::mRenderState0C offset must be 0x0C");
   static_assert(offsetof(WRenViewport, mEnabled) == 0x1D, "moho::WRenViewport::mEnabled offset must be 0x1D");
   static_assert(offsetof(WRenViewport, m_parent) == 0x2C, "moho::WRenViewport::m_parent offset must be 0x2C");
 

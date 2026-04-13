@@ -6,19 +6,47 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiTarget.h"
+#include "moho/ai/IAiCommandDispatchImpl.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/entity/EntityFastVectorReflection.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/COGrid.h"
+#include "moho/sim/CArmyImpl.h"
+#include "moho/sim/EAllianceTypeInfo.h"
+#include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitRepairTask.h"
 
 namespace
 {
+  class CUnitRepairTaskDispatchView final : public moho::CUnitRepairTask
+  {
+  public:
+    using moho::CUnitRepairTask::CUnitRepairTask;
+
+    int Execute() override
+    {
+      return -1;
+    }
+
+    void OnEvent(moho::ECommandEvent) override {}
+  };
+
+  static_assert(
+    sizeof(CUnitRepairTaskDispatchView) == sizeof(moho::CUnitRepairTask),
+    "CUnitRepairTaskDispatchView size must match CUnitRepairTask"
+  );
+
   [[nodiscard]] gpg::RType* CachedCUnitPodAssistType()
   {
     gpg::RType* type = moho::CUnitPodAssist::sType;
@@ -47,6 +75,127 @@ namespace
       moho::WeakPtr<moho::Unit>::sType = type;
     }
     return type;
+  }
+
+  [[nodiscard]] moho::IAiCommandDispatchImpl* AsDispatchImpl(moho::CCommandTask* const dispatchTask) noexcept
+  {
+    return static_cast<moho::IAiCommandDispatchImpl*>(dispatchTask);
+  }
+
+  [[nodiscard]] float DistanceSquared(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
+  {
+    const float dx = a.x - b.x;
+    const float dy = a.y - b.y;
+    const float dz = a.z - b.z;
+    return (dx * dx) + (dy * dy) + (dz * dz);
+  }
+
+  void DispatchRepairTask(
+    moho::CUnitPodAssist* const task,
+    moho::Unit* const targetUnit,
+    const bool isSiloBuild
+  )
+  {
+    (void)new (std::nothrow) CUnitRepairTaskDispatchView(AsDispatchImpl(task->mDispatchTask), targetUnit, isSiloBuild);
+  }
+
+  void DispatchReclaimTask(moho::CUnitPodAssist* const task, moho::Entity* const targetEntity)
+  {
+    moho::CAiTarget target{};
+    (void)target.UpdateTarget(targetEntity);
+    AsDispatchImpl(task->mDispatchTask)->IssueReclaimTask(target);
+  }
+
+  [[nodiscard]] moho::Unit* ResolveFocusUnit(moho::Unit* const unit) noexcept
+  {
+    if (unit == nullptr) {
+      return nullptr;
+    }
+
+    moho::Entity* const focusEntity = unit->GetFocusEntity();
+    return (focusEntity != nullptr) ? focusEntity->IsUnit() : nullptr;
+  }
+
+  [[nodiscard]] bool IsEligibleNearbyAssistCandidate(
+    moho::Unit* const ownerUnit,
+    moho::Unit* const candidateUnit
+  )
+  {
+    if (ownerUnit == nullptr || candidateUnit == nullptr) {
+      return false;
+    }
+
+    if (candidateUnit == ownerUnit || candidateUnit->IsDead()) {
+      return false;
+    }
+
+    if (ownerUnit->ArmyRef == nullptr || candidateUnit->SimulationRef == nullptr || candidateUnit->SimulationRef->mMapData == nullptr) {
+      return false;
+    }
+
+    if (!candidateUnit->SimulationRef->mMapData->IsWithin(candidateUnit->Position, 1.0f, ownerUnit->ArmyRef->UseWholeMap())) {
+      return false;
+    }
+
+    if (Wm3::Vector3f::Compare(&candidateUnit->Position, &candidateUnit->PrevPosition) != 0) {
+      return false;
+    }
+
+    const moho::CArmyImpl* const ownerArmy = ownerUnit->ArmyRef;
+    const moho::CArmyImpl* const candidateArmy = candidateUnit->ArmyRef;
+    return candidateArmy == ownerArmy || ownerArmy->GetAllianceWith(candidateArmy) == moho::ALLIANCE_Ally;
+  }
+
+  [[nodiscard]] moho::Unit* ResolveAssistDistanceTarget(moho::Unit* const candidateUnit) noexcept
+  {
+    if (candidateUnit == nullptr) {
+      return nullptr;
+    }
+
+    if (!candidateUnit->IsUnitState(moho::UNITSTATE_BeingReclaimed)) {
+      if (!candidateUnit->IsBeingBuilt() && candidateUnit->Health >= candidateUnit->MaxHealth) {
+        if (moho::Unit* const focusUnit = ResolveFocusUnit(candidateUnit); focusUnit != nullptr) {
+          return focusUnit;
+        }
+
+        if (!candidateUnit->IsUnitState(moho::UNITSTATE_Enhancing)
+            && !candidateUnit->IsUnitState(moho::UNITSTATE_SiloBuildingAmmo)) {
+          return nullptr;
+        }
+      }
+    }
+
+    return candidateUnit;
+  }
+
+  void GatherNearbyAssistEntities(moho::Unit* const ownerUnit, moho::EntityGatherVector& outEntities)
+  {
+    outEntities.ResetStorageToInline();
+    if (ownerUnit == nullptr || ownerUnit->SimulationRef == nullptr || ownerUnit->SimulationRef->mOGrid == nullptr) {
+      return;
+    }
+
+    const moho::RUnitBlueprint* const blueprint = ownerUnit->GetBlueprint();
+    if (blueprint == nullptr) {
+      return;
+    }
+
+    const Wm3::Vec3f& ownerPosition = ownerUnit->GetPosition();
+    const float scanRadius = blueprint->AI.GuardScanRadius;
+    const gpg::Rect2f worldRect{
+      ownerPosition.x - scanRadius,
+      ownerPosition.z - scanRadius,
+      ownerPosition.x + scanRadius,
+      ownerPosition.z + scanRadius
+    };
+
+    moho::CollisionDBRect cellRect{};
+    (void)moho::func_Rect2fToInt16(&cellRect, worldRect);
+    (void)ownerUnit->SimulationRef->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
+      outEntities,
+      cellRect,
+      moho::ENTITYTYPE_Unit
+    );
   }
 
   template <class TObject>
@@ -196,6 +345,117 @@ namespace moho
     }
 
     return commands[1].GetObjectPtr() != nullptr;
+  }
+
+  /**
+   * Address: 0x0061DA00 (FUN_0061DA00)
+   *
+   * What it does:
+   * For station-assist pod auto mode, scans nearby allied units in guard
+   * radius, chooses the nearest eligible assist target, then dispatches
+   * repair or reclaim follow-up work.
+   */
+  bool CUnitPodAssist::TryIssueNearbyAssistTask()
+  {
+    if (!mUnit->IsAutoMode()) {
+      return false;
+    }
+
+    if (mUnit->IsInCategory("STATIONASSISTPOD") && ((mUnit->ScriptBitMask & 0x10u) != 0u)) {
+      return false;
+    }
+
+    EntityGatherVector nearbyEntities{};
+    GatherNearbyAssistEntities(mUnit, nearbyEntities);
+
+    Unit* bestTargetUnit = nullptr;
+    float bestDistanceSquared = std::numeric_limits<float>::infinity();
+    for (Entity* const nearbyEntity : nearbyEntities) {
+      Unit* const nearbyUnit = (nearbyEntity != nullptr) ? nearbyEntity->IsUnit() : nullptr;
+      if (!IsEligibleNearbyAssistCandidate(mUnit, nearbyUnit)) {
+        continue;
+      }
+
+      Unit* const distanceTarget = ResolveAssistDistanceTarget(nearbyUnit);
+      if (distanceTarget == nullptr) {
+        continue;
+      }
+
+      const float candidateDistanceSquared = DistanceSquared(mUnit->GetPosition(), distanceTarget->GetPosition());
+      if (candidateDistanceSquared < bestDistanceSquared) {
+        bestDistanceSquared = candidateDistanceSquared;
+        bestTargetUnit = distanceTarget;
+      }
+    }
+
+    if (bestTargetUnit == nullptr) {
+      return false;
+    }
+
+    Kill();
+    if (bestTargetUnit->AiSiloBuild != nullptr && bestTargetUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+      DispatchRepairTask(this, bestTargetUnit, true);
+      return true;
+    }
+
+    if (bestTargetUnit->IsUnitState(UNITSTATE_BeingReclaimed)) {
+      DispatchReclaimTask(this, static_cast<Entity*>(bestTargetUnit));
+      return true;
+    }
+
+    DispatchRepairTask(this, bestTargetUnit, false);
+    return true;
+  }
+
+  /**
+   * Address: 0x0061DE50 (FUN_0061DE50)
+   *
+   * What it does:
+   * For non-station pod assist lanes, evaluates current assist-target/focus
+   * state and dispatches repair or reclaim follow-up work when possible.
+   */
+  bool CUnitPodAssist::TryIssueFocusedAssistTask()
+  {
+    if (!mUnit->IsAutoMode()) {
+      return false;
+    }
+
+    Unit* const assistTargetUnit = mAssistTarget.GetObjectPtr();
+    if (assistTargetUnit == nullptr) {
+      return false;
+    }
+
+    if (assistTargetUnit->IsUnitState(UNITSTATE_Enhancing)) {
+      Kill();
+      DispatchRepairTask(this, assistTargetUnit, false);
+      return true;
+    }
+
+    Entity* const focusEntity = assistTargetUnit->GetFocusEntity();
+    if (focusEntity == nullptr) {
+      return false;
+    }
+
+    Unit* const focusUnit = focusEntity->IsUnit();
+    if (focusUnit != nullptr && focusUnit->AiSiloBuild != nullptr && focusUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+      Kill();
+      DispatchRepairTask(this, focusUnit, true);
+      return true;
+    }
+
+    if (assistTargetUnit->IsUnitState(UNITSTATE_Repairing) || assistTargetUnit->IsUnitState(UNITSTATE_Building)) {
+      Kill();
+      DispatchRepairTask(this, focusUnit, false);
+      return true;
+    }
+
+    if (assistTargetUnit->IsUnitState(UNITSTATE_Reclaiming)) {
+      Kill();
+      DispatchReclaimTask(this, focusEntity);
+      return true;
+    }
+
+    return false;
   }
 
   /**

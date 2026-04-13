@@ -308,6 +308,52 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00438460 (FUN_00438460, Moho::CD3DPrimBatcher::~CD3DPrimBatcher)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CD3DPrimBatcher::~CD3DPrimBatcher(int a1);
+   *
+   * What it does:
+   * Tears down one prim-batcher instance in the binary's original order:
+   * destroy the three vertex sheets and the index sheet through their
+   * typed `Destroy` virtuals, release shared-control-block references
+   * held by the batch-texture and dynamic-texture-sheet weak-style
+   * handles, then release the primitive and vertex legacy-vector heap
+   * storage and null their tracking pointers.
+   */
+  CD3DPrimBatcher::~CD3DPrimBatcher()
+  {
+    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+
+    for (CD3DVertexSheet* const sheet : runtime->mVertexSheets) {
+      if (sheet != nullptr) {
+        sheet->Destroy();
+      }
+    }
+
+    if (runtime->mIndexSheet != nullptr) {
+      runtime->mIndexSheet->Destroy();
+    }
+
+    boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mDynamicTexSheet));
+    boost::ReleaseSharedControlOnly(AsSharedCountPair(&runtime->mTexture));
+
+    if (runtime->mPrimitives.mFirst != nullptr) {
+      ::operator delete(static_cast<void*>(runtime->mPrimitives.mFirst));
+    }
+    runtime->mPrimitives.mFirst = nullptr;
+    runtime->mPrimitives.mLast = nullptr;
+    runtime->mPrimitives.mEnd = nullptr;
+
+    if (runtime->mVertices.mFirst != nullptr) {
+      ::operator delete(static_cast<void*>(runtime->mVertices.mFirst));
+    }
+    runtime->mVertices.mFirst = nullptr;
+    runtime->mVertices.mLast = nullptr;
+    runtime->mVertices.mEnd = nullptr;
+  }
+
+  /**
    * Address: 0x00438560 (FUN_00438560)
    *
    * What it does:

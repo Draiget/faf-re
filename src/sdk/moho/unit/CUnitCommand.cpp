@@ -418,9 +418,6 @@ namespace
       variableData.mCells.push_back(issueData.mCells[i]);
     }
 
-    variableData.v19 = issueData.unk64;
-    variableData.v20 = issueData.unk68;
-    variableData.mMaxCount = issueData.unk6C;
     variableData.mCount = issueData.unk70;
     variableData.v23 = issueData.unk74;
   }

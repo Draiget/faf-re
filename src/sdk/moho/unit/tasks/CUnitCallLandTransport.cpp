@@ -8,6 +8,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/IAiTransport.h"
+#include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/path/SNavGoal.h"
@@ -36,19 +37,6 @@ namespace
   [[nodiscard]] bool IsValidCellPos(const moho::SOCellPos& cellPos) noexcept
   {
     return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
-  }
-
-  [[nodiscard]] gpg::Rect2i BuildOgridRectFromWorldPos(const moho::Unit* const unit, const Wm3::Vector3f& worldPos) noexcept
-  {
-    const moho::SFootprint& footprint = unit->GetFootprint();
-    const moho::SOCellPos cellPos = footprint.ToCellPos(worldPos);
-
-    return gpg::Rect2i{
-      static_cast<std::int32_t>(cellPos.x),
-      static_cast<std::int32_t>(cellPos.z),
-      static_cast<std::int32_t>(cellPos.x) + static_cast<std::int32_t>(footprint.mSizeX),
-      static_cast<std::int32_t>(cellPos.z) + static_cast<std::int32_t>(footprint.mSizeZ),
-    };
   }
 
   [[nodiscard]] gpg::RType* CachedCUnitCallLandTransportType()
@@ -208,16 +196,34 @@ namespace moho
 
         mUnit->UnitStateMask |= kUnitStateMaskWaitingForTransport;
         if (transport->TransportIsReadyForUnit(mUnit)) {
-          SOCellPos pickupCell = transport->TransportGetAttachPosition(mUnit);
-          if (!IsValidCellPos(pickupCell)) {
-            pickupCell = transportUnit->GetFootprint().ToCellPos(transportUnit->GetPosition());
+          SOCellPos pickupCell = transportUnit->GetFootprint().ToCellPos(transportUnit->GetPosition());
+
+          bool hasMeleeSpace = false;
+          if (transportUnit->IsMobile()) {
+            const SFootprint& transportFootprint = transportUnit->GetFootprint();
+            std::uint8_t transportSize = transportFootprint.mSizeZ;
+            if (transportFootprint.mSizeX > transportFootprint.mSizeZ) {
+              transportSize = transportFootprint.mSizeX;
+            }
+
+            if (transportSize > 1u) {
+              hasMeleeSpace = mUnit->HasMeleeSpaceAroundLargeTarget(transportUnit, &pickupCell, 1);
+            } else {
+              hasMeleeSpace = mUnit->HasMeleeSpaceAroundSmallTarget(transportUnit, &pickupCell);
+            }
+          } else {
+            hasMeleeSpace = mUnit->HasMeleeSpaceAroundSmallTarget(transportUnit, &pickupCell);
           }
-          if (!IsValidCellPos(pickupCell) || mSim == nullptr || mSim->mMapData == nullptr) {
+
+          if (!hasMeleeSpace || !IsValidCellPos(pickupCell)) {
             return -1;
           }
 
           const Wm3::Vector3f pickupWorldPos = COORDS_ToWorldPos(mSim->mMapData, pickupCell, mUnit->GetFootprint());
-          mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, pickupWorldPos));
+          const SCoordsVec2 pickupPosXZ{pickupWorldPos.x, pickupWorldPos.z};
+          gpg::Rect2i pickupRect{};
+          (void)COORDS_ToGridRect(&pickupRect, pickupPosXZ, mUnit->GetFootprint());
+          mUnit->ReserveOgridRect(pickupRect);
           mTaskState = NextTaskState(mTaskState);
           mIsOccupying = true;
           NewMoveTask(SNavGoal(pickupCell), this, 0, nullptr, 0);

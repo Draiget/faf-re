@@ -3,9 +3,36 @@
 
 #include "gpg/core/containers/Rect2.h"
 
+namespace gpg
+{
+  class RType;
+} // namespace gpg
+
 namespace moho
 {
   struct PathTablesImpl;
+
+  /**
+   * Recovered placeholder for `Moho::PathQueue` — used by
+   * `gpg::RRef_PathQueue` (FUN_005ACCA0) and as a forward-declared type
+   * referenced by `gpg::ReadArchive` and several path-finder lanes.
+   * The complete-object size and field layout have not yet been
+   * confirmed from binary evidence; the class is given a single
+   * `std::uintptr_t` body so it remains a complete C++ type for
+   * `typeid()` use.
+   *
+   * Note: the binary's `PathQueue::DirtyClusters` method is currently
+   * recovered on the sibling `PathTables::DirtyClusters` slot — those
+   * may be the same class with two decompiler-pass names.
+   */
+  class PathQueue
+  {
+  public:
+    static gpg::RType* sType;
+
+  private:
+    std::uintptr_t mPlaceholderState{};
+  };
 
   class PathTables
   {

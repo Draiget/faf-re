@@ -167,4 +167,8 @@ namespace moho
       cluster->DirtyRect(dirtyRect);
     }
   }
+
+  // Static cached RType slot for the placeholder `PathQueue` type;
+  // populated lazily by `gpg::RRef_PathQueue` via cached lookup.
+  gpg::RType* PathQueue::sType = nullptr;
 } // namespace moho
