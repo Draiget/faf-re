@@ -299,6 +299,12 @@ namespace LuaPlus
 		 */
 		void SetInteger(int32_t index, int32_t value);
 
+		/**
+		 * Address: 0x009081F0 (FUN_009081F0, ?SetInteger@LuaObject@LuaPlus@@QBEXPBDH@Z)
+		 *
+		 * What it does:
+		 * Writes one table entry by string key using an integer payload lane.
+		 */
 		void SetInteger(const char* key, int32_t value);
 
 		/**

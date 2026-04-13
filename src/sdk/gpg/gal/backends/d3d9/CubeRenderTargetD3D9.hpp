@@ -14,6 +14,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x00941450 (FUN_00941450, gpg::gal::CubeRenderTargetD3D9::CubeRenderTargetD3D9)
+         *
+         * What it does:
+         * Initializes cube-target state, applies one context/texture payload,
+         * and acquires one face-surface handle per cube face.
+         */
+        CubeRenderTargetD3D9(const CubeRenderTargetContext* context, void* cubeTexture);
+
+        /**
          * Address: 0x00941430 (FUN_00941430)
          *
          * What it does:

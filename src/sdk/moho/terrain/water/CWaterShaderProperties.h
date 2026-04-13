@@ -9,6 +9,7 @@
 namespace moho
 {
   class CD3DDynamicTextureSheet;
+  class ID3DTextureSheet;
 
   /**
    * Water shader parameters and texture handles for the high-fidelity water
@@ -46,6 +47,17 @@ namespace moho
      */
     void releaseTextures();
 
+    /**
+     * Address: 0x0089FD70 (FUN_0089FD70)
+     * Mangled: ?GetWaterRamp@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ
+     *
+     * What it does:
+     * Lazily resolves one water-ramp texture resource from the stored ramp-path
+     * string, caches it in `mTextures[5]`, and returns one retained shared
+     * texture-sheet handle.
+     */
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetWaterRamp() const;
+
     // -------------------------------------------------------------------------
     // Layout — offsets confirmed from binary evidence (dtor + releaseTextures).
     // Fields at +0x04 through +0x83 are not yet recovered; placeholder used.
@@ -60,12 +72,12 @@ namespace moho
 
     // Two additional string fields following the array.
     msvc8::string mShaderName4{};                    // +0xF4
-    msvc8::string mShaderName5{};                    // +0x110
+    msvc8::string mWaterRamp{};                      // +0x110
 
     // Six texture-sheet handles (boost::SharedPtrRaw<CD3DDynamicTextureSheet>).
     // Confirmed by: releaseTextures() iterating mTextures[0..5] and
     //   eh_vector_destructor(this+0x12C, size=8, n=4, WeakPtr_CD3DDynamicTextureSheet::Release).
-    boost::SharedPtrRaw<CD3DDynamicTextureSheet> mTextures[6]{};  // +0x12C
+    mutable boost::SharedPtrRaw<ID3DTextureSheet> mTextures[6]{}; // +0x12C
   };
 
   // Spot-check key field offsets derived from binary evidence.
@@ -73,8 +85,8 @@ namespace moho
                 "CWaterShaderProperties::mShaderNames offset must be 0x84");
   static_assert(offsetof(CWaterShaderProperties, mShaderName4) == 0xF4,
                 "CWaterShaderProperties::mShaderName4 offset must be 0xF4");
-  static_assert(offsetof(CWaterShaderProperties, mShaderName5) == 0x110,
-                "CWaterShaderProperties::mShaderName5 offset must be 0x110");
+  static_assert(offsetof(CWaterShaderProperties, mWaterRamp) == 0x110,
+                "CWaterShaderProperties::mWaterRamp offset must be 0x110");
   static_assert(offsetof(CWaterShaderProperties, mTextures) == 0x12C,
                 "CWaterShaderProperties::mTextures offset must be 0x12C");
 

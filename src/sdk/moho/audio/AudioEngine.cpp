@@ -1809,4 +1809,29 @@ namespace moho
       gpg::Warnf("SND: XACT3DApply failed.\n%s", func_SoundErrorCodeToMsg(applyResult));
     }
   }
+
+  /**
+   * Address: 0x004D9FA0 (FUN_004D9FA0, ?IsStopped@AudioEngine@Moho@@QAE_NPAUIXACTCue@@@Z)
+   *
+   * IXACTCue* cue
+   *
+   * What it does:
+   * Queries one cue state through `IXACTCue::GetState` and returns true when
+   * the state equals `0x20` (stopped).
+   */
+  bool AudioEngine::IsStopped(IXACTCue* const cue) const
+  {
+    int cueState = static_cast<int>(reinterpret_cast<std::uintptr_t>(this));
+    if (mImpl->mInstance == nullptr || cue == nullptr) {
+      return false;
+    }
+
+    const bool queryFailed = cue->GetState(&cueState) < 0;
+    if (queryFailed) {
+      const char* const errorText = func_SoundErrorCodeToMsg(static_cast<int>(queryFailed));
+      gpg::Warnf("SND: %s", errorText);
+    }
+
+    return cueState == 0x20;
+  }
 } // namespace moho

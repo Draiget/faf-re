@@ -415,6 +415,14 @@ namespace moho
   void register_CConFunc_LUA();
 
   /**
+   * Address: 0x00BDF9D0 (FUN_00BDF9D0, register_CConFunc_ExecutePasteBuffer)
+   *
+   * What it does:
+   * Registers the startup console command that executes clipboard text as Lua.
+   */
+  void register_CConFunc_ExecutePasteBuffer();
+
+  /**
    * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
    *
    * What it does:
@@ -662,6 +670,41 @@ namespace moho
    * texture state into it, then closes the stream.
    */
   void CON_DumpPreloadedTextures(void* commandArgs);
+
+  /**
+   * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
+   * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
+   *
+   * What it does:
+   * Requests application main-loop exit through the active wx app object.
+   */
+  void WIN_AppRequestExit();
+
+  /**
+   * Address: 0x004F3C30 (FUN_004F3C30, Moho::WIN_ToggleLogDialog)
+   *
+   * What it does:
+   * Lazily creates the log window when needed and toggles its visible state.
+   */
+  void WIN_ToggleLogDialog();
+
+  /**
+   * Address: 0x004F3C60 (FUN_004F3C60, Moho::WIN_ShowLogDialog)
+   *
+   * What it does:
+   * Parses one show/hide token and applies the requested visibility to the
+   * log dialog window.
+   */
+  void WIN_ShowLogDialog(void* commandArgs);
+
+  /**
+   * Address: 0x007B5920 (FUN_007B5920, Moho::CON_ExecutePasteBuffer)
+   *
+   * What it does:
+   * Reads UTF-8 clipboard text and executes it as Lua in active world-session
+   * state (or user Lua state when no active session exists).
+   */
+  void CON_ExecutePasteBuffer();
 
   /**
    * Address: <shared helper for recovered handlers>

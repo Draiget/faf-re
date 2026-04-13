@@ -28,6 +28,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007D9BB0 (FUN_007D9BB0, Moho::MapImager::~MapImager)
+     *
+     * What it does:
+     * Clears border mesh instances and releases retained vector storage lanes.
+     */
+    ~MapImager();
+
+    /**
      * Address: 0x007D9B90 (FUN_007D9B90)
      *
      * What it does:

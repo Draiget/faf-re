@@ -22,6 +22,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005D5F30 (FUN_005D5F30, Moho::LAiAttackerImpl::LAiAttackerImpl)
+     *
+     * What it does:
+     * Initializes one detached AI attacker task shell and binds the owning
+     * `CAiAttackerImpl` lane.
+     */
+    explicit LAiAttackerImpl(CAiAttackerImpl* owner);
+
+    /**
      * Address: 0x005D5FD0 (FUN_005D5FD0, Moho::LAiAttackerImpl::dtr)
      * Address: 0x005D5FF0 (FUN_005D5FF0, destructor body helper)
      * Slot: 0

@@ -107,7 +107,7 @@ namespace moho
   void CRandomStreamTypeInfo::Init()
   {
     size_ = sizeof(CRandomStream);
-    newRefFunc_ = &NewRef;
+    newRefFunc_ = &::NewRef;
     deleteFunc_ = &Delete;
     ctorRefFunc_ = &CtrRef;
     dtrFunc_ = &Destruct;

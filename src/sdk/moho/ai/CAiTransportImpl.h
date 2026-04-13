@@ -76,6 +76,16 @@ namespace moho
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
 
+    /**
+     * Address: 0x005EBB30 (FUN_005EBB30, Moho::STransportPickUpInfo::MemberSerialize)
+     *
+     * What it does:
+     * Writes `mFallbackPos` (SCoordsVec2), `mOri` (Quaternionf), `mPos` (Vector3f),
+     * `mUnits` (EntitySetTemplate<Unit>), and `mHasSpace` (bool) into the archive
+     * via cached RType lookups.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     SCoordsVec2 mFallbackPos;        // +0x00
     Wm3::Quatf mOri;                 // +0x08
     Wm3::Vec3f mPos;                 // +0x18
@@ -485,6 +495,19 @@ namespace moho
       msvc8::vector<SAttachPoint>& attachPoints,
       msvc8::vector<SAttachPoint>& outAttachPoints,
       int& outAttachSize
+    );
+
+    /**
+     * Address: 0x005E9700 (FUN_005E9700, ??0vector_SAttachPoint@std@@QAE@@Z)
+     * Mangled: ??0vector_SAttachPoint@std@@QAE@@Z
+     *
+     * What it does:
+     * Rebuilds one destination attach-point vector from source lanes using the
+     * same zero-init + resize + copy sequence as the VC8 helper constructor.
+     */
+    static msvc8::vector<SAttachPoint>* CopyAttachPointVector(
+      const msvc8::vector<SAttachPoint>& source,
+      msvc8::vector<SAttachPoint>& destination
     );
 
     /**

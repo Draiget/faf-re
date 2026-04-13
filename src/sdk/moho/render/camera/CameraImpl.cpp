@@ -10,6 +10,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/math/MathReflection.h"
 #include "moho/render/RCamManager.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CWldSession.h"
@@ -22,6 +23,7 @@ namespace moho
   extern float cam_NearZoom;
   extern float cam_FarFOV;
   extern float cam_FarPitch;
+  extern float cam_ShakeMult;
   extern float ren_BorderSize;
   int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
   int cfunc_CameraImplReset(lua_State* luaContext);
@@ -120,6 +122,41 @@ namespace
   constexpr const char* kCameraAccTypeFastInSlowOutName = "FastInSlowOut";
   constexpr const char* kCameraAccTypeSlowInOutName = "SlowInOut";
 
+  struct CameraShakeParamsView
+  {
+    Wm3::Vec3f mCenter{};                  // +0x00
+    float mMaxRange = 0.0f;                // +0x0C
+    float mMinMagnitude = 0.0f;            // +0x10
+    float mMaxMagnitude = 0.0f;            // +0x14
+    float mDuration = 0.0f;                // +0x18
+    float mElapsed = 0.0f;                 // +0x1C
+    float mScale = 0.0f;                   // +0x20
+  };
+
+  static_assert(sizeof(CameraShakeParamsView) == 0x24, "CameraShakeParamsView size must be 0x24");
+  static_assert(offsetof(CameraShakeParamsView, mCenter) == 0x00, "CameraShakeParamsView::mCenter offset must be 0x00");
+  static_assert(
+    offsetof(CameraShakeParamsView, mMaxRange) == 0x0C,
+    "CameraShakeParamsView::mMaxRange offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CameraShakeParamsView, mMinMagnitude) == 0x10,
+    "CameraShakeParamsView::mMinMagnitude offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CameraShakeParamsView, mMaxMagnitude) == 0x14,
+    "CameraShakeParamsView::mMaxMagnitude offset must be 0x14"
+  );
+  static_assert(
+    offsetof(CameraShakeParamsView, mDuration) == 0x18,
+    "CameraShakeParamsView::mDuration offset must be 0x18"
+  );
+  static_assert(
+    offsetof(CameraShakeParamsView, mElapsed) == 0x1C,
+    "CameraShakeParamsView::mElapsed offset must be 0x1C"
+  );
+  static_assert(offsetof(CameraShakeParamsView, mScale) == 0x20, "CameraShakeParamsView::mScale offset must be 0x20");
+
   struct CameraImplRuntimeView
   {
     std::uint8_t mUnknown000To03B[0x3C]{};
@@ -155,7 +192,9 @@ namespace
     std::uint8_t mEnableEaseInOut = 0;       // +0x3CC
     std::uint8_t mUnknown3CDTo3CF[0x03]{};   // +0x3CD
     float mUnknown3D0 = 0.0f;                // +0x3D0
-    std::uint8_t mUnknown3D4To44F[0x7C]{};   // +0x3D4
+    std::uint8_t mUnknown3D4To427[0x54]{};   // +0x3D4
+    CameraShakeParamsView mCamShakeParams{}; // +0x428
+    std::uint8_t mUnknown44CTo44F[0x04]{};   // +0x44C
     std::int32_t mAccType = 0;               // +0x450
   };
 
@@ -237,6 +276,10 @@ namespace
     "CameraImplRuntimeView::mEnableEaseInOut offset must be 0x3CC"
   );
   static_assert(
+    offsetof(CameraImplRuntimeView, mCamShakeParams) == 0x428,
+    "CameraImplRuntimeView::mCamShakeParams offset must be 0x428"
+  );
+  static_assert(
     offsetof(CameraImplRuntimeView, mAccType) == 0x450,
     "CameraImplRuntimeView::mAccType offset must be 0x450"
   );
@@ -249,6 +292,58 @@ namespace
   [[nodiscard]] const CameraImplRuntimeView* AsRuntimeView(const moho::CameraImpl* const camera) noexcept
   {
     return reinterpret_cast<const CameraImplRuntimeView*>(camera);
+  }
+
+  /**
+   * Address: 0x007A67C0 (FUN_007A67C0, func_CameraImplUpdateShake)
+   *
+   * What it does:
+   * Builds one per-frame camera shake offset from center/range/time/magnitude
+   * lanes and scales it by `cam_ShakeMult`.
+   */
+  Wm3::Vector3f* func_CameraImplUpdateShake(
+    const Wm3::Vector3f* const cameraOffset,
+    Wm3::Vector3f* const outShakeOffset,
+    CameraShakeParamsView* const shakeParams
+  )
+  {
+    if (shakeParams->mElapsed >= shakeParams->mDuration) {
+      outShakeOffset->x = 0.0f;
+      outShakeOffset->y = 0.0f;
+      outShakeOffset->z = 0.0f;
+      return outShakeOffset;
+    }
+
+    Wm3::Vector3f shakeDirection{};
+    shakeDirection.x = shakeParams->mCenter.x - cameraOffset->x;
+    shakeDirection.y = 0.0f;
+    shakeDirection.z = shakeParams->mCenter.z - cameraOffset->z;
+
+    const float centerDistance = Wm3::Vector3f::Normalize(&shakeDirection);
+    if (centerDistance < 10.0f) {
+      shakeDirection.x = static_cast<float>(moho::MathGlobalRandomRange(-1.0f, 1.0f));
+      shakeDirection.y = 0.0f;
+      shakeDirection.z = static_cast<float>(moho::MathGlobalRandomRange(-1.0f, 1.0f));
+      (void)Wm3::Vector3f::Normalize(&shakeDirection);
+    }
+
+    float distanceFactor = centerDistance / shakeParams->mMaxRange;
+    if (distanceFactor >= 1.0f) {
+      distanceFactor = 1.0f;
+    }
+
+    const float magnitude =
+      (1.0f - (shakeParams->mElapsed / shakeParams->mDuration)) *
+      (((shakeParams->mMaxMagnitude - shakeParams->mMinMagnitude) * distanceFactor) + shakeParams->mMinMagnitude);
+    const float radialAmount =
+      static_cast<float>(moho::MathGlobalRandomUnitScaled(magnitude)) * shakeParams->mScale * 0.5f;
+    const float tangentialAmount = static_cast<float>(moho::MathGlobalRandomRange(-magnitude, magnitude)) * 0.25f;
+
+    outShakeOffset->x = ((shakeDirection.x * radialAmount) + (shakeDirection.z * tangentialAmount)) * moho::cam_ShakeMult;
+    outShakeOffset->y = ((shakeDirection.y * radialAmount) + (tangentialAmount * 0.0f)) * moho::cam_ShakeMult;
+    outShakeOffset->z =
+      ((shakeDirection.z * radialAmount) + ((0.0f - shakeDirection.x) * tangentialAmount)) * moho::cam_ShakeMult;
+    return outShakeOffset;
   }
 
   struct CameraImplZoomLimitView

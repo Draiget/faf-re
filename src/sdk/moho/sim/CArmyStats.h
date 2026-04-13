@@ -159,6 +159,28 @@ namespace moho
     void Delete(const char* statPath) override;
 
     /**
+     * Address: 0x00714870 (FUN_00714870, Moho::CArmyStats::MemberDeserialize)
+     *
+     * gpg::ReadArchive*
+     *
+     * What it does:
+     * Loads base stats storage, name-index map runtime lane, and trigger-list
+     * runtime lane from archive using cached reflection RTTI.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00714920 (FUN_00714920, Moho::CArmyStats::MemberSerialize)
+     *
+     * gpg::WriteArchive*
+     *
+     * What it does:
+     * Writes base stats storage, name-index map runtime lane, and trigger-list
+     * runtime lane to archive using cached reflection RTTI.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
      * Address: 0x0070B860 (FUN_0070B860, Moho::CArmyStats::GetStat)
      *
      * What it does:

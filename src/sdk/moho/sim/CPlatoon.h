@@ -7,6 +7,7 @@
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/ArmyUnitSet.h"
 
 namespace LuaPlus
 {
@@ -111,6 +112,17 @@ namespace moho
      * Returns the first squad lane matching `squadClass`, or null when absent.
      */
     CSquad* GetSquad(ESquadClass squadClass);
+
+    /**
+     * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
+     *
+     * What it does:
+     * Locates this platoon's `SQUADCLASS_Unassigned` squad and forwards to
+     * `CSquad::AppendUnitsWithBP` to collect up to `maxCount` live units
+     * matching `blueprintId` into `outUnits`. No-op when there is no
+     * unassigned squad.
+     */
+    void GetUnassignedUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
 
     /**
      * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)

@@ -312,6 +312,13 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x005166A0 (FUN_005166A0, Moho::REmitterBlueprintCurveTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates one `REmitterBlueprintCurve`, runs constructor initialization,
+   * and returns a typed reflection reference.
+   */
   [[nodiscard]] gpg::RRef NewEmitterCurveRef()
   {
     return MakeEmitterCurveRef(new moho::REmitterBlueprintCurve());

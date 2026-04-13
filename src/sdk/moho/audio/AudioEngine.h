@@ -528,12 +528,13 @@ namespace moho
     static void Calculate3D(const Wm3::Vec3f* worldPos, AudioEngine* engine, IXACTCue* cue);
 
     /**
-     * Address: unknown (called from HSound::UpdateLoopCompletionState)
+     * Address: 0x004D9FA0 (FUN_004D9FA0, ?IsStopped@AudioEngine@Moho@@QAE_NPAUIXACTCue@@@Z)
      *
      * IXACTCue* cue
      *
      * What it does:
-     * Queries whether the given cue has stopped playing.
+     * Queries one cue state and returns true when the XACT state mask equals
+     * the stopped flag value (`0x20`).
      */
     [[nodiscard]] bool IsStopped(IXACTCue* cue) const;
   };

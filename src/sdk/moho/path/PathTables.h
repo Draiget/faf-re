@@ -5,9 +5,19 @@
 
 namespace moho
 {
+  struct PathTablesImpl;
+
   class PathTables
   {
   public:
+    /**
+     * Address: 0x0076BAC0 (FUN_0076BAC0, ??1PathTables@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Releases all per-footprint cluster maps, tears down the impl payload, and frees impl storage.
+     */
+    ~PathTables();
+
     /**
      * Address: 0x0076BC10 (FUN_0076BC10)
      *
@@ -35,8 +45,8 @@ namespace moho
     void DirtyClusters(const gpg::Rect2i& dirtyRect);
 
   private:
-    // Runtime path-queue implementation pointer (PathQueue::Impl).
-    void* mQueue;
+    // Runtime path-table implementation payload (PathTables::Impl).
+    PathTablesImpl* mImpl;
   };
 
   static_assert(sizeof(PathTables) == 0x4, "PathTables size must be 0x4");

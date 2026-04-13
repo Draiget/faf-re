@@ -6,6 +6,8 @@
 
 namespace moho
 {
+  class CAiPathNavigator;
+
   /**
    * VFTABLE: 0x00E1C6B4
    * COL:  0x00E72488
@@ -42,6 +44,39 @@ namespace moho
      * VFTable SLOT: 9
      */
     void Init() override;
+
+    /**
+     * Address: 0x005B0930 (FUN_005B0930, Moho::CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath)
+     */
+    static void __stdcall AddBase_Listener_NavPath(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x005B0740 (FUN_005B0740, Moho::CAiPathNavigatorTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates one `CAiPathNavigator` and returns a reflection reference to
+     * the constructed object.
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x005B07E0 (FUN_005B07E0, Moho::CAiPathNavigatorTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CAiPathNavigator` in caller-provided storage and returns
+     * a reflection reference to it.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x005B07C0 (FUN_005B07C0, Moho::CAiPathNavigatorTypeInfo::Delete)
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x005B0850 (FUN_005B0850, Moho::CAiPathNavigatorTypeInfo::Destruct)
+     */
+    static void Destruct(void* objectStorage);
   };
 
   static_assert(sizeof(CAiPathNavigatorTypeInfo) == 0x64, "CAiPathNavigatorTypeInfo size must be 0x64");

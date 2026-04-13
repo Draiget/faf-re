@@ -1,6 +1,7 @@
 #include "moho/unit/tasks/CUnitGetBuiltTaskTypeInfo.h"
 
 #include <cstdlib>
+#include <new>
 #include <typeinfo>
 
 #include "moho/unit/tasks/CUnitGetBuiltTask.h"
@@ -41,6 +42,15 @@ namespace
     }
     return type;
   }
+
+  [[nodiscard]] gpg::RType* CachedCUnitGetBuiltTaskType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::CUnitGetBuiltTask));
+    }
+    return cached;
+  }
 } // namespace
 
 namespace moho
@@ -79,7 +89,7 @@ namespace moho
    */
   void CUnitGetBuiltTaskTypeInfo::Init()
   {
-    size_ = 0x30;
+    size_ = sizeof(CUnitGetBuiltTask);
     newRefFunc_ = &CUnitGetBuiltTaskTypeInfo::NewRef;
     ctorRefFunc_ = &CUnitGetBuiltTaskTypeInfo::CtrRef;
     deleteFunc_ = &CUnitGetBuiltTaskTypeInfo::Delete;
@@ -90,17 +100,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x0060A600 (FUN_0060A600, AddBase_CCommandTask lane)
+   * Address: 0x0060C430 (FUN_0060C430, Moho::CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask)
    *
    * What it does:
    * Registers `CCommandTask` as reflection base for `CUnitGetBuiltTask`.
    */
-  void CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCCommandTaskType();
-    if (!baseType) {
-      return;
-    }
 
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
@@ -109,6 +116,58 @@ namespace moho
     baseField.v4 = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Address: 0x0060BE20 (FUN_0060BE20, Moho::CUnitGetBuiltTaskTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates one `CUnitGetBuiltTask` and tags it with the reflected runtime
+   * type descriptor.
+   */
+  gpg::RRef CUnitGetBuiltTaskTypeInfo::NewRef()
+  {
+    auto* const task = new (std::nothrow) CUnitGetBuiltTask();
+    return gpg::RRef{task, CachedCUnitGetBuiltTaskType()};
+  }
+
+  /**
+   * Address: 0x0060BEC0 (FUN_0060BEC0, Moho::CUnitGetBuiltTaskTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Constructs one `CUnitGetBuiltTask` in caller-provided storage and tags it
+   * with the reflected runtime type descriptor.
+   */
+  gpg::RRef CUnitGetBuiltTaskTypeInfo::CtrRef(void* const objectStorage)
+  {
+    auto* const task = static_cast<CUnitGetBuiltTask*>(objectStorage);
+    if (task) {
+      new (task) CUnitGetBuiltTask();
+    }
+    return gpg::RRef{task, CachedCUnitGetBuiltTaskType()};
+  }
+
+  /**
+   * Address: 0x0060BEA0 (FUN_0060BEA0, Moho::CUnitGetBuiltTaskTypeInfo::Delete)
+   *
+   * What it does:
+   * Deletes a `CUnitGetBuiltTask` through its deleting-destructor path.
+   */
+  void CUnitGetBuiltTaskTypeInfo::Delete(void* const objectStorage)
+  {
+    delete static_cast<CUnitGetBuiltTask*>(objectStorage);
+  }
+
+  /**
+   * Address: 0x0060BF40 (FUN_0060BF40, Moho::CUnitGetBuiltTaskTypeInfo::Destruct)
+   *
+   * What it does:
+   * Runs the non-deleting `CUnitGetBuiltTask` destructor body on placement
+   * storage.
+   */
+  void CUnitGetBuiltTaskTypeInfo::Destruct(void* const objectStorage)
+  {
+    static_cast<CUnitGetBuiltTask*>(objectStorage)->~CUnitGetBuiltTask();
   }
 
   /**

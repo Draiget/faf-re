@@ -672,6 +672,12 @@ namespace gpg
     return gMap;
   }
 
+  /**
+   * Address: 0x008DD8E0 (FUN_008DD8E0, func_GetRTypeVec)
+   *
+   * What it does:
+   * Lazily constructs and returns the global reflection type-index vector.
+   */
   inline TypeVec& GetRTypeVec()
   {
     static TypeVec gVec;
@@ -2660,6 +2666,16 @@ namespace gpg
      */
     [[nodiscard]]
     virtual RRef GetDerivedObjectRef();
+
+    /**
+     * Address: 0x008DC130 (FUN_008DC130, gpg::RType::NewRef)
+     *
+     * What it does:
+     * Invokes the registered default-constructor callback and returns the
+     * produced reference, or throws `BadRefCast` when no constructor callback
+     * is registered for this type.
+     */
+    [[nodiscard]] RRef NewRef() const;
 
     /**
      * Destructor.

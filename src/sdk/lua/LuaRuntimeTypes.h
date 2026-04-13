@@ -262,6 +262,21 @@ struct __declspec(align(8)) lua_State
 	GCObject* gclist;             // Thread GC list link.
 	unsigned int allocFlags;      // Allocator behavior flags.
 	LuaPlus::LuaState* stateUserData; // C++ LuaState wrapper back-pointer.
+
+	/**
+	 * Address: 0x00921050 (FUN_00921050, lua_State::MemberSerialize)
+	 *
+	 * What it does:
+	 * Serializes raw VM stack/callframe/global/upvalue lanes for one
+	 * `lua_State` runtime object.
+	 */
+	static void MemberSerialize(
+		gpg::WriteArchive* archive,
+		lua_State* state,
+		int version,
+		const gpg::RRef* ownerRef
+	);
+
 	// Stock LuaPlus_1081 ends at +0x44. Remaining slots are kept for the
 	// engine-linked build variant until each one is proven in gpgcore/moho.
 	int32_t unknown48;

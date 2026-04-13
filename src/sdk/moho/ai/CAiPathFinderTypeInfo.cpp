@@ -73,73 +73,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiPathFinderType()
-  {
-    if (!CAiPathFinder::sType) {
-      CAiPathFinder::sType = gpg::LookupRType(typeid(CAiPathFinder));
-    }
-    return CAiPathFinder::sType;
-  }
-
-  template <typename T>
-  [[nodiscard]] gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  [[nodiscard]] gpg::RRef CreateAiPathFinderRefOwned()
-  {
-    return MakeTypedRef(new CAiPathFinder(), CachedCAiPathFinderType());
-  }
-
-  void DeleteAiPathFinderOwned(void* object)
-  {
-    delete static_cast<CAiPathFinder*>(object);
-  }
-
-  [[nodiscard]] gpg::RRef ConstructAiPathFinderRefInPlace(void* objectStorage)
-  {
-    auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
-    if (pathFinder) {
-      new (pathFinder) CAiPathFinder();
-    }
-    return MakeTypedRef(pathFinder, CachedCAiPathFinderType());
-  }
-
-  void DestroyAiPathFinderInPlace(void* object)
-  {
-    auto* const pathFinder = static_cast<CAiPathFinder*>(object);
-    if (pathFinder) {
-      pathFinder->~CAiPathFinder();
-    }
-  }
-
   void cleanup_Rect2iListTypeName()
   {
     gRect2iListTypeName.clear();
@@ -294,15 +227,75 @@ const char* CAiPathFinderTypeInfo::GetName() const
 }
 
 /**
+ * Address: 0x005AB870 (FUN_005AB870, Moho::CAiPathFinderTypeInfo::NewRef)
+ *
+ * What it does:
+ * Allocates and constructs one `CAiPathFinder` object for reflection use,
+ * then returns its typed reflection reference.
+ */
+gpg::RRef CAiPathFinderTypeInfo::NewRef()
+{
+  auto* const pathFinder = new (std::nothrow) CAiPathFinder();
+  gpg::RRef out{};
+  (void)gpg::RRef_CAiPathFinder(&out, pathFinder);
+  return out;
+}
+
+/**
+ * Address: 0x005AB8E0 (FUN_005AB8E0, Moho::CAiPathFinderTypeInfo::Delete)
+ *
+ * What it does:
+ * Deletes one heap-owned `CAiPathFinder` object.
+ */
+void CAiPathFinderTypeInfo::Delete(void* const objectStorage)
+{
+  delete static_cast<CAiPathFinder*>(objectStorage);
+}
+
+/**
+ * Address: 0x005AB900 (FUN_005AB900, Moho::CAiPathFinderTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Placement-constructs one `CAiPathFinder` object in caller-provided storage,
+ * then returns its typed reflection reference.
+ */
+gpg::RRef CAiPathFinderTypeInfo::CtrRef(void* const objectStorage)
+{
+  auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
+  if (pathFinder != nullptr) {
+    new (pathFinder) CAiPathFinder();
+  }
+
+  gpg::RRef out{};
+  (void)gpg::RRef_CAiPathFinder(&out, pathFinder);
+  return out;
+}
+
+/**
+ * Address: 0x005AB970 (FUN_005AB970, Moho::CAiPathFinderTypeInfo::Destruct)
+ *
+ * What it does:
+ * Runs in-place destructor for one `CAiPathFinder` object without freeing
+ * storage.
+ */
+void CAiPathFinderTypeInfo::Destruct(void* const objectStorage)
+{
+  auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
+  if (pathFinder != nullptr) {
+    pathFinder->~CAiPathFinder();
+  }
+}
+
+/**
  * Address: 0x005AAB00 (FUN_005AAB00, ?Init@CAiPathFinderTypeInfo@Moho@@UAEXXZ)
  */
 void CAiPathFinderTypeInfo::Init()
 {
   size_ = sizeof(CAiPathFinder);
-  newRefFunc_ = &CreateAiPathFinderRefOwned;
-  ctorRefFunc_ = &ConstructAiPathFinderRefInPlace;
-  deleteFunc_ = &DeleteAiPathFinderOwned;
-  dtrFunc_ = &DestroyAiPathFinderInPlace;
+  newRefFunc_ = &CAiPathFinderTypeInfo::NewRef;
+  ctorRefFunc_ = &CAiPathFinderTypeInfo::CtrRef;
+  deleteFunc_ = &CAiPathFinderTypeInfo::Delete;
+  dtrFunc_ = &CAiPathFinderTypeInfo::Destruct;
 
   gpg::RType::Init();
 

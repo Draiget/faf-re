@@ -550,6 +550,46 @@ namespace moho
   gpg::RType* CEconRequest::sType = nullptr;
   gpg::RType* CEconomyEvent::sType = nullptr;
   CScrLuaMetatableFactory<CEconomyEvent> CScrLuaMetatableFactory<CEconomyEvent>::sInstance{};
+
+  /**
+   * Address: 0x00774A60 (FUN_00774A60, Moho::CEconRequest::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes requested and granted economy-value lanes.
+   */
+  void CEconRequest::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    gpg::RType* const econValueType = CachedSEconValueType();
+    GPG_ASSERT(econValueType != nullptr);
+
+    archive->Read(econValueType, &mRequested, nullOwner);
+    archive->Read(econValueType, &mGranted, nullOwner);
+  }
+
+  /**
+   * Address: 0x00774AE0 (FUN_00774AE0, Moho::CEconRequest::MemberSerialize)
+   *
+   * What it does:
+   * Serializes requested and granted economy-value lanes.
+   */
+  void CEconRequest::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    gpg::RType* const econValueType = CachedSEconValueType();
+    GPG_ASSERT(econValueType != nullptr);
+
+    archive->Write(econValueType, &mRequested, nullOwner);
+    archive->Write(econValueType, &mGranted, nullOwner);
+  }
 } // namespace moho
 
 /**

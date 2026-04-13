@@ -18,6 +18,8 @@
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
+#include "moho/app/WinApp.h"
+#include "moho/app/WxRuntimeTypes.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConFunc.h"
 #include "moho/core/Thread.h"
@@ -45,11 +47,9 @@ using namespace moho;
 
 namespace moho
 {
-  void WIN_AppRequestExit();
-  void WIN_ToggleLogDialog();
-  void WIN_ShowLogDialog();
   void CON_WxInputBox(void* commandArgs);
   extern bool sPathDebuggerEnabled;
+  extern CWinLogTarget sLogWindowTarget;
 }
 
 namespace moho
@@ -153,6 +153,22 @@ namespace
   static_assert(
     offsetof(CameraImplDumpRuntimeView, mTargetLocation) == 0x380,
     "CameraImplDumpRuntimeView::mTargetLocation offset must be 0x380"
+  );
+
+  struct WWinLogWindowVisibilityRuntimeView
+  {
+    std::uint8_t mUnknown00ToCB[0xCC]{};
+    std::uint8_t mBitfields = 0;
+
+    [[nodiscard]] bool IsShown() const noexcept
+    {
+      return (mBitfields & 0x02u) != 0u;
+    }
+  };
+
+  static_assert(
+    offsetof(WWinLogWindowVisibilityRuntimeView, mBitfields) == 0xCC,
+    "WWinLogWindowVisibilityRuntimeView::mBitfields offset must be 0xCC"
   );
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
@@ -1761,6 +1777,85 @@ void moho::UI_ShowRenameDialog()
 }
 
 /**
+ * Address: 0x004F2B40 (FUN_004F2B40, ?WIN_AppRequestExit@Moho@@YAXXZ)
+ * Address: 0x004F2400 (FUN_004F2400, ?WIN_AppRequestExit@Moho@@YAXXZ_0)
+ *
+ * What it does:
+ * Requests application main-loop exit through the active wx app object.
+ */
+void moho::WIN_AppRequestExit()
+{
+  wxTheApp->ExitMainLoop();
+}
+
+/**
+ * Address: 0x004F3C30 (FUN_004F3C30, Moho::WIN_ToggleLogDialog)
+ *
+ * What it does:
+ * Lazily creates the log window when needed and toggles its visible state.
+ */
+void moho::WIN_ToggleLogDialog()
+{
+  WWinLogWindow* dialog = sLogWindowTarget.dialog;
+  if (dialog == nullptr) {
+    WINX_PrecreateLogWindow();
+    dialog = sLogWindowTarget.dialog;
+  }
+
+  const auto* const dialogView = reinterpret_cast<const WWinLogWindowVisibilityRuntimeView*>(dialog);
+  dialog->Show(!dialogView->IsShown());
+}
+
+/**
+ * Address: 0x004F3C60 (FUN_004F3C60, Moho::WIN_ShowLogDialog)
+ *
+ * What it does:
+ * Parses one boolean visibility token (`"true"` => show, otherwise hide),
+ * ensures the log-window runtime exists, and forwards the visibility toggle.
+ */
+void moho::WIN_ShowLogDialog(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 2u) {
+    return;
+  }
+
+  const msvc8::string* const showToken = args.At(1u);
+  if (showToken == nullptr) {
+    return;
+  }
+
+  const bool showDialog = std::strcmp(showToken->c_str(), "true") == 0;
+
+  WWinLogWindow* dialog = sLogWindowTarget.dialog;
+  if (dialog == nullptr) {
+    WINX_PrecreateLogWindow();
+    dialog = sLogWindowTarget.dialog;
+  }
+
+  dialog->Show(showDialog);
+}
+
+/**
+ * Address: 0x007B5920 (FUN_007B5920, Moho::CON_ExecutePasteBuffer)
+ *
+ * What it does:
+ * Reads UTF-8 clipboard text and executes it as Lua in active world-session
+ * state (or user Lua state when no active session exists).
+ */
+void moho::CON_ExecutePasteBuffer()
+{
+  const msvc8::string clipboardText = WIN_GetClipboardText();
+
+  LuaPlus::LuaState* state = USER_GetLuaState();
+  if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    state = session->mState;
+  }
+
+  (void)SCR_LuaDoString(clipboardText.c_str(), state);
+}
+
+/**
  * Address: 0x007B5A40 (FUN_007B5A40, Moho::CON_PopupCreateUnitMenu)
  *
  * What it does:
@@ -2331,6 +2426,8 @@ namespace
   constexpr const char* kConsoleStartupConListCommandsDescription = "List all registered console commands.";
   constexpr const char* kConsoleStartupConLuaDocDescription = "Dump Lua API binder docs.";
   constexpr const char* kConsoleStartupConLuaDescription = "Execute one Lua command line in the user Lua state.";
+  constexpr const char* kConsoleStartupConExecutePasteBufferDescription =
+    "Execute UTF-8 clipboard text as a Lua chunk.";
   constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
   constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
@@ -2368,6 +2465,7 @@ namespace
   CConFunc gCConFunc_EndLoggingStats{};
   CConFunc gCConFunc_LUADOC{};
   CConFunc gCConFunc_LUA{};
+  CConFunc gCConFunc_ExecutePasteBuffer{};
   CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
   CConFunc gCConFunc_d3d_AntiAliasingSamples{};
@@ -2849,6 +2947,34 @@ namespace moho
       "LUA",
       &moho::CON_LUA,
       &cleanup_CConFunc_LUA
+    );
+  }
+
+  /**
+   * Address: 0x00C03750 (FUN_00C03750, ??1CConFunc_ExecutePasteBuffer@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `ExecutePasteBuffer`.
+   */
+  void cleanup_CConFunc_ExecutePasteBuffer()
+  {
+    CleanupStartupConCommand(gCConFunc_ExecutePasteBuffer);
+  }
+
+  /**
+   * Address: 0x00BDF9D0 (FUN_00BDF9D0, register_CConFunc_ExecutePasteBuffer)
+   *
+   * What it does:
+   * Registers startup console callback for `ExecutePasteBuffer`.
+   */
+  void register_CConFunc_ExecutePasteBuffer()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_ExecutePasteBuffer,
+      kConsoleStartupConExecutePasteBufferDescription,
+      "ExecutePasteBuffer",
+      reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecutePasteBuffer),
+      &cleanup_CConFunc_ExecutePasteBuffer
     );
   }
 
@@ -3629,6 +3755,7 @@ namespace
     {
       moho::register_CConFunc_LUADOC();
       moho::register_CConFunc_LUA();
+      moho::register_CConFunc_ExecutePasteBuffer();
       moho::register_CConFunc_PrintStats();
       moho::register_CConFunc_ClearStats();
       moho::register_CConFunc_BeginLoggingStats();

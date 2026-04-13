@@ -85,6 +85,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005C0290 (FUN_005C0290, ??0CAiReconDBImpl@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes recon map/list/grid lanes with no owning army and fog-of-war
+     * disabled.
+     */
+    CAiReconDBImpl();
+
+    /**
      * Address: 0x005BFF90 (FUN_005BFF90, ??0CAiReconDBImpl@Moho@@QAE@PAVSimArmy@1@_N1@Z)
      *
      * What it does:

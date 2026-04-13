@@ -6,6 +6,15 @@
 namespace moho
 {
   /**
+   * Address: 0x0062FB50 (FUN_0062FB50, func_NormalizeAngle)
+   *
+   * What it does:
+   * Wraps an angle in radians into the signed range `[-pi, pi]` using a
+   * modulo by `2*pi`, then applies one corrective wrap when needed.
+   */
+  [[nodiscard]] float NormalizeAngleSignedRadians(float angleRadians) noexcept;
+
+  /**
    * Address: 0x004EB740 (FUN_004EB740, fun_RotateQuat)
    *
    * IDA signature:

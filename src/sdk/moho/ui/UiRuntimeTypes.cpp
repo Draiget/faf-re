@@ -16,6 +16,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -30,6 +31,8 @@
 #include "moho/lua/SCR_Color.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/render/camera/CameraImpl.h"
+#include "moho/render/RCamManager.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
@@ -1153,6 +1156,24 @@ namespace
     }
   };
 
+  struct CameraTargetRuntimeView
+  {
+    void* vftable = nullptr;
+
+    [[nodiscard]] static CameraTargetRuntimeView* FromCamera(moho::CameraImpl* camera) noexcept
+    {
+      return reinterpret_cast<CameraTargetRuntimeView*>(camera);
+    }
+
+    void TargetLocation(const Wm3::Vector3f& worldPosition, const float transitionSeconds)
+    {
+      using TargetLocationFn = void(__thiscall*)(CameraTargetRuntimeView*, const Wm3::Vector3f*, float);
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<TargetLocationFn>(table[10]);
+      fn(this, &worldPosition, transitionSeconds);
+    }
+  };
+
   struct CRenderWorldViewRuntimeView
   {
     void* vftable = nullptr;
@@ -1292,6 +1313,42 @@ namespace
     "CMauiLuaDraggerEmbeddedRuntimeView::mDraggerBase offset must be 0x34"
   );
 
+  using CameraDragDeltaFn = int(__thiscall*)(void*, Wm3::Vector2f*);
+
+  struct CameraDraggerRuntimeView
+  {
+    void* mVftable = nullptr;            // +0x00
+    DraggerLink* mListHead = nullptr;    // +0x04
+    moho::CameraImpl* mCamera = nullptr; // +0x08
+    Wm3::Vector2f mPos{};                // +0x0C
+    std::uint32_t mUnknown14 = 0;        // +0x14
+    CameraDragDeltaFn mDragMoveFn = nullptr; // +0x18
+    std::int32_t mDragMoveOffset = 0;    // +0x1C
+  };
+
+  static_assert(offsetof(CameraDraggerRuntimeView, mCamera) == 0x8, "CameraDraggerRuntimeView::mCamera offset must be 0x8");
+  static_assert(offsetof(CameraDraggerRuntimeView, mPos) == 0xC, "CameraDraggerRuntimeView::mPos offset must be 0xC");
+  static_assert(
+    offsetof(CameraDraggerRuntimeView, mDragMoveFn) == 0x18,
+    "CameraDraggerRuntimeView::mDragMoveFn offset must be 0x18"
+  );
+  static_assert(
+    offsetof(CameraDraggerRuntimeView, mDragMoveOffset) == 0x1C,
+    "CameraDraggerRuntimeView::mDragMoveOffset offset must be 0x1C"
+  );
+  static_assert(sizeof(CameraDraggerRuntimeView) == 0x20, "CameraDraggerRuntimeView size must be 0x20");
+
+  struct MiniMapDraggerRuntimeView
+  {
+    void* mVftable = nullptr;             // +0x00
+    DraggerLink* mListHead = nullptr;     // +0x04
+    std::uint32_t mUnknown08 = 0;         // +0x08
+    msvc8::string mCameraName{};          // +0x0C
+  };
+
+  static_assert(offsetof(MiniMapDraggerRuntimeView, mListHead) == 0x4, "MiniMapDraggerRuntimeView::mListHead offset must be 0x4");
+  static_assert(offsetof(MiniMapDraggerRuntimeView, mCameraName) == 0xC, "MiniMapDraggerRuntimeView::mCameraName offset must be 0xC");
+
   struct CurrentDraggerSentinel
   {
     DraggerLink* mPrev = nullptr;
@@ -1366,6 +1423,10 @@ namespace
   CurrentDraggerSentinel sCurrentDragger{};
   std::int32_t sCurrentDraggerKeycode = 0;
   std::uint8_t sMouseIsCaptured = 0;
+  std::uint8_t sMouseIsScrubbing = 0;
+  POINT sMouseMoveStart{};
+  POINT sMouseScrubDelta{};
+  POINT sMouseScrubAnchor{};
 
   [[nodiscard]] DraggerLink* CurrentDraggerSentinelLink() noexcept
   {
@@ -1394,6 +1455,18 @@ namespace
       return nullptr;
     }
     return reinterpret_cast<IMauiDragger*>(linkAddress - kListOffset);
+  }
+
+  DraggerLink* DetachDraggerList(DraggerLink*& head) noexcept
+  {
+    DraggerLink* node = head;
+    while (node != nullptr) {
+      head = node->mNext;
+      node->mPrev = nullptr;
+      node->mNext = nullptr;
+      node = head;
+    }
+    return node;
   }
 
   [[nodiscard]] IMauiDragger* ResolveEmbeddedLuaDragger(moho::CMauiLuaDragger* const luaDragger) noexcept
@@ -2323,6 +2396,8 @@ namespace
 } // namespace
 
 moho::EUIState moho::sUIState = moho::UIS_none;
+bool moho::cam_Free = false;
+bool moho::ui_DisableCursorFixing = false;
 moho::CScriptObject* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
@@ -2897,6 +2972,42 @@ moho::CMauiCursor* moho::CMauiCursorLink::GetCursor() const noexcept
   const std::uintptr_t rawAddress = reinterpret_cast<std::uintptr_t>(ownerHeadLink);
   const std::uintptr_t cursorAddress = rawAddress - offsetof(CMauiCursorRuntimeView, ownerChainHead);
   return reinterpret_cast<CMauiCursor*>(cursorAddress);
+}
+
+/**
+ * Address: 0x0078CB50 (FUN_0078CB50, Moho::CMauiCursor::CMauiCursor)
+ *
+ * What it does:
+ * Initializes cursor texture/hotspot runtime lanes and binds one Lua object
+ * back-reference.
+ */
+moho::CMauiCursor::CMauiCursor(LuaPlus::LuaObject* const luaObject)
+{
+  struct SharedPtrRuntimeStorage final
+  {
+    void* object = nullptr;
+    void* count = nullptr;
+  };
+  static_assert(sizeof(SharedPtrRuntimeStorage) == sizeof(boost::shared_ptr<RD3DTextureResource>));
+
+  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+  static_cast<WeakObject*>(scriptObject)->weakLinkHead_ = 0;
+  new (&scriptObject->cObject) LuaPlus::LuaObject();
+  new (&scriptObject->mLuaObj) LuaPlus::LuaObject();
+
+  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
+  *reinterpret_cast<SharedPtrRuntimeStorage*>(&cursorView->mTexture) = SharedPtrRuntimeStorage{};
+  *reinterpret_cast<SharedPtrRuntimeStorage*>(&cursorView->mDefaultTexture) = SharedPtrRuntimeStorage{};
+  cursorView->mHotspotX = 0;
+  cursorView->mHotspotY = 0;
+  cursorView->mDefaultHotspotX = 0;
+  cursorView->mDefaultHotspotY = 0;
+  cursorView->mIsDefaultTexture = true;
+  cursorView->mIsShowing = true;
+
+  if (luaObject != nullptr) {
+    scriptObject->SetLuaObject(*luaObject);
+  }
 }
 
 /**
@@ -6157,6 +6268,381 @@ static IMauiDragger* func_GetCurrentDragger2()
 }
 
 /**
+ * Address: 0x0086DDF0 (FUN_0086DDF0, sub_86DDF0)
+ *
+ * What it does:
+ * Clears the global mouse-scrub active flag and returns its storage address.
+ */
+[[maybe_unused]] static std::uint8_t* func_ResetMouseScrubStateFlag()
+{
+  sMouseIsScrubbing = 0;
+  return &sMouseIsScrubbing;
+}
+
+/**
+ * Address: 0x0086DE00 (FUN_0086DE00, sub_86DE00)
+ *
+ * What it does:
+ * Converts integer mouse-scrub delta lanes to float XY output.
+ */
+[[maybe_unused]] static float* func_GetMouseScrubDelta(float* const outDelta)
+{
+  outDelta[0] = static_cast<float>(sMouseScrubDelta.x);
+  outDelta[1] = static_cast<float>(sMouseScrubDelta.y);
+  return outDelta;
+}
+
+/**
+ * Address: 0x0086DE20 (FUN_0086DE20, sub_86DE20)
+ *
+ * What it does:
+ * Returns whether mouse-scrub mode is currently active.
+ */
+[[maybe_unused]] static std::uint8_t func_IsMouseScrubbingActive()
+{
+  return sMouseIsScrubbing;
+}
+
+/**
+ * Address: 0x0086DFE0 (FUN_0086DFE0, sub_86DFE0)
+ *
+ * What it does:
+ * Clears accumulated integer mouse-scrub deltas and returns zero.
+ */
+[[maybe_unused]] static int func_ResetMouseScrubDelta()
+{
+  sMouseScrubDelta.x = 0;
+  sMouseScrubDelta.y = 0;
+  return 0;
+}
+
+/**
+ * Address: 0x0086DFF0 (FUN_0086DFF0, func_ProcessMouseScrubbing)
+ *
+ * What it does:
+ * While scrub mode is active, accumulates mouse delta into scrub lanes,
+ * recenters the cursor to scrub anchor, and hides cursor texture state.
+ */
+[[maybe_unused]] static void func_ProcessMouseScrubbing()
+{
+  if (sMouseIsScrubbing == 0) {
+    return;
+  }
+
+  POINT cursorPoint{};
+  ::GetCursorPos(&cursorPoint);
+  sMouseScrubDelta.x += cursorPoint.x - sMouseScrubAnchor.x;
+  sMouseScrubDelta.y += cursorPoint.y - sMouseScrubAnchor.y;
+  ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
+
+  auto* const cursor = moho::g_UIManager->GetCursor();
+  auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
+  if (cursorView->mIsShowing) {
+    cursorView->mIsShowing = false;
+    cursorView->mIsDefaultTexture = true;
+  }
+}
+
+/**
+ * Address: 0x0086DE30 (FUN_0086DE30, func_StartMouseScrubbing)
+ *
+ * What it does:
+ * Toggles mouse-scrub mode, updates cursor visibility/default state, and when
+ * enabling scrub mode recenters the cursor to the control midpoint inside the
+ * active UI head rectangle.
+ */
+[[maybe_unused]] static void func_StartMouseScrubbing(const bool doStart, moho::CMauiControl* const control)
+{
+  if (moho::ui_DisableCursorFixing || sMouseIsScrubbing == static_cast<std::uint8_t>(doStart)) {
+    return;
+  }
+
+  sMouseIsScrubbing = static_cast<std::uint8_t>(doStart);
+
+  auto* const cursor = moho::g_UIManager->GetCursor();
+  auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
+  const bool shouldShowCursor = !doStart;
+  if (cursorView->mIsShowing != shouldShowCursor) {
+    cursorView->mIsShowing = shouldShowCursor;
+    cursorView->mIsDefaultTexture = true;
+  }
+
+  if (!doStart) {
+    ::SetCursorPos(sMouseMoveStart.x, sMouseMoveStart.y);
+    return;
+  }
+
+  POINT cursorPoint{};
+  ::GetCursorPos(&cursorPoint);
+  sMouseMoveStart = cursorPoint;
+  sMouseScrubDelta.x = 0;
+  sMouseScrubDelta.y = 0;
+
+  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+  gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+
+  HWND secondHeadWindow = nullptr;
+  if (static_cast<unsigned int>(context->GetHeadCount()) > 1u) {
+    secondHeadWindow = reinterpret_cast<HWND>(context->GetHead(1u).mWindow);
+  }
+
+  RECT viewportRect{};
+  const HWND mainWindowHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+  ::GetWindowRect(mainWindowHandle, &viewportRect);
+
+  if (
+    cursorPoint.x < viewportRect.left || cursorPoint.x > viewportRect.right || cursorPoint.y < viewportRect.top
+    || cursorPoint.y > viewportRect.bottom
+  ) {
+    if (secondHeadWindow != nullptr) {
+      ::GetWindowRect(secondHeadWindow, &viewportRect);
+    }
+  }
+
+  auto* const controlView = moho::CMauiControlRuntimeView::FromControl(control);
+  const float top = moho::CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  const float height = moho::CScriptLazyVar_float::GetValue(&controlView->mHeightLV);
+  const LONG scrubY = static_cast<LONG>(top + static_cast<float>(viewportRect.top) + (height * 0.5f));
+
+  const float left = moho::CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  const float width = moho::CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
+  sMouseScrubAnchor.x = static_cast<LONG>(left + static_cast<float>(viewportRect.left) + (width * 0.5f));
+  sMouseScrubAnchor.y = scrubY;
+  ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
+}
+
+/**
+ * Address: 0x0086E140 (FUN_0086E140, Moho::CameraDragger::DragMove)
+ *
+ * What it does:
+ * Applies camera drag delta from either raw mouse motion (cursor-fixing
+ * disabled) or accumulated scrub delta, then resets scrub delta lanes.
+ */
+[[maybe_unused]] static int func_CameraDraggerDragMove(
+  CameraDraggerRuntimeView* const dragger, const moho::SMauiEventData* const eventData
+)
+{
+  auto* const cameraBytes = reinterpret_cast<std::uint8_t*>(dragger->mCamera);
+  void* const dragTarget = cameraBytes + dragger->mDragMoveOffset;
+  CameraDragDeltaFn const dragMoveFn = dragger->mDragMoveFn;
+
+  if (moho::ui_DisableCursorFixing) {
+    const Wm3::Vector2f currentMousePos(eventData->mMousePos.x, eventData->mMousePos.y);
+    Wm3::Vector2f dragDelta(currentMousePos.x - dragger->mPos.x, currentMousePos.y - dragger->mPos.y);
+    const int result = dragMoveFn(dragTarget, &dragDelta);
+    dragger->mPos = currentMousePos;
+    return result;
+  }
+
+  Wm3::Vector2f dragDelta(static_cast<float>(sMouseScrubDelta.x), static_cast<float>(sMouseScrubDelta.y));
+  (void)dragMoveFn(dragTarget, &dragDelta);
+  sMouseScrubDelta.x = 0;
+  sMouseScrubDelta.y = 0;
+  return 0;
+}
+
+/**
+ * Address: 0x0086E060 (FUN_0086E060, Moho::CameraDragger::CameraDragger)
+ *
+ * What it does:
+ * Initializes one camera dragger with drag target camera/lane and enables
+ * mouse-scrub mode for the owning control.
+ */
+[[maybe_unused]] static CameraDraggerRuntimeView* func_CameraDraggerConstruct(
+  CameraDraggerRuntimeView* const dragger,
+  moho::CameraImpl* const camera,
+  const Wm3::Vector2f* const mousePos,
+  moho::CMauiControl* const ownerControl,
+  CameraDragDeltaFn const dragMoveFn,
+  const std::int32_t dragMoveOffset
+)
+{
+  dragger->mListHead = nullptr;
+  dragger->mCamera = camera;
+  dragger->mPos = *mousePos;
+  dragger->mDragMoveFn = dragMoveFn;
+  dragger->mDragMoveOffset = dragMoveOffset;
+  func_StartMouseScrubbing(true, ownerControl);
+  return dragger;
+}
+
+/**
+ * Address: 0x0086E0D0 (FUN_0086E0D0, Moho::CameraDragger::~CameraDragger)
+ *
+ * What it does:
+ * Disables mouse-scrub mode and unlinks all attached dragger-list nodes.
+ */
+[[maybe_unused]] static void func_CameraDraggerDestruct(CameraDraggerRuntimeView* const dragger)
+{
+  func_StartMouseScrubbing(false, nullptr);
+  (void)DetachDraggerList(dragger->mListHead);
+}
+
+/**
+ * Address: 0x0086E250 (FUN_0086E250, Moho::CameraDragger::dtr)
+ *
+ * What it does:
+ * Runs `CameraDragger` destructor behavior and frees storage when requested.
+ */
+[[maybe_unused]] static CameraDraggerRuntimeView* func_CameraDraggerDeletingDtor(
+  CameraDraggerRuntimeView* const dragger, const char deleteFlags
+)
+{
+  func_CameraDraggerDestruct(dragger);
+  if ((deleteFlags & 1) != 0) {
+    ::operator delete(dragger);
+  }
+  return dragger;
+}
+
+/**
+ * Address: 0x0086E1F0 (FUN_0086E1F0, Moho::CameraDragger::DragCancel)
+ *
+ * What it does:
+ * Reverts held camera rotation when free-look is off, then destroys this
+ * dragger instance.
+ */
+[[maybe_unused]] static void func_CameraDraggerDragCancel(CameraDraggerRuntimeView* const dragger)
+{
+  if (!moho::cam_Free) {
+    dragger->mCamera->CameraRevertRotation();
+  }
+  if (dragger != nullptr) {
+    (void)func_CameraDraggerDeletingDtor(dragger, 1);
+  }
+}
+
+/**
+ * Address: 0x0086E220 (FUN_0086E220, Moho::CameraDragger::DragRelease)
+ *
+ * What it does:
+ * Mirrors `DragCancel`: conditionally reverts camera rotation and destroys
+ * the dragger.
+ */
+[[maybe_unused]] static void func_CameraDraggerDragRelease(
+  CameraDraggerRuntimeView* const dragger, const moho::SMauiEventData* const /*eventData*/
+)
+{
+  if (!moho::cam_Free) {
+    dragger->mCamera->CameraRevertRotation();
+  }
+  if (dragger != nullptr) {
+    (void)func_CameraDraggerDeletingDtor(dragger, 1);
+  }
+}
+
+/**
+ * Address: 0x0086E270 (FUN_0086E270, Moho::CMiniMapDragger::CMiniMapDragger)
+ *
+ * What it does:
+ * Initializes one minimap dragger and copies its camera-name lane from the
+ * incoming string payload.
+ */
+[[maybe_unused]] static MiniMapDraggerRuntimeView* func_MiniMapDraggerConstruct(
+  MiniMapDraggerRuntimeView* const dragger, msvc8::string cameraName
+)
+{
+  dragger->mListHead = nullptr;
+  ::new (&dragger->mCameraName) msvc8::string();
+  dragger->mCameraName.assign(cameraName, 0, msvc8::string::npos);
+  return dragger;
+}
+
+/**
+ * Address: 0x0086E2F0 (FUN_0086E2F0, Moho::CMiniMapDragger::DragMove)
+ *
+ * What it does:
+ * Updates world-session cursor screen lanes from incoming Maui event coords
+ * and retargets the named minimap camera to the current cursor world point.
+ */
+[[maybe_unused]] static void func_MiniMapDraggerDragMove(
+  MiniMapDraggerRuntimeView* const dragger, const moho::SMauiEventData* const eventData
+)
+{
+  moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
+  if (activeSession == nullptr) {
+    return;
+  }
+
+  auto* const sessionView = CWldSessionCursorRuntimeView::FromSession(activeSession);
+  if (sessionView->mCursorInfo.mHitValid == 0u) {
+    return;
+  }
+
+  moho::RCamManager* const cameraManager = moho::CAM_GetManager();
+  moho::CameraImpl* const camera = cameraManager != nullptr ? cameraManager->GetCamera(dragger->mCameraName.c_str()) : nullptr;
+  if (camera == nullptr) {
+    return;
+  }
+
+  moho::MouseInfo cursorInfo = sessionView->mCursorInfo;
+  cursorInfo.mMouseScreenPos.x = eventData->mMousePos.x;
+  cursorInfo.mMouseScreenPos.y = eventData->mMousePos.y;
+  sessionView->mCursorInfo = cursorInfo;
+
+  CameraTargetRuntimeView::FromCamera(camera)->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
+}
+
+/**
+ * Address: 0x0086E430 (FUN_0086E430, Moho::CMiniMapDragger::~CMiniMapDragger)
+ *
+ * What it does:
+ * Releases minimap dragger camera-name storage, restores empty-string state,
+ * and unlinks all attached dragger-list nodes.
+ */
+[[maybe_unused]] static DraggerLink* func_MiniMapDraggerDestruct(MiniMapDraggerRuntimeView* const dragger)
+{
+  dragger->mCameraName.~string();
+  ::new (&dragger->mCameraName) msvc8::string();
+  return DetachDraggerList(dragger->mListHead);
+}
+
+/**
+ * Address: 0x0086E410 (FUN_0086E410, Moho::CMiniMapDragger::dtr)
+ *
+ * What it does:
+ * Runs `CMiniMapDragger` destructor behavior and frees storage when requested.
+ */
+[[maybe_unused]] static MiniMapDraggerRuntimeView* func_MiniMapDraggerDeletingDtor(
+  MiniMapDraggerRuntimeView* const dragger, const char deleteFlags
+)
+{
+  (void)func_MiniMapDraggerDestruct(dragger);
+  if ((deleteFlags & 1) != 0) {
+    ::operator delete(dragger);
+  }
+  return dragger;
+}
+
+/**
+ * Address: 0x0086E3E0 (FUN_0086E3E0, Moho::CMiniMapDragger::DragCancel)
+ *
+ * What it does:
+ * Destroys this minimap dragger instance.
+ */
+[[maybe_unused]] static void func_MiniMapDraggerDragCancel(MiniMapDraggerRuntimeView* const dragger)
+{
+  if (dragger != nullptr) {
+    (void)func_MiniMapDraggerDeletingDtor(dragger, 1);
+  }
+}
+
+/**
+ * Address: 0x0086E3F0 (FUN_0086E3F0, Moho::CMiniMapDragger::DragRelease)
+ *
+ * What it does:
+ * Destroys this minimap dragger instance.
+ */
+[[maybe_unused]] static void func_MiniMapDraggerDragRelease(
+  MiniMapDraggerRuntimeView* const dragger, const moho::SMauiEventData* const /*eventData*/
+)
+{
+  if (dragger != nullptr) {
+    (void)func_MiniMapDraggerDeletingDtor(dragger, 1);
+  }
+}
+
+/**
  * Address: 0x0078E540 (FUN_0078E540, sub_78E540)
  *
  * What it does:
@@ -6256,6 +6742,45 @@ static DraggerLink* func_SetCurDragger(IMauiDragger* const dragger)
   }
 
   return sentinelLink;
+}
+
+/**
+ * Address: 0x00823E40 (FUN_00823E40, func_OnCommandDragBegin)
+ *
+ * What it does:
+ * Imports `/lua/ui/game/commandgraph.lua` and invokes
+ * `OnCommandDragBegin()` on the active UI Lua state.
+ */
+[[maybe_unused]] static void func_OnCommandDragBegin(LuaPlus::LuaState* const state)
+{
+  (void)InvokeUiLuaCallback(
+    state,
+    "/lua/ui/game/commandgraph.lua",
+    "OnCommandDragBegin",
+    [](LuaPlus::LuaFunction<void>& callbackFunction) { callbackFunction(); }
+  );
+}
+
+/**
+ * Address: 0x00823F00 (FUN_00823F00, func_OnCommandDragEnd)
+ *
+ * What it does:
+ * Builds one Maui-event Lua payload and invokes
+ * `/lua/ui/game/commandgraph.lua:OnCommandDragEnd(event, isDragger)`.
+ */
+[[maybe_unused]] static void func_OnCommandDragEnd(
+  moho::SMauiEventData* const eventData, const std::int32_t isDragger, LuaPlus::LuaState* const state
+)
+{
+  LuaPlus::LuaObject eventObject{};
+  (void)moho::CreateLuaEventObject(eventData, &eventObject, state);
+
+  (void)InvokeUiLuaCallback(
+    state,
+    "/lua/ui/game/commandgraph.lua",
+    "OnCommandDragEnd",
+    [&eventObject, isDragger](LuaPlus::LuaFunction<void>& callbackFunction) { callbackFunction(eventObject, isDragger); }
+  );
 }
 
 /**
@@ -15922,6 +16447,57 @@ void moho::CMauiBitmap::OnPatternEnd()
 }
 
 /**
+ * Address: 0x0078F720 (FUN_0078F720, Moho::CMauiEdit::Frame)
+ *
+ * What it does:
+ * Dispatches script `OnFrame(delta)` and updates the caret blink-phase alpha
+ * lane from configured on/off alpha cycle parameters.
+ */
+void moho::CMauiEdit::Frame(const float deltaSeconds)
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+
+  const float cycleSeconds = editView->mCaretCycleSeconds;
+  const float nextCycleTime = editView->mCaretCycleTime + deltaSeconds;
+  editView->mCaretCycleTime = nextCycleTime;
+  if (nextCycleTime > cycleSeconds) {
+    editView->mCaretCycleTime = 0.0f;
+  }
+
+  const float cycleBlendFactor = editView->mCaretCycleTime <= (cycleSeconds * 0.5f)
+    ? ((editView->mCaretCycleTime / cycleSeconds) * 2.0f)
+    : (((cycleSeconds - editView->mCaretCycleTime) / cycleSeconds) * 2.0f);
+
+  const int offAlpha = static_cast<int>(editView->mCaretCycleOffAlpha);
+  const int alphaDelta = static_cast<int>(editView->mCaretCycleOnAlpha) - offAlpha;
+  const int blendedAlpha = static_cast<int>(
+    (static_cast<double>(alphaDelta) * static_cast<double>(cycleBlendFactor)) + static_cast<double>(offAlpha)
+  );
+  editView->mCaretCycleCurrentAlpha = static_cast<std::uint32_t>(blendedAlpha);
+}
+
+/**
+ * Address: 0x007906F0 (FUN_007906F0, Moho::CMauiEdit::GetSelection)
+ *
+ * What it does:
+ * Returns the currently selected UTF-8 substring from the edit text lane.
+ */
+msvc8::string moho::CMauiEdit::GetSelection()
+{
+  msvc8::string selectionText{};
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+
+  const int selectionStart = editView->mSelectionStart;
+  const int selectionEnd = editView->mSelectionEnd;
+  if (selectionStart != selectionEnd) {
+    selectionText = gpg::STR_Utf8SubString(editView->mText.c_str(), selectionStart, selectionEnd - selectionStart);
+  }
+
+  return selectionText;
+}
+
+/**
  * Address: 0x00790510 (FUN_00790510, Moho::CMauiEdit::NonTextKeyPressed)
  *
  * What it does:
@@ -16113,6 +16689,28 @@ void moho::CMauiEdit::HandleClickEvent(SMauiEventData* const eventData)
   editView->mSelectionStart = selectionStart;
   editView->mSelectionEnd = selectionEnd;
   SetCaretPosition(selectionEnd);
+}
+
+/**
+ * Address: 0x007914C0 (FUN_007914C0, Moho::CMauiEdit::DragRelease)
+ *
+ * What it does:
+ * Computes the clipped text hit-test for a release event and clears selection
+ * when the release landed back on the original drag start lane.
+ */
+void moho::CMauiEdit::DragRelease(const SMauiEventData* const eventData)
+{
+  const float left = CScriptLazyVar_float::GetValue(&CMauiEditRuntimeView::FromEdit(this)->mLeftLV);
+  const float releaseX = eventData->mMousePos.x - left;
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+
+  msvc8::string clippedText = gpg::STR_Utf8SubString(editView->mText.c_str(), editView->mClipOffset, editView->mClipLength);
+  const int releaseCaret = editView->mFont->GetNearestCharacterIndex(clippedText.c_str(), releaseX) + editView->mClipOffset;
+
+  if (releaseCaret == editView->mDragStart) {
+    editView->mSelectionStart = 0;
+    editView->mSelectionEnd = 0;
+  }
 }
 
 /**

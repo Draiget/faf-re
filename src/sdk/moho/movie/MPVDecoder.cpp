@@ -796,6 +796,20 @@ extern "C" int mpvlib_DefaultConditionNoOp();
 extern "C" int mpvlib_InitDctPa(int handleAddress);
 extern "C" int mpvlib_SetCondAll(int conditionIndex, int callbackAddress);
 
+std::int32_t M2V_IsSetup();
+std::int32_t M2V_SetUsrSj(
+  std::int32_t decoderHandle, std::int32_t userSlotIndex, std::int32_t lane0, std::int32_t lane1, std::int32_t lane2
+);
+std::int32_t M2V_SetPicUsrBuf(std::int32_t decoderHandle, std::uintptr_t userBufferAddress, std::int32_t userBufferSizeBytes);
+std::int32_t M2V_DecodePicAtr(std::int32_t decoderHandle, std::int32_t decodeMode);
+std::int32_t M2V_GetPicUsr(std::int32_t decoderHandle, std::int32_t userSlotIndex, void* outUserBuffer);
+std::int32_t M2V_GetPicAtr(std::int32_t decoderHandle, void* outPictureAttributes);
+std::int32_t M2V_GetBitRate(std::int32_t decoderHandle, std::int32_t* outBitRate);
+std::int32_t M2V_GetVbvBufSiz(
+  std::int32_t decoderHandle, std::int32_t* outVbvBufferSize, std::int32_t* outVbvPayloadSize, void* outVbvFlags
+);
+std::int32_t M2V_GetLinkFlg(std::int32_t decoderHandle, std::int32_t* outLinkFlag, std::int32_t* outLinkState);
+
 namespace
 {
   constexpr int kMpvAddressSegmentMask = 0x02000000;
@@ -1681,6 +1695,80 @@ extern "C" int* MPV_GetPicUsr(const int handleAddress, int* const outUserBufferA
     *outDecodeState = handle->pictureUserDecodeState;
   }
   return outDecodeState;
+}
+
+/**
+ * Address: 0x00AF5D70 (FUN_00AF5D70, _mpvm2v_CopyPicAtr)
+ *
+ * What it does:
+ * Pulls decoded picture-attribute and bitrate/VBV/link flag lanes from the M2V
+ * decoder into the MPV handle runtime fields.
+ */
+static int CopyM2vPictureAttributesToHandle(const int handleAddress)
+{
+  MPVHandleInitView* const handle = AsHandleView(handleAddress);
+
+  MPVPictureAttributeExportBlock pictureAttributeBlock{};
+  std::int32_t bitRateCode = 0;
+  std::int32_t vbvBufferSize = 0;
+  std::int32_t pictureVbvDelay = 0;
+  std::uint32_t vbvFlags = 0;
+  std::int32_t gopLinkFlag = 0;
+  std::int32_t gopLinkState = 0;
+
+  M2V_GetPicAtr(handle->m2vDecoderHandle, &pictureAttributeBlock);
+  M2V_GetBitRate(handle->m2vDecoderHandle, &bitRateCode);
+  M2V_GetVbvBufSiz(handle->m2vDecoderHandle, &vbvBufferSize, &pictureVbvDelay, &vbvFlags);
+  M2V_GetLinkFlg(handle->m2vDecoderHandle, &gopLinkFlag, &gopLinkState);
+
+  handle->sequenceBitRateCode = bitRateCode;
+  std::memcpy(&handle->pictureAttributes, &pictureAttributeBlock, sizeof(pictureAttributeBlock));
+  handle->sequenceVbvBufferCode = vbvBufferSize / 2048;
+  handle->gopClosedFlag = gopLinkFlag;
+  handle->gopBrokenLinkFlag = gopLinkState;
+  handle->pictureVbvDelay = pictureVbvDelay;
+  return pictureVbvDelay;
+}
+
+/**
+ * Address: 0x00AF5CC0 (FUN_00AF5CC0, _MPVM2V_DecodePicAtr)
+ *
+ * What it does:
+ * Wires user-SJ lanes into the M2V decoder, runs picture-attribute decode for
+ * the current stream, then copies decoded attribute state back into handle
+ * fields.
+ */
+extern "C" int MPVM2V_DecodePicAtr(const int handleAddress, MPVSjStream* const stream)
+{
+  if (M2V_IsSetup() == 0) {
+    return -1;
+  }
+
+  MPVHandleInitView* const handle = AsHandleView(handleAddress);
+  for (std::int32_t laneIndex = 0; laneIndex < 4; ++laneIndex) {
+    const MPVUserSjLane& lane = handle->userSjLanes[laneIndex];
+    M2V_SetUsrSj(
+      handle->m2vDecoderHandle,
+      laneIndex,
+      lane.streamObjectAddress,
+      lane.streamCallbackAddress,
+      lane.streamContextAddress
+    );
+  }
+
+  M2V_SetPicUsrBuf(
+    handle->m2vDecoderHandle,
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle->pictureUserBufferAddress)),
+    handle->pictureUserContextAddress
+  );
+
+  if (M2V_DecodePicAtr(handle->m2vDecoderHandle, PointerToAddress(stream)) != 0) {
+    return -2;
+  }
+
+  M2V_GetPicUsr(handle->m2vDecoderHandle, 0, &handle->pictureUserDecodeState);
+  (void)CopyM2vPictureAttributesToHandle(handleAddress);
+  return 0;
 }
 
 /**

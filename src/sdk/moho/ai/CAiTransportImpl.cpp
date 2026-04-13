@@ -102,6 +102,33 @@ void STransportPickUpInfo::MemberDeserialize(gpg::ReadArchive* const archive)
   mHasSpace = static_cast<std::uint8_t>(hasSpace ? 1 : 0);
 }
 
+/**
+ * Address: 0x005EBB30 (FUN_005EBB30, Moho::STransportPickUpInfo::MemberSerialize)
+ *
+ * What it does:
+ * Writes fallback position (SCoordsVec2), orientation (Quaternionf),
+ * world position (Vector3f), unit set (EntitySetTemplate<Unit>), and
+ * has-space flag to the archive via cached RType lookups.
+ */
+void STransportPickUpInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  static gpg::RType* const coordsType = gpg::LookupRType(typeid(SCoordsVec2));
+  static gpg::RType* const quatType = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
+  static gpg::RType* const vecType = gpg::LookupRType(typeid(Wm3::Vector3<float>));
+  static gpg::RType* const unitsType = gpg::LookupRType(typeid(SEntitySetTemplateUnit));
+
+  const gpg::RRef ownerRef{};
+  archive->Write(coordsType, &mFallbackPos, ownerRef);
+  archive->Write(quatType, &mOri, ownerRef);
+  archive->Write(vecType, &mPos, ownerRef);
+  archive->Write(unitsType, &mUnits, ownerRef);
+  archive->WriteBool(mHasSpace != 0u);
+}
+
 namespace
 {
   gpg::RType* gIAiTransportType = nullptr;
@@ -1107,6 +1134,29 @@ bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlu
 }
 
 /**
+ * Address: 0x005E9700 (FUN_005E9700, ??0vector_SAttachPoint@std@@QAE@@Z)
+ * Mangled: ??0vector_SAttachPoint@std@@QAE@@Z
+ *
+ * What it does:
+ * Rebuilds one destination attach-point vector from source lanes using the
+ * same zero-init + resize + copy sequence as the VC8 helper constructor.
+ */
+msvc8::vector<SAttachPoint>* CAiTransportImpl::CopyAttachPointVector(
+  const msvc8::vector<SAttachPoint>& source,
+  msvc8::vector<SAttachPoint>& destination
+)
+{
+  destination.clear();
+  if (source.empty()) {
+    return &destination;
+  }
+
+  destination.resize(source.size());
+  (void)std::copy(source.begin(), source.end(), destination.begin());
+  return &destination;
+}
+
+/**
  * Address: 0x005E6B30 (FUN_005E6B30)
  */
 void CAiTransportImpl::TransportFindAttachList(
@@ -1127,36 +1177,40 @@ void CAiTransportImpl::TransportFindAttachList(
   if (unitClass > blueprint->Transport.ClassGenericUpTo) {
     switch (unitClass) {
       case static_cast<int>(ETransportClass::TRANSPORTCLASS_1):
-        attachPoints = mClass1AttachPoints;
+        (void)CopyAttachPointVector(mClass1AttachPoints, attachPoints);
         break;
       case static_cast<int>(ETransportClass::TRANSPORTCLASS_2):
-        attachPoints = mClass2AttachPoints;
+        (void)CopyAttachPointVector(mClass2AttachPoints, attachPoints);
         outAttachSize = blueprint->Transport.Class2AttachSize;
         break;
       case static_cast<int>(ETransportClass::TRANSPORTCLASS_3):
-        attachPoints = mClass3AttachPoints;
+        (void)CopyAttachPointVector(mClass3AttachPoints, attachPoints);
         outAttachSize = blueprint->Transport.Class3AttachSize;
         break;
       case static_cast<int>(ETransportClass::TRANSPORTCLASS_4):
-        attachPoints = mClass4AttachPoints;
+        (void)CopyAttachPointVector(mClass4AttachPoints, attachPoints);
         outAttachSize = blueprint->Transport.Class4AttachSize;
         [[fallthrough]];
       case static_cast<int>(ETransportClass::TRANSPORTCLASS_SPECIAL):
-        attachPoints = mClassSAttachPoints;
+        (void)CopyAttachPointVector(mClassSAttachPoints, attachPoints);
         outAttachSize = blueprint->Transport.ClassSAttachSize;
         break;
       default:
         break;
     }
   } else {
-    attachPoints = mGenericAttachPoints;
+    (void)CopyAttachPointVector(mGenericAttachPoints, attachPoints);
   }
 
   if (outAttachSize == 0) {
-    attachPoints = !mClass1AttachPoints.empty() ? mClass1AttachPoints : mGenericAttachPoints;
+    if (!mClass1AttachPoints.empty()) {
+      (void)CopyAttachPointVector(mClass1AttachPoints, attachPoints);
+    } else {
+      (void)CopyAttachPointVector(mGenericAttachPoints, attachPoints);
+    }
   }
 
-  outAttachPoints = attachPoints;
+  (void)CopyAttachPointVector(attachPoints, outAttachPoints);
 }
 
 /**

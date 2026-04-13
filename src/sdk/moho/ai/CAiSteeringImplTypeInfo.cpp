@@ -81,6 +81,13 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x005D4270 (FUN_005D4270, Moho::CAiSteeringImplTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates one `CAiSteeringImpl`, runs constructor initialization, and
+   * returns a typed reflection reference.
+   */
   [[nodiscard]] gpg::RRef CreateAiSteeringImplRefOwned()
   {
     return MakeTypedRef(new CAiSteeringImpl(), CachedCAiSteeringImplType());

@@ -63,7 +63,14 @@ namespace gpg
 	 */
 	bool ParseNum(const char* start, const char* end, int* dest) noexcept;
 
-	void SetThreadName(unsigned int id, const char* name); // 0x009071D0
+	/**
+	 * Address: 0x009071D0 (FUN_009071D0, gpg::SetThreadName)
+	 *
+	 * What it does:
+	 * Emits the MSVC debugger thread-name exception payload for `id`/`name`
+	 * when AQtime instrumentation mode allows it.
+	 */
+	void SetThreadName(unsigned int id, const char* name);
 }
 
 static gpg::die_handler_t dieHandler; // 0x00F8EBDC

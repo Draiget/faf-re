@@ -218,11 +218,49 @@ namespace moho
     {
       ResetFromOwnerLinkSlot(EncodeOwnerLinkSlot(object));
     }
+
+    void Set(T* object) noexcept
+    {
+      ResetFromObject(object);
+    }
   };
   static_assert(sizeof(WeakPtr<void>) == 0x08, "WeakPtr<T> must be 8 bytes");
   static_assert(WeakPtr<void>::kOwnerLinkOffset == 0x4, "WeakPtr ABI expects owner-link offset 0x4");
   static_assert(offsetof(WeakPtr<void>, ownerLinkSlot) == 0x00, "WeakPtr<T>::ownerLinkSlot offset must be 0x00");
   static_assert(offsetof(WeakPtr<void>, nextInOwner) == 0x04, "WeakPtr<T>::nextInOwner offset must be 0x04");
+
+  /**
+   * Address: 0x0057D4F0 (FUN_0057D4F0, Moho::WeakPtr_Unit::Set)
+   *
+   * What it does:
+   * Rebinds one weak-unit node by unlinking from its current owner chain and
+   * inserting at the head of the new owner's weak-link list.
+   */
+  template <>
+  inline void WeakPtr<Unit>::Set(Unit* object) noexcept
+  {
+    void* const targetOwnerLinkSlot = EncodeOwnerLinkSlot(object);
+    if (ownerLinkSlot == targetOwnerLinkSlot) {
+      return;
+    }
+
+    if (ownerLinkSlot != nullptr) {
+      auto** existing = reinterpret_cast<WeakPtr<Unit>**>(ownerLinkSlot);
+      while (*existing != this) {
+        existing = &(*existing)->nextInOwner;
+      }
+      *existing = nextInOwner;
+    }
+
+    ownerLinkSlot = targetOwnerLinkSlot;
+    if (targetOwnerLinkSlot != nullptr) {
+      auto** const ownerHead = reinterpret_cast<WeakPtr<Unit>**>(targetOwnerLinkSlot);
+      nextInOwner = *ownerHead;
+      *ownerHead = this;
+    } else {
+      nextInOwner = nullptr;
+    }
+  }
 
   template <class T>
   struct WeakPtrVectorStorage

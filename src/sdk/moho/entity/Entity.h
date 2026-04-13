@@ -9,6 +9,7 @@
 #include "../task/CTask.h"
 #include "EntityId.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/String.h"
@@ -210,6 +211,26 @@ namespace moho
    * defaulting to `LAYER_None` for unknown text.
    */
   [[nodiscard]] ELayer COORDS_StringToLayer(const char* layerName) noexcept;
+
+  /**
+   * Address: 0x0050AFA0 (FUN_0050AFA0, Moho::COORDS_ToGridRect)
+   *
+   * What it does:
+   * Fills `result` with the axis-aligned integer grid rect occupied by a
+   * footprint of dimensions `sizeX × sizeZ` centered at `centerXZ` (world
+   * coordinates). Corner values are truncated to 16-bit integer range to
+   * match the binary's `WORD` cast.
+   */
+  gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* result, const SCoordsVec2& centerXZ, int sizeX, int sizeZ);
+
+  /**
+   * Address: 0x0050B010 (FUN_0050B010, Moho::COORDS_ToGridRect)
+   *
+   * What it does:
+   * Footprint-typed overload of `COORDS_ToGridRect` that delegates to the
+   * raw integer overload using `footprint.mSizeX`/`mSizeZ`.
+   */
+  gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* result, const SCoordsVec2& centerXZ, const SFootprint& footprint);
 
   /**
    * Address: 0x0050B0F0 (FUN_0050B0F0, ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSOCellPos@1@EHH@Z)

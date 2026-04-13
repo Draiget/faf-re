@@ -648,6 +648,37 @@ namespace
     (void)moho::WxAppRuntime::DestroyWindow(frameWindow);
     frameWindow = nullptr;
   }
+
+  /**
+   * Address: 0x008CED90 (FUN_008CED90, func_CreateFileMapping)
+   *
+   * What it does:
+   * Publishes the current primary-window bounds into
+   * `Local\\FullScreenPresentationModeInfo` shared memory for
+   * fullscreen-presentation compatibility paths.
+   */
+  void PublishWindowedPresentationBounds(HWND const windowHandle)
+  {
+    HANDLE const mapping = ::CreateFileMappingW(
+      INVALID_HANDLE_VALUE,
+      nullptr,
+      PAGE_READWRITE,
+      0,
+      sizeof(RECT),
+      L"Local\\FullScreenPresentationModeInfo"
+    );
+    if (mapping == nullptr) {
+      return;
+    }
+
+    auto* const windowRect = static_cast<RECT*>(::MapViewOfFile(mapping, FILE_MAP_WRITE, 0, 0, 0));
+    if (windowRect == nullptr) {
+      return;
+    }
+
+    ::GetWindowRect(windowHandle, windowRect);
+    (void)::UnmapViewOfFile(windowRect);
+  }
 } // namespace
 
 /**
@@ -774,6 +805,15 @@ bool CScApp::Init()
 
   if (!::SystemParametersInfoW(SPI_SETSCREENSAVEACTIVE, 0, nullptr, 0)) {
     gpg::Warnf("unable to suppress screensaver");
+  }
+
+  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+  gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+  if (context->GetHeadCount() > 0) {
+    const gpg::gal::Head& primaryHead = context->GetHead(0);
+    if (primaryHead.mWindowed && primaryHead.mHandle != nullptr) {
+      PublishWindowedPresentationBounds(reinterpret_cast<HWND>(primaryHead.mHandle));
+    }
   }
 
   return true;

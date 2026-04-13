@@ -517,6 +517,55 @@ namespace
     head->prev = head;
     return head;
   }
+
+  template <class TObject>
+  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
+  {
+    if (!slot) {
+      slot = gpg::LookupRType(typeid(TObject));
+    }
+    return slot;
+  }
+
+  struct ArmyNameIndexMapRuntime
+  {
+    std::uint32_t meta0;
+    moho::ArmyNameIndexNode* head;
+    std::uint32_t size;
+  };
+  static_assert(sizeof(ArmyNameIndexMapRuntime) == 0x0C, "ArmyNameIndexMapRuntime size must be 0x0C");
+
+  struct ArmyTriggerListRuntime
+  {
+    void* proxy;
+    moho::ArmyTriggerNode* head;
+    std::uint32_t size;
+  };
+  static_assert(sizeof(ArmyTriggerListRuntime) == 0x0C, "ArmyTriggerListRuntime size must be 0x0C");
+
+  [[nodiscard]] ArmyNameIndexMapRuntime* NameIndexMapRuntimeView(moho::CArmyStats* const object)
+  {
+    return reinterpret_cast<ArmyNameIndexMapRuntime*>(&object->mNameIndex);
+  }
+
+  [[nodiscard]] const ArmyNameIndexMapRuntime* NameIndexMapRuntimeView(const moho::CArmyStats* const object)
+  {
+    return reinterpret_cast<const ArmyNameIndexMapRuntime*>(&object->mNameIndex);
+  }
+
+  [[nodiscard]] ArmyTriggerListRuntime* TriggerListRuntimeView(moho::CArmyStats* const object)
+  {
+    return reinterpret_cast<ArmyTriggerListRuntime*>(&object->mNameIndex.metaC);
+  }
+
+  [[nodiscard]] const ArmyTriggerListRuntime* TriggerListRuntimeView(const moho::CArmyStats* const object)
+  {
+    return reinterpret_cast<const ArmyTriggerListRuntime*>(&object->mNameIndex.metaC);
+  }
+
+  gpg::RType* gArmyStatsBaseType = nullptr;
+  gpg::RType* gArmyNameIndexType = nullptr;
+  gpg::RType* gArmyTriggerListType = nullptr;
 } // namespace
 
 namespace moho
@@ -873,6 +922,54 @@ namespace moho
     }
 
     Stats<CArmyStatItem>::Delete(statPath);
+  }
+
+  /**
+   * Address: 0x00714870 (FUN_00714870, Moho::CArmyStats::MemberDeserialize)
+   *
+   * gpg::ReadArchive*
+   *
+   * What it does:
+   * Loads base stats storage, name-index map runtime lane, and trigger-list
+   * runtime lane from archive using cached reflection RTTI.
+   */
+  void CArmyStats::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Read(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
+    archive->Read(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexMapRuntimeView(this), owner);
+    archive->Read(CachedType<ArmyTriggerListRuntime>(gArmyTriggerListType), TriggerListRuntimeView(this), owner);
+  }
+
+  /**
+   * Address: 0x00714920 (FUN_00714920, Moho::CArmyStats::MemberSerialize)
+   *
+   * gpg::WriteArchive*
+   *
+   * What it does:
+   * Writes base stats storage, name-index map runtime lane, and trigger-list
+   * runtime lane to archive using cached reflection RTTI.
+   */
+  void CArmyStats::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    GPG_ASSERT(archive != nullptr);
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef owner{};
+    archive->Write(
+      CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType),
+      static_cast<const Stats<CArmyStatItem>*>(this),
+      owner
+    );
+    archive->Write(CachedType<ArmyNameIndexMapRuntime>(gArmyNameIndexType), NameIndexMapRuntimeView(this), owner);
+    archive->Write(CachedType<ArmyTriggerListRuntime>(gArmyTriggerListType), TriggerListRuntimeView(this), owner);
   }
 
   /**

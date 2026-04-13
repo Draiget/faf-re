@@ -112,7 +112,25 @@ namespace moho
      */
     CAniPose(boost::shared_ptr<const CAniSkel> skeleton, float scale);
 
+    /**
+     * Address: 0x0054B290 (FUN_0054B290, ??0CAniPose@Moho@@QAE@ABV01@@Z)
+     *
+     * What it does:
+     * Initializes one pose with default storage lanes, then overwrites it from
+     * another pose.
+     */
+    CAniPose(const CAniPose& copy);
+
     ~CAniPose() = default;
+
+    /**
+     * Address: 0x0054B330 (FUN_0054B330, ?OverwritePose@CAniPose@Moho@@QAEXABV12@@Z)
+     *
+     * What it does:
+     * Copies skeleton/transform/max-offset state and rebuilds per-bone parent
+     * links from this pose's skeleton hierarchy.
+     */
+    void OverwritePose(const CAniPose& copy);
 
     /**
      * Address: 0x005E3B10 (FUN_005E3B10, ?GetSkeleton@CAniPose@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
@@ -131,6 +149,16 @@ namespace moho
      * payload, and max-offset cache value.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+  private:
+    /**
+     * Address: 0x0054B990 (FUN_0054B990, ?MarkBoneDirty@CAniPose@Moho@@AAEXH@Z)
+     *
+     * What it does:
+     * Marks one bone as composite-dirty, then propagates that dirty state to
+     * downstream bones whose parent is already dirty.
+     */
+    void MarkBoneDirty(int idx);
 
   public:
     boost::shared_ptr<const CAniSkel> mSkeleton; // +0x00

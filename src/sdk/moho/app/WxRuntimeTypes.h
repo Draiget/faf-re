@@ -56,6 +56,48 @@ void wxENTER_CRIT_SECT(_RTL_CRITICAL_SECTION* criticalSection);
 void wxLEAVE_CRIT_SECT(_RTL_CRITICAL_SECTION* criticalSection);
 
 /**
+ * Address: 0x009AD330 (FUN_009AD330, wxThread::IsMain)
+ *
+ * What it does:
+ * Returns whether the current Win32 thread matches the stored wx main-thread id.
+ */
+[[nodiscard]] bool wxThreadIsMain();
+
+/**
+ * Address: 0x009AD660 (FUN_009AD660, wxGuiOwnedByMainThread)
+ *
+ * What it does:
+ * Returns the wx GUI-ownership flag managed by the GUI mutex helpers.
+ */
+[[nodiscard]] bool wxGuiOwnedByMainThread();
+
+/**
+ * Address: 0x009AD670 (FUN_009AD670, wxWakeUpMainThread)
+ *
+ * What it does:
+ * Posts one wake-up message (`WM_NULL`) to the stored wx main-thread id.
+ */
+[[nodiscard]] bool wxWakeUpMainThread();
+
+/**
+ * Address: 0x009ADC20 (FUN_009ADC20, wxMutexGuiLeave)
+ *
+ * What it does:
+ * Releases GUI ownership for the calling lane and unlocks wx GUI/waiting
+ * critical sections with the original runtime ordering.
+ */
+void wxMutexGuiLeave();
+
+/**
+ * Address: 0x009ADC70 (FUN_009ADC70, wxMutexGuiLeaveOrEnter)
+ *
+ * What it does:
+ * Reconciles GUI ownership against waiting-thread state, leaving or entering
+ * the wx GUI critical section as required by the original runtime contract.
+ */
+void wxMutexGuiLeaveOrEnter();
+
+/**
  * Address: 0x009C7540 (FUN_009C7540, wxGetOsVersion)
  *
  * What it does:

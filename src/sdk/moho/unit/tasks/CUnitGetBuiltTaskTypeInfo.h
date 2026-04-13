@@ -44,10 +44,44 @@ namespace moho
      */
     void Init() override;
 
-    static void AddBase_CCommandTask(gpg::RType* typeInfo);
+    /**
+     * Address: 0x0060C430 (FUN_0060C430, Moho::CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask)
+     */
+    static void __stdcall AddBase_CCommandTask(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x0060BE20 (FUN_0060BE20, Moho::CUnitGetBuiltTaskTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates one `CUnitGetBuiltTask` and returns a reflection reference to
+     * the constructed object.
+     */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x0060BEC0 (FUN_0060BEC0, Moho::CUnitGetBuiltTaskTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CUnitGetBuiltTask` in caller-provided storage and
+     * returns a reflection reference to it.
+     */
     static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x0060BEA0 (FUN_0060BEA0, Moho::CUnitGetBuiltTaskTypeInfo::Delete)
+     *
+     * What it does:
+     * Deletes a `CUnitGetBuiltTask` through its deleting-destructor path.
+     */
     static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x0060BF40 (FUN_0060BF40, Moho::CUnitGetBuiltTaskTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs the non-deleting `CUnitGetBuiltTask` destructor body on placement
+     * storage.
+     */
     static void Destruct(void* objectStorage);
   };
 

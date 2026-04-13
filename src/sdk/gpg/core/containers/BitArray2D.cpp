@@ -15,6 +15,18 @@ BitArray2D::BitArray2D()
 }
 
 /**
+ * Address: 0x008D82F0 (FUN_008D82F0, ??0BitArray2D@gpg@@QAE@II@Z_0)
+ */
+BitArray2D::BitArray2D(const unsigned int newWidth, const unsigned int newHeight)
+  : ptr(nullptr)
+  , size(0)
+  , width(0)
+  , height(0)
+{
+    Reset(newWidth, newHeight);
+}
+
+/**
  * Address: 0x008D8200 (FUN_008D8200, ??1BitArray2D@gpg@@QAE@XZ)
  */
 BitArray2D::~BitArray2D()

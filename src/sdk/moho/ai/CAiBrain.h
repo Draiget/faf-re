@@ -1685,6 +1685,112 @@ namespace moho
    * least one structure, or nil when no such army exists.
    */
   int cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058C490 (FUN_0058C490, cfunc_CAiBrainBuildPlatoon)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_CAiBrainBuildPlatoonL`.
+   */
+  int cfunc_CAiBrainBuildPlatoon(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058C4B0 (FUN_0058C4B0, func_CAiBrainBuildPlatoon_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:BuildPlatoon()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainBuildPlatoon_LuaFuncDef();
+
+  /**
+   * Address: 0x0058C510 (FUN_0058C510, cfunc_CAiBrainBuildPlatoonL)
+   *
+   * What it does:
+   * Issues `BuildUnit` for each row in the build-plan table, scaling the
+   * row's base count by the supplied multiplier and rotating across the
+   * builder table.
+   */
+  int cfunc_CAiBrainBuildPlatoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058DC60 (FUN_0058DC60, cfunc_CAiBrainAssignUnitsToPlatoon)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to
+   * `cfunc_CAiBrainAssignUnitsToPlatoonL`.
+   */
+  int cfunc_CAiBrainAssignUnitsToPlatoon(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058DC80 (FUN_0058DC80, func_CAiBrainAssignUnitsToPlatoon_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiBrain:AssignUnitsToPlatoon()` Lua binder.
+   */
+  CScrLuaInitForm* func_CAiBrainAssignUnitsToPlatoon_LuaFuncDef();
+
+  /**
+   * Address: 0x0058DCE0 (FUN_0058DCE0, cfunc_CAiBrainAssignUnitsToPlatoonL)
+   *
+   * What it does:
+   * Moves units from a Lua list into a platoon's named squad, removing them
+   * from any prior platoon assignment, then dispatches `OnUnitsAddedToPlatoon`.
+   */
+  int cfunc_CAiBrainAssignUnitsToPlatoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058D650 (FUN_0058D650, cfunc_CAiBrainMakePlatoon)
+   */
+  int cfunc_CAiBrainMakePlatoon(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058D670 (FUN_0058D670, func_CAiBrainMakePlatoon_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CAiBrainMakePlatoon_LuaFuncDef();
+
+  /**
+   * Address: 0x0058D6D0 (FUN_0058D6D0, cfunc_CAiBrainMakePlatoonL)
+   *
+   * What it does:
+   * Two-mode `(brain, name|configTable, plan?)` platoon constructor: string
+   * form passes through to `IArmy::MakePlatoon`; table form additionally
+   * pulls live units out of the army-pool's unassigned squad to seed each
+   * configured squad on the new platoon.
+   */
+  int cfunc_CAiBrainMakePlatoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0058BF80 (FUN_0058BF80, cfunc_CAiBrainCanBuildPlatoon)
+   */
+  int cfunc_CAiBrainCanBuildPlatoon(lua_State* luaContext);
+
+  /**
+   * Address: 0x0058BFA0 (FUN_0058BFA0, func_CAiBrainCanBuildPlatoon_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_CAiBrainCanBuildPlatoon_LuaFuncDef();
+
+  /**
+   * Address: 0x0058C000 (FUN_0058C000, cfunc_CAiBrainCanBuildPlatoonL)
+   *
+   * What it does:
+   * Returns either a Lua array of factory units or nil, answering "can this
+   * brain's army currently build every row of a platoon template".
+   */
+  int cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x0057AC30 (FUN_0057AC30, Moho::FindAvailableFactory)
+   *
+   * What it does:
+   * Returns the first builder in `candidateList` (or, when that list is
+   * empty, any of the brain's army static factories) that is live, idle,
+   * fully built, and capable of building the blueprint identified by
+   * `blueprintId`. Returns null when no candidate matches or the blueprint
+   * id is unknown.
+   */
+  [[nodiscard]] Unit* FindAvailableFactory(
+    gpg::core::FastVector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
+  );
 } // namespace moho
 
 /**

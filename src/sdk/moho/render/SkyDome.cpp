@@ -5,6 +5,7 @@
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/render/d3d/CD3DVertexFormat.h"
 
 namespace moho
 {
@@ -33,12 +34,11 @@ namespace moho
   {
     CreateTextures();
     CreateDomeFormat();
+    CreateDecalFormat();
     CreateDomeVertexBuffer(mSkyParams.x, mSkyParams.y, mSkyParams.z, mWidth, mHeight);
     CreateDomeIndexBuffer(mWidth, mHeight);
-    // CreateDecalFormat / CreateDecalVertexBuffers / CreateDecalIndexBuffer
-    // are referenced in the binary at this site but their declarations and
-    // bodies are still pending another agent's recovery pass on SkyDome decal
-    // geometry. Re-enable when those helpers land in SkyDome.h/.cpp.
+    // CreateDecalVertexBuffers / CreateDecalIndexBuffer are referenced in the
+    // binary at this site but remain pending a wider SkyDome geometry pass.
   }
 
   /**
@@ -57,5 +57,34 @@ namespace moho
     // Effect / EffectD3D9 inheritance is recovered.
     (void)D3D_GetDevice()->GetResources()->FindEffect("sky");
     return {};
+  }
+
+  /**
+   * Address: 0x008180A0 (FUN_008180A0, ?CreateDomeFormat@SkyDome@Moho@@AAEXXZ)
+   *
+   * What it does:
+   * Creates one dome vertex-format descriptor (format token `3`) when it is
+   * not already present.
+   */
+  void SkyDome::CreateDomeFormat()
+  {
+    if (!mDomeFormat) {
+      mDomeFormat = boost::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(3U));
+    }
+  }
+
+  /**
+   * Address: 0x00818630 (FUN_00818630, ?CreateDecalFormat@SkyDome@Moho@@AAEXXZ)
+   *
+   * What it does:
+   * Creates the two sky-decal vertex-format descriptors (format tokens `20`
+   * and `21`) when they are not already present.
+   */
+  void SkyDome::CreateDecalFormat()
+  {
+    if (!mDecalFormat1) {
+      mDecalFormat1 = boost::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(20U));
+      mDecalFormat2 = boost::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(21U));
+    }
   }
 } // namespace moho

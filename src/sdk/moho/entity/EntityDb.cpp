@@ -734,6 +734,15 @@ namespace
   class EntityDbTypeInfo final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x00687920 (FUN_00687920, Moho::EntityDBTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates and default-constructs one `CEntityDb`, then wraps it in an
+     * `EntityDB` reflection reference.
+     */
+    [[nodiscard]] static gpg::RRef NewRef();
+
     [[nodiscard]] const char* GetName() const override
     {
       return "EntityDB";
@@ -741,12 +750,32 @@ namespace
 
     void Init() override
     {
+      newRefFunc_ = &EntityDbTypeInfo::NewRef;
       size_ = sizeof(moho::CEntityDb);
       gpg::RType::Init();
       Finish();
     }
   };
   static_assert(sizeof(EntityDbTypeInfo) == 0x64, "EntityDbTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00687920 (FUN_00687920, Moho::EntityDBTypeInfo::NewRef)
+   *
+   * What it does:
+   * Allocates and default-constructs one `CEntityDb`, then wraps it in an
+   * `EntityDB` reflection reference.
+   */
+  gpg::RRef EntityDbTypeInfo::NewRef()
+  {
+    moho::CEntityDb* entityDb = nullptr;
+    if (void* const storage = ::operator new(sizeof(moho::CEntityDb), std::nothrow); storage != nullptr) {
+      entityDb = new (storage) moho::CEntityDb();
+    }
+
+    gpg::RRef out{};
+    (void)gpg::RRef_EntityDB(&out, entityDb);
+    return out;
+  }
 
   extern msvc8::string gEntityDbIdPoolMapTypeName;
   extern std::uint32_t gEntityDbIdPoolMapTypeNameInitGuard;

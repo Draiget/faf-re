@@ -313,6 +313,48 @@ namespace moho
   }
 
   /**
+   * Address: 0x00560150 (FUN_00560150, Moho::SSTIEntityVariableData::cpy)
+   */
+  SSTIEntityVariableData* SSTIEntityVariableData::cpy(SSTIEntityVariableData* const destination) const
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+
+    if (destination == this) {
+      return destination;
+    }
+
+    destination->mScmResource = mScmResource;
+    destination->mMeshBlueprint = mMeshBlueprint;
+    destination->mScale = mScale;
+    destination->mHealth = mHealth;
+    destination->mMaxHealth = mMaxHealth;
+    destination->mIsBeingBuilt = mIsBeingBuilt;
+    destination->mIsDead = mIsDead;
+    destination->mRequestRefreshUI = mRequestRefreshUI;
+    destination->mCurTransform = mCurTransform;
+    destination->mLastTransform = mLastTransform;
+    destination->mCurImpactValue = mCurImpactValue;
+    destination->mFractionComplete = mFractionComplete;
+    destination->mAttachmentParentRef = mAttachmentParentRef;
+    destination->mAuxValueVector.AssignFrom(mAuxValueVector);
+    destination->mScroll0U = mScroll0U;
+    destination->mScroll0V = mScroll0V;
+    destination->mScroll1U = mScroll1U;
+    destination->mScroll1V = mScroll1V;
+    destination->mAmbientSound = mAmbientSound;
+    destination->mRumbleSound = mRumbleSound;
+    destination->mVisibilityHidden = mVisibilityHidden;
+    destination->mVisibilityMode = mVisibilityMode;
+    destination->mLayerMask = mLayerMask;
+    destination->mUsingAltFootprint = mUsingAltFootprint;
+    destination->mUnderlayTexture = mUnderlayTexture;
+    destination->mIntelAttributes = mIntelAttributes;
+    return destination;
+  }
+
+  /**
    * Address: 0x00559E00 (FUN_00559E00, Moho::SSTIEntityVariableData::MemberSerialize)
    */
   void SSTIEntityVariableData::MemberSerialize(gpg::WriteArchive* const archive, const int version)

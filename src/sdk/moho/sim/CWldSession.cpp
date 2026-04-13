@@ -1507,6 +1507,56 @@ namespace moho
       *ownerLinkSlot = &weakRef;
     }
 
+    class ScopedSelectionOwnerLinkGuard
+    {
+    public:
+      explicit ScopedSelectionOwnerLinkGuard(UserEntity* const entity) noexcept
+      {
+        mOwnerLinkSlot = entity ? reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead) : nullptr;
+        if (!mOwnerLinkSlot) {
+          return;
+        }
+
+        mPrev = *mOwnerLinkSlot;
+        *mOwnerLinkSlot = MarkerNode();
+      }
+
+      ~ScopedSelectionOwnerLinkGuard()
+      {
+        Restore();
+      }
+
+      ScopedSelectionOwnerLinkGuard(const ScopedSelectionOwnerLinkGuard&) = delete;
+      ScopedSelectionOwnerLinkGuard& operator=(const ScopedSelectionOwnerLinkGuard&) = delete;
+
+    private:
+      [[nodiscard]] SSelectionWeakRefUserEntity* MarkerNode() noexcept
+      {
+        return reinterpret_cast<SSelectionWeakRefUserEntity*>(&mOwnerLinkSlot);
+      }
+
+      void Restore() noexcept
+      {
+        if (!mOwnerLinkSlot) {
+          return;
+        }
+
+        auto** cursor = mOwnerLinkSlot;
+        const SSelectionWeakRefUserEntity* const marker = MarkerNode();
+        while (*cursor != marker) {
+          cursor = &((*cursor)->mNextOwner);
+        }
+
+        *cursor = mPrev;
+        mOwnerLinkSlot = nullptr;
+        mPrev = nullptr;
+      }
+
+    private:
+      SSelectionWeakRefUserEntity** mOwnerLinkSlot = nullptr;
+      SSelectionWeakRefUserEntity* mPrev = nullptr;
+    };
+
     void FixupAfterSelectionInsert(SSelectionSetUserEntity& selection, SSelectionNodeUserEntity* node)
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
@@ -1551,10 +1601,17 @@ namespace moho
       head->mParent->mColor = 1u;
     }
 
-    [[nodiscard]] bool InsertSelectionEntity(SSelectionSetUserEntity& selection, UserEntity* const entity)
+    [[nodiscard]] bool InsertSelectionEntity(
+      SSelectionSetUserEntity& selection,
+      UserEntity* const entity,
+      SSelectionNodeUserEntity** const outNode = nullptr
+    )
     {
       SSelectionNodeUserEntity* const head = selection.mHead;
       if (head == nullptr || entity == nullptr) {
+        if (outNode != nullptr) {
+          *outNode = head;
+        }
         return false;
       }
 
@@ -1568,6 +1625,9 @@ namespace moho
         } else if (probe->mKey < key) {
           probe = probe->mRight;
         } else {
+          if (outNode != nullptr) {
+            *outNode = probe;
+          }
           return false;
         }
       }
@@ -1594,6 +1654,9 @@ namespace moho
       ++selection.mSize;
       FixupAfterSelectionInsert(selection, inserted);
       RecomputeSelectionExtrema(selection);
+      if (outNode != nullptr) {
+        *outNode = inserted;
+      }
       return true;
     }
 
@@ -2577,6 +2640,43 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add)
+   *
+   * What it does:
+   * Inserts one user-entity pointer key into the selection weak-set tree and
+   * returns `{ownerSet,node,inserted}` in `outResult`.
+   */
+  SSelectionSetUserEntity::AddResult* SSelectionSetUserEntity::Add(
+    AddResult* const outResult,
+    SSelectionSetUserEntity* const set,
+    UserEntity* const entity
+  )
+  {
+    GPG_ASSERT(outResult != nullptr);
+    if (!outResult) {
+      return nullptr;
+    }
+
+    outResult->mOwnerSet = set;
+    outResult->mNode = (set != nullptr) ? set->mHead : nullptr;
+    outResult->mWasInserted = 0u;
+    outResult->mReserved09_0B[0] = 0u;
+    outResult->mReserved09_0B[1] = 0u;
+    outResult->mReserved09_0B[2] = 0u;
+
+    if (set == nullptr) {
+      return outResult;
+    }
+
+    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
+    SSelectionNodeUserEntity* node = set->mHead;
+    const bool inserted = InsertSelectionEntity(*set, entity, &node);
+    outResult->mNode = node;
+    outResult->mWasInserted = inserted ? 1u : 0u;
+    return outResult;
+  }
+
+  /**
    * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
    *
    * What it does:
@@ -3345,6 +3445,40 @@ namespace moho
 
       if (std::find(outUnits.begin(), outUnits.end(), userUnit) == outUnits.end()) {
         outUnits.push_back(userUnit);
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00896090 (FUN_00896090, ?GetValidAttackingUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
+   *
+   * What it does:
+   * Walks selected units and keeps only those that can attack the currently
+   * hovered entity.
+   */
+  void CWldSession::GetValidAttackingUnits(msvc8::vector<UserUnit*>& outUnits) const
+  {
+    outUnits.clear();
+
+    const UserEntity* const hoveredTarget = GetHoveredUserEntity(this);
+    const SSelectionNodeUserEntity* const head = mSelection.mHead;
+    if (!head) {
+      return;
+    }
+
+    for (const SSelectionNodeUserEntity* node = head->mLeft; node && node != head; node = NextTreeNode(node)) {
+      UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt);
+      if (!entity) {
+        continue;
+      }
+
+      UserUnit* const userUnit = entity->IsUserUnit();
+      if (!userUnit) {
+        continue;
+      }
+
+      if (userUnit->CanAttackTarget(hoveredTarget, true)) {
+        AppendUnitUnique(outUnits, userUnit);
       }
     }
   }

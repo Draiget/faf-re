@@ -42,6 +42,40 @@ namespace moho
      * VFTable SLOT: 9
      */
     void Init() override;
+
+    /**
+     * Address: 0x0059D0F0 (FUN_0059D0F0, ??2CAiFormationInstance@Moho@@QAE@@Z_0)
+     *
+     * What it does:
+     * Allocates and default-constructs one `CAiFormationInstance`, then returns
+     * it as a typed reflection reference.
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x0059D1A0 (FUN_0059D1A0)
+     *
+     * What it does:
+     * Placement-constructs one `CAiFormationInstance` in caller-provided
+     * storage and returns it as a typed reflection reference.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x0059D180 (FUN_0059D180)
+     *
+     * What it does:
+     * Invokes slot-0 deleting lane (`deleteFlags=1`) when storage is non-null.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x0059D220 (FUN_0059D220)
+     *
+     * What it does:
+     * Invokes slot-0 non-deleting lane (`deleteFlags=0`) for in-place teardown.
+     */
+    static void Destruct(void* objectStorage);
   };
 
   static_assert(sizeof(CAiFormationInstanceTypeInfo) == 0x64, "CAiFormationInstanceTypeInfo size must be 0x64");

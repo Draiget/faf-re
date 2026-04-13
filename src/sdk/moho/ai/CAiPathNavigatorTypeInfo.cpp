@@ -1,11 +1,11 @@
 #include "moho/ai/CAiPathNavigatorTypeInfo.h"
 
-#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
 
 #include "moho/ai/CAiPathNavigator.h"
+#include "moho/misc/Listener.h"
 
 using namespace moho;
 
@@ -13,6 +13,7 @@ namespace
 {
   alignas(CAiPathNavigatorTypeInfo) unsigned char gCAiPathNavigatorTypeInfoStorage[sizeof(CAiPathNavigatorTypeInfo)] = {};
   bool gCAiPathNavigatorTypeInfoConstructed = false;
+  gpg::RType* gListenerNavPathType = nullptr;
 
   [[nodiscard]] CAiPathNavigatorTypeInfo* AcquireCAiPathNavigatorTypeInfo()
   {
@@ -24,71 +25,12 @@ namespace
     return reinterpret_cast<CAiPathNavigatorTypeInfo*>(gCAiPathNavigatorTypeInfoStorage);
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiPathNavigatorType()
+  [[nodiscard]] gpg::RType* CachedListenerNavPathType()
   {
-    if (!CAiPathNavigator::sType) {
-      CAiPathNavigator::sType = gpg::LookupRType(typeid(CAiPathNavigator));
+    if (!gListenerNavPathType) {
+      gListenerNavPathType = gpg::LookupRType(typeid(moho::Listener<const moho::SNavPath&>));
     }
-    return CAiPathNavigator::sType;
-  }
-
-  template <typename T>
-  [[nodiscard]] gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  [[nodiscard]] gpg::RRef CreateAiPathNavigatorRefOwned()
-  {
-    return MakeTypedRef(new CAiPathNavigator(nullptr), CachedCAiPathNavigatorType());
-  }
-
-  void DeleteAiPathNavigatorOwned(void* object)
-  {
-    delete static_cast<CAiPathNavigator*>(object);
-  }
-
-  [[nodiscard]] gpg::RRef ConstructAiPathNavigatorRefInPlace(void* objectStorage)
-  {
-    auto* const navigator = static_cast<CAiPathNavigator*>(objectStorage);
-    if (navigator) {
-      new (navigator) CAiPathNavigator(nullptr);
-    }
-    return MakeTypedRef(navigator, CachedCAiPathNavigatorType());
-  }
-
-  void DestroyAiPathNavigatorInPlace(void* object)
-  {
-    auto* const navigator = static_cast<CAiPathNavigator*>(object);
-    if (navigator) {
-      navigator->~CAiPathNavigator();
-    }
+    return gListenerNavPathType;
   }
 
   /**
@@ -139,12 +81,80 @@ const char* CAiPathNavigatorTypeInfo::GetName() const
 void CAiPathNavigatorTypeInfo::Init()
 {
   size_ = sizeof(CAiPathNavigator);
-  newRefFunc_ = &CreateAiPathNavigatorRefOwned;
-  ctorRefFunc_ = &ConstructAiPathNavigatorRefInPlace;
-  deleteFunc_ = &DeleteAiPathNavigatorOwned;
-  dtrFunc_ = &DestroyAiPathNavigatorInPlace;
+  newRefFunc_ = &CAiPathNavigatorTypeInfo::NewRef;
+  ctorRefFunc_ = &CAiPathNavigatorTypeInfo::CtrRef;
+  deleteFunc_ = &CAiPathNavigatorTypeInfo::Delete;
+  dtrFunc_ = &CAiPathNavigatorTypeInfo::Destruct;
   gpg::RType::Init();
+  AddBase_Listener_NavPath(this);
+  Version(1);
   Finish();
+}
+
+/**
+ * Address: 0x005B0930 (FUN_005B0930, Moho::CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath)
+ */
+void __stdcall CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath(gpg::RType* const typeInfo)
+{
+  gpg::RType* const baseType = CachedListenerNavPathType();
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
+ * Address: 0x005B0740 (FUN_005B0740, Moho::CAiPathNavigatorTypeInfo::NewRef)
+ *
+ * What it does:
+ * Allocates one detached `CAiPathNavigator` and returns a typed reflection
+ * reference for it.
+ */
+gpg::RRef CAiPathNavigatorTypeInfo::NewRef()
+{
+  auto* const navigator = new (std::nothrow) CAiPathNavigator();
+  gpg::RRef out{};
+  gpg::RRef_CAiPathNavigator(&out, navigator);
+  return out;
+}
+
+/**
+ * Address: 0x005B07E0 (FUN_005B07E0, Moho::CAiPathNavigatorTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Constructs one detached `CAiPathNavigator` in caller-provided storage and
+ * returns a typed reflection reference for it.
+ */
+gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
+{
+  auto* const navigator = static_cast<CAiPathNavigator*>(objectStorage);
+  if (navigator) {
+    new (navigator) CAiPathNavigator();
+  }
+
+  gpg::RRef out{};
+  gpg::RRef_CAiPathNavigator(&out, navigator);
+  return out;
+}
+
+/**
+ * Address: 0x005B07C0 (FUN_005B07C0, Moho::CAiPathNavigatorTypeInfo::Delete)
+ */
+void CAiPathNavigatorTypeInfo::Delete(void* const objectStorage)
+{
+  delete static_cast<CAiPathNavigator*>(objectStorage);
+}
+
+/**
+ * Address: 0x005B0850 (FUN_005B0850, Moho::CAiPathNavigatorTypeInfo::Destruct)
+ */
+void CAiPathNavigatorTypeInfo::Destruct(void* const objectStorage)
+{
+  static_cast<CAiPathNavigator*>(objectStorage)->~CAiPathNavigator();
 }
 
 /**

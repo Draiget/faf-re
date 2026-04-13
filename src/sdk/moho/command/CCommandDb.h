@@ -38,7 +38,22 @@ namespace moho
     std::uint8_t pad_0014[0x0C];
     IdPool pool;
 
+    /**
+     * Address: 0x006E1430 (FUN_006E1430, Moho::CCommandDB::MemberDeserialize)
+     *
+     * What it does:
+     * Reads owned `CUnitCommand` pointer lanes from archive, assigns recovered
+     * command ids from the id-pool, and inserts each command into the command map.
+     */
     void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x006E13A0 (FUN_006E13A0, Moho::CCommandDB::MemberSerialize)
+     *
+     * What it does:
+     * Serializes each command-db entry as an owned tracked `CUnitCommand`
+     * pointer and emits the terminating null pointer lane.
+     */
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 

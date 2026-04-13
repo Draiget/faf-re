@@ -10,6 +10,14 @@ namespace moho
 {
 
 /**
+ * Address: 0x007D9BB0 (FUN_007D9BB0, Moho::MapImager::~MapImager)
+ */
+MapImager::~MapImager()
+{
+  ClearBorder();
+}
+
+/**
  * Address: 0x007D9F00 (FUN_007D9F00)
  *
  * IDA signature:

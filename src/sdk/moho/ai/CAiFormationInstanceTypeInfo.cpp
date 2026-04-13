@@ -78,15 +78,6 @@ namespace
     return nullptr;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiFormationInstanceType()
-  {
-    static gpg::RType* cachedType = nullptr;
-    if (!cachedType) {
-      cachedType = gpg::LookupRType(typeid(CAiFormationInstance));
-    }
-    return cachedType;
-  }
-
   [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
   {
     static gpg::RType* cachedType = nullptr;
@@ -99,50 +90,8 @@ namespace
   [[nodiscard]] gpg::RRef MakeFormationInstanceRef(CAiFormationInstance* const object)
   {
     gpg::RRef out{};
-    out.mObj = object;
-    out.mType = CachedCAiFormationInstanceType();
+    gpg::RRef_CAiFormationInstance(&out, object);
     return out;
-  }
-
-  [[nodiscard]] gpg::RRef CreateFormationInstanceRefOwned()
-  {
-    auto* const object = new (std::nothrow) CAiFormationInstanceTypeInfoConstructShim();
-    if (object) {
-      object->mSim = nullptr;
-    }
-
-    return MakeFormationInstanceRef(object);
-  }
-
-  [[nodiscard]] gpg::RRef ConstructFormationInstanceRefInPlace(void* const objectStorage)
-  {
-    auto* const object = static_cast<CAiFormationInstanceTypeInfoConstructShim*>(objectStorage);
-    if (object) {
-      new (object) CAiFormationInstanceTypeInfoConstructShim();
-      object->mSim = nullptr;
-    }
-
-    return MakeFormationInstanceRef(object);
-  }
-
-  void DeleteFormationInstanceOwned(void* const objectStorage)
-  {
-    auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
-    if (!object) {
-      return;
-    }
-
-    object->operator_delete(1);
-  }
-
-  void DestroyFormationInstanceInPlace(void* const objectStorage)
-  {
-    auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
-    if (!object) {
-      return;
-    }
-
-    object->operator_delete(0);
   }
 
   void AddCFormationInstanceBase(gpg::RType* const typeInfo)
@@ -210,14 +159,59 @@ const char* CAiFormationInstanceTypeInfo::GetName() const
 void CAiFormationInstanceTypeInfo::Init()
 {
   size_ = sizeof(CAiFormationInstance);
-  newRefFunc_ = &CreateFormationInstanceRefOwned;
-  ctorRefFunc_ = &ConstructFormationInstanceRefInPlace;
-  deleteFunc_ = &DeleteFormationInstanceOwned;
-  dtrFunc_ = &DestroyFormationInstanceInPlace;
+  newRefFunc_ = &CAiFormationInstanceTypeInfo::NewRef;
+  ctorRefFunc_ = &CAiFormationInstanceTypeInfo::CtrRef;
+  deleteFunc_ = &CAiFormationInstanceTypeInfo::Delete;
+  dtrFunc_ = &CAiFormationInstanceTypeInfo::Destruct;
 
   gpg::RType::Init();
   AddCFormationInstanceBase(this);
   Finish();
+}
+
+/**
+ * Address: 0x0059D0F0 (FUN_0059D0F0, ??2CAiFormationInstance@Moho@@QAE@@Z_0)
+ */
+gpg::RRef CAiFormationInstanceTypeInfo::NewRef()
+{
+  auto* const object = new (std::nothrow) CAiFormationInstanceTypeInfoConstructShim();
+  if (object) {
+    object->mSim = nullptr;
+  }
+  return MakeFormationInstanceRef(object);
+}
+
+/**
+ * Address: 0x0059D1A0 (FUN_0059D1A0)
+ */
+gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
+{
+  auto* const object = static_cast<CAiFormationInstanceTypeInfoConstructShim*>(objectStorage);
+  if (object) {
+    new (object) CAiFormationInstanceTypeInfoConstructShim();
+    object->mSim = nullptr;
+  }
+  return MakeFormationInstanceRef(object);
+}
+
+/**
+ * Address: 0x0059D180 (FUN_0059D180)
+ */
+void CAiFormationInstanceTypeInfo::Delete(void* const objectStorage)
+{
+  auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
+  if (!object) {
+    return;
+  }
+  object->operator_delete(1);
+}
+
+/**
+ * Address: 0x0059D220 (FUN_0059D220)
+ */
+void CAiFormationInstanceTypeInfo::Destruct(void* const objectStorage)
+{
+  static_cast<CAiFormationInstance*>(objectStorage)->operator_delete(0);
 }
 
 /**

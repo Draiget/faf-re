@@ -20,6 +20,14 @@ namespace gpg
 		BitArray2D();
 
 		/**
+		 * Address: 0x008D82F0 (FUN_008D82F0, ??0BitArray2D@gpg@@QAE@II@Z_0)
+		 *
+		 * What it does:
+		 * Initializes an empty bit-array then resets it to the requested size.
+		 */
+		BitArray2D(unsigned int width, unsigned int height);
+
+		/**
 		 * Address: 0x008D8200 (FUN_008D8200, ??1BitArray2D@gpg@@QAE@XZ)
 		 *
 		 * What it does:

@@ -12,14 +12,18 @@
 
 namespace
 {
-  void DecrementLAiAttackerImplStatCounter()
+  void AdjustStatCounter(moho::StatItem* const stat, const long delta)
   {
-    moho::StatItem* const stat = moho::InstanceCounter<moho::LAiAttackerImpl>::GetStatItem();
     if (stat == nullptr) {
       return;
     }
 
-    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&stat->mPrimaryValueBits), -1L);
+    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&stat->mPrimaryValueBits), delta);
+  }
+
+  void DecrementLAiAttackerImplStatCounter()
+  {
+    AdjustStatCounter(moho::InstanceCounter<moho::LAiAttackerImpl>::GetStatItem(), -1L);
   }
 } // namespace
 
@@ -42,6 +46,21 @@ moho::StatItem* moho::InstanceCounter<moho::LAiAttackerImpl>::GetStatItem()
   moho::EngineStats* const engineStats = moho::GetEngineStats();
   sStatItem = engineStats->GetItem(statPath.c_str(), true);
   return sStatItem;
+}
+
+/**
+ * Address: 0x005D5F30 (FUN_005D5F30, Moho::LAiAttackerImpl::LAiAttackerImpl)
+ *
+ * What it does:
+ * Initializes detached task lanes, bumps CTask/LAiAttackerImpl instance
+ * counters, and binds the owning attacker-impl pointer.
+ */
+moho::LAiAttackerImpl::LAiAttackerImpl(CAiAttackerImpl* const owner)
+  : CTask(nullptr, false)
+  , mReserved18(0u)
+  , cImpl(owner)
+{
+  AdjustStatCounter(InstanceCounter<LAiAttackerImpl>::GetStatItem(), +1L);
 }
 
 /**

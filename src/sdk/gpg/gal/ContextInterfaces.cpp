@@ -10,6 +10,8 @@
 #include "TextureContext.hpp"
 #include "VertexBufferContext.hpp"
 
+#include <new>
+
 namespace gpg::gal
 {
     namespace
@@ -334,6 +336,34 @@ namespace gpg::gal
      * destructor thunk teardown.
      */
     DrawContext::~DrawContext() = default;
+
+    /**
+     * Address: 0x0093FBE0 (FUN_0093FBE0, gpg::gal::EffectContext::EffectContext)
+     *
+     * What it does:
+     * Initializes effect source/cache string lanes, source-buffer ownership
+     * metadata, and macro vector storage to their default empty state.
+     */
+    EffectContext::EffectContext()
+    {
+        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
+
+        runtime->sourceType = 0U;
+        runtime->useCache = 0U;
+
+        ::new (static_cast<void*>(&runtime->sourcePath)) msvc8::string();
+        ::new (static_cast<void*>(&runtime->cachePath)) msvc8::string();
+
+        runtime->sourceBufferBytes = 0U;
+        runtime->sourceBufferCount = nullptr;
+        runtime->sourceBufferBegin = 0U;
+        runtime->sourceBufferEnd = 0U;
+
+        runtime->macros.proxy = nullptr;
+        runtime->macros.first = nullptr;
+        runtime->macros.last = nullptr;
+        runtime->macros.end = nullptr;
+    }
 
     /**
      * Address: 0x0093F950 (FUN_0093F950, gpg::gal::EffectContext::~EffectContext)

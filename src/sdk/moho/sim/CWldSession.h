@@ -200,6 +200,28 @@ namespace moho
     std::uint32_t mSize;               // +0x08
     std::uint32_t mSizeMirrorOrUnused; // +0x0C
 
+    struct Index
+    {
+      SSelectionSetUserEntity* mOwnerSet; // +0x00
+      SSelectionNodeUserEntity* mNode;    // +0x04
+    };
+
+    struct AddResult : Index
+    {
+      std::uint8_t mWasInserted;          // +0x08
+      std::uint8_t mReserved09_0B[3]{};   // +0x09
+    };
+
+    /**
+     * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add)
+     *
+     * What it does:
+     * Inserts one user-entity pointer key into the selection weak-set tree and
+     * returns `{ownerSet,node,inserted}` in `outResult`.
+     */
+    [[nodiscard]] static AddResult*
+      Add(AddResult* outResult, SSelectionSetUserEntity* set, UserEntity* entity);
+
     /**
      * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
      *
@@ -242,6 +264,12 @@ namespace moho
     offsetof(SSelectionSetUserEntity, mSizeMirrorOrUnused) == 0x0C,
     "SSelectionSetUserEntity::mSizeMirrorOrUnused offset must be 0x0C"
   );
+  static_assert(sizeof(SSelectionSetUserEntity::Index) == 0x08, "SSelectionSetUserEntity::Index size must be 0x08");
+  static_assert(
+    offsetof(SSelectionSetUserEntity::AddResult, mWasInserted) == 0x08,
+    "SSelectionSetUserEntity::AddResult::mWasInserted offset must be 0x08"
+  );
+  static_assert(sizeof(SSelectionSetUserEntity::AddResult) == 0x0C, "SSelectionSetUserEntity::AddResult size must be 0x0C");
 
   struct SSessionSaveData
   {
@@ -415,6 +443,15 @@ namespace moho
      * entries for currently live selected units.
      */
     void GetSelectionUnits(msvc8::vector<UserUnit*>& outUnits) const;
+
+    /**
+     * Address: 0x00896090 (FUN_00896090, ?GetValidAttackingUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
+     *
+     * What it does:
+     * Filters current selection down to units that can attack the hovered
+     * target entity and writes unique unit entries to `outUnits`.
+     */
+    void GetValidAttackingUnits(msvc8::vector<UserUnit*>& outUnits) const;
 
     /**
      * Address context:

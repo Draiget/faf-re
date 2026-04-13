@@ -128,8 +128,23 @@ namespace gpg
             return static_cast<std::size_t>(mEnd - mBegin);
         }
 
-        /** Copy assignment (shares ownership). */
-        MemBuffer& operator=(const MemBuffer&) noexcept = default;
+        /**
+         * Address: 0x004D8E90 (FUN_004D8E90, gpg::MemBuffer<char>::operator=)
+         *
+         * What it does:
+         * Performs one shallow lane copy (shared owner + begin/end bounds).
+         */
+        MemBuffer& operator=(const MemBuffer& rhs) noexcept
+        {
+            if (this == &rhs) {
+                return *this;
+            }
+
+            mData = rhs.mData;
+            mBegin = rhs.mBegin;
+            mEnd = rhs.mEnd;
+            return *this;
+        }
 
         /** Converting assignment (e.g. MemBuffer<char> -> MemBuffer<const char>). */
         template <class U, std::enable_if_t<std::is_convertible_v<U*, type*>, int> = 0>

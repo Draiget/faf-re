@@ -53,11 +53,12 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedWeakUnitType()
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Unit>));
+    gpg::RType* type = WeakPtr<Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(WeakPtr<Unit>));
+      WeakPtr<Unit>::sType = type;
     }
-    return cached;
+    return type;
   }
 
   [[nodiscard]] gpg::RType* CachedIntVectorType()
@@ -93,6 +94,60 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
+ *
+ * What it does:
+ * Loads transport/attach indices, reserved-unit weak link, and reserved
+ * attach-bone list from one archive payload.
+ */
+void SAiReservedTransportBone::MemberDeserialize(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  archive->ReadUInt(&transportBoneIndex);
+  archive->ReadUInt(&attachBoneIndex);
+
+  const gpg::RRef ownerRef{};
+
+  gpg::RType* const weakUnitType = CachedWeakUnitType();
+  GPG_ASSERT(weakUnitType != nullptr);
+  archive->Read(weakUnitType, &reservedUnit, ownerRef);
+
+  gpg::RType* const intVectorType = CachedIntVectorType();
+  GPG_ASSERT(intVectorType != nullptr);
+  archive->Read(intVectorType, &reservedBones, ownerRef);
+}
+
+/**
+ * Address: 0x005EB8F0 (FUN_005EB8F0, Moho::SAiReservedTransportBone::MemberSerialize)
+ *
+ * What it does:
+ * Stores transport/attach indices, reserved-unit weak link, and reserved
+ * attach-bone list into one archive payload.
+ */
+void SAiReservedTransportBone::MemberSerialize(gpg::WriteArchive* const archive) const
+{
+  if (!archive) {
+    return;
+  }
+
+  archive->WriteUInt(transportBoneIndex);
+  archive->WriteUInt(attachBoneIndex);
+
+  const gpg::RRef ownerRef{};
+
+  gpg::RType* const weakUnitType = CachedWeakUnitType();
+  GPG_ASSERT(weakUnitType != nullptr);
+  archive->Write(weakUnitType, &reservedUnit, ownerRef);
+
+  gpg::RType* const intVectorType = CachedIntVectorType();
+  GPG_ASSERT(intVectorType != nullptr);
+  archive->Write(intVectorType, &reservedBones, ownerRef);
+}
+
+/**
  * Address: 0x005E40A0 (FUN_005E40A0, SAiReservedTransportBoneSerializer::Deserialize)
  */
 void SAiReservedTransportBoneSerializer::Deserialize(
@@ -107,18 +162,7 @@ void SAiReservedTransportBoneSerializer::Deserialize(
   }
 
   auto* const bone = reinterpret_cast<SAiReservedTransportBone*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->ReadUInt(&bone->transportBoneIndex);
-  archive->ReadUInt(&bone->attachBoneIndex);
-
-  const gpg::RRef ownerRef{};
-
-  gpg::RType* const weakUnitType = CachedWeakUnitType();
-  GPG_ASSERT(weakUnitType != nullptr);
-  archive->Read(weakUnitType, &bone->reservedUnit, ownerRef);
-
-  gpg::RType* const intVectorType = CachedIntVectorType();
-  GPG_ASSERT(intVectorType != nullptr);
-  archive->Read(intVectorType, &bone->reservedBones, ownerRef);
+  bone->MemberDeserialize(archive);
 }
 
 /**
@@ -136,18 +180,7 @@ void SAiReservedTransportBoneSerializer::Serialize(
   }
 
   auto* const bone = reinterpret_cast<const SAiReservedTransportBone*>(static_cast<std::uintptr_t>(objectPtr));
-  archive->WriteUInt(bone->transportBoneIndex);
-  archive->WriteUInt(bone->attachBoneIndex);
-
-  const gpg::RRef ownerRef{};
-
-  gpg::RType* const weakUnitType = CachedWeakUnitType();
-  GPG_ASSERT(weakUnitType != nullptr);
-  archive->Write(weakUnitType, &bone->reservedUnit, ownerRef);
-
-  gpg::RType* const intVectorType = CachedIntVectorType();
-  GPG_ASSERT(intVectorType != nullptr);
-  archive->Write(intVectorType, &bone->reservedBones, ownerRef);
+  bone->MemberSerialize(archive);
 }
 
 /**

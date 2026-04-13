@@ -124,6 +124,7 @@ namespace gpg
 	class BinaryReader;
 	class RType;
 	class RRef;
+	class WriteArchive;
 }
 
 struct global_State;

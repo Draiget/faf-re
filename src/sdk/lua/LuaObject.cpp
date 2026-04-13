@@ -64,13 +64,89 @@ namespace
 		offsetof(LuaGlobalStateUserdataRuntimeView, userdataMetatable) == 0x118,
 		"LuaGlobalStateUserdataRuntimeView::userdataMetatable offset must be 0x118"
 	);
+
+	struct LuaFuncStateCodegenRuntimeView
+	{
+		Proto* functionProto;
+		std::uint8_t reserved04To0B[0x08];
+		void* lexState;
+		std::uint8_t reserved10To23[0x14];
+		int freeRegister;
+	};
+
+	static_assert(
+		offsetof(LuaFuncStateCodegenRuntimeView, functionProto) == 0x00,
+		"LuaFuncStateCodegenRuntimeView::functionProto offset must be 0x00"
+	);
+	static_assert(
+		offsetof(LuaFuncStateCodegenRuntimeView, lexState) == 0x0C,
+		"LuaFuncStateCodegenRuntimeView::lexState offset must be 0x0C"
+	);
+	static_assert(
+		offsetof(LuaFuncStateCodegenRuntimeView, freeRegister) == 0x24,
+		"LuaFuncStateCodegenRuntimeView::freeRegister offset must be 0x24"
+	);
+
+	struct LuaExpDescCodegenRuntimeView
+	{
+		int kind;
+		int info;
+		int aux;
+		int t;
+		int f;
+	};
+
+	static_assert(offsetof(LuaExpDescCodegenRuntimeView, kind) == 0x00, "LuaExpDescCodegenRuntimeView::kind offset must be 0x00");
+	static_assert(offsetof(LuaExpDescCodegenRuntimeView, info) == 0x04, "LuaExpDescCodegenRuntimeView::info offset must be 0x04");
+	static_assert(offsetof(LuaExpDescCodegenRuntimeView, aux) == 0x08, "LuaExpDescCodegenRuntimeView::aux offset must be 0x08");
+	static_assert(offsetof(LuaExpDescCodegenRuntimeView, t) == 0x0C, "LuaExpDescCodegenRuntimeView::t offset must be 0x0C");
+	static_assert(offsetof(LuaExpDescCodegenRuntimeView, f) == 0x10, "LuaExpDescCodegenRuntimeView::f offset must be 0x10");
+
+	struct LuaFuncStateUpvalueRuntimeView
+	{
+		Proto* functionProto;
+		std::uint8_t reserved04To0B[0x08];
+		void* lexState;
+		lua_State* state;
+		std::uint8_t reserved14To37[0x24];
+		LuaExpDescCodegenRuntimeView upvalues[0x20];
+	};
+
+	static_assert(
+		offsetof(LuaFuncStateUpvalueRuntimeView, functionProto) == 0x00,
+		"LuaFuncStateUpvalueRuntimeView::functionProto offset must be 0x00"
+	);
+	static_assert(
+		offsetof(LuaFuncStateUpvalueRuntimeView, lexState) == 0x0C,
+		"LuaFuncStateUpvalueRuntimeView::lexState offset must be 0x0C"
+	);
+	static_assert(
+		offsetof(LuaFuncStateUpvalueRuntimeView, state) == 0x10,
+		"LuaFuncStateUpvalueRuntimeView::state offset must be 0x10"
+	);
+	static_assert(
+		offsetof(LuaFuncStateUpvalueRuntimeView, upvalues) == 0x38,
+		"LuaFuncStateUpvalueRuntimeView::upvalues offset must be 0x38"
+	);
 }
+
+struct FuncState;
+struct expdesc;
 
 extern "C"
 {
 	void luaC_collectgarbage(lua_State* L);
 	Closure* luaF_newCclosure(lua_State* L, int nelems);
 	void luaD_growstack(lua_State* L, int n);
+	void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
+	void* luaM_growaux(lua_State* L, void* block, int* size, int sizeElem, int limit, const char* what);
+	void luaG_runerror(lua_State* L, const char* format, ...);
+	void discharge2reg(expdesc* e, int reg, FuncState* fs);
+	void luaX_checklimit(void* ls, int v, int l, const char* what);
+	void luaX_syntaxerror(void* ls, const char* msg);
+	const TObject* luaH_getnum(Table* t, int key);
+	TObject* luaH_set(lua_State* L, Table* t, const TObject* key);
+	TObject* luaH_setnum(lua_State* L, Table* t, int key);
 
 	/**
 	 * Address: 0x0090CED0 (FUN_0090CED0, lua_pushcclosure)
@@ -178,6 +254,210 @@ extern "C"
 		}
 
 		return defaultValue;
+	}
+
+	/**
+	 * Address: 0x00927240 (FUN_00927240, setarrayvector)
+	 *
+	 * What it does:
+	 * Resizes one table dense-array lane, nil-tags newly exposed slots, and
+	 * updates `Table::sizearray`.
+	 */
+	int setarrayvector(const int size, Table* const table, lua_State* const state)
+	{
+		const lu_mem oldBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(table->sizearray);
+		const lu_mem newBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(size);
+		table->array = static_cast<TObject*>(luaM_realloc(state, table->array, oldBytes, newBytes));
+
+		int index = table->sizearray;
+		while (index < size) {
+			table->array[index].tt = LUA_TNIL;
+			++index;
+		}
+
+		table->sizearray = size;
+		return index;
+	}
+
+	/**
+	 * Address: 0x00927290 (FUN_00927290, setnodevector)
+	 *
+	 * What it does:
+	 * Allocates or binds one table hash-node lane, nil-tags every hash slot key
+	 * and value tag, then refreshes `lsizenode` and `firstfree`.
+	 */
+	Node* setnodevector(lua_State* const state, Table* const table, const int lsize)
+	{
+		constexpr int kLuaTableMaxHashBits = 0x18;
+		if (lsize > kLuaTableMaxHashBits) {
+			luaG_runerror(state, "table overflow");
+		}
+
+		const int size = 1 << lsize;
+		if (lsize != 0) {
+			const lu_mem nodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(size);
+			table->node = static_cast<Node*>(luaM_realloc(state, nullptr, 0u, nodeBytes));
+
+			for (int index = 0; index < size; ++index) {
+				Node& node = table->node[index];
+				node.next = nullptr;
+				node.i_key.tt = LUA_TNIL;
+				node.i_val.tt = LUA_TNIL;
+			}
+		} else {
+			table->node = state->l_G->dummynode;
+		}
+
+		table->lsizenode = static_cast<lu_byte>(lsize);
+		Node* const firstFree = &table->node[size - 1];
+		table->firstfree = firstFree;
+		return firstFree;
+	}
+
+	/**
+	 * Address: 0x00927780 (FUN_00927780, resize)
+	 *
+	 * What it does:
+	 * Rebuilds one Lua table's array/hash storage to new capacities, migrates
+	 * live entries across resized lanes, and frees old hash storage when
+	 * applicable.
+	 */
+	int resize(Table* const table, const int newArraySize, lua_State* const state, const int newHashBits)
+	{
+		const int oldArraySize = table->sizearray;
+		const int oldHashBits = table->lsizenode;
+		Node* oldNodeArray = table->node;
+
+		Node copiedDummyNode{};
+		if (oldHashBits == 0) {
+			copiedDummyNode = *oldNodeArray;
+			oldNodeArray = &copiedDummyNode;
+			state->l_G->dummynode[0].i_key.tt = LUA_TNIL;
+			state->l_G->dummynode[0].i_val.tt = LUA_TNIL;
+		}
+
+		if (newArraySize > oldArraySize) {
+			setarrayvector(newArraySize, table, state);
+		}
+		setnodevector(state, table, newHashBits);
+
+		if (newArraySize < oldArraySize) {
+			table->sizearray = newArraySize;
+			for (int index = newArraySize; index < oldArraySize; ++index) {
+				TObject* const arraySlot = &table->array[index];
+				if (arraySlot->tt == LUA_TNIL) {
+					continue;
+				}
+
+				const int oneBasedKey = index + 1;
+				TObject* destinationSlot = const_cast<TObject*>(luaH_getnum(table, oneBasedKey));
+				if (destinationSlot->tt == LUA_TNIL) {
+					destinationSlot = luaH_setnum(state, table, oneBasedKey);
+				}
+				*destinationSlot = *arraySlot;
+			}
+
+			const lu_mem oldArrayBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(oldArraySize);
+			const lu_mem newArrayBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(newArraySize);
+			table->array = static_cast<TObject*>(luaM_realloc(state, table->array, oldArrayBytes, newArrayBytes));
+		}
+
+		const int oldNodeCount = 1 << oldHashBits;
+		for (int index = oldNodeCount - 1; index >= 0; --index) {
+			const Node& oldNode = oldNodeArray[index];
+			if (oldNode.i_val.tt == LUA_TNIL) {
+				continue;
+			}
+
+			TObject* const destinationSlot = luaH_set(state, table, &oldNode.i_key);
+			*destinationSlot = oldNode.i_val;
+		}
+
+		if (oldHashBits != 0) {
+			const lu_mem oldNodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(oldNodeCount);
+			return static_cast<int>(reinterpret_cast<std::uintptr_t>(luaM_realloc(state, oldNodeArray, oldNodeBytes, 0u)));
+		}
+
+		return oldNodeCount;
+	}
+
+	/**
+	 * Address: 0x00910A70 (FUN_00910A70, discharge2anyreg)
+	 *
+	 * What it does:
+	 * Ensures one expression is materialized in a register lane, grows
+	 * `Proto::maxstacksize` when needed, and throws parser syntax errors when
+	 * register usage exceeds Lua's function complexity cap.
+	 */
+	void discharge2anyreg(FuncState* const fs, expdesc* const e)
+	{
+		constexpr int kExpKindNonReloc = 0x0B;
+		constexpr int kLuaMaxFunctionRegisterSlots = 0xFA;
+
+		auto* const fsView = reinterpret_cast<LuaFuncStateCodegenRuntimeView*>(fs);
+		const auto* const expView = reinterpret_cast<const LuaExpDescCodegenRuntimeView*>(e);
+		if (expView->kind == kExpKindNonReloc) {
+			return;
+		}
+
+		const int requiredRegisterCount = fsView->freeRegister + 1;
+		if (requiredRegisterCount > static_cast<int>(fsView->functionProto->maxstacksize)) {
+			if (requiredRegisterCount >= kLuaMaxFunctionRegisterSlots) {
+				luaX_syntaxerror(fsView->lexState, "function or expression too complex");
+			}
+			fsView->functionProto->maxstacksize = static_cast<lu_byte>(requiredRegisterCount);
+		}
+
+		discharge2reg(e, fsView->freeRegister++, fs);
+	}
+
+	/**
+	 * Address: 0x0091AE90 (FUN_0091AE90, indexupvalue)
+	 *
+	 * What it does:
+	 * Finds or appends one parser upvalue entry matching expression
+	 * kind/info lanes, grows proto upvalue-name storage when needed, and
+	 * returns resolved upvalue index.
+	 */
+	int indexupvalue(FuncState* const fs, expdesc* const value, TString* const name)
+	{
+		constexpr int kLuaMaxUpvalues = 0x20;
+		constexpr int kLuaIntMaxMinusTwo = 0x7FFFFFFD;
+		constexpr int kUpvalueNameEntrySizeBytes = 4;
+
+		auto* const fsView = reinterpret_cast<LuaFuncStateUpvalueRuntimeView*>(fs);
+		Proto* const proto = fsView->functionProto;
+		const auto* const valueView = reinterpret_cast<const LuaExpDescCodegenRuntimeView*>(value);
+
+		int index = 0;
+		const int existingUpvalueCount = static_cast<int>(proto->nups);
+		while (index < existingUpvalueCount) {
+			const LuaExpDescCodegenRuntimeView& slot = fsView->upvalues[index];
+			if (slot.kind == valueView->kind && slot.info == valueView->info) {
+				return index;
+			}
+			++index;
+		}
+
+		luaX_checklimit(fsView->lexState, existingUpvalueCount + 1, kLuaMaxUpvalues, "upvalues");
+		int& upvalueCapacity = proto->sizeupvalues;
+		if (existingUpvalueCount + 1 > upvalueCapacity) {
+			proto->upvalues = static_cast<TString**>(
+				luaM_growaux(
+					fsView->state,
+					proto->upvalues,
+					&upvalueCapacity,
+					kUpvalueNameEntrySizeBytes,
+					kLuaIntMaxMinusTwo,
+					"upvalues"
+				)
+			);
+		}
+
+		proto->upvalues[existingUpvalueCount] = name;
+		fsView->upvalues[existingUpvalueCount] = *valueView;
+		proto->nups = static_cast<lu_byte>(existingUpvalueCount + 1);
+		return existingUpvalueCount;
 	}
 
 } // extern "C"
@@ -3627,6 +3907,73 @@ void LuaState::SetState(lua_State* const state)
 }
 
 /**
+ * Address: 0x00921050 (FUN_00921050, lua_State::MemberSerialize)
+ *
+ * What it does:
+ * Serializes raw lua_State stack/callframe/global/upvalue lanes for archive
+ * persistence.
+ */
+void lua_State::MemberSerialize(
+	gpg::WriteArchive* const archive,
+	lua_State* const state,
+	const int,
+	const gpg::RRef* const ownerRef
+)
+{
+	Ensure(archive != nullptr, "archive");
+	Ensure(state != nullptr, "state");
+
+	const gpg::RRef nullOwner{};
+	const gpg::RRef& owner = ownerRef != nullptr ? *ownerRef : nullOwner;
+
+	TObject* const stackBase = state->stack;
+	const int baseIndex = static_cast<int>(state->base - stackBase);
+	const int topIndex = static_cast<int>(state->top - stackBase);
+
+	archive->WriteInt(state->stacksize);
+	archive->WriteInt(baseIndex);
+	archive->WriteInt(topIndex);
+
+	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
+	for (int index = 0; index < topIndex; ++index) {
+		archive->Write(tObjectType, &stackBase[index], owner);
+	}
+
+	archive->WriteUShort(state->size_ci);
+	const std::uint16_t currentCallInfoIndex = static_cast<std::uint16_t>(state->ci - state->base_ci);
+	archive->WriteUShort(currentCallInfoIndex);
+
+	for (std::uint16_t callInfoIndex = 0; callInfoIndex <= currentCallInfoIndex; ++callInfoIndex) {
+		CallInfo* const callInfo = state->base_ci + callInfoIndex;
+
+		archive->WriteInt(static_cast<int>(callInfo->base - stackBase));
+		archive->WriteInt(static_cast<int>(callInfo->top - stackBase));
+		archive->WriteInt(callInfo->state);
+		archive->WriteInt(callInfo->tailcalls);
+
+		if (callInfo->state < 3) {
+			const TObject* const functionSlot = callInfo->base - 1;
+			const auto* const closure = static_cast<const Closure*>(functionSlot->value.p);
+			const Instruction* const codeBase = closure->l.p->code;
+			archive->WriteInt(static_cast<int>(callInfo->savedpc - codeBase));
+		}
+	}
+
+	archive->Write(tObjectType, &state->_gt, owner);
+
+	for (GCObject* openUpval = state->openupval; openUpval != nullptr; openUpval = openUpval->gch.next) {
+		UpVal* const upvalue = &openUpval->uv;
+		archive->WriteInt(static_cast<int>(upvalue->v - stackBase));
+
+		gpg::RRef upvalueRef{};
+		(void)gpg::RRef_UpVal(&upvalueRef, upvalue);
+		gpg::WriteRawPointer(archive, upvalueRef, gpg::TrackedPointerState::Unowned, owner);
+	}
+
+	archive->WriteInt(-1);
+}
+
+/**
  * Address: 0x0090B8F0 (FUN_0090B8F0, LuaPlus::LuaState::MemberSerialize)
  *
  * What it does:
@@ -4604,10 +4951,20 @@ void LuaObject::SetInteger(const int32_t index, const int32_t value)
 	luaV_settable(lstate, &m_object, &key, &val);
 }
 
+/**
+ * Address: 0x009081F0 (FUN_009081F0, ?SetInteger@LuaObject@LuaPlus@@QBEXPBDH@Z)
+ *
+ * What it does:
+ * Writes one table entry by string key using an integer payload lane.
+ */
 void LuaObject::SetInteger(const char* key, const int32_t value)
 {
 	Ensure(m_state != nullptr, "m_state");
-	SetNumber(key, static_cast<float>(value));
+
+	TObject object{};
+	object.tt = LUA_TNUMBER;
+	object.value.n = static_cast<float>(value);
+	SetTableHelper(key, &object);
 }
 
 /**

@@ -10,6 +10,12 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CScriptEvent.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+} // namespace gpg
+
 namespace moho
 {
   class Unit;
@@ -41,6 +47,22 @@ namespace moho
    */
   struct CEconRequest
   {
+    /**
+     * Address: 0x00774A60 (FUN_00774A60, Moho::CEconRequest::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes requested and granted economy-value lanes.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00774AE0 (FUN_00774AE0, Moho::CEconRequest::MemberSerialize)
+     *
+     * What it does:
+     * Serializes requested and granted economy-value lanes.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
     TDatListItem<void, void> mNode; // +0x00
     SEconValue mRequested;          // +0x08
     SEconValue mGranted;            // +0x10

@@ -2,11 +2,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <float.h>
 #include <limits>
 #include <new>
 #include <typeinfo>
+
+#include <xmmintrin.h>
 
 #include <Windows.h>
 
@@ -175,6 +179,34 @@ moho::CRandomStream& moho::math_GlobalRandomStream =
 namespace moho
 {
   VMatrix4 VMatrix4::NaN{};
+
+  /**
+   * Address: 0x007A6460 (FUN_007A6460, sub_7A6460)
+   *
+   * What it does:
+   * Returns one process-global random sample in `[0, scale)` using the
+   * shared MT stream.
+   */
+  double MathGlobalRandomUnitScaled(const float scale)
+  {
+    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    const float unit = CMersenneTwister::ToUnitFloat(math_GlobalRandomStream.twister.NextUInt32());
+    return static_cast<double>(unit * scale);
+  }
+
+  /**
+   * Address: 0x007A64B0 (FUN_007A64B0, func_DRand)
+   *
+   * What it does:
+   * Returns one process-global random sample in `[minValue, maxValue)` using
+   * the shared MT stream.
+   */
+  double MathGlobalRandomRange(const float minValue, const float maxValue)
+  {
+    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    const float unit = CMersenneTwister::ToUnitFloat(math_GlobalRandomStream.twister.NextUInt32());
+    return static_cast<double>(minValue + (maxValue - minValue) * unit);
+  }
 
   /**
    * Address: 0x004EC590 (FUN_004EC590, Moho::VAxes3::VAxes3)
@@ -1407,3 +1439,27 @@ namespace
 
   [[maybe_unused]] MathReflectionBootstrap gMathReflectionBootstrap;
 } // namespace
+
+extern "C" int global_mode_sse2 = 1;
+
+/**
+ * Address: 0x00A8DCD0 (FUN_00A8DCD0, acos)
+ *
+ * What it does:
+ * Preserves the CRT's SSE2/control-word dispatch gate and computes arccosine
+ * for the supplied angle lane.
+ */
+extern "C" double __cdecl acos(double value)
+{
+  if (global_mode_sse2 != 0) {
+    const unsigned int mxcsr = _mm_getcsr() & 0x1F80u;
+    if (mxcsr == 0x1F80u) {
+      unsigned int controlWord = 0;
+      if (_controlfp_s(&controlWord, 0, 0) == 0 && (controlWord & 0x7Fu) == 0x7Fu) {
+        return std::atan2(std::sqrt(1.0 - (value * value)), value);
+      }
+    }
+  }
+
+  return std::atan2(std::sqrt(1.0 - (value * value)), value);
+}
