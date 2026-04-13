@@ -48,6 +48,16 @@ namespace moho
   {}
 
   /**
+   * Address: 0x0060A810 (FUN_0060A810, Moho::CUnitGetBuildTask::CUnitGetBuildTask)
+   *
+   * What it does:
+   * Constructs one built-task child lane from parent command-dispatch context.
+   */
+  CUnitGetBuiltTask::CUnitGetBuiltTask(CCommandTask* const parent)
+    : CCommandTask(parent)
+  {}
+
+  /**
    * Address: 0x0060A570 (FUN_0060A570, scalar deleting destructor thunk)
    *
    * What it does:

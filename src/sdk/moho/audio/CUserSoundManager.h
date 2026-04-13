@@ -498,6 +498,36 @@ namespace moho
   int cfunc_PlaySoundL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x008ACDA0 (FUN_008ACDA0, cfunc_PauseSound)
+   */
+  int cfunc_PauseSound(lua_State* luaContext);
+
+  /**
+   * Address: 0x008ACDC0 (FUN_008ACDC0, func_PauseSound_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_PauseSound_LuaFuncDef();
+
+  /**
+   * Address: 0x008ACE20 (FUN_008ACE20, cfunc_PauseSoundL)
+   */
+  int cfunc_PauseSoundL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x008ACF50 (FUN_008ACF50, cfunc_PauseVoice)
+   */
+  int cfunc_PauseVoice(lua_State* luaContext);
+
+  /**
+   * Address: 0x008ACF70 (FUN_008ACF70, func_PauseVoice_LuaFuncDef)
+   */
+  CScrLuaInitForm* func_PauseVoice_LuaFuncDef();
+
+  /**
+   * Address: 0x008ACFD0 (FUN_008ACFD0, cfunc_PauseVoiceL)
+   */
+  int cfunc_PauseVoiceL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x008AD280 (FUN_008AD280, cfunc_SoundIsPrepared)
    *
    * What it does:

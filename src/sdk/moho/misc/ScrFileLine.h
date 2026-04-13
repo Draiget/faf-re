@@ -26,9 +26,12 @@ namespace moho
      * ScrFileLine const &
      *
      * What it does:
-     * Copies vtable, marker state, and both string lanes from the source row.
+     * Copies vtable, marker state, and both string lanes from the source
+     * row using the owning-copy lane so heap-backed source strings are
+     * duplicated into fresh owned storage rather than adopted
+     * non-owningly.
      */
-    ScrFileLine(const ScrFileLine&) = default;
+    ScrFileLine(const ScrFileLine& other);
 
     /**
      * Address: 0x004C1E10 (FUN_004C1E10, Moho::ScrFileLine::~ScrFileLine)

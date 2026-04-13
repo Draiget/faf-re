@@ -11,12 +11,16 @@
 #include <string>
 #include <vector>
 #include <windows.h>
+#include <mmreg.h>
+#include <mmsystem.h>
+#include <dsound.h>
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/XAudioError.h"
+#include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/camera/VTransform.h"
@@ -947,6 +951,41 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x004D84D0 (FUN_004D84D0, func_SoundConfigInit)
+   *
+   * IDA signature:
+   * struct_SoundConfig *__usercall func_SoundConfigInit@<eax>(struct_SoundConfig *this@<esi>);
+   *
+   * What it does:
+   * Default-initializes a freshly allocated `SoundConfiguration`:
+   * default-constructs the embedded `gpg::time::Timer`, zeros the
+   * engine-pointer vector lanes, zeros the global settings memory
+   * buffer lanes, primes the speaker-configuration field to `3`, and
+   * clears every remaining flag, runtime-module pointer, and reserved
+   * trailing dword. The binary returns `this`; the C++ ctor returns
+   * implicitly.
+   */
+  SoundConfiguration::SoundConfiguration() noexcept
+    : mTime{}
+    , mEngines{}
+    , mGlobalSettingsBuffer{}
+    , mNoSound(0u)
+    , mReserved29{}
+    , mSpeakerConfiguration(3u)
+    , mAudioRuntimeModule(nullptr)
+    , mLookAheadTimeMs(0u)
+    , mGlobalSettingsStart(nullptr)
+    , mGlobalSettingsLength(0u)
+    , mRuntimeFlags(0u)
+    , mReserved44{}
+    , mHandleSoundEvent(nullptr)
+    , mReserved54{}
+    , mAudition(0u)
+    , mReserved59{}
+  {
+  }
+
+  /**
    * Address: 0x004D9250 (FUN_004D9250, ??1struct_SoundConfig@@QAE@@Z)
    * Mangled: ??1struct_SoundConfig@@QAE@@Z
    *
@@ -1063,6 +1102,100 @@ namespace moho
 
     default:
       break;
+    }
+  }
+
+  /**
+   * Address: 0x004D8C00 (FUN_004D8C00, func_InitSound)
+   *
+   * IDA signature:
+   * void callcnv_33 func_InitSound();
+   *
+   * What it does:
+   * Allocates and initializes a fresh `SoundConfiguration` slot,
+   * replaces any existing global, parses the `/audition` and
+   * `/nosound` CLI flags. When sound is enabled it also primes the
+   * lookahead time to 250ms, wires the XACT notification handler,
+   * loads the global settings buffer from `/sounds/SupCom.xgs` via
+   * the file wait handle set + VFS, exposes the loaded buffer's
+   * range through `mGlobalSettingsStart`/`mGlobalSettingsLength`,
+   * then queries DirectSound for the current speaker channel mode
+   * and stores it in `mSpeakerConfiguration`.
+   */
+  void func_InitSound()
+  {
+    auto* const freshConfiguration = new (std::nothrow) SoundConfiguration();
+
+    SoundConfiguration* const previousConfiguration = sSoundConfiguration;
+    sSoundConfiguration = freshConfiguration;
+    if (previousConfiguration != nullptr) {
+      previousConfiguration->~SoundConfiguration();
+      ::operator delete(previousConfiguration);
+    }
+
+    if (sSoundConfiguration == nullptr) {
+      return;
+    }
+
+    sSoundConfiguration->mAudition = static_cast<std::uint8_t>(
+      moho::CFG_GetArgOption("/audition", 0u, nullptr) ? 1u : 0u
+    );
+    sSoundConfiguration->mNoSound = static_cast<std::uint8_t>(
+      moho::CFG_GetArgOption("/nosound", 0u, nullptr) ? 1u : 0u
+    );
+
+    if (sSoundConfiguration->mNoSound == 0u) {
+      sSoundConfiguration->mLookAheadTimeMs = 250u;
+      sSoundConfiguration->mHandleSoundEvent =
+        reinterpret_cast<std::uint32_t (__cdecl*)(int*)>(&moho::func_HandleSoundEvent);
+      sSoundConfiguration->mRuntimeFlags = 0u;
+
+      moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+      msvc8::string mountedPath{};
+      const msvc8::string* const resolvedPath =
+        waitHandleSet->mHandle->FindFile(&mountedPath, "/sounds/SupCom.xgs", nullptr);
+
+      gpg::MemBuffer<char> loadedBuffer = moho::DISK_ReadFile(resolvedPath->c_str());
+      sSoundConfiguration->mGlobalSettingsBuffer = loadedBuffer;
+
+      if (sSoundConfiguration->mGlobalSettingsBuffer.mBegin != nullptr) {
+        sSoundConfiguration->mGlobalSettingsLength = static_cast<std::uint32_t>(
+          sSoundConfiguration->mGlobalSettingsBuffer.mEnd -
+          sSoundConfiguration->mGlobalSettingsBuffer.mBegin
+        );
+        sSoundConfiguration->mGlobalSettingsStart =
+          sSoundConfiguration->mGlobalSettingsBuffer.mBegin;
+      }
+    }
+
+    LPDIRECTSOUND directSound = nullptr;
+    if (::DirectSoundCreate(nullptr, &directSound, nullptr) >= 0) {
+      DWORD speakerConfig = 0;
+      directSound->GetSpeakerConfig(&speakerConfig);
+      switch (static_cast<std::uint8_t>(speakerConfig)) {
+        case 0u:
+        case 1u:
+        case 2u:
+        case 3u:
+        case 4u:
+        case 5u:
+        case 7u:
+          sSoundConfiguration->mSpeakerConfiguration = 3u;
+          break;
+        case 6u:
+          sSoundConfiguration->mSpeakerConfiguration = 63u;
+          break;
+        default:
+          gpg::Warnf(
+            "Unknown DirectSound speaker configuration %i. Defaulting to Stereo.",
+            static_cast<unsigned>(static_cast<std::uint8_t>(speakerConfig))
+          );
+          sSoundConfiguration->mSpeakerConfiguration = 3u;
+          break;
+      }
+      directSound->Release();
+    } else {
+      gpg::Warnf("Failed to create DirectSound.");
     }
   }
 

@@ -500,4 +500,11 @@ namespace moho
     version_ = 2;
     Finish();
   }
+
+  // Static cached RType slot for the recovered placeholder
+  // `SSTIEntityAttachInfo` type. Populated by the first
+  // `gpg::RRef_SSTIEntityAttachInfo` call via cached lookup; no
+  // additional registration is required because the binary's only
+  // observed access to `sType` is through the same RRef helper.
+  gpg::RType* SSTIEntityAttachInfo::sType = nullptr;
 } // namespace moho

@@ -26,6 +26,7 @@
 #include "moho/animation/CAniPose.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -62,6 +63,18 @@
 #include "moho/unit/core/UnitLuaFunctionThunks.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/core/UserUnit.h"
+
+namespace moho
+{
+  /**
+   * Address: 0x00720F70 (FUN_00720F70, Moho::COORDS_CanMoveAt)
+   *
+   * What it does:
+   * Validates whether `moveUnit` can occupy/move through `*pos` while filtering
+   * nearby collision occupants against movement/attachment/formation rules.
+   */
+  bool COORDS_CanMoveAt(SOCellPos* pos, COGrid* grid, Unit* moveUnit, bool disallowAttached, Unit* ignoreUnit);
+} // namespace moho
 
 using namespace moho;
 
@@ -1981,6 +1994,73 @@ namespace
 
   constexpr std::uint8_t kTerrainOccupancyMask = static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND) |
     static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED) | static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+
+  [[nodiscard]] std::uint8_t FootprintMaxSide(const SFootprint& footprint) noexcept
+  {
+    return (footprint.mSizeX > footprint.mSizeZ) ? footprint.mSizeX : footprint.mSizeZ;
+  }
+
+  [[nodiscard]] Wm3::Box3f BuildAxisAlignedCollisionProbe(
+    const Wm3::Vec3f& center,
+    const Wm3::Vec3f& extents
+  ) noexcept
+  {
+    Wm3::Box3f probe{};
+    probe.Center[0] = center.x;
+    probe.Center[1] = center.y;
+    probe.Center[2] = center.z;
+
+    probe.Axis[0][0] = 1.0f;
+    probe.Axis[0][1] = 0.0f;
+    probe.Axis[0][2] = 0.0f;
+    probe.Axis[1][0] = 0.0f;
+    probe.Axis[1][1] = 1.0f;
+    probe.Axis[1][2] = 0.0f;
+    probe.Axis[2][0] = 0.0f;
+    probe.Axis[2][1] = 0.0f;
+    probe.Axis[2][2] = 1.0f;
+
+    probe.Extent[0] = extents.x;
+    probe.Extent[1] = extents.y;
+    probe.Extent[2] = extents.z;
+    return probe;
+  }
+
+  [[nodiscard]] bool IsMeleeCandidateCellNavigable(
+    Unit& moveUnit,
+    Unit* const ignoreUnit,
+    const SFootprint& moverFootprint,
+    const ELayer moveLayer,
+    COGrid& ogrid,
+    const STIMap& mapData,
+    const SOCellPos& candidateCell
+  )
+  {
+    EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(moverFootprint, mapData, candidateCell);
+    if (moveLayer == LAYER_Water) {
+      const std::uint8_t filteredCaps =
+        static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+      occupancyCaps = static_cast<EOccupancyCaps>(filteredCaps);
+    }
+
+    if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(ogrid, candidateCell, moverFootprint, occupancyCaps)) == 0u) {
+      return false;
+    }
+
+    const gpg::Rect2i ogridRect{
+      static_cast<std::int32_t>(candidateCell.x),
+      static_cast<std::int32_t>(candidateCell.z),
+      static_cast<std::int32_t>(candidateCell.x) + static_cast<std::int32_t>(moverFootprint.mSizeX),
+      static_cast<std::int32_t>(candidateCell.z) + static_cast<std::int32_t>(moverFootprint.mSizeZ),
+    };
+
+    if (!moveUnit.CanReserveOgridRect(ogridRect)) {
+      return false;
+    }
+
+    SOCellPos moveCell = candidateCell;
+    return COORDS_CanMoveAt(&moveCell, &ogrid, &moveUnit, true, ignoreUnit);
+  }
 
   [[nodiscard]] std::int32_t RoundOccupyRectEdge(const float value) noexcept
   {
@@ -11362,6 +11442,205 @@ bool Unit::IsHigherPriorityThan(const Unit* const other) const
   }
 
   return static_cast<std::uint32_t>(GetEntityId()) < static_cast<std::uint32_t>(other->GetEntityId());
+}
+
+/**
+ * Address: 0x0062BEE0 (FUN_0062BEE0, Moho::Unit::HasMeleeSpaceAroundSmallTarget)
+ *
+ * What it does:
+ * Scans perimeter candidate cells around `target` using this unit footprint,
+ * filters by occupancy/pathability checks, and writes nearest valid melee
+ * destination into `inOutCell`.
+ */
+bool Unit::HasMeleeSpaceAroundSmallTarget(Unit* const target, SOCellPos* const inOutCell)
+{
+  if (target == nullptr || inOutCell == nullptr) {
+    return false;
+  }
+
+  Sim* const sim = SimulationRef;
+  if (sim == nullptr || sim->mOGrid == nullptr || sim->mMapData == nullptr) {
+    return false;
+  }
+
+  COGrid& ogrid = *sim->mOGrid;
+  const STIMap& mapData = *sim->mMapData;
+
+  const SFootprint& moverFootprint = GetFootprint();
+  const SFootprint& targetFootprint = target->GetFootprint();
+  const ELayer moveLayer = mCurrentLayer;
+  const bool useWholeMap = (ArmyRef != nullptr) ? ArmyRef->UseWholeMap() : false;
+  const float mapBorder = static_cast<float>(FootprintMaxSide(moverFootprint));
+
+  const int minX = static_cast<int>(inOutCell->x) - static_cast<int>(moverFootprint.mSizeX);
+  const int maxX = static_cast<int>(inOutCell->x) + static_cast<int>(targetFootprint.mSizeX);
+  const int minZ = static_cast<int>(inOutCell->z) - static_cast<int>(moverFootprint.mSizeZ);
+  const int maxZ = static_cast<int>(inOutCell->z) + static_cast<int>(targetFootprint.mSizeZ);
+  if (minZ > maxZ) {
+    return false;
+  }
+
+  const float moverHalfSizeX = static_cast<float>(moverFootprint.mSizeX) * 0.5f;
+  const float moverHalfSizeZ = static_cast<float>(moverFootprint.mSizeZ) * 0.5f;
+
+  bool found = false;
+  float bestDistanceSq = std::numeric_limits<float>::infinity();
+  SOCellPos bestCell = *inOutCell;
+
+  for (int z = minZ; z <= maxZ; ++z) {
+    int stepX = ((z == minZ) || (z == maxZ)) ? 1 : (maxX - minX);
+    if (stepX <= 0) {
+      stepX = 1;
+    }
+
+    for (int x = minX; x <= maxX; x += stepX) {
+      const SOCellPos candidateCell{static_cast<std::int16_t>(x), static_cast<std::int16_t>(z)};
+      const Wm3::Vec3f candidateWorldPos{
+        static_cast<float>(x) + moverHalfSizeX,
+        0.0f,
+        static_cast<float>(z) + moverHalfSizeZ,
+      };
+
+      if (!mapData.IsWithin(candidateWorldPos, mapBorder, useWholeMap)) {
+        continue;
+      }
+
+      if (!IsMeleeCandidateCellNavigable(*this, target, moverFootprint, moveLayer, ogrid, mapData, candidateCell)) {
+        continue;
+      }
+
+      const Wm3::Vec3f unitPos = GetPosition();
+      const float deltaX = candidateWorldPos.x - unitPos.x;
+      const float deltaZ = candidateWorldPos.z - unitPos.z;
+      const float distanceSq = (deltaX * deltaX) + (deltaZ * deltaZ);
+      if (distanceSq < bestDistanceSq) {
+        bestDistanceSq = distanceSq;
+        bestCell = candidateCell;
+        found = true;
+      }
+    }
+  }
+
+  if (!found) {
+    return false;
+  }
+
+  *inOutCell = bestCell;
+  return true;
+}
+
+/**
+ * Address: 0x0062C340 (FUN_0062C340, Moho::Unit::HasMeleeSpaceAroundLargeTarget)
+ *
+ * What it does:
+ * Scans a collision-bounds search window around `target`, applies shell
+ * collision probes plus occupancy/pathability checks, and writes nearest
+ * valid melee destination into `inOutCell`.
+ */
+bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const inOutCell, const int targetSize)
+{
+  if (target == nullptr || inOutCell == nullptr) {
+    return false;
+  }
+
+  Sim* const sim = SimulationRef;
+  if (sim == nullptr || sim->mOGrid == nullptr || sim->mMapData == nullptr) {
+    return false;
+  }
+
+  EntityCollisionUpdater* const targetCollisionShape = target->CollisionExtents;
+  if (targetCollisionShape == nullptr) {
+    return false;
+  }
+
+  COGrid& ogrid = *sim->mOGrid;
+  const STIMap& mapData = *sim->mMapData;
+
+  const SFootprint& moverFootprint = GetFootprint();
+  const ELayer moveLayer = mCurrentLayer;
+  const bool useWholeMap = (ArmyRef != nullptr) ? ArmyRef->UseWholeMap() : false;
+  const float mapBorder = static_cast<float>(FootprintMaxSide(moverFootprint));
+
+  const float innerHalfExtentX = static_cast<float>(targetSize + static_cast<int>(moverFootprint.mSizeX)) * 0.5f;
+  const float innerHalfExtentZ = static_cast<float>(targetSize + static_cast<int>(moverFootprint.mSizeZ)) * 0.5f;
+  const float outerHalfExtentX = innerHalfExtentX + 1.0f;
+  const float outerHalfExtentZ = innerHalfExtentZ + 1.0f;
+
+  constexpr float kMeleeProbeHalfHeight = 1000.0f;
+  Wm3::Box3f outerProbe = BuildAxisAlignedCollisionProbe(
+    Wm3::Vec3f::Zero(),
+    Wm3::Vec3f(outerHalfExtentX, kMeleeProbeHalfHeight, outerHalfExtentZ)
+  );
+  Wm3::Box3f innerProbe = BuildAxisAlignedCollisionProbe(
+    Wm3::Vec3f::Zero(),
+    Wm3::Vec3f(innerHalfExtentX, kMeleeProbeHalfHeight, innerHalfExtentZ)
+  );
+  CollisionResult collisionResult{};
+
+  const int minX = RoundGridCoordDown(target->mCollisionBoundsMin.x) - static_cast<int>(moverFootprint.mSizeX);
+  const int maxX = RoundGridCoordUp(target->mCollisionBoundsMax.x) + 1;
+  const int minZ = RoundGridCoordDown(target->mCollisionBoundsMin.z) - static_cast<int>(moverFootprint.mSizeZ);
+  const int maxZ = RoundGridCoordUp(target->mCollisionBoundsMax.z) + 1;
+  if (minZ > maxZ) {
+    return false;
+  }
+
+  const float moverHalfSizeX = static_cast<float>(moverFootprint.mSizeX) * 0.5f;
+  const float moverHalfSizeZ = static_cast<float>(moverFootprint.mSizeZ) * 0.5f;
+
+  bool found = false;
+  float bestDistanceSq = std::numeric_limits<float>::infinity();
+  SOCellPos bestCell = *inOutCell;
+
+  for (int z = minZ; z <= maxZ; ++z) {
+    for (int x = minX; x <= maxX; ++x) {
+      const SOCellPos candidateCell{static_cast<std::int16_t>(x), static_cast<std::int16_t>(z)};
+      const Wm3::Vec3f candidateWorldPos{
+        static_cast<float>(x) + moverHalfSizeX,
+        0.0f,
+        static_cast<float>(z) + moverHalfSizeZ,
+      };
+
+      if (!mapData.IsWithin(candidateWorldPos, mapBorder, useWholeMap)) {
+        continue;
+      }
+
+      outerProbe.Center[0] = candidateWorldPos.x;
+      outerProbe.Center[1] = candidateWorldPos.y;
+      outerProbe.Center[2] = candidateWorldPos.z;
+      if (!targetCollisionShape->CollideBox(&outerProbe, &collisionResult)) {
+        continue;
+      }
+
+      innerProbe.Center[0] = candidateWorldPos.x;
+      innerProbe.Center[1] = candidateWorldPos.y;
+      innerProbe.Center[2] = candidateWorldPos.z;
+      if (targetCollisionShape->CollideBox(&innerProbe, &collisionResult)) {
+        continue;
+      }
+
+      if (!IsMeleeCandidateCellNavigable(*this, target, moverFootprint, moveLayer, ogrid, mapData, candidateCell)) {
+        continue;
+      }
+
+      const Wm3::Vec3f unitPos = GetPosition();
+      const float deltaX = candidateWorldPos.x - unitPos.x;
+      const float deltaZ = candidateWorldPos.z - unitPos.z;
+      const float distanceSq = (deltaX * deltaX) + (deltaZ * deltaZ);
+      if (distanceSq < bestDistanceSq) {
+        bestDistanceSq = distanceSq;
+        bestCell = candidateCell;
+        found = true;
+      }
+    }
+  }
+
+  if (!found) {
+    return false;
+  }
+
+  *inOutCell = bestCell;
+  return true;
 }
 
 /**

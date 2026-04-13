@@ -59,6 +59,26 @@ moho::ScrFileLine::ScrFileLine(const int lineNumberOneBased, const msvc8::string
 }
 
 /**
+ * Address: 0x004C6150 (FUN_004C6150, Moho::ScrFileLine::ScrFileLine)
+ *
+ * IDA signature:
+ * int __userpurge sub_4C6150@<eax>(int a1@<edi>, int a2);
+ *
+ * What it does:
+ * Duplicates marker state and both embedded string lanes of the source
+ * row, initializing each string member to empty SSO state and then
+ * assigning the owning-copy of the corresponding source string.
+ */
+moho::ScrFileLine::ScrFileLine(const ScrFileLine& other)
+  : mMarkerState(other.mMarkerState)
+  , mLineNumberText()
+  , mSourceText()
+{
+  mLineNumberText.assign_owned(other.mLineNumberText.view());
+  mSourceText.assign_owned(other.mSourceText.view());
+}
+
+/**
  * Address: 0x004C1E10 (FUN_004C1E10, Moho::ScrFileLine::~ScrFileLine)
  *
  * What it does:

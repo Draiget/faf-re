@@ -334,7 +334,7 @@ namespace moho
   void CDecoder::DecodeIssueCommand(gpg::BinaryReader& reader)
   {
     const BVSet<EntId, EntIdUniverse> entities = DecodeEntIdSet(reader);
-    SSTICommandIssueData commandData{};
+    SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_None);
     DecodeCommandData(reader, "CDecoder::DecodeIssueCommand()", commandData);
 
     std::uint8_t clearQueue = 0;
@@ -356,7 +356,7 @@ namespace moho
   void CDecoder::DecodeIssueFactoryCommand(gpg::BinaryReader& reader)
   {
     const BVSet<EntId, EntIdUniverse> entities = DecodeEntIdSet(reader);
-    SSTICommandIssueData commandData{};
+    SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_None);
     DecodeCommandData(reader, "CDecoder::DecodeIssueFactoryCommand()", commandData);
 
     std::uint8_t clearQueue = 0;

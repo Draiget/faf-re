@@ -247,4 +247,35 @@ namespace moho
    * Address: 0x00BD5CC0 (FUN_00BD5CC0, register_CScrLuaMetatableFactory_MotorFallDown_Index)
    */
   int register_CScrLuaMetatableFactory_MotorFallDown_Index();
+
+  class CScrLuaInitForm;
+
+  /**
+   * Address: 0x00695720 (FUN_00695720, cfunc_MotorFallDownWhack)
+   *
+   * What it does:
+   * Unwraps the raw `lua_State` callback context and forwards to
+   * `cfunc_MotorFallDownWhackL`.
+   */
+  int cfunc_MotorFallDownWhack(struct lua_State* luaContext);
+
+  /**
+   * Address: 0x006957A0 (FUN_006957A0, cfunc_MotorFallDownWhackL)
+   *
+   * What it does:
+   * Parses `MotorFallDown:Whack(nx, ny, nz, force, dobreak)`; on the first
+   * whack captures the XZ-plane fall direction `atan2(nx, nz)` and latches
+   * the `dobreak` flag into the motor's active-fall state. Every call adds
+   * `force` to the motor's depth (angular velocity) accumulator.
+   */
+  int cfunc_MotorFallDownWhackL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x00695740 (FUN_00695740, func_MotorFallDownWhack_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `MotorFallDown:Whack(nx, ny, nz, force, dobreak)` binder
+   * into the sim Lua init set.
+   */
+  CScrLuaInitForm* func_MotorFallDownWhack_LuaFuncDef();
 } // namespace moho

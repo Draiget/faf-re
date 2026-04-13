@@ -1,5 +1,7 @@
 #pragma once
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <mutex>
 #include <ostream>
@@ -489,4 +491,113 @@ namespace gpg
      * Converts microsecond timestamp to local `HH:MM:SS.mmm` text.
      */
     msvc8::string FileTimeToString(LONGLONG time);
+
+    /**
+     * Global state backing nested log-scope indentation. `g_LogScopeDepth`
+     * tracks the current scope depth; `g_LogScopeDepthScale` is the per-level
+     * width multiplier; `g_LogScopePadding` is refreshed to a spaces-only
+     * string of `depth * scale` characters whenever the depth changes.
+     *
+     * Binary data lanes:
+     *   g_LogScopeDepth        orig: dword_10A6630
+     *   g_LogScopeDepthScale   orig: dword_10A6634
+     *   g_LogScopePadding      orig: stru_10A6614
+     */
+    extern int g_LogScopeDepth;
+    extern int g_LogScopeDepthScale;
+    extern msvc8::string g_LogScopePadding;
+
+    /**
+     * Address: 0x00406110 (FUN_00406110, sub_406110)
+     *
+     * What it does:
+     * Increments the global log-scope depth counter, rebuilds
+     * `g_LogScopePadding` to `depth * scale` space characters, and returns
+     * a pointer to the refreshed global padding string.
+     */
+    msvc8::string* IncreaseLogScopeDepth();
+
+    /**
+     * Address: 0x004061B0 (FUN_004061B0, sub_4061B0)
+     *
+     * What it does:
+     * Mirror of `IncreaseLogScopeDepth`: decrements the global depth
+     * counter, refreshes the shared padding string, and returns the
+     * global padding pointer.
+     */
+    msvc8::string* DecreaseLogScopeDepth();
+
+    /**
+     * Binary identity: `class gpg::StrArg` (mangled `VStrArg@gpg`).
+     *
+     * RAII-style helper used by subsystem init paths to emit an indented
+     * log line on scope exit. The constructor copies a format string into
+     * an embedded `msvc8::string` and bumps the global log-scope depth;
+     * `Emit` formats the stored body with the current scope width and
+     * dispatches it through `gpg::LogMessage` at the stored severity,
+     * then resets the embedded body string.
+     *
+     * Named by behavior rather than by the binary symbol because the
+     * simple API-level alias `gpg::StrArg = const char*` already occupies
+     * that identifier elsewhere in this SDK.
+     *
+     * Layout is partial: the fields at `+0x38` and `+0x50` are read by
+     * the recovered emit path but initialized externally by callers that
+     * have not yet been recovered. Intermediate slabs are kept as opaque
+     * byte arrays so the proven offsets stay binary-accurate. No size
+     * assertion is added because the complete-object size upper bound is
+     * not yet confirmed.
+     */
+    class LogScopeEntry
+    {
+    public:
+        /**
+         * Address: 0x00406280 (FUN_00406280, ??0StrArg@gpg@@QAE@@Z)
+         * Mangled: gpg::StrArg::StrArg
+         *
+         * What it does:
+         * Initializes the embedded body string to empty SSO state,
+         * assigns the full contents of `fmt` into the body, zeroes the
+         * severity lane, and bumps the global log-scope depth through
+         * `IncreaseLogScopeDepth`.
+         */
+        explicit LogScopeEntry(const msvc8::string& fmt);
+
+        /**
+         * Address: 0x004062E0 (FUN_004062E0, func_Log)
+         *
+         * What it does:
+         * Decrements the global log-scope depth, formats the stored body
+         * string with `gpg::STR_Printf` using an integer width argument
+         * derived from `field_0x38`, dispatches the formatted line
+         * through `gpg::LogMessage` at the stored severity, and resets
+         * the embedded body string to empty SSO state.
+         */
+        void Emit();
+
+        LogScopeEntry(const LogScopeEntry&) = delete;
+        LogScopeEntry& operator=(const LogScopeEntry&) = delete;
+
+        // +0x00 .. +0x1C
+        msvc8::string body{};
+        // +0x1C .. +0x38 - unproven 28-byte slab kept opaque so the
+        // known offsets of later fields stay binary-accurate.
+        std::array<std::byte, 0x1C> aux_0x1C{};
+        // +0x38 - loaded by Emit() as the subtrahend when computing the
+        // STR_Printf width argument (`eax = 0 - [esi+38h]`). Left
+        // zero-initialized; real value is set externally by callers
+        // that have not yet been recovered.
+        std::uint32_t field_0x38{};
+        // +0x3C .. +0x50 - unproven 20-byte slab kept opaque.
+        std::array<std::byte, 0x14> pad_0x3C{};
+        // +0x50 - log severity consumed by Emit(). The constructor
+        // zeroes this lane; callers set it before invoking Emit().
+        LogSeverity severity{LogSeverity::Debug};
+    };
+    static_assert(offsetof(LogScopeEntry, body) == 0x00,
+        "LogScopeEntry body must live at +0x00");
+    static_assert(offsetof(LogScopeEntry, field_0x38) == 0x38,
+        "LogScopeEntry field_0x38 must live at +0x38");
+    static_assert(offsetof(LogScopeEntry, severity) == 0x50,
+        "LogScopeEntry severity must live at +0x50");
 } // namespace gpg

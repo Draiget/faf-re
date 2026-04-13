@@ -26,6 +26,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/SCR_FromLua.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CAcquireTargetTask.h"
@@ -80,6 +81,8 @@ namespace moho
   int cfunc_CAiAttackerImplGetMaxWeaponRangeL(LuaPlus::LuaState* state);
   int cfunc_CAiAttackerImplIsTooClose(lua_State* luaState);
   int cfunc_CAiAttackerImplIsTooCloseL(LuaPlus::LuaState* state);
+  int cfunc_CAiAttackerImplIsWithinAttackRange(lua_State* luaState);
+  int cfunc_CAiAttackerImplIsWithinAttackRangeL(LuaPlus::LuaState* state);
   int cfunc_CAiAttackerImplIsTargetExempt(lua_State* luaState);
   int cfunc_CAiAttackerImplIsTargetExemptL(LuaPlus::LuaState* state);
   int cfunc_CAiAttackerImplHasSlavedTarget(lua_State* luaState);
@@ -128,6 +131,9 @@ namespace
     "Loop through the weapons to find the weapon with the longest range that is not manual fire";
   constexpr const char* kAiAttackerImplIsTooCloseName = "IsTooClose";
   constexpr const char* kAiAttackerImplIsTooCloseHelpText = "Check if the target is too close to our weapons";
+  constexpr const char* kAiAttackerImplIsWithinAttackRangeName = "IsWithinAttackRange";
+  constexpr const char* kAiAttackerImplIsWithinAttackRangeHelpText =
+    "Check if the target is within any weapon range";
   constexpr const char* kAiAttackerImplIsTargetExemptName = "IsTargetExempt";
   constexpr const char* kAiAttackerImplIsTargetExemptHelpText = "Check if the target is exempt from being attacked";
   constexpr const char* kAiAttackerImplHasSlavedTargetName = "HasSlavedTarget";
@@ -1996,6 +2002,118 @@ int moho::cfunc_CAiAttackerImplGetMaxWeaponRangeL(LuaPlus::LuaState* const state
   lua_pushnumber(state->m_state, attacker->GetMaxWeaponRange());
   (void)lua_gettop(state->m_state);
   return 1;
+}
+
+/**
+ * Address: 0x005DA8E0 (FUN_005DA8E0, cfunc_CAiAttackerImplIsWithinAttackRange)
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplIsWithinAttackRangeL`.
+ */
+int moho::cfunc_CAiAttackerImplIsWithinAttackRange(lua_State* const luaContext)
+{
+  return cfunc_CAiAttackerImplIsWithinAttackRangeL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x005DA960 (FUN_005DA960, cfunc_CAiAttackerImplIsWithinAttackRangeL)
+ *
+ * What it does:
+ * Resolves `(attacker[, weaponIndex], target)` and returns whether the target
+ * (either a CAiTarget table or a Vector3 world position) is within the
+ * attacker's weapon range. When `weaponIndex` is supplied the check is
+ * performed against that specific weapon; otherwise against any weapon.
+ */
+int moho::cfunc_CAiAttackerImplIsWithinAttackRangeL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(
+      state,
+      "%s\n  expected between %d and %d args, but got %d",
+      kAiAttackerImplIsWithinAttackRangeHelpText,
+      2,
+      3,
+      argumentCount
+    );
+  }
+
+  const LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
+  CAiAttackerImpl* const attacker = SCR_FromLua_CAiAttackerImpl(selfObject, state);
+  if (!attacker) {
+    return 0;
+  }
+
+  bool result = false;
+  if (argumentCount == 3) {
+    LuaPlus::LuaStackObject weaponIndexObject(state, 2);
+    if (lua_type(rawState, 2) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&weaponIndexObject, "integer");
+    }
+    const int weaponIndex = static_cast<int>(lua_tonumber(rawState, 2));
+    UnitWeapon* const weapon = attacker->GetWeapon(weaponIndex);
+    if (!weapon) {
+      LuaPlus::LuaState::Error(state, "Unable to find weapon %i", weaponIndex);
+    }
+
+    lua_pushstring(rawState, "Type");
+    lua_gettable(rawState, 3);
+    const bool hasTypeField = lua_type(rawState, lua_gettop(rawState)) != LUA_TNIL;
+
+    const LuaPlus::LuaObject argObject(LuaPlus::LuaStackObject(state, 3));
+    if (hasTypeField) {
+      CAiTarget target{};
+      SCR_FromLuaCopy_CAiTarget(target, argObject);
+      result = attacker->TargetIsWithinWeaponAttackRange(weapon, &target);
+      target.targetEntity.UnlinkFromOwnerChain();
+    } else {
+      const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(argObject);
+      result = attacker->VectorIsWithinWeaponAttackRange(weapon, &position);
+    }
+  } else {
+    lua_pushstring(rawState, "Type");
+    lua_gettable(rawState, 2);
+    const bool hasTypeField = lua_type(rawState, lua_gettop(rawState)) != LUA_TNIL;
+
+    const LuaPlus::LuaObject argObject(LuaPlus::LuaStackObject(state, 2));
+    if (hasTypeField) {
+      CAiTarget target{};
+      SCR_FromLuaCopy_CAiTarget(target, argObject);
+      result = attacker->TargetIsWithinAttackRange(&target);
+      target.targetEntity.UnlinkFromOwnerChain();
+    } else {
+      const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(argObject);
+      result = attacker->VectorIsWithinAttackRange(&position);
+    }
+  }
+
+  lua_pushboolean(rawState, result ? 1 : 0);
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
+ * Address: 0x005DA900 (FUN_005DA900, func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes `CAiAttackerImpl:IsWithinAttackRange()` into the sim Lua init set.
+ */
+CScrLuaInitForm* moho::func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    kAiAttackerImplIsWithinAttackRangeName,
+    &moho::cfunc_CAiAttackerImplIsWithinAttackRange,
+    &CScrLuaMetatableFactory<CScriptObject*>::Instance(),
+    kAiAttackerImplLuaClassName,
+    kAiAttackerImplIsWithinAttackRangeHelpText
+  );
+  return &binder;
 }
 
 /**

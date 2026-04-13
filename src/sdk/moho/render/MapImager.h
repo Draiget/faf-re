@@ -73,4 +73,15 @@ namespace moho
    * If the global render viewport exists, clears its MapImager border meshes.
    */
   int cfunc_MapBorderClear(struct lua_State* rawState);
+
+  class CScrLuaInitForm;
+
+  /**
+   * Address: 0x00848420 (FUN_00848420, func_MapBorderClear_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder metadata for `MapBorderClear()` into the user
+   * init set.
+   */
+  CScrLuaInitForm* func_MapBorderClear_LuaFuncDef();
 } // namespace moho

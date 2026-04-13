@@ -7,8 +7,8 @@ Reconstruction/disassembly project for the old **Supreme Commander: Forged Allia
 Progress snapshot:
 
 - Total FAF functions (IDA index): `67,153`
-- Recovered so far (source annotations, in-scope families): `7,312`
-- **Coverage (moho + gpg + external): `55.32%`**
+- Recovered so far (source annotations, in-scope families): `7,326`
+- **Coverage (moho + gpg + external): `55.41%`**
 
 Namespace families:
 
@@ -22,6 +22,24 @@ External dependency status (progress):
 - `MSVC STL/CRT`: `51/398 (12.81%)`
 - `WildMagic`: `42/387 (10.85%)` — consolidated as upstream `external_dependency` (see [`dependencies/patches/wildmagic3p8_faf_required.md`](dependencies/patches/wildmagic3p8_faf_required.md))
 - `LuaPlus/Lua`: `157/184 (85.33%)`
+
+Progress DB status breakdown (`decomp/recovery/recovered_progress.json`, `fa_full_2026_03_26`):
+
+- `recovered`: `24,780` (70.14%)
+- `skip`: `4,738` (13.41%) — CRT-internal / compiler-generated
+- `external_dependency`: `2,855` (8.08%) — third-party libs (libpng,
+  zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, CRI Sofdec/ADX, undname,
+  bugsplat) and CRT helpers
+- `needs_evidence`: `2,048` (5.80%)
+- **`blocked`: `908` (2.57%)** — functions previously attempted that
+  depend on an unrecovered subsystem, a not-yet-typed owner class, or
+  a non-trivial call-tree not yet walked bottom-up. The remaining
+  blocked bucket is dominated by large single-function engine work
+  (UI dialogs, Sim bootstrap, large Unit/command state machines,
+  shader/material caches) plus a few Moho typed-owner bundles
+  (CFormationInstance layout, CUnitAssistMoveTask Execute path) that
+  each need a dedicated recovery pass.
+- **Total tracked in progress DB: `35,328`**
 
 ## Patch + Build Quickstart
 

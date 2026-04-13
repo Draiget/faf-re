@@ -213,4 +213,14 @@ namespace moho
   static_assert(
     offsetof(IAiCommandDispatchImpl, mCommandQueue) == 0x44, "IAiCommandDispatchImpl::mCommandQueue offset must be 0x44"
   );
+
+  /**
+   * Address: 0x00599470 (FUN_00599470, ?AI_CreateCommandDispatch@Moho@@YAPAVIAiCommandDispatch@1@PAVUnit@1@_N@Z)
+   *
+   * What it does:
+   * Allocates one `IAiCommandDispatchImpl`, warms the built-task child lane
+   * used by unit start-up dispatch flow, and returns the `IAiCommandDispatch`
+   * base view.
+   */
+  [[nodiscard]] IAiCommandDispatch* AI_CreateCommandDispatch(Unit* unit);
 } // namespace moho

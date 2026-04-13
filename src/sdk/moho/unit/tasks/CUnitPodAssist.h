@@ -75,6 +75,25 @@ namespace moho
     [[nodiscard]] bool HasNextCommand() const;
 
     /**
+     * Address: 0x0061DA00 (FUN_0061DA00)
+     *
+     * What it does:
+     * For station-assist pod auto mode, scans nearby allied units in guard
+     * radius, chooses the nearest eligible assist target, then dispatches
+     * repair or reclaim follow-up work.
+     */
+    [[nodiscard]] bool TryIssueNearbyAssistTask();
+
+    /**
+     * Address: 0x0061DE50 (FUN_0061DE50)
+     *
+     * What it does:
+     * For non-station pod assist lanes, evaluates current assist-target/focus
+     * state and dispatches repair or reclaim follow-up work when possible.
+     */
+    [[nodiscard]] bool TryIssueFocusedAssistTask();
+
+    /**
      * Address: 0x0061E970 (FUN_0061E970, Moho::CUnitPodAssist::MemberDeserialize)
      *
      * What it does:

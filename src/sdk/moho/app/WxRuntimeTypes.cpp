@@ -3987,7 +3987,9 @@ moho::WD3DViewport::WD3DViewport(
   const std::wstring wideTitle = gpg::STR_Utf8ToWide(title != nullptr ? title : "");
   (void)wideTitle;
 
-  std::memset(mUnknown04To1C, 0, sizeof(mUnknown04To1C));
+  std::memset(mUnknown04To0C, 0, sizeof(mUnknown04To0C));
+  mRenderState0C = -1;
+  std::memset(mUnknown10To1D, 0, sizeof(mUnknown10To1D));
   mEnabled = 0;
   std::memset(mUnknown1ETo2B, 0, sizeof(mUnknown1ETo2B));
   m_parent = parentWindow;
@@ -6244,4 +6246,20 @@ void moho::WWinManagedFrame::DestroyManagedOwners(
 )
 {
   DestroyManagedRuntimeCollection<WWinManagedFrame>(slots);
+}
+
+/**
+ * Address: 0x00453AA0 (FUN_00453AA0, sub_453AA0)
+ *
+ * IDA signature:
+ * void __thiscall sub_453AA0(_DWORD *this);
+ *
+ * What it does:
+ * Resets the viewport render-state dword at `+0x0C` to `-1`. Called
+ * from the render-camera-outline path as the viewport begins a new
+ * render pass.
+ */
+void moho::WRenViewport::ResetRenderState0C() noexcept
+{
+  mRenderState0C = -1;
 }

@@ -52,6 +52,15 @@ namespace moho
     );
 
     /**
+     * Address: 0x0077F1E0 (FUN_0077F1E0, Moho::CDecalHandle::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes base script-object lanes, decal payload, army visibility,
+     * and creation tick from the archive.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x007788B0 (FUN_007788B0, Moho::CDecalHandle::GetClass)
      * Slot: 0
      */

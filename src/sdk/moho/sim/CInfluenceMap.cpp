@@ -1591,6 +1591,170 @@ namespace moho
   {
     return category && category->ContainsBit(categoryBitIndex);
   }
+
+  /**
+   * Address: 0x00716B00 (FUN_00716B00, Moho::CInfluenceMap::AssignThreatAtPosition)
+   *
+   * IDA signature:
+   * void __userpurge Moho::CInfluenceMap::AssignThreatAtPosition(
+   *   Wm3::Vector3f *pos@<eax>, Moho::CInfluenceMap *this@<ecx>,
+   *   Moho::EThreatType threatType@<esi>, float assignedThreat, float assignedDecay);
+   *
+   * What it does:
+   * Adds `assignedThreat` to the per-type threat lane of the cell
+   * containing `position`, then re-derives the matching decay lane as
+   * `(updated threat) * assignedDecay`. Negative `assignedDecay`
+   * substitutes a default `0.01` rate. The Overall and Unknown enum
+   * values both map to the cell's `unknownInfluence` lane to match
+   * the binary's switch fallthrough.
+   */
+  void CInfluenceMap::AssignThreatAtPosition(
+    const Wm3::Vec3f& position,
+    const EThreatType threatType,
+    const float assignedThreat,
+    float assignedDecay
+  )
+  {
+    const std::int32_t cellIndex = VectorToCoords(position);
+    if (cellIndex < 0 || cellIndex >= static_cast<std::int32_t>(mMapEntries.size())) {
+      return;
+    }
+
+    if (assignedDecay < 0.0f) {
+      assignedDecay = 0.01f;
+    }
+
+    InfluenceGrid& cell = mMapEntries[static_cast<std::size_t>(cellIndex)];
+
+    auto applyThreat = [&assignedThreat, &assignedDecay](float& threatLane, float& decayLane) {
+      threatLane += assignedThreat;
+      decayLane = threatLane * assignedDecay;
+    };
+
+    switch (threatType) {
+      case THREATTYPE_Overall:
+      case THREATTYPE_Unknown:
+        applyThreat(cell.threat.unknownInfluence, cell.decay.unknownInfluence);
+        break;
+      case THREATTYPE_StructuresNotMex:
+        applyThreat(cell.threat.influenceStructuresNotMex, cell.decay.influenceStructuresNotMex);
+        break;
+      case THREATTYPE_Structures:
+        applyThreat(cell.threat.influenceStructures, cell.decay.influenceStructures);
+        break;
+      case THREATTYPE_Naval:
+        applyThreat(cell.threat.navalInfluence, cell.decay.navalInfluence);
+        break;
+      case THREATTYPE_Air:
+        applyThreat(cell.threat.airInfluence, cell.decay.airInfluence);
+        break;
+      case THREATTYPE_Land:
+        applyThreat(cell.threat.landInfluence, cell.decay.landInfluence);
+        break;
+      case THREATTYPE_Experimental:
+        applyThreat(cell.threat.experimentalInfluence, cell.decay.experimentalInfluence);
+        break;
+      case THREATTYPE_Commander:
+        applyThreat(cell.threat.commanderInfluence, cell.decay.commanderInfluence);
+        break;
+      case THREATTYPE_Artillery:
+        applyThreat(cell.threat.artilleryInfluence, cell.decay.artilleryInfluence);
+        break;
+      case THREATTYPE_AntiAir:
+        applyThreat(cell.threat.antiAirInfluence, cell.decay.antiAirInfluence);
+        break;
+      case THREATTYPE_AntiSurface:
+        applyThreat(cell.threat.antiSurfaceInfluence, cell.decay.antiSurfaceInfluence);
+        break;
+      case THREATTYPE_AntiSub:
+        applyThreat(cell.threat.antiSubInfluence, cell.decay.antiSubInfluence);
+        break;
+      case THREATTYPE_Economy:
+        applyThreat(cell.threat.economyInfluence, cell.decay.economyInfluence);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Address: 0x00716FC0 (FUN_00716FC0, Moho::CInfluenceMap::GetHighestThreatPosition)
+   *
+   * IDA signature:
+   * Wm3::Vector3f *__userpurge Moho::CInfluenceMap::GetHighestThreatPosition@<eax>(
+   *   Moho::CInfluenceMap *this@<eax>, Wm3::Vector3f *outPos, float *outThreat,
+   *   int radius, char onMap, Moho::EThreatType threatType, int armyIndex);
+   *
+   * What it does:
+   * Walks every cell of the influence grid, computes that cell's
+   * threat value (rectangle aggregate when `radius > 0`, otherwise
+   * the cell's own per-type sample), and tracks the cell with the
+   * highest value. Ties are broken by squared XZ distance from this
+   * army's start position (closer wins). The peak value is written
+   * into `outThreat` and the chosen cell's world-space center
+   * (with `y = 0`) is written into `outPosition`.
+   *
+   * Initial threat seed is `-200.0f` (binary's `nInf_200` constant)
+   * so any positive sample wins.
+   */
+  Wm3::Vec3f* CInfluenceMap::GetHighestThreatPosition(
+    Wm3::Vec3f* const outPosition,
+    float* const outThreat,
+    const int radius,
+    const bool onMap,
+    const EThreatType threatType,
+    const int armyIndex
+  )
+  {
+    constexpr float kInitialThreat = -200.0f;
+
+    Wm3::Vector2f armyStart{};
+    mArmy->GetArmyStartPos(armyStart);
+    const float startX = armyStart.x;
+    const float startZ = armyStart.y;
+
+    float bestThreat = kInitialThreat;
+    float bestDistanceSq = kInitialThreat;
+    std::int32_t bestCellIndex = 0;
+
+    const std::int32_t cellCount = static_cast<std::int32_t>(mMapEntries.size());
+    for (std::int32_t cellIndex = 0; cellIndex < cellCount; ++cellIndex) {
+      InfluenceGrid& cell = mMapEntries[static_cast<std::size_t>(cellIndex)];
+      const std::int32_t cellX = cellIndex % mWidth;
+      const std::int32_t cellZ = cellIndex / mWidth;
+
+      const float currentThreat = (radius != 0)
+        ? GetThreatRect(cellX, cellZ, radius, onMap, threatType, armyIndex)
+        : cell.GetThreat(threatType, armyIndex);
+
+      const std::int32_t halfStep = mGridSize / 2;
+      const float cellCenterX = static_cast<float>(halfStep + cellX * mGridSize);
+      const float cellCenterZ = static_cast<float>(halfStep + cellZ * mGridSize);
+      const float deltaX = startX - cellCenterX;
+      const float deltaZ = startZ - cellCenterZ;
+      const float distanceSq = deltaX * deltaX + deltaZ * deltaZ;
+
+      if (currentThreat > bestThreat) {
+        bestThreat = currentThreat;
+        bestCellIndex = cellIndex;
+        bestDistanceSq = distanceSq;
+      } else if (currentThreat == bestThreat && distanceSq < bestDistanceSq) {
+        bestThreat = currentThreat;
+        bestCellIndex = cellIndex;
+        bestDistanceSq = distanceSq;
+      }
+    }
+
+    *outThreat = bestThreat;
+
+    const std::int32_t halfStep = mGridSize / 2;
+    const std::int32_t bestX = bestCellIndex % mWidth;
+    const std::int32_t bestZ = bestCellIndex / mWidth;
+    outPosition->x = static_cast<float>(halfStep + bestX * mGridSize);
+    outPosition->y = 0.0f;
+    outPosition->z = static_cast<float>(halfStep + bestZ * mGridSize);
+    return outPosition;
+  }
 } // namespace moho
 
 namespace

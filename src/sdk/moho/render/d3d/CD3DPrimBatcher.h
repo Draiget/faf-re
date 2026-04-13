@@ -36,7 +36,16 @@ namespace moho
       float mV;             // +0x14
     };
 
-    virtual ~CD3DPrimBatcher() = default;
+    /**
+     * Address: 0x00438460 (FUN_00438460, Moho::CD3DPrimBatcher::~CD3DPrimBatcher)
+     *
+     * What it does:
+     * Destroys the three vertex sheets and the index sheet through their
+     * virtual `Destroy()` method, releases shared-control-block references
+     * held by the batch-texture and dynamic-texture-sheet weak-style
+     * handles, then frees the primitive and vertex legacy-vector storage.
+     */
+    virtual ~CD3DPrimBatcher();
 
     /**
      * Address: 0x00438560 (FUN_00438560)

@@ -68,6 +68,7 @@
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/entity/Prop.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/entity/intel/CIntelCounterHandle.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
@@ -878,6 +879,10 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gIUnitRRefCache{false, {}};
   gpg::RType* gWeakPtrIUnitRRefType = nullptr;
   thread_local TypeInfoCache3 gWeakPtrIUnitRRefCache{false, {}};
+  gpg::RType* gSSTIEntityAttachInfoRRefType = nullptr;
+  thread_local TypeInfoCache3 gSSTIEntityAttachInfoRRefCache{false, {}};
+  gpg::RType* gPathQueueRRefType = nullptr;
+  thread_local TypeInfoCache3 gPathQueueRRefCache{false, {}};
   gpg::RType* gRUnitBlueprintRRefType = nullptr;
   thread_local TypeInfoCache3 gRUnitBlueprintRRefCache{false, {}}; 
   gpg::RType* gRBlueprintRRefType = nullptr;
@@ -1769,6 +1774,20 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   gpg::RPointerType<moho::Entity> gEntityPointerType;
   gpg::RPointerType<moho::CEconomyEvent> gCEconomyEventPointerType;
   gpg::RPointerType<moho::CLuaConOutputHandler> gCLuaConOutputHandlerPointerType;
+  /**
+   * Address: 0x004C86E0 (FUN_004C86E0, ??0?$RPointerType@VCScriptObject@moho@@@gpg@@QAE@XZ)
+   * Demangled: gpg::RPointerType_CScriptObject::RPointerType_CScriptObject
+   *
+   * What it does:
+   * Global storage slot for the reflected pointer-type descriptor
+   * `gpg::RPointerType<moho::CScriptObject>`. The binary's one-shot
+   * ctor at this address runs the base `gpg::RType` ctor and then
+   * calls `gpg::PreRegisterRType(typeid(moho::CScriptObject*), this)`;
+   * the recovered code factors the preregistration out into the
+   * `PointerTypeRegistration` struct below so all pointer-type
+   * descriptors are wired in one pass, preserving the same observable
+   * side effect (registration is live before first reflection query).
+   */
   gpg::RPointerType<moho::CScriptObject> gCScriptObjectPointerType;
   gpg::RPointerType<moho::CSndParams> gCSndParamsPointerType;
   gpg::RPointerType<moho::IFormationInstance> gIFormationInstancePointerType;
@@ -3523,6 +3542,52 @@ gpg::RRef* gpg::RRef_WeakPtr_IUnit(RRef* const out, moho::WeakPtr<moho::IUnit>* 
     typeid(moho::WeakPtr<moho::IUnit>),
     gWeakPtrIUnitRRefType,
     gWeakPtrIUnitRRefCache
+  );
+}
+
+/**
+ * Address: 0x00559790 (FUN_00559790, gpg::RRef_SSTIEntityAttachInfo)
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_SSTIEntityAttachInfo(gpg::RRef *a1, Moho::SSTIEntityAttachInfo *a2);
+ *
+ * What it does:
+ * Builds a reflection reference for one `moho::SSTIEntityAttachInfo`
+ * pointer using the cached RTTI lookup + 3-slot derived-type
+ * normalization helper, matching the binary's TLS-cached lookup +
+ * `IsDerivedFrom` adjustment chain.
+ */
+gpg::RRef* gpg::RRef_SSTIEntityAttachInfo(RRef* const out, moho::SSTIEntityAttachInfo* const value)
+{
+  return BuildTypedRefWithCache<moho::SSTIEntityAttachInfo>(
+    out,
+    value,
+    typeid(moho::SSTIEntityAttachInfo),
+    gSSTIEntityAttachInfoRRefType,
+    gSSTIEntityAttachInfoRRefCache
+  );
+}
+
+/**
+ * Address: 0x005ACCA0 (FUN_005ACCA0, gpg::RRef_PathQueue)
+ *
+ * IDA signature:
+ * gpg::RRef *__cdecl gpg::RRef_PathQueue(gpg::RRef *a1, Moho::PathQueue *a2);
+ *
+ * What it does:
+ * Builds a reflection reference for one `moho::PathQueue` pointer
+ * using the cached RTTI lookup + 3-slot derived-type normalization
+ * helper, matching the binary's TLS-cached lookup + `IsDerivedFrom`
+ * adjustment chain.
+ */
+gpg::RRef* gpg::RRef_PathQueue(RRef* const out, moho::PathQueue* const value)
+{
+  return BuildTypedRefWithCache<moho::PathQueue>(
+    out,
+    value,
+    typeid(moho::PathQueue),
+    gPathQueueRRefType,
+    gPathQueueRRefCache
   );
 }
 

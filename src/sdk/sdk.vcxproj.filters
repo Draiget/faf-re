@@ -1188,6 +1188,12 @@
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitMoveTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1414,6 +1420,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\terrain\StratumMaterial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\terrain\splat\CWldSplat.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp">
@@ -4135,6 +4144,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\terrain\StratumMaterial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\terrain\splat\CWldSplat.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\terrain\water\LowFidelityWater.h">
