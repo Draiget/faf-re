@@ -36,6 +36,16 @@ namespace moho
      */
     CUnitFireAtTask(CCommandTask* dispatchTask, CAiTarget* target, std::int32_t isNuclear);
 
+    /**
+     * Execute override placeholder. The actual body lives at
+     * 0x0060B380 (Moho::CUnitFireAtTask::TaskTick, 373 instructions —
+     * extensive weapon/target acquisition state machine that needs
+     * dedicated recovery). Provided here as a non-pure stub so the
+     * class is instantiable from `Create` until the real body is
+     * lifted; tracked as needs_evidence in `recovered_progress.json`.
+     */
+    int Execute() override;
+
   public:
     IAiCommandDispatchImpl* mDispatch; // +0x30
     CAiTarget mTarget;                 // +0x34

@@ -55,11 +55,11 @@ namespace moho
   std::uint32_t CD3DVertexFormat::GetElementCount() const
   {
     const auto* const vertexFormat = mFormat.get();
-    if ((vertexFormat == nullptr) || (vertexFormat->elementArrayBegin_ == nullptr)) {
+    if (vertexFormat == nullptr) {
       return 0;
     }
 
-    return static_cast<std::uint32_t>(vertexFormat->elementArrayEnd_ - vertexFormat->elementArrayBegin_);
+    return static_cast<std::uint32_t>(vertexFormat->elementStrideByStream_.size());
   }
 
   /**
@@ -73,11 +73,15 @@ namespace moho
   std::uint32_t CD3DVertexFormat::GetElement(const std::uint32_t elementIndex) const
   {
     const auto* const vertexFormat = mFormat.get();
-    if ((vertexFormat == nullptr) || (vertexFormat->elementArrayBegin_ == nullptr)) {
+    if (vertexFormat == nullptr) {
       return 0;
     }
 
-    return vertexFormat->elementArrayBegin_[elementIndex];
+    if (elementIndex >= vertexFormat->elementStrideByStream_.size()) {
+      return 0;
+    }
+
+    return vertexFormat->elementStrideByStream_.data()[elementIndex];
   }
 
   /**

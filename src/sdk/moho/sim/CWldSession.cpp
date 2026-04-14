@@ -1914,7 +1914,7 @@ namespace moho
       if (terrainRes == nullptr) {
         return false;
       }
-      return terrainRes->SetPlayableMapRect(playableRect);
+      return terrainRes->SetPlayableMapRect(VisibilityRect::FromRect2i(playableRect));
     }
 
     /**

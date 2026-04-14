@@ -8,22 +8,22 @@ Progress snapshot:
 
 - Total FAF functions: `67,168`
   - *IDA index, exported*
-- Progress coverage:  **`50.20%`**
+- Progress coverage:  **`50.46%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
   - *Total amount of recovered functions: `35,916`*
 
 Progress DB status breakdown: 
 
-- `recovered`: `25,269` (70.36%)
-- `skip`: `4,798` (13.36%) — CRT-internal / compiler-generated
-- `external_dependency`: `3,654` (10.17%) — third-party libs 
+- `recovered`: `25,354` (70.36%)
+- `skip`: `4,798` (13.32%) — CRT-internal / compiler-generated
+- `external_dependency`: `3,739` (10.38%) — third-party libs 
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
-- `needs_evidence`: `1,753` (4.88%)
-- **`blocked`: `440` (1.23%)** 
-  - *strict circular/dep-blocked*
-  - *Consists of `needs_evidence`, combined with `needs_evidence`;
-  - *"not-yet-recovered non-external" bucket: `2,193`* 
-    *— functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.*
+- `needs_evidence`: `1,697` (4.71%)
+- **`blocked`: `443` (1.23%)** 
+  - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,140`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `~2,142`*
+    — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
 ## Build Quickstart + Paches
 

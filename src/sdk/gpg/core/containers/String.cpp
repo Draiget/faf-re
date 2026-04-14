@@ -1,6 +1,7 @@
 #include "String.h"
 
 #include <cstdarg>
+#include <string_view>
 using namespace gpg;
 
 msvc8::string gpg::sWhitespaceChars{" \n\t\r"};
@@ -470,7 +471,7 @@ int gpg::STR_Replace(
   if (unk != 0u) {
     std::size_t searchPos = 0u;
     while ((searchPos = str.find(what, searchPos, whatLength)) != msvc8::string::npos) {
-      str.replace(searchPos, whatLength, with, withLength);
+      str.replace(searchPos, whatLength, std::string_view{with, withLength});
       searchPos += withLength;
       ++replaceCount;
     }

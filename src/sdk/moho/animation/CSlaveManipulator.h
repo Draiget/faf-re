@@ -70,6 +70,14 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00645E00 (FUN_00645E00, Moho::CSlaveManipulatorTypeInfo::GetName)
+     *
+     * What it does:
+     * Returns the literal type name "CSlaveManipulator" for reflection.
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
      * Address: 0x00645DC0 (FUN_00645DC0, Moho::CSlaveManipulatorTypeInfo::Init)
      *
      * What it does:
