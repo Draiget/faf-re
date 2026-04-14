@@ -4,11 +4,25 @@
 #include <cstdint>
 
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 
 namespace moho
 {
   struct SSTICommandSource
   {
+    SSTICommandSource() = default;
+
+    /**
+     * Address: 0x007BF390 (FUN_007BF390, ??0SSTICommandSource@Moho@@QAE@@Z)
+     * Mangled: ??0SSTICommandSource@Moho@@QAE@IHPBD@Z
+     *
+     * What it does:
+     * Initializes one command-source record from `(index, playerName, timeouts)`.
+     * The string lane is reset to empty SSO state before copying player-name
+     * bytes, then timeout lanes are committed.
+     */
+    SSTICommandSource(std::uint32_t index, const char* playerName, std::int32_t timeouts);
+
     /**
      * Address: 0x005452B0 (FUN_005452B0, ??1SSTICommandSource@Moho@@QAE@@Z)
      * Mangled: ??1SSTICommandSource@Moho@@QAE@@Z
@@ -52,5 +66,17 @@ namespace moho
     const SSTICommandSource& prototype,
     std::uint32_t count,
     SSTICommandSource* destination
+  );
+
+  /**
+   * Address: 0x007C84D0 (FUN_007C84D0, func_vec_SSTICommandSource_Append)
+   *
+   * What it does:
+   * Appends one `SSTICommandSource` entry to a command-source vector lane,
+   * preserving the original capacity-fast-path behavior.
+   */
+  void AppendSSTICommandSource(
+    msvc8::vector<SSTICommandSource>& commandSources,
+    const SSTICommandSource& entry
   );
 } // namespace moho

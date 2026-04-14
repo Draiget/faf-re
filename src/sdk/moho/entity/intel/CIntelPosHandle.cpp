@@ -29,15 +29,6 @@ namespace
     return cached;
   }
 
-  void RefreshGridCoverageAtPosition(moho::CIntelPosHandle& handle, const Wm3::Vec3f& worldPos)
-  {
-    const std::uint32_t savedRadius = handle.mRadius;
-    handle.SubViz();
-    handle.mLastPos = worldPos;
-    handle.mRadius = savedRadius;
-    handle.AddViz();
-  }
-
   [[nodiscard]]
   gpg::RRef MakeSharedIntelGridRef(moho::CIntelGrid* const intelGrid)
   {
@@ -93,6 +84,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x0076EFC0 (FUN_0076EFC0, Moho::CIntelPosHandle::Update)
+   *
+   * What it does:
+   * Rebuilds grid coverage at a new world position when the value differs
+   * from the cached position.
+   */
+  void CIntelPosHandle::Update(const Wm3::Vec3f& pos)
+  {
+    const std::uint32_t savedRadius = mRadius;
+    if (Wm3::Vec3f::Compare(&pos, &mLastPos)) {
+      SubViz();
+      mLastPos = pos;
+      mRadius = savedRadius;
+      AddViz();
+    }
+  }
+
+  /**
    * Address: 0x0076F1E0 (FUN_0076F1E0, Moho::CIntelPosHandle::UpdatePos)
    *
    * What it does:
@@ -109,9 +118,9 @@ namespace moho
       const float range = static_cast<float>(static_cast<double>(mRadius) * 0.333);
       const float rangeSquared = range * range;
 
-      if (distanceSquared >= rangeSquared || (curTick - mLastTickUpdated) > 5) {
+      if (distanceSquared >= rangeSquared || (curTick - mLastTickUpdated) > 30) {
         mLastTickUpdated = curTick;
-        RefreshGridCoverageAtPosition(*this, newPos);
+        Update(newPos);
       }
 
       return curTick;

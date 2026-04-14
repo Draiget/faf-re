@@ -77,9 +77,19 @@ namespace
     return out;
   }
 
+  /**
+   * Address: 0x005B52A0 (FUN_005B52A0, Moho::CAiPathSpline::operator new)
+   *
+   * What it does:
+   * Allocates and default-constructs one `CAiPathSpline`, then returns the
+   * typed reflection reference used by RTTI new-ref lanes.
+   */
   [[nodiscard]] gpg::RRef CreateAiPathSplineRefOwned()
   {
-    return MakeTypedRef(new CAiPathSpline(), CachedCAiPathSplineType());
+    CAiPathSpline* const spline = new (std::nothrow) CAiPathSpline();
+    gpg::RRef out{};
+    gpg::RRef_CAiPathSpline(&out, spline);
+    return out;
   }
 
   void DeleteAiPathSplineOwned(void* object)

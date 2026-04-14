@@ -388,6 +388,24 @@ namespace moho
   gpg::RType* CCollisionManipulator::sType = nullptr;
 
   /**
+   * Address: 0x00638950 (FUN_00638950, func_CreateCollisionManipulatorObject)
+   *
+   * What it does:
+   * Returns cached `CCollisionManipulator` metatable object from Lua
+   * object-factory storage.
+   */
+  LuaPlus::LuaObject*
+  func_CreateCollisionManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<CCollisionManipulator>::Instance().Get(state);
+    return object;
+  }
+
+  /**
    * Address: 0x00638770 (FUN_00638770, CCollisionManipulatorTypeInfo::newRefFunc_)
    * Address: 0x00638830 (FUN_00638830, CCollisionManipulatorTypeInfo::ctorRefFunc_)
    */
@@ -405,7 +423,16 @@ namespace moho
     , mOwnerUnit(ownerUnit)
     , mCollisionCallbacksEnabled(false)
     , mTerrainCollisionCheckEnabled(false)
-  {}
+  {
+    if (sim != nullptr && sim->mLuaState != nullptr) {
+      LuaPlus::LuaObject arg3{};
+      LuaPlus::LuaObject arg2{};
+      LuaPlus::LuaObject arg1{};
+      LuaPlus::LuaObject scriptFactory{};
+      (void)func_CreateCollisionManipulatorObject(&scriptFactory, sim->mLuaState);
+      CreateLuaObject(scriptFactory, arg1, arg2, arg3);
+    }
+  }
 
   /**
    * Address: 0x00637B40 (FUN_00637B40, scalar deleting body)

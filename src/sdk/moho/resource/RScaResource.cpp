@@ -14,6 +14,31 @@ namespace moho
 gpg::RType* RScaResource::sType = nullptr;
 
 /**
+ * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
+ *
+ * What it does:
+ * Resolves cached `RScaResource` RTTI and updates the prefetch/resource
+ * type lanes used by factory virtual dispatch.
+ */
+void CScaResourceFactory::Init()
+{
+  gpg::RType* firstResolvedType = RScaResource::sType;
+  if (firstResolvedType == nullptr) {
+    firstResolvedType = gpg::LookupRType(typeid(RScaResource));
+    RScaResource::sType = firstResolvedType;
+  }
+
+  gpg::RType* resolvedType = firstResolvedType;
+  if (resolvedType == nullptr) {
+    resolvedType = gpg::LookupRType(typeid(RScaResource));
+    RScaResource::sType = resolvedType;
+  }
+
+  mPrefetchType = firstResolvedType;
+  mResourceType = resolvedType;
+}
+
+/**
  * Address: 0x0053A4D0 (FUN_0053A4D0)
  *
  * IDA signature:
@@ -115,6 +140,23 @@ CScaResourceFactory::Load(ResourceHandle& outResource, const char* const path)
     outResource.reset();
   }
 
+  return outResource;
+}
+
+/**
+ * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
+ *
+ * What it does:
+ * Clones prefetch handle lane, forwards into `LoadFromImpl`, and copies the
+ * resulting resource handle into `outResource`.
+ */
+CScaResourceFactory::ResourceHandle&
+CScaResourceFactory::LoadFrom(ResourceHandle& outResource, const char* const path, ResourceHandle prefetchData)
+{
+  ResourceHandle prefetchCopy = prefetchData;
+  ResourceHandle loadedResource{};
+  (void)LoadFromImpl(loadedResource, path, prefetchCopy);
+  outResource = loadedResource;
   return outResource;
 }
 

@@ -31,6 +31,12 @@ namespace moho
     std::uintptr_t mPlaceholderState{};
   };
 
+  static_assert(sizeof(SSTIEntityAttachInfo) == 0x04, "SSTIEntityAttachInfo size must be 0x04");
+  static_assert(
+    offsetof(SSTIEntityAttachInfo, mPlaceholderState) == 0x00,
+    "SSTIEntityAttachInfo::mPlaceholderState offset must be 0x00"
+  );
+
   enum class EUserEntityVisibilityMode : std::int32_t
   {
     Hidden = 1,

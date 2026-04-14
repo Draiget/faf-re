@@ -5,8 +5,11 @@
 #include <cstdlib>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Global.h"
 #include "moho/misc/Listener.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/EUnitCommandQueueStatus.h"
@@ -56,6 +59,26 @@ namespace
   {
   public:
     /**
+     * Address: 0x006EA7A0 (FUN_006EA7A0, Moho::RBroadcasterRType_ECommandEvent::SerLoad)
+     *
+     * What it does:
+     * Deserializes one intrusive `Broadcaster<ECommandEvent>` lane by reading
+     * listener pointers until a null sentinel and relinking each listener node
+     * into the broadcaster ring.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x006EA810 (FUN_006EA810, Moho::RBroadcasterRType_ECommandEvent::SerSave)
+     *
+     * What it does:
+     * Serializes one intrusive `Broadcaster<ECommandEvent>` lane by writing
+     * each linked listener pointer as `UNOWNED` and terminating with one null
+     * pointer record.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x006E97D0 (FUN_006E97D0, Moho::RBroadcasterRType_ECommandEvent::GetName)
      *
      * What it does:
@@ -82,6 +105,8 @@ namespace
     void Init() override
     {
       size_ = sizeof(moho::Broadcaster);
+      serLoadFunc_ = &RBroadcasterRType_ECommandEvent::SerLoad;
+      serSaveFunc_ = &RBroadcasterRType_ECommandEvent::SerSave;
       Finish();
     }
   };
@@ -163,6 +188,89 @@ namespace
     return reinterpret_cast<moho::Listener<moho::EUnitCommandQueueStatus>*>(
       bytePtr - offsetof(moho::Listener<moho::EUnitCommandQueueStatus>, mListenerLink)
     );
+  }
+
+  [[nodiscard]] moho::Listener<moho::ECommandEvent>* ListenerFromCommandEventLinkNode(moho::Broadcaster* const node
+  ) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
+    return reinterpret_cast<moho::Listener<moho::ECommandEvent>*>(
+      bytePtr - offsetof(moho::Listener<moho::ECommandEvent>, mListenerLink)
+    );
+  }
+
+  /**
+   * Address: 0x006EA7A0 (FUN_006EA7A0, Moho::RBroadcasterRType_ECommandEvent::SerLoad)
+   *
+   * What it does:
+   * Reads listener pointers until a null sentinel and relinks each listener's
+   * intrusive broadcaster node before the destination broadcaster sentinel.
+   */
+  void RBroadcasterRType_ECommandEvent::SerLoad(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(broadcaster != nullptr);
+    if (!archive || !broadcaster) {
+      return;
+    }
+
+    moho::Listener<moho::ECommandEvent>* listener = nullptr;
+    archive->ReadPointer_Listener_ECommandEvent(&listener, ownerRef);
+    while (listener != nullptr) {
+      listener->mListenerLink.ListLinkBefore(broadcaster);
+      archive->ReadPointer_Listener_ECommandEvent(&listener, ownerRef);
+    }
+  }
+
+  /**
+   * Address: 0x006EA810 (FUN_006EA810, Moho::RBroadcasterRType_ECommandEvent::SerSave)
+   *
+   * What it does:
+   * Serializes one intrusive broadcaster lane by writing each linked command
+   * listener pointer as `UNOWNED` and appending a null sentinel pointer.
+   */
+  void RBroadcasterRType_ECommandEvent::SerSave(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+    );
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(broadcaster != nullptr);
+    if (!archive || !broadcaster) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+    gpg::RRef pointerRef{};
+
+    for (
+      moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
+      node != broadcaster;
+      node = static_cast<moho::Broadcaster*>(node->mNext)
+    ) {
+      (void)gpg::RRef_Listener_ECommandEvent(&pointerRef, ListenerFromCommandEventLinkNode(node));
+      gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+    }
+
+    (void)gpg::RRef_Listener_ECommandEvent(&pointerRef, nullptr);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
   template <class TType>
@@ -261,6 +369,42 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x006E94A0 (FUN_006E94A0,
+   * ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)
+   *
+   * What it does:
+   * Broadcasts one command event to linked listeners while preserving
+   * iteration safety if listeners relink/unlink themselves during callbacks.
+   */
+  void Broadcaster::BroadcastEvent(const ECommandEvent event)
+  {
+    Broadcaster detached{};
+
+    if (mPrev == this) {
+      return;
+    }
+
+    detached.mPrev = mPrev;
+    detached.mNext = mNext;
+    detached.mNext->mPrev = &detached;
+    detached.mPrev->mNext = &detached;
+    mPrev = this;
+    mNext = this;
+
+    while (detached.mPrev != &detached) {
+      auto* const listenerLink = reinterpret_cast<Broadcaster*>(detached.mPrev);
+      listenerLink->ListLinkAfter(this);
+
+      if (Listener<ECommandEvent>* const listener = ListenerFromCommandEventLinkNode(listenerLink)) {
+        listener->OnEvent(event);
+      }
+    }
+
+    detached.mNext->mPrev = detached.mPrev;
+    detached.mPrev->mNext = detached.mNext;
+  }
+
   /**
    * Address: 0x006F8070 (FUN_006F8070,
    * ?BroadcastEvent@?$Broadcaster@W4EUnitCommandQueueStatus@Moho@@@Moho@@IAEXW4EUnitCommandQueueStatus@2@@Z)

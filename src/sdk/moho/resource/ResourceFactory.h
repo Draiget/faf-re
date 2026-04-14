@@ -109,6 +109,8 @@ namespace moho
 
     /**
      * Address: 0x0044A420 (FUN_0044A420, Moho::ResourceFactory_SBatchTextureData::Load)
+     * Address: 0x005397F0 (FUN_005397F0, Moho::ResourceFactory_RScmResource::Load wrapper)
+     * Address: 0x0053AE00 (FUN_0053AE00, Moho::ResourceFactory_RScaResource::Load wrapper)
      *
      * What it does:
      * Forwards load requests into `LoadImpl` using one temporary handle lane.
@@ -123,6 +125,8 @@ namespace moho
 
     /**
      * Address: 0x0044A4D0 (FUN_0044A4D0, Moho::ResourceFactory_SBatchTextureData::Preload)
+     * Address: 0x005398A0 (FUN_005398A0, Moho::ResourceFactory_RScmResource::Preload wrapper)
+     * Address: 0x0053AEB0 (FUN_0053AEB0, Moho::ResourceFactory_RScaResource::Preload wrapper)
      *
      * What it does:
      * Forwards preload requests into `PreloadImpl` using one temporary handle lane.
@@ -158,6 +162,8 @@ namespace moho
 
     /**
      * Address: 0x0044A360 (FUN_0044A360, Moho::ResourceFactory_SBatchTextureData::PreloadImpl)
+     * Address: 0x00539730 (FUN_00539730, Moho::ResourceFactory_RScmResource::PreloadImpl)
+     * Address: 0x0053AD40 (FUN_0053AD40, Moho::ResourceFactory_RScaResource::PreloadImpl)
      *
      * What it does:
      * Default prefetch implementation that reuses `LoadImpl`.
@@ -168,6 +174,8 @@ namespace moho
     }
 
     /**
+     * Address: 0x00539760 (FUN_00539760, Moho::ResourceFactory_RScmResource::LoadFromImpl)
+     * Address: 0x0053AD70 (FUN_0053AD70, Moho::ResourceFactory_RScaResource::LoadFromImpl)
      * Address: 0x0044A390 (FUN_0044A390, Moho::ResourceFactory_SBatchTextureData::LoadFromImpl)
      *
      * What it does:
@@ -288,6 +296,15 @@ namespace moho
     using ResourceHandle = boost::shared_ptr<RScmResource>;
 
     /**
+     * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
+     *
+     * What it does:
+     * Resolves cached `RScmResource` RTTI and updates the prefetch/resource
+     * type lanes used by factory virtual dispatch.
+     */
+    void Init() override;
+
+    /**
      * Address: 0x00539290 (FUN_00539290, Moho::CScmResourceFactory::Load)
      *
      * What it does:
@@ -295,6 +312,15 @@ namespace moho
      * materializes one `RScmResource` bound to aliased file bytes.
      */
     ResourceHandle& Load(ResourceHandle& outResource, const char* path) override;
+
+    /**
+     * Address: 0x00539950 (FUN_00539950, Moho::ResourceFactory_RScmResource::LoadFrom)
+     *
+     * What it does:
+     * Clones prefetch handle lane, forwards into `LoadFromImpl`, and assigns
+     * the loaded resource handle to `outResource`.
+     */
+    ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, ResourceHandle prefetchData) override;
 
     /**
      * What it does:

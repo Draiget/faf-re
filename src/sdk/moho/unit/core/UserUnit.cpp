@@ -28,8 +28,10 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
-#include "moho/sim/SimDriver.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/UserArmy.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/core/IUnit.h"
@@ -637,6 +639,74 @@ namespace
   [[nodiscard]] IUnit* GetIUnitBridge(UserUnit* const self) noexcept
   {
     return reinterpret_cast<IUnit*>(self->mIUnitAndScriptBridge);
+  }
+
+  struct UserUnitIUnitStateBridgeView
+  {
+    std::uint8_t pad_0000_0268[0x268];
+    std::uint64_t unitStates; // +0x268
+  };
+  static_assert(
+    offsetof(UserUnitIUnitStateBridgeView, unitStates) == 0x268,
+    "UserUnitIUnitStateBridgeView::unitStates offset must be 0x268"
+  );
+
+  /**
+   * Address: 0x008BEF80 (FUN_008BEF80, Moho::IUnit_UserUnit::CalcTransportLoadFactor)
+   *
+   * What it does:
+   * Returns the fixed transport-load factor used by the UserUnit IUnit bridge.
+   */
+  [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
+  {
+    (void)bridge;
+    return 1.0f;
+  }
+
+  /**
+   * Address: 0x008BEFA0 (FUN_008BEFA0, Moho::IUnit_UserUnit::DestroyQueued)
+   *
+   * What it does:
+   * Returns false for the UserUnit IUnit bridge destroy-queued lane.
+   */
+  [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
+  {
+    (void)bridge;
+    return false;
+  }
+
+  /**
+   * Address: 0x008BEFC0 (FUN_008BEFC0, Moho::IUnit_UserUnit::IsNavigatorIdle)
+   *
+   * What it does:
+   * Returns false for the UserUnit IUnit bridge navigator-idle lane.
+   */
+  [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
+  {
+    (void)bridge;
+    return false;
+  }
+
+  /**
+   * Address: 0x008BF020 (FUN_008BF020, Moho::IUnit_UserUnit::IsUnitState)
+   *
+   * What it does:
+   * Tests one unit-state bit in the `UserUnit` IUnit-bridge state mask.
+   */
+  [[nodiscard]] bool IUnitBridgeIsUnitState(const IUnit* const bridge, const EUnitState state) noexcept
+  {
+    if (bridge == nullptr) {
+      return false;
+    }
+
+    const std::uint32_t stateIndex = static_cast<std::uint32_t>(state);
+    if (stateIndex >= 64u) {
+      return false;
+    }
+
+    const auto* const stateView = reinterpret_cast<const UserUnitIUnitStateBridgeView*>(bridge);
+    const std::uint64_t stateMask = (std::uint64_t{1} << stateIndex);
+    return (stateView->unitStates & stateMask) != 0u;
   }
 
   [[nodiscard]] const UserUnitLuaRuntimeView& GetLuaRuntimeView(const UserUnit* const self) noexcept
@@ -1998,6 +2068,25 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
 }
 
 /**
+ * Address: 0x00852950 (FUN_00852950, Moho::UserUnit::GetSkirt)
+ *
+ * What it does:
+ * Samples this unit's current world XZ position and writes the resolved
+ * blueprint skirt rectangle into `outSkirtRect`.
+ */
+gpg::Rect2f* UserUnit::GetSkirt(gpg::Rect2f* const outSkirtRect) const
+{
+  const UserEntity* const entityView = reinterpret_cast<const UserEntity*>(this);
+  const SCoordsVec2 currentPosition{
+    entityView->mVariableData.mCurTransform.pos_.x,
+    entityView->mVariableData.mCurTransform.pos_.z
+  };
+  const RUnitBlueprint* const blueprint = GetIUnitBridge(this)->GetBlueprint();
+  *outSkirtRect = blueprint->GetSkirtRect(currentPosition);
+  return outSkirtRect;
+}
+
+/**
  * Address: 0x008C09B0 (FUN_008C09B0, moho::UserUnit::UpdateVisibility)
  *
  * What it does:
@@ -2286,7 +2375,7 @@ bool UserUnit::Select()
     return false;
   }
 
-  if (iunitBridge->IsUnitState(UNITSTATE_UnSelectable)) {
+  if (IUnitBridgeIsUnitState(iunitBridge, UNITSTATE_UnSelectable)) {
     return false;
   }
 
@@ -2751,6 +2840,73 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
   }
 
   return false;
+}
+
+/**
+ * Address: 0x008C1430 (FUN_008C1430, ?USERUNIT_CanOccupy@Moho@@YA_NAAVCWldSession@1@ABUSFootprint@1@AAUSOCellPos@1@@Z)
+ *
+ * What it does:
+ * Validates one candidate occupancy rectangle against map bounds and rejects
+ * placement if it overlaps a visible non-mobile unit footprint in the spatial
+ * database.
+ */
+bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint, SOCellPos& position)
+{
+  const std::int16_t cellX = position.x;
+  if (cellX < 0 || position.z < 0) {
+    return false;
+  }
+
+  STIMap* const map = reinterpret_cast<STIMap*>(session.mWldMap->mTerrainRes->mPlayableRectSource);
+  CHeightField* const field = map->GetHeightField();
+
+  const std::int32_t rectX1 = static_cast<std::int32_t>(cellX) + static_cast<std::int32_t>(footprint.mSizeX);
+  if (rectX1 >= (field->width - 1)) {
+    return false;
+  }
+
+  const std::int32_t rectZ1 = static_cast<std::int32_t>(position.z) + static_cast<std::int32_t>(footprint.mSizeZ);
+  if (rectZ1 >= (field->height - 1)) {
+    return false;
+  }
+
+  const gpg::Rect2i queryRect{
+    static_cast<std::int32_t>(cellX),
+    static_cast<std::int32_t>(position.z),
+    rectX1,
+    rectZ1,
+  };
+
+  constexpr EEntityType kSpatialTypeUnit = static_cast<EEntityType>(0x00000100u);
+  constexpr std::uint32_t kIntelVisibleMask = 0x08u;
+
+  gpg::fastvector_n<UserEntity*, 100> nearbyUnits{};
+  auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(session.GetEntitySpatialDbStorage());
+  spatialStorage->Collect(nearbyUnits, kSpatialTypeUnit);
+
+  for (UserEntity* const nearbyEntity : nearbyUnits) {
+    auto* const nearbyUserUnit = reinterpret_cast<UserUnit*>(nearbyEntity);
+    const IUnit* const iunitBridge = GetIUnitBridge(nearbyUserUnit);
+    const RUnitBlueprint* const unitBlueprint = iunitBridge->GetBlueprint();
+    if (unitBlueprint->IsMobile() || (nearbyUserUnit->mIntelStateFlags & kIntelVisibleMask) == 0u) {
+      continue;
+    }
+
+    const SFootprint& nearbyFootprint = unitBlueprint->mFootprint;
+    const SOCellPos nearbyCell = nearbyFootprint.ToCellPos(nearbyEntity->mVariableData.mCurTransform.pos_);
+    const gpg::Rect2i nearbyRect{
+      static_cast<std::int32_t>(nearbyCell.x),
+      static_cast<std::int32_t>(nearbyCell.z),
+      static_cast<std::int32_t>(nearbyCell.x) + static_cast<std::int32_t>(nearbyFootprint.mSizeX),
+      static_cast<std::int32_t>(nearbyCell.z) + static_cast<std::int32_t>(nearbyFootprint.mSizeZ),
+    };
+
+    if (queryRect.Overlaps(nearbyRect)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**

@@ -21,6 +21,7 @@
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/sim/STIMap.h"
 #include "moho/ui/CUIManager.h"
 #include "moho/ui/UiRuntimeTypes.h"
@@ -480,6 +481,41 @@ namespace moho
     runtime->mP2y = uvRect->z0;
     runtime->mP1x = uvRect->x1 - uvRect->x0;
     runtime->mP1y = uvRect->z1 - uvRect->z0;
+  }
+
+  /**
+   * Address: 0x00438870 (FUN_00438870, ?SetTexture@CD3DPrimBatcher@Moho@@QAEXV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
+   *
+   * What it does:
+   * Binds one retained dynamic texture sheet directly without going through
+   * the atlas path. Flushes queued primitives if a different sheet is already
+   * bound, releases any held batch-texture handle, assigns the new sheet to
+   * the legacy-weak handle lane, and resets UV scale/border to the identity
+   * rectangle (scale = 1,1; border = 0,0).
+   *
+   * Parameter is the ID3DTextureSheet base interface, but the runtime
+   * invariant across all call sites is that the concrete sheet is always a
+   * CD3DDynamicTextureSheet (binary directly stores the derived pointer
+   * without a virtual downcast guard).
+   */
+  void CD3DPrimBatcher::SetTexture(boost::shared_ptr<ID3DTextureSheet> sheet)
+  {
+    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+
+    const boost::shared_ptr<CD3DDynamicTextureSheet> derivedSheet =
+      boost::static_pointer_cast<CD3DDynamicTextureSheet>(sheet);
+
+    if (runtime->mVertices.HasElements() && runtime->mDynamicTexSheet.px != derivedSheet.get()) {
+      Flush();
+    }
+
+    ResetLegacyWeakHandle(runtime->mTexture);
+    AssignLegacyWeakFromShared(runtime->mDynamicTexSheet, derivedSheet);
+
+    runtime->mP2x = 0.0f;
+    runtime->mP2y = 0.0f;
+    runtime->mP1x = 1.0f;
+    runtime->mP1y = 1.0f;
   }
 
   /**

@@ -6,6 +6,7 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/math/MathReflection.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/CRandomStream.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
@@ -818,9 +819,30 @@ namespace
 
 namespace moho
 {
+  float ren_ClutterRadius = 0.0f;
+
   void ClutterSurfaceElement::DestroyInPlace()
   {
     vtable->destroy(this, 0);
+  }
+
+  /**
+   * Address: 0x007D5EE0 (FUN_007D5EE0, ??0Region@Clutter@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes region links and key coordinates, then allocates one empty
+   * region-map list sentinel.
+   */
+  ClutterRegion::ClutterRegion()
+  {
+    vtable = RegionRuntimeVtableResetToken();
+    mNext = nullptr;
+    mPrev = nullptr;
+    mX = -1;
+    mZ = -1;
+    mMap.lane00 = nullptr;
+    mMap.head = AllocateListSentinelNode();
+    mMap.size = 0;
   }
 
   /**
@@ -913,6 +935,50 @@ namespace moho
       ClearIntrusiveListNodes(&mList1);
       ::operator delete(mList1.head);
       mList1.head = nullptr;
+    }
+  }
+
+  /**
+   * Address: 0x007D6410 (FUN_007D6410, ?IsVisible@Clutter@Moho@@AAE_NPBVGeomCamera3@2@ABV?$AxisAlignedBox3@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Returns whether one region AABB is close enough to the camera and inside
+   * the camera frustum-solid lane.
+   */
+  bool Clutter::IsVisible(const GeomCamera3* const camera, const Wm3::AxisAlignedBox3f& regionBox)
+  {
+    const float centerX = (regionBox.Min.x + regionBox.Max.x) * 0.5f;
+    const float centerY = (regionBox.Min.y + regionBox.Max.y) * 0.5f;
+    const float centerZ = (regionBox.Min.z + regionBox.Max.z) * 0.5f;
+
+    const float deltaX = centerX - camera->inverseView.r[3].x;
+    const float deltaY = centerY - camera->inverseView.r[3].y;
+    const float deltaZ = centerZ - camera->inverseView.r[3].z;
+    const float centerDistance = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+    if (centerDistance > ren_ClutterRadius) {
+      return false;
+    }
+
+    return camera->solid2.Intersects(regionBox);
+  }
+
+  /**
+   * Address: 0x007D6510 (FUN_007D6510, ?UpdateCurrent@Clutter@Moho@@AAEXPBVGeomCamera3@2@@Z)
+   *
+   * What it does:
+   * Walks the active-region chain and destroys regions that are outside clutter
+   * distance radius or no longer intersect the camera frustum solid.
+   */
+  void Clutter::UpdateCurrent(const GeomCamera3* const camera)
+  {
+    ClutterRegion* currentRegion = mCurRegion;
+    while (currentRegion != nullptr) {
+      ClutterRegion* const previousRegion = currentRegion->mPrev;
+      if (!IsVisible(camera, currentRegion->mBox)) {
+        DestroyRegion(currentRegion);
+      }
+
+      currentRegion = previousRegion;
     }
   }
 

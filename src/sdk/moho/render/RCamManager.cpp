@@ -107,6 +107,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x007AAA90 (FUN_007AAA90, ?ForgetCamera@RCamManager@Moho@@QAEXPBVRCamCamera@2@@Z)
+   */
+  void RCamManager::ForgetCamera(const CameraImpl* const camera)
+  {
+    if (camera == nullptr) {
+      return;
+    }
+
+    for (auto it = mCams.begin(); it != mCams.end(); ++it) {
+      if (*it == camera) {
+        mCams.erase(it);
+        return;
+      }
+    }
+  }
+
+  /**
    * Address: 0x007AAAF0 (FUN_007AAAF0, ?GetCamera@RCamManager@Moho@@QAEPAVCameraImpl@2@VStrArg@gpg@@@Z)
    */
   CameraImpl* RCamManager::GetCamera(const gpg::StrArg name)

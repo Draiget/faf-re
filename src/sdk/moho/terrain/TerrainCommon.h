@@ -8,6 +8,7 @@
 namespace moho
 {
   class RD3DTextureResource;
+  struct TerrainWaterResourceView;
 
   /**
    * VFTABLE: 0x00E419D4
@@ -34,6 +35,13 @@ namespace moho
      * base vtable lane during teardown.
      */
     virtual ~TerrainCommon();
+
+    /**
+     * What it does:
+     * Binds one terrain-resource owner lane and initializes fidelity-specific
+     * terrain runtime state.
+     */
+    [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
 
     boost::shared_ptr<RD3DTextureResource> mDecalMask{}; // +0x04
   };

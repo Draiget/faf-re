@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "gpg/core/containers/Rect2.h"
+
 namespace gpg
 {
 	class BitArray2D
@@ -68,6 +70,15 @@ namespace gpg
 		 * is treated as occupied if it overlaps a non-empty area.
 		 */
 		[[nodiscard]] bool GetRectOr(int x0, int z0, int w, int h, bool disallowNegative) const;
+
+		/**
+		 * Address: 0x00720580 (FUN_00720580, gpg::BitArray2D::GetRectNeg)
+		 *
+		 * What it does:
+		 * Tests one integer rectangle against set bits and treats negative /
+		 * out-of-range overlap as occupied.
+		 */
+		[[nodiscard]] bool GetRectNeg(const Rect2i& rect) const;
 
 		/**
 		 * What it does:

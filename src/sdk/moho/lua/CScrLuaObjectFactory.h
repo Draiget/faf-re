@@ -58,12 +58,32 @@ namespace moho
   );
 
   /**
+   * Address: 0x004D2380 (FUN_004D2380, ?SCR_ExpectArgs@Moho@@YAXPAVLuaState@LuaPlus@@HHPBD@Z)
+   *
+   * What it does:
+   * Validates Lua argument count in `[minArgs, maxArgs]` (or `>= minArgs`
+   * when `maxArgs == -1`) and raises LuaState::Error with `helpText` on
+   * mismatch.
+   */
+  void SCR_ExpectArgs(LuaPlus::LuaState* state, int maxArgs, int minArgs, const char* helpText);
+
+  /**
    * Address: 0x004D2F70 (FUN_004D2F70, ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
    *
    * What it does:
    * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `msvc8::string`.
    */
   [[nodiscard]] msvc8::string SCR_ToString(const LuaPlus::LuaObject& object);
+
+  /**
+   * Address: 0x004D31D0 (FUN_004D31D0, ?SCR_ToBool@Moho@@YA_NABVLuaObject@LuaPlus@@@Z)
+   *
+   * What it does:
+   * Converts one Lua object to bool using Moho script semantics:
+   * numeric non-zero is true; case-insensitive string `"true"`, `"on"`, or
+   * `"yes"` is true; every other value is false.
+   */
+  [[nodiscard]] bool SCR_ToBool(const LuaPlus::LuaObject& object);
 
   /**
    * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)

@@ -388,6 +388,13 @@ size_t gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetCount(void* obj) con
   return static_cast<std::size_t>(storage->end - storage->begin);
 }
 
+/**
+ * Address: 0x0056BF60 (FUN_0056BF60, gpg::RFastVectorType_WeakPtr_IUnit::SetCount)
+ *
+ * What it does:
+ * Resizes the reflected `fastvector<WeakPtr<IUnit>>` lane to `count`,
+ * preserving weak-link ownership semantics through the shared resize helper.
+ */
 void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SetCount(void* obj, const int count) const
 {
   auto* const storage = static_cast<moho::WeakPtrVectorStorage<moho::IUnit>*>(obj);

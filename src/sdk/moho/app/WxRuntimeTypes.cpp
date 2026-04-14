@@ -1,6 +1,7 @@
 #include "WxRuntimeTypes.h"
 
 #include <Windows.h>
+#include <commctrl.h>
 #include <shellapi.h>
 
 #include <algorithm>
@@ -10,24 +11,41 @@
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
+#include <cwctype>
 #include <fcntl.h>
 #include <filesystem>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <system_error>
+#include <utility>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include <io.h>
 
+#include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "libpng/PngReadRuntime.h"
 #include "moho/console/CConCommand.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/particles/CWorldParticles.h"
+#include "moho/render/IRenderWorldView.h"
+#include "moho/render/camera/GeomCamera3.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/terrain/TerrainFactory.h"
+#include "moho/terrain/TerrainCommon.h"
+#include "moho/ui/IUIManager.h"
+
+extern "C" void __cdecl _free_crt(void* ptr);
 
 class wxClassInfo;
 
@@ -212,6 +230,57 @@ namespace
   void* gWxImageHandlerClassInfoTable[1] = {nullptr};
   void* gWxPngHandlerClassInfoTable[1] = {nullptr};
 
+  class WxPngIoStreamRuntime
+  {
+  public:
+    virtual ~WxPngIoStreamRuntime() = default;
+    virtual void RuntimeSlot08() = 0;
+    virtual void RuntimeSlot0C() = 0;
+    virtual void WritePngBytes(png_bytep bytes, png_size_t byteCount) = 0;
+    virtual void ReadPngBytes(png_bytep bytes, png_size_t byteCount) = 0;
+  };
+
+  struct WxPngIoContextRuntime
+  {
+    std::uint8_t setJmpAndStateLane[0x44]{};
+    WxPngIoStreamRuntime* stream = nullptr;
+  };
+  static_assert(offsetof(WxPngIoContextRuntime, stream) == 0x44, "WxPngIoContextRuntime::stream offset must be 0x44");
+
+  /**
+   * Address: 0x00974E30 (FUN_00974E30, write_data_fn)
+   *
+   * What it does:
+   * Resolves the active wx/libpng callback context and forwards one PNG input
+   * byte-span request into the stream read lane.
+   */
+  void wxPngReadFromStreamCallback(
+    png_structp const pngPtr,
+    png_bytep const bytes,
+    png_size_t const byteCount
+  )
+  {
+    auto* const ioContext = static_cast<WxPngIoContextRuntime*>(png_get_io_ptr(pngPtr));
+    ioContext->stream->ReadPngBytes(bytes, byteCount);
+  }
+
+  /**
+   * Address: 0x00974E60 (FUN_00974E60, _PNG_stream_writer)
+   *
+   * What it does:
+   * Resolves the active wx/libpng callback context and forwards one PNG output
+   * byte-span request into the stream write lane.
+   */
+  void wxPngWriteToStreamCallback(
+    png_structp const pngPtr,
+    png_bytep const bytes,
+    png_size_t const byteCount
+  )
+  {
+    auto* const ioContext = static_cast<WxPngIoContextRuntime*>(png_get_io_ptr(pngPtr));
+    ioContext->stream->WritePngBytes(bytes, byteCount);
+  }
+
   MSG gCurrentMessage{};
   std::uint32_t gDoMessageStateFlags = 0u;
   bool gIsDispatchingDeferredMessages = false;
@@ -228,9 +297,53 @@ namespace
   int gWxGetOsVersionCache = -1;
   int gWxGetOsVersionMajor = -1;
   int gWxGetOsVersionMinor = -1;
+  int gWxColourDisplayCache = -1;
   HCURSOR gs_wxBusyCursor = nullptr;
   HCURSOR gs_wxBusyCursorOld = nullptr;
   int gs_wxBusyCursorCount = 0;
+
+  class WxStockListRuntimeBase
+  {
+  public:
+    virtual ~WxStockListRuntimeBase() = default;
+  };
+
+  WxStockListRuntimeBase* wxTheBrushList = nullptr;
+  WxStockListRuntimeBase* wxThePenList = nullptr;
+  WxStockListRuntimeBase* wxTheFontList = nullptr;
+  WxStockListRuntimeBase* wxTheBitmapList = nullptr;
+
+  void DeleteStockList(WxStockListRuntimeBase*& stockList) noexcept
+  {
+    delete stockList;
+    stockList = nullptr;
+  }
+
+  /**
+   * Address: 0x00A19150 (FUN_00A19150)
+   *
+   * What it does:
+   * Scans one runtime IID pointer list and reports whether any entry matches
+   * the requested COM interface id.
+   */
+  [[nodiscard]] bool IsIidFromList(
+    REFIID iid,
+    const IID* const* const iidList,
+    const unsigned int count
+  )
+  {
+    if (count == 0U) {
+      return false;
+    }
+
+    for (unsigned int index = 0U; index < count; ++index) {
+      if (InlineIsEqualGUID(iid, *iidList[index])) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   struct WxWindowHandleHashEntryRuntime
   {
@@ -577,6 +690,145 @@ namespace
     return true;
   }
 
+  [[nodiscard]] std::wstring ToLowerWide(
+    std::wstring value
+  )
+  {
+    std::transform(
+      value.begin(),
+      value.end(),
+      value.begin(),
+      [](const wchar_t ch) {
+      return static_cast<wchar_t>(std::towlower(static_cast<wint_t>(ch)));
+    }
+    );
+    return value;
+  }
+
+  [[nodiscard]] bool ContainsNoCase(
+    const std::wstring& haystack,
+    const wchar_t* const needle
+  )
+  {
+    if (needle == nullptr || *needle == L'\0') {
+      return false;
+    }
+
+    const std::wstring lowerHaystack = ToLowerWide(haystack);
+    const std::wstring lowerNeedle = ToLowerWide(std::wstring(needle));
+    return lowerHaystack.find(lowerNeedle) != std::wstring::npos;
+  }
+
+  [[nodiscard]] bool TryParseIntToken(
+    const std::wstring& token,
+    std::int32_t* const outValue
+  )
+  {
+    if (token.empty() || outValue == nullptr) {
+      return false;
+    }
+
+    std::size_t parsedCount = 0;
+    const long value = std::wcstol(token.c_str(), nullptr, 10);
+    if (value == 0L && token[0] != L'0') {
+      return false;
+    }
+
+    const std::wstring normalized = (token[0] == L'+' || token[0] == L'-') ? token.substr(1) : token;
+    for (const wchar_t ch : normalized) {
+      if (ch < L'0' || ch > L'9') {
+        return false;
+      }
+      ++parsedCount;
+    }
+    if (parsedCount == 0) {
+      return false;
+    }
+
+    *outValue = static_cast<std::int32_t>(value);
+    return true;
+  }
+
+  [[nodiscard]] bool TryMapEncodingToCharset(
+    const std::wstring& token,
+    std::int32_t* const outCharset
+  )
+  {
+    if (outCharset == nullptr) {
+      return false;
+    }
+
+    const std::wstring lower = ToLowerWide(token);
+    if (lower == L"ansi" || lower == L"cp1252" || lower == L"latin1" || lower == L"iso8859-1") {
+      *outCharset = 0;
+      return true;
+    }
+    if (lower == L"cp1250" || lower == L"easteurope" || lower == L"iso8859-2") {
+      *outCharset = 238;
+      return true;
+    }
+    if (lower == L"cp1251" || lower == L"russian" || lower == L"koi8-r") {
+      *outCharset = 204;
+      return true;
+    }
+    if (lower == L"cp1253" || lower == L"greek") {
+      *outCharset = 161;
+      return true;
+    }
+    if (lower == L"cp1254" || lower == L"turkish") {
+      *outCharset = 162;
+      return true;
+    }
+    if (lower == L"cp1255" || lower == L"hebrew") {
+      *outCharset = 177;
+      return true;
+    }
+    if (lower == L"cp1256" || lower == L"arabic") {
+      *outCharset = 178;
+      return true;
+    }
+    if (lower == L"cp1257" || lower == L"baltic") {
+      *outCharset = 186;
+      return true;
+    }
+    if (lower == L"cp1258" || lower == L"vietnamese") {
+      *outCharset = 163;
+      return true;
+    }
+    if (lower == L"utf-8" || lower == L"utf8" || lower == L"default") {
+      *outCharset = 1;
+      return true;
+    }
+
+    return false;
+  }
+
+  [[nodiscard]] std::vector<std::wstring> SplitNativeFontDescriptionTokens(
+    const std::wstring& description
+  )
+  {
+    std::vector<std::wstring> tokens{};
+    std::wstring token{};
+
+    auto flushToken = [&]() {
+      if (!token.empty()) {
+        tokens.push_back(token);
+        token.clear();
+      }
+    };
+
+    for (const wchar_t ch : description) {
+      const bool isSeparator = ch == L';' || ch == L',' || std::iswspace(static_cast<wint_t>(ch)) != 0;
+      if (isSeparator) {
+        flushToken();
+      } else {
+        token.push_back(ch);
+      }
+    }
+    flushToken();
+    return tokens;
+  }
+
   /**
    * Address: 0x00980B70 (FUN_00980B70)
    *
@@ -886,9 +1138,21 @@ namespace
     std::wstring name{};
   };
 
+  struct WxLogFrameRuntimeState
+  {
+    std::wstring title{};
+    std::wstring windowName{};
+    std::wstring statusText{};
+    wxTextCtrlRuntime* textControl = nullptr;
+    wxLogWindowRuntime* ownerLogWindow = nullptr;
+    std::array<std::int32_t, 3> logMenuItemIds{{5003, 5033, 5001}};
+    bool menuReady = false;
+  };
+
   std::unordered_map<const wxTopLevelWindowRuntime*, WxTopLevelWindowRuntimeState>
     gWxTopLevelWindowRuntimeStateByWindow{};
   std::unordered_map<const wxDialogRuntime*, WxDialogRuntimeState> gWxDialogRuntimeStateByDialog{};
+  std::unordered_map<const wxLogFrameRuntime*, WxLogFrameRuntimeState> gWxLogFrameRuntimeStateByFrame{};
 
   struct WxTreeListNodeRuntimeState
   {
@@ -1000,6 +1264,26 @@ namespace
   std::int32_t gWxEvtIdleRuntimeType = 0;
   std::int32_t gWxEvtDropFilesRuntimeType = 0;
   std::int32_t gWxEvtMouseCaptureChangedRuntimeType = 0;
+  std::int32_t gWxEvtUpdateUiRuntimeType = 0;
+  std::int32_t gWxEvtSizeRuntimeType = 0;
+  std::int32_t gWxEvtPaintRuntimeType = 0;
+  std::int32_t gWxEvtNcPaintRuntimeType = 0;
+  std::int32_t gWxEvtEraseBackgroundRuntimeType = 0;
+  std::int32_t gWxEvtMoveRuntimeType = 0;
+  std::int32_t gWxEvtActivateRuntimeType = 0;
+  std::int32_t gWxEvtInitDialogRuntimeType = 0;
+  std::int32_t gWxEvtSysColourChangedRuntimeType = 0;
+  std::int32_t gWxEvtDisplayChangedRuntimeType = 0;
+  std::int32_t gWxEvtNavigationKeyRuntimeType = 0;
+  std::int32_t gWxEvtPaletteChangedRuntimeType = 0;
+  std::int32_t gWxEvtQueryNewPaletteRuntimeType = 0;
+  std::int32_t gWxEvtShowRuntimeType = 0;
+  std::int32_t gWxEvtMaximizeRuntimeType = 0;
+  std::int32_t gWxEvtIconizeRuntimeType = 0;
+  std::int32_t gWxEvtChildFocusRuntimeType = 0;
+  std::int32_t gWxEvtWindowCreateRuntimeType = 0;
+  std::int32_t gWxEvtWindowDestroyRuntimeType = 0;
+  std::int32_t gWxEvtSetCursorRuntimeType = 0;
 
   [[nodiscard]] std::int32_t EnsureWxEvtIdleRuntimeType()
   {
@@ -1023,6 +1307,166 @@ namespace
       gWxEvtMouseCaptureChangedRuntimeType = wxNewEventType();
     }
     return gWxEvtMouseCaptureChangedRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtUpdateUiRuntimeType()
+  {
+    if (gWxEvtUpdateUiRuntimeType == 0) {
+      gWxEvtUpdateUiRuntimeType = wxNewEventType();
+    }
+    return gWxEvtUpdateUiRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtSizeRuntimeType()
+  {
+    if (gWxEvtSizeRuntimeType == 0) {
+      gWxEvtSizeRuntimeType = wxNewEventType();
+    }
+    return gWxEvtSizeRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtPaintRuntimeType()
+  {
+    if (gWxEvtPaintRuntimeType == 0) {
+      gWxEvtPaintRuntimeType = wxNewEventType();
+    }
+    return gWxEvtPaintRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtNcPaintRuntimeType()
+  {
+    if (gWxEvtNcPaintRuntimeType == 0) {
+      gWxEvtNcPaintRuntimeType = wxNewEventType();
+    }
+    return gWxEvtNcPaintRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtEraseBackgroundRuntimeType()
+  {
+    if (gWxEvtEraseBackgroundRuntimeType == 0) {
+      gWxEvtEraseBackgroundRuntimeType = wxNewEventType();
+    }
+    return gWxEvtEraseBackgroundRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtMoveRuntimeType()
+  {
+    if (gWxEvtMoveRuntimeType == 0) {
+      gWxEvtMoveRuntimeType = wxNewEventType();
+    }
+    return gWxEvtMoveRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtActivateRuntimeType()
+  {
+    if (gWxEvtActivateRuntimeType == 0) {
+      gWxEvtActivateRuntimeType = wxNewEventType();
+    }
+    return gWxEvtActivateRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtInitDialogRuntimeType()
+  {
+    if (gWxEvtInitDialogRuntimeType == 0) {
+      gWxEvtInitDialogRuntimeType = wxNewEventType();
+    }
+    return gWxEvtInitDialogRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtSysColourChangedRuntimeType()
+  {
+    if (gWxEvtSysColourChangedRuntimeType == 0) {
+      gWxEvtSysColourChangedRuntimeType = wxNewEventType();
+    }
+    return gWxEvtSysColourChangedRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtDisplayChangedRuntimeType()
+  {
+    if (gWxEvtDisplayChangedRuntimeType == 0) {
+      gWxEvtDisplayChangedRuntimeType = wxNewEventType();
+    }
+    return gWxEvtDisplayChangedRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtNavigationKeyRuntimeType()
+  {
+    if (gWxEvtNavigationKeyRuntimeType == 0) {
+      gWxEvtNavigationKeyRuntimeType = wxNewEventType();
+    }
+    return gWxEvtNavigationKeyRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtPaletteChangedRuntimeType()
+  {
+    if (gWxEvtPaletteChangedRuntimeType == 0) {
+      gWxEvtPaletteChangedRuntimeType = wxNewEventType();
+    }
+    return gWxEvtPaletteChangedRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtQueryNewPaletteRuntimeType()
+  {
+    if (gWxEvtQueryNewPaletteRuntimeType == 0) {
+      gWxEvtQueryNewPaletteRuntimeType = wxNewEventType();
+    }
+    return gWxEvtQueryNewPaletteRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtShowRuntimeType()
+  {
+    if (gWxEvtShowRuntimeType == 0) {
+      gWxEvtShowRuntimeType = wxNewEventType();
+    }
+    return gWxEvtShowRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtMaximizeRuntimeType()
+  {
+    if (gWxEvtMaximizeRuntimeType == 0) {
+      gWxEvtMaximizeRuntimeType = wxNewEventType();
+    }
+    return gWxEvtMaximizeRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtIconizeRuntimeType()
+  {
+    if (gWxEvtIconizeRuntimeType == 0) {
+      gWxEvtIconizeRuntimeType = wxNewEventType();
+    }
+    return gWxEvtIconizeRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtChildFocusRuntimeType()
+  {
+    if (gWxEvtChildFocusRuntimeType == 0) {
+      gWxEvtChildFocusRuntimeType = wxNewEventType();
+    }
+    return gWxEvtChildFocusRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtWindowCreateRuntimeType()
+  {
+    if (gWxEvtWindowCreateRuntimeType == 0) {
+      gWxEvtWindowCreateRuntimeType = wxNewEventType();
+    }
+    return gWxEvtWindowCreateRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtWindowDestroyRuntimeType()
+  {
+    if (gWxEvtWindowDestroyRuntimeType == 0) {
+      gWxEvtWindowDestroyRuntimeType = wxNewEventType();
+    }
+    return gWxEvtWindowDestroyRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtSetCursorRuntimeType()
+  {
+    if (gWxEvtSetCursorRuntimeType == 0) {
+      gWxEvtSetCursorRuntimeType = wxNewEventType();
+    }
+    return gWxEvtSetCursorRuntimeType;
   }
 
   class WxIdleEventRuntime final : public wxEventRuntime
@@ -1250,6 +1694,1231 @@ namespace
     "WxMouseCaptureChangedEventRuntime size must be 0x24"
   );
 
+  class WxSizeEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxSizeEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtSizeRuntimeType())
+      , mSizeX(0)
+      , mSizeY(0)
+    {}
+
+    WxSizeEventFactoryRuntime* Clone() const override
+    {
+      auto* const clone = new (std::nothrow) WxSizeEventFactoryRuntime();
+      if (clone == nullptr) {
+        return nullptr;
+      }
+
+      clone->mRefData = mRefData;
+      clone->mEventObject = mEventObject;
+      clone->mEventType = mEventType;
+      clone->mEventTimestamp = mEventTimestamp;
+      clone->mEventId = mEventId;
+      clone->mCallbackUserData = mCallbackUserData;
+      clone->mSkipped = mSkipped;
+      clone->mIsCommandEvent = mIsCommandEvent;
+      clone->mReserved1E = mReserved1E;
+      clone->mReserved1F = mReserved1F;
+      clone->mSizeX = mSizeX;
+      clone->mSizeY = mSizeY;
+      return clone;
+    }
+
+    std::int32_t mSizeX = 0;
+    std::int32_t mSizeY = 0;
+  };
+
+  static_assert(
+    offsetof(WxSizeEventFactoryRuntime, mSizeX) == 0x20,
+    "WxSizeEventFactoryRuntime::mSizeX offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxSizeEventFactoryRuntime, mSizeY) == 0x24,
+    "WxSizeEventFactoryRuntime::mSizeY offset must be 0x24"
+  );
+  static_assert(sizeof(WxSizeEventFactoryRuntime) == 0x28, "WxSizeEventFactoryRuntime size must be 0x28");
+
+  class WxPaintEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxPaintEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtPaintRuntimeType())
+    {}
+
+    WxPaintEventFactoryRuntime* Clone() const override
+    {
+      auto* const clone = new (std::nothrow) WxPaintEventFactoryRuntime();
+      if (clone == nullptr) {
+        return nullptr;
+      }
+
+      clone->mRefData = mRefData;
+      clone->mEventObject = mEventObject;
+      clone->mEventType = mEventType;
+      clone->mEventTimestamp = mEventTimestamp;
+      clone->mEventId = mEventId;
+      clone->mCallbackUserData = mCallbackUserData;
+      clone->mSkipped = mSkipped;
+      clone->mIsCommandEvent = mIsCommandEvent;
+      clone->mReserved1E = mReserved1E;
+      clone->mReserved1F = mReserved1F;
+      return clone;
+    }
+  };
+
+  static_assert(sizeof(WxPaintEventFactoryRuntime) == 0x20, "WxPaintEventFactoryRuntime size must be 0x20");
+
+  class WxNcPaintEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxNcPaintEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtNcPaintRuntimeType())
+    {}
+
+    WxNcPaintEventFactoryRuntime* Clone() const override
+    {
+      auto* const clone = new (std::nothrow) WxNcPaintEventFactoryRuntime();
+      if (clone == nullptr) {
+        return nullptr;
+      }
+
+      clone->mRefData = mRefData;
+      clone->mEventObject = mEventObject;
+      clone->mEventType = mEventType;
+      clone->mEventTimestamp = mEventTimestamp;
+      clone->mEventId = mEventId;
+      clone->mCallbackUserData = mCallbackUserData;
+      clone->mSkipped = mSkipped;
+      clone->mIsCommandEvent = mIsCommandEvent;
+      clone->mReserved1E = mReserved1E;
+      clone->mReserved1F = mReserved1F;
+      return clone;
+    }
+  };
+
+  static_assert(sizeof(WxNcPaintEventFactoryRuntime) == 0x20, "WxNcPaintEventFactoryRuntime size must be 0x20");
+
+  class WxEraseEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxEraseEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtEraseBackgroundRuntimeType())
+      , mDeviceContext(nullptr)
+    {}
+
+    WxEraseEventFactoryRuntime* Clone() const override
+    {
+      auto* const clone = new (std::nothrow) WxEraseEventFactoryRuntime();
+      if (clone == nullptr) {
+        return nullptr;
+      }
+
+      clone->mRefData = mRefData;
+      clone->mEventObject = mEventObject;
+      clone->mEventType = mEventType;
+      clone->mEventTimestamp = mEventTimestamp;
+      clone->mEventId = mEventId;
+      clone->mCallbackUserData = mCallbackUserData;
+      clone->mSkipped = mSkipped;
+      clone->mIsCommandEvent = mIsCommandEvent;
+      clone->mReserved1E = mReserved1E;
+      clone->mReserved1F = mReserved1F;
+      clone->mDeviceContext = mDeviceContext;
+      return clone;
+    }
+
+    void* mDeviceContext = nullptr;
+  };
+
+  static_assert(
+    offsetof(WxEraseEventFactoryRuntime, mDeviceContext) == 0x20,
+    "WxEraseEventFactoryRuntime::mDeviceContext offset must be 0x20"
+  );
+  static_assert(sizeof(WxEraseEventFactoryRuntime) == 0x24, "WxEraseEventFactoryRuntime size must be 0x24");
+
+  class WxMoveEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxMoveEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtMoveRuntimeType())
+      , mX(0)
+      , mY(0)
+    {}
+
+    WxMoveEventFactoryRuntime* Clone() const override
+    {
+      auto* const clone = new (std::nothrow) WxMoveEventFactoryRuntime();
+      if (clone == nullptr) {
+        return nullptr;
+      }
+
+      clone->mRefData = mRefData;
+      clone->mEventObject = mEventObject;
+      clone->mEventType = mEventType;
+      clone->mEventTimestamp = mEventTimestamp;
+      clone->mEventId = mEventId;
+      clone->mCallbackUserData = mCallbackUserData;
+      clone->mSkipped = mSkipped;
+      clone->mIsCommandEvent = mIsCommandEvent;
+      clone->mReserved1E = mReserved1E;
+      clone->mReserved1F = mReserved1F;
+      clone->mX = mX;
+      clone->mY = mY;
+      return clone;
+    }
+
+    std::int32_t mX = 0;
+    std::int32_t mY = 0;
+  };
+
+  static_assert(
+    offsetof(WxMoveEventFactoryRuntime, mX) == 0x20,
+    "WxMoveEventFactoryRuntime::mX offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxMoveEventFactoryRuntime, mY) == 0x24,
+    "WxMoveEventFactoryRuntime::mY offset must be 0x24"
+  );
+  static_assert(sizeof(WxMoveEventFactoryRuntime) == 0x28, "WxMoveEventFactoryRuntime size must be 0x28");
+
+  class WxFocusEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxFocusEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mFocusedWindow(nullptr)
+    {}
+
+    WxFocusEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxFocusEventFactoryRuntime(*this);
+    }
+
+    wxWindowBase* mFocusedWindow = nullptr;
+  };
+
+  static_assert(
+    offsetof(WxFocusEventFactoryRuntime, mFocusedWindow) == 0x20,
+    "WxFocusEventFactoryRuntime::mFocusedWindow offset must be 0x20"
+  );
+  static_assert(sizeof(WxFocusEventFactoryRuntime) == 0x24, "WxFocusEventFactoryRuntime size must be 0x24");
+
+  class WxCloseEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxCloseEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mCanVeto(1)
+      , mVeto(0)
+      , mLoggingOff(1)
+      , mReserved23(0)
+    {}
+
+    WxCloseEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxCloseEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mCanVeto = 1;
+    std::uint8_t mVeto = 0;
+    std::uint8_t mLoggingOff = 1;
+    std::uint8_t mReserved23 = 0;
+  };
+
+  static_assert(offsetof(WxCloseEventFactoryRuntime, mCanVeto) == 0x20, "WxCloseEventFactoryRuntime::mCanVeto offset must be 0x20");
+  static_assert(offsetof(WxCloseEventFactoryRuntime, mVeto) == 0x21, "WxCloseEventFactoryRuntime::mVeto offset must be 0x21");
+  static_assert(
+    offsetof(WxCloseEventFactoryRuntime, mLoggingOff) == 0x22,
+    "WxCloseEventFactoryRuntime::mLoggingOff offset must be 0x22"
+  );
+  static_assert(sizeof(WxCloseEventFactoryRuntime) == 0x24, "WxCloseEventFactoryRuntime size must be 0x24");
+
+  class WxShowEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxShowEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtShowRuntimeType())
+      , mShown(0)
+      , mPadding21To23{0, 0, 0}
+    {}
+
+    WxShowEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxShowEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mShown = 0;
+    std::uint8_t mPadding21To23[3] = {0, 0, 0};
+  };
+
+  static_assert(offsetof(WxShowEventFactoryRuntime, mShown) == 0x20, "WxShowEventFactoryRuntime::mShown offset must be 0x20");
+  static_assert(sizeof(WxShowEventFactoryRuntime) == 0x24, "WxShowEventFactoryRuntime size must be 0x24");
+
+  class WxMaximizeEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxMaximizeEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtMaximizeRuntimeType())
+    {}
+
+    WxMaximizeEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxMaximizeEventFactoryRuntime(*this);
+    }
+  };
+
+  static_assert(sizeof(WxMaximizeEventFactoryRuntime) == 0x20, "WxMaximizeEventFactoryRuntime size must be 0x20");
+
+  class WxIconizeEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxIconizeEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtIconizeRuntimeType())
+      , mIconized(1)
+      , mPadding21To23{0, 0, 0}
+    {}
+
+    WxIconizeEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxIconizeEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mIconized = 1;
+    std::uint8_t mPadding21To23[3] = {0, 0, 0};
+  };
+
+  static_assert(offsetof(WxIconizeEventFactoryRuntime, mIconized) == 0x20, "WxIconizeEventFactoryRuntime::mIconized offset must be 0x20");
+  static_assert(sizeof(WxIconizeEventFactoryRuntime) == 0x24, "WxIconizeEventFactoryRuntime size must be 0x24");
+
+  class WxActivateEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxActivateEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtActivateRuntimeType())
+      , mIsActive(1)
+      , mPadding21To23{0, 0, 0}
+    {}
+
+    WxActivateEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxActivateEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mIsActive = 1;
+    std::uint8_t mPadding21To23[3] = {0, 0, 0};
+  };
+
+  static_assert(
+    offsetof(WxActivateEventFactoryRuntime, mIsActive) == 0x20,
+    "WxActivateEventFactoryRuntime::mIsActive offset must be 0x20"
+  );
+  static_assert(sizeof(WxActivateEventFactoryRuntime) == 0x24, "WxActivateEventFactoryRuntime size must be 0x24");
+
+  class WxInitDialogEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxInitDialogEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtInitDialogRuntimeType())
+    {}
+
+    WxInitDialogEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxInitDialogEventFactoryRuntime(*this);
+    }
+  };
+
+  static_assert(sizeof(WxInitDialogEventFactoryRuntime) == 0x20, "WxInitDialogEventFactoryRuntime size must be 0x20");
+
+  class WxSysColourChangedEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxSysColourChangedEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtSysColourChangedRuntimeType())
+    {}
+
+    WxSysColourChangedEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxSysColourChangedEventFactoryRuntime(*this);
+    }
+  };
+
+  static_assert(
+    sizeof(WxSysColourChangedEventFactoryRuntime) == 0x20,
+    "WxSysColourChangedEventFactoryRuntime size must be 0x20"
+  );
+
+  class WxDisplayChangedEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxDisplayChangedEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtDisplayChangedRuntimeType())
+    {}
+
+    WxDisplayChangedEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxDisplayChangedEventFactoryRuntime(*this);
+    }
+  };
+
+  static_assert(sizeof(WxDisplayChangedEventFactoryRuntime) == 0x20, "WxDisplayChangedEventFactoryRuntime size must be 0x20");
+
+  class WxNavigationKeyEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxNavigationKeyEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtNavigationKeyRuntimeType())
+      , mNavigationFlags(5)
+      , mCurrentFocusWindow(nullptr)
+    {}
+
+    WxNavigationKeyEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxNavigationKeyEventFactoryRuntime(*this);
+    }
+
+    std::int32_t mNavigationFlags = 5;
+    wxWindowBase* mCurrentFocusWindow = nullptr;
+  };
+
+  static_assert(
+    offsetof(WxNavigationKeyEventFactoryRuntime, mNavigationFlags) == 0x20,
+    "WxNavigationKeyEventFactoryRuntime::mNavigationFlags offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxNavigationKeyEventFactoryRuntime, mCurrentFocusWindow) == 0x24,
+    "WxNavigationKeyEventFactoryRuntime::mCurrentFocusWindow offset must be 0x24"
+  );
+  static_assert(
+    sizeof(WxNavigationKeyEventFactoryRuntime) == 0x28,
+    "WxNavigationKeyEventFactoryRuntime size must be 0x28"
+  );
+
+  class WxPaletteChangedEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxPaletteChangedEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtPaletteChangedRuntimeType())
+      , mChangedWindow(nullptr)
+    {}
+
+    WxPaletteChangedEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxPaletteChangedEventFactoryRuntime(*this);
+    }
+
+    wxWindowBase* mChangedWindow = nullptr;
+  };
+
+  static_assert(
+    offsetof(WxPaletteChangedEventFactoryRuntime, mChangedWindow) == 0x20,
+    "WxPaletteChangedEventFactoryRuntime::mChangedWindow offset must be 0x20"
+  );
+  static_assert(
+    sizeof(WxPaletteChangedEventFactoryRuntime) == 0x24,
+    "WxPaletteChangedEventFactoryRuntime size must be 0x24"
+  );
+
+  class WxQueryNewPaletteEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxQueryNewPaletteEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtQueryNewPaletteRuntimeType())
+      , mPaletteRealized(0)
+      , mPadding21To23{0, 0, 0}
+    {}
+
+    WxQueryNewPaletteEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxQueryNewPaletteEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mPaletteRealized = 0;
+    std::uint8_t mPadding21To23[3] = {0, 0, 0};
+  };
+
+  static_assert(
+    offsetof(WxQueryNewPaletteEventFactoryRuntime, mPaletteRealized) == 0x20,
+    "WxQueryNewPaletteEventFactoryRuntime::mPaletteRealized offset must be 0x20"
+  );
+  static_assert(
+    sizeof(WxQueryNewPaletteEventFactoryRuntime) == 0x24,
+    "WxQueryNewPaletteEventFactoryRuntime size must be 0x24"
+  );
+
+  class WxMenuEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxMenuEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mMenuId(0)
+    {}
+
+    WxMenuEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxMenuEventFactoryRuntime(*this);
+    }
+
+    std::int32_t mMenuId = 0;
+  };
+
+  static_assert(offsetof(WxMenuEventFactoryRuntime, mMenuId) == 0x20, "WxMenuEventFactoryRuntime::mMenuId offset must be 0x20");
+  static_assert(sizeof(WxMenuEventFactoryRuntime) == 0x24, "WxMenuEventFactoryRuntime size must be 0x24");
+
+  class WxJoystickEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxJoystickEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mPositionX(0)
+      , mPositionY(0)
+      , mPositionZ(0)
+      , mButtonChange(0)
+      , mButtonState(0)
+      , mJoystickIndex(0)
+    {}
+
+    WxJoystickEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxJoystickEventFactoryRuntime(*this);
+    }
+
+    std::int32_t mPositionX = 0;
+    std::int32_t mPositionY = 0;
+    std::int32_t mPositionZ = 0;
+    std::int32_t mButtonChange = 0;
+    std::int32_t mButtonState = 0;
+    std::int32_t mJoystickIndex = 0;
+  };
+
+  static_assert(
+    offsetof(WxJoystickEventFactoryRuntime, mPositionX) == 0x20,
+    "WxJoystickEventFactoryRuntime::mPositionX offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxJoystickEventFactoryRuntime, mPositionY) == 0x24,
+    "WxJoystickEventFactoryRuntime::mPositionY offset must be 0x24"
+  );
+  static_assert(
+    offsetof(WxJoystickEventFactoryRuntime, mPositionZ) == 0x28,
+    "WxJoystickEventFactoryRuntime::mPositionZ offset must be 0x28"
+  );
+  static_assert(
+    offsetof(WxJoystickEventFactoryRuntime, mButtonChange) == 0x2C,
+    "WxJoystickEventFactoryRuntime::mButtonChange offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(WxJoystickEventFactoryRuntime, mButtonState) == 0x30,
+    "WxJoystickEventFactoryRuntime::mButtonState offset must be 0x30"
+  );
+  static_assert(
+    offsetof(WxJoystickEventFactoryRuntime, mJoystickIndex) == 0x34,
+    "WxJoystickEventFactoryRuntime::mJoystickIndex offset must be 0x34"
+  );
+  static_assert(sizeof(WxJoystickEventFactoryRuntime) == 0x38, "WxJoystickEventFactoryRuntime size must be 0x38");
+
+  class WxScrollEventFactoryRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxScrollEventFactoryRuntime()
+      : wxCommandEventRuntime(0, 0)
+    {}
+
+    WxScrollEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxScrollEventFactoryRuntime(*this);
+    }
+  };
+
+  static_assert(sizeof(WxScrollEventFactoryRuntime) == 0x34, "WxScrollEventFactoryRuntime size must be 0x34");
+
+  class WxContextMenuEventRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxContextMenuEventRuntime()
+      : wxCommandEventRuntime(0, 0)
+      , mContextMenuPosition{-1, -1}
+    {}
+
+    WxContextMenuEventRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxContextMenuEventRuntime(*this);
+    }
+
+    wxPoint mContextMenuPosition{};
+  };
+
+  static_assert(
+    offsetof(WxContextMenuEventRuntime, mContextMenuPosition) == 0x34,
+    "WxContextMenuEventRuntime::mContextMenuPosition offset must be 0x34"
+  );
+  static_assert(
+    sizeof(WxContextMenuEventRuntime) == 0x3C,
+    "WxContextMenuEventRuntime size must be 0x3C"
+  );
+
+  class WxNotifyEventRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxNotifyEventRuntime()
+      : wxCommandEventRuntime(0, 0)
+      , mAllow(true)
+      , mPadding35To37{0, 0, 0}
+    {}
+
+    WxNotifyEventRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxNotifyEventRuntime(*this);
+    }
+
+    std::uint8_t mAllow = 1;
+    std::uint8_t mPadding35To37[3] = {0, 0, 0};
+  };
+
+  static_assert(
+    offsetof(WxNotifyEventRuntime, mAllow) == 0x34,
+    "WxNotifyEventRuntime::mAllow offset must be 0x34"
+  );
+  static_assert(sizeof(WxNotifyEventRuntime) == 0x38, "WxNotifyEventRuntime size must be 0x38");
+
+  class WxUpdateUIEventRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxUpdateUIEventRuntime()
+      : wxCommandEventRuntime(EnsureWxEvtUpdateUiRuntimeType(), 0)
+      , mSetChecked(0)
+      , mSetEnabled(0)
+      , mSetShown(0)
+      , mSetText(0)
+      , mSetTextColour(0)
+      , mPadding39To3B{0, 0, 0}
+      , mTextLabel(L"")
+    {}
+
+    WxUpdateUIEventRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxUpdateUIEventRuntime(*this);
+    }
+
+    std::uint8_t mSetChecked = 0;
+    std::uint8_t mSetEnabled = 0;
+    std::uint8_t mSetShown = 0;
+    std::uint8_t mSetText = 0;
+    std::uint8_t mSetTextColour = 0;
+    std::uint8_t mPadding39To3B[3] = {0, 0, 0};
+    const wchar_t* mTextLabel = L"";
+  };
+
+  static_assert(
+    offsetof(WxUpdateUIEventRuntime, mSetChecked) == 0x34,
+    "WxUpdateUIEventRuntime::mSetChecked offset must be 0x34"
+  );
+  static_assert(
+    offsetof(WxUpdateUIEventRuntime, mTextLabel) == 0x3C,
+    "WxUpdateUIEventRuntime::mTextLabel offset must be 0x3C"
+  );
+  static_assert(sizeof(WxUpdateUIEventRuntime) == 0x40, "WxUpdateUIEventRuntime size must be 0x40");
+
+  class WxEvtHandlerFactoryRuntime
+  {
+  public:
+    virtual ~WxEvtHandlerFactoryRuntime() = default;
+
+    void* mRefData = nullptr;                            // +0x04
+    WxEvtHandlerFactoryRuntime* mNextHandler = nullptr; // +0x08
+    WxEvtHandlerFactoryRuntime* mPreviousHandler = nullptr; // +0x0C
+    std::uint8_t mEnabled = 1;                          // +0x10
+    std::uint8_t mPadding11To13[3] = {0, 0, 0};        // +0x11
+    void* mDynamicEvents = nullptr;                     // +0x14
+    std::uint8_t mIsWindow = 0;                         // +0x18
+    std::uint8_t mPadding19To1B[3] = {0, 0, 0};        // +0x19
+    void* mPendingEvents = nullptr;                     // +0x1C
+    void* mEventsLocker = nullptr;                      // +0x20
+    std::uint32_t mClientDataType = 0;                  // +0x24
+  };
+  static_assert(sizeof(WxEvtHandlerFactoryRuntime) == 0x28, "WxEvtHandlerFactoryRuntime size must be 0x28");
+
+  class WxScrollWinEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxScrollWinEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mCommandInt(0)
+      , mExtraLong(0)
+    {}
+
+    WxScrollWinEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxScrollWinEventFactoryRuntime(*this);
+    }
+
+    std::int32_t mCommandInt = 0;
+    std::int32_t mExtraLong = 0;
+  };
+  static_assert(sizeof(WxScrollWinEventFactoryRuntime) == 0x28, "WxScrollWinEventFactoryRuntime size must be 0x28");
+
+  class WxMouseEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxMouseEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mMetaDown(0)
+      , mAltDown(0)
+      , mControlDown(0)
+      , mShiftDown(0)
+      , mLeftDown(0)
+      , mRightDown(0)
+      , mMiddleDown(0)
+      , mReserved27(0)
+      , mX(0)
+      , mY(0)
+      , mWheelRotation(0)
+      , mWheelDelta(0)
+      , mLinesPerAction(0)
+    {}
+
+    WxMouseEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxMouseEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mMetaDown = 0;
+    std::uint8_t mAltDown = 0;
+    std::uint8_t mControlDown = 0;
+    std::uint8_t mShiftDown = 0;
+    std::uint8_t mLeftDown = 0;
+    std::uint8_t mRightDown = 0;
+    std::uint8_t mMiddleDown = 0;
+    std::uint8_t mReserved27 = 0;
+    std::int32_t mX = 0;
+    std::int32_t mY = 0;
+    std::int32_t mWheelRotation = 0;
+    std::int32_t mWheelDelta = 0;
+    std::int32_t mLinesPerAction = 0;
+  };
+  static_assert(sizeof(WxMouseEventFactoryRuntime) == 0x3C, "WxMouseEventFactoryRuntime size must be 0x3C");
+
+  class WxKeyEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxKeyEventFactoryRuntime()
+      : wxEventRuntime(0, 0)
+      , mShiftDown(0)
+      , mControlDown(0)
+      , mMetaDown(0)
+      , mAltDown(0)
+      , mKeyCode(0)
+      , mScanCode(0)
+      , mUniChar(0)
+      , mUnknown30To3B{0, 0, 0}
+    {}
+
+    WxKeyEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxKeyEventFactoryRuntime(*this);
+    }
+
+    std::uint8_t mShiftDown = 0;
+    std::uint8_t mControlDown = 0;
+    std::uint8_t mMetaDown = 0;
+    std::uint8_t mAltDown = 0;
+    std::int32_t mKeyCode = 0;
+    std::int32_t mScanCode = 0;
+    std::int32_t mUniChar = 0;
+    std::int32_t mUnknown30To3B[3] = {0, 0, 0};
+  };
+  static_assert(sizeof(WxKeyEventFactoryRuntime) == 0x3C, "WxKeyEventFactoryRuntime size must be 0x3C");
+
+  class WxChildFocusEventFactoryRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxChildFocusEventFactoryRuntime()
+      : wxCommandEventRuntime(EnsureWxEvtChildFocusRuntimeType(), 0)
+    {
+      mEventObject = nullptr;
+    }
+
+    WxChildFocusEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxChildFocusEventFactoryRuntime(*this);
+    }
+  };
+  static_assert(sizeof(WxChildFocusEventFactoryRuntime) == 0x34, "WxChildFocusEventFactoryRuntime size must be 0x34");
+
+  class WxSetCursorEventFactoryRuntime final : public wxEventRuntime
+  {
+  public:
+    WxSetCursorEventFactoryRuntime()
+      : wxEventRuntime(0, EnsureWxEvtSetCursorRuntimeType())
+      , mX(0)
+      , mY(0)
+      , mCursorStorage{0, 0, 0}
+    {}
+
+    WxSetCursorEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxSetCursorEventFactoryRuntime(*this);
+    }
+
+    std::int32_t mX = 0;
+    std::int32_t mY = 0;
+    std::int32_t mCursorStorage[3] = {0, 0, 0};
+  };
+  static_assert(sizeof(WxSetCursorEventFactoryRuntime) == 0x34, "WxSetCursorEventFactoryRuntime size must be 0x34");
+
+  class WxWindowCreateEventFactoryRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxWindowCreateEventFactoryRuntime()
+      : wxCommandEventRuntime(EnsureWxEvtWindowCreateRuntimeType(), 0)
+    {
+      mEventObject = nullptr;
+    }
+
+    WxWindowCreateEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxWindowCreateEventFactoryRuntime(*this);
+    }
+  };
+  static_assert(sizeof(WxWindowCreateEventFactoryRuntime) == 0x34, "WxWindowCreateEventFactoryRuntime size must be 0x34");
+
+  class WxWindowDestroyEventFactoryRuntime final : public wxCommandEventRuntime
+  {
+  public:
+    WxWindowDestroyEventFactoryRuntime()
+      : wxCommandEventRuntime(EnsureWxEvtWindowDestroyRuntimeType(), 0)
+    {
+      mEventObject = nullptr;
+    }
+
+    WxWindowDestroyEventFactoryRuntime* Clone() const override
+    {
+      return new (std::nothrow) WxWindowDestroyEventFactoryRuntime(*this);
+    }
+  };
+  static_assert(sizeof(WxWindowDestroyEventFactoryRuntime) == 0x34, "WxWindowDestroyEventFactoryRuntime size must be 0x34");
+
+  /**
+   * Address: 0x00979FB0 (FUN_00979FB0, wxConstructorForwxEvtHandler)
+   *
+   * What it does:
+   * Allocates one wx event-handler runtime payload and seeds its core handler
+   * chain/enable lanes with an empty lock pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] void* wxConstructorForwxEvtHandler()
+  {
+    auto* const handler = new (std::nothrow) WxEvtHandlerFactoryRuntime();
+    if (handler == nullptr) {
+      return nullptr;
+    }
+
+    handler->mEventsLocker = ::operator new(0x18u, std::nothrow);
+    return handler;
+  }
+
+  /**
+   * Address: 0x0097A1C0 (FUN_0097A1C0, wxConstructorForwxScrollWinEvent)
+   *
+   * What it does:
+   * Allocates one scroll-window event payload with null type and zeroed
+   * command/extra lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxScrollWinEvent()
+  {
+    return new (std::nothrow) WxScrollWinEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A1F0 (FUN_0097A1F0, wxConstructorForwxMouseEvent)
+   *
+   * What it does:
+   * Allocates one mouse-event payload with zeroed modifier/button/wheel lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMouseEvent()
+  {
+    return new (std::nothrow) WxMouseEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A210 (FUN_0097A210, wxConstructorForwxKeyEvent)
+   *
+   * What it does:
+   * Allocates one key-event payload with zeroed modifier/keycode/scancode
+   * lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxKeyEvent()
+  {
+    return new (std::nothrow) WxKeyEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A390 (FUN_0097A390, wxConstructorForwxChildFocusEvent)
+   *
+   * What it does:
+   * Allocates one child-focus command event payload and clears its event-object lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxChildFocusEvent()
+  {
+    return new (std::nothrow) WxChildFocusEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A630 (FUN_0097A630, wxConstructorForwxSetCursorEvent)
+   *
+   * What it does:
+   * Allocates one set-cursor event payload with zeroed coordinates and cursor storage.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSetCursorEvent()
+  {
+    return new (std::nothrow) WxSetCursorEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A860 (FUN_0097A860, wxConstructorForwxWindowCreateEvent)
+   *
+   * What it does:
+   * Allocates one window-create command event payload and clears its source object.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxWindowCreateEvent()
+  {
+    return new (std::nothrow) WxWindowCreateEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A8D0 (FUN_0097A8D0, wxConstructorForwxWindowDestroyEvent)
+   *
+   * What it does:
+   * Allocates one window-destroy command event payload and clears its source object.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxWindowDestroyEvent()
+  {
+    return new (std::nothrow) WxWindowDestroyEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A020 (FUN_0097A020, wxConstructorForwxIdleEvent)
+   *
+   * What it does:
+   * Allocates one idle-event payload and initializes the request-more lane to
+   * false.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxIdleEvent()
+  {
+    return new (std::nothrow) WxIdleEventRuntime();
+  }
+
+  /**
+   * Address: 0x0097A060 (FUN_0097A060, wxConstructorForwxCommandEvent)
+   *
+   * What it does:
+   * Allocates one command-event payload with default null type/id lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxCommandEvent()
+  {
+    return new (std::nothrow) wxCommandEventRuntime(0, 0);
+  }
+
+  /**
+   * Address: 0x0097A140 (FUN_0097A140, wxConstructorForwxScrollEvent)
+   *
+   * What it does:
+   * Allocates one scroll-event payload using command-event base initialization
+   * and zeroed scroll lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxScrollEvent()
+  {
+    return new (std::nothrow) WxScrollEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A230 (FUN_0097A230, wxConstructorForwxSizeEvent)
+   *
+   * What it does:
+   * Allocates one size-event payload and clears the width/height lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSizeEvent()
+  {
+    return new (std::nothrow) WxSizeEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A270 (FUN_0097A270, wxConstructorForwxPaintEvent)
+   *
+   * What it does:
+   * Allocates one paint-event payload with base wx event runtime lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxPaintEvent()
+  {
+    return new (std::nothrow) WxPaintEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A2A0 (FUN_0097A2A0, wxConstructorForwxNcPaintEvent)
+   *
+   * What it does:
+   * Allocates one non-client paint-event payload with base wx event lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxNcPaintEvent()
+  {
+    return new (std::nothrow) WxNcPaintEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A2D0 (FUN_0097A2D0, wxConstructorForwxEraseEvent)
+   *
+   * What it does:
+   * Allocates one erase-background event payload and clears the device-context
+   * lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxEraseEvent()
+  {
+    return new (std::nothrow) WxEraseEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A310 (FUN_0097A310, wxConstructorForwxMoveEvent)
+   *
+   * What it does:
+   * Allocates one move-event payload and clears cached move-position lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMoveEvent()
+  {
+    return new (std::nothrow) WxMoveEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A350 (FUN_0097A350, wxConstructorForwxFocusEvent)
+   *
+   * What it does:
+   * Allocates one focus-event payload and clears the focused-window lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxFocusEvent()
+  {
+    return new (std::nothrow) WxFocusEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A400 (FUN_0097A400, wxConstructorForwxCloseEvent)
+   *
+   * What it does:
+   * Allocates one close-event payload and seeds veto/logging flags to
+   * `(canVeto=true, veto=false, loggingOff=true)`.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxCloseEvent()
+  {
+    return new (std::nothrow) WxCloseEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A440 (FUN_0097A440, wxConstructorForwxShowEvent)
+   *
+   * What it does:
+   * Allocates one show-event payload and seeds the shown-state lane to false.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxShowEvent()
+  {
+    return new (std::nothrow) WxShowEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A480 (FUN_0097A480, wxConstructorForwxMaximizeEvent)
+   *
+   * What it does:
+   * Allocates one maximize-event payload with base wx event lanes only.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMaximizeEvent()
+  {
+    return new (std::nothrow) WxMaximizeEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A4B0 (FUN_0097A4B0, wxConstructorForwxIconizeEvent)
+   *
+   * What it does:
+   * Allocates one iconize-event payload and seeds the iconized-state lane to
+   * true.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxIconizeEvent()
+  {
+    return new (std::nothrow) WxIconizeEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A4F0 (FUN_0097A4F0, wxConstructorForwxMenuEvent)
+   *
+   * What it does:
+   * Allocates one menu-event payload and clears the selected menu-id lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMenuEvent()
+  {
+    return new (std::nothrow) WxMenuEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A530 (FUN_0097A530, wxConstructorForwxJoystickEvent)
+   *
+   * What it does:
+   * Allocates one joystick-event payload and clears all position/button
+   * lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxJoystickEvent()
+  {
+    return new (std::nothrow) WxJoystickEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A580 (FUN_0097A580, wxConstructorForwxDropFilesEvent)
+   *
+   * What it does:
+   * Allocates one drop-files event payload and clears file-count, drop-point,
+   * and file-array lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxDropFilesEvent()
+  {
+    auto* const dropFilesEvent = new (std::nothrow) WxDropFilesEventRuntime();
+    if (dropFilesEvent == nullptr) {
+      return nullptr;
+    }
+
+    dropFilesEvent->mEventType = 0;
+    dropFilesEvent->mFileCount = 0;
+    dropFilesEvent->mDropPointX = 0;
+    dropFilesEvent->mDropPointY = 0;
+    dropFilesEvent->mFiles = nullptr;
+    return dropFilesEvent;
+  }
+
+  /**
+   * Address: 0x0097A5C0 (FUN_0097A5C0, wxConstructorForwxActivateEvent)
+   *
+   * What it does:
+   * Allocates one activate-event payload and marks it active by default.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxActivateEvent()
+  {
+    return new (std::nothrow) WxActivateEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A600 (FUN_0097A600, wxConstructorForwxInitDialogEvent)
+   *
+   * What it does:
+   * Allocates one init-dialog event payload with base wx-event lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxInitDialogEvent()
+  {
+    return new (std::nothrow) WxInitDialogEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A6A0 (FUN_0097A6A0, wxConstructorForwxSysColourChangedEvent)
+   *
+   * What it does:
+   * Allocates one system-colour-changed event payload with base wx-event
+   * lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxSysColourChangedEvent()
+  {
+    return new (std::nothrow) WxSysColourChangedEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A6D0 (FUN_0097A6D0, wxConstructorForwxDisplayChangedEvent)
+   *
+   * What it does:
+   * Allocates one display-changed event payload with base wx-event lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxDisplayChangedEvent()
+  {
+    return new (std::nothrow) WxDisplayChangedEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A700 (FUN_0097A700, wxConstructorForwxUpdateUIEvent)
+   *
+   * What it does:
+   * Allocates one update-UI command event payload and clears update lanes
+   * (`checked/enabled/shown/text`) plus its text-label pointer lane.
+   */
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxUpdateUIEvent()
+  {
+    return new (std::nothrow) WxUpdateUIEventRuntime();
+  }
+
+  /**
+   * Address: 0x0097A7A0 (FUN_0097A7A0, wxConstructorForwxNavigationKeyEvent)
+   *
+   * What it does:
+   * Allocates one navigation-key event payload and seeds default
+   * `navigation-flags/current-focus` lanes.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxNavigationKeyEvent()
+  {
+    return new (std::nothrow) WxNavigationKeyEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A7E0 (FUN_0097A7E0, wxConstructorForwxPaletteChangedEvent)
+   *
+   * What it does:
+   * Allocates one palette-changed event payload and clears changed-window
+   * ownership lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxPaletteChangedEvent()
+  {
+    return new (std::nothrow) WxPaletteChangedEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A820 (FUN_0097A820, wxConstructorForwxQueryNewPaletteEvent)
+   *
+   * What it does:
+   * Allocates one query-new-palette event payload and clears realized-state
+   * lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxQueryNewPaletteEvent()
+  {
+    return new (std::nothrow) WxQueryNewPaletteEventFactoryRuntime();
+  }
+
+  /**
+   * Address: 0x0097A9F0 (FUN_0097A9F0, wxConstructorForwxContextMenuEvent)
+   *
+   * What it does:
+   * Allocates one context-menu event object, runs the command-event base
+   * initialization lane, and seeds the event position with wx default
+   * coordinates `(-1, -1)`.
+   */
+  [[nodiscard]] wxEventRuntime* wxConstructorForwxContextMenuEvent()
+  {
+    return new (std::nothrow) WxContextMenuEventRuntime();
+  }
+
+  /**
+   * Address: 0x0097AA70 (FUN_0097AA70, wxConstructorForwxMouseCaptureChangedEvent)
+   *
+   * What it does:
+   * Allocates one mouse-capture-changed event payload and clears the previous
+   * capture window lane.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxMouseCaptureChangedEvent()
+  {
+    return new (std::nothrow)
+      WxMouseCaptureChangedEventRuntime(0, EnsureWxEvtMouseCaptureChangedRuntimeType(), nullptr);
+  }
+
+  /**
+   * Address: 0x0097A0D0 (FUN_0097A0D0, wxConstructorForwxNotifyEvent)
+   *
+   * What it does:
+   * Allocates one notify-event payload lane, runs command-event base
+   * initialization, and marks the event as allowed by default.
+   */
+  [[maybe_unused]] [[nodiscard]] wxEventRuntime* wxConstructorForwxNotifyEvent()
+  {
+    return new (std::nothrow) WxNotifyEventRuntime();
+  }
+
   [[nodiscard]] std::uintptr_t AllocateSupComFramePseudoHandle() noexcept
   {
     const std::uintptr_t handle = gNextSupComFramePseudoHandle;
@@ -1285,6 +2954,13 @@ namespace
   )
   {
     return gWxDialogRuntimeStateByDialog[dialog];
+  }
+
+  [[nodiscard]] WxLogFrameRuntimeState& EnsureWxLogFrameRuntimeState(
+    const wxLogFrameRuntime* const frame
+  )
+  {
+    return gWxLogFrameRuntimeStateByFrame[frame];
   }
 
   [[nodiscard]] WxTreeListRuntimeState& EnsureWxTreeListRuntimeState(
@@ -1751,6 +3427,28 @@ bool wxWakeUpMainThread()
 }
 
 /**
+ * Address: 0x009674D0 (FUN_009674D0, wxIsShiftDown)
+ *
+ * What it does:
+ * Returns whether the Win32 Shift key is currently pressed.
+ */
+bool wxIsShiftDown()
+{
+  return ::GetKeyState(VK_SHIFT) < 0;
+}
+
+/**
+ * Address: 0x009674F0 (FUN_009674F0, wxIsCtrlDown)
+ *
+ * What it does:
+ * Returns whether the Win32 Control key is currently pressed.
+ */
+bool wxIsCtrlDown()
+{
+  return ::GetKeyState(VK_CONTROL) < 0;
+}
+
+/**
  * Address: 0x009ADC20 (FUN_009ADC20, wxMutexGuiLeave)
  *
  * What it does:
@@ -1799,6 +3497,40 @@ void wxMutexGuiLeaveOrEnter()
 
   wxLEAVE_CRIT_SECT(waitingForGuiCriticalSection);
 }
+
+namespace
+{
+  struct ProcessWindowEnumContext
+  {
+    HWND matchedWindow = nullptr; // +0x00
+    DWORD targetProcessId = 0;    // +0x04
+  };
+  static_assert(sizeof(ProcessWindowEnumContext) == 0x8, "ProcessWindowEnumContext size must be 0x8");
+
+  /**
+   * Address: 0x009C72B0 (FUN_009C72B0, EnumFunc)
+   *
+   * What it does:
+   * EnumWindows callback that stores the first window owned by
+   * `targetProcessId`, then stops enumeration.
+   */
+  BOOL CALLBACK EnumWindowForProcessId(const HWND window, const LPARAM contextParam)
+  {
+    auto* const context = reinterpret_cast<ProcessWindowEnumContext*>(contextParam);
+    if (context == nullptr) {
+      return TRUE;
+    }
+
+    DWORD ownerProcessId = 0;
+    (void)::GetWindowThreadProcessId(window, &ownerProcessId);
+    if (ownerProcessId != context->targetProcessId) {
+      return TRUE;
+    }
+
+    context->matchedWindow = window;
+    return FALSE;
+  }
+} // namespace
 
 /**
  * Address: 0x009C7540 (FUN_009C7540, wxGetOsVersion)
@@ -1860,6 +3592,461 @@ void wxLogDebug(
   ...
 )
 {}
+
+/**
+ * Address: 0x00962910 (FUN_00962910, wxLogTrace)
+ *
+ * What it does:
+ * Preserves wx trace-log callsites as a no-op lane.
+ */
+void wxLogTrace(
+  ...
+)
+{}
+
+/**
+ * Address: 0x00966E60 (FUN_00966E60, nullsub_3482)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackH()
+{}
+
+/**
+ * Address: 0x00966E70 (FUN_00966E70, nullsub_3483)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackI()
+{}
+
+/**
+ * Address: 0x00967010 (FUN_00967010, nullsub_3484)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1G(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00983420 (FUN_00983420, nullsub_3491)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1H(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00978200 (FUN_00978200, nullsub_3488)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackA()
+{}
+
+/**
+ * Address: 0x00999B70 (FUN_00999B70, nullsub_3495)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x009A8EE0 (FUN_009A8EE0, nullsub_3496)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackB()
+{}
+
+/**
+ * Address: 0x009AD4F0 (FUN_009AD4F0, nullsub_3501)
+ *
+ * What it does:
+ * Preserves one `wxThread` vtable virtual lane as an intentional no-op.
+ */
+void wxThreadNoOpVirtualSlot()
+{}
+
+/**
+ * Address: 0x009C5EE0 (FUN_009C5EE0, nullsub_3505)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with two stack arguments as
+ * an intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall2A(
+  const std::int32_t reservedArg0,
+  const std::int32_t reservedArg1
+)
+{
+  static_cast<void>(reservedArg0);
+  static_cast<void>(reservedArg1);
+}
+
+/**
+ * Address: 0x009C5EF0 (FUN_009C5EF0, nullsub_3506)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with two stack arguments as
+ * an intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall2B(
+  const std::int32_t reservedArg0,
+  const std::int32_t reservedArg1
+)
+{
+  static_cast<void>(reservedArg0);
+  static_cast<void>(reservedArg1);
+}
+
+/**
+ * Address: 0x009C5F00 (FUN_009C5F00, nullsub_3507)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1B(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x009C88E0 (FUN_009C88E0, nullsub_3509)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackC()
+{}
+
+/**
+ * Address: 0x009C88F0 (FUN_009C88F0, nullsub_3510)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackD()
+{}
+
+/**
+ * Address: 0x009C8900 (FUN_009C8900, nullsub_3511)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackE()
+{}
+
+/**
+ * Address: 0x009C9DE0 (FUN_009C9DE0, nullsub_3512)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackJ()
+{}
+
+/**
+ * Address: 0x009C9DF0 (FUN_009C9DF0, nullsub_3513)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackK()
+{}
+
+/**
+ * Address: 0x009C9E00 (FUN_009C9E00, nullsub_3514)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackL()
+{}
+
+/**
+ * Address: 0x009D2F00 (FUN_009D2F00, nullsub_3515)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackM()
+{}
+
+/**
+ * Address: 0x00A06BF0 (FUN_00A06BF0, nullsub_3517)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1C(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00A07DD0 (FUN_00A07DD0, nullsub_3518)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with two stack arguments as
+ * an intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall2C(
+  const std::int32_t reservedArg0,
+  const std::int32_t reservedArg1
+)
+{
+  static_cast<void>(reservedArg0);
+  static_cast<void>(reservedArg1);
+}
+
+/**
+ * Address: 0x00A0B3F0 (FUN_00A0B3F0, nullsub_3519)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1D(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00A0DC40 (FUN_00A0DC40, nullsub_3520)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackF()
+{}
+
+/**
+ * Address: 0x00A0E400 (FUN_00A0E400, nullsub_3521)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1I(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00A0E410 (FUN_00A0E410, nullsub_3522)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1J(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00A18DB0 (FUN_00A18DB0, nullsub_3523)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackG()
+{}
+
+/**
+ * Address: 0x00A20780 (FUN_00A20780, nullsub_8)
+ *
+ * What it does:
+ * Preserves one runtime function-pointer dispatch lane as an intentional
+ * no-op.
+ */
+void wxNoOpRuntimeDispatchSlot()
+{}
+
+/**
+ * Address: 0x00A27140 (FUN_00A27140, nullsub_3525)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1F(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x00A37F30 (FUN_00A37F30, nullsub_3526)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1E(const std::int32_t reservedArg0)
+{
+  static_cast<void>(reservedArg0);
+}
+
+/**
+ * Address: 0x009DD360 (FUN_009DD360, nullsub_3486)
+ *
+ * What it does:
+ * No-op hook lane used by wx file-buffer flush helpers before commit/fflush
+ * dispatch.
+ */
+void wxNoOpFileFlushHook()
+{}
+
+/**
+ * Address: 0x009BCDD0 (FUN_009BCDD0, wxDeleteStockLists)
+ *
+ * What it does:
+ * Releases each global wx stock-list singleton (brush, pen, font, bitmap)
+ * and clears the stored singleton pointer lanes.
+ */
+void wxDeleteStockLists()
+{
+  DeleteStockList(wxTheBrushList);
+  DeleteStockList(wxThePenList);
+  DeleteStockList(wxTheFontList);
+  DeleteStockList(wxTheBitmapList);
+}
+
+/**
+ * Address: 0x009C4840 (FUN_009C4840)
+ *
+ * What it does:
+ * Displays one fatal-message modal box (`MB_ICONHAND`) by dereferencing
+ * pointer-stable wx string text/caption lanes supplied by caller-owned
+ * `wxString` storage.
+ */
+int wxShowFatalMessageBoxFromStringStorage(
+  const wchar_t* const* const titleText,
+  const wchar_t* const* const messageText
+)
+{
+  return ::MessageBoxW(nullptr, *messageText, *titleText, MB_ICONHAND);
+}
+
+/**
+ * Address: 0x009C4860 (FUN_009C4860, wxSafeShowMessage)
+ *
+ * What it does:
+ * Formats one fatal-log message into a fixed stack buffer, wraps both title
+ * and message in temporary wx string storage, then shows the message box via
+ * the pointer-based helper lane.
+ */
+int wxSafeShowMessage(
+  const wchar_t* const formatText,
+  va_list argList
+)
+{
+  constexpr std::size_t kMessageBufferCount = 2048u;
+  wchar_t messageBuffer[kMessageBufferCount]{};
+
+  (void)std::vswprintf(messageBuffer, kMessageBufferCount, formatText, argList);
+  messageBuffer[kMessageBufferCount - 1] = L'\0';
+
+  wxStringRuntime message = AllocateOwnedWxString(messageBuffer);
+  wxStringRuntime title = AllocateOwnedWxString(L"Fatal Error");
+
+  const int result = wxShowFatalMessageBoxFromStringStorage(&title.m_pchData, &message.m_pchData);
+
+  ReleaseOwnedWxString(title);
+  ReleaseOwnedWxString(message);
+  return result;
+}
+
+/**
+ * Address: 0x009C4940 (FUN_009C4940, wxVLogFatalError)
+ *
+ * What it does:
+ * Initializes one variadic argument lane, forwards the fatal message through
+ * `wxSafeShowMessage`, and terminates the process with `abort()`.
+ */
+[[noreturn]] void wxVLogFatalError(
+  wchar_t* const formatText,
+  ...
+)
+{
+  va_list argList;
+  va_start(argList, formatText);
+  (void)wxSafeShowMessage(formatText, argList);
+  va_end(argList);
+  std::abort();
+}
+
+/**
+ * Address: 0x009C7D70 (FUN_009C7D70, wxColourDisplay)
+ *
+ * What it does:
+ * Caches one display color-capability lane using `GetDeviceCaps(BITSPIXEL)`
+ * and returns true when the current desktop device reports color output.
+ */
+BOOL wxColourDisplay()
+{
+  if (gWxColourDisplayCache == -1) {
+    HDC const deviceContext = ::GetDC(nullptr);
+    const int colorBits = ::GetDeviceCaps(deviceContext, BITSPIXEL);
+    gWxColourDisplayCache = 0;
+    if (colorBits == -1 || colorBits > 2) {
+      gWxColourDisplayCache = 1;
+    }
+    (void)::ReleaseDC(nullptr, deviceContext);
+  }
+
+  return gWxColourDisplayCache != 0 ? TRUE : FALSE;
+}
+
+class wxListBaseRuntime
+{
+public:
+  explicit wxListBaseRuntime(const std::int32_t) noexcept {}
+
+  virtual ~wxListBaseRuntime() = default;
+};
+
+class wxBitmapListRuntime : public wxListBaseRuntime
+{
+public:
+  wxBitmapListRuntime() noexcept
+    : wxListBaseRuntime(0)
+  {
+  }
+};
+
+/**
+ * Address: 0x009BCE40 (FUN_009BCE40, wxBitmapListInit)
+ *
+ * What it does:
+ * Runs the stock wx bitmap-list constructor lane used by the global list
+ * initializers.
+ */
+[[nodiscard]] wxBitmapListRuntime* wxBitmapListInit(wxBitmapListRuntime* const object) noexcept
+{
+  return new (object) wxBitmapListRuntime();
+}
 
 /**
  * Address: 0x009C7BB0 (FUN_009C7BB0, wxBeginBusyCursor)
@@ -1954,6 +4141,62 @@ wxClientDataRuntime* wxClientDataRuntime::DeleteWithFlag(
 }
 
 /**
+ * Address: 0x009F34B0 (FUN_009F34B0, wxSizer::DoSetClientObject)
+ *
+ * What it does:
+ * Deletes the previous client-object payload (when present), then stores one
+ * new client-object lane and marks payload type as object-backed.
+ */
+void wxSizerClientDataRuntime::DoSetClientObject(
+  void* const clientObject
+)
+{
+  if (mClientPayload != nullptr) {
+    delete static_cast<wxClientDataRuntime*>(mClientPayload);
+  }
+
+  mClientPayload = clientObject;
+  mClientPayloadType = kClientPayloadObject;
+}
+
+/**
+ * Address: 0x009F34F0 (FUN_009F34F0, wxSizer::DoGetClientObject)
+ *
+ * What it does:
+ * Returns the stored client payload pointer lane.
+ */
+void* wxSizerClientDataRuntime::DoGetClientObject() const
+{
+  return mClientPayload;
+}
+
+/**
+ * Address: 0x009F3500 (FUN_009F3500, wxSizer::DoSetClientData)
+ *
+ * What it does:
+ * Stores one raw client-data payload pointer and marks payload type as raw
+ * client-data.
+ */
+void wxSizerClientDataRuntime::DoSetClientData(
+  void* const clientData
+)
+{
+  mClientPayload = clientData;
+  mClientPayloadType = kClientPayloadData;
+}
+
+/**
+ * Address: 0x009F3520 (FUN_009F3520, wxSizer::DoGetClientData)
+ *
+ * What it does:
+ * Returns the stored client payload pointer lane.
+ */
+void* wxSizerClientDataRuntime::DoGetClientData() const
+{
+  return mClientPayload;
+}
+
+/**
  * Address: 0x004A3710 (FUN_004A3710)
  * Mangled: ??0wxTopLevelWindowMSW@@QAE@@Z
  *
@@ -2011,6 +4254,86 @@ bool wxTopLevelWindowRuntime::Show(
 void wxTopLevelWindowRuntime::ResetTopLevelFlag34() noexcept
 {
   EnsureWxTopLevelWindowRuntimeState(this).flag34 = 0;
+}
+
+/**
+ * Address: 0x00A0AB50 (FUN_00A0AB50, wxLogFrame::wxLogFrame)
+ * Mangled: ??0wxLogFrame@@QAE@PAVwxFrame@@PAVwxLogWindow@@PBD@Z
+ *
+ * What it does:
+ * Builds one log-output frame lane, creates the embedded multiline text
+ * control, and seeds log menu/status metadata.
+ */
+wxLogFrameRuntime::wxLogFrameRuntime(
+  wxTopLevelWindowRuntime* const parentFrame,
+  wxLogWindowRuntime* const ownerLogWindow,
+  const wchar_t* const titleText
+)
+  : wxTopLevelWindowRuntime()
+{
+  constexpr long kWxLogFrameStyle = 0x20400E40;
+  constexpr long kWxLogTextCtrlStyle = 0x40000030;
+  constexpr wchar_t kFrameWindowName[] = L"frame";
+  constexpr wchar_t kTextCtrlWindowName[] = L"text";
+
+  mOwnerLogWindow = ownerLogWindow;
+  mTextControl = new (std::nothrow) wxTextCtrlRuntime();
+
+  WxWindowBaseRuntimeState& frameState = EnsureWxWindowBaseRuntimeState(this);
+  frameState.parentWindow = static_cast<wxWindowBase*>(parentFrame);
+  frameState.windowId = -1;
+  frameState.windowStyle = kWxLogFrameStyle;
+  frameState.windowName.assign(kFrameWindowName);
+
+  if (mTextControl != nullptr) {
+    WxWindowBaseRuntimeState& textState = EnsureWxWindowBaseRuntimeState(mTextControl);
+    textState.parentWindow = this;
+    textState.windowId = -1;
+    textState.windowStyle = kWxLogTextCtrlStyle;
+    textState.windowName.assign(kTextCtrlWindowName);
+    EnsureWxTextCtrlRuntimeState(mTextControl).richEditMajorVersion = 0;
+  }
+
+  WxLogFrameRuntimeState& logFrameState = EnsureWxLogFrameRuntimeState(this);
+  logFrameState.title.assign(titleText != nullptr ? titleText : L"");
+  logFrameState.windowName.assign(kFrameWindowName);
+  logFrameState.statusText.assign(L"Ready");
+  logFrameState.textControl = mTextControl;
+  logFrameState.ownerLogWindow = ownerLogWindow;
+  logFrameState.menuReady = true;
+}
+
+wxTextCtrlRuntime* wxLogFrameRuntime::TextCtrl() const noexcept
+{
+  return mTextControl;
+}
+
+/**
+ * Address: 0x00A0BC80 (FUN_00A0BC80, wxLogWindow::wxLogWindow)
+ * Mangled: ??0wxLogWindow@@QAE@PAVwxFrame@@PBD_N2@Z
+ *
+ * What it does:
+ * Initializes one log-window owner lane, allocates the backing log frame, and
+ * shows that frame when requested by constructor arguments.
+ */
+wxLogWindowRuntime::wxLogWindowRuntime(
+  wxTopLevelWindowRuntime* const parentFrame,
+  const wchar_t* const titleText,
+  const bool showAtStartup,
+  const bool passToOldLog
+)
+{
+  std::memset(mUnknown04To0F, 0, sizeof(mUnknown04To0F));
+  mPassToOldLog = passToOldLog ? 1u : 0u;
+  mFrame = new (std::nothrow) wxLogFrameRuntime(parentFrame, this, titleText);
+  if (showAtStartup && mFrame != nullptr) {
+    (void)mFrame->Show(true);
+  }
+}
+
+wxLogFrameRuntime* wxLogWindowRuntime::GetFrame() const noexcept
+{
+  return mFrame;
 }
 
 /**
@@ -2689,6 +5012,17 @@ void** WX_FrameBaseGetClassInfo() noexcept
 }
 
 /**
+ * Address: 0x009C7EF0 (FUN_009C7EF0, wxGetWindowId)
+ *
+ * What it does:
+ * Returns one Win32 window-id lane (`GWL_ID`) from the provided native HWND.
+ */
+long wxGetWindowId(void* const nativeWindow) noexcept
+{
+  return ::GetWindowLongW(static_cast<HWND>(nativeWindow), GWL_ID);
+}
+
+/**
  * Address: 0x0099E8A0 (FUN_0099E8A0)
  *
  * What it does:
@@ -2705,6 +5039,7 @@ wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(
   // Binary path sets the frame "destroyed" bit before delegating to shared
   // frame-base teardown.
   EnsureWxWindowBaseRuntimeState(frame).bitfields |= 0x8u;
+  gWxLogFrameRuntimeStateByFrame.erase(reinterpret_cast<const wxLogFrameRuntime*>(frame));
   return wxTopLevelWindowRuntime::DeleteWithFlag(frame, 0u);
 }
 
@@ -3907,10 +6242,80 @@ bool wxApp::DoMessage()
   return true;
 }
 
+/**
+ * Address: 0x00992B90 (FUN_00992B90, wxEntryStart)
+ *
+ * IDA signature:
+ * BOOL sub_992B90();
+ *
+ * What it does:
+ * Runs wx startup initialization and returns the success flag as `bool`.
+ */
+bool wxEntryStart()
+{
+  return wxApp::Initialize();
+}
+
+/**
+ * Address: 0x00992020 (FUN_00992020, wxEntryInitGui)
+ *
+ * What it does:
+ * Invokes `wxTheApp->OnInitGui()` and returns the virtual-call success lane.
+ */
+bool wxEntryInitGui()
+{
+  return wxTheApp->OnInitGui();
+}
+
+/**
+ * Address: 0x00992FE0 (FUN_00992FE0, wxEntryCleanup)
+ *
+ * IDA signature:
+ * void __cdecl wxEntryCleanup();
+ *
+ * What it does:
+ * Runs wx shutdown cleanup used by the `wxEntry` exit path.
+ */
+void wxEntryCleanup()
+{
+  wxApp::CleanUp();
+}
+
+/**
+ * Address: 0x00968990 (FUN_00968990, wxYieldForCommandsOnly)
+ *
+ * What it does:
+ * Pumps only `WM_COMMAND` messages from the current thread queue and routes
+ * each through `wxApp::ProcessMessage`; reposts quit state when `WM_QUIT` is
+ * observed.
+ */
+void wxYieldForCommandsOnly()
+{
+  MSG commandMessage{};
+  const UINT commandMessageId = WM_COMMAND;
+
+  while (::PeekMessageW(&commandMessage, nullptr, commandMessageId, commandMessageId, PM_REMOVE) != FALSE) {
+    if (commandMessage.message == WM_QUIT) {
+      break;
+    }
+
+    if (wxTheApp != nullptr) {
+      (void)wxTheApp->ProcessMessage(reinterpret_cast<void**>(&commandMessage));
+    }
+  }
+
+  if (commandMessage.message == WM_QUIT) {
+    ::PostQuitMessage(0);
+  }
+}
+
 msvc8::vector<moho::ManagedWindowSlot> moho::managedWindows{};
 msvc8::vector<moho::ManagedWindowSlot> moho::managedFrames{};
 wxWindowBase* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
+void* moho::WBitmapPanel::sm_eventTable[1] = {nullptr};
+void* moho::WBitmapCheckBox::sm_eventTable[1] = {nullptr};
+void* moho::WRenViewport::sm_eventTable[1] = {nullptr};
 
 moho::wxDCRuntime::wxDCRuntime(
   wxWindowBase* const ownerWindow
@@ -4080,7 +6485,7 @@ moho::WPreviewImageRuntime moho::WD3DViewport::GetPreviewImage() const
 /**
  * Address: 0x0042BB50 (FUN_0042BB50)
  */
-void* moho::WD3DViewport::GetPrimBatcher() const
+moho::CD3DPrimBatcher* moho::WD3DViewport::GetPrimBatcher() const
 {
   return nullptr;
 }
@@ -4323,6 +6728,162 @@ wxInputStream::wxInputStream()
 {}
 
 /**
+ * Address: 0x00A312A0 (FUN_00A312A0, sub_A312A0)
+ *
+ * What it does:
+ * Formats one DDE error-code lane into a human-readable wx string payload.
+ */
+wxStringRuntime* wxFormatDdeErrorString(
+  wxStringRuntime* const outText,
+  const unsigned int ddeErrorCode
+)
+{
+  if (outText == nullptr) {
+    return nullptr;
+  }
+
+  ReleaseOwnedWxString(*outText);
+
+  const auto assignLiteral = [outText](const wchar_t* const text) -> wxStringRuntime* {
+    AssignOwnedWxString(outText, text != nullptr ? std::wstring(text) : std::wstring());
+    return outText;
+  };
+
+  switch (ddeErrorCode) {
+  case 0x0000u:
+    return assignLiteral(L"no DDE error.");
+  case 0x4000u:
+    return assignLiteral(L"a request for a synchronous advise transaction has timed out.");
+  case 0x4001u:
+    return assignLiteral(L"the response to the transaction caused the DDE_FBUSY bit to be set.");
+  case 0x4002u:
+    return assignLiteral(L"a request for a synchronous data transaction has timed out.");
+  case 0x4003u:
+    return assignLiteral(
+      L"a DDEML function was called without first calling the DdeInitialize function,\n"
+      L"or an invalid instance identifier\n"
+      L"was passed to a DDEML function."
+    );
+  case 0x4004u:
+    return assignLiteral(
+      L"an application initialized as APPCLASS_MONITOR has\n"
+      L"attempted to perform a DDE transaction,\n"
+      L"or an application initialized as APPCMD_CLIENTONLY has \n"
+      L"attempted to perform server transactions."
+    );
+  case 0x4005u:
+    return assignLiteral(L"a request for a synchronous execute transaction has timed out.");
+  case 0x4006u:
+    return assignLiteral(L"a parameter failed to be validated by the DDEML.");
+  case 0x4007u:
+    return assignLiteral(L"a DDEML application has created a prolonged race condition.");
+  case 0x4008u:
+    return assignLiteral(L"a memory allocation failed.");
+  case 0x4009u:
+    return assignLiteral(L"a transaction failed.");
+  case 0x400Au:
+    return assignLiteral(L"a client's attempt to establish a conversation has failed.");
+  case 0x400Bu:
+    return assignLiteral(L"a request for a synchronous poke transaction has timed out.");
+  case 0x400Cu:
+    return assignLiteral(L"an internal call to the PostMessage function has failed. ");
+  case 0x400Du:
+    return assignLiteral(L"reentrancy problem.");
+  case 0x400Eu:
+    return assignLiteral(
+      L"a server-side transaction was attempted on a conversation\n"
+      L"that was terminated by the client, or the server\n"
+      L"terminated before completing a transaction."
+    );
+  case 0x400Fu:
+    return assignLiteral(L"an internal error has occurred in the DDEML.");
+  case 0x4010u:
+    return assignLiteral(L"a request to end an advise transaction has timed out.");
+  case 0x4011u:
+    return assignLiteral(
+      L"an invalid transaction identifier was passed to a DDEML function.\n"
+      L"Once the application has returned from an XTYP_XACT_COMPLETE callback,\n"
+      L"the transaction identifier for that callback is no longer valid."
+    );
+  default:
+    break;
+  }
+
+  std::array<wchar_t, 64> unknownMessage{};
+  std::swprintf(unknownMessage.data(), unknownMessage.size(), L"Unknown DDE error %08x", ddeErrorCode);
+  AssignOwnedWxString(outText, std::wstring(unknownMessage.data()));
+  return outText;
+}
+
+namespace
+{
+  struct ChildProcessMonitorThreadContext
+  {
+    HWND notificationWindow = nullptr;           // +0x00
+    HANDLE childProcessHandle = nullptr;         // +0x04
+    DWORD childProcessId = 0;                    // +0x08
+    void* ownerContext = nullptr;                // +0x0C
+    DWORD childProcessExitCode = 0;              // +0x10
+    std::uint8_t completionPending = 0;          // +0x14
+    std::uint8_t reserved15_17[3] = {0, 0, 0};  // +0x15
+  };
+
+  static_assert(
+    offsetof(ChildProcessMonitorThreadContext, notificationWindow) == 0x00,
+    "ChildProcessMonitorThreadContext::notificationWindow offset must be 0x00"
+  );
+  static_assert(
+    offsetof(ChildProcessMonitorThreadContext, childProcessHandle) == 0x04,
+    "ChildProcessMonitorThreadContext::childProcessHandle offset must be 0x04"
+  );
+  static_assert(
+    offsetof(ChildProcessMonitorThreadContext, childProcessId) == 0x08,
+    "ChildProcessMonitorThreadContext::childProcessId offset must be 0x08"
+  );
+  static_assert(
+    offsetof(ChildProcessMonitorThreadContext, ownerContext) == 0x0C,
+    "ChildProcessMonitorThreadContext::ownerContext offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(ChildProcessMonitorThreadContext, childProcessExitCode) == 0x10,
+    "ChildProcessMonitorThreadContext::childProcessExitCode offset must be 0x10"
+  );
+  static_assert(
+    offsetof(ChildProcessMonitorThreadContext, completionPending) == 0x14,
+    "ChildProcessMonitorThreadContext::completionPending offset must be 0x14"
+  );
+  static_assert(
+    sizeof(ChildProcessMonitorThreadContext) == 0x18,
+    "ChildProcessMonitorThreadContext size must be 0x18"
+  );
+
+  constexpr UINT kChildProcessCompletedMessage = WM_PALETTEISCHANGING | 0x2800u;
+} // namespace
+
+/**
+ * Address: 0x00A133F0 (FUN_00A133F0, StartAddress)
+ *
+ * What it does:
+ * Waits for a launched child process, records its exit code in the shared
+ * monitor context, and notifies the hidden window that completion arrived.
+ */
+DWORD WINAPI StartAddress(
+  LPVOID const lpThreadParameter
+)
+{
+  auto* const threadContext = static_cast<ChildProcessMonitorThreadContext*>(lpThreadParameter);
+  ::WaitForSingleObject(threadContext->childProcessHandle, INFINITE);
+  ::GetExitCodeProcess(threadContext->childProcessHandle, &threadContext->childProcessExitCode);
+  ::SendMessageW(
+    threadContext->notificationWindow,
+    kChildProcessCompletedMessage,
+    0,
+    reinterpret_cast<LPARAM>(threadContext)
+  );
+  return 0;
+}
+
+/**
  * Address: 0x009DDDE0 (FUN_009DDDE0, wxFileExists)
  *
  * What it does:
@@ -4384,6 +6945,26 @@ bool wxFile::Exists(
   return exists;
 }
 
+/**
+ * Address: 0x00A94D8C (FUN_00A94D8C, wxOpen)
+ *
+ * What it does:
+ * Opens one wide filesystem path with `_SH_DENYNO` sharing via CRT secure
+ * open dispatch and returns either the file descriptor or `-1`.
+ */
+int wxOpen(
+  const wchar_t* const fileName,
+  const int openFlags,
+  const int permissions
+)
+{
+  int fileDescriptor = -1;
+  if (_wsopen_s(&fileDescriptor, fileName, openFlags, _SH_DENYNO, permissions) != 0) {
+    return -1;
+  }
+  return fileDescriptor;
+}
+
 bool wxFile::Open(
   const wchar_t* const fileName,
   const OpenMode mode,
@@ -4401,7 +6982,8 @@ bool wxFile::Open(
     return false;
   }
 
-  m_fd = _wopen(fileName, _O_BINARY | _O_RDONLY, permissions);
+  const int openFlags = _O_BINARY | _O_RDONLY;
+  m_fd = wxOpen(fileName, openFlags, permissions);
   m_error = m_fd == -1 ? 1 : 0;
   return m_fd != -1;
 }
@@ -4712,6 +7294,208 @@ wxStringRuntime wxStringRuntime::Borrow(
 }
 
 /**
+ * Address: 0x0096E1D0 (FUN_0096E1D0, wxNativeFontInfo::wxNativeFontInfo)
+ * Mangled: ??0wxNativeFontInfo@@QAE@@Z
+ *
+ * What it does:
+ * Constructs one native-font descriptor and seeds default runtime lanes.
+ */
+wxNativeFontInfoRuntime::wxNativeFontInfoRuntime()
+{
+  Init();
+}
+
+/**
+ * Address: 0x0097EEF0 (FUN_0097EEF0, wxNativeFontInfo::FromString)
+ * Mangled: ?FromString@wxNativeFontInfo@@QAE_NABVwxString@@@Z
+ *
+ * What it does:
+ * Resets this descriptor, tokenizes one textual font descriptor, and applies
+ * style/weight/underline/point-size/charset/facename lanes.
+ */
+bool wxNativeFontInfoRuntime::FromString(
+  const wxStringRuntime& description
+)
+{
+  Init();
+
+  std::wstring pendingFaceName{};
+  const std::vector<std::wstring> tokens = SplitNativeFontDescriptionTokens(description.c_str());
+
+  auto flushPendingFaceName = [&]() {
+    if (pendingFaceName.empty()) {
+      return;
+    }
+
+    SetFaceName(wxStringRuntime::Borrow(pendingFaceName.c_str()));
+    pendingFaceName.clear();
+  };
+
+  for (const std::wstring& token : tokens) {
+    const std::wstring lowered = ToLowerWide(token);
+    bool recognized = false;
+
+    if (lowered == L"underlined") {
+      SetUnderlined(true);
+      recognized = true;
+    } else if (lowered == L"light") {
+      SetWeight(91);
+      recognized = true;
+    } else if (lowered == L"bold" || ContainsNoCase(lowered, L"bold")) {
+      SetWeight(92);
+      recognized = true;
+    } else if (lowered == L"italic" || ContainsNoCase(lowered, L"italic")) {
+      SetStyle(93);
+      recognized = true;
+    } else {
+      std::int32_t pointSize = 0;
+      if (TryParseIntToken(lowered, &pointSize)) {
+        SetPointSize(pointSize);
+        recognized = true;
+      } else {
+        std::int32_t charset = 0;
+        if (TryMapEncodingToCharset(lowered, &charset)) {
+          SetEncoding(charset);
+          recognized = true;
+        }
+      }
+    }
+
+    if (recognized) {
+      flushPendingFaceName();
+      continue;
+    }
+
+    if (!pendingFaceName.empty()) {
+      pendingFaceName.push_back(L' ');
+    }
+    pendingFaceName += token;
+  }
+
+  flushPendingFaceName();
+  return true;
+}
+
+/**
+ * Address: 0x0097F440 (FUN_0097F440, wxFontBase::SetNativeFontInfo)
+ * Mangled: ?SetNativeFontInfo@wxFontBase@@QAEXABVwxString@@@Z
+ *
+ * What it does:
+ * Parses one textual native-font descriptor and forwards the parsed
+ * descriptor into virtual slot `+0x68` on the font object.
+ */
+void WX_FontBaseSetNativeFontInfoFromString(
+  void* const fontObject,
+  const wxStringRuntime& description
+)
+{
+  if (fontObject == nullptr) {
+    return;
+  }
+
+  const wchar_t* const text = description.c_str();
+  if (text == nullptr || *text == L'\0') {
+    return;
+  }
+
+  wxNativeFontInfoRuntime nativeFontInfo{};
+  if (!nativeFontInfo.FromString(description)) {
+    return;
+  }
+
+  void** const vtable = *reinterpret_cast<void***>(fontObject);
+  if (vtable == nullptr) {
+    return;
+  }
+
+  using SetNativeInfoFn = std::int32_t(__thiscall*)(void*, const wxNativeFontInfoRuntime&);
+  auto const setNativeInfo = reinterpret_cast<SetNativeInfoFn>(vtable[0x68 / sizeof(void*)]);
+  (void)setNativeInfo(fontObject, nativeFontInfo);
+}
+
+void wxNativeFontInfoRuntime::Init() noexcept
+{
+  mHeight = 0;
+  mWidth = 0;
+  mEscapement = 0;
+  mOrientation = 0;
+  mWeight = 400;
+  mItalic = 0;
+  mUnderline = 0;
+  mStrikeOut = 0;
+  mCharSet = 1;
+  mOutPrecision = 0;
+  mClipPrecision = 0;
+  mQuality = 0;
+  mPitchAndFamily = 0;
+  std::wmemset(mFaceName, 0, std::size(mFaceName));
+}
+
+void wxNativeFontInfoRuntime::SetPointSize(
+  const std::int32_t pointSize
+) noexcept
+{
+  mHeight = pointSize > 0 ? pointSize : 0;
+}
+
+void wxNativeFontInfoRuntime::SetWeight(
+  const std::int32_t weight
+) noexcept
+{
+  if (weight == 91) {
+    mWeight = 300;
+    return;
+  }
+
+  if (weight == 92) {
+    mWeight = 700;
+    return;
+  }
+
+  mWeight = weight;
+}
+
+void wxNativeFontInfoRuntime::SetStyle(
+  const std::int32_t style
+) noexcept
+{
+  mItalic = style == 93 ? 1u : 0u;
+}
+
+void wxNativeFontInfoRuntime::SetUnderlined(
+  const bool underlined
+) noexcept
+{
+  mUnderline = underlined ? 1u : 0u;
+}
+
+void wxNativeFontInfoRuntime::SetFaceName(
+  const wxStringRuntime& faceName
+) noexcept
+{
+  std::wmemset(mFaceName, 0, std::size(mFaceName));
+
+  const wchar_t* const text = faceName.c_str();
+  if (text == nullptr || *text == L'\0') {
+    return;
+  }
+
+  const std::size_t len = std::wcslen(text);
+  const std::size_t copyLen = (std::min)(len, std::size(mFaceName) - 1u);
+  if (copyLen > 0u) {
+    std::wmemcpy(mFaceName, text, copyLen);
+    mFaceName[copyLen] = L'\0';
+  }
+}
+
+void wxNativeFontInfoRuntime::SetEncoding(
+  const std::int32_t encoding
+) noexcept
+{
+  mCharSet = static_cast<std::uint8_t>(encoding & 0xFF);
+}
+
+/**
  * Address: 0x0042B870 (FUN_0042B870)
  * Mangled: ??0wxImageHandler@@QAE@@Z
  *
@@ -4867,6 +7651,82 @@ void wxImageRuntime::Create(
   refData->mWidth = width;
   refData->mHeight = height;
   refData->mMaskAndFlags[4] = 1;
+}
+
+/**
+ * Address: 0x00976400 (FUN_00976400, wxCreateDIB)
+ *
+ * What it does:
+ * Allocates one palette-backed DIB header block, seeds its metadata, and
+ * converts the palette entries into bitmap color-table order for the caller.
+ */
+bool wxCreateDIB(
+  const std::int32_t xSize,
+  const std::int32_t ySize,
+  const std::int32_t bitsPerPixel,
+  HPALETTE hpal,
+  LPBITMAPINFO* const lpDIBHeader
+)
+{
+  auto* const dibHeader = static_cast<LPBITMAPINFO>(std::malloc(0x428u));
+  ::GetPaletteEntries(hpal, 0, 0x100u, reinterpret_cast<LPPALETTEENTRY>(dibHeader->bmiColors));
+
+  dibHeader->bmiHeader.biPlanes = 0;
+  dibHeader->bmiHeader.biXPelsPerMeter = 0;
+  dibHeader->bmiHeader.biYPelsPerMeter = 0;
+  dibHeader->bmiHeader.biClrImportant = 0;
+  dibHeader->bmiHeader.biHeight = ySize;
+  dibHeader->bmiHeader.biWidth = xSize;
+  dibHeader->bmiHeader.biSizeImage = (bitsPerPixel * xSize * std::abs(ySize)) >> 3;
+  dibHeader->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  dibHeader->bmiHeader.biPlanes = 1;
+  dibHeader->bmiHeader.biBitCount = static_cast<WORD>(bitsPerPixel);
+  dibHeader->bmiHeader.biCompression = BI_RGB;
+  dibHeader->bmiHeader.biClrUsed = 0x100;
+
+  auto* const paletteEntries = reinterpret_cast<const PALETTEENTRY*>(dibHeader->bmiColors);
+  auto* const rgbQuads = dibHeader->bmiColors;
+  for (std::int32_t index = 0; index < 0x100; ++index) {
+    const PALETTEENTRY paletteEntry = paletteEntries[index];
+    rgbQuads[index].rgbBlue = paletteEntry.peBlue;
+    rgbQuads[index].rgbGreen = paletteEntry.peGreen;
+    rgbQuads[index].rgbRed = paletteEntry.peRed;
+    rgbQuads[index].rgbReserved = paletteEntry.peFlags;
+  }
+
+  *lpDIBHeader = dibHeader;
+  return true;
+}
+
+/**
+ * Address: 0x009764C0 (FUN_009764C0, wxFreeDIB)
+ *
+ * What it does:
+ * Releases one DIB header block previously allocated by `wxCreateDIB()`.
+ */
+void wxFreeDIB(void* const ptr)
+{
+  _free_crt(ptr);
+}
+
+/**
+ * Address: 0x009C6900 (FUN_009C6900, wxRGBToColour)
+ *
+ * What it does:
+ * Initializes one `wxColourRuntime` from packed `0x00BBGGRR` RGB bytes and
+ * returns the output pointer.
+ */
+wxColourRuntime* wxRGBToColour(wxColourRuntime* const outColour, const std::uint32_t packedRgb)
+{
+  if (outColour == nullptr) {
+    return nullptr;
+  }
+
+  const std::uint8_t red = static_cast<std::uint8_t>(packedRgb & 0xFFu);
+  const std::uint8_t green = static_cast<std::uint8_t>((packedRgb >> 8u) & 0xFFu);
+  const std::uint8_t blue = static_cast<std::uint8_t>((packedRgb >> 16u) & 0xFFu);
+  *outColour = wxColourRuntime::FromRgb(red, green, blue);
+  return outColour;
 }
 
 wxColourRuntime wxColourRuntime::FromRgb(
@@ -5155,6 +8015,31 @@ wxCommandEventRuntime::wxCommandEventRuntime(
   mIsCommandEvent = 1u;
 }
 
+wxCommandEventRuntime* wxCommandEventRuntime::Clone() const
+{
+  auto* const clone = new (std::nothrow) wxCommandEventRuntime();
+  if (clone == nullptr) {
+    return nullptr;
+  }
+
+  clone->mRefData = mRefData;
+  clone->mEventObject = mEventObject;
+  clone->mEventType = mEventType;
+  clone->mEventTimestamp = mEventTimestamp;
+  clone->mEventId = mEventId;
+  clone->mCallbackUserData = mCallbackUserData;
+  clone->mSkipped = mSkipped;
+  clone->mIsCommandEvent = mIsCommandEvent;
+  clone->mReserved1E = mReserved1E;
+  clone->mReserved1F = mReserved1F;
+  AssignOwnedWxString(&clone->mCommandString, std::wstring(mCommandString.c_str()));
+  clone->mCommandInt = mCommandInt;
+  clone->mExtraLong = mExtraLong;
+  clone->mClientData = mClientData;
+  clone->mClientObject = mClientObject;
+  return clone;
+}
+
 /**
  * Address: 0x006609B0 (FUN_006609B0, ??1wxCommandEvent@@QAE@@Z)
  *
@@ -5186,6 +8071,209 @@ wxListItemRuntime::~wxListItemRuntime()
 
   ReleaseWxStringSharedPayload(mText);
   RunWxObjectUnrefTail(reinterpret_cast<WxObjectRuntimeView*>(this));
+}
+
+namespace
+{
+  struct wxListItemInternalDataRuntime
+  {
+    wxListItemAttrRuntime* attr = nullptr; // +0x00
+    LPARAM lParam = 0;                     // +0x04
+  };
+
+  static_assert(
+    offsetof(wxListItemInternalDataRuntime, attr) == 0x0,
+    "wxListItemInternalDataRuntime::attr offset must be 0x0"
+  );
+  static_assert(
+    offsetof(wxListItemInternalDataRuntime, lParam) == 0x4,
+    "wxListItemInternalDataRuntime::lParam offset must be 0x4"
+  );
+  static_assert(sizeof(wxListItemInternalDataRuntime) == 0x8, "wxListItemInternalDataRuntime size must be 0x8");
+
+  /**
+   * Address: 0x0099BC70 (FUN_0099BC70, wxGetInternalData)
+   *
+   * What it does:
+   * Requests one list-view row and returns the internal lParam payload when
+   * the native `LVM_GETITEMW` query succeeds.
+   */
+  [[nodiscard]] wxListItemInternalDataRuntime* wxGetInternalData(
+    const LPARAM itemId,
+    const HWND listHandle
+  )
+  {
+    LVITEMW item{};
+    item.mask = LVIF_PARAM;
+    item.iItem = static_cast<int>(itemId);
+
+    const LRESULT queryResult = ::SendMessageW(listHandle, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&item));
+    return queryResult != 0 ? reinterpret_cast<wxListItemInternalDataRuntime*>(item.lParam) : nullptr;
+  }
+
+  /**
+   * Address: 0x0099BCA0 (FUN_0099BCA0, wxGetInternalData_0)
+   *
+   * What it does:
+   * Resolves the list-view HWND for one control instance and forwards to
+   * `wxGetInternalData`.
+   */
+  [[nodiscard]] wxListItemInternalDataRuntime* wxGetInternalData_0(
+    wxListCtrlRuntime* const listControl,
+    const LPARAM itemId
+  )
+  {
+    const HWND listHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(listControl->GetHandle()));
+    return wxGetInternalData(itemId, listHandle);
+  }
+
+  /**
+   * Address: 0x0099BCD0 (FUN_0099BCD0, wxConvertFromMSWListItem)
+   *
+   * What it does:
+   * Converts one native `LVITEMW` payload into runtime `wxListItem` lanes,
+   * including state-bit translation and optional text retrieval.
+   */
+  void wxConvertFromMSWListItem(
+    LVITEMW* const mswItem,
+    wxListItemRuntime* const item,
+    const HWND listHandle
+  )
+  {
+    if (const auto* const internalData = reinterpret_cast<wxListItemInternalDataRuntime*>(mswItem->lParam);
+      internalData != nullptr) {
+      item->mData = internalData->lParam;
+    }
+
+    item->mMask = 0;
+    item->mState = 0;
+    item->mStateMask = 0;
+    item->mItemId = mswItem->iItem;
+
+    const UINT originalMask = mswItem->mask;
+    UINT restoredMask = mswItem->mask;
+    bool allocatedTextBuffer = false;
+
+    if (listHandle != nullptr) {
+      if ((originalMask & LVIF_TEXT) == 0u) {
+        allocatedTextBuffer = true;
+        mswItem->pszText = static_cast<LPWSTR>(::operator new(0x402u));
+        mswItem->cchTextMax = 512;
+      }
+
+      mswItem->mask |= (LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM);
+      (void)::SendMessageW(listHandle, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(mswItem));
+      restoredMask = originalMask;
+    }
+
+    if ((mswItem->mask & LVIF_STATE) != 0u) {
+      item->mMask |= 0x1;
+
+      if ((mswItem->stateMask & 0x4u) != 0u) {
+        item->mStateMask |= 0x8;
+        if ((mswItem->state & 0x4u) != 0u) {
+          item->mState |= 0x8;
+        }
+      }
+
+      if ((mswItem->stateMask & 0x8u) != 0u) {
+        item->mStateMask |= 0x1;
+        if ((mswItem->state & 0x8u) != 0u) {
+          item->mState |= 0x1;
+        }
+      }
+
+      if ((mswItem->stateMask & 0x1u) != 0u) {
+        item->mStateMask |= 0x2;
+        if ((mswItem->state & 0x1u) != 0u) {
+          item->mState |= 0x2;
+        }
+      }
+
+      if ((mswItem->stateMask & 0x2u) != 0u) {
+        item->mStateMask |= 0x4;
+        if ((mswItem->state & 0x2u) != 0u) {
+          item->mState |= 0x4;
+        }
+      }
+    }
+
+    if ((mswItem->mask & LVIF_TEXT) != 0u) {
+      item->mMask |= 0x2;
+      AssignOwnedWxString(&item->mText, mswItem->pszText != nullptr ? std::wstring(mswItem->pszText) : std::wstring{});
+      restoredMask = originalMask;
+    }
+
+    if ((mswItem->mask & LVIF_IMAGE) != 0u) {
+      item->mMask |= 0x4;
+      item->mImage = mswItem->iImage;
+    }
+
+    if ((mswItem->mask & LVIF_PARAM) != 0u) {
+      item->mMask |= 0x8;
+    }
+
+    if ((mswItem->mask & LVIF_INDENT) != 0u) {
+      item->mMask |= 0x10;
+    }
+
+    item->mColumn = mswItem->iSubItem;
+
+    if (allocatedTextBuffer && mswItem->pszText != nullptr) {
+      ::operator delete(mswItem->pszText);
+      mswItem->mask = originalMask;
+    } else {
+      mswItem->mask = restoredMask;
+    }
+  }
+} // namespace
+
+/**
+ * Address: 0x0099BCB0 (FUN_0099BCB0, wxGetInternalDataAttr)
+ *
+ * What it does:
+ * Returns the optional per-row list-item attribute payload lane for one
+ * list-control row id.
+ */
+wxListItemAttrRuntime* wxGetInternalDataAttr(
+  const LPARAM itemId,
+  wxListCtrlRuntime* const listControl
+)
+{
+  wxListItemInternalDataRuntime* const internalData = wxGetInternalData_0(listControl, itemId);
+  return internalData != nullptr ? internalData->attr : nullptr;
+}
+
+/**
+ * Address: 0x0099D910 (FUN_0099D910, wxDeleteInternalData)
+ *
+ * What it does:
+ * Clears one row's native list-view lParam lane, then destroys retained
+ * wx-list-item internal attribute/data payload storage.
+ */
+void wxDeleteInternalData(
+  const LPARAM itemId,
+  wxListCtrlRuntime* const listControl
+)
+{
+  wxListItemInternalDataRuntime* const internalData = wxGetInternalData_0(listControl, itemId);
+  if (internalData == nullptr) {
+    return;
+  }
+
+  LVITEMW item{};
+  item.mask = LVIF_PARAM;
+  item.iItem = static_cast<int>(itemId);
+
+  const HWND listHandle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(listControl->GetHandle()));
+  (void)::SendMessageW(listHandle, LVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&item));
+
+  if (internalData->attr != nullptr) {
+    DestroyWxListItemAttrRuntime(internalData->attr);
+    ::operator delete(internalData->attr);
+  }
+
+  ::operator delete(internalData);
 }
 
 /**
@@ -5853,6 +8941,7 @@ namespace
   constexpr unsigned int kSupComFrameMessageActivateApp = WM_ACTIVATEAPP;
   constexpr unsigned int kSupComFrameMessageSysCommand = WM_SYSCOMMAND;
   constexpr unsigned int kSupComFrameMessageExitSizeMove = WM_EXITSIZEMOVE;
+  constexpr unsigned int kSupComFrameSysCommandSize = SC_SIZE;
   constexpr unsigned int kSupComFrameSysCommandToggleLogDialog = 0x1u;
   constexpr unsigned int kSupComFrameSysCommandLuaDebugger = 0x2u;
   constexpr unsigned int kSupComFrameSysCommandKeyMenu = SC_KEYMENU;
@@ -5962,6 +9051,87 @@ namespace
     ::ClipCursor(clipRectPtr);
   }
 } // namespace
+
+/**
+ * Address: 0x008CE060 (FUN_008CE060, WSupComFrame::dtr)
+ *
+ * What it does:
+ * Implements deleting-dtor thunk semantics for SupCom frame runtime lanes.
+ */
+WSupComFrame* WSupComFrame::DeleteWithFlag(
+  WSupComFrame* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  gSupComFrameStateByFrame.erase(object);
+  WX_FrameDestroyWithoutDelete(object);
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+
+  return object;
+}
+
+/**
+ * Address: 0x008CDAA0 (FUN_008CDAA0, WSupComFrame::OnCloseWindow)
+ *
+ * What it does:
+ * Exits the wx main loop when the frame is iconized; otherwise requests the
+ * Moho escape dialog.
+ */
+void WSupComFrame::OnCloseWindow(
+  wxCloseEventRuntime& event
+)
+{
+  (void)event;
+
+  if (IsIconized()) {
+    wxTheApp->ExitMainLoop();
+    return;
+  }
+
+  (void)moho::ShowEscapeDialog(true);
+}
+
+/**
+ * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
+ *
+ * What it does:
+ * Handles SupCom system-command defaults, including pending-maximize sync
+ * priming and Alt-menu suppression, then forwards remaining lanes through
+ * base wx default-window-proc dispatch.
+ */
+long WSupComFrame::MSWDefWindowProc(
+  const unsigned int message,
+  const unsigned int wParam,
+  const long lParam
+)
+{
+  auto dispatchBase = [this, message, wParam, lParam]() -> long {
+    return wxTopLevelWindowRuntime::MSWDefWindowProc(message, wParam, lParam);
+  };
+
+  if (message != kSupComFrameMessageSysCommand) {
+    return dispatchBase();
+  }
+
+  if ((wParam & 0xFFF0u) == kSupComFrameSysCommandSize) {
+    mPendingMaximizeSync = 1;
+    if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
+      (void)device->Clear2(true);
+    }
+  }
+
+  if (wParam == kSupComFrameSysCommandKeyMenu && lParam == 0) {
+    return 0;
+  }
+
+  return dispatchBase();
+}
 
 /**
  * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
@@ -6301,10 +9471,71 @@ void moho::WWinManagedFrame::DestroyManagedOwners(
  */
 namespace
 {
+  /**
+   * Address: 0x007FB730 (FUN_007FB730, boost::shared_ptr_CD3DPrimBatcher::operator=)
+   *
+   * What it does:
+   * Rebinds one `shared_ptr<CD3DPrimBatcher>` from a raw pointer and releases
+   * prior ownership.
+   */
+  boost::shared_ptr<moho::CD3DPrimBatcher>* AssignSharedPrimBatcherFromRaw(
+    boost::shared_ptr<moho::CD3DPrimBatcher>* const outPrimBatcher,
+    moho::CD3DPrimBatcher* const primBatcher
+  )
+  {
+    outPrimBatcher->reset(primBatcher);
+    return outPrimBatcher;
+  }
+
+  /**
+   * Address: 0x007FB7C0 (FUN_007FB7C0, boost::shared_ptr_IRenTerrain::operator=)
+   *
+   * What it does:
+   * Rebinds one `shared_ptr<TerrainCommon>` from a raw pointer and releases
+   * prior ownership.
+   */
+  boost::shared_ptr<moho::TerrainCommon>* AssignSharedTerrainFromRaw(
+    boost::shared_ptr<moho::TerrainCommon>* const outTerrain,
+    moho::TerrainCommon* const terrain
+  )
+  {
+    outTerrain->reset(terrain);
+    return outTerrain;
+  }
+
+  struct WRenViewportWorldViewParamRuntime final
+  {
+    moho::IRenderWorldView* view;           // +0x00
+    std::int32_t head;                      // +0x04
+    std::int32_t depth;                     // +0x08
+    boost::shared_ptr<moho::TerrainCommon> terrain; // +0x0C
+  };
+  static_assert(offsetof(WRenViewportWorldViewParamRuntime, depth) == 0x08);
+  static_assert(offsetof(WRenViewportWorldViewParamRuntime, terrain) == 0x0C);
+  static_assert(sizeof(WRenViewportWorldViewParamRuntime) == 0x14);
+
+  struct WRenViewportWorldViewVectorRuntime final
+  {
+    WRenViewportWorldViewParamRuntime* mFirst; // +0x00
+    WRenViewportWorldViewParamRuntime* mLast;  // +0x04
+    WRenViewportWorldViewParamRuntime* mEnd;   // +0x08
+  };
+  static_assert(sizeof(WRenViewportWorldViewVectorRuntime) == 0x0C);
+
   struct WRenViewportRenderView final
   {
-    std::uint8_t mUnknown0000_215B[0x215C];
-    std::uint8_t mDebugCanvas[0x40];
+    struct DebugCanvasRuntimeView final
+    {
+      moho::CD3DPrimBatcher* mPrimBatcher = nullptr; // +0x00
+      std::uint8_t mUnknown04To3F[0x3C]{};
+    };
+
+    static_assert(sizeof(DebugCanvasRuntimeView) == 0x40, "WRenViewportRenderView::DebugCanvasRuntimeView size must be 0x40");
+
+    std::uint8_t mUnknown0000_2147[0x2148];
+    WRenViewportWorldViewVectorRuntime mWorldViews; // +0x2148
+    std::uint8_t mUnknown2154_215B[0x08];
+    DebugCanvasRuntimeView mDebugCanvas;
     moho::GeomCamera3* mCam; // +0x219C
     std::uint8_t mUnknown21A0_2C7[0x128];
     struct PrimBatcherView final
@@ -6315,7 +9546,7 @@ namespace
     std::uint8_t mUnknown2CC_307[0x3C];
     Wm3::Vector2i mScreenPos; // +0x308
     Wm3::Vector2i mScreenSize; // +0x310
-    std::uint8_t mUnknown318_31F[0x08];
+    Wm3::Vector2i mFullScreen; // +0x318
     std::int32_t mHead; // +0x320
     std::uint8_t mUnknown324_4EF[0x1CC];
     struct ShadowView final
@@ -6326,27 +9557,343 @@ namespace
     ShadowView mShadowRenderer; // +0x4F0
   };
 
+  struct WRenViewportPreviewImageView final
+  {
+    std::uint8_t mUnknown0000_2193[0x2194];
+    moho::WPreviewImageRuntime mPreviewImage; // +0x2194
+  };
+
+  struct WRenViewportReflectionPassView final
+  {
+    struct ReflectionRenderTargetSlot final
+    {
+      moho::ID3DRenderTarget* mRenderTarget; // +0x00
+      void* mWriterLock;                      // +0x04
+    };
+
+    struct ReflectionDepthStencilSlot final
+    {
+      moho::ID3DDepthStencil* mDepthStencil; // +0x00
+      void* mWriterLock;                      // +0x04
+    };
+
+    ReflectionRenderTargetSlot mRenderTargetSlots[2]; // +0x00
+    ReflectionDepthStencilSlot mDepthStencilSlots[2]; // +0x10
+  };
+
+  static_assert(sizeof(WRenViewportReflectionPassView::ReflectionRenderTargetSlot) == 0x08);
+  static_assert(sizeof(WRenViewportReflectionPassView::ReflectionDepthStencilSlot) == 0x08);
+  static_assert(sizeof(WRenViewportReflectionPassView) == 0x20);
+
   static_assert(
     offsetof(WRenViewportRenderView, mDebugCanvas) == 0x215C,
     "WRenViewportRenderView::mDebugCanvas offset must be 0x215C"
   );
   static_assert(
+    offsetof(WRenViewportRenderView, mWorldViews) == 0x2148,
+    "WRenViewportRenderView::mWorldViews offset must be 0x2148"
+  );
+  static_assert(
     offsetof(WRenViewportRenderView, mCam) == 0x219C, "WRenViewportRenderView::mCam offset must be 0x219C"
   );
+  static_assert(
+    offsetof(WRenViewportPreviewImageView, mPreviewImage) == 0x2194,
+    "WRenViewportPreviewImageView::mPreviewImage offset must be 0x2194"
+  );
+#if defined(MOHO_ABI_MSVC8_COMPAT)
+  static_assert(
+    offsetof(WRenViewportRenderView, mFullScreen) == 0x318,
+    "WRenViewportRenderView::mFullScreen offset must be 0x318"
+  );
+#endif
   [[nodiscard]] WRenViewportRenderView* AsRenderView(moho::WRenViewport* const viewport) noexcept
   {
     return reinterpret_cast<WRenViewportRenderView*>(viewport);
   }
+
+  [[nodiscard]] WRenViewportReflectionPassView* AsReflectionPassView(WRenViewportRenderView* const runtime) noexcept
+  {
+    auto* const bytes = reinterpret_cast<std::uint8_t*>(runtime);
+    return reinterpret_cast<WRenViewportReflectionPassView*>(bytes + 0x2174);
+  }
+
+  [[nodiscard]] msvc8::vector<WRenViewportWorldViewParamRuntime>* AsWorldViewVector(
+    WRenViewportRenderView* const runtime
+  ) noexcept
+  {
+    auto* const bytes = reinterpret_cast<std::uint8_t*>(runtime);
+    return reinterpret_cast<msvc8::vector<WRenViewportWorldViewParamRuntime>*>(bytes + 0x2144);
+  }
+
 } // namespace
 
 namespace moho
 {
+  extern bool ren_Fx;
   extern bool ren_ShowSkeletons;
+  extern bool ren_Water;
+  extern bool ren_Reflection;
 } // namespace moho
+
+/**
+ * Address: 0x004F1E50 (FUN_004F1E50, Moho::MohoApp::OnInit)
+ * Mangled: ?OnInit@MohoApp@Moho@@UAE_NXZ
+ *
+ * What it does:
+ * Returns startup success for the app bootstrap lane.
+ */
+bool moho::MohoApp::OnInit()
+{
+  return true;
+}
+
+/**
+ * Address: 0x004F1E80 (FUN_004F1E80, Moho::MohoApp::ExitMainLoop)
+ * Mangled: ?ExitMainLoop@MohoApp@Moho@@UAEXXZ
+ *
+ * What it does:
+ * Clears the loop-keepalive flag so wx main-loop pumping exits.
+ */
+void moho::MohoApp::ExitMainLoop()
+{
+  m_keepGoing = 0;
+}
+
+/**
+ * Address: 0x007F6530 (FUN_007F6530, Moho::REN_ShowSkeletons)
+ *
+ * What it does:
+ * Toggles skeleton-debug rendering and mirrors that bool into the active
+ * sim-driver sync option lane when a driver instance exists.
+ */
+void moho::REN_ShowSkeletons()
+{
+  const bool showSkeletons = !moho::ren_ShowSkeletons;
+  moho::ren_ShowSkeletons = showSkeletons;
+
+  if (ISTIDriver* const simDriver = moho::SIM_GetActiveDriver(); simDriver != nullptr) {
+    simDriver->SetSyncFilterOptionFlag(showSkeletons);
+  }
+}
+
+/**
+ * Address: 0x007FA170 (FUN_007FA170, ?REN_GetTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
+ *
+ * What it does:
+ * Returns the active world-map terrain resource when one is available.
+ */
+moho::IWldTerrainRes* moho::REN_GetTerrainRes()
+{
+  moho::CWldSession* const session = moho::WLD_GetActiveSession();
+  if (session == nullptr || session->mWldMap == nullptr) {
+    return nullptr;
+  }
+
+  return session->mWldMap->mTerrainRes;
+}
+
+/**
+ * Address: 0x004FBCB0 (FUN_004FBCB0, ?GetEventTable@WBitmapPanel@Moho@@MBEPBUwxEventTable@@XZ)
+ * Mangled: ?GetEventTable@WBitmapPanel@Moho@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Returns the static event-table lane for this bitmap-panel runtime type.
+ */
+const void* moho::WBitmapPanel::GetEventTable() const
+{
+  return sm_eventTable;
+}
+
+/**
+ * Address: 0x004FBE20 (FUN_004FBE20, ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ)
+ * Mangled: ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Returns the static event-table lane for this bitmap-check-box runtime type.
+ */
+const void* moho::WBitmapCheckBox::GetEventTable() const
+{
+  return sm_eventTable;
+}
+
+/**
+ * Address: 0x007F65D0 (FUN_007F65D0, ?GetPreviewImage@WRenViewport@Moho@@UAE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
+ *
+ * What it does:
+ * Returns one retained preview-image shared-pointer lane from viewport
+ * runtime storage.
+ */
+moho::WPreviewImageRuntime moho::WRenViewport::GetPreviewImage() const
+{
+  const auto* const runtime = reinterpret_cast<const WRenViewportPreviewImageView*>(this);
+  WPreviewImageRuntime previewImage = runtime->mPreviewImage;
+  if (previewImage.lane1 != nullptr) {
+    auto* const refCount = reinterpret_cast<volatile long*>(reinterpret_cast<std::uint8_t*>(previewImage.lane1) + 0x04u);
+    (void)InterlockedIncrement(refCount);
+  }
+  return previewImage;
+}
+
+/**
+ * Address: 0x007F6690 (FUN_007F6690, ?GetEventTable@WRenViewport@Moho@@MBEPBUwxEventTable@@XZ)
+ * Mangled: ?GetEventTable@WRenViewport@Moho@@MBEPBUwxEventTable@@XZ
+ *
+ * What it does:
+ * Returns the static event-table lane for this viewport runtime type.
+ */
+const void* moho::WRenViewport::GetEventTable() const
+{
+  return sm_eventTable;
+}
+
+/**
+ * Address: 0x007F6600 (FUN_007F6600, ?GetPrimBatcher@WRenViewport@Moho@@UBEPAVCD3DPrimBatcher@2@XZ)
+ * Mangled: ?GetPrimBatcher@WRenViewport@Moho@@UBEPAVCD3DPrimBatcher@2@XZ
+ *
+ * What it does:
+ * Returns the viewport debug-canvas primary batcher lane.
+ */
+moho::CD3DPrimBatcher* moho::WRenViewport::GetPrimBatcher() const
+{
+  const WRenViewportRenderView* const runtime = AsRenderView(const_cast<WRenViewport*>(this));
+  return runtime->mDebugCanvas.mPrimBatcher;
+}
+
+/**
+ * Address: 0x007F6610 (FUN_007F6610, ?OnMouseEnter@WRenViewport@Moho@@QAEXAAVwxMouseEvent@@@Z)
+ *
+ * What it does:
+ * Focuses the primary GAL head window when the mouse enters the render
+ * viewport and device runtime is ready.
+ */
+void moho::WRenViewport::OnMouseEnter(wxMouseEventRuntime& mouseEvent)
+{
+  (void)mouseEvent;
+
+  if (!gpg::gal::Device::IsReady()) {
+    return;
+  }
+
+  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+  if (device == nullptr) {
+    return;
+  }
+
+  gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+  if (context == nullptr || context->GetHeadCount() <= 0) {
+    return;
+  }
+
+  const gpg::gal::Head& head = context->GetHead(0);
+  if (head.mWindow != nullptr) {
+    (void)::SetFocus(reinterpret_cast<HWND>(head.mWindow));
+  }
+}
 
 void moho::WRenViewport::ResetRenderState0C() noexcept
 {
   mRenderState0C = -1;
+}
+
+/**
+ * Address: 0x007F9E60 (FUN_007F9E60, ?AddWorldView@WRenViewport@Moho@@QAEXPAVIRenderWorldView@2@HH@Z)
+ *
+ * What it does:
+ * Inserts one world-view lane sorted by depth and initializes one terrain
+ * renderer lane for that world-view entry.
+ *
+ * Notes:
+ * The binary uses global `ren_Viewport` as the active owner lane.
+ */
+void moho::WRenViewport::AddWorldView(
+  IRenderWorldView* const worldView,
+  const int head,
+  const int depth
+)
+{
+  WRenViewport* const viewport = moho::ren_Viewport;
+  viewport->RemoveWorldView(worldView);
+
+  WRenViewportRenderView* const runtime = AsRenderView(viewport);
+  WRenViewportWorldViewParamRuntime* insertPos = runtime->mWorldViews.mFirst;
+  for (WRenViewportWorldViewParamRuntime* it = runtime->mWorldViews.mLast; insertPos != it; ++insertPos) {
+    if (depth < insertPos->depth) {
+      break;
+    }
+  }
+
+  WRenViewportWorldViewParamRuntime entry{};
+  entry.view = worldView;
+  entry.head = head;
+  entry.depth = depth;
+  (void)AssignSharedTerrainFromRaw(&entry.terrain, moho::IRenTerrain::Create());
+  if (entry.terrain) {
+    (void)entry.terrain->Create(reinterpret_cast<moho::TerrainWaterResourceView*>(moho::REN_GetTerrainRes()));
+  }
+
+  msvc8::vector<WRenViewportWorldViewParamRuntime>* const worldViews = AsWorldViewVector(runtime);
+  std::size_t insertIndex = 0;
+  if (runtime->mWorldViews.mFirst != nullptr && insertPos != nullptr) {
+    insertIndex = static_cast<std::size_t>(insertPos - runtime->mWorldViews.mFirst);
+  }
+
+  worldViews->push_back(WRenViewportWorldViewParamRuntime{});
+  WRenViewportWorldViewParamRuntime* const begin = worldViews->begin();
+  WRenViewportWorldViewParamRuntime* dst = worldViews->end() - 1;
+  WRenViewportWorldViewParamRuntime* const target = begin + insertIndex;
+  while (dst != target) {
+    *dst = std::move(*(dst - 1));
+    --dst;
+  }
+
+  *dst = std::move(entry);
+}
+
+/**
+ * Address: 0x007FA090 (FUN_007FA090, ?RemoveWorldView@WRenViewport@Moho@@QAEXPAVIRenderWorldView@2@@Z)
+ *
+ * What it does:
+ * Removes the first matching world-view lane from the viewport world-view
+ * vector at `+0x2148`.
+ */
+void moho::WRenViewport::RemoveWorldView(IRenderWorldView* const worldView)
+{
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  msvc8::vector<WRenViewportWorldViewParamRuntime>* const worldViews = AsWorldViewVector(runtime);
+  WRenViewportWorldViewParamRuntime* const first = runtime->mWorldViews.mFirst;
+  WRenViewportWorldViewParamRuntime* const last = runtime->mWorldViews.mLast;
+  if (first == nullptr || last == nullptr || first == last || worldViews == nullptr) {
+    return;
+  }
+
+  for (WRenViewportWorldViewParamRuntime* it = first; it != last; ++it) {
+    if (it->view != worldView) {
+      continue;
+    }
+
+    worldViews->erase(it);
+    return;
+  }
+}
+
+/**
+ * Address: 0x007F81C0 (FUN_007F81C0, ?RenderCompositeTerrain@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
+ * Mangled: ?RenderCompositeTerrain@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
+ *
+ * What it does:
+ * Binds the active viewport render target and viewport lanes, renders terrain
+ * normal-composite data with optional shadow lane, then emits terrain skirt
+ * geometry for the same frame.
+ */
+void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
+{
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
+  device->SetColorWriteState(true, false);
+  SetViewportToLocalScreen();
+
+  (void)terrain;
 }
 
 /**
@@ -6363,7 +9910,7 @@ void moho::WRenViewport::RenderMeshes(const int meshFlags, const bool mirrored)
   moho::GeomCamera3* const cam = runtime->mCam;
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
   device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
-  moho::D3D_GetDevice()->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
+  SetViewportToLocalScreen();
   device->SetColorWriteState(true, true);
 
   moho::Shadow* const shadowRenderer = runtime->mShadowRenderer.shadow_Fidelity != 0
@@ -6374,7 +9921,7 @@ void moho::WRenViewport::RenderMeshes(const int meshFlags, const bool mirrored)
   if (moho::ren_ShowSkeletons) {
     instance->RenderSkeletons(
       reinterpret_cast<moho::CD3DPrimBatcher*>(runtime->mPrimBatcher.batcher),
-      reinterpret_cast<moho::CDebugCanvas*>(runtime->mDebugCanvas),
+      reinterpret_cast<moho::CDebugCanvas*>(&runtime->mDebugCanvas),
       *cam,
       true
     );
@@ -6383,4 +9930,181 @@ void moho::WRenViewport::RenderMeshes(const int meshFlags, const bool mirrored)
 
   instance->Render(meshFlags, *cam, shadowRenderer, instance->meshes);
   (void)mirrored;
+}
+
+/**
+ * Address: 0x007F8560 (FUN_007F8560, Moho::WRenViewport::RenderEffects)
+ *
+ * What it does:
+ * Binds the viewport render target and viewport lanes for the active head,
+ * configures color writes for FX, then renders world-particle effects.
+ */
+void moho::WRenViewport::RenderEffects(const bool renderWaterSurface)
+{
+  if (!moho::ren_Fx) {
+    return;
+  }
+
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
+  SetViewportToLocalScreen();
+  device->SetColorWriteState(true, false);
+
+  (void)moho::sWorldParticles.RenderEffects(
+    runtime->mCam,
+    static_cast<char>(renderWaterSurface ? 1 : 0),
+    0,
+    moho::REN_GetGameTick(),
+    moho::REN_GetSimDeltaSeconds()
+  );
+}
+
+/**
+ * Address: 0x007F86F0 (FUN_007F86F0, ?RenderWater@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
+ * Mangled: ?RenderWater@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
+ *
+ * What it does:
+ * Binds the active viewport head to the water render target, restores the
+ * viewport rectangle, and forwards the current frame lanes to terrain water
+ * rendering.
+ */
+void moho::WRenViewport::RenderWater(TerrainCommon* const terrain)
+{
+  if (!moho::ren_Water) {
+    return;
+  }
+
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
+  SetViewportToLocalScreen();
+  device->SetColorWriteState(true, true);
+
+  (void)terrain;
+}
+
+/**
+ * Address: 0x007F7DF0 (FUN_007F7DF0, ?RenderReflections@WRenViewport@Moho@@AAEXXZ)
+ *
+ * What it does:
+ * Binds reflection render-target/depth lanes for the active head slot and,
+ * when enabled, renders reflection meshes through `MeshRenderer`.
+ */
+void moho::WRenViewport::RenderReflections()
+{
+  if (!moho::ren_Water) {
+    return;
+  }
+
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  WRenViewportReflectionPassView* const reflectionView = AsReflectionPassView(runtime);
+  moho::CD3DDevice* const colorDevice = moho::D3D_GetDevice();
+  moho::CD3DDevice* const targetDevice = moho::D3D_GetDevice();
+  const std::size_t reflectionIndex = static_cast<std::size_t>(runtime->mHead);
+  targetDevice->SetRenderTarget1(
+    reflectionView->mRenderTargetSlots[reflectionIndex].mRenderTarget,
+    reflectionView->mDepthStencilSlots[reflectionIndex].mDepthStencil,
+    true,
+    0,
+    1.0f,
+    0
+  );
+
+  if (!moho::ren_Reflection) {
+    return;
+  }
+  SetViewportToLocalScreen();
+  colorDevice->SetColorWriteState(true, true);
+
+  moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+  renderer->Render(2, *runtime->mCam, nullptr, renderer->meshes);
+}
+
+/**
+ * Address: 0x007F7EA0 (FUN_007F7EA0, ?SetViewportToLocalScreen@WRenViewport@Moho@@AAEXXZ)
+ *
+ * What it does:
+ * Applies this viewport's cached local-screen rectangle to the active D3D
+ * device viewport state.
+ */
+void moho::WRenViewport::SetViewportToLocalScreen()
+{
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  device->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
+}
+
+/**
+ * Address: 0x007F87F0 (FUN_007F87F0, ?UpdateRenderViewportCoordinates@WRenViewport@Moho@@AAEXXZ)
+ * Mangled: ?UpdateRenderViewportCoordinates@WRenViewport@Moho@@AAEXXZ
+ *
+ * What it does:
+ * Refreshes full-head dimensions and local viewport lanes from the active
+ * camera's viewport matrix row when a camera is present, else falls back to
+ * the full-head rectangle.
+ */
+void moho::WRenViewport::UpdateRenderViewportCoordinates()
+{
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+
+  moho::CD3DDevice* const widthDevice = moho::D3D_GetDevice();
+  const int headWidth = widthDevice->GetHeadWidth(static_cast<unsigned int>(runtime->mHead));
+  moho::CD3DDevice* const heightDevice = moho::D3D_GetDevice();
+  const int headHeight = heightDevice->GetHeadHeight(static_cast<unsigned int>(runtime->mHead));
+  runtime->mFullScreen.x = headWidth;
+  runtime->mFullScreen.y = headHeight;
+
+  moho::GeomCamera3* const camera = runtime->mCam;
+  if (camera != nullptr) {
+    runtime->mScreenPos.x = static_cast<int>(camera->viewport.r[3].x);
+    runtime->mScreenPos.y = static_cast<int>(camera->viewport.r[3].y);
+    runtime->mScreenSize.x = static_cast<int>(camera->viewport.r[3].z);
+    runtime->mScreenSize.y = static_cast<int>(camera->viewport.r[3].w);
+    return;
+  }
+
+  runtime->mScreenSize.x = headWidth;
+  runtime->mScreenSize.y = runtime->mFullScreen.y;
+  runtime->mScreenPos.x = 0;
+  runtime->mScreenPos.y = 0;
+}
+
+/**
+ * Address: 0x007F8B70 (FUN_007F8B70, ?FogOff@WRenViewport@Moho@@AAEXXZ)
+ * Mangled: ?FogOff@WRenViewport@Moho@@AAEXXZ
+ *
+ * What it does:
+ * Disables fog on the active GAL D3D9 device with default depth range
+ * (`0.0f..1.0f`) and zero fog color lanes.
+ */
+void moho::WRenViewport::FogOff()
+{
+  gpg::gal::DeviceD3D9* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+  device->SetFogState(false, nullptr, 0.0f, 1.0f, 0);
+}
+
+/**
+ * Address: 0x007F7F10 (FUN_007F7F10, ?RenderTerrainNormals@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
+ * Mangled: ?RenderTerrainNormals@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
+ *
+ * What it does:
+ * Binds the viewport's terrain-normal render target and viewport lanes, then
+ * dispatches terrain-normal rendering when terrain debug rendering is enabled.
+ */
+void moho::WRenViewport::RenderTerrainNormals(TerrainCommon* const terrain)
+{
+  if (terrain == nullptr) {
+    return;
+  }
+
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  gpg::gal::DeviceD3D9* const d3dDevice = device->GetDeviceD3D9();
+  if (d3dDevice != nullptr) {
+    (void)d3dDevice->ClearTextures();
+  }
+
+  device->SetRenderTarget2(runtime->mHead, true, 0, 1.0f, 0);
+  SetViewportToLocalScreen();
 }

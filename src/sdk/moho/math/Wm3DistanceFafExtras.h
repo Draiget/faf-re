@@ -17,6 +17,30 @@
 namespace Wm3
 {
   /**
+   * Address: 0x00A57240 (FUN_00A57240, fn)
+   *
+   * What it does:
+   * Preserves one legacy TRational query callback lane as an explicit no-op.
+   */
+  void QueryRationalNoOpCallbackA(void* self) noexcept;
+
+  /**
+   * Address: 0x00A57250 (FUN_00A57250, nullsub_10)
+   *
+   * What it does:
+   * Preserves one legacy TRational query callback lane as an explicit no-op.
+   */
+  void QueryRationalNoOpCallbackB(void* self) noexcept;
+
+  /**
+   * Address: 0x00A766B0 (FUN_00A766B0, nullsub_11)
+   *
+   * What it does:
+   * Preserves one legacy TRational query callback lane as an explicit no-op.
+   */
+  void QueryRationalNoOpCallbackC(void* self) noexcept;
+
+  /**
    * Address: 0x00A45C00 (FUN_00A45C00, Wm3::DistVector3Box3f::GetSquared)
    *
    * Wm3::Vector3<float> const&, Wm3::Box3<float> const&

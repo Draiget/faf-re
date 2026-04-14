@@ -90,6 +90,15 @@ namespace moho
      */
     void DestroyHandle(CDecalHandle* handle);
 
+    /**
+     * Address: 0x00779BB0 (FUN_00779BB0, Moho::CDecalBuffer::SwapVectors)
+     *
+     * What it does:
+     * Swaps runtime storage pointers for both decal publish vectors:
+     * visible decals and pending hide object-id lanes.
+     */
+    void SwapVectors(msvc8::vector<SDecalInfo>* addDecals, msvc8::vector<std::uint32_t>* removeDecals);
+
   private:
     /**
      * What it does:

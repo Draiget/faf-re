@@ -2,15 +2,15 @@
 
 #include <new>
 
+/**
+ * Address: 0x00978FD0
+ * Mangled: ?wxNewEventType@@YAHXZ
+ */
+int wxNewEventType();
+
 namespace
 {
   void* gScrPauseEventClassInfoTable[1] = {nullptr};
-
-  /**
-   * Address: 0x00978FD0
-   * Mangled: ?wxNewEventType@@YAHXZ
-   */
-  int wxNewEventType();
 
   void InitializeWxEventRuntime(wxEventRuntime& eventRuntime, const int eventType) noexcept
   {

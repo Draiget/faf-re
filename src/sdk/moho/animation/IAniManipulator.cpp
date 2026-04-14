@@ -68,6 +68,14 @@ namespace
     manipulator->mWatchBones.mCapacityEnd = inlineStorage + 2;
   }
 
+  /**
+   * Address: 0x0063CA20 (FUN_0063CA20)
+   *
+   * What it does:
+   * Copies `[sourceBegin, sourceEnd)` watch-bone bindings into `destination`
+   * element-by-element and returns the destination end pointer; a null
+   * destination becomes a dry-run pointer advance.
+   */
   [[nodiscard]] moho::SAniManipBinding* CopyBindingRange(
     moho::SAniManipBinding* destination,
     const moho::SAniManipBinding* sourceEnd,

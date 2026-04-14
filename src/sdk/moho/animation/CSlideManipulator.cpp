@@ -78,6 +78,14 @@ namespace
     return &bonesBegin[boneIndex];
   }
 
+  /**
+   * Address: 0x005D1E70 (FUN_005D1E70)
+   *
+   * What it does:
+   * Clamps a 3D vector to `maxLength` when its squared length exceeds the
+   * allowed maximum, preserving direction and returning whether scaling
+   * occurred.
+   */
   [[nodiscard]] bool LimitVectorLengthTo(Wm3::Vector3f* const vector, const float maxLength)
   {
     if (vector == nullptr || maxLength <= 0.0f) {

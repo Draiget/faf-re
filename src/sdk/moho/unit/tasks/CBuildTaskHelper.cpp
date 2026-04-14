@@ -89,6 +89,33 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005F5670 (FUN_005F5670, func_CheckBuildRestriction)
+   *
+   * What it does:
+   * Applies build-location restriction policy from unit blueprint physics:
+   * mass deposit, hydrocarbon deposit, or unrestricted placement.
+   */
+  bool CheckBuildRestriction(
+    const RUnitBlueprint* const blueprint,
+    gpg::Rect2i* const buildArea,
+    CBuildTaskHelper* const buildTaskHelper
+  )
+  {
+    const ERuleBPUnitBuildRestriction restriction = blueprint->Physics.BuildRestriction;
+    ISimResources* const resources = const_cast<ISimResources*>(buildTaskHelper->mSim->GetResources());
+
+    if (restriction == RULEUBR_OnMassDeposit) {
+      return resources->DepositIsInArea(kMass, buildArea);
+    }
+
+    if (restriction == RULEUBR_OnHydrocarbonDeposit) {
+      return resources->DepositIsInArea(kHydrocarbon, buildArea);
+    }
+
+    return true;
+  }
+
   CBuildTaskHelper::CBuildTaskHelper()
     : mUnit(nullptr)
     , mSim(nullptr)

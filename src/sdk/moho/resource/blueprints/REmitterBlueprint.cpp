@@ -94,9 +94,11 @@ namespace moho
 
   /**
    * Address: 0x0050E580 (FUN_0050E580, scalar deleting dtor thunk)
+   * Address: 0x0050E5A0 (FUN_0050E5A0, base dtor thunk lane)
    *
    * What it does:
-   * Releases key-storage payload for this curve instance.
+   * Releases key-storage payload for this curve instance; shared dtor thunks
+   * at both addresses funnel through this same teardown lane.
    */
   REmitterBlueprintCurve::~REmitterBlueprintCurve()
   {

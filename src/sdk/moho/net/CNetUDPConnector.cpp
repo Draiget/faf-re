@@ -898,6 +898,7 @@ SNetPacket* CNetUDPConnector::NewPacket()
 
 /**
  * Address: 0x00489F90 (FUN_00489F90)
+ * Address: 0x0128C620 (FUN_0128C620, patch_Moho::CNetUDPConnector::Entry)
  *
  * What it does:
  * Connector worker loop: receives inbound data, sends outbound data, handles

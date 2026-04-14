@@ -31,10 +31,9 @@ namespace moho
    */
   RD3DTextureResource::RD3DTextureResource(const char* const location)
     : mResources()
-    , mContext()
+    , mContext(location != nullptr ? location : "", 0U, 0U, 0U)
     , mBaseTex()
   {
-    mContext.location_.assign_owned(location != nullptr ? location : "");
   }
 
   /**
@@ -128,15 +127,14 @@ namespace moho
       mContext.reserved0x50_ = static_cast<std::uint32_t>(resources->GetSkipMipLevels());
     }
 
-    gpg::gal::DeviceD3D9* const deviceD3D9 = device->GetDeviceD3D9();
-    if (deviceD3D9 == nullptr) {
+    if (device->GetDeviceD3D9() == nullptr) {
       gpg::Warnf("Unable to load texture: %s", mContext.location_.c_str());
       return false;
     }
 
     try {
       TextureHandle createdTexture{};
-      deviceD3D9->CreateTexture(&createdTexture, &mContext);
+      (void)CreateTextureOnActiveDevice(createdTexture, mContext);
       mBaseTex = createdTexture;
       mContext.ClearDataBuffer();
       return mBaseTex.get() != nullptr;

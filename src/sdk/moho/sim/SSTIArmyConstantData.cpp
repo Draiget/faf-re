@@ -8,6 +8,29 @@
 namespace moho
 {
   /**
+   * Address: 0x006FD330 (FUN_006FD330, Moho::SSTIArmyConstantData::SSTIArmyConstantData)
+   *
+   * What it does:
+   * Initializes fixed army identity lanes, clears civilian flag padding, and
+   * nulls all tracked intel-grid shared pointers.
+   */
+  SSTIArmyConstantData::SSTIArmyConstantData()
+    : mArmyIndex(0)
+    , mArmyName()
+    , mPlayerName()
+    , mIsCivilian(0)
+    , mPad3D{0, 0, 0}
+    , mExploredReconGrid()
+    , mFogReconGrid()
+    , mWaterReconGrid()
+    , mRadarReconGrid()
+    , mSonarReconGrid()
+    , mOmniReconGrid()
+    , mRciReconGrid()
+    , mSciReconGrid()
+  {}
+
+  /**
    * Address: 0x006FD570 (FUN_006FD570, Moho::SSTIArmyConstantData::~SSTIArmyConstantData)
    *
    * What it does:

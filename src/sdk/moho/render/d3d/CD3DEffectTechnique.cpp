@@ -561,6 +561,13 @@ namespace moho
       return 0;
     }
 
+    /**
+     * Address: 0x00434500 (FUN_00434500)
+     *
+     * What it does:
+     * Walks the technique-definition red-black tree by name and returns the
+     * lower-bound node (first node whose name is not less than the search key).
+     */
     [[nodiscard]] TechniqueNode* LowerBoundTechniqueNode(
       const TechniqueTree& tree,
       const msvc8::string& techniqueName

@@ -178,14 +178,16 @@ int CUnitUpgradeTask::TaskTick()
 
     mUnit->UnitStateMask |= kUpgradeOwnerHighMask;
 
-    SUnitConstructionParams params{};
-    params.mArmy = mUnit->ArmyRef;
-    params.mBlueprint = mToBlueprint;
-    params.mTransform.pos_ = position;
+    SUnitConstructionParams params(
+      static_cast<std::int32_t>(mUnit->mCurrentLayer),
+      position,
+      mUnit->ArmyRef,
+      mToBlueprint,
+      mUnit,
+      ReadInstaBuildFlag(mSim)
+    );
     params.mUseLayerOverride = 0;
     params.mFixElevation = 0;
-    params.mLayer = static_cast<std::int32_t>(mUnit->mCurrentLayer);
-    params.mLinkSourceUnit = mUnit;
     params.mComplete = ReadInstaBuildFlag(mSim) ? 1u : 0u;
 
     Unit* upgradedUnit = nullptr;

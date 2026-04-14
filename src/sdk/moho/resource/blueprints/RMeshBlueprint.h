@@ -81,6 +81,17 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x005283A0 (FUN_005283A0)
+     * Mangled: ??0RMeshBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Forwards to `RBlueprint` base ctor; all member defaults are handled by
+     * in-class initializers (`mLods` empty, `mIconFadeInZoom/mSortOrder = 0`,
+     * `mUniformScale = 1.0`, `mStraddleWater = 0`).
+     */
+    RMeshBlueprint(RRuleGameRules* owner, const RResId& resId);
+
+    /**
      * Address: 0x00528360 (FUN_00528360)
      * Mangled: ?GetClass@RMeshBlueprint@Moho@@UBEPAVRType@gpg@@XZ
      *

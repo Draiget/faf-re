@@ -37,58 +37,30 @@ namespace
     std::memcpy(&manager.mTimer2.mTime, &value, sizeof(value));
   }
 
+  /**
+   * Address: 0x0053EE40 (FUN_0053EE40, func_ClientNeedsPartiallyQueuedBeatsUntil)
+   *
+   * What it does:
+   * Returns whether at least one non-ejection-pending client is already
+   * ejected/eject-pending or has queued through `beat`.
+   */
   bool ClientNeedsPartiallyQueuedBeatsUntil(CClientManagerImpl& manager, const int beat)
   {
-    for (CClientBase* const client : manager.mClients) {
-      if (client == nullptr || !client->NoEjectionPending()) {
-        continue;
-      }
-
-      if (!(client->mEjected || client->mEjectPending || beat <= static_cast<int>(client->mQueuedBeat))) {
-        return false;
-      }
+    const std::size_t count = manager.mClients.size();
+    if (count == 0u) {
+      return false;
     }
 
-    return true;
-  }
-
-  bool ClientNeedsFullyQueuedBeatsUntil(CClientManagerImpl& manager, const int beat)
-  {
-    for (CClientBase* const client : manager.mClients) {
-      if (client == nullptr || client->mEjected) {
-        continue;
-      }
-
-      if (client->mEjectPending) {
-        int expiredEjectBeat = 0;
-        client->GetMostExpiredEjectRequest(expiredEjectBeat);
-        if (beat > expiredEjectBeat) {
-          return false;
+    for (std::size_t index = 0; index < count; ++index) {
+      CClientBase* const client = manager.mClients[index];
+      if (client->NoEjectionPending()) {
+        if (client->mEjected || client->mEjectPending || ((beat - static_cast<int>(client->mQueuedBeat)) <= 0)) {
+          return true;
         }
-        continue;
-      }
-
-      if (beat > static_cast<int>(client->mQueuedBeat)) {
-        return false;
       }
     }
 
-    return true;
-  }
-
-  bool ClientNeedsAvailableBeatsUntil(CClientManagerImpl& manager, const int beat)
-  {
-    for (CClientBase* const client : manager.mClients) {
-      if (client == nullptr) {
-        continue;
-      }
-
-      if (!client->IsReadyForBeat(beat)) {
-        return false;
-      }
-    }
-
-    return true;
+    return false;
   }
 } // namespace
 
@@ -836,6 +808,63 @@ void CClientManagerImpl::ProcessClients(CMessage& msg)
 }
 
 /**
+ * Address: 0x0053EEC0 (FUN_0053EEC0)
+ *
+ * What it does:
+ * Returns whether all non-ejected clients have queued data through `beat`.
+ * Clients in eject-pending state are probed for oldest-eject bookkeeping but
+ * do not block advancement.
+ */
+bool CClientManagerImpl::ClientNeedsFullyQueuedBeatsUntil(const int beat)
+{
+  const std::size_t count = mClients.size();
+  if (count == 0u) {
+    return true;
+  }
+
+  for (std::size_t index = 0; index < count; ++index) {
+    CClientBase* const client = mClients[index];
+    if (client->mEjected) {
+      continue;
+    }
+
+    if (client->mEjectPending) {
+      int ignoredMostExpiredBeat = beat;
+      client->GetMostExpiredEjectRequest(ignoredMostExpiredBeat);
+      continue;
+    }
+
+    if (beat > static_cast<int>(client->mQueuedBeat)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Address: 0x0053EF30 (FUN_0053EF30, Moho::CClientManagerImpl::EveryoneResponsiveSince)
+ *
+ * What it does:
+ * Returns whether every managed client is responsive for the requested beat.
+ */
+bool CClientManagerImpl::EveryoneResponsiveSince(const int beat)
+{
+  const std::size_t count = mClients.size();
+  if (count == 0u) {
+    return true;
+  }
+
+  for (std::size_t index = 0; index < count; ++index) {
+    if (!mClients[index]->IsReadyForBeat(beat)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Address: 0x0053EA30 (FUN_0053EA30)
  */
 void CClientManagerImpl::DoBeat()
@@ -871,19 +900,19 @@ void CClientManagerImpl::DoBeat()
     } while (ClientNeedsPartiallyQueuedBeatsUntil(*this, mPartiallyQueuedBeat + 1));
   }
 
-  if (ClientNeedsFullyQueuedBeatsUntil(*this, mFullyQueuedBeat + 1)) {
+  if (ClientNeedsFullyQueuedBeatsUntil(mFullyQueuedBeat + 1)) {
     if (mFullyQueuedBeat == mDispatchedBeat) {
       mDispatchedTimer.Reset();
     }
     do {
       ++mFullyQueuedBeat;
-    } while (ClientNeedsFullyQueuedBeatsUntil(*this, mFullyQueuedBeat + 1));
+    } while (ClientNeedsFullyQueuedBeatsUntil(mFullyQueuedBeat + 1));
   }
 
-  if (ClientNeedsAvailableBeatsUntil(*this, mAvailableBeat + 1)) {
+  if (EveryoneResponsiveSince(mAvailableBeat + 1)) {
     do {
       ++mAvailableBeat;
-    } while (ClientNeedsAvailableBeatsUntil(*this, mAvailableBeat + 1));
+    } while (EveryoneResponsiveSince(mAvailableBeat + 1));
 
     CMessage message{EClientMsg::CLIMSG_Available};
     CMessageStream stream{message};

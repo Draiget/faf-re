@@ -124,6 +124,15 @@ namespace moho
   );
 
   /**
+   * Address: 0x0077D450 (FUN_0077D450, func_CreateCDecalHandleObject)
+   *
+   * What it does:
+   * Returns cached `CDecalHandle` metatable object from Lua object-factory
+   * storage.
+   */
+  LuaPlus::LuaObject* func_CreateCDecalHandleObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
+
+  /**
    * VFTABLE: 0x00E267D4
    * COL: 0x00E7F224
    */

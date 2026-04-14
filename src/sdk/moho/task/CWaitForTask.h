@@ -139,6 +139,24 @@ namespace moho
   static_assert(sizeof(CWaitForTaskTypeInfo) == 0x64, "CWaitForTaskTypeInfo size must be 0x64");
 
   /**
+   * Address: 0x00BC6280 (FUN_00BC6280, CWaitForTask startup type-info registration)
+   *
+   * What it does:
+   * Pre-registers `CWaitForTask` reflected type metadata and schedules
+   * type-info cleanup at process exit.
+   */
+  void register_CWaitForTaskTypeInfo();
+
+  /**
+   * Address: 0x00BC62A0 (FUN_00BC62A0, CWaitForTask startup construct registration)
+   *
+   * What it does:
+   * Initializes construct/delete callback helper lanes for `CWaitForTask` and
+   * schedules intrusive helper cleanup at process exit.
+   */
+  void register_CWaitForTaskConstruct();
+
+  /**
    * Address: 0x00BC62E0 (FUN_00BC62E0, register_CWaitForTaskSerializer)
    *
    * What it does:
@@ -148,6 +166,9 @@ namespace moho
   void register_CWaitForTaskSerializer();
 
   /**
+   * Address: 0x004CA830 (FUN_004CA830, serializer cleanup alias A)
+   * Address: 0x004CA860 (FUN_004CA860, serializer cleanup alias B)
+   *
    * What it does:
    * Unlinks static serializer helper node from the intrusive helper list and
    * restores self-links.

@@ -5,6 +5,7 @@
 #include <DbgHelp.h>
 
 #include <algorithm>
+#include <cstdarg>
 #include <cstdio>
 #include <cmath>
 #include <cstddef>
@@ -35,6 +36,7 @@
 #include "IWinApp.h"
 #include "legacy/containers/Vector.h"
 #include "WxAppRuntime.h"
+#include "WxRuntimeTypes.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/ResourceManager.h"
@@ -1586,6 +1588,13 @@ namespace
     return true;
   }
 
+  /**
+   * Address: 0x004F2000 (FUN_004F2000, func_HasCorrectPlatform)
+   *
+   * What it does:
+   * Returns true when OS version probing fails or platform is not
+   * `VER_PLATFORM_WIN32_WINDOWS`.
+   */
   bool HasCorrectPlatform()
   {
     OSVERSIONINFOW versionInfo{};
@@ -1593,9 +1602,16 @@ namespace
     return !::GetVersionExW(&versionInfo) || versionInfo.dwPlatformId != VER_PLATFORM_WIN32_WINDOWS;
   }
 
+  /**
+   * Address: 0x004F1540 (FUN_004F1540, func_ProbeWakeTimer)
+   *
+   * What it does:
+   * Returns elapsed wake-timer milliseconds and resets the timer origin.
+   */
   float ProbeWakeTimerMs()
   {
-    return static_cast<float>(wakeupTimer.ElapsedMilliseconds());
+    const LONGLONG elapsedCycles = wakeupTimer.ElapsedCyclesAndReset();
+    return gpg::time::CyclesToMilliseconds(elapsedCycles);
   }
 
   /**
@@ -1651,12 +1667,18 @@ namespace
     wxApp::CleanUp();
   }
 
+  /**
+   * Address: 0x004F2050 (FUN_004F2050, func_WindowHook)
+   *
+   * What it does:
+   * Suppresses left/right Windows keys for low-level keyboard hook events when
+   * app-level key suppression is enabled; otherwise forwards to next hook.
+   */
   LRESULT CALLBACK WindowHook(const int code, const WPARAM wParam, const LPARAM lParam)
   {
-    if (code == HC_ACTION && sSupComApp != nullptr && sSupComApp->AppDoSuppressWindowsKeys() && wParam >= WM_KEYDOWN &&
-        wParam <= WM_KEYUP) {
+    if (code == HC_ACTION && sSupComApp->AppDoSuppressWindowsKeys() && wParam >= WM_KEYDOWN && wParam <= WM_KEYUP) {
       const auto* const keyData = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lParam);
-      if (keyData != nullptr && (keyData->vkCode == VK_LWIN || keyData->vkCode == VK_RWIN)) {
+      if (keyData->vkCode == VK_LWIN || keyData->vkCode == VK_RWIN) {
         return 1;
       }
     }
@@ -1778,6 +1800,14 @@ namespace
     return result;
   }
 
+  /**
+   * Address: 0x004F2730 (FUN_004F2730, ?WIN_CopyToClipboard@Moho@@YA_NVStrArgW@gpg@@@Z)
+   *
+   * What it does:
+   * Copies a wide-string payload to the Windows clipboard as `CF_UNICODETEXT`,
+   * allocating a movable global block, locking it, copying the data, and
+   * publishing it under an exclusive open/empty/set/close cycle.
+   */
   bool WIN_CopyToClipboard(const wchar_t* const text)
   {
     if (text == nullptr) {
@@ -3027,6 +3057,23 @@ void moho::WIN_OkBox(const gpg::StrArg caption, const gpg::StrArg text)
 }
 
 /**
+ * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
+ *
+ * What it does:
+ * Displays a UTF-8 yes/no message box and reports whether the user selected
+ * `Yes`.
+ */
+bool moho::WIN_YesNoBox(const gpg::StrArg caption, const gpg::StrArg text)
+{
+  const HWND ownerWindow = sMainWindow != nullptr
+                             ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
+                             : nullptr;
+  const std::wstring wideCaption = gpg::STR_Utf8ToWide(caption);
+  const std::wstring wideText = gpg::STR_Utf8ToWide(text);
+  return ::MessageBoxW(ownerWindow, wideText.c_str(), wideCaption.c_str(), 0x40004u) == IDYES;
+}
+
+/**
  * Address: 0x004F3A60 (FUN_004F3A60, ?WINX_Exit@Moho@@YAXXZ)
  *
  * What it does:
@@ -3036,6 +3083,27 @@ void moho::WINX_Exit()
 {
   WWinManagedDialog::DestroyManagedOwners(managedWindows);
   WWinManagedFrame::DestroyManagedOwners(managedFrames);
+}
+
+/**
+ * Address: 0x004F3B60 (FUN_004F3B60, ?WINX_Printf@Moho@@YA?AVwxString@@PBDZZ)
+ *
+ * What it does:
+ * Formats one UTF-8 vararg string through `gpg::STR_Va`, converts it to wide
+ * text, and stores the result in caller-provided `wxString`.
+ */
+wxString* moho::WINX_Printf(wxString* const out, const char* const format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  const char* formatCursor = format;
+  const msvc8::string formatted = gpg::STR_Va(formatCursor, args);
+  va_end(args);
+
+  const std::wstring wideText = gpg::STR_Utf8ToWide(formatted.c_str());
+  auto* const outText = reinterpret_cast<wxStringRuntime*>(out);
+  *outText = wxStringRuntime::Borrow(wideText.c_str());
+  return out;
 }
 
 /**

@@ -14,6 +14,31 @@ namespace gpg
 
 namespace moho
 {
+  class VTransform;
+
+  /**
+   * Address owner:
+   * - 0x00679290 (FUN_00679290, Moho::Entity::GetPhysBody stack payload)
+   *
+   * What it does:
+   * Packs mass, inertia-tensor, and collision-offset lanes used to construct
+   * one `SPhysBody`.
+   */
+  struct SPhysBodyParams
+  {
+    float mass;                  // +0x00
+    Wm3::Vec3f inertiaTensor;    // +0x04
+    Wm3::Vec3f collisionOffset;  // +0x10
+  };
+
+  static_assert(offsetof(SPhysBodyParams, mass) == 0x00, "SPhysBodyParams::mass offset must be 0x00");
+  static_assert(offsetof(SPhysBodyParams, inertiaTensor) == 0x04, "SPhysBodyParams::inertiaTensor offset must be 0x04");
+  static_assert(
+    offsetof(SPhysBodyParams, collisionOffset) == 0x10,
+    "SPhysBodyParams::collisionOffset offset must be 0x10"
+  );
+  static_assert(sizeof(SPhysBodyParams) == 0x1C, "SPhysBodyParams size must be 0x1C");
+
   /**
    * Address evidence:
    * - 0x00697450 (FUN_00697450, SPhysBodyTypeInfo::Init, size = 0x54)
@@ -24,6 +49,17 @@ namespace moho
   struct SPhysBody
   {
     static gpg::RType* sType;
+
+    SPhysBody() = default;
+
+    /**
+     * Address: 0x006975B0 (FUN_006975B0, Moho::SPhysBody::SPhysBody)
+     *
+     * What it does:
+     * Initializes one physics body from constants pointer + physical params,
+     * seeding identity/default kinematic lanes before inverse-inertia setup.
+     */
+    SPhysBody(SPhysConstants* constants, const SPhysBodyParams& params);
 
     SPhysConstants* mConstants;       // +0x00
     float mMass;                      // +0x04
@@ -52,6 +88,15 @@ namespace moho
      * world impulse via the position/impulse cross product.
      */
     void AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint);
+
+    /**
+     * Address: 0x006976E0 (FUN_006976E0, Moho::SPhysBody::SetTransform)
+     *
+     * What it does:
+     * Copies orientation from transform input, rotates `mCollisionOffset`, and
+     * stores world-space position as `rotatedOffset + transform.pos_`.
+     */
+    void SetTransform(const VTransform& transform);
   };
 
   static_assert(offsetof(SPhysBody, mConstants) == 0x00, "SPhysBody::mConstants offset must be 0x00");

@@ -1,7 +1,9 @@
 #include "ReadArchive.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <istream>
 #include <string>
 #include <string_view>
 
@@ -1255,29 +1257,59 @@ namespace
       }
     }
 
+    /**
+     * Address: 0x009055F0 (FUN_009055F0, BinaryReadArchive::ReadFloat)
+     *
+     * What it does:
+     * Reads one 32-bit float lane from the binary archive stream.
+     */
     void ReadFloat(float* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadFloat2(value);
     }
 
+    /**
+     * Address: 0x009055E0 (FUN_009055E0, BinaryReadArchive::ReadDouble)
+     *
+     * What it does:
+     * Reads one 64-bit primitive lane used by this archive vtable slot.
+     */
     void ReadUInt64(unsigned __int64* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadUInt642(value);
     }
 
+    /**
+     * Address: 0x009055D0 (FUN_009055D0, BinaryReadArchive::ReadInt64)
+     *
+     * What it does:
+     * Reads one signed 64-bit primitive lane from the stream.
+     */
     void ReadInt64(__int64* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadInt642(value);
     }
 
+    /**
+     * Address: 0x009055C0 (FUN_009055C0, BinaryReadArchive::ReadULong)
+     *
+     * What it does:
+     * Reads one unsigned long lane from the stream.
+     */
     void ReadULong(unsigned long* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadULong2(value);
     }
 
+    /**
+     * Address: 0x009055B0 (FUN_009055B0, BinaryReadArchive::ReadLong)
+     *
+     * What it does:
+     * Reads one signed long lane from the stream.
+     */
     void ReadLong(long* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadLong2(value);
     }
 
     /**
@@ -1291,31 +1323,67 @@ namespace
       ReadInt2(value);
     }
 
+    /**
+     * Address: 0x00905590 (FUN_00905590, BinaryReadArchive::ReadInt)
+     *
+     * What it does:
+     * Thunk lane forwarding signed 32-bit reads to `ReadUInt2`.
+     */
     void ReadInt(int* const value) override
     {
-      ReadInt2(value);
+      ReadUInt2(value);
     }
 
+    /**
+     * Address: 0x00905580 (FUN_00905580, BinaryReadArchive::ReadUShort)
+     *
+     * What it does:
+     * Reads one unsigned 16-bit primitive lane from the stream.
+     */
     void ReadUShort(unsigned short* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadUShort2(value);
     }
 
+    /**
+     * Address: 0x00905570 (FUN_00905570, BinaryReadArchive::ReadShort)
+     *
+     * What it does:
+     * Reads one signed 16-bit primitive lane from the stream.
+     */
     void ReadShort(short* const value) override
     {
-      ReadBytes(reinterpret_cast<char*>(value), sizeof(*value));
+      ReadShort2(value);
     }
 
+    /**
+     * Address: 0x00905560 (FUN_00905560, BinaryReadArchive::ReadUByte)
+     *
+     * What it does:
+     * Reads one unsigned byte lane through the shared one-byte read helper.
+     */
     void ReadUByte(unsigned __int8* const value) override
     {
-      ReadBool2(value);
+      ReadUByte2(value);
     }
 
+    /**
+     * Address: 0x00905550 (FUN_00905550, BinaryReadArchive::ReadByte)
+     *
+     * What it does:
+     * Reads one signed byte lane through the shared one-byte read helper.
+     */
     void ReadByte(__int8* const value) override
     {
-      ReadBool2(value);
+      ReadByte2(value);
     }
 
+    /**
+     * Address: 0x00905540 (FUN_00905540, BinaryReadArchive::ReadBool)
+     *
+     * What it does:
+     * Thunk lane forwarding bool reads to `ReadBool2`.
+     */
     void ReadBool(bool* const value) override
     {
       ReadBool2(value);
@@ -1375,6 +1443,50 @@ namespace
     }
 
     /**
+     * Address: 0x00904B40 (FUN_00904B40)
+     *
+     * What it does:
+     * One-byte signed lane helper used by `ReadByte`.
+     */
+    void ReadByte2(void* const outValue)
+    {
+      ReadBool2(outValue);
+    }
+
+    /**
+     * Address: 0x00904BD0 (FUN_00904BD0)
+     *
+     * What it does:
+     * One-byte unsigned lane helper used by `ReadUByte`.
+     */
+    void ReadUByte2(void* const outValue)
+    {
+      ReadBool2(outValue);
+    }
+
+    /**
+     * Address: 0x00904C60 (FUN_00904C60)
+     *
+     * What it does:
+     * Two-byte signed lane helper used by `ReadShort`.
+     */
+    void ReadShort2(void* const outValue)
+    {
+      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(short));
+    }
+
+    /**
+     * Address: 0x00904CF0 (FUN_00904CF0)
+     *
+     * What it does:
+     * Two-byte unsigned lane helper used by `ReadUShort`.
+     */
+    void ReadUShort2(void* const outValue)
+    {
+      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(unsigned short));
+    }
+
+    /**
      * Address: 0x00904D80 (FUN_00904D80, BinaryReadArchive::ReadUInt2)
      *
      * What it does:
@@ -1407,16 +1519,213 @@ namespace
       ReadUInt2(outValue);
     }
 
+    /**
+     * Address: 0x00904EA0 (FUN_00904EA0)
+     *
+     * What it does:
+     * Signed long lane helper used by `ReadLong`.
+     */
+    void ReadLong2(void* const outValue)
+    {
+      ReadUInt2(outValue);
+    }
+
+    /**
+     * Address: 0x00904F30 (FUN_00904F30)
+     *
+     * What it does:
+     * Unsigned long lane helper used by `ReadULong`.
+     */
+    void ReadULong2(void* const outValue)
+    {
+      ReadUInt2(outValue);
+    }
+
+    /**
+     * Address: 0x00904FC0 (FUN_00904FC0)
+     *
+     * What it does:
+     * Signed 64-bit lane helper used by `ReadInt64`.
+     */
+    void ReadInt642(void* const outValue)
+    {
+      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(__int64));
+    }
+
+    /**
+     * Address: 0x00905050 (FUN_00905050)
+     *
+     * What it does:
+     * 64-bit lane helper used by the vtable slot recovered as `ReadUInt64`.
+     */
+    void ReadUInt642(void* const outValue)
+    {
+      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(unsigned __int64));
+    }
+
+    /**
+     * Address: 0x009050E0 (FUN_009050E0)
+     *
+     * What it does:
+     * 32-bit float lane helper used by `ReadFloat`.
+     */
+    void ReadFloat2(void* const outValue)
+    {
+      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(float));
+    }
+
     boost::shared_ptr<std::FILE> mFile;
+  };
+
+  struct TextReadArchiveRuntimeView
+  {
+    std::uint8_t pad_0000_0040[0x40];
+    std::istream* stream; // +0x40
+  };
+  static_assert(
+    offsetof(TextReadArchiveRuntimeView, stream) == 0x40,
+    "TextReadArchiveRuntimeView::stream offset must be 0x40"
+  );
+
+  class TextReadArchive : public gpg::ReadArchive
+  {
+  public:
+    /**
+     * Address: 0x0093E770 (FUN_0093E770, TextReadArchive::ReadDouble)
+     *
+     * What it does:
+     * Extracts one unsigned 64-bit token from the text stream lane.
+     */
+    void ReadUInt64(unsigned __int64* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E760 (FUN_0093E760, TextReadArchive::ReadInt64)
+     *
+     * What it does:
+     * Extracts one signed 64-bit token from the text stream lane.
+     */
+    void ReadInt64(__int64* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E750 (FUN_0093E750, TextReadArchive::ReadULong)
+     *
+     * What it does:
+     * Extracts one unsigned long token from the text stream lane.
+     */
+    void ReadULong(unsigned long* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E740 (FUN_0093E740, TextReadArchive::ReadLong)
+     *
+     * What it does:
+     * Extracts one signed long primitive from the text stream lane.
+     */
+    void ReadLong(long* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E730 (FUN_0093E730, TextReadArchive::ReadUInt)
+     *
+     * What it does:
+     * Extracts one unsigned 32-bit primitive from the text stream lane.
+     */
+    void ReadUInt(unsigned int* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E720 (FUN_0093E720, TextReadArchive::ReadInt)
+     *
+     * What it does:
+     * Extracts one signed 32-bit primitive from the text stream lane.
+     */
+    void ReadInt(int* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E710 (FUN_0093E710, TextReadArchive::ReadUShort)
+     *
+     * What it does:
+     * Extracts one unsigned 16-bit primitive from the text stream lane.
+     */
+    void ReadUShort(unsigned short* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E700 (FUN_0093E700, TextReadArchive::ReadShort)
+     *
+     * What it does:
+     * Extracts one signed 16-bit primitive from the text stream lane.
+     */
+    void ReadShort(short* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
+
+    /**
+     * Address: 0x0093E6E0 (FUN_0093E6E0, TextReadArchive::ReadUByte)
+     *
+     * What it does:
+     * Reads one integer token from the text stream and truncates it to the low
+     * unsigned-byte lane.
+     */
+    void ReadUByte(unsigned __int8* const value) override
+    {
+      int parsedValue = 0;
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> parsedValue;
+      *value = static_cast<unsigned __int8>(parsedValue);
+    }
+
+    /**
+     * Address: 0x0093E6C0 (FUN_0093E6C0, TextReadArchive::ReadByte)
+     *
+     * What it does:
+     * Reads one integer token from the text stream and truncates it to the low
+     * signed-byte lane.
+     */
+    void ReadByte(__int8* const value) override
+    {
+      int parsedValue = 0;
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> parsedValue;
+      *value = static_cast<__int8>(parsedValue);
+    }
+
+    /**
+     * Address: 0x0093E6B0 (FUN_0093E6B0, TextReadArchive::ReadBool)
+     *
+     * What it does:
+     * Extracts one bool token from the text archive stream lane.
+     */
+    void ReadBool(bool* const value) override
+    {
+      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+    }
   };
 } // namespace
 
 /**
- * Address: 0x00953700 (FUN_00953700)
- * Demangled: gpg::ReadArchive::dtr
+ * Address: 0x00952E40 (FUN_00952E40, ??1ReadArchive@gpg@@UAE@XZ)
+ * Address: 0x00953700 (FUN_00953700, scalar deleting destructor thunk)
  *
  * What it does:
- * Destroys read-archive bookkeeping state.
+ * Destroys read-archive bookkeeping state. Binary body is the compiler-emitted
+ * defaulted destructor (sets vtable + member subobject teardown).
  */
 ReadArchive::~ReadArchive() = default;
 
@@ -2380,6 +2689,7 @@ ReadArchive* ReadArchive::ReadPointer_HSound(moho::HSound** const outValue, cons
 
 /**
  * Address: 0x00511790 (FUN_00511790, gpg::ReadArchive::ReadPointer_RRuleGameRules2)
+ * Address: 0x005375C0 (FUN_005375C0, alias/duplicate body)
  *
  * What it does:
  * Reads one tracked pointer lane and upcasts it to `moho::RRuleGameRules`,

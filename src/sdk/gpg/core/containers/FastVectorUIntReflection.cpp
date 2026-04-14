@@ -6,6 +6,8 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/entity/SSTIEntityVariableData.h"
+#include "moho/sim/SOCellPos.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -451,6 +453,49 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] gpg::RType* CachedEntIdType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      constexpr const char* kEntIdTypeCandidates[] = {"EntId", "Moho::EntId", "int", "signed int"};
+      for (const char* const candidate : kEntIdTypeCandidates) {
+        if (!candidate) {
+          continue;
+        }
+
+        cached = gpg::REF_FindTypeNamed(candidate);
+        if (cached != nullptr) {
+          break;
+        }
+      }
+
+      if (!cached) {
+        cached = gpg::LookupRType(typeid(int));
+      }
+    }
+
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSOCellPosType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::SOCellPos));
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSSTIEntityAttachInfoType()
+  {
+    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
+    if (type == nullptr) {
+      type = gpg::LookupRType(typeid(moho::SSTIEntityAttachInfo));
+      moho::SSTIEntityAttachInfo::sType = type;
+    }
+    return type;
+  }
+
   void cleanup_FastVectorVector3fTypeName()
   {
     gFastVectorVector3fTypeName = msvc8::string{};
@@ -463,6 +508,30 @@ namespace
     gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
   }
 
+  void FastVectorSOCellPosResize(const moho::SOCellPos* fillValue, const unsigned int newSize, void* objectStorage)
+  {
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(objectStorage);
+    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+  }
+
+  void FastVectorSSTIEntityAttachInfoResize(
+    const moho::SSTIEntityAttachInfo* fillValue,
+    const unsigned int newSize,
+    void* objectStorage
+  )
+  {
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(objectStorage);
+    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+  }
+
+  /**
+   * Address: 0x00515FF0 (FUN_00515FF0, gpg::RFastVectorType_Vector3f::SerLoad)
+   *
+   * What it does:
+   * Reads serialized count for one reflected `fastvector<Wm3::Vector3f>`,
+   * resizes backing storage with zeroed fill lanes, then deserializes each
+   * element through `ReadArchive::Read`.
+   */
   void LoadFastVectorVector3f(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
@@ -486,6 +555,112 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x005535B0 (FUN_005535B0, gpg::RFastVectorType_EntId::SerLoad)
+   *
+   * What it does:
+   * Reads serialized lane count for one reflected `fastvector<EntId>`,
+   * resizes storage with invalid-id sentinel fill, then deserializes each lane
+   * through `ReadArchive::Read`.
+   */
+  [[maybe_unused]] void LoadFastVectorEntId(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    constexpr unsigned int kInvalidEntIdFill = 0xF0000000u;
+    FastVectorUIntResize(&kInvalidEntIdFill, count, storage);
+
+    gpg::RType* const entIdType = CachedEntIdType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(entIdType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x005536A0 (FUN_005536A0, gpg::RFastVectorType_SOCellPos::SerLoad)
+   *
+   * What it does:
+   * Reads count for one reflected `fastvector<moho::SOCellPos>`, resizes with
+   * invalid-cell sentinel fill (`-32768,-32768`), then deserializes each lane
+   * through `ReadArchive::Read`.
+   */
+  [[maybe_unused]] void LoadFastVectorSOCellPos(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    constexpr moho::SOCellPos fill{-32768, -32768};
+    FastVectorSOCellPosResize(&fill, count, storage);
+
+    gpg::RType* const soCellPosType = CachedSOCellPosType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(storage);
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(soCellPosType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x00558F80 (FUN_00558F80, gpg::RFastVectorType_SSTIEntityAttachInfo::SerLoad)
+   *
+   * What it does:
+   * Reads count for one reflected `fastvector<moho::SSTIEntityAttachInfo>`,
+   * resizes with invalid-id sentinel fill (`0xF0000000`), then deserializes
+   * each lane through `ReadArchive::Read`.
+   */
+  [[maybe_unused]] void LoadFastVectorSSTIEntityAttachInfo(
+    gpg::ReadArchive* archive,
+    int objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+
+    moho::SSTIEntityAttachInfo fill{};
+    fill.mPlaceholderState = 0xF0000000u;
+    FastVectorSSTIEntityAttachInfoResize(&fill, count, storage);
+
+    gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(storage);
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(attachInfoType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x00516080 (FUN_00516080, gpg::RFastVectorType_Vector3f::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<Wm3::Vector3f>` payload as archive count
+   * plus per-lane `WriteArchive::Write` serialization.
+   */
   void SaveFastVectorVector3f(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
@@ -503,6 +678,92 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(vector3Type, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x00553630 (FUN_00553630, gpg::RFastVectorType_EntId::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<EntId>` payload as archive count plus
+   * per-lane reflected `EntId` serialization.
+   */
+  [[maybe_unused]] void SaveFastVectorEntId(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
+    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    archive->WriteUInt(count);
+
+    gpg::RType* const entIdType = CachedEntIdType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(entIdType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x00553720 (FUN_00553720, gpg::RFastVectorType_SOCellPos::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<moho::SOCellPos>` payload as archive
+   * count plus per-lane reflected `SOCellPos` serialization.
+   */
+  [[maybe_unused]] void SaveFastVectorSOCellPos(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(storage);
+    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    archive->WriteUInt(count);
+
+    gpg::RType* const soCellPosType = CachedSOCellPosType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(soCellPosType, view.ElementAtUnchecked(i), owner);
+    }
+  }
+
+  /**
+   * Address: 0x00559000 (FUN_00559000, gpg::RFastVectorType_SSTIEntityAttachInfo::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<moho::SSTIEntityAttachInfo>` payload as
+   * archive count plus per-lane reflected attach-info serialization.
+   */
+  [[maybe_unused]] void SaveFastVectorSSTIEntityAttachInfo(
+    gpg::WriteArchive* archive,
+    int objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
+  {
+    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(storage);
+    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    archive->WriteUInt(count);
+
+    gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(attachInfoType, view.ElementAtUnchecked(i), owner);
     }
   }
 } // namespace

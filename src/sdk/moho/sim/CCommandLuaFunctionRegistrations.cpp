@@ -353,6 +353,9 @@ namespace moho
   int cfunc_IssueClearCommandsL(LuaPlus::LuaState* state);
   int cfunc_IssueStopL(LuaPlus::LuaState* state);
   int cfunc_IssuePauseL(LuaPlus::LuaState* state);
+  int cfunc_IssueTacticalL(LuaPlus::LuaState* state);
+  int cfunc_IssuePatrolL(LuaPlus::LuaState* state);
+  int cfunc_IssueFormPatrolL(LuaPlus::LuaState* state);
   int cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* state);
   int cfunc_GetUnitCommandDataL(LuaPlus::LuaState* state);
   int cfunc_IssueDockCommandL(LuaPlus::LuaState* state);
@@ -2293,5 +2296,38 @@ namespace moho
     }
 
     return 0;
+  }
+
+  /**
+   * Address: 0x006F4490 (FUN_006F4490, cfunc_IssueTactical)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueTacticalL`.
+   */
+  int cfunc_IssueTactical(lua_State* const luaContext)
+  {
+    return cfunc_IssueTacticalL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F49B0 (FUN_006F49B0, cfunc_IssuePatrol)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssuePatrolL`.
+   */
+  int cfunc_IssuePatrol(lua_State* const luaContext)
+  {
+    return cfunc_IssuePatrolL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x006F4C80 (FUN_006F4C80, cfunc_IssueFormPatrol)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueFormPatrolL`.
+   */
+  int cfunc_IssueFormPatrol(lua_State* const luaContext)
+  {
+    return cfunc_IssueFormPatrolL(moho::SCR_ResolveBindingState(luaContext));
   }
 } // namespace moho

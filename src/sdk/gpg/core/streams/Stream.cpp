@@ -158,6 +158,8 @@ void Stream::Write(const msvc8::string& str)
 
 /**
  * Address: 0x0043D130 (FUN_0043D130)
+ * Address: 0x004D4E00 (FUN_004D4E00, __imp_?Write@Stream@gpg@@QAEXPBXI@Z)
+ * Address: 0x004D4E30 (FUN_004D4E30, __imp_?Write@Stream@gpg@@QAEXPBXI@Z alias)
  *
  * What it does:
  * Writes one byte span via inline buffer fast path or virtual write fallback.
@@ -261,6 +263,29 @@ void Stream::UnGetByte(const int value)
   }
 
   mReadHead = readHead - 1;
+}
+
+/**
+ * Address: 0x004D29F0 (FUN_004D29F0, gpg::Stream::CheckByte)
+ *
+ * What it does:
+ * Reads one byte (buffer-fast-path or virtual fallback), rewinds it with
+ * `UnGetByte`, and returns that byte value; returns `255` on EOF.
+ */
+int Stream::CheckByte()
+{
+  unsigned char value = 0;
+  if (mReadHead == mReadEnd) {
+    if (VirtRead(reinterpret_cast<char*>(&value), 1U) == 0U) {
+      return 255;
+    }
+  } else {
+    value = static_cast<unsigned char>(*mReadHead);
+    ++mReadHead;
+  }
+
+  UnGetByte(static_cast<int>(value));
+  return static_cast<int>(value);
 }
 
 void gpg::UnGetByteChecked(Stream& stream, const int value)

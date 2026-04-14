@@ -208,6 +208,68 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E7D60 (FUN_008E7D60, ??0TextureContext@gal@gpg@@QAE@PBDIHH@Z)
+     *
+     * What it does:
+     * Initializes archive-backed texture source metadata from one location
+     * string plus explicit format and dimensions.
+     */
+    TextureContext::TextureContext(
+        const char* const location,
+        const std::uint32_t format,
+        const std::uint32_t width,
+        const std::uint32_t height
+    )
+        : source_(1U),
+          location_(
+            (location != nullptr) ? location : "",
+            static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
+          ),
+          dataArray_(nullptr),
+          dataCount_(nullptr),
+          dataBegin_(0U),
+          dataEnd_(0U),
+          type_(0U),
+          usage_(1U),
+          format_(format),
+          mipmapLevels_(0U),
+          reserved0x44_(0U),
+          width_(width),
+          height_(height),
+          reserved0x50_(0U)
+    {
+    }
+
+    /**
+     * Address: 0x008E7A40 (FUN_008E7A40, gpg::gal::TextureContext::Copy)
+     *
+     * What it does:
+     * Copy-constructs one texture-context payload, including location string
+     * data and shared-data ownership lanes.
+     */
+    TextureContext::TextureContext(const TextureContext& other)
+        : source_(other.source_),
+          location_(),
+          dataArray_(other.dataArray_),
+          dataCount_(other.dataCount_),
+          dataBegin_(other.dataBegin_),
+          dataEnd_(other.dataEnd_),
+          type_(other.type_),
+          usage_(other.usage_),
+          format_(other.format_),
+          mipmapLevels_(other.mipmapLevels_),
+          reserved0x44_(other.reserved0x44_),
+          width_(other.width_),
+          height_(other.height_),
+          reserved0x50_(other.reserved0x50_)
+    {
+        location_.assign(other.location_, 0U, msvc8::string::npos);
+        if (dataCount_ != nullptr) {
+            dataCount_->add_ref_copy();
+        }
+    }
+
+    /**
      * Address: 0x00903B60 (FUN_00903B60)
      *
      * What it does:
@@ -323,10 +385,13 @@ namespace gpg::gal
     CubeRenderTargetContext::~CubeRenderTargetContext() = default;
 
     /**
-     * Address: 0x0093EFF0 (FUN_0093EFF0)
+     * Address: 0x0093EFE0 (FUN_0093EFE0, ??1DepthStencilTargetContext@gal@gpg@@QAE@@Z)
+     * Address: 0x0093EFF0 (FUN_0093EFF0, scalar deleting destructor thunk)
      *
      * What it does:
-     * Scalar-deleting destructor thunk owner for depth-stencil target context handles.
+     * Destructor body: sets vtable to `gpg::gal::DepthStencilTargetContext::`vftable``
+     * before member subobject teardown. Defaulted because this class owns no
+     * non-trivial member resources directly.
      */
     DepthStencilTargetContext::~DepthStencilTargetContext() = default;
 
@@ -631,10 +696,13 @@ namespace gpg::gal
     OutputContext::~OutputContext() = default;
 
     /**
-     * Address: 0x00442080 (FUN_00442080)
+     * Address: 0x008E7A00 (FUN_008E7A00, ??1RenderTargetContext@gal@gpg@@QAE@@Z)
+     * Address: 0x00442080 (FUN_00442080, scalar deleting destructor thunk)
      *
      * What it does:
-     * Scalar-deleting destructor thunk owner for render-target context handles.
+     * Destructor body: sets vtable to `gpg::gal::RenderTargetContext::`vftable``
+     * before member subobject teardown. Defaulted because this class owns no
+     * non-trivial member resources directly.
      */
     RenderTargetContext::~RenderTargetContext() = default;
 

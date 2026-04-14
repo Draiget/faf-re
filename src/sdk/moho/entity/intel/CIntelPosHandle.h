@@ -49,6 +49,15 @@ namespace moho
     ~CIntelPosHandle();
 
     /**
+     * Address: 0x0076EFC0 (FUN_0076EFC0, Moho::CIntelPosHandle::Update)
+     *
+     * What it does:
+     * Rebuilds grid coverage at a new world position when the value differs
+     * from the cached position.
+     */
+    void Update(const Wm3::Vec3f& pos);
+
+    /**
      * Address: 0x0076F1E0 (FUN_0076F1E0, Moho::CIntelPosHandle::UpdatePos)
      *
      * What it does:

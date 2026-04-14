@@ -45,12 +45,34 @@ namespace gpg
         void Read(char* buf, size_t size) const;
 
         /**
+         * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
+         *
+         * int *
+         *
+         * IDA signature:
+         * int * __usercall gpg::BinaryReader::ReadInt@<eax>(gpg::BinaryReader *this@<eax>, int *outValue@<ecx>);
+         *
+         * What it does:
+         * Reads one 32-bit integer into `outValue`, using stream fast-path bytes
+         * when available and throwing `PrematureEOF` on short reads.
+         */
+        int* ReadInt(int* outValue) const;
+
+        /**
          * Address: 0x00445590 (FUN_00445590)
          *
          * What it does:
-         * Reads one 32-bit integer and returns it by value.
+         * Reads one 32-bit integer and returns it by value via `ReadInt`.
          */
         [[nodiscard]] int ReadInt32() const;
+
+        /**
+         * Address: 0x004D4DC0 (FUN_004D4DC0, gpg::BinaryReader::ReadChar)
+         *
+         * What it does:
+         * Reads one byte from stream input and returns it as unsigned char.
+         */
+        [[nodiscard]] std::uint8_t ReadChar() const;
 
         /**
          * Address: 0x004CCDD0 (FUN_004CCDD0)

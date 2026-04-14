@@ -46,6 +46,14 @@ namespace moho
     [[nodiscard]] CameraImpl* CreateCamera(gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* luaState);
 
     /**
+     * Address: 0x007AAA90 (FUN_007AAA90, ?ForgetCamera@RCamManager@Moho@@QAEXPBVRCamCamera@2@@Z)
+     *
+     * What it does:
+     * Removes one camera pointer from the manager camera vector when present.
+     */
+    void ForgetCamera(const CameraImpl* camera);
+
+    /**
      * Address: 0x007AAAF0 (FUN_007AAAF0, ?GetCamera@RCamManager@Moho@@QAEPAVCameraImpl@2@VStrArg@gpg@@@Z)
      *
      * gpg::StrArg name

@@ -36,7 +36,18 @@ namespace
     return sOverlayClassList;
   }
 
-  void cleanup_sDBGOverlays();
+  /**
+   * Address: 0x00BFB730 (??1sDBGOverlays@Moho@@QAE@@Z, cleanup_sDBGOverlays)
+   *
+   * What it does:
+   * Unlinks the global debug-overlay registry head and restores singleton
+   * list state.
+   */
+  void cleanup_sDBGOverlays()
+  {
+    moho::TDatList<moho::RDebugOverlayClass, void>& overlays = GlobalDebugOverlayClassList();
+    overlays.ListUnlink();
+  }
 
   moho::RDebugGridTypeInfo* gRDebugGridTypeInfo = nullptr;
   moho::RDebugRadarTypeInfo* gRDebugRadarTypeInfo = nullptr;
@@ -369,19 +380,6 @@ namespace moho
   {
     delete gRDebugWeaponsTypeInfo;
     gRDebugWeaponsTypeInfo = nullptr;
-  }
-
-  /**
-   * Address: 0x00BFB730 (??1sDBGOverlays@Moho@@QAE@@Z, cleanup_sDBGOverlays)
-   *
-   * What it does:
-   * Unlinks the global debug-overlay registry head and restores singleton
-   * list state.
-   */
-  void cleanup_sDBGOverlays()
-  {
-    TDatList<RDebugOverlayClass, void>& overlays = GlobalDebugOverlayClassList();
-    overlays.ListUnlink();
   }
 
   /**

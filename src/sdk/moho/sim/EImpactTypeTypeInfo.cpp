@@ -5,6 +5,9 @@
 #include <new>
 #include <typeinfo>
 
+#include "moho/entity/Entity.h"
+#include "moho/sim/Sim.h"
+
 namespace
 {
   alignas(moho::EImpactTypeTypeInfo) unsigned char gEImpactTypeTypeInfoStorage[sizeof(moho::EImpactTypeTypeInfo)]{};
@@ -130,6 +133,61 @@ namespace moho
   gpg::REnumType* preregister_EImpactTypeTypeInfo()
   {
     return ConstructEImpactTypeTypeInfoInternal();
+  }
+
+  /**
+   * Address: 0x0067B240 (FUN_0067B240, Moho::ENT_GetImpactType)
+   */
+  EImpactType ENT_GetImpactType(Sim* const sim, Entity* const entity, const Wm3::Vector3f& hitPosition)
+  {
+    static constexpr float kNoWaterElevation = -10000.0f;
+    static constexpr std::uint32_t kShieldEntityMask = 0xF0000000u;
+    static constexpr std::uint32_t kShieldEntityTag = 0x40000000u;
+
+    const STIMap* const mapData = sim->mMapData;
+    const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : kNoWaterElevation;
+
+    if (waterElevation > hitPosition.y) {
+      if (entity == nullptr) {
+        return IMPACT_Underwater;
+      }
+
+      if (entity->IsUnit() != nullptr) {
+        return IMPACT_UnitUnderwater;
+      }
+
+      if (entity->IsProjectile() != nullptr) {
+        return IMPACT_ProjectileUnderwater;
+      }
+
+      if ((entity->id_ & kShieldEntityMask) == kShieldEntityTag) {
+        return IMPACT_Shield;
+      }
+
+      return IMPACT_Underwater;
+    }
+
+    if (entity == nullptr) {
+      return IMPACT_Air;
+    }
+
+    if (entity->IsUnit() != nullptr) {
+      return (entity->mCurrentLayer == LAYER_Air) ? IMPACT_UnitAir : IMPACT_Unit;
+    }
+
+    if (entity->IsProjectile() != nullptr) {
+      return IMPACT_Projectile;
+    }
+
+    if (entity->IsProp() != nullptr) {
+      return IMPACT_Prop;
+    }
+
+    if ((entity->id_ & kShieldEntityMask) == kShieldEntityTag) {
+      return IMPACT_Shield;
+    }
+
+    return IMPACT_Air;
   }
 
   /**

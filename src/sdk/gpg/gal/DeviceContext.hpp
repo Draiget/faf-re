@@ -34,6 +34,15 @@ namespace gpg::gal
         DeviceContext(const DeviceContext& other);
 
         /**
+         * Address: 0x008D1D00 (FUN_008D1D00, func_CpyDeviceContext)
+         *
+         * What it does:
+         * Copies all scalar capability lanes and head-descriptor vector state
+         * from one context into this context.
+         */
+        DeviceContext& operator=(const DeviceContext& other);
+
+        /**
          * Address: 0x00430570 (FUN_00430570)
          *
          * What it does:

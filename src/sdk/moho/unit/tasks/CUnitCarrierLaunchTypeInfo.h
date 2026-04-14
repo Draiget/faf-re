@@ -21,8 +21,16 @@ namespace moho
      * Allocates one `CUnitCarrierLaunch` and returns a typed reflection ref.
      */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x00607DA0 (FUN_00607DA0, Moho::CUnitCarrierLaunchTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Placement-constructs one `CUnitCarrierLaunch` in caller storage and
+     * returns a typed reflection ref.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
   };
 
   static_assert(sizeof(CUnitCarrierLaunchTypeInfo) == 0x64, "CUnitCarrierLaunchTypeInfo size must be 0x64");
 } // namespace moho
-

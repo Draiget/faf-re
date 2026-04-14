@@ -6,6 +6,8 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
+#include "moho/ai/CBuilderArmManipulator.h"
+#include "moho/animation/CRotateManipulator.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -25,8 +27,11 @@ namespace moho
   int cfunc_CBoneEntityManipulatorSetPivot(lua_State* luaContext);
   int cfunc_EntityAttachBoneToEntityBone(lua_State* luaContext);
   int cfunc_CBuilderArmManipulatorSetAimingArc(lua_State* luaContext);
+  int cfunc_CBuilderArmManipulatorSetAimingArcL(LuaPlus::LuaState* state);
   int cfunc_CBuilderArmManipulatorGetHeadingPitch(lua_State* luaContext);
+  int cfunc_CBuilderArmManipulatorGetHeadingPitchL(LuaPlus::LuaState* state);
   int cfunc_CBuilderArmManipulatorSetHeadingPitch(lua_State* luaContext);
+  int cfunc_CBuilderArmManipulatorSetHeadingPitchL(LuaPlus::LuaState* state);
   int cfunc_CRotateManipulatorSetSpinDown(lua_State* luaContext);
   int cfunc_CRotateManipulatorSetGoal(lua_State* luaContext);
   int cfunc_CRotateManipulatorClearGoal(lua_State* luaContext);
@@ -203,6 +208,51 @@ namespace moho
   {
     return SCR_CreateSimpleMetatable(state);
   }
+
+  LuaPlus::LuaObject CreateRotateManipulatorLuaMetatable(LuaPlus::LuaState* const state)
+  {
+    return CScrLuaMetatableFactory<CRotateManipulator>::Instance().Get(state);
+  }
+
+  /**
+   * Address: 0x006371B0 (FUN_006371B0, func_CreateLuaBuilderArmObject)
+   *
+   * What it does:
+   * Writes the `CBuilderArmManipulator` metatable Lua object into `object` and
+   * returns the same destination pointer.
+   */
+  LuaPlus::LuaObject* func_CreateLuaBuilderArmObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    *object = CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance().Get(state);
+    return object;
+  }
+
+  /**
+   * Address: 0x00645540 (FUN_00645540, func_CreateCRotateManipulatorObject)
+   *
+   * What it does:
+   * Writes the `CRotateManipulator` metatable Lua object into `object` and
+   * returns the same destination pointer.
+   */
+  LuaPlus::LuaObject*
+  func_CreateCRotateManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    *object = CScrLuaMetatableFactory<CRotateManipulator>::Instance().Get(state);
+    return object;
+  }
+
+  /**
+   * Address: 0x0064B380 (FUN_0064B380, func_CreateLuaCThrustManipulator)
+   *
+   * What it does:
+   * Writes the `CThrustManipulator` metatable Lua object into `object` and
+   * returns the same destination pointer.
+   */
+  LuaPlus::LuaObject* func_CreateLuaCThrustManipulator(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    *object = CScrLuaMetatableFactory<CThrustManipulator>::Instance().Get(state);
+    return object;
+  }
 } // namespace moho
 
 namespace
@@ -227,6 +277,7 @@ namespace
   constexpr const char* kCBuilderArmManipulatorSetHeadingPitchName = "SetHeadingPitch";
   constexpr const char* kCBuilderArmManipulatorSetHeadingPitchHelpText =
     "CBuilderArmManipulator:SetHeadingPitch( heading, pitch )";
+  constexpr float kDegreesToRadians = 0.017453292f;
 
   constexpr const char* kCRotateManipulatorSetSpinDownName = "SetSpinDown";
   constexpr const char* kCRotateManipulatorSetGoalName = "SetGoal";
@@ -263,16 +314,6 @@ namespace
   constexpr const char* kCThrustManipulatorSetThrustingParamHelpText =
     "ThrustManipulator:SetThrustingParam(xCapMin, xCapMax, yCapMin, yCapMax, zCapMin, zCapMax, turnForceMult, "
     "turnSpeed)";
-
-  struct CRotateManipulatorRuntimeView
-  {
-    std::uint8_t mReserved00_7F[0x80];
-    std::uint8_t mHasGoal; // +0x80
-  };
-  static_assert(
-    offsetof(CRotateManipulatorRuntimeView, mHasGoal) == 0x80,
-    "CRotateManipulatorRuntimeView::mHasGoal offset must be 0x80"
-  );
 
   [[nodiscard]] gpg::RType* CachedCRotateManipulatorType()
   {
@@ -328,7 +369,7 @@ namespace
     return static_cast<moho::CScriptObject**>(upcast.mObj);
   }
 
-  [[nodiscard]] CRotateManipulatorRuntimeView*
+  [[nodiscard]] moho::CRotateManipulator*
   GetRotateManipulatorOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
   {
     moho::CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlot(object);
@@ -350,7 +391,7 @@ namespace
       return nullptr;
     }
 
-    return static_cast<CRotateManipulatorRuntimeView*>(upcast.mObj);
+    return static_cast<moho::CRotateManipulator*>(upcast.mObj);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
@@ -361,6 +402,19 @@ namespace
 
     static moho::CScrLuaInitFormSet fallbackSet("sim");
     return fallbackSet;
+  }
+
+  [[nodiscard]] float ReadRequiredLuaNumber(LuaPlus::LuaState* const state, const int stackIndex)
+  {
+    LuaPlus::LuaStackObject stackObject{};
+    stackObject.m_state = state;
+    stackObject.m_stackIndex = stackIndex;
+    if (lua_type(state->m_state, stackIndex) != 3) {
+      LuaPlus::LuaObject valueObject(stackObject);
+      valueObject.TypeError("number");
+    }
+
+    return lua_tonumber(stackObject.m_state->m_state, stackObject.m_stackIndex);
   }
 
   template <moho::CScrLuaInitForm* (*Target)()>
@@ -442,6 +496,122 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x006369D0 (FUN_006369D0, func_CBuilderArmManipulatorSetAimingArc)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_CBuilderArmManipulatorSetAimingArcL`.
+   */
+  int cfunc_CBuilderArmManipulatorSetAimingArc(lua_State* const luaContext)
+  {
+    return cfunc_CBuilderArmManipulatorSetAimingArcL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00636A50 (FUN_00636A50, cfunc_CBuilderArmManipulatorSetAimingArcL)
+   *
+   * What it does:
+   * Reads six degree-domain arc parameters from Lua, converts to radians, and
+   * updates builder-arm heading/pitch arc lanes.
+   */
+  int cfunc_CBuilderArmManipulatorSetAimingArcL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 7) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBuilderArmManipulatorSetAimingArcHelpText, 7, argumentCount);
+    }
+
+    const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CBuilderArmManipulator* const manipulator = moho::SCR_FromLua_CBuilderArmManipulator(manipulatorObject, state);
+
+    float paramsRadians[6]{};
+    for (int index = 0; index < 6; ++index) {
+      paramsRadians[index] = ReadRequiredLuaNumber(state, index + 2) * kDegreesToRadians;
+    }
+
+    manipulator->SetAimingArc(
+      paramsRadians[0],
+      paramsRadians[1],
+      paramsRadians[2] * 0.1f,
+      paramsRadians[3],
+      paramsRadians[4],
+      paramsRadians[5] * 0.1f
+    );
+    return 0;
+  }
+
+  /**
+   * Address: 0x00636BD0 (FUN_00636BD0, cfunc_CBuilderArmManipulatorGetHeadingPitch)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_CBuilderArmManipulatorGetHeadingPitchL`.
+   */
+  int cfunc_CBuilderArmManipulatorGetHeadingPitch(lua_State* const luaContext)
+  {
+    return cfunc_CBuilderArmManipulatorGetHeadingPitchL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00636C50 (FUN_00636C50, cfunc_CBuilderArmManipulatorGetHeadingPitchL)
+   *
+   * What it does:
+   * Pushes current builder-arm heading/pitch values to Lua.
+   */
+  int cfunc_CBuilderArmManipulatorGetHeadingPitchL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 1) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBuilderArmManipulatorGetHeadingPitchHelpText, 1, argumentCount);
+    }
+
+    const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CBuilderArmManipulator* const manipulator = moho::SCR_FromLua_CBuilderArmManipulator(manipulatorObject, state);
+
+    lua_pushnumber(state->m_state, manipulator->mHeading);
+    (void)lua_gettop(state->m_state);
+    lua_pushnumber(state->m_state, manipulator->mPitch);
+    (void)lua_gettop(state->m_state);
+    return 2;
+  }
+
+  /**
+   * Address: 0x00636D30 (FUN_00636D30, cfunc_CBuilderArmManipulatorSetHeadingPitch)
+   *
+   * What it does:
+   * Unwraps raw Lua callback state and forwards to
+   * `cfunc_CBuilderArmManipulatorSetHeadingPitchL`.
+   */
+  int cfunc_CBuilderArmManipulatorSetHeadingPitch(lua_State* const luaContext)
+  {
+    return cfunc_CBuilderArmManipulatorSetHeadingPitchL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
+  /**
+   * Address: 0x00636DB0 (FUN_00636DB0, cfunc_CBuilderArmManipulatorSetHeadingPitchL)
+   *
+   * What it does:
+   * Reads heading/pitch scalar args from Lua and stores them on the builder-arm
+   * manipulator runtime lane.
+   */
+  int cfunc_CBuilderArmManipulatorSetHeadingPitchL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCBuilderArmManipulatorSetHeadingPitchHelpText, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
+    CBuilderArmManipulator* const manipulator = moho::SCR_FromLua_CBuilderArmManipulator(manipulatorObject, state);
+
+    const float pitch = ReadRequiredLuaNumber(state, 3);
+    const float heading = ReadRequiredLuaNumber(state, 2);
+    manipulator->mHeading = heading;
+    manipulator->mPitch = pitch;
+    return 0;
+  }
+
+  /**
    * Address: 0x006445C0 (FUN_006445C0, cfunc_CRotateManipulatorClearGoal)
    *
    * What it does:
@@ -468,7 +638,7 @@ namespace moho
     }
 
     const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
-    CRotateManipulatorRuntimeView* const manipulator = GetRotateManipulatorOptional(manipulatorObject, state);
+    moho::CRotateManipulator* const manipulator = GetRotateManipulatorOptional(manipulatorObject, state);
     if (!manipulator) {
       lua_pushstring(state->m_state, kInvalidRotatorError);
       (void)lua_gettop(state->m_state);

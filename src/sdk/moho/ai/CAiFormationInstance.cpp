@@ -13,6 +13,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
+#include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -413,6 +414,63 @@ namespace
     head->left = head;
     head->right = head;
     map.size = 0u;
+  }
+
+  void DestroyLaneMapStorage(moho::SFormationLaneUnitMap& map)
+  {
+    if (map.head == nullptr) {
+      map.size = 0u;
+      return;
+    }
+
+    ResetLaneMap(map);
+    delete map.head;
+    map.head = nullptr;
+    map.size = 0u;
+  }
+
+  void DestroyCoordCacheMapStorage(moho::SFormationCoordCacheMap& cache)
+  {
+    if (cache.head == nullptr) {
+      cache.size = 0u;
+      return;
+    }
+
+    ResetCoordCacheMap(cache);
+    delete cache.head;
+    cache.head = nullptr;
+    cache.size = 0u;
+  }
+
+  void CleanupFormationTransientState(moho::CAiFormationInstance& formation)
+  {
+    formation.mOccupiedSlots.ResetStorageToInline();
+    DestroyCoordCacheMapStorage(formation.mCoordCachePrimary);
+    DestroyCoordCacheMapStorage(formation.mCoordCacheSecondary);
+    formation.mOrientationBaseline = kZeroQuaternion;
+
+    for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
+      moho::SFormationLaneEntry* lane = formation.mLanes[laneIndex].begin();
+      const moho::SFormationLaneEntry* const laneEnd = formation.mLanes[laneIndex].end();
+      while (lane != laneEnd) {
+        UnlinkWeakWordNode(lane->linkedUnitBackLinkHeadWord, lane->linkedUnitBackLinkNextWord);
+        DestroyLaneMapStorage(lane->unitMap);
+        ++lane;
+      }
+
+      formation.mLanes[laneIndex].ResetStorageToInline();
+    }
+  }
+
+  void CleanupFormationUnitLinks(moho::CAiFormationInstance& formation)
+  {
+    moho::SFormationLinkedUnitRef* unitRef = formation.mUnits.begin();
+    const moho::SFormationLinkedUnitRef* const endRef = formation.mUnits.end();
+    while (unitRef != endRef) {
+      UnlinkLinkedRef(*unitRef);
+      ++unitRef;
+    }
+    formation.mUnits.ResetStorageToInline();
   }
 
   void CollectLaneMapNodes(
@@ -968,7 +1026,9 @@ namespace
     formation.mPlanUpdateRequested = 0u;
     (void)formation.RemoveDeadUnits(nullptr);
 
-    // Full UpdateFormation path remains in-progress in this translation unit.
+    // Binary also executes CFormationInstance::CleanupFormation (0x00568AC0)
+    // and CAiFormationInstance::UpdateFormation (0x00568CA0) here; those
+    // dependencies are tracked separately.
   }
 
   [[nodiscard]] bool IsBusyFormationQueueCommand(const moho::EUnitCommandType commandType) noexcept
@@ -1015,10 +1075,86 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
+   *
+   * What it does:
+   * Models the base `CFormationInstance` speed-stub lane that returns zero
+   * speed for non-specialized formation owners.
+   */
+  float CFormationInstanceCalcFormationSpeedFallback(Unit*, float*, SFormationLaneEntry*)
+  {
+    return 0.0f;
+  }
+
   std::uint32_t* SFormationLinkedUnitRef::NextChainLinkSlot(const std::uint32_t linkWord) noexcept
   {
     auto* const link = reinterpret_cast<SFormationLinkedUnitRefWordView*>(static_cast<std::uintptr_t>(linkWord));
     return &link->nextChainLinkWord;
+  }
+
+  /**
+   * Address: 0x0059A500 (FUN_0059A500, ??1CAiFormationInstance@Moho@@QAE@@Z)
+   * Mangled: ??1CAiFormationInstance@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Clears transient formation caches and lane ownership state, unregisters
+   * this instance from the owning formation DB, then tears down unit links.
+   */
+  CAiFormationInstance::~CAiFormationInstance()
+  {
+    CleanupFormationTransientState(*this);
+    mSim->mFormationDB->RemoveFormation(this);
+    CleanupFormationUnitLinks(*this);
+    mUnitLinkListHead.ListUnlink();
+  }
+
+  /**
+   * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Loads one occupied-slot lane: assigned 2D position, footprint size, and
+   * lane token.
+   */
+  void SFormationOccupiedSlot::MemberDeserialize(SFormationOccupiedSlot* const slot, gpg::ReadArchive* const archive)
+  {
+    if (!archive || !slot) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Read(coordsType, &slot->position, ownerRef);
+    }
+
+    archive->ReadInt(&slot->footprintSize);
+    archive->ReadInt(&slot->laneToken);
+  }
+
+  /**
+   * Address: 0x00570E80 (FUN_00570E80, Moho::SAssignedLocInfo::MemberSerialize)
+   *
+   * What it does:
+   * Stores one occupied-slot lane: assigned 2D position, footprint size, and
+   * lane token.
+   */
+  void SFormationOccupiedSlot::MemberSerialize(const SFormationOccupiedSlot* const slot, gpg::WriteArchive* const archive)
+  {
+    if (!archive || !slot) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Write(coordsType, &slot->position, ownerRef);
+    }
+
+    archive->WriteInt(slot->footprintSize);
+    archive->WriteInt(slot->laneToken);
   }
 
   /**

@@ -15,6 +15,14 @@ namespace moho
     , outputSheet()
   {}
 
+  /**
+   * Address: 0x007EAF90 (FUN_007EAF90, ??0MeshThumbnail@Moho@@QAE@@Z)
+   * Mangled: ??0MeshThumbnail@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Deep-copies the embedded camera payload and value-copy lanes, then
+   * bumps shared ownership on the output-sheet smart pointer lane.
+   */
   MeshThumbnail::MeshThumbnail(const MeshThumbnail& rhs)
     : requestId(rhs.requestId)
     , camera(rhs.camera)

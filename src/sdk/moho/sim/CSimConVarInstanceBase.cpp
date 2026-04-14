@@ -73,6 +73,60 @@ namespace
 CSimConVarInstanceBase::~CSimConVarInstanceBase() = default;
 
 /**
+ * Address: 0x005D41E0 (FUN_005D41E0, Moho::TSimConVarInstance_float::GetPtr)
+ *
+ * What it does:
+ * Returns pointer to the float value lane stored at offset +0x08.
+ */
+template <>
+void* moho::TSimConVarInstance<float>::GetValueStorage()
+{
+  return &mValue;
+}
+
+/**
+ * Address: 0x0057FC80 (FUN_0057FC80, Moho::TSimConVarInstance_bool::GetRRef)
+ *
+ * What it does:
+ * Builds one reflected bool reference for this convar value and copies it
+ * into `outRef`.
+ */
+template <>
+gpg::RRef* moho::TSimConVarInstance<bool>::GetValueRef(gpg::RRef* const outRef)
+{
+  if (outRef == nullptr) {
+    return nullptr;
+  }
+
+  gpg::RRef boolValueRef{};
+  gpg::RRef_bool(&boolValueRef, &mValue);
+  outRef->mObj = boolValueRef.mObj;
+  outRef->mType = boolValueRef.mType;
+  return outRef;
+}
+
+/**
+ * Address: 0x005D41F0 (FUN_005D41F0, Moho::TSimConVarInstance_float::GetRRef)
+ *
+ * What it does:
+ * Builds one reflected float reference for this convar value and copies it
+ * into `outRef`.
+ */
+template <>
+gpg::RRef* moho::TSimConVarInstance<float>::GetValueRef(gpg::RRef* const outRef)
+{
+  if (outRef == nullptr) {
+    return nullptr;
+  }
+
+  gpg::RRef floatValueRef{};
+  gpg::RRef_float(&floatValueRef, &mValue);
+  outRef->mObj = floatValueRef.mObj;
+  outRef->mType = floatValueRef.mType;
+  return outRef;
+}
+
+/**
  * Address: 0x005D4180 (FUN_005D4180, Moho::TSimConVarInstance_float::OnCall)
  *
  * What it does:

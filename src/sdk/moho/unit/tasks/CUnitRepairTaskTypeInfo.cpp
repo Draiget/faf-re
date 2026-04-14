@@ -66,6 +66,13 @@ namespace
     bool mGuardAssistMode;
     bool mInheritingWork;
 
+    /**
+     * Address: 0x005F8BE0 (FUN_005F8BE0, ??0CUnitRepairTask@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes the reflection-construction `CUnitRepairTask` storage lane:
+     * listener self-links, build-helper defaults, and weak-target slots.
+     */
     CUnitRepairTaskReflectionView()
       : CCommandTask()
       , CUnitRepairTaskListenerPad{}

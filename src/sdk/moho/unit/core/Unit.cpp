@@ -14,7 +14,11 @@
 #include <stdexcept>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiAttackerImpl.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiBuilder.h"
@@ -56,6 +60,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SPhysBody.h"
+#include "moho/sim/SPhysConstants.h"
 #include "moho/sim/SimStartupRegistrations.h"
 #include "moho/sim/STIMap.h"
 #include "moho/unit/CUnitMotion.h"
@@ -63,6 +68,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UnitLuaFunctionThunks.h"
 #include "moho/unit/core/UnitWeapon.h"
+#include "moho/unit/tasks/CUnitAssistMoveTask.h"
 #include "moho/unit/core/UserUnit.h"
 
 namespace moho
@@ -931,7 +937,7 @@ namespace
   constexpr std::uint8_t kUnitGetStatWaterOccupancyCaps = static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER);
   constexpr float kUnitGetStatWaterOnlyMaxWaterDepth = 1.5f;
   REntityBlueprint* gUnitGetStatOriginalBlueprint = nullptr;
-  RUnitBlueprint gUnitGetStatBlueprint{};
+  RUnitBlueprint gUnitGetStatBlueprint(nullptr, RResId{});
   constexpr const char* kUnitGetCargoTransportOnlyText = "Unit:GetCargo only valid for transport units";
   constexpr const char* kUnitOnProductionActiveScript = "OnProductionActive";
   constexpr const char* kUnitOnProductionInactiveScript = "OnProductionInActive";
@@ -1201,6 +1207,16 @@ namespace
     }
 
     return bone;
+  }
+
+  [[nodiscard]] CEconomyEvent* EconomyEventFromNode(TDatListItem<void, void>* const node) noexcept
+  {
+    if (node == nullptr) {
+      return nullptr;
+    }
+
+    auto* const rawNode = reinterpret_cast<std::uint8_t*>(node);
+    return reinterpret_cast<CEconomyEvent*>(rawNode - offsetof(CEconomyEvent, mUnitEventNode));
   }
 
   /**
@@ -1594,6 +1610,18 @@ namespace
   }
 
   /**
+   * Address: 0x00594850 (FUN_00594850, func_CastUnit)
+   *
+   * What it does:
+   * Upcasts one reflected object lane to `Unit*` using cached `Unit` RTTI.
+   */
+  [[nodiscard]] Unit* UpcastUnitFromRef(const gpg::RRef& sourceRef)
+  {
+    const gpg::RRef unitRef = gpg::REF_UpcastPtr(sourceRef, CachedUnitRType());
+    return static_cast<Unit*>(unitRef.mObj);
+  }
+
+  /**
    * Address: 0x00593970 (FUN_00593970, func_GetUnitOpt)
    *
    * What it does:
@@ -1632,8 +1660,7 @@ namespace
     }
 
     const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-    const gpg::RRef unitRef = gpg::REF_UpcastPtr(sourceRef, CachedUnitRType());
-    return static_cast<Unit*>(unitRef.mObj);
+    return UpcastUnitFromRef(sourceRef);
   }
 
   [[nodiscard]] Unit* ResolveUnitBridge(UserUnit* const userUnit) noexcept
@@ -2040,14 +2067,6 @@ namespace
     return out;
   }
 
-  struct CollisionDBRect
-  {
-    std::uint16_t xPos;
-    std::uint16_t zPos;
-    std::uint16_t xSize;
-    std::uint16_t zSize;
-  };
-
   [[nodiscard]] CollisionDBRect COORDS_OgridRectToCollisionRect(const gpg::Rect2i& ogridRect) noexcept
   {
     // Address: 0x004FCAA0 (FUN_004FCAA0)
@@ -2057,18 +2076,16 @@ namespace
     const std::int32_t zEnd = (ogridRect.z1 + 3) >> 2;
 
     CollisionDBRect collisionRect{};
-    collisionRect.xPos = static_cast<std::uint16_t>(xPos);
-    collisionRect.zPos = static_cast<std::uint16_t>(zPos);
+    collisionRect.mStartX = static_cast<std::uint16_t>(xPos);
+    collisionRect.mStartZ = static_cast<std::uint16_t>(zPos);
 
-    const std::int32_t maxXSpan = 0xFFFF - static_cast<std::int32_t>(collisionRect.xPos);
-    const std::int32_t maxZSpan = 0xFFFF - static_cast<std::int32_t>(collisionRect.zPos);
-    const std::int32_t xSpan =
-      std::clamp(xEnd - static_cast<std::int32_t>(collisionRect.xPos), std::int32_t{1}, maxXSpan);
-    const std::int32_t zSpan =
-      std::clamp(zEnd - static_cast<std::int32_t>(collisionRect.zPos), std::int32_t{1}, maxZSpan);
+    const std::int32_t maxXSpan = 0xFFFF - static_cast<std::int32_t>(collisionRect.mStartX);
+    const std::int32_t maxZSpan = 0xFFFF - static_cast<std::int32_t>(collisionRect.mStartZ);
+    const std::int32_t xSpan = std::clamp(xEnd - static_cast<std::int32_t>(collisionRect.mStartX), std::int32_t{1}, maxXSpan);
+    const std::int32_t zSpan = std::clamp(zEnd - static_cast<std::int32_t>(collisionRect.mStartZ), std::int32_t{1}, maxZSpan);
 
-    collisionRect.xSize = static_cast<std::uint16_t>(xSpan);
-    collisionRect.zSize = static_cast<std::uint16_t>(zSpan);
+    collisionRect.mWidth = static_cast<std::uint16_t>(xSpan);
+    collisionRect.mHeight = static_cast<std::uint16_t>(zSpan);
     return collisionRect;
   }
 
@@ -2077,10 +2094,7 @@ namespace
     const gpg::Rect2i zeroRect{};
     const CollisionDBRect currentCollisionRect = COORDS_OgridRectToCollisionRect(ogridRect);
     const CollisionDBRect zeroCollisionRect = COORDS_OgridRectToCollisionRect(zeroRect);
-    return currentCollisionRect.xPos == zeroCollisionRect.xPos &&
-      currentCollisionRect.zPos == zeroCollisionRect.zPos &&
-      currentCollisionRect.xSize == zeroCollisionRect.xSize &&
-      currentCollisionRect.zSize == zeroCollisionRect.zSize;
+    return !currentCollisionRect.NotEqual(zeroCollisionRect);
   }
 
   [[nodiscard]] gpg::Rect2i GetReservedOgridRect(const Unit& unit) noexcept
@@ -2416,6 +2430,22 @@ CScrLuaMetatableFactory<Unit>& CScrLuaMetatableFactory<Unit>::Instance()
 LuaPlus::LuaObject CScrLuaMetatableFactory<Unit>::Create(LuaPlus::LuaState* const state)
 {
   return SCR_CreateSimpleMetatable(state);
+}
+
+/**
+ * Address: 0x0067F080 (FUN_0067F080, func_GetUnitFactory)
+ *
+ * What it does:
+ * Returns cached `Unit` metatable object from Lua object-factory storage.
+ */
+LuaPlus::LuaObject* moho::func_GetUnitFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+{
+  if (object == nullptr) {
+    return nullptr;
+  }
+
+  *object = moho::CScrLuaMetatableFactory<moho::Unit>::Instance().Get(state);
+  return object;
 }
 
 namespace
@@ -4263,17 +4293,11 @@ int moho::cfunc_UnitGetTransportFerryBeaconL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  const CUnitCommandQueue* const commandQueue = unit->CommandQueue;
-  if (commandQueue != nullptr && !commandQueue->mCommandVec.empty()) {
-    const CUnitCommand* const command = commandQueue->mCommandVec.front().GetObjectPtr();
-    if (command != nullptr && reinterpret_cast<std::uintptr_t>(command) != kInvalidWeakCommandSentinel) {
-      boost::shared_ptr<Unit> ferryBeaconUnit = command->mUnit.lock();
-      if (ferryBeaconUnit) {
-        LuaPlus::LuaObject ferryBeaconLuaObject = ferryBeaconUnit->GetLuaObject();
-        ferryBeaconLuaObject.PushStack(state);
-        return 1;
-      }
-    }
+  Unit* const ferryBeacon = (unit != nullptr) ? unit->GetTransportFerryBeacon() : nullptr;
+  if (ferryBeacon != nullptr) {
+    LuaPlus::LuaObject ferryBeaconLuaObject = ferryBeacon->GetLuaObject();
+    ferryBeaconLuaObject.PushStack(state);
+    return 1;
   }
 
   lua_pushnil(rawState);
@@ -10368,7 +10392,7 @@ int moho::cfunc_UnitGetVelocityL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
-  const Wm3::Vec3f velocity = unit->Entity::GetVelocity();
+  const Wm3::Vec3f velocity = unit->GetVelocity();
 
   lua_pushnumber(rawState, velocity.x);
   (void)lua_gettop(rawState);
@@ -10647,6 +10671,29 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x0055B6E0 (FUN_0055B6E0, ??0UnitWeaponInfo@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes both category bitset lanes to empty inline storage and seeds
+ * default layer/radius/UI range visual-id values.
+ */
+UnitWeaponInfo::UnitWeaponInfo()
+  : mCat1()
+  , mCat2()
+  , mLayer(LAYER_None)
+  , mMinRadius(0.0f)
+  , mMaxRadius(10000.0f)
+  , mEffectiveRadius(0.0f)
+  , mUIMinRangeVisualId()
+  , mUIMaxRangeVisualId()
+{
+  mCat1.ResetToEmpty(EntityCategoryHelper{});
+  mCat2.ResetToEmpty(EntityCategoryHelper{});
+  mUIMinRangeVisualId.tidy(false, 0U);
+  mUIMaxRangeVisualId.tidy(false, 0U);
+}
+
+/**
  * Address: 0x0055D170 (FUN_0055D170, ??1UnitWeaponInfo@Moho@@QAE@@Z)
  *
  * What it does:
@@ -10873,6 +10920,42 @@ SSTIUnitVariableData const& Unit::VarDat() const noexcept
 }
 
 /**
+ * Address: 0x006A4920 (FUN_006A4920, Moho::Unit::StaticGetClass)
+ *
+ * What it does:
+ * Returns cached reflection descriptor for `Unit`.
+ */
+gpg::RType* Unit::StaticGetClass()
+{
+  return CachedUnitRType();
+}
+
+/**
+ * Address: 0x006A4940 (FUN_006A4940, Moho::Unit::GetClass)
+ *
+ * What it does:
+ * Returns cached reflection descriptor for `Unit`.
+ */
+gpg::RType* Unit::GetClass() const
+{
+  return StaticGetClass();
+}
+
+/**
+ * Address: 0x006A4960 (FUN_006A4960, Moho::Unit::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef Unit::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = GetClass();
+  return ref;
+}
+
+/**
  * Address: 0x006A4BC0 (FUN_006A4BC0)
  *
  * What it does:
@@ -10945,6 +11028,36 @@ gpg::Rect2f Unit::GetSkirtRect() const
   const SCoordsVec2 unitPos2d{unitPosition.x, unitPosition.z};
   const RUnitBlueprint* const blueprint = GetBlueprint();
   return blueprint->GetSkirtRect(unitPos2d);
+}
+
+/**
+ * Address: 0x0062CC40 (FUN_0062CC40, Moho::Unit::IsAtPosition)
+ *
+ * What it does:
+ * Compares this unit's footprint-aligned grid anchor against one candidate
+ * world position using the same half-footprint cell projection.
+ */
+bool Unit::IsAtPosition(const Wm3::Vec3f& position) const
+{
+  const SFootprint& unitFootprint = GetFootprint();
+  const Wm3::Vec3f& currentPosition = GetPosition();
+
+  const std::int16_t currentCellZ = static_cast<std::int16_t>(
+    static_cast<int>(currentPosition.z - static_cast<float>(unitFootprint.mSizeZ) * 0.5f)
+  );
+  const std::int16_t currentCellX = static_cast<std::int16_t>(
+    static_cast<int>(currentPosition.x - static_cast<float>(unitFootprint.mSizeX) * 0.5f)
+  );
+
+  const SFootprint& targetFootprint = GetFootprint();
+  const std::int16_t targetCellZ = static_cast<std::int16_t>(
+    static_cast<int>(position.z - static_cast<float>(targetFootprint.mSizeZ) * 0.5f)
+  );
+  const std::int16_t targetCellX = static_cast<std::int16_t>(
+    static_cast<int>(position.x - static_cast<float>(targetFootprint.mSizeX) * 0.5f)
+  );
+
+  return currentCellX == targetCellX && currentCellZ == targetCellZ;
 }
 
 /**
@@ -11074,6 +11187,108 @@ Wm3::Vec3f Unit::GetTargetPoint(std::int32_t targetPoint) const
 }
 
 /**
+ * Address: 0x006AA5C0 (FUN_006AA5C0, ?GetBoneWorldTransform@Unit@Moho@@UBE?AVVTransform@2@H@Z)
+ *
+ * What it does:
+ * Resolves one unit bone world transform from pose composite lanes when the
+ * bone index is valid, otherwise composes unit world transform with the
+ * fallback local anchor (`+SizeY*0.5` for root `-1`).
+ */
+VTransform Unit::GetBoneWorldTransform(const int boneIndex) const
+{
+  if (AniActor != nullptr && AniActor->mPose.px != nullptr && boneIndex >= 0) {
+    const CAniPose* const pose = AniActor->mPose.px;
+    const CAniPoseBone* const bonesBegin = pose->mBones.begin();
+    const CAniPoseBone* const bonesEnd = pose->mBones.end();
+    if (bonesBegin != nullptr && bonesEnd != nullptr && bonesEnd >= bonesBegin) {
+      const std::size_t boneCount = static_cast<std::size_t>(bonesEnd - bonesBegin);
+      if (static_cast<std::size_t>(boneIndex) < boneCount) {
+        return bonesBegin[boneIndex].GetCompositeTransform();
+      }
+    }
+  }
+
+  VTransform localAnchor{};
+  localAnchor.orient_.w = 1.0f;
+  localAnchor.orient_.x = 0.0f;
+  localAnchor.orient_.y = 0.0f;
+  localAnchor.orient_.z = 0.0f;
+  localAnchor.pos_.x = 0.0f;
+  localAnchor.pos_.y = 0.0f;
+  localAnchor.pos_.z = 0.0f;
+
+  if (boneIndex == -1) {
+    if (const RUnitBlueprint* const blueprint = GetBlueprint(); blueprint != nullptr) {
+      localAnchor.pos_.y = blueprint->mSizeY * 0.5f;
+    }
+  }
+
+  return VTransform::Compose(GetTransform(), localAnchor);
+}
+
+/**
+ * Address: 0x006AA440 (FUN_006AA440, ?GetBoneLocalTransform@Unit@Moho@@UBE?AVVTransform@2@H@Z)
+ *
+ * What it does:
+ * Resolves one unit bone local transform from animation pose composite lanes,
+ * with `-1` fallback to blueprint center-height anchor.
+ */
+VTransform Unit::GetBoneLocalTransform(const int boneIndex) const
+{
+  VTransform localTransform{};
+  localTransform.orient_.w = 1.0f;
+  localTransform.orient_.x = 0.0f;
+  localTransform.orient_.y = 0.0f;
+  localTransform.orient_.z = 0.0f;
+  localTransform.pos_.x = 0.0f;
+  localTransform.pos_.y = 0.0f;
+  localTransform.pos_.z = 0.0f;
+
+  if (AniActor != nullptr && AniActor->mPose.px != nullptr) {
+    const CAniPose* const pose = AniActor->mPose.px;
+    const CAniPoseBone* const bonesBegin = pose->mBones.begin();
+    const CAniPoseBone* const bonesEnd = pose->mBones.end();
+    if (bonesBegin != nullptr && bonesEnd != nullptr && bonesEnd >= bonesBegin) {
+      const std::size_t boneCount = static_cast<std::size_t>(bonesEnd - bonesBegin);
+      if (boneIndex >= 0 && static_cast<std::size_t>(boneIndex) < boneCount) {
+        localTransform = bonesBegin[boneIndex].GetCompositeTransform();
+        const VTransform poseInverse = pose->mLocalTransform.Inverse();
+        localTransform = VTransform::Compose(localTransform, poseInverse);
+        return localTransform;
+      }
+    }
+  }
+
+  if (boneIndex == -1) {
+    localTransform.pos_.y = GetBlueprint()->mSizeY * 0.5f;
+  }
+
+  return localTransform;
+}
+
+/**
+ * Address: 0x006ABB90 (FUN_006ABB90, ?SetPoses@Unit@Moho@@QAEXABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
+ *
+ * What it does:
+ * Copies prior/current shared animation poses into variable-data lanes and
+ * mirrors them into `AniActor::{mPose,mPriorPose}`.
+ */
+void Unit::SetPoses(
+  const boost::shared_ptr<CAniPose>& priorSharedPose,
+  const boost::shared_ptr<CAniPose>& sharedPose
+)
+{
+  SSTIUnitVariableData& varDat = VarDat();
+  varDat.mSharedPose = sharedPose;
+  varDat.mPriorSharedPose = priorSharedPose;
+
+  const boost::SharedPtrRaw<CAniPose> sharedPoseRaw = boost::SharedPtrRawFromSharedBorrow(sharedPose);
+  const boost::SharedPtrRaw<CAniPose> priorSharedPoseRaw = boost::SharedPtrRawFromSharedBorrow(priorSharedPose);
+  AniActor->mPose.assign_retain(sharedPoseRaw);
+  AniActor->mPriorPose.assign_retain(priorSharedPoseRaw);
+}
+
+/**
  * Address: 0x006A9E50 (FUN_006A9E50, ?CanBuild@Unit@Moho@@QBE_NPBVRUnitBlueprint@2@@Z)
  *
  * What it does:
@@ -11094,16 +11309,148 @@ bool Unit::CanBuild(const RUnitBlueprint* const blueprint) const
     !unitBuildRestrictions.ContainsBit(categoryBitIndex);
 }
 
+/**
+ * Address: 0x0062D780 (FUN_0062D780, Moho::Unit::CanStartBuilding)
+ *
+ * What it does:
+ * Returns true when this unit's army economy can start a build tick from
+ * stored resources or by satisfying required income gates.
+ */
+bool Unit::CanStartBuilding(const float energyCost, const float massCost) const
+{
+  constexpr float kBuildResourceEpsilon = 0.001f;
+
+  if (ArmyRef == nullptr) {
+    return false;
+  }
+
+  const CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy();
+  if (economyInfo == nullptr) {
+    return false;
+  }
+
+  const SEconTotals& totals = economyInfo->economy;
+  if (totals.mStored.ENERGY > kBuildResourceEpsilon && totals.mStored.MASS > kBuildResourceEpsilon) {
+    return true;
+  }
+
+  const bool hasEnergyBudget = (energyCost <= 0.0f) || (totals.mIncome.ENERGY >= kBuildResourceEpsilon);
+  const bool hasMassBudget = (massCost <= 0.0f) || (totals.mIncome.MASS >= kBuildResourceEpsilon);
+  return hasEnergyBudget && hasMassBudget;
+}
+
 // 0x006A49D0
 LuaPlus::LuaObject Unit::GetLuaObject()
 {
   return mLuaObj;
 }
 
-// 0x006A8B30
+/**
+ * Address: 0x00603F10 (FUN_00603F10, Moho::Unit::DecrementCapturers)
+ *
+ * What it does:
+ * Decrements the non-negative captor reference count at `CaptorCount`
+ * (+0x690), clamped at zero. Returns the post-decrement count.
+ */
+std::int32_t Unit::DecrementCapturers()
+{
+  if (CaptorCount > 0) {
+    --CaptorCount;
+  }
+  return CaptorCount;
+}
+
+/**
+ * Address: 0x006A75C0 (FUN_006A75C0, ?GetMaxFootprintSize@Unit@Moho@@QBEHXZ)
+ *
+ * What it does:
+ * Returns the larger side length of this unit's footprint (`sizeX`/`sizeZ`).
+ */
+int Unit::GetMaxFootprintSize() const
+{
+  const SFootprint& footprint = GetFootprint();
+  const int sizeX = static_cast<int>(footprint.mSizeX);
+  const int sizeZ = static_cast<int>(footprint.mSizeZ);
+  return (sizeX >= sizeZ) ? sizeX : sizeZ;
+}
+
+/**
+ * Address: 0x006A7640 (FUN_006A7640, Moho::Unit::SetFocusEntity)
+ * Mangled: ?SetFocusEntity@Unit@Moho@@QAEXPAVEntity@2@@Z
+ *
+ * What it does:
+ * Rebinds the focus-entity weak reference at +0x4D0, runs the
+ * `OnAssignedFocusEntity` Lua callback when the slot now holds a live
+ * target (non-null, non-sentinel), then unconditionally marks the unit
+ * dirty for sync replication.
+ */
+void Unit::SetFocusEntity(Entity* const focusEntity)
+{
+  FocusEntityRef.ResetObjectPtr<Entity>(focusEntity);
+
+  const WeakPtr<Entity>& focusLane = FocusEntityRef.AsWeakPtr<Entity>();
+  if (focusLane.HasValue()) {
+    RunScript(kUnitOnAssignedFocusEntityScript);
+  }
+
+  NeedSyncGameData = true;
+}
+
+/**
+ * Address: 0x006A7680 (FUN_006A7680, ?SetTargetBlipEntity@Unit@Moho@@QAEXPAVEntity@2@@Z)
+ *
+ * What it does:
+ * Rebinds target-blip weak-reference ownership and marks unit sync state
+ * dirty for replication.
+ */
+void Unit::SetTargetBlipEntity(Entity* const blipEntity)
+{
+  TargetBlipEntityRef.AsWeakPtr<Entity>().Set(blipEntity);
+  NeedSyncGameData = true;
+}
+
+/**
+ * Address: 0x006A8B30 (FUN_006A8B30, ?CalcTransportLoadFactor@Unit@Moho@@UBEMXZ)
+ *
+ * What it does:
+ * Returns cached transport load-factor for carried units; when the cache is
+ * invalid (`< 0`), recomputes it from own mass and attached-unit masses.
+ */
 float Unit::CalcTransportLoadFactor() const
 {
-  return 1.0f;
+  if (GetTransportedBy() == nullptr) {
+    return 1.0f;
+  }
+
+  if (TransportLoadFactor < 0.0f) {
+    const RUnitBlueprint* const thisBlueprint = GetBlueprint();
+    const float thisMass = thisBlueprint != nullptr
+      ? (thisBlueprint->mAverageDensity * thisBlueprint->mSizeZ) * thisBlueprint->mSizeY * thisBlueprint->mSizeX
+      : 0.0f;
+
+    float attachedMass = 0.0f;
+    if (thisMass > 0.0f) {
+      for (Entity* const attachedEntity : mAttachedEntities) {
+        Unit* const attachedUnit = attachedEntity != nullptr ? attachedEntity->IsUnit() : nullptr;
+        if (attachedUnit == nullptr) {
+          continue;
+        }
+
+        const RUnitBlueprint* const attachedBlueprint = attachedUnit->GetBlueprint();
+        if (attachedBlueprint == nullptr) {
+          continue;
+        }
+
+        attachedMass +=
+          (attachedBlueprint->mAverageDensity * attachedBlueprint->mSizeZ) * attachedBlueprint->mSizeY *
+          attachedBlueprint->mSizeX;
+      }
+
+      const_cast<Unit*>(this)->TransportLoadFactor = (attachedMass + thisMass) / thisMass;
+    }
+  }
+
+  return TransportLoadFactor;
 }
 
 // 0x006A49F0
@@ -11128,6 +11475,141 @@ bool Unit::IsMobile() const
 bool Unit::IsBeingBuilt() const
 {
   return BeingBuilt != 0;
+}
+
+/**
+ * Address: 0x006A4BD0 (FUN_006A4BD0, Moho::Unit::GetUniformScale)
+ *
+ * What it does:
+ * Returns display uniform scale from the unit blueprint lane.
+ */
+float Unit::GetUniformScale() const
+{
+  return GetBlueprint()->Display.UniformScale;
+}
+
+/**
+ * Address: 0x006A9C90 (FUN_006A9C90, Moho::Unit::GetVelocity)
+ *
+ * What it does:
+ * Returns motion velocity when a unit-motion lane is active on non-air
+ * layers; otherwise computes per-tick position delta scaled by
+ * `mVelocityScale`.
+ */
+Wm3::Vec3f Unit::GetVelocity() const
+{
+  if (UnitMotion != nullptr && mCurrentLayer != LAYER_Air) {
+    return UnitMotion->mVelocity;
+  }
+
+  Wm3::Vec3f velocity{};
+  velocity.x = (Position.x - PrevPosition.x) * mVelocityScale;
+  velocity.y = (Position.y - PrevPosition.y) * mVelocityScale;
+  velocity.z = (Position.z - PrevPosition.z) * mVelocityScale;
+  return velocity;
+}
+
+/**
+ * Address: 0x006A9350 (FUN_006A9350, Moho::Unit::AdjustHealth)
+ *
+ * What it does:
+ * Forwards unit health adjustments to the shared `Entity` health mutation
+ * path.
+ */
+void Unit::AdjustHealth(Entity* const instigator, const float delta)
+{
+  Entity::AdjustHealth(instigator, delta);
+}
+
+/**
+ * Address: 0x006A9A40 (FUN_006A9A40, Moho::Unit::HandleTerranEffects)
+ *
+ * What it does:
+ * Reads terrain-type Lua data for this unit, applies periodic
+ * `HealthEffectPerSecond` scaling against max health every 10 ticks, and
+ * kills the unit when health reaches zero.
+ */
+void Unit::HandleTerranEffects()
+{
+  LuaPlus::LuaObject terrainType = SimulationRef->mMapData->GetTerrainType(CurrentTerrainType);
+  if (!terrainType.IsTable()) {
+    return;
+  }
+
+  if ((SimulationRef->mCurTick % 10u) != 0u) {
+    return;
+  }
+
+  LuaPlus::LuaObject healthEffect = terrainType["HealthEffectPerSecond"];
+  if (healthEffect.IsNil()) {
+    return;
+  }
+
+  const float delta = healthEffect.GetNumber() * MaxHealth;
+  AdjustHealth(nullptr, delta);
+  if (Health <= 0.0f) {
+    Kill(nullptr, "", 0.0f);
+  }
+}
+
+/**
+ * Address: 0x006ABC30 (FUN_006ABC30, Moho::Unit::UpdateVisibility)
+ *
+ * What it does:
+ * Recomputes base entity visibility lanes, then keeps unit visibility enabled
+ * only for the focused army or when no army is focused.
+ */
+void Unit::UpdateVisibility()
+{
+  Entity::UpdateVisibility();
+  const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
+  mVisibilityState = static_cast<std::uint8_t>(focusArmy == -1 || focusArmy == ArmyRef->ArmyId);
+}
+
+/**
+ * Address: 0x006AB410 (FUN_006AB410, ?AttachTo@Unit@Moho@@UAE_NABUSEntAttachInfo@2@@Z)
+ *
+ * What it does:
+ * Attaches through `Entity::AttachTo`, then (for mobile units) notifies unit
+ * motion and sets attached-state bit; resets cached transport load factor.
+ */
+bool Unit::AttachTo(const SEntAttachInfo& attachInfo)
+{
+  if (!Entity::AttachTo(attachInfo)) {
+    return false;
+  }
+
+  if (IsMobile()) {
+    UnitMotion->NotifyAttached(attachInfo);
+    UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Attached));
+  }
+
+  TransportLoadFactor = -1.0f;
+  return true;
+}
+
+/**
+ * Address: 0x006AB480 (FUN_006AB480, ?DetachFrom@Unit@Moho@@UAE_NPAVEntity@2@_N@Z)
+ *
+ * What it does:
+ * Detaches through `Entity::DetachFrom`, then (for mobile units) notifies unit
+ * motion and clears attached-state bit; resets cached transport load factor
+ * and unlinks the transport weak-pointer chain.
+ */
+bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
+{
+  if (!Entity::DetachFrom(parent, skipBallistic)) {
+    return false;
+  }
+
+  if (IsMobile()) {
+    UnitMotion->NotifyDetached(parent, skipBallistic);
+    UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Attached));
+  }
+
+  TransportLoadFactor = -1.0f;
+  TransportedByRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
+  return true;
 }
 
 /**
@@ -11196,6 +11678,29 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
 }
 
 /**
+ * Address: 0x006D3A40 (FUN_006D3A40, Moho::Unit::CalcBombDrop)
+ *
+ * What it does:
+ * Scales current world velocity by ten ticks and resolves one ballistic
+ * drop-point lane against `targetPosition` using sim gravity.
+ */
+Wm3::Vec3f* Unit::CalcBombDrop(Wm3::Vec3f* const out, const Wm3::Vec3f& targetPosition) const
+{
+  Wm3::Vec3f velocity = Entity::GetVelocity();
+  velocity.x *= 10.0f;
+  velocity.y *= 10.0f;
+  velocity.z *= 10.0f;
+
+  return ComputeBombDropAimPoint(
+    velocity,
+    out,
+    SimulationRef->mPhysConstants->mGravity,
+    targetPosition,
+    GetPosition()
+  );
+}
+
+/**
  * Address: 0x006A7B90 (FUN_006A7B90, ?InitializeArmor@Unit@Moho@@AAEXXZ)
  *
  * What it does:
@@ -11259,6 +11764,64 @@ bool Unit::IsBusy() const
   }
 
   return true;
+}
+
+/**
+ * Address: 0x005F0E80 (FUN_005F0E80, Moho::Unit::NeedsPickup)
+ *
+ * What it does:
+ * Estimates whether assisting `task->mUnit` should switch to pickup by
+ * comparing this unit's goal ETA against assisted-unit interception ETA.
+ */
+bool Unit::NeedsPickup(const CUnitAssistMoveTask* const task) const
+{
+  if (IsUnitState(UNITSTATE_ProblemGettingToGoal)) {
+    return true;
+  }
+
+  const Unit* const assistedUnit = task ? task->mUnit : nullptr;
+  if (assistedUnit == nullptr) {
+    return false;
+  }
+
+  const RUnitBlueprint* const assistedBlueprint = assistedUnit->GetBlueprint();
+  const float assistedMaxSpeed =
+    (assistedBlueprint->Air.CanFly != 0u) ? assistedBlueprint->Air.MaxAirspeed : assistedBlueprint->Physics.MaxSpeed;
+  if (assistedMaxSpeed < 0.001f) {
+    return false;
+  }
+
+  const RUnitBlueprint* const selfBlueprint = GetBlueprint();
+  const float selfMaxSpeed = (selfBlueprint->Air.CanFly != 0u) ? selfBlueprint->Air.MaxAirspeed : selfBlueprint->Physics.MaxSpeed;
+  if (selfMaxSpeed < 0.001f) {
+    return false;
+  }
+
+  const IAiNavigator* const navigator = AiNavigator;
+  if (navigator == nullptr) {
+    return false;
+  }
+
+  const Wm3::Vec3f& selfPosition = GetPosition();
+  const Wm3::Vector3f goalPosition = navigator->GetGoalPos();
+  const float goalDx = goalPosition.x - selfPosition.x;
+  const float goalDz = goalPosition.z - selfPosition.z;
+  const float goalDistance = std::sqrt((goalDx * goalDx) + (goalDz * goalDz));
+  const float goalTime = goalDistance / selfMaxSpeed;
+
+  const Wm3::Vec3f& assistedPosition = assistedUnit->GetPosition();
+  const float taskDx = assistedPosition.x - selfPosition.x;
+  const float taskDz = assistedPosition.z - selfPosition.z;
+  const float taskDistance = std::sqrt((taskDx * taskDx) + (taskDz * taskDz));
+
+  float pickupEta = ((taskDistance + goalDistance) / assistedMaxSpeed) + 5.0f;
+  if (assistedUnit->mCurrentLayer == LAYER_Air || taskDistance > selfBlueprint->AI.GuardScanRadius) {
+    pickupEta += 4.0f;
+  } else {
+    pickupEta += taskDistance / selfMaxSpeed;
+  }
+
+  return goalTime > pickupEta;
 }
 
 /**
@@ -11456,6 +12019,29 @@ Unit* Unit::GetTransportedBy() const
 }
 
 /**
+ * Address: 0x006A8890 (FUN_006A8890, Moho::Unit::GetTransportFerryBeacon)
+ *
+ * What it does:
+ * Returns ferry-beacon unit ownership from the current command-queue head
+ * command when the weak unit lane resolves to a live unit.
+ */
+Unit* Unit::GetTransportFerryBeacon() const
+{
+  const CUnitCommandQueue* const commandQueue = CommandQueue;
+  if (commandQueue == nullptr || commandQueue->mCommandVec.empty()) {
+    return nullptr;
+  }
+
+  const CUnitCommand* const command = commandQueue->mCommandVec.front().GetObjectPtr();
+  if (command == nullptr || reinterpret_cast<std::uintptr_t>(command) == kInvalidWeakCommandSentinel) {
+    return nullptr;
+  }
+
+  boost::shared_ptr<Unit> ferryBeacon = command->mUnit.lock();
+  return ferryBeacon.get();
+}
+
+/**
  * Address: 0x005F5540 (FUN_005F5540, Moho::Unit::GetCreator)
  *
  * What it does:
@@ -11464,6 +12050,222 @@ Unit* Unit::GetTransportedBy() const
 Unit* Unit::GetCreator() const
 {
   return CreatorRef.ResolveObjectPtr<Unit>();
+}
+
+/**
+ * Address: 0x006AD5D0 (FUN_006AD5D0, ?SerEconomyEvents@Unit@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Reads tracked owned `CEconomyEvent*` lanes until a null terminator is read,
+ * unlinking each loaded event node from its prior ring and linking it into
+ * this unit's event-list head.
+ */
+void Unit::SerEconomyEvents(gpg::ReadArchive& archive, const int)
+{
+  CEconomyEvent* economyEvent = nullptr;
+  gpg::RRef ownerRef{};
+  archive.ReadPointerOwned_CEconomyEvent(&economyEvent, &ownerRef);
+
+  while (economyEvent != nullptr) {
+    economyEvent->mUnitEventNode.ListLinkBefore(&mEconomyEventListHead);
+    economyEvent = nullptr;
+    ownerRef = gpg::RRef{};
+    archive.ReadPointerOwned_CEconomyEvent(&economyEvent, &ownerRef);
+  }
+}
+
+/**
+ * Address: 0x006AD540 (FUN_006AD540, ?SerEconomyEvents@Unit@Moho@@ABEXAAVWriteArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Serializes unit-owned economy-event pointer lanes as tracked owned pointers,
+ * then writes a null terminator pointer lane.
+ */
+void Unit::SerEconomyEvents(gpg::WriteArchive& archive, const int) const
+{
+  const TDatListItem<void, void>* const listHead = &mEconomyEventListHead;
+  for (TDatListItem<void, void>* node = mEconomyEventListHead.mNext; node != listHead; node = node->mNext) {
+    gpg::RRef eventOwnerRef{};
+    gpg::RRef eventRef{};
+    gpg::RRef_CEconomyEvent(&eventRef, EconomyEventFromNode(node));
+    gpg::WriteRawPointer(&archive, eventRef, gpg::TrackedPointerState::Owned, eventOwnerRef);
+  }
+
+  gpg::RRef tailOwnerRef{};
+  gpg::RRef nullRef{};
+  gpg::RRef_CEconomyEvent_P(&nullRef, nullptr);
+  gpg::WriteRawPointer(&archive, nullRef, gpg::TrackedPointerState::Owned, tailOwnerRef);
+}
+
+/**
+ * Address: 0x0062D2B0 (FUN_0062D2B0, Moho::Unit::OverlapsWith)
+ *
+ * What it does:
+ * Returns true when this unit skirt rectangle overlaps `other` using the
+ * original 1.0f edge-contact tolerance checks.
+ */
+bool Unit::OverlapsWith(Unit* const other) const
+{
+  if (other == nullptr || IsDead() || other->IsDead()) {
+    return false;
+  }
+
+  const gpg::Rect2f thisSkirt = GetSkirtRect();
+  const gpg::Rect2f otherSkirt = other->GetSkirtRect();
+
+  const float xEdgeDelta0 = std::fabs(thisSkirt.x0 - otherSkirt.x1);
+  const float xEdgeDelta1 = std::fabs(thisSkirt.x1 - otherSkirt.x0);
+  const bool xEdge0WithinTolerance = xEdgeDelta0 >= 0.0f && xEdgeDelta0 < 1.0f;
+  const bool xEdge1WithinTolerance = xEdgeDelta1 >= 0.0f && xEdgeDelta1 < 1.0f;
+
+  if (xEdge0WithinTolerance || xEdge1WithinTolerance) {
+    return (thisSkirt.z0 >= otherSkirt.z0 && otherSkirt.z1 >= thisSkirt.z1) ||
+      (otherSkirt.z0 >= thisSkirt.z0 && thisSkirt.z1 >= otherSkirt.z1);
+  }
+
+  const float yEdgeDelta0 = std::fabs(thisSkirt.z0 - otherSkirt.z1);
+  const float yEdgeDelta1 = std::fabs(thisSkirt.z1 - otherSkirt.z0);
+  const bool yEdge0WithinTolerance = yEdgeDelta0 >= 0.0f && yEdgeDelta0 < 1.0f;
+  const bool yEdge1WithinTolerance = yEdgeDelta1 >= 0.0f && yEdgeDelta1 < 1.0f;
+
+  if (!(yEdge0WithinTolerance || yEdge1WithinTolerance)) {
+    return false;
+  }
+
+  return (thisSkirt.x0 >= otherSkirt.x0 && otherSkirt.x1 >= thisSkirt.x1) ||
+    (otherSkirt.x0 >= thisSkirt.x0 && thisSkirt.x1 >= otherSkirt.x1);
+}
+
+/**
+ * Address: 0x006A8C20 (FUN_006A8C20, Moho::Unit::GetFormationVector)
+ *
+ * What it does:
+ * Resolves one unit movement vector from formation runtime lanes, with
+ * air-leader fallback to leader forward heading when applicable.
+ */
+Wm3::Vector3f Unit::GetFormationVector() const
+{
+  Wm3::Vector3f result{0.0f, 0.0f, 0.0f};
+
+  if (IsUnitState(UNITSTATE_TransportLoading) || IsUnitState(UNITSTATE_Refueling) ||
+      mInfoCache.mFormationLayer == nullptr) {
+    return result;
+  }
+
+  if (mIsAir) {
+    const Unit* const formationLead = mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    if (formationLead != nullptr && !formationLead->mIsAir) {
+      return ForwardXZ(*formationLead);
+    }
+  }
+
+  const auto* const formationLayer = reinterpret_cast<const CAiFormationInstance*>(mInfoCache.mFormationLayer);
+  if (formationLayer != nullptr && formationLayer->CommandIsForm()) {
+    formationLayer->Func19(&result, const_cast<Unit*>(this));
+  }
+
+  return result;
+}
+
+/**
+ * Address: 0x006A9720 (FUN_006A9720, Moho::Unit::GetFormation)
+ *
+ * What it does:
+ * Resolves active formation ownership either from guarded-unit formation lane
+ * or from the current command queue head command.
+ */
+IFormationInstance* Unit::GetFormation() const
+{
+  Unit* const guardedUnit = GuardedUnitRef.ResolveObjectPtr<Unit>();
+  if (guardedUnit != nullptr && !mIsEngineer) {
+    if (IsUnitState(UNITSTATE_GuardBusy)) {
+      return nullptr;
+    }
+
+    return guardedUnit->GuardFormation;
+  }
+
+  const CUnitCommandQueue* const commandQueue = CommandQueue;
+  if (commandQueue != nullptr && !commandQueue->mCommandVec.empty()) {
+    CUnitCommand* const currentCommand = commandQueue->mCommandVec.front().GetObjectPtr();
+    if (currentCommand != nullptr) {
+      CAiFormationInstance* const commandFormation = currentCommand->mFormationInstance;
+      if (commandFormation != nullptr && commandFormation->Func17(const_cast<Unit*>(this), true)) {
+        return commandFormation;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+/**
+ * Address: 0x006A9810 (FUN_006A9810, Moho::Unit::UpdateInfoCache)
+ *
+ * What it does:
+ * Refreshes cached formation-owner/speed lanes and recomputes movement top
+ * speed for mobile units.
+ */
+void Unit::UpdateInfoCache()
+{
+  if (!IsMobile()) {
+    return;
+  }
+
+  CAiFormationInstance* const formation = reinterpret_cast<CAiFormationInstance*>(GetFormation());
+  SFormationLaneEntry* laneEntry = nullptr;
+
+  if (formation != nullptr && formation->CommandIsForm() && formation->Func17(this, false)) {
+    laneEntry = formation->Func6(this);
+    mInfoCache.mFormationLayer = reinterpret_cast<CFormationInstance*>(formation);
+    mInfoCache.mHasFormationSpeedData = formation->Func21(this);
+
+    Unit* const formationLead = formation->Func14(this, laneEntry);
+    mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().Set(formationLead);
+
+    Wm3::Vec3f headingHint{};
+    formation->Func10(&headingHint, this, laneEntry);
+    mInfoCache.mFormationHeadingHint = headingHint;
+    mInfoCache.mFormationDistanceMetric = formation->Func11(this, laneEntry);
+    mInfoCache.mFormationPriorityOrder = formation->Func12(this, laneEntry);
+  } else {
+    mInfoCache.mFormationLayer = nullptr;
+    mInfoCache.mHasFormationSpeedData = true;
+    mInfoCache.mFormationLeadRef.AsWeakPtr<Unit>().Set(nullptr);
+    mInfoCache.mFormationHeadingHint = GetPosition();
+    mInfoCache.mFormationDistanceMetric = 0.0f;
+    mInfoCache.mFormationPriorityOrder = 0;
+  }
+
+  const RUnitBlueprint* const blueprint = GetBlueprint();
+  if (blueprint == nullptr) {
+    mInfoCache.mFormationTopSpeed = 0.0f;
+    return;
+  }
+
+  const float speedMult = GetAttributes().moveSpeedMult;
+  float topSpeed = 0.0f;
+  if (!blueprint->Air.CanFly) {
+    topSpeed = blueprint->Physics.MaxSpeed * speedMult;
+  } else {
+    topSpeed = (blueprint->Air.MaxAirspeed * speedMult) / CalcTransportLoadFactor();
+  }
+
+  float speedScale = 1.0f;
+  float clampedFormationSpeed = topSpeed;
+  if (formation != nullptr && laneEntry != nullptr) {
+    const float formationSpeed = formation->CalcFormationSpeed(this, &speedScale, laneEntry);
+    if (formationSpeed > 0.0f) {
+      clampedFormationSpeed = (formationSpeed > topSpeed) ? topSpeed : formationSpeed;
+    }
+  }
+
+  const float scaledSpeed = speedScale * clampedFormationSpeed;
+  if (scaledSpeed <= topSpeed) {
+    topSpeed = scaledSpeed;
+  }
+
+  mInfoCache.mFormationTopSpeed = topSpeed;
 }
 
 /**
@@ -11829,6 +12631,38 @@ void Unit::ExecuteOccupyGround()
     rect.z1 = RoundOccupyRectEdge(unitPos.z + occupyRect.CenterOffsetZ + occupyRect.HalfSizeZ);
     ApplyOccupancyRect(occupancyCaps, ogrid, rect);
   }
+}
+
+/**
+ * Address: 0x006A7AB0 (FUN_006A7AB0, Moho::Unit::ReleaseOccupyGround)
+ *
+ * What it does:
+ * Clears the occupied-ground lane previously applied by `ExecuteOccupyGround`
+ * and releases the matching footprint rectangle from the sim O-grid.
+ */
+void Unit::ReleaseOccupyGround()
+{
+  if (!FootprintDown) {
+    return;
+  }
+
+  const SFootprint& footprint = GetFootprint();
+  const Wm3::Vec3f& unitPos = GetPosition();
+  gpg::Rect2i occupyRect{};
+  occupyRect.x0 = static_cast<std::int16_t>(
+    static_cast<std::int32_t>(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+  );
+  occupyRect.z0 = static_cast<std::int16_t>(
+    static_cast<std::int32_t>(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+  );
+  occupyRect.x1 = static_cast<std::int16_t>(occupyRect.x0 + static_cast<std::int32_t>(footprint.mSizeX));
+  occupyRect.z1 = static_cast<std::int16_t>(occupyRect.z0 + static_cast<std::int32_t>(footprint.mSizeZ));
+
+  if (SimulationRef != nullptr && SimulationRef->mOGrid != nullptr) {
+    SimulationRef->mOGrid->ReleaseOccupy(footprint.mOccupancyCaps, occupyRect);
+  }
+
+  FootprintDown = false;
 }
 
 /**

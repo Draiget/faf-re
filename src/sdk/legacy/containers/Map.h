@@ -154,16 +154,33 @@ namespace msvc8
             }
             pointer operator->() const noexcept { return std::addressof(**this); }
 
-            /** Pre-increment (next in-order). */
+            /**
+             * Address: 0x0094F030 (FUN_0094F030, std::map_RType_int::iterator::operator++)
+             *
+             * What it does:
+             * Advances this iterator by one tree step using header-aware
+             * in-order traversal; when starting on the sentinel lane, the
+             * iterator moves to the sentinel's `_Right` link.
+             */
             iterator& operator++() noexcept {
                 _DbgAssert(_Owner && _Ptr, "msvc8::map::iterator: ++ on null");
+                if (_Ptr == _Owner->_Myhead) {
+                    _Ptr = _Owner->_Myhead->_Right;
+                    return *this;
+                }
                 _Ptr = map::_Inc(_Ptr, _Owner->_Myhead);
                 return *this;
             }
             /** Post-increment. */
             iterator operator++(int) noexcept { auto c = *this; ++*this; return c; }
 
-            /** Pre-decrement (prev in-order). */
+            /**
+             * Address: 0x0094F090 (FUN_0094F090, std::map_RType_int::iterator::operator--)
+             *
+             * What it does:
+             * Steps this iterator to the previous in-order node using the
+             * cached header-aware RB-tree links.
+             */
             iterator& operator--() noexcept {
                 _DbgAssert(_Owner && _Ptr, "msvc8::map::iterator: -- on null");
                 _Ptr = map::_Dec(_Ptr, _Owner->_Myhead);

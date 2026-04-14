@@ -75,6 +75,14 @@ namespace moho
     ~Projectile() override;
 
     /**
+     * Address: 0x0069A610 (FUN_0069A610, Moho::Projectile::IsProjectile)
+     *
+     * What it does:
+     * Returns this projectile pointer through the RTTI/downcast lane.
+     */
+    Projectile* IsProjectile() override;
+
+    /**
      * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
      */
     static void MemberConstruct(gpg::ReadArchive* archive, gpg::SerConstructResult* result);
@@ -150,6 +158,15 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<Projectile>) == 0x08,
     "CScrLuaMetatableFactory<Projectile> size must be 0x08"
   );
+
+  /**
+   * Address: 0x0067F0E0 (FUN_0067F0E0, func_GetProjectileFactory)
+   *
+   * What it does:
+   * Returns cached `Projectile` metatable object from Lua object-factory
+   * storage.
+   */
+  LuaPlus::LuaObject* func_GetProjectileFactory(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00BD50D0 (FUN_00BD50D0, register_CScrLuaMetatableFactory_Projectile_Index)

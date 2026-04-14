@@ -190,9 +190,19 @@ namespace
     return cellPos;
   }
 
-  [[nodiscard]] SBuilderRebuildNode* AllocateRebuildNode() noexcept
+  /**
+   * Address: 0x005A1410 (FUN_005A1410, func_NewMapNodeRUnitBlueprint)
+   *
+   * What it does:
+   * Allocates and initializes one rebuild-map RB-tree node lane.
+   */
+  [[nodiscard]] SBuilderRebuildNode* CreateRebuildMapNode() noexcept
   {
-    auto* const node = static_cast<SBuilderRebuildNode*>(::operator new(sizeof(SBuilderRebuildNode)));
+    auto* const node = static_cast<SBuilderRebuildNode*>(::operator new(sizeof(SBuilderRebuildNode), std::nothrow));
+    if (node == nullptr) {
+      return nullptr;
+    }
+
     node->left = nullptr;
     node->parent = nullptr;
     node->right = nullptr;
@@ -208,7 +218,12 @@ namespace
   void InitializeRebuildMap(SBuilderRebuildMap& map)
   {
     map.mMeta00 = 0;
-    map.mHead = AllocateRebuildNode();
+    map.mHead = CreateRebuildMapNode();
+    if (map.mHead == nullptr) {
+      map.mSize = 0;
+      return;
+    }
+
     map.mHead->isNil = 1;
     map.mHead->parent = map.mHead;
     map.mHead->left = map.mHead;
@@ -396,7 +411,11 @@ namespace
       }
     }
 
-    SBuilderRebuildNode* const inserted = AllocateRebuildNode();
+    SBuilderRebuildNode* const inserted = CreateRebuildMapNode();
+    if (inserted == nullptr) {
+      return;
+    }
+
     inserted->key = key;
     inserted->blueprint = blueprint;
     inserted->left = head;

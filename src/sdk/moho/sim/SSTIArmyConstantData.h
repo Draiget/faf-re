@@ -29,6 +29,15 @@ namespace moho
   struct SSTIArmyConstantData
   {
     /**
+     * Address: 0x006FD330 (FUN_006FD330, Moho::SSTIArmyConstantData::SSTIArmyConstantData)
+     *
+     * What it does:
+     * Initializes fixed army identity lanes, zeroes civilian state, and clears
+     * all tracked intel-grid shared-pointer lanes.
+     */
+    SSTIArmyConstantData();
+
+    /**
      * Address: 0x006FD570 (FUN_006FD570, Moho::SSTIArmyConstantData::~SSTIArmyConstantData)
      *
      * What it does:

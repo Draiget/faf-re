@@ -199,6 +199,24 @@ namespace LuaPlus
 		TObject(float number) : tt{ LUA_TNUMBER } { value.n = number; }
 		TObject(bool boolean) : tt{ LUA_TBOOLEAN } { value.b = boolean ? 1 : 0; }
 		TObject() : tt{ LUA_TNIL } { value.p = nullptr; }
+
+		/**
+		 * Address: 0x009216D0 (FUN_009216D0, TObject::MemberSerialize)
+		 *
+		 * What it does:
+		 * Serializes one tagged Lua value lane into write-archive format,
+		 * including named-object indirection and type-specific payload dispatch.
+		 */
+		static void MemberSerialize(gpg::WriteArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
+
+		/**
+		 * Address: 0x009226F0 (FUN_009226F0, TObject::MemberDeserialize)
+		 *
+		 * What it does:
+		 * Deserializes one tagged Lua value lane from read-archive format,
+		 * including named-object lookup and type-specific payload dispatch.
+		 */
+		static void MemberDeserialize(gpg::ReadArchive* archive, TObject* object, int version, gpg::RRef* ownerRef);
 	};
 
 	using StkId = TObject*;

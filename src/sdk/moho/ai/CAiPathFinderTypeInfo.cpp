@@ -6,6 +6,8 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/String.h"
 #include "moho/ai/CAiPathFinder.h"
 #include "moho/misc/Stats.h"
@@ -19,6 +21,9 @@ namespace
   public:
     [[nodiscard]] const char* GetName() const override;
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    void Init() override;
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(Rect2iListTypeInfo) == 0x64, "Rect2iListTypeInfo size must be 0x64");
@@ -112,6 +117,93 @@ namespace
     const auto* const list = static_cast<const std::list<gpg::Rect2i>*>(ref.mObj);
     const int size = list ? static_cast<int>(list->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
+  }
+
+  /**
+   * Address: 0x005AB040 (FUN_005AB040, gpg::RListType_Rect2i::Init)
+   *
+   * What it does:
+   * Configures reflected `list<Rect2i>` layout/version lanes and installs
+   * list serializer callbacks.
+   */
+  void Rect2iListTypeInfo::Init()
+  {
+    size_ = sizeof(std::list<gpg::Rect2i>);
+    version_ = 1;
+    serLoadFunc_ = &Rect2iListTypeInfo::SerLoad;
+    serSaveFunc_ = &Rect2iListTypeInfo::SerSave;
+  }
+
+  /**
+   * Address: 0x005AB410 (FUN_005AB410, gpg::RListType_Rect2i::SerLoad)
+   *
+   * What it does:
+   * Clears one reflected `list<Rect2i>`, reads element count, then deserializes
+   * each `Rect2i` element in archive order.
+   */
+  void Rect2iListTypeInfo::SerLoad(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    auto* const list = reinterpret_cast<std::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr || list == nullptr) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+    list->clear();
+
+    gpg::RType* const elementType = CachedRect2iType();
+    if (elementType == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int index = 0; index < count; ++index) {
+      gpg::Rect2i value{};
+      archive->Read(elementType, &value, owner);
+      list->push_back(value);
+    }
+  }
+
+  /**
+   * Address: 0x005AB4C0 (FUN_005AB4C0, gpg::RListType_Rect2i::SerSave)
+   *
+   * What it does:
+   * Writes reflected `list<Rect2i>` element count, then serializes each
+   * element in list traversal order.
+   */
+  void Rect2iListTypeInfo::SerSave(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const list = reinterpret_cast<const std::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr) {
+      return;
+    }
+
+    const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
+    archive->WriteUInt(count);
+    if (!list) {
+      return;
+    }
+
+    gpg::RType* const elementType = CachedRect2iType();
+    if (elementType == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (const gpg::Rect2i& value : *list) {
+      archive->Write(elementType, &value, owner);
+    }
   }
 
   void AddBaseByTypeInfo(gpg::RType* typeInfo, const std::type_info& baseTypeInfo, const std::int32_t baseOffset)

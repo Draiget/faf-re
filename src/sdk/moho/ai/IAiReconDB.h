@@ -56,6 +56,12 @@ namespace moho
   public:
     /**
      * Address: 0x005BE010 (??1IAiReconDB@Moho@@UAE@XZ)
+     * Address: 0x005BE020 (FUN_005BE020, scalar deleting thunk)
+     *
+     * What it does:
+     * Runs the non-deleting interface destructor body; the deleting thunk at
+     * `0x005BE020` resets this object's vtable lane and conditionally frees
+     * `this` when the low delete-flag bit is set.
      *
      * VFTable SLOT: 0
      */

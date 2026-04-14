@@ -24,6 +24,31 @@ namespace
     static SimConCommandRegistry sRegistry;
     return sRegistry;
   }
+
+  /**
+   * Address: 0x00736250 (FUN_00736250, func_GetSimCon)
+   *
+   * What it does:
+   * Returns the case-insensitive lower-bound node for one command name in the
+   * sim-command registry tree.
+   */
+  [[nodiscard]] SimConCommandRegistry::iterator
+  FindSimConLowerBound(SimConCommandRegistry& registry, const std::string& commandName)
+  {
+    return registry.lower_bound(commandName);
+  }
+
+  /**
+   * Address: 0x00735130 (FUN_00735130, func_InitSimConList)
+   *
+   * What it does:
+   * Forces lazy construction of the global case-insensitive sim-command
+   * registry map before first use.
+   */
+  void InitSimConList()
+  {
+    (void)GetSimConCommandRegistry();
+  }
 } // namespace
 
 namespace moho
@@ -43,6 +68,8 @@ namespace moho
     , mRequiresCheat(requiresCheat ? 1u : 0u)
     , mPad09{0u, 0u, 0u}
   {
+    InitSimConList();
+
     if (mName == nullptr || *mName == '\0') {
       return;
     }
@@ -76,13 +103,20 @@ namespace moho
 
   CSimConCommand* FindRegisteredSimConCommand(const std::string& commandName)
   {
+    InitSimConList();
+
     if (commandName.empty()) {
       return nullptr;
     }
 
     auto& registry = GetSimConCommandRegistry();
-    const auto it = registry.find(commandName);
+    const auto it = FindSimConLowerBound(registry, commandName);
     if (it == registry.end()) {
+      return nullptr;
+    }
+
+    SimConCommandNameLess less{};
+    if (less(commandName, it->first) || less(it->first, commandName)) {
       return nullptr;
     }
 

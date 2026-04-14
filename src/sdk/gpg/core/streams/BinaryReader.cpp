@@ -51,15 +51,63 @@ void BinaryReader::Read(char* buf, const size_t size) const
 }
 
 /**
+ * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
+ *
+ * int *
+ *
+ * IDA signature:
+ * int * __usercall gpg::BinaryReader::ReadInt@<eax>(gpg::BinaryReader *this@<eax>, int *outValue@<ecx>);
+ *
+ * What it does:
+ * Reads one 32-bit integer into `outValue`, preferring the stream's resident
+ * read window and throwing `PrematureEOF` on short reads.
+ */
+int* BinaryReader::ReadInt(int* const outValue) const
+{
+    if (outValue == nullptr) {
+        throw PrematureEOF();
+    }
+
+    *outValue = 0;
+
+    Stream* const stream = mStream;
+    const auto available = static_cast<std::size_t>(stream->mReadEnd - stream->mReadHead);
+    if (available < sizeof(*outValue)) {
+        const std::size_t readCount = stream->VirtRead(reinterpret_cast<char*>(outValue), sizeof(*outValue));
+        if (readCount != sizeof(*outValue)) {
+            throw PrematureEOF();
+        }
+        return outValue;
+    }
+
+    std::memcpy(outValue, stream->mReadHead, sizeof(*outValue));
+    stream->mReadHead += sizeof(*outValue);
+    return outValue;
+}
+
+/**
  * Address: 0x00445590 (FUN_00445590)
  *
  * What it does:
- * Reads one 32-bit integer and returns it by value.
+ * Reads one 32-bit integer and returns it by value via `ReadInt`.
  */
 int BinaryReader::ReadInt32() const
 {
     int value = 0;
-    Read(reinterpret_cast<char*>(&value), sizeof(value));
+    (void)ReadInt(&value);
+    return value;
+}
+
+/**
+ * Address: 0x004D4DC0 (FUN_004D4DC0, gpg::BinaryReader::ReadChar)
+ *
+ * What it does:
+ * Reads one byte from stream input and returns it as unsigned char.
+ */
+std::uint8_t BinaryReader::ReadChar() const
+{
+    std::uint8_t value = 0;
+    Read(reinterpret_cast<char*>(&value), 1U);
     return value;
 }
 

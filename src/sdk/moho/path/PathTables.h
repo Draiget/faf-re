@@ -34,6 +34,15 @@ namespace moho
      */
     explicit PathQueue(int size);
 
+    /**
+     * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
+     *
+     * What it does:
+     * Replaces one owner slot with a new queue pointer, then tears down and
+     * frees the previous queue payload when present.
+     */
+    static void Move(PathQueue** slot, PathQueue* replacement) noexcept;
+
     struct Impl;
 
   private:

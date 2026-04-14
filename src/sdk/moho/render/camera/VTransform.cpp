@@ -10,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/streams/BinaryReader.h"
 #include "moho/math/VMatrix4.h"
 #include "Wm3Vector3.h"
 
@@ -97,6 +98,16 @@ namespace
     }
 
     InitializeHelperNode(serializer);
+  }
+
+  [[nodiscard]] bool CompareQuaternionComponents(
+    const Wm3::Quatf& lhs,
+    const Wm3::Quatf& rhs,
+    const float epsilon = 1.0e-5f
+  ) noexcept
+  {
+    return std::fabs(lhs.w - rhs.w) > epsilon || std::fabs(lhs.x - rhs.x) > epsilon || std::fabs(lhs.y - rhs.y) > epsilon
+      || std::fabs(lhs.z - rhs.z) > epsilon;
   }
 
   void CleanupVTransformTypeInfoAtExit()
@@ -227,6 +238,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x00549DC0 (FUN_00549DC0)
+   *
+   * What it does:
+   * Returns true when either translation or orientation lanes differ,
+   * matching the binary short-circuit comparison order.
+   */
+  bool VTransform::Compare(const VTransform& rhs) const noexcept
+  {
+    return Wm3::Vector3f::Compare(&pos_, &rhs.pos_) || CompareQuaternionComponents(rhs.orient_, orient_);
+  }
+
+  /**
    * Address: 0x0046FBF0 (FUN_0046FBF0)
    *
    * What it does:
@@ -297,6 +320,27 @@ namespace moho
     out.pos_.y = rhs.pos_.y + rotatedPosition.y;
     out.pos_.z = rhs.pos_.z + rotatedPosition.z;
     return out;
+  }
+
+  /**
+   * Address: 0x006E58C0 (FUN_006E58C0, Moho::VTransform::Load)
+   *
+   * What it does:
+   * Initializes an identity fallback transform, then reads one full
+   * transform payload from a binary reader into caller storage.
+   */
+  VTransform* VTransform::Load(gpg::BinaryReader* const reader, VTransform* const outTransform)
+  {
+    outTransform->orient_.w = 1.0f;
+    outTransform->orient_.x = 0.0f;
+    outTransform->orient_.y = 0.0f;
+    outTransform->orient_.z = 0.0f;
+    outTransform->pos_.x = 0.0f;
+    outTransform->pos_.y = 0.0f;
+    outTransform->pos_.z = 0.0f;
+
+    reader->Read(reinterpret_cast<char*>(outTransform), sizeof(VTransform));
+    return outTransform;
   }
 
   /**

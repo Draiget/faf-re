@@ -347,6 +347,24 @@ namespace moho
   CScrLuaInitForm* register_CurrentThread_LuaFuncDef();
 
   /**
+   * Address: 0x00BC6160 (FUN_00BC6160, CLuaTask startup type-info registration)
+   *
+   * What it does:
+   * Pre-registers `CLuaTask` reflected type metadata and schedules type-info
+   * cleanup at process exit.
+   */
+  void register_CLuaTaskTypeInfo();
+
+  /**
+   * Address: 0x00BC6180 (FUN_00BC6180, CLuaTask startup construct registration)
+   *
+   * What it does:
+   * Initializes construct/delete callback helper lanes for `CLuaTask` and
+   * schedules intrusive helper cleanup at process exit.
+   */
+  void register_CLuaTaskConstruct();
+
+  /**
    * Address: 0x00BC61C0 (FUN_00BC61C0, register_CLuaTaskSerializer)
    *
    * What it does:
@@ -356,6 +374,9 @@ namespace moho
   void register_CLuaTaskSerializer();
 
   /**
+   * Address: 0x004C9CA0 (FUN_004C9CA0, serializer cleanup alias A)
+   * Address: 0x004C9CD0 (FUN_004C9CD0, serializer cleanup alias B)
+   *
    * What it does:
    * Unlinks static serializer helper node from the intrusive helper list and
    * restores self-links.

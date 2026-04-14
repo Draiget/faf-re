@@ -14,6 +14,22 @@
 
 namespace
 {
+  /**
+   * Address: 0x0084E6F0 (FUN_0084E6F0, funcReleaseRange_WeakPtrFrame)
+   *
+   * What it does:
+   * Releases one half-open range of `boost::shared_ptr<CMauiFrame>` elements.
+   */
+  void ReleaseFrameSharedPtrRange(
+    boost::shared_ptr<moho::CMauiFrame>* begin,
+    boost::shared_ptr<moho::CMauiFrame>* end
+  )
+  {
+    for (boost::shared_ptr<moho::CMauiFrame>* it = begin; it != end; ++it) {
+      it->reset();
+    }
+  }
+
   [[nodiscard]] bool IsValidFrameIndex(const moho::CUIManager& manager, const int frameIdx)
   {
     return frameIdx >= 0 && static_cast<std::size_t>(frameIdx) < manager.mFrames.Size();
@@ -68,6 +84,11 @@ moho::CUIManager::CUIManager()
 void moho::CUIManager::DestroyCore()
 {
   mCursorLink.Unlink();
+
+  if (!mFrames.Empty()) {
+    ReleaseFrameSharedPtrRange(mFrames.begin(), mFrames.end());
+  }
+
   mFrames.ResetStorageToInline();
 }
 
@@ -145,6 +166,7 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
       }
     }
 
+    ReleaseFrameSharedPtrRange(mFrames.begin(), mFrames.end());
     mFrames.ResetStorageToInline();
   }
 
@@ -219,6 +241,7 @@ void moho::CUIManager::ClearFrames()
       }
     }
 
+    ReleaseFrameSharedPtrRange(mFrames.begin(), mFrames.end());
     mFrames.ResetStorageToInline();
   }
 
@@ -326,9 +349,7 @@ void moho::CUIManager::OnResize(const int frameIdx, const int width, const int h
     return;
   }
 
-  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame.get());
-  CScriptLazyVar_float::SetValue(&frameView->mWidthLV, static_cast<float>(width));
-  CScriptLazyVar_float::SetValue(&frameView->mHeightLV, static_cast<float>(height));
+  frame->SetBounds(width, height);
   MAUI_OnApplicationResize(frameIdx, width, height);
 }
 

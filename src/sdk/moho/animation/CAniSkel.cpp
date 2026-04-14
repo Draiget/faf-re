@@ -10,9 +10,21 @@
 
 namespace
 {
+  /**
+   * Address: 0x0054AC80 (FUN_0054AC80, nullsub_2)
+   *
+   * What it does:
+   * Preserves the default-skeleton shared-pointer deleter lane as a deliberate
+   * no-op.
+   */
+  void DefaultAniSkelNoDelete(void*) noexcept {}
+
   struct NoDeleteAniSkel
   {
-    void operator()(const moho::CAniSkel*) const noexcept {}
+    void operator()(const moho::CAniSkel* const skeleton) const noexcept
+    {
+      DefaultAniSkelNoDelete(const_cast<moho::CAniSkel*>(skeleton));
+    }
   };
 } // namespace
 

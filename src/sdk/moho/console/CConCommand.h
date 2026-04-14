@@ -425,6 +425,15 @@ namespace moho
   void register_CConFunc_ExecutePasteBuffer();
 
   /**
+   * Address: 0x00BDF780 (FUN_00BDF780, register_CConFunc_UI_ResetView)
+   *
+   * What it does:
+   * Registers the startup console command that resets one or more named
+   * cameras to their default runtime view state.
+   */
+  void register_CConFunc_UI_ResetView();
+
+  /**
    * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
    *
    * What it does:
@@ -513,6 +522,15 @@ namespace moho
    * prints p4-is-opened usage text.
    */
   void CON_p4_IsOpenedForEdit(void* commandArgs);
+
+  /**
+   * Address: 0x007ADFC0 (FUN_007ADFC0, Moho::CAM_SetLOD)
+   *
+   * What it does:
+   * Parses `cam_SetLOD <cameraName> <lodScale>` and applies the LOD scale to
+   * the named runtime camera when found.
+   */
+  void CAM_SetLOD(void* commandArgs);
 
   /**
    * Address: 0x007AE040 (FUN_007AE040, Moho::CON_DumpCamera)
@@ -612,6 +630,14 @@ namespace moho
   void CON_UI_ToggleGamePanels(void* commandArgs);
 
   /**
+   * Address: 0x008349C0 (FUN_008349C0, Moho::UI_Quit)
+   *
+   * What it does:
+   * Shows the escape dialog through UI main callback lane.
+   */
+  void UI_Quit(void* commandArgs);
+
+  /**
    * Address: 0x00834A80 (FUN_00834A80, Moho::UI_MakeSelectionSet)
    *
    * What it does:
@@ -638,6 +664,15 @@ namespace moho
   void CON_UI_CreateHead1Map(void* commandArgs);
 
   /**
+   * Address: 0x007ADF50 (FUN_007ADF50, Moho::UI_ResetView)
+   *
+   * What it does:
+   * Iterates camera-name command tokens starting at index 1, resolves each
+   * named camera through `RCamManager`, and resets found cameras.
+   */
+  void UI_ResetView(void* commandArgs);
+
+  /**
    * Address: 0x00835370 (FUN_00835370, Moho::UI_Lua)
    *
    * What it does:
@@ -654,6 +689,23 @@ namespace moho
    * rename dialog seeded with selected unit custom-name text.
    */
   void UI_ShowRenameDialog();
+
+  /**
+   * Address: 0x00835A40 (FUN_00835A40, Moho::UI_DumpControls)
+   *
+   * What it does:
+   * Walks each root UI frame and logs every control via depth-first traversal.
+   */
+  void UI_DumpControls(void* commandArgs);
+
+  /**
+   * Address: 0x00835AA0 (FUN_00835AA0, Moho::UI_DumpControlsUnderCursor)
+   *
+   * What it does:
+   * Dispatches `DumpControlsUnderMouse()` on the active UI manager when one is
+   * available.
+   */
+  void UI_DumpControlsUnderCursor(void* commandArgs);
 
   /**
    * Address: 0x0043D360 (FUN_0043D360, Moho::CON_ren_MipSkipLevels)

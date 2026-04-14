@@ -302,20 +302,6 @@ namespace
     }
   }
 
-  void InsertEmitterCurveKeySortedByX(moho::SEfxCurve& curve, const Wm3::Vector3f& key)
-  {
-    Wm3::Vector3f* insertPosition = curve.mKeys.end();
-    for (Wm3::Vector3f* it = curve.mKeys.begin(); it != curve.mKeys.end(); ++it) {
-      if (it->x > key.x) {
-        insertPosition = it;
-        break;
-      }
-    }
-
-    curve.mKeys.InsertAt(insertPosition, &key, &key + 1);
-    RecomputeEmitterCurveYBounds(curve);
-  }
-
   [[nodiscard]] moho::SEfxCurve* ResolveCurveStorage(const std::int32_t curveParamAddress) noexcept
   {
     return reinterpret_cast<moho::SEfxCurve*>(static_cast<std::uintptr_t>(curveParamAddress));
@@ -2114,7 +2100,7 @@ namespace moho
 
     SEfxCurve curve{};
     const Wm3::Vector3f key{0.0f, height, size};
-    InsertEmitterCurveKeySortedByX(curve, key);
+    moho::InsertEmitterCurveKey(curve, key);
     effect->SetCurveParam(curveParamIndex, &curve);
     effect->mLuaObj.PushStack(state);
     return 1;
@@ -3312,6 +3298,32 @@ namespace moho
   CScrLuaInitForm* j_func_CreateEmitterAtBone_LuaFuncDef()
   {
     return ForwardEffectLuaThunk<&func_CreateEmitterAtBone_LuaFuncDef>();
+  }
+
+  /**
+   * Address: 0x0065A730 (FUN_0065A730, func_CreateLuaIEffect)
+   *
+   * What it does:
+   * Writes the cached `IEffect` Lua metatable object into the caller-provided
+   * destination and returns that destination pointer.
+   */
+  LuaPlus::LuaObject* func_CreateLuaIEffect(LuaPlus::LuaObject* object, LuaPlus::LuaState* state)
+  {
+    *object = CScrLuaMetatableFactory<IEffect>::Instance().Get(state);
+    return object;
+  }
+
+  /**
+   * Address: 0x0077D450 (FUN_0077D450, func_CreateCDecalHandleObject)
+   *
+   * What it does:
+   * Writes the cached `CDecalHandle` Lua metatable object into the
+   * caller-provided destination and returns that destination pointer.
+   */
+  LuaPlus::LuaObject* func_CreateCDecalHandleObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state)
+  {
+    *object = CScrLuaMetatableFactory<CDecalHandle>::Instance().Get(state);
+    return object;
   }
 
   /**

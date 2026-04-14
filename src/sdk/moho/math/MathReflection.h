@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "boost/mutex.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/math/Vector2f.h"
@@ -60,6 +61,14 @@ namespace moho
     float y; // +0x08
   };
 
+  /**
+   * Address: 0x004EB590 (FUN_004EB590, func_EulerToQuaternion)
+   *
+   * What it does:
+   * Converts Euler roll/pitch/yaw lanes into one quaternion orientation.
+   */
+  [[nodiscard]] Wm3::Quaternionf EulerToQuaternion(const VEulers3& orientation);
+
   struct VAxes3
   {
     VAxes3() = default;
@@ -72,10 +81,63 @@ namespace moho
      */
     explicit VAxes3(const Wm3::Quaternionf& orientation);
 
+    /**
+     * Address: 0x004EC6D0 (FUN_004EC6D0, ??0VAxes3@Moho@@QAE@ABVVEulers3@1@@Z)
+     *
+     * What it does:
+     * Converts roll/pitch/yaw Euler lanes to quaternion and then expands that
+     * quaternion into one orthonormal basis matrix.
+     */
+    explicit VAxes3(const VEulers3& orientation);
+
+    /**
+     * Address: 0x004EC720 (FUN_004EC720, ?OrthoNormalize@VAxes3@Moho@@QAEXXZ)
+     * Mangled: ?OrthoNormalize@VAxes3@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Rebuilds one orthonormal basis by deriving `vX` from `vY x vZ`, then
+     * deriving `vZ` from `vX x vY`, and finally deriving `vY` from `vZ x vX`.
+     */
+    void OrthoNormalize();
+
+    /**
+     * Address: 0x004EC850 (FUN_004EC850, ?IsNormal@VAxes3@Moho@@QBE_NXZ)
+     * Mangled: ?IsNormal@VAxes3@Moho@@QBE_NXZ
+     *
+     * What it does:
+     * Verifies all basis lanes are unit-length and confirms `vX` matches the
+     * reconstructed `vZ x vY` lane within epsilon.
+     */
+    [[nodiscard]] bool IsNormal() const;
+
     Wm3::Vector3f vX; // +0x00
     Wm3::Vector3f vY; // +0x0C
     Wm3::Vector3f vZ; // +0x18
   };
+
+  /**
+   * Address: 0x004ECB60 (FUN_004ECB60, ??$Identity@VVAxes3@Moho@@@Moho@@YAABVVAxes3@0@XZ)
+   *
+   * What it does:
+   * Returns a reference to the lazy-initialized identity `VAxes3` basis
+   * `(1,0,0)/(0,1,0)/(0,0,1)`. The first call latches an init-once guard so
+   * subsequent calls skip the matrix write.
+   */
+  template <typename T>
+  [[nodiscard]] const T& Identity();
+
+  template <>
+  [[nodiscard]] const VAxes3& Identity<VAxes3>();
+
+  /**
+   * Address: 0x004ED000 (FUN_004ED000, ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z)
+   * Mangled: ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z
+   *
+   * What it does:
+   * Formats one `VAxes3` basis as `X=(...) Y=(...) Z=(...)` by reusing the
+   * vector-lane string formatter.
+   */
+  [[nodiscard]] msvc8::string ToString(const VAxes3& value);
 
   /**
    * Address: 0x004EDB60 (FUN_004EDB60, Moho::AxisAlignedBox3f::MemberDeserialize)
@@ -533,6 +595,16 @@ namespace moho
     gpg::RType::load_func_t mDeserialize;  // +0x0C
     gpg::RType::save_func_t mSerialize;    // +0x10
   };
+
+  /**
+   * Address: 0x004ECBD0 (FUN_004ECBD0, Moho::VEC_LookAt)
+   *
+   * What it does:
+   * Builds one orthonormal basis from a reference up vector and a forward
+   * vector, using the binary's alternate right-axis lane when the cross
+   * product collapses.
+   */
+  void VEC_LookAt(const Wm3::Vector3f& up, const Wm3::Vector3f& forward, VAxes3* axes);
 
   /**
    * Address: 0x004EC4E0 (FUN_004EC4E0, Moho::VAxes3Serializer::DeserializeThunk)

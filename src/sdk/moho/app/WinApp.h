@@ -8,6 +8,7 @@
 
 struct _EXCEPTION_POINTERS;
 class wxWindowBase;
+class wxString;
 
 namespace moho
 {
@@ -249,6 +250,15 @@ namespace moho
   void WIN_OkBox(gpg::StrArg caption, gpg::StrArg text);
 
   /**
+   * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
+   *
+   * What it does:
+   * Displays a UTF-8 yes/no message box and returns true only when the user
+   * picks `IDYES`.
+   */
+  bool WIN_YesNoBox(gpg::StrArg caption, gpg::StrArg text);
+
+  /**
    * Address: 0x004F2A00 (FUN_004F2A00)
    * Mangled:
    * ?WIN_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
@@ -280,6 +290,15 @@ namespace moho
    * Destroys all managed dialog/frame windows and unlinks their registry slots.
    */
   void WINX_Exit();
+
+  /**
+   * Address: 0x004F3B60 (FUN_004F3B60, ?WINX_Printf@Moho@@YA?AVwxString@@PBDZZ)
+   *
+   * What it does:
+   * Formats one UTF-8 vararg string, converts it to UTF-16, and writes the
+   * result into caller-provided `wxString` storage.
+   */
+  wxString* WINX_Printf(wxString* out, const char* format, ...);
 
   /**
    * Address: 0x004F3CE0 (FUN_004F3CE0)

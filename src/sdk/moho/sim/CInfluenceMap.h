@@ -66,6 +66,23 @@ namespace moho
     [[nodiscard]] float ValueByType(EThreatType threatType) const noexcept;
   };
 
+  /**
+   * Address: 0x0071E760 (FUN_0071E760, func_VectorCpy_SThreat)
+   *
+   * What it does:
+   * Copies one `SThreat` value into `count` consecutive destination slots.
+   */
+  void CopySThreatValueRange(SThreat* destination, std::uint32_t count, const SThreat* source) noexcept;
+
+  /**
+   * Address: 0x0071F6A0 (FUN_0071F6A0, func_VectorMemCpy_SThreat)
+   *
+   * What it does:
+   * Copies one contiguous `SThreat` source range `[sourceBegin, sourceEnd)`
+   * into destination storage and returns one-past the last destination slot.
+   */
+  SThreat* CopySThreatRangeNullable(SThreat* destination, const SThreat* sourceBegin, const SThreat* sourceEnd) noexcept;
+
   struct InfluenceMapEntry
   {
     static gpg::RType* sType;

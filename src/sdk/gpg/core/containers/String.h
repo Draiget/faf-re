@@ -10,20 +10,49 @@ namespace gpg
 
   extern msvc8::string sWhitespaceChars; // 0x00F32308
 
-  int STR_Utf8ByteOffset(StrArg str, int pos);                          // 0x009380A0
+  /**
+   * Address: 0x009380A0 (FUN_009380A0, gpg::STR_Utf8ByteOffset)
+   *
+   * What it does:
+   * Returns the byte offset that corresponds to `pos` UTF-8 codepoints into
+   * `str`, clamping at the NUL terminator.
+   */
+  int STR_Utf8ByteOffset(StrArg str, int pos);
   int STR_Utf8Len(char const*);                                         // 0x00938070
   const char* STR_NextUtf8Char(const char* str);                        // 0x00938040
-  const char* STR_PreviousUtf8Char(const char* str, const char* start); // 0x00938020
+  /**
+   * Address: 0x00938020 (FUN_00938020, gpg::STR_PreviousUtf8Char)
+   *
+   * What it does:
+   * Walks backward from `str` to the previous UTF-8 codepoint boundary,
+   * stopping at `start` when provided.
+   */
+  const char* STR_PreviousUtf8Char(const char* str, const char* start);
   /**
    * Address: 0x009387D0 (FUN_009387D0, gpg::STR_Utf8SubString)
    *
    * What it does:
    * Returns one UTF-8 codepoint-range substring; throws `std::out_of_range`
    * when `pos` starts past the end of the source string.
-   */
+  */
   msvc8::string STR_Utf8SubString(StrArg str, int pos, int len);
-  char* STR_EncodeUtf8Char(char*, wchar_t, const char*);                // 0x00937F90
-  const char* STR_DecodeUtf8Char(const char*, wchar_t&);                // 0x00937EF0
+  /**
+   * Address: 0x00937F90 (FUN_00937F90, gpg::STR_EncodeUtf8Char)
+   *
+   * What it does:
+   * Encodes one wide character into UTF-8 at `dest`, returning the first
+   * byte after written output or the original `dest` when `limit` blocks
+   * the write.
+   */
+  char* STR_EncodeUtf8Char(char* dest, wchar_t chr, const char* limit);
+  /**
+   * Address: 0x00937EF0 (FUN_00937EF0, gpg::STR_DecodeUtf8Char)
+   *
+   * What it does:
+   * Decodes one UTF-8 sequence from `str` into `dest` and returns a pointer to
+   * the first byte after the consumed sequence.
+   */
+  const char* STR_DecodeUtf8Char(const char*, wchar_t&);
   msvc8::string STR_WideToUtf8(const wchar_t*);                         // 0x00938680
   std::wstring STR_Utf8ToWide(StrArg str);                              // 0x00938720
 
@@ -37,7 +66,19 @@ namespace gpg
    */
   void STR_GetTokens(StrArg find, const char* str, msvc8::vector<msvc8::string>& dest);
   int STR_GetWordStartIndex(msvc8::string& str, int pos);                               // 0x009384A0
-  int STR_GetNextWordStartIndex(msvc8::string& str, int pos);                           // 0x00938570
+  /**
+   * Address: 0x00938570 (FUN_00938570, gpg::STR_GetNextWordStartIndex)
+   *
+   * msvc8::string &, int
+   *
+   * IDA signature:
+   * int __cdecl gpg::STR_GetNextWordStartIndex(std::string *str, int pos);
+   *
+   * What it does:
+   * Scans forward from `pos` and returns the first non-whitespace codepoint
+   * after the next whitespace separator; returns UTF-8 length when none exists.
+   */
+  int STR_GetNextWordStartIndex(msvc8::string& str, int pos);
   bool STR_EndsWith(StrArg str, StrArg end);                                            // 0x00938190
   /**
    * Address: 0x00938210 (FUN_00938210, gpg::STR_StartsWith)
@@ -46,13 +87,34 @@ namespace gpg
    * Returns whether `str` begins with `start`.
    */
   bool STR_StartsWith(StrArg str, StrArg start);
-  bool STR_EndsWithNoCase(StrArg str, StrArg end);                                      // 0x00938250
-  bool STR_StartsWithNoCase(StrArg str, StrArg start);                                  // 0x009382B0
+  /**
+   * Address: 0x00938250 (FUN_00938250, gpg::STR_EndsWithNoCase)
+   *
+   * What it does:
+   * Returns whether `str` ends with `end` using ASCII case-insensitive
+   * comparison.
+   */
+  bool STR_EndsWithNoCase(StrArg str, StrArg end);
+  /**
+   * Address: 0x009382B0 (FUN_009382B0, gpg::STR_StartsWithNoCase)
+   *
+   * What it does:
+   * Returns whether `str` begins with `start` using ASCII case-insensitive
+   * comparison.
+   */
+  bool STR_StartsWithNoCase(StrArg str, StrArg start);
   bool STR_EqualsNoCaseN(StrArg lhs, StrArg rhs, std::size_t count);
   int STR_CompareNoCase(StrArg lhs, StrArg rhs);
   bool STR_ContainsNoCase(StrArg str, StrArg needle);
   bool STR_EqualsNoCase(StrArg lhs, StrArg rhs);
-  bool STR_IsIdent(StrArg str); // 0x009382F0
+  /**
+   * Address: 0x009382F0 (FUN_009382F0, gpg::STR_IsIdent)
+   *
+   * What it does:
+   * Returns whether `str` matches Lua/C identifier rules:
+   * first char `[A-Za-z_]`, remaining chars `[A-Za-z0-9_]*`.
+   */
+  bool STR_IsIdent(StrArg str);
   /**
    * Address: 0x00938B40 (FUN_00938B40, gpg::STR_Replace)
    *
@@ -64,15 +126,40 @@ namespace gpg
   int STR_ParseUInt32(StrArg str);                                                 // 0x00938150
   int STR_Xtoi(StrArg str);                                                        // 0x009380F0
   bool STR_IsAsciiWhitespace(char ch);
-  bool STR_MatchWildcard(StrArg, StrArg); // 0x00938450
+  /**
+   * Address: 0x00938450 (FUN_00938450, gpg::STR_MatchWildcard)
+   *
+   * What it does:
+   * Evaluates wildcard matching in case-sensitive mode.
+   */
+  bool STR_MatchWildcard(StrArg, StrArg);
   bool STR_MatchWildcard(StrArg, StrArg, bool caseSensitive);
-  bool STR_WildcardValidPrefix(StrArg, StrArg); // 0x00938470
+  /**
+   * Address: 0x00938470 (FUN_00938470, gpg::STR_WildcardValidPrefix)
+   *
+   * What it does:
+   * Evaluates wildcard-prefix validity in default case-sensitive mode.
+   */
+  bool STR_WildcardValidPrefix(StrArg prefix, StrArg pattern);
   bool STR_WildcardValidPrefix(StrArg, StrArg, bool caseSensitive);
 
   msvc8::string STR_GetWhitespaceCharacters();  // 0x00938C80
-  msvc8::string STR_Chop(StrArg str, char chr); // 0x00938BF0
+  /**
+   * Address: 0x00938BF0 (FUN_00938BF0, gpg::STR_Chop)
+   *
+   * What it does:
+   * Returns `str` without its trailing `chr` delimiter (or without the last
+   * character when `chr==0`).
+   */
+  msvc8::string STR_Chop(StrArg str, char chr);
   msvc8::string STR_ToLower(StrArg str);        // 0x00938A80
-  msvc8::string STR_ToUpper(StrArg str);        // 0x009389C0
+  /**
+   * Address: 0x009389C0 (FUN_009389C0, gpg::STR_ToUpper)
+   *
+   * What it does:
+   * Returns one uppercase ASCII copy of `str`.
+   */
+  msvc8::string STR_ToUpper(StrArg str);
   void STR_NormalizeFilenameLowerSlash(msvc8::string& inOut);
   void STR_NormalizeFilenameLowerSlash(std::string& inOut);
 

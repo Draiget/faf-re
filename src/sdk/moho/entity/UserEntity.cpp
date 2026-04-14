@@ -180,6 +180,72 @@ namespace
     "SessionVisionRuntimeView::visionDb offset must be 0x3C8"
   );
 
+  struct SessionEntityMapNodeRuntimeView
+  {
+    SessionEntityMapNodeRuntimeView* mLeft;   // +0x00
+    SessionEntityMapNodeRuntimeView* mParent; // +0x04
+    SessionEntityMapNodeRuntimeView* mRight;  // +0x08
+    std::uint32_t mEntityId;                  // +0x0C
+    moho::UserEntity* mEntity;                // +0x10
+    std::uint8_t pad_14_17[0x04];
+    std::uint8_t mColor;      // +0x18
+    std::uint8_t mIsSentinel; // +0x19
+    std::uint8_t pad_1A[0x02];
+  };
+
+  static_assert(sizeof(SessionEntityMapNodeRuntimeView) == 0x1C, "SessionEntityMapNodeRuntimeView size must be 0x1C");
+  static_assert(
+    offsetof(SessionEntityMapNodeRuntimeView, mEntityId) == 0x0C,
+    "SessionEntityMapNodeRuntimeView::mEntityId offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SessionEntityMapNodeRuntimeView, mEntity) == 0x10,
+    "SessionEntityMapNodeRuntimeView::mEntity offset must be 0x10"
+  );
+
+  struct SessionEntityMapRuntimeView
+  {
+    void* mAllocProxy;                      // +0x00
+    SessionEntityMapNodeRuntimeView* mHead; // +0x04
+    std::uint32_t mSize;                    // +0x08
+  };
+
+  static_assert(sizeof(SessionEntityMapRuntimeView) == 0x0C, "SessionEntityMapRuntimeView size must be 0x0C");
+  static_assert(
+    offsetof(SessionEntityMapRuntimeView, mHead) == 0x04,
+    "SessionEntityMapRuntimeView::mHead offset must be 0x04"
+  );
+
+  [[nodiscard]] SessionEntityMapRuntimeView* GetSessionEntityMapRuntimeView(moho::CWldSession* const session) noexcept
+  {
+    static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
+    return reinterpret_cast<SessionEntityMapRuntimeView*>(&session->mUnknownOwner44);
+  }
+
+  [[nodiscard]] SessionEntityMapNodeRuntimeView*
+  FindSessionEntityMapNodeById(SessionEntityMapRuntimeView& map, const std::uint32_t entityId) noexcept
+  {
+    SessionEntityMapNodeRuntimeView* const head = map.mHead;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    SessionEntityMapNodeRuntimeView* node = head->mParent;
+    while (node != nullptr && node != head) {
+      if (entityId < node->mEntityId) {
+        node = node->mLeft;
+        continue;
+      }
+      if (node->mEntityId < entityId) {
+        node = node->mRight;
+        continue;
+      }
+      return node;
+    }
+
+    return nullptr;
+  }
+
   [[nodiscard]] float ClampUnitInterval(const float value) noexcept
   {
     return std::clamp(value, 0.0f, 1.0f);
@@ -585,6 +651,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x007EC2F0 (FUN_007EC2F0, ?GetInterpolatedPosition@UserEntity@Moho@@QBE?AV?$Vector3@M@Wm3@@M@Z)
+   *
+   * What it does:
+   * Returns interpolated world-position lanes extracted from
+   * `GetInterpolatedTransform(interpolationAlpha)`.
+   */
+  Wm3::Vec3f UserEntity::GetInterpolatedPosition(const float interpolationAlpha) const
+  {
+    const VTransform interpolated = GetInterpolatedTransform(interpolationAlpha);
+    return interpolated.pos_;
+  }
+
+  /**
    * Address: 0x008B8530 (FUN_008B8530, ?RequiresUIRefresh@UserEntity@Moho@@UBE_NXZ)
    */
   bool UserEntity::RequiresUIRefresh() const
@@ -666,6 +745,65 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B8BC0 (FUN_008B8BC0, ?SetPose@UserEntity@Moho@@QAEXABV?$shared_ptr@VCAniPose@Moho@@@boost@@@Z)
+   *
+   * What it does:
+   * Rebinds primary/secondary pose handles from one shared pose, upgrades
+   * dynamic meshes to static-pose mode when required, then updates mesh stance
+   * and spatial-db swept bounds.
+   */
+  void UserEntity::SetPose(const boost::shared_ptr<CAniPose>& pose)
+  {
+    if (mMeshInstance == nullptr) {
+      return;
+    }
+
+    bool forceRefresh = false;
+    if (mMeshInstance->isStaticPose == 0u) {
+      DestroyMeshInstance();
+      CreateMeshInstance(true);
+      forceRefresh = true;
+    }
+
+    mPosePrimary = pose;
+    mPoseSecondary = pose;
+
+    mMeshInstance->SetStance(
+      mVariableData.mCurTransform,
+      mVariableData.mLastTransform,
+      forceRefresh,
+      mPosePrimary,
+      mPoseSecondary
+    );
+
+    const Wm3::AxisAlignedBox3f sweptBounds = mMeshInstance->GetSweptAlignedBox();
+    reinterpret_cast<SpatialDB_MeshInstance*>(&mSpatialDbEntry)->UpdateBounds(sweptBounds);
+  }
+
+  /**
+   * Address: 0x00838030 (FUN_00838030, ?GetAttachmentParent@UserEntity@Moho@@QAEPAV12@XZ)
+   * Mangled: ?GetAttachmentParent@UserEntity@Moho@@QAEPAV12@XZ
+   *
+   * What it does:
+   * Resolves one attachment-parent entity id against the owning session
+   * entity-map tree and returns the live parent entity pointer when present.
+   */
+  UserEntity* UserEntity::GetAttachmentParent()
+  {
+    if (mSession == nullptr) {
+      return nullptr;
+    }
+
+    SessionEntityMapRuntimeView* const entityMap = GetSessionEntityMapRuntimeView(mSession);
+    if (entityMap == nullptr || entityMap->mHead == nullptr) {
+      return nullptr;
+    }
+
+    SessionEntityMapNodeRuntimeView* const node = FindSessionEntityMapNodeById(*entityMap, mVariableData.mAttachmentParentRef);
+    return node != nullptr ? node->mEntity : nullptr;
+  }
+
+  /**
    * Address: 0x007FD3F0 (FUN_007FD3F0, Moho::UserEntity::GetSelectionBracketTexture)
    *
    * What it does:
@@ -690,6 +828,18 @@ namespace moho
     }
 
     return CD3DBatchTexture::FromFile(kSelectionBracketNeutralTexture, 1u);
+  }
+
+  /**
+   * Address: 0x0085B050 (FUN_0085B050, Moho::WeakPtr_CD3DBatchTexture::WeakPtr_CD3DBatchTexture)
+   *
+   * What it does:
+   * Returns one retained shared owner lane for this entity's strategic-underlay
+   * texture payload.
+   */
+  boost::shared_ptr<CD3DBatchTexture> UserEntity::GetStrategicUnderlayTexture() const
+  {
+    return boost::static_pointer_cast<CD3DBatchTexture>(mVariableData.mUnderlayTexture);
   }
 
   /**
@@ -732,6 +882,33 @@ namespace moho
 
     default:
       return;
+    }
+  }
+
+  /**
+   * Address: 0x008B9670 (FUN_008B9670, ?OrphanUpdate@UserEntity@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Deletes this orphan entity when focus-army visibility conditions are met.
+   */
+  void UserEntity::OrphanUpdate()
+  {
+    const std::int32_t focusArmyIndex = mSession->FocusArmy;
+    UserArmy* focusArmy = nullptr;
+
+    if (focusArmyIndex >= 0) {
+      UserArmy* const* const userArmies = mSession->userArmies.data();
+      if (userArmies != nullptr) {
+        focusArmy = userArmies[focusArmyIndex];
+      }
+    }
+
+    if (
+      focusArmyIndex < 0 || focusArmy == nullptr ||
+      (mVariableData.mLayerMask & kUserEntityUnderwaterLayerMaskBits) != 0u ||
+      focusArmy->CanSeePoint(mVariableData.mCurTransform.pos_, UserArmy::EReconGridMask::Explored)
+    ) {
+      delete this;
     }
   }
 

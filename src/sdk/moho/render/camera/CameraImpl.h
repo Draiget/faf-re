@@ -4,6 +4,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/math/Vector2f.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector3.h"
@@ -15,11 +16,18 @@ namespace LuaPlus
   class LuaState;
 }
 
+namespace gpg
+{
+  class RRef;
+}
+
 namespace moho
 {
   class Broadcaster;
   class CScrLuaInitForm;
   class STIMap;
+  class UserEntity;
+  struct SSelectionSetUserEntity;
 
   struct CameraUserEntityWeakRef
   {
@@ -60,6 +68,28 @@ namespace moho
     "CameraFrustumUserEntityList::mInlineOrigin offset must be 0x0C"
   );
 
+  struct SCamShakeParams
+  {
+    Wm3::Vec3f mCenter{};         // +0x00
+    float mMaxRange = 0.0f;       // +0x0C
+    float mMinMagnitude = 0.0f;   // +0x10
+    float mMaxMagnitude = 0.0f;   // +0x14
+    float mDuration = 0.0f;       // +0x18
+  };
+
+  static_assert(sizeof(SCamShakeParams) == 0x1C, "SCamShakeParams size must be 0x1C");
+  static_assert(offsetof(SCamShakeParams, mCenter) == 0x00, "SCamShakeParams::mCenter offset must be 0x00");
+  static_assert(offsetof(SCamShakeParams, mMaxRange) == 0x0C, "SCamShakeParams::mMaxRange offset must be 0x0C");
+  static_assert(
+    offsetof(SCamShakeParams, mMinMagnitude) == 0x10,
+    "SCamShakeParams::mMinMagnitude offset must be 0x10"
+  );
+  static_assert(
+    offsetof(SCamShakeParams, mMaxMagnitude) == 0x14,
+    "SCamShakeParams::mMaxMagnitude offset must be 0x14"
+  );
+  static_assert(offsetof(SCamShakeParams, mDuration) == 0x18, "SCamShakeParams::mDuration offset must be 0x18");
+
   class CameraImpl
   {
   public:
@@ -72,6 +102,16 @@ namespace moho
      * optional Lua state ownership.
      */
     CameraImpl(gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* luaState);
+
+    /**
+     * Address: 0x007A69D0 (FUN_007A69D0, Moho::CameraImpl::GetDerivedObjectRef)
+     * Mangled: ?GetDerivedObjectRef@CameraImpl@Moho@@UAE?AVRRef@gpg@@XZ
+     *
+     * What it does:
+     * Packs `{scriptSubobject, scriptSubobject->GetClass()}` as a reflected
+     * object reference.
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
 
     /**
      * Address context: called from `RCamManager::Frame` (`0x007AABB0`) camera-loop lane.
@@ -90,6 +130,44 @@ namespace moho
      * `SlowInOut`) into the camera runtime acceleration lane.
      */
     void CameraSetAccType(const msvc8::string& accType);
+
+    /**
+     * Address: 0x007A6CE0 (FUN_007A6CE0, Moho::CameraImpl::CameraSpin)
+     * Mangled: ?CameraSpin@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
+     *
+     * What it does:
+     * Applies heading/pitch spin deltas from one 2D input vector using
+     * zoom-scaled spin speed and clamps pitch to valid camera limits.
+     */
+    virtual void CameraSpin(const Wm3::Vector2f& spinDelta);
+
+    /**
+     * Address: 0x007A8260 (FUN_007A8260, Moho::CameraImpl::CameraZoom)
+     * Mangled: ?CameraZoom@CameraImpl@Moho@@UAEXM@Z
+     *
+     * What it does:
+     * Scales near-zoom exponentially from wheel/input delta and clamps it to
+     * `[cam_NearZoom, GetMaxZoom()]`.
+     */
+    virtual void CameraZoom(float zoomDelta);
+
+    /**
+     * Address: 0x007A6DF0 (FUN_007A6DF0, Moho::CameraImpl::CameraSetPitch)
+     * Mangled: ?CameraSetPitch@CameraImpl@Moho@@UAEXM@Z
+     *
+     * What it does:
+     * Arms rotated mode, clears revert state, and stores current pitch lane.
+     */
+    virtual void CameraSetPitch(float pitchRadians);
+
+    /**
+     * Address: 0x007A6E10 (FUN_007A6E10, Moho::CameraImpl::CameraSetHeading)
+     * Mangled: ?CameraSetHeading@CameraImpl@Moho@@UAEXM@Z
+     *
+     * What it does:
+     * Arms rotated mode, clears revert state, and stores current heading lane.
+     */
+    virtual void CameraSetHeading(float headingRadians);
 
     /**
      * Address: 0x007A6DE0 (FUN_007A6DE0, Moho::CameraImpl::CameraHoldRotation)
@@ -141,6 +219,143 @@ namespace moho
     [[nodiscard]] virtual const GeomCamera3& CameraGetView() const;
 
     /**
+     * Address: 0x007A7410 (FUN_007A7410, Moho::CameraImpl::GetViewBox)
+     * Mangled: ?GetViewBox@CameraImpl@Moho@@UBE?AV?$AxisAlignedBox3@M@Wm3@@XZ
+     *
+     * What it does:
+     * Returns an axis-aligned box centered on the target location with half
+     * extents derived from half of the current near-zoom lane.
+     */
+    [[nodiscard]] virtual Wm3::AxisAlignedBox3f GetViewBox() const;
+
+    /**
+     * Address: 0x007A6A80 (FUN_007A6A80, Moho::CameraImpl::CameraSetViewport)
+     * Mangled: ?CameraSetViewport@CameraImpl@Moho@@QAEPAV?$Vector2@M@Wm3@@ABV34@0@Z
+     *
+     * What it does:
+     * Updates camera viewport origin/size lanes, rebuilds viewport row-2
+     * normalization from row-1, and refreshes zoom-metric aspect scaling.
+     */
+    void CameraSetViewport(const Wm3::Vector2f& viewportOrigin, const Wm3::Vector2f& viewportSize);
+
+    /**
+     * Address: 0x007A6A10 (FUN_007A6A10, Moho::CameraImpl::CameraSetOrtho)
+     * Mangled: ?CameraSetOrtho@CameraImpl@Moho@@UAEX_N@Z
+     *
+     * What it does:
+     * Stores orthographic-camera mode flag lane.
+     */
+    virtual void CameraSetOrtho(bool enabled);
+
+    /**
+     * Address: 0x007A6A20 (FUN_007A6A20, Moho::CameraImpl::CameraIsOrtho)
+     * Mangled: ?CameraIsOrtho@CameraImpl@Moho@@UAE_NXZ
+     *
+     * What it does:
+     * Returns orthographic-camera mode flag lane.
+     */
+    [[nodiscard]] virtual bool CameraIsOrtho();
+
+    /**
+     * Address: 0x007A6B20 (FUN_007A6B20, Moho::CameraImpl::CameraGetViewport)
+     * Mangled: ?CameraGetViewport@CameraImpl@Moho@@UBEXAAV?$Vector2@M@Wm3@@0@Z
+     *
+     * What it does:
+     * Returns current camera viewport origin and viewport size lanes.
+     */
+    virtual void CameraGetViewport(Wm3::Vector2f& viewportOrigin, Wm3::Vector2f& viewportSize) const;
+
+    /**
+     * Address: 0x007A6C90 (FUN_007A6C90, Moho::CameraImpl::CameraGetZoom)
+     * Mangled: ?CameraGetZoom@CameraImpl@Moho@@UBEMXZ
+     *
+     * What it does:
+     * Returns current camera zoom lane.
+     */
+    [[nodiscard]] virtual float CameraGetZoom() const;
+
+    /**
+     * Address: 0x007A6CC0 (FUN_007A6CC0, Moho::CameraImpl::CameraGetHeading)
+     * Mangled: ?CameraGetHeading@CameraImpl@Moho@@UBEMXZ
+     *
+     * What it does:
+     * Returns current camera heading lane in radians.
+     */
+    [[nodiscard]] virtual float CameraGetHeading() const;
+
+    /**
+     * Address: 0x007A6CD0 (FUN_007A6CD0, Moho::CameraImpl::CameraGetPitch)
+     * Mangled: ?CameraGetPitch@CameraImpl@Moho@@UBEMXZ
+     *
+     * What it does:
+     * Returns current camera pitch lane in radians.
+     */
+    [[nodiscard]] virtual float CameraGetPitch() const;
+
+    /**
+     * Address: 0x007A6E30 (FUN_007A6E30, Moho::CameraImpl::CameraIsRotated)
+     * Mangled: ?CameraIsRotated@CameraImpl@Moho@@UBE_NXZ
+     *
+     * What it does:
+     * Returns whether rotated-camera mode is currently enabled.
+     */
+    [[nodiscard]] virtual bool CameraIsRotated() const;
+
+    /**
+     * Address: 0x007A6B50 (FUN_007A6B50, ?Project@CameraImpl@Moho@@UBE?AV?$Vector2@M@Wm3@@ABV?$Vector3@M@4@@Z)
+     *
+     * What it does:
+     * Projects one world-space point through the embedded camera view and
+     * returns screen-space coordinates.
+     */
+    [[nodiscard]] virtual Wm3::Vector2f Project(const Wm3::Vector3f& worldPoint) const;
+
+    /**
+     * Address: 0x007A6B70 (FUN_007A6B70, ?Unproject@CameraImpl@Moho@@UBE?AU?$GeomLine3@M@2@ABV?$Vector2@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Builds one world-space ray from a screen-space point using the embedded
+     * camera view/projection/viewport lanes.
+     */
+    [[nodiscard]] virtual GeomLine3 Unproject(const Wm3::Vector2f& screenPoint) const;
+
+    /**
+     * Address: 0x007A6BB0 (FUN_007A6BB0, ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
+     *
+     * What it does:
+     * Unprojects one screen-space point and resolves the terrain/water surface
+     * intersection point on the active map.
+     */
+    [[nodiscard]] virtual Wm3::Vector3f CameraScreenToSurface(const Wm3::Vector2f& screenPoint) const;
+
+    /**
+     * Address: 0x007A72F0 (FUN_007A72F0, ?SetLODScale@CameraImpl@Moho@@UAEXM@Z)
+     *
+     * What it does:
+     * Updates embedded camera LOD scale used by projection/unprojection lanes.
+     */
+    virtual void SetLODScale(float scale);
+
+    /**
+     * Address: 0x007A7120 (FUN_007A7120, Moho::CameraImpl::CanShake)
+     * Mangled: ?CanShake@CameraImpl@Moho@@UAEX_N@Z
+     *
+     * What it does:
+     * Enables or disables camera-shake application for this camera runtime.
+     */
+    virtual void CanShake(bool canShake);
+
+    /**
+     * Address: 0x007A7130 (FUN_007A7130, Moho::CameraImpl::CameraShake)
+     * Mangled: ?CameraShake@CameraImpl@Moho@@UAEXABUSCamShakeParams@2@@Z
+     *
+     * What it does:
+     * Arms camera shake params when shaking is enabled and either the previous
+     * shake finished or incoming shake has stronger minimum magnitude.
+     */
+    virtual void CameraShake(const SCamShakeParams& shakeParams);
+
+    /**
      * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
      *
      * What it does:
@@ -148,6 +363,34 @@ namespace moho
      * camera frustum.
      */
     [[nodiscard]] CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
+
+    /**
+     * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
+     * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Stops entity tracking broadcasts when needed, resets target mode to
+     * location, and clears target-time lanes.
+     */
+    virtual void TargetNothing();
+
+    /**
+     * Address: 0x007A7290 (FUN_007A7290, Moho::CameraImpl::GetTargetEntity)
+     * Mangled: ?GetTargetEntity@CameraImpl@Moho@@UBEPAVUserEntity@2@XZ
+     *
+     * What it does:
+     * Returns current live entity target when target mode is entity/nose-cam.
+     */
+    [[nodiscard]] virtual UserEntity* GetTargetEntity() const;
+
+    /**
+     * Address: 0x007A73E0 (FUN_007A73E0, Moho::CameraImpl::GetTargetPosition)
+     * Mangled: ?GetTargetPosition@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@XZ
+     *
+     * What it does:
+     * Returns current target-position lane by value.
+     */
+    [[nodiscard]] virtual Wm3::Vector3f GetTargetPosition() const;
 
     /**
      * Address: 0x007A82F0 (FUN_007A82F0, Moho::CameraImpl::TargetLocation)
@@ -178,6 +421,47 @@ namespace moho
      * bounds, and optionally applies immediate focus+FOV clamping.
      */
     virtual void TargetBox(const Wm3::AxisAlignedBox3f& targetBox, float seconds);
+
+    /**
+     * Address: 0x007A8640 (FUN_007A8640, Moho::CameraImpl::TargetEntities)
+     * Mangled: ?TargetEntities@CameraImpl@Moho@@UAEXABV?$WeakSet@VUserEntity@Moho@@@2@_NMM@Z
+     *
+     * What it does:
+     * Replaces camera target weak-list from one entity weak-set, then starts
+     * tracked or untracked multi-entity target behavior.
+     */
+    virtual void TargetEntities(
+      const SSelectionSetUserEntity& entities,
+      bool trackEntities,
+      float zoom,
+      float seconds
+    );
+
+    /**
+     * Address: 0x007A8EE0 (FUN_007A8EE0, Moho::CameraImpl::TargetNextEntity)
+     * Mangled: ?TargetNextEntity@CameraImpl@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Advances active entity-target cursor to the next live weak target,
+     * prunes stale weak nodes, and emits tracking stop/start notifications.
+     */
+    virtual void TargetNextEntity();
+
+    /**
+     * Address: 0x007A8A20 (FUN_007A8A20, Moho::CameraImpl::TargetNoseCam)
+     * Mangled: ?TargetNoseCam@CameraImpl@Moho@@QAEXABV?$WeakSet@VUserEntity@Moho@@@2@MMMM@Z
+     *
+     * What it does:
+     * Targets one entity list in nose-camera mode with pitch-adjust, zoom,
+     * transition seconds, and transition parameter lanes.
+     */
+    void TargetNoseCam(
+      const SSelectionSetUserEntity& entities,
+      float pitchAdjust,
+      float zoom,
+      float seconds,
+      float transition
+    );
 
     /**
      * Address: 0x007A74C0 (FUN_007A74C0, Moho::CameraImpl::TimedMoveInit)
@@ -294,6 +578,15 @@ namespace moho
   );
 
   /**
+   * Address: 0x007B0A90 (FUN_007B0A90, func_CreateLuaCameraImpl)
+   *
+   * What it does:
+   * Returns cached `CameraImpl` metatable object from Lua object-factory
+   * storage.
+   */
+  LuaPlus::LuaObject* func_CreateLuaCameraImpl(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x007AB080 (FUN_007AB080, cfunc_GetCamera)
    *
    * What it does:
@@ -368,6 +661,16 @@ namespace moho
    * Publishes Lua binder metadata for `CameraImpl:MoveToRegion`.
    */
   CScrLuaInitForm* func_CameraImplMoveToRegion_LuaFuncDef();
+
+  /**
+   * Address: 0x007AB230 (FUN_007AB230, cfunc_CameraImplMoveToRegionL)
+   *
+   * What it does:
+   * Validates `Camera:MoveTo(region[,seconds])`, quantizes region corners to
+   * terrain grid cell centers, samples corner elevations, and targets one
+   * world box transition.
+   */
+  int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007AB760 (FUN_007AB760, cfunc_CameraImplMoveToL)
@@ -500,6 +803,24 @@ namespace moho
   CScrLuaInitForm* func_CameraImplTrackEntities_LuaFuncDef();
 
   /**
+   * Address: 0x007ABA60 (FUN_007ABA60, cfunc_CameraImplTrackEntities)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CameraImplTrackEntitiesL`.
+   */
+  int cfunc_CameraImplTrackEntities(lua_State* luaContext);
+
+  /**
+   * Address: 0x007ABAE0 (FUN_007ABAE0, cfunc_CameraImplTrackEntitiesL)
+   *
+   * What it does:
+   * Validates `Camera:TrackEntities(ents,zoom,seconds)` and dispatches tracked
+   * multi-entity targeting.
+   */
+  int cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x007ABE60 (FUN_007ABE60, func_CameraImplTargetEntities_LuaFuncDef)
    *
    * What it does:
@@ -508,12 +829,47 @@ namespace moho
   CScrLuaInitForm* func_CameraImplTargetEntities_LuaFuncDef();
 
   /**
+   * Address: 0x007ABE40 (FUN_007ABE40, cfunc_CameraImplTargetEntities)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CameraImplTargetEntitiesL`.
+   */
+  int cfunc_CameraImplTargetEntities(lua_State* luaContext);
+
+  /**
+   * Address: 0x007ABEC0 (FUN_007ABEC0, cfunc_CameraImplTargetEntitiesL)
+   *
+   * What it does:
+   * Validates `Camera:TargetEntities(ents,zoom,seconds)` and dispatches
+   * untracked multi-entity targeting.
+   */
+  int cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x007AC1E0 (FUN_007AC1E0, func_CameraImplNoseCam_LuaFuncDef)
    *
    * What it does:
    * Publishes Lua binder metadata for `CameraImpl:NoseCam`.
    */
   CScrLuaInitForm* func_CameraImplNoseCam_LuaFuncDef();
+
+  /**
+   * Address: 0x007AC1C0 (FUN_007AC1C0, cfunc_CameraImplNoseCam)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplNoseCamL`.
+   */
+  int cfunc_CameraImplNoseCam(lua_State* luaContext);
+
+  /**
+   * Address: 0x007AC240 (FUN_007AC240, cfunc_CameraImplNoseCamL)
+   *
+   * What it does:
+   * Validates `Camera:NoseCam(ent,pitchAdjust,zoom,seconds,transition)` and
+   * dispatches nose-camera targeting.
+   */
+  int cfunc_CameraImplNoseCamL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007AC520 (FUN_007AC520, func_CameraImplHoldRotation_LuaFuncDef)
@@ -585,12 +941,30 @@ namespace moho
   CScrLuaInitForm* func_CameraImplGetMinZoom_LuaFuncDef();
 
   /**
+   * Address: 0x007ACC40 (FUN_007ACC40, cfunc_CameraImplGetZoom)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CameraImplGetZoomL`.
+   */
+  int cfunc_CameraImplGetZoom(lua_State* luaContext);
+
+  /**
    * Address: 0x007ACC60 (FUN_007ACC60, func_CameraImplGetZoom_LuaFuncDef)
    *
    * What it does:
    * Publishes Lua binder metadata for `CameraImpl:GetZoom`.
    */
   CScrLuaInitForm* func_CameraImplGetZoom_LuaFuncDef();
+
+  /**
+   * Address: 0x007ACCC0 (FUN_007ACCC0, cfunc_CameraImplGetZoomL)
+   *
+   * What it does:
+   * Validates `Camera:GetZoom()`, resolves one camera payload, and pushes the
+   * current target-zoom scalar.
+   */
+  int cfunc_CameraImplGetZoomL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007ACDA0 (FUN_007ACDA0, func_CameraImplGetFocusPosition_LuaFuncDef)
@@ -601,6 +975,15 @@ namespace moho
   CScrLuaInitForm* func_CameraImplGetFocusPosition_LuaFuncDef();
 
   /**
+   * Address: 0x007ACEE0 (FUN_007ACEE0, cfunc_CameraImplSaveSettings)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CameraImplSaveSettingsL`.
+   */
+  int cfunc_CameraImplSaveSettings(lua_State* luaContext);
+
+  /**
    * Address: 0x007ACF00 (FUN_007ACF00, func_CameraImplSaveSettings_LuaFuncDef)
    *
    * What it does:
@@ -609,12 +992,40 @@ namespace moho
   CScrLuaInitForm* func_CameraImplSaveSettings_LuaFuncDef();
 
   /**
+   * Address: 0x007ACF60 (FUN_007ACF60, cfunc_CameraImplSaveSettingsL)
+   *
+   * What it does:
+   * Captures one camera snapshot table (`Focus`, `Zoom`, `Pitch`, `Heading`)
+   * from the current camera runtime and returns it to Lua.
+   */
+  int cfunc_CameraImplSaveSettingsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x007AD0D0 (FUN_007AD0D0, cfunc_CameraImplRestoreSettings)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CameraImplRestoreSettingsL`.
+   */
+  int cfunc_CameraImplRestoreSettings(lua_State* luaContext);
+
+  /**
    * Address: 0x007AD0F0 (FUN_007AD0F0, func_CameraImplRestoreSettings_LuaFuncDef)
    *
    * What it does:
    * Publishes Lua binder metadata for `CameraImpl:RestoreSettings`.
    */
   CScrLuaInitForm* func_CameraImplRestoreSettings_LuaFuncDef();
+
+  /**
+   * Address: 0x007AD150 (FUN_007AD150, cfunc_CameraImplRestoreSettingsL)
+   *
+   * What it does:
+   * Reads one saved camera snapshot table (`Focus`, `Zoom`, `Pitch`,
+   * `Heading`), restores manual target state immediately, then clears timed
+   * targeting and reapplies rotation-revert semantics.
+   */
+  int cfunc_CameraImplRestoreSettingsL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007AD3D0 (FUN_007AD3D0, cfunc_CameraImplGetTargetZoom)

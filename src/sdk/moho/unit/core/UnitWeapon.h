@@ -25,6 +25,7 @@ namespace LuaPlus
 namespace moho
 {
   class CFireWeaponTask;
+  class Entity;
   class IAiAttacker;
   class Projectile;
   struct RProjectileBlueprint;
@@ -32,6 +33,26 @@ namespace moho
   class Sim;
   class Unit;
   class UnitWeapon;
+
+  /**
+   * Collision candidate lane used by beam-impact filtering.
+   *
+   * Address evidence:
+   * - `UnitWeapon::GetClosestCollision` (0x006D6A00) iterates 0x20-byte entries
+   *   with `entity` at +0x00 and hit distance at +0x1C.
+   */
+  struct WeaponCollisionEntry
+  {
+    Entity* entity;              // +0x00
+    Wm3::Vector3f collisionAxis; // +0x04
+    Wm3::Vector3f contactPoint;  // +0x10
+    float dist;                  // +0x1C
+  };
+  static_assert(sizeof(WeaponCollisionEntry) == 0x20, "WeaponCollisionEntry size must be 0x20");
+  static_assert(offsetof(WeaponCollisionEntry, entity) == 0x00, "WeaponCollisionEntry::entity offset must be 0x00");
+  static_assert(offsetof(WeaponCollisionEntry, dist) == 0x1C, "WeaponCollisionEntry::dist offset must be 0x1C");
+
+  using WeaponCollisionEntryVec = gpg::fastvector_n<WeaponCollisionEntry, 10>;
 
   class UnitWeapon : public CScriptEvent
   {
@@ -63,6 +84,23 @@ namespace moho
      * Copies this weapon label text into caller-provided output storage.
      */
     msvc8::string* GetLabel(msvc8::string* outLabel) const;
+
+    /**
+     * Address: 0x006A4C70 (FUN_006A4C70, Moho::UnitWeapon::GetCat1)
+     *
+     * What it does:
+     * Copies this weapon primary target category set into caller-provided
+     * output storage.
+     */
+    EntityCategorySet* GetCat1(EntityCategorySet* outCategory) const;
+
+    /**
+     * Address: 0x006A4CA0 (FUN_006A4CA0, Moho::UnitWeapon::GetCat2)
+     *
+     * What it does:
+     * Copies secondary category filter payload into caller-provided storage.
+     */
+    EntityCategorySet* GetCat2(EntityCategorySet* outCategory) const;
 
     /**
      * Address family: 0x006DB9E0 / 0x006DB960 callsites
@@ -124,6 +162,15 @@ namespace moho
     void ChangeProjectileBlueprint(const msvc8::string& blueprint);
 
     /**
+     * Address: 0x006D5330 (FUN_006D5330, Moho::UnitWeapon::GetTransform)
+     *
+     * What it does:
+     * Writes this weapon world position into caller-provided output storage,
+     * using muzzle-bone transform when a valid muzzle bone is configured.
+     */
+    Wm3::Vector3f* GetTransform(Wm3::Vector3f* outPosition) const;
+
+    /**
      * Address: 0x006D5720 (FUN_006D5720, Moho::UnitWeapon::CanAttackTarget)
      *
      * What it does:
@@ -131,6 +178,24 @@ namespace moho
      * entity layer/category gates and ground water-surface layer gates.
      */
     [[nodiscard]] static bool CanAttackTarget(CAiTarget* target, UnitWeapon* weapon);
+
+    /**
+     * Address: 0x006D5500 (FUN_006D5500, Moho::UnitWeapon::CheckSilo)
+     *
+     * What it does:
+     * Validates counted-projectile silo storage availability for this weapon.
+     */
+    [[nodiscard]] bool CheckSilo();
+
+    /**
+     * Address: 0x006D6A00 (FUN_006D6A00, Moho::UnitWeapon::GetClosestCollision)
+     *
+     * What it does:
+     * Scans collision candidates, applies script and ally filters, and returns
+     * the nearest surviving collision lane.
+     */
+    [[nodiscard]] static WeaponCollisionEntry*
+    GetClosestCollision(WeaponCollisionEntryVec* collisions, UnitWeapon* weapon, Unit* ownerUnit, bool ignoreAlly);
 
     /**
      * Address: 0x006D5200 (FUN_006D5200, sub_6D5200)

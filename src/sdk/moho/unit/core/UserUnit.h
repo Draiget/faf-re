@@ -2,6 +2,7 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
+#include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
@@ -26,6 +27,8 @@ namespace moho
   class CWldSession;
   struct RUnitBlueprint;
   struct SCoordsVec2;
+  struct SFootprint;
+  struct SOCellPos;
 } // namespace moho
 
 namespace moho
@@ -318,6 +321,15 @@ namespace moho
      * including layer/category filters and optional range checks.
      */
     [[nodiscard]] bool CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) const;
+
+    /**
+     * Address: 0x00852950 (FUN_00852950, Moho::UserUnit::GetSkirt)
+     *
+     * What it does:
+     * Samples this unit's current world XZ position and writes the resolved
+     * blueprint skirt rectangle into `outSkirtRect`.
+     */
+    [[nodiscard]] gpg::Rect2f* GetSkirt(gpg::Rect2f* outSkirtRect) const;
 
     /**
      * Address: 0x00893080 (FUN_00893080, Moho::UserUnit::AddSelectionSet)
@@ -647,6 +659,15 @@ namespace moho
    * COL:  0x00E9E888
    */
   using UserUnitGetMissileInfo_LuaFuncDef = ::moho::CScrLuaBinder;
+
+  /**
+   * Address: 0x008C1430 (FUN_008C1430, ?USERUNIT_CanOccupy@Moho@@YA_NAAVCWldSession@1@ABUSFootprint@1@AAUSOCellPos@1@@Z)
+   *
+   * What it does:
+   * Validates one build footprint origin against map bounds and rejects
+   * placement when it strictly overlaps a visible non-mobile unit footprint.
+   */
+  bool USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint, SOCellPos& position);
 
   /**
    * Address: 0x008C1610 (FUN_008C1610, ?USERUNIT_WithinBuildDistance@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@@Z)

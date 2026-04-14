@@ -14,6 +14,11 @@ namespace gpg
   class SerConstructResult;
 }
 
+namespace LuaPlus
+{
+  class LuaObject;
+}
+
 namespace moho
 {
   class CScrLuaInitForm;
@@ -178,6 +183,14 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<CAnimationManipulator>) == 0x8,
     "CScrLuaMetatableFactory<CAnimationManipulator> size must be 0x8"
   );
+
+  /**
+   * Address: 0x006423C0 (FUN_006423C0, func_CreateCAnimationManipulatorObject)
+   *
+   * What it does:
+   * Materializes the `CAnimationManipulator` Lua userdata factory object.
+   */
+  [[nodiscard]] LuaPlus::LuaObject func_CreateCAnimationManipulatorObject(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x006404B0 (FUN_006404B0, cfunc_CreateAnimator)

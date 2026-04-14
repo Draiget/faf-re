@@ -477,21 +477,19 @@ namespace moho
     Wm3::Vector2f startPosition{};
     army->GetArmyStartPos(startPosition);
 
-    SUnitConstructionParams constructionParams{};
-    constructionParams.mArmy = army;
-    constructionParams.mBlueprint = blueprint;
+    SUnitConstructionParams constructionParams{
+      0,
+      Wm3::Vector3f{startPosition.x, 0.0f, startPosition.y},
+      army,
+      blueprint,
+      nullptr,
+      true
+    };
     constructionParams.mTransform.orient_.x = 1.0f;
     constructionParams.mTransform.orient_.y = 0.0f;
     constructionParams.mTransform.orient_.z = 0.0f;
     constructionParams.mTransform.orient_.w = 0.0f;
-    constructionParams.mTransform.pos_.x = startPosition.x;
-    constructionParams.mTransform.pos_.y = 0.0f;
-    constructionParams.mTransform.pos_.z = startPosition.y;
     constructionParams.mUseLayerOverride = 1;
-    constructionParams.mFixElevation = 0;
-    constructionParams.mLayer = 0;
-    constructionParams.mLinkSourceUnit = nullptr;
-    constructionParams.mComplete = 1;
 
     Unit* const unit = sim ? sim->CreateUnitForScript(constructionParams, true) : nullptr;
     if (!unit) {

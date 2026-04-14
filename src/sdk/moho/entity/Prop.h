@@ -190,6 +190,14 @@ namespace moho
   static_assert(sizeof(CScrLuaMetatableFactory<Prop>) == 0x08, "CScrLuaMetatableFactory<Prop> size must be 0x08");
 
   /**
+   * Address: 0x0067F140 (FUN_0067F140, func_GetPropFactory)
+   *
+   * What it does:
+   * Returns cached `Prop` metatable object from Lua object-factory storage.
+   */
+  LuaPlus::LuaObject* func_GetPropFactory(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00BD50F0 (FUN_00BD50F0, register_CScrLuaMetatableFactory_Prop_Index)
    *
    * What it does:

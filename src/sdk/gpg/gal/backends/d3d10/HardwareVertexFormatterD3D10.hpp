@@ -15,6 +15,14 @@ namespace gpg::gal
 	{
 	public:
 		/**
+		 * Address: 0x0094D4F0 (FUN_0094D4F0, ??0HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
+		 *
+		 * What it does:
+		 * Initializes one D3D10 hardware vertex-formatter instance.
+		 */
+		HardwareVertexFormatterD3D10();
+
+		/**
 		 * Address: 0x0094D8F0 (FUN_0094D8F0, scalar deleting destructor thunk)
 		 * Slot: 0
 		 */

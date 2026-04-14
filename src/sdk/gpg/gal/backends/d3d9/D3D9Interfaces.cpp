@@ -28,6 +28,7 @@
 #include "boost/weak_ptr.h"
 
 #include <bit>
+#include <fstream>
 #include <cstdio>
 #include <cstring>
 #include <new>
@@ -110,8 +111,29 @@ namespace gpg::gal
         );
         using d3dx_get_vertex_shader_profile_fn = const char*(WINAPI*)(void*);
         using d3dx_get_pixel_shader_profile_fn = const char*(WINAPI*)(void*);
+        using d3dx_create_effect_fn = HRESULT(WINAPI*)(
+            void*,
+            const void*,
+            unsigned int,
+            const void*,
+            void*,
+            unsigned int,
+            void*,
+            void**,
+            void**
+        );
+        using d3dx_create_effect_compiler_fn = HRESULT(WINAPI*)(
+            const char*,
+            unsigned int,
+            const void*,
+            void*,
+            unsigned int,
+            void**,
+            void**
+        );
         using d3dx_buffer_get_pointer_fn = void*(__stdcall*)(void*);
         using d3dx_buffer_get_size_fn = unsigned int(__stdcall*)(void*);
+        using effect_compiler_compile_effect_fn = HRESULT(__stdcall*)(void*, unsigned int, void**, void**);
         using effect_get_parameter_by_name_fn = void*(__stdcall*)(void*, void*, const char*);
         using effect_get_annotation_by_name_fn = void*(__stdcall*)(void*, void*, const char*);
         using effect_get_technique_by_name_fn = void*(__stdcall*)(void*, const char*);
@@ -409,6 +431,12 @@ namespace gpg::gal
             const char* name = nullptr; // +0x00
         };
 
+        struct D3DXMacroRuntime final
+        {
+            const char* name = nullptr;       // +0x00
+            const char* definition = nullptr; // +0x04
+        };
+
         struct D3DXImageInfoRuntime final
         {
             unsigned int width = 0U;      // +0x00
@@ -624,6 +652,8 @@ namespace gpg::gal
             d3dx_create_cube_texture_from_file_in_memory_ex_fn createCubeTextureFromFileInMemoryEx = nullptr;
             d3dx_get_vertex_shader_profile_fn getVertexShaderProfile = nullptr;
             d3dx_get_pixel_shader_profile_fn getPixelShaderProfile = nullptr;
+            d3dx_create_effect_fn createEffect = nullptr;
+            d3dx_create_effect_compiler_fn createEffectCompiler = nullptr;
         };
 
         /**
@@ -853,6 +883,10 @@ namespace gpg::gal
                 exports.getPixelShaderProfile = reinterpret_cast<d3dx_get_pixel_shader_profile_fn>(
                     ::GetProcAddress(module, "D3DXGetPixelShaderProfile")
                 );
+                exports.createEffect =
+                    reinterpret_cast<d3dx_create_effect_fn>(::GetProcAddress(module, "D3DXCreateEffect"));
+                exports.createEffectCompiler =
+                    reinterpret_cast<d3dx_create_effect_compiler_fn>(::GetProcAddress(module, "D3DXCreateEffectCompiler"));
                 if ((fallbackFloat32To16Array == nullptr) && (exports.float32To16Array != nullptr))
                 {
                     fallbackFloat32To16Array = exports.float32To16Array;
@@ -1134,6 +1168,64 @@ namespace gpg::gal
             );
         }
 
+        HRESULT InvokeD3DXCreateEffectCompiler(
+            const char* const sourceData,
+            const unsigned int sourceBytes,
+            const D3DXMacroRuntime* const defines,
+            void* const include,
+            const unsigned int flags,
+            void** const outEffectCompiler,
+            void** const outParseErrors
+        )
+        {
+            const D3DXExports& exports = GetD3DXExports();
+            if (exports.createEffectCompiler == nullptr)
+            {
+                return kMissingD3DXCall;
+            }
+
+            return exports.createEffectCompiler(
+                sourceData,
+                sourceBytes,
+                defines,
+                include,
+                flags,
+                outEffectCompiler,
+                outParseErrors
+            );
+        }
+
+        HRESULT InvokeD3DXCreateEffect(
+            void* const nativeDevice,
+            const void* const sourceData,
+            const unsigned int sourceBytes,
+            const D3DXMacroRuntime* const defines,
+            void* const include,
+            const unsigned int flags,
+            void* const effectPool,
+            void** const outEffect,
+            void** const outCompilationErrors
+        )
+        {
+            const D3DXExports& exports = GetD3DXExports();
+            if (exports.createEffect == nullptr)
+            {
+                return kMissingD3DXCall;
+            }
+
+            return exports.createEffect(
+                nativeDevice,
+                sourceData,
+                sourceBytes,
+                defines,
+                include,
+                flags,
+                effectPool,
+                outEffect,
+                outCompilationErrors
+            );
+        }
+
         const char* InvokeD3DXGetVertexShaderProfile(void* const nativeDevice) noexcept
         {
             const D3DXExports& exports = GetD3DXExports();
@@ -1287,6 +1379,18 @@ namespace gpg::gal
             auto** const vtable = *reinterpret_cast<void***>(d3dxBuffer);
             auto* const getBufferPointer = reinterpret_cast<d3dx_buffer_get_pointer_fn>(vtable[3]);
             return getBufferPointer(d3dxBuffer);
+        }
+
+        HRESULT InvokeEffectCompilerCompileEffect(
+            void* const effectCompiler,
+            const unsigned int flags,
+            void** const outCompiledEffectBuffer,
+            void** const outCompilationErrors
+        )
+        {
+            auto** const vtable = *reinterpret_cast<void***>(effectCompiler);
+            auto* const compileEffect = reinterpret_cast<effect_compiler_compile_effect_fn>(vtable[3]);
+            return compileEffect(effectCompiler, flags, outCompiledEffectBuffer, outCompilationErrors);
         }
 
         void* InvokeEffectGetAnnotationByName(void* const effect, void* const handle, const char* const name)
@@ -1540,6 +1644,54 @@ namespace gpg::gal
         const DeviceD3D9RuntimeView& AsDeviceD3D9Runtime(const DeviceD3D9& device) noexcept
         {
             return *reinterpret_cast<const DeviceD3D9RuntimeView*>(&device);
+        }
+
+        /**
+         * Address: 0x008EA250 (FUN_008EA250, boost::shared_ptr_PipelineStateD3D9::operator=)
+         *
+         * What it does:
+         * Rebinds one `shared_ptr<PipelineStateD3D9>` from a raw pointer,
+         * replacing and releasing any previous ownership lane.
+         */
+        boost::shared_ptr<PipelineStateD3D9>* AssignSharedPipelineStateFromRaw(
+            boost::shared_ptr<PipelineStateD3D9>* const outPipelineState,
+            PipelineStateD3D9* const pipelineState
+        )
+        {
+            outPipelineState->reset(pipelineState);
+            return outPipelineState;
+        }
+
+        /**
+         * Address: 0x008E9E40 (FUN_008E9E40, boost::shared_ptr_RenderTargetD3D9::operator=)
+         *
+         * What it does:
+         * Rebinds one `shared_ptr<RenderTargetD3D9>` from a raw pointer and
+         * releases prior ownership.
+         */
+        boost::shared_ptr<RenderTargetD3D9>* AssignSharedRenderTargetFromRaw(
+            boost::shared_ptr<RenderTargetD3D9>* const outRenderTarget,
+            RenderTargetD3D9* const renderTarget
+        )
+        {
+            outRenderTarget->reset(renderTarget);
+            return outRenderTarget;
+        }
+
+        /**
+         * Address: 0x008E9EB0 (FUN_008E9EB0, boost::shared_ptr_DepthStencilTargetD3D9::operator=)
+         *
+         * What it does:
+         * Rebinds one `shared_ptr<DepthStencilTargetD3D9>` from a raw pointer
+         * and releases prior ownership.
+         */
+        boost::shared_ptr<DepthStencilTargetD3D9>* AssignSharedDepthStencilTargetFromRaw(
+            boost::shared_ptr<DepthStencilTargetD3D9>* const outDepthStencilTarget,
+            DepthStencilTargetD3D9* const depthStencilTarget
+        )
+        {
+            outDepthStencilTarget->reset(depthStencilTarget);
+            return outDepthStencilTarget;
         }
 
         const OutputContextD3D9RuntimeView& AsOutputContextD3D9Runtime(const OutputContext& context) noexcept
@@ -2320,15 +2472,28 @@ namespace gpg::gal
             return effect;
         }
 
+        /**
+         * Address: 0x00941B90 (FUN_00941B90)
+         *
+         * What it does:
+         * Constructs one weak effect reference from a live shared effect handle.
+         */
+        boost::weak_ptr<EffectD3D9> CreateWeakEffectReference(
+            const boost::shared_ptr<EffectD3D9>& effect
+        )
+        {
+            return boost::weak_ptr<EffectD3D9>(effect);
+        }
+
         boost::shared_ptr<EffectTechniqueD3D9> CreateEffectTechniqueWrapper(
             const char* const name,
-            const boost::weak_ptr<EffectD3D9>& effect,
+            const boost::shared_ptr<EffectD3D9>& effect,
             void* const handle
         )
         {
             boost::shared_ptr<EffectTechniqueD3D9> technique(new EffectTechniqueD3D9());
             technique->name_.assign_owned(name != nullptr ? name : "");
-            technique->effect_ = effect;
+            technique->effect_ = CreateWeakEffectReference(effect);
             technique->handle_ = handle;
             technique->beginEndActive_ = false;
             return technique;
@@ -2336,11 +2501,13 @@ namespace gpg::gal
 
         boost::shared_ptr<EffectVariableD3D9> CreateEffectVariableWrapper(
             const char* const name,
-            const boost::weak_ptr<EffectD3D9>& effect,
+            const boost::shared_ptr<EffectD3D9>& effect,
             void* const handle
         )
         {
-            return boost::shared_ptr<EffectVariableD3D9>(new EffectVariableD3D9(name, effect, handle));
+            return boost::shared_ptr<EffectVariableD3D9>(
+                new EffectVariableD3D9(name, CreateWeakEffectReference(effect), handle)
+            );
         }
 
         unsigned int ToIndexBufferLockFlags(const MohoD3DLockFlags flags)
@@ -3147,6 +3314,266 @@ namespace gpg::gal
             effect->selfWeak_.reset();
         }
 
+        [[nodiscard]] msvc8::string ReadD3DXErrorText(void* const d3dxErrorBuffer)
+        {
+            const char* errorText = "unknown error";
+            if (d3dxErrorBuffer != nullptr)
+            {
+                const void* const textPtr = GetD3DXBufferPointer(d3dxErrorBuffer);
+                if (textPtr != nullptr)
+                {
+                    errorText = static_cast<const char*>(textPtr);
+                }
+            }
+
+            msvc8::string reason{};
+            reason.assign_owned(errorText);
+            return reason;
+        }
+
+        [[nodiscard]]
+        msvc8::string BuildEffectCreationMessage(
+            const char* const prefix,
+            const EffectContextRuntime& contextRuntime,
+            const msvc8::string& reason
+        )
+        {
+            msvc8::string message(prefix != nullptr ? prefix : "");
+            message = message + contextRuntime.field0C;
+            message = message + " reason: ";
+            message = message + reason;
+            return message;
+        }
+
+        void BuildD3DXMacroDefines(
+            std::vector<D3DXMacroRuntime>& outDefines,
+            const EffectContextLane54Runtime& macros
+        )
+        {
+            outDefines.clear();
+
+            const std::size_t macroCount = EffectMacroCount(macros);
+            if (macroCount == 0U)
+            {
+                return;
+            }
+
+            outDefines.resize(macroCount + 1U);
+
+            std::size_t index = 0U;
+            for (EffectMacro* macro = macros.first; macro != macros.last; ++macro, ++index)
+            {
+                outDefines[index].name = macro->keyText_.c_str();
+                outDefines[index].definition = macro->valueText_.c_str();
+            }
+
+            outDefines[index].name = nullptr;
+            outDefines[index].definition = nullptr;
+        }
+
+        /**
+         * Address: 0x008F09A0 (FUN_008F09A0)
+         *
+         * What it does:
+         * Compiles one effect from source-memory + macro lanes, builds a D3D9
+         * effect object, installs the active pipeline state-manager, and emits
+         * the compiled bytecode to cache-path when the file can be opened.
+         */
+        boost::shared_ptr<EffectD3D9>* CreateEffectFromSourceBuffer(
+            DeviceD3D9* const device,
+            boost::shared_ptr<EffectD3D9>* const outEffect,
+            EffectContext* const context
+        )
+        {
+            const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
+            if (contextRuntime->field04 != 2U)
+            {
+                ThrowGalError("DeviceD3D9.cpp", 1514, "");
+            }
+
+            std::vector<D3DXMacroRuntime> macroDefines{};
+            BuildD3DXMacroDefines(macroDefines, contextRuntime->lane54);
+            const D3DXMacroRuntime* const defines = macroDefines.empty() ? nullptr : macroDefines.data();
+
+            ComObjectScope effectCompiler{};
+            ComObjectScope compilationErrors{};
+
+            const char* const sourceData =
+                reinterpret_cast<const char*>(static_cast<std::uintptr_t>(contextRuntime->field4C));
+            const unsigned int sourceBytes = (contextRuntime->field50 >= contextRuntime->field4C)
+                ? (contextRuntime->field50 - contextRuntime->field4C)
+                : 0U;
+
+            const HRESULT createCompilerResult = InvokeD3DXCreateEffectCompiler(
+                sourceData,
+                sourceBytes,
+                defines,
+                nullptr,
+                0x10001U,
+                effectCompiler.out(),
+                compilationErrors.out()
+            );
+            if (createCompilerResult < 0)
+            {
+                const msvc8::string reason = ReadD3DXErrorText(compilationErrors.get());
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, reason);
+                ThrowGalError("DeviceD3D9.cpp", 1549, message.c_str());
+            }
+
+            compilationErrors.reset();
+
+            ComObjectScope compiledEffectBuffer{};
+            const HRESULT compileEffectResult = InvokeEffectCompilerCompileEffect(
+                effectCompiler.get(),
+                1U,
+                compiledEffectBuffer.out(),
+                compilationErrors.out()
+            );
+            if (compileEffectResult < 0)
+            {
+                const msvc8::string reason = ReadD3DXErrorText(compilationErrors.get());
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, reason);
+                ThrowGalError("DeviceD3D9.cpp", 1557, message.c_str());
+            }
+
+            compilationErrors.reset();
+
+            ComObjectScope nativeEffect{};
+            ComObjectScope createEffectErrors{};
+
+            auto& deviceRuntime = AsDeviceD3D9Runtime(*device);
+            const HRESULT createEffectResult = InvokeD3DXCreateEffect(
+                deviceRuntime.nativeDevice,
+                GetD3DXBufferPointer(compiledEffectBuffer.get()),
+                GetD3DXBufferSize(compiledEffectBuffer.get()),
+                defines,
+                nullptr,
+                1U,
+                nullptr,
+                nativeEffect.out(),
+                createEffectErrors.out()
+            );
+            if (createEffectResult < 0)
+            {
+                const msvc8::string reason = ReadD3DXErrorText(createEffectErrors.get());
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, reason);
+                ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
+            }
+
+            PipelineStateD3D9* const pipelineState = deviceRuntime.pipelineState.get();
+            StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
+            const HRESULT setStateManagerResult = InvokeEffectSetStateManager(nativeEffect.get(), stateManager);
+            if (setStateManagerResult < 0)
+            {
+                ThrowGalError(
+                    "DeviceD3D9.cpp",
+                    1580,
+                    ::gpg::D3DErrorToString(static_cast<long>(setStateManagerResult))
+                );
+            }
+
+            const char* const cachePath = GetStringDataRaw(contextRuntime->field28);
+            std::ofstream compiledCache(
+                (cachePath != nullptr) ? cachePath : "",
+                std::ios::out | std::ios::binary
+            );
+            if (compiledCache.good())
+            {
+                const char* const compiledBytes = static_cast<const char*>(GetD3DXBufferPointer(compiledEffectBuffer.get()));
+                const unsigned int compiledBytesCount = GetD3DXBufferSize(compiledEffectBuffer.get());
+                compiledCache.write(compiledBytes, static_cast<std::streamsize>(compiledBytesCount));
+                compiledCache.close();
+            }
+
+            outEffect->reset(new EffectD3D9(context, nativeEffect.release()));
+            return outEffect;
+        }
+
+        /**
+         * Address: 0x008F0F90 (FUN_008F0F90)
+         *
+         * What it does:
+         * Loads one cached compiled-effect payload from `cachePath`, creates the
+         * native D3D9 effect, and installs the active pipeline state-manager.
+         */
+        boost::shared_ptr<EffectD3D9>* CreateEffectFromCachedBinary(
+            DeviceD3D9* const device,
+            boost::shared_ptr<EffectD3D9>* const outEffect,
+            EffectContext* const context
+        )
+        {
+            const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
+            if (contextRuntime->field04 != 2U)
+            {
+                ThrowGalError("DeviceD3D9.cpp", 1609, "");
+            }
+
+            const char* const cachePath = GetStringDataRaw(contextRuntime->field28);
+            std::ifstream compiledCache(
+                (cachePath != nullptr) ? cachePath : "",
+                std::ios::in | std::ios::binary
+            );
+            if (!compiledCache.good())
+            {
+                ThrowGalError("DeviceD3D9.cpp", 1612, "");
+            }
+
+            compiledCache.seekg(0, std::ios::end);
+            const std::streamoff compiledSizeStream = compiledCache.tellg();
+            compiledCache.seekg(0, std::ios::beg);
+
+            const std::size_t compiledSize = (compiledSizeStream > 0)
+                ? static_cast<std::size_t>(compiledSizeStream)
+                : 0U;
+            std::vector<char> compiledBytes(compiledSize);
+            if (compiledSize != 0U)
+            {
+                compiledCache.read(compiledBytes.data(), static_cast<std::streamsize>(compiledSize));
+            }
+            compiledCache.close();
+
+            ComObjectScope nativeEffect{};
+            ComObjectScope createEffectErrors{};
+
+            auto& deviceRuntime = AsDeviceD3D9Runtime(*device);
+            const HRESULT createEffectResult = InvokeD3DXCreateEffect(
+                deviceRuntime.nativeDevice,
+                compiledBytes.empty() ? nullptr : static_cast<const void*>(compiledBytes.data()),
+                static_cast<unsigned int>(compiledBytes.size()),
+                nullptr,
+                nullptr,
+                0U,
+                nullptr,
+                nativeEffect.out(),
+                createEffectErrors.out()
+            );
+            if (createEffectResult < 0)
+            {
+                const msvc8::string reason = ReadD3DXErrorText(createEffectErrors.get());
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, reason);
+                ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
+            }
+
+            PipelineStateD3D9* const pipelineState = deviceRuntime.pipelineState.get();
+            StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
+            const HRESULT setStateManagerResult = InvokeEffectSetStateManager(nativeEffect.get(), stateManager);
+            if (setStateManagerResult < 0)
+            {
+                ThrowGalError(
+                    "DeviceD3D9.cpp",
+                    1646,
+                    ::gpg::D3DErrorToString(static_cast<long>(setStateManagerResult))
+                );
+            }
+
+            outEffect->reset(new EffectD3D9(context, nativeEffect.release()));
+            return outEffect;
+        }
+
         /**
          * Address: 0x00942FC0 (FUN_00942FC0)
          *
@@ -3448,6 +3875,14 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x009451C0 (FUN_009451C0, ??0HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one D3D9 hardware-vertex formatter wrapper.
+     */
+    HardwareVertexFormatterD3D9::HardwareVertexFormatterD3D9() = default;
+
+    /**
      * Address: 0x00945600 (FUN_00945600)
      *
      * What it does:
@@ -3504,6 +3939,14 @@ namespace gpg::gal
     {
         return static_cast<std::uint32_t>(0x48 + ((streamClass != 0) ? 4 : 0));
     }
+
+    /**
+     * Address: 0x00945380 (FUN_00945380, ??0Float16HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one D3D9 float16 hardware-vertex formatter wrapper.
+     */
+    Float16HardwareVertexFormatterD3D9::Float16HardwareVertexFormatterD3D9() = default;
 
     /**
      * Address: 0x00945620 (FUN_00945620)
@@ -3675,6 +4118,33 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x009410A0 (FUN_009410A0, gpg::gal::AdapterD3D9::AdapterD3D9)
+     * Mangled: ??0AdapterD3D9@gal@gpg@@QAE@@Z
+     *
+     * What it does:
+     * Initializes adapter identifier lanes and copies driver/device/description
+     * strings into this adapter instance.
+     */
+    AdapterD3D9::AdapterD3D9(
+        const std::uint32_t vendorIdValue,
+        const std::uint32_t deviceIdValue,
+        const msvc8::string& driverName,
+        const msvc8::string& deviceNameText,
+        const msvc8::string& descriptionText
+    )
+        : vendorId(vendorIdValue)
+        , deviceId(deviceIdValue)
+        , driver()
+        , deviceName()
+        , description()
+        , modes()
+    {
+        driver.assign(driverName, 0U, msvc8::string::npos);
+        deviceName.assign(deviceNameText, 0U, msvc8::string::npos);
+        description.assign(descriptionText, 0U, msvc8::string::npos);
+    }
+
+    /**
      * Address: 0x00940C90 (FUN_00940C90)
      * Scalar-deleting wrapper: 0x008F0040 (FUN_008F0040)
      *
@@ -3684,10 +4154,29 @@ namespace gpg::gal
     AdapterD3D9::~AdapterD3D9() = default;
 
     /**
-     * Address: 0x008E8E40 (FUN_008E8E40)
+     * Address: 0x00940990 (FUN_00940990, ??0AdapterModeD3D9@gal@gpg@@QAE@@Z)
      *
      * What it does:
-     * Scalar-deleting destructor thunk owner for adapter-mode wrapper instances.
+     * Initializes one adapter-mode lane with width/height/refresh-rate scalar values.
+     */
+    AdapterModeD3D9::AdapterModeD3D9(
+        const std::uint32_t widthValue,
+        const std::uint32_t heightValue,
+        const std::uint32_t refreshRateValue
+    )
+        : width_(widthValue)
+        , height_(heightValue)
+        , refreshRate_(refreshRateValue)
+    {
+    }
+
+    /**
+     * Address: 0x009409B0 (FUN_009409B0, ??1AdapterModeD3D9@gal@gpg@@QAE@@Z)
+     * Scalar-deleting wrapper: 0x008E8E40 (FUN_008E8E40)
+     *
+     * What it does:
+     * Restores AdapterModeD3D9 vftable ownership; deleting-thunk lanes route
+     * through this destructor body.
      */
     AdapterModeD3D9::~AdapterModeD3D9() = default;
 
@@ -3792,11 +4281,21 @@ namespace gpg::gal
      * Address: 0x008F13D0 (FUN_008F13D0)
      *
      * What it does:
-     * Preserves the unresolved effect-creation slot until full typed
-     * `EffectContext` startup wiring is lifted.
+     * Dispatches effect creation through cache-binary or source-compile paths
+     * based on `EffectContext::useCache`.
      */
-    void DeviceD3D9::CreateEffect()
+    boost::shared_ptr<EffectD3D9>*
+    DeviceD3D9::CreateEffect(boost::shared_ptr<EffectD3D9>* const outEffect, EffectContext* const context)
     {
+        Func1();
+
+        const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
+        if (contextRuntime->field08 != 0U)
+        {
+            return CreateEffectFromCachedBinary(this, outEffect, context);
+        }
+
+        return CreateEffectFromSourceBuffer(this, outEffect, context);
     }
 
     /**
@@ -4019,12 +4518,12 @@ namespace gpg::gal
             renderTargetContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
             RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(&renderTargetContext, nullptr);
             renderTarget->renderSurface_ = backBuffer.release();
-            outputHeads[headIndex].renderTarget.reset(renderTarget);
+            (void)AssignSharedRenderTargetFromRaw(&outputHeads[headIndex].renderTarget, renderTarget);
 
             const DepthStencilTargetContext depthStencilContext(surfaceDesc.width, surfaceDesc.height, 3U, false);
             DepthStencilTargetD3D9* const depthStencilTarget =
                 new DepthStencilTargetD3D9(&depthStencilContext, depthStencilSurface.release());
-            outputHeads[headIndex].depthStencil.reset(depthStencilTarget);
+            (void)AssignSharedDepthStencilTargetFromRaw(&outputHeads[headIndex].depthStencil, depthStencilTarget);
         }
     }
 
@@ -4265,7 +4764,8 @@ namespace gpg::gal
         static_cast<void>(BuildDeviceCapabilities(context));
         CreateHeads();
 
-        runtime.pipelineState.reset(new PipelineStateD3D9(runtime.nativeDevice));
+        PipelineStateD3D9* const pipelineState = new PipelineStateD3D9(runtime.nativeDevice);
+        AssignSharedPipelineStateFromRaw(&runtime.pipelineState, pipelineState);
         if (runtime.pipelineState.get() != nullptr)
         {
             static_cast<void>(runtime.pipelineState->InitState());
@@ -4601,6 +5101,21 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E9CF0 (FUN_008E9CF0, boost::shared_ptr_TextureD3D9::shared_ptr_TextureD3D9)
+     *
+     * What it does:
+     * Constructs one `boost::shared_ptr<TextureD3D9>` in caller-provided storage
+     * from a raw texture pointer.
+     */
+    [[nodiscard]] boost::shared_ptr<TextureD3D9>* ConstructTextureSharedFromRaw(
+        boost::shared_ptr<TextureD3D9>* const outTexture,
+        TextureD3D9* const texture
+    )
+    {
+        return ::new (static_cast<void*>(outTexture)) boost::shared_ptr<TextureD3D9>(texture);
+    }
+
+    /**
      * Address: 0x008EACC0 (FUN_008EACC0)
      *
      * boost::shared_ptr<gpg::gal::TextureD3D9> *,gpg::gal::TextureContext const *
@@ -4806,8 +5321,7 @@ namespace gpg::gal
         }
 
         TextureD3D9* const texture = new TextureD3D9(&textureContext, nativeTexture);
-        outTexture->reset(texture);
-        return outTexture;
+        return ConstructTextureSharedFromRaw(outTexture, texture);
     }
 
     /**
@@ -6374,8 +6888,13 @@ namespace gpg::gal
                 ThrowGalErrorFromHresult("EffectD3D9.cpp", 66, result);
             }
 
+            const boost::shared_ptr<EffectD3D9> effect = selfWeak_.lock();
+            if (!effect)
+            {
+                ThrowGalError("EffectD3D9.cpp", 67, "invalid effect");
+            }
             const EffectTechniqueSharedRef wrapper =
-                CreateEffectTechniqueWrapper(techniqueDesc.name, selfWeak_, techniqueHandle);
+                CreateEffectTechniqueWrapper(techniqueDesc.name, effect, techniqueHandle);
             static_cast<void>(AppendEffectTechniqueSharedRef(outTechniques, wrapper));
             result = InvokeEffectFindNextValidTechnique(dxEffect_, techniqueHandle, &techniqueHandle);
         }
@@ -6409,7 +6928,12 @@ namespace gpg::gal
             ThrowGalError("EffectD3D9.cpp", 79, message);
         }
 
-        return CreateEffectVariableWrapper(variableName, selfWeak_, parameterHandle);
+        const boost::shared_ptr<EffectD3D9> effect = selfWeak_.lock();
+        if (!effect)
+        {
+            ThrowGalError("EffectD3D9.cpp", 80, "invalid effect");
+        }
+        return CreateEffectVariableWrapper(variableName, effect, parameterHandle);
     }
 
     /**
@@ -6438,7 +6962,12 @@ namespace gpg::gal
             ThrowGalError("EffectD3D9.cpp", 89, message);
         }
 
-        return CreateEffectTechniqueWrapper(techniqueName, selfWeak_, techniqueHandle);
+        const boost::shared_ptr<EffectD3D9> effect = selfWeak_.lock();
+        if (!effect)
+        {
+            ThrowGalError("EffectD3D9.cpp", 90, "invalid effect");
+        }
+        return CreateEffectTechniqueWrapper(techniqueName, effect, techniqueHandle);
     }
 
     /**
@@ -7060,6 +7589,33 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F5470 (FUN_008F5470, gpg::gal::RenderTargetD3D9::RenderTargetD3D9 `_0` overload)
+     * Mangled: ??0RenderTargetD3D9@gal@gpg@@QAE@@Z_0
+     *
+     * What it does:
+     * Surface-wrap overload used by `DeviceD3D9::CreateHeads` to wrap a
+     * pre-existing `IDirect3DSurface9*` (typically a back-buffer) without an
+     * owning `RenderTargetContext`. Resets lane state, caches the surface as
+     * the retained render-target payload at `renderTexture_` (+0x14), then
+     * queries surface width/height from the D3D9 descriptor and stores them
+     * in the embedded context lane.
+     */
+    RenderTargetD3D9::RenderTargetD3D9(void* const backBufferSurface)
+        : context_()
+        , renderTexture_(nullptr)
+        , renderSurface_(nullptr)
+    {
+        ResetRenderTargetD3D9State(this);
+
+        renderTexture_ = backBufferSurface;
+
+        D3DSurfaceDescRuntime surfaceDesc{};
+        static_cast<void>(InvokeSurfaceGetDesc(backBufferSurface, &surfaceDesc));
+        context_.width_ = surfaceDesc.width;
+        context_.height_ = surfaceDesc.height;
+    }
+
+    /**
      * Address: 0x008F5500 (FUN_008F5500)
      *
      * What it does:
@@ -7121,6 +7677,21 @@ namespace gpg::gal
     RenderTargetContext* RenderTargetD3D9::GetContext()
     {
         return &context_;
+    }
+
+    /**
+     * Address: 0x008F52D0 (FUN_008F52D0, Moho::D3DSurface::GetSurface)
+     * Mangled: ?GetSurface@D3DSurface@Moho@@QAEPAUIDirect3DSurface9@@XZ
+     *
+     * What it does:
+     * Returns the retained render-target texture/surface payload lane at
+     * `this+0x14`. Callers in `DeviceD3D9::StretchRect`,
+     * `CreateRenderTarget`, `Func4`, and `ClearTarget` use this lane as an
+     * `IDirect3DSurface9*` handle.
+     */
+    void* RenderTargetD3D9::GetSurface()
+    {
+        return renderTexture_;
     }
 
     /**

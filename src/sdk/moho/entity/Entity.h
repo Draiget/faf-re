@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "../script/CScriptObject.h"
 #include "../task/CTask.h"
 #include "EntityId.h"
@@ -15,11 +16,13 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/containers/TDatList.h"
+#include "SSTIEntityVariableData.h"
 #include "moho/math/Vector4f.h"
 #include "REntityBlueprint.h"
 #include "SEntAttachInfo.h"
 #include "Wm3Box3.h"
 #include "Wm3Quaternion.h"
+#include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
 
 struct lua_State;
@@ -40,8 +43,10 @@ namespace moho
   class CollisionBeamEntity;
   class Projectile;
   class Prop;
+  class RScmResource;
   struct RResId;
   struct RMeshBlueprint;
+  struct RUnitBlueprint;
   class ReconBlip;
   class Shield;
   class Sim;
@@ -55,12 +60,97 @@ namespace moho
   class CArmyImpl;
   class CSndParams;
   class STIMap;
+  struct CollisionPairResult;
   enum EVisibilityMode : std::int32_t;
   struct PositionHistory;
   struct SCoordsVec2;
   struct SOCellPos;
   struct SFootprint;
   struct SSyncData;
+
+  enum EEntityAttribute : std::int32_t
+  {
+    ENTATTR_Vision = 0,
+    ENTATTR_WaterVision = 1,
+    ENTATTR_Radar = 2,
+    ENTATTR_Sonar = 3,
+    ENTATTR_Omni = 4,
+    ENTATTR_RadarStealthField = 5,
+    ENTATTR_SonarStealthField = 6,
+    ENTATTR_CloakField = 7,
+    ENTATTR_Jammer = 8,
+    ENTATTR_Spoof = 9,
+    ENTATTR_Cloak = 10,
+    ENTATTR_RadarStealth = 11,
+    ENTATTR_SonarStealth = 12,
+  };
+
+  static_assert(sizeof(EEntityAttribute) == 0x04, "EEntityAttribute size must be 0x04");
+
+  /**
+   * Reflected payload wrapper for the engine's entity-intel attribute lanes.
+   *
+   * The binary exposes this shape through RTTI as `Moho::EntityAttributes`
+   * while the project currently stores the fields in `SSTIIntelAttributes`.
+   * The wrapper keeps the recovered behavior typed without reintroducing any
+   * raw offset access.
+   */
+  struct EntityAttributes : SSTIIntelAttributes
+  {
+    /**
+     * Address: 0x005BD530 (FUN_005BD530, Moho::EntityAttributes::GetRange)
+     *
+     * What it does:
+     * Returns the masked intel range magnitude for a stored attribute lane,
+     * or zero for the field/jammer/spoof lanes that do not carry a range.
+     */
+    [[nodiscard]] std::uint32_t GetRange(EEntityAttribute attribute) const noexcept;
+
+    /**
+     * Address: 0x005BD470 (FUN_005BD470, Moho::EntityAttributes::SetIntelRadius)
+     *
+     * What it does:
+     * Stores a new intel radius magnitude in the selected lane while preserving
+     * the lane's sign bit. The field/jammer/spoof lanes are ignored.
+     */
+    void SetIntelRadius(EEntityAttribute attribute, int radius) noexcept;
+
+    /**
+     * Address: 0x008B8330 (FUN_008B8330, Moho::EntityAttributes::IsEnabled)
+     *
+     * What it does:
+     * Returns the sign-bit enable flag for intel-bearing attributes; field and
+     * jammer/spoof lanes always report disabled.
+     */
+    [[nodiscard]] bool IsEnabled(EEntityAttribute attribute) const noexcept;
+
+    /**
+     * Address: 0x00559350 (FUN_00559350, Moho::EntityAttributes::MemberDeserialize)
+     *
+     * What it does:
+     * Loads all eight intel payload lanes from archive storage in field order.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005593D0 (FUN_005593D0, Moho::EntityAttributes::MemberSerialize)
+     *
+     * What it does:
+     * Stores all eight intel payload lanes to archive storage in field order.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x006A46A0 (FUN_006A46A0, Moho::EntityAttributes::Initialize)
+     *
+     * What it does:
+     * Seeds intel lanes from unit-blueprint intel radii, setting the enable
+     * sign bit for non-zero ranges.
+     */
+    void Initialize(const RUnitBlueprint* blueprint);
+  };
+
+  static_assert(sizeof(EntityAttributes) == sizeof(SSTIIntelAttributes), "EntityAttributes size must match payload");
 
   enum ELayer : std::int32_t
   {
@@ -186,6 +276,15 @@ namespace moho
   );
 
   /**
+   * Address: 0x0050B300 (FUN_0050B300, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@MMM@Z)
+   *
+   * What it does:
+   * Builds a heading/pitch orientation quaternion from half-angle sine/cosine
+   * products, using the engine's original lane ordering/sign convention.
+   */
+  [[nodiscard]] Wm3::Quaternionf COORDS_Orient(float heading, float pitch) noexcept;
+
+  /**
    * Address: 0x0050B480 (FUN_0050B480, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@ABV?$Vector3@M@3@@Z)
    *
    * What it does:
@@ -193,6 +292,25 @@ namespace moho
    * with fixed fallback quaternions for zero-length and vertical vectors.
    */
   [[nodiscard]] Wm3::Quaternionf COORDS_Orient(const Wm3::Vector3f& direction) noexcept;
+
+  /**
+   * Address: 0x0050B710 (FUN_0050B710, ?COORDS_Pitch@Moho@@YAMABV?$Vector3@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Computes the negative fast-asin pitch approximation from a velocity vector
+   * by normalizing `y` against vector length and evaluating the binary's
+   * polynomial/square-root lane.
+   */
+  [[nodiscard]] float COORDS_Pitch(const Wm3::Vector3f& velocity) noexcept;
+
+  /**
+   * Address: 0x0050B790 (FUN_0050B790, ?COORDS_Pitch@Moho@@YAMABV?$Quaternion@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Computes pitch from quaternion orientation lanes using the binary's
+   * clamped fast-asin polynomial path.
+   */
+  [[nodiscard]] float COORDS_Pitch(const Wm3::Quaternionf& orientation) noexcept;
 
   /**
    * Address: 0x0050B820 (FUN_0050B820, ?COORDS_Tilt@Moho@@YAXPAV?$Quaternion@M@Wm3@@V?$Vector3@M@3@@Z)
@@ -596,8 +714,17 @@ namespace moho
     );
 
     /**
+     * Address: 0x00679C40 (FUN_00679C40, ?TaskTick@Entity@Moho@@EAE?AW4ETaskStatus@2@XZ)
+     *
+     * What it does:
+     * Ticks texture-scroller/attach-follow lanes, prunes invalid shooters, and
+     * returns this entity's per-frame task status.
+     */
+    int TaskTick();
+
+    /**
      * Address: 0x00679F70
-     * (CTask secondary vtable Execute slot forwards to MotionTick path.)
+     * (CTask secondary vtable Execute slot forwards to TaskTick path.)
      */
     int Execute() override;
 
@@ -650,6 +777,14 @@ namespace moho
     virtual int GetBoneCount() const;
 
     /**
+     * Address: 0x0062CB60 (FUN_0062CB60, Moho::Entity::IsInBounds)
+     *
+     * What it does:
+     * Tests current world position against map bounds using `STIMap::IsWithin`.
+     */
+    [[nodiscard]] bool IsInBounds(bool wholeMap, float border) const;
+
+    /**
      * Address: 0x00678B90 (FUN_00678B90, Moho::Entity::GetArmyIndex)
      *
      * What it does:
@@ -666,6 +801,25 @@ namespace moho
      * returning `-1` when no skeleton is available.
      */
     [[nodiscard]] int ResolveBoneIndex(const char* boneName) const;
+
+    /**
+     * Address: 0x00678C30 (FUN_00678C30, Moho::Entity::GetBoneName)
+     *
+     * What it does:
+     * Resolves one bone index through the current mesh skeleton and returns the
+     * corresponding bone-name pointer, or `nullptr` when unavailable/out of
+     * range.
+     */
+    [[nodiscard]] const char* GetBoneName(std::uint32_t boneIndex) const;
+
+    /**
+     * Address: 0x005BDB90 (FUN_005BDB90, Moho::Entity::GetMesh)
+     *
+     * What it does:
+     * Copies this entity's mesh shared-handle lanes and retains one shared
+     * owner on the control block when present.
+     */
+    [[nodiscard]] boost::SharedPtrRaw<RScmResource> GetMesh() const;
 
     /**
      * Address: 0x005BDB60
@@ -728,6 +882,32 @@ namespace moho
      * Updates intel manager probe position from current transform payload.
      */
     void UpdateIntel();
+
+    /**
+     * Address: 0x0067A020 (FUN_0067A020, ?CalculateAttachedTransform@Entity@Moho@@QAE?AVVTransform@2@XZ)
+     *
+     * What it does:
+     * Calculates one attached-follow world transform from parent and child bone
+     * lanes using current attach-relative payload.
+     */
+    [[nodiscard]] VTransform CalculateAttachedTransform();
+
+    /**
+     * Address: 0x0067A190 (FUN_0067A190, ?ProcessEntitiesShootingAtMe@Entity@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Removes null, queued-for-destroy, and dead entries from the shooter set.
+     */
+    void ProcessEntitiesShootingAtMe();
+
+    /**
+     * Address: 0x0067A130 (FUN_0067A130, Moho::Entity::AddShooter)
+     *
+     * What it does:
+     * Inserts one shooter entity pointer into this entity's shooter set when
+     * non-null.
+     */
+    void AddShooter(Entity* shooter);
 
     /**
      * Address: 0x00679290 (FUN_00679290, ?GetPhysBody@Entity@Moho@@QAEPAUSPhysBody@2@_N@Z)
@@ -834,6 +1014,24 @@ namespace moho
     virtual void UpdateCollision();
 
     /**
+     * Address: 0x00679180 (FUN_00679180, ?UpdateAABox@Entity@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Reads one world-space bounds snapshot from the active collision primitive
+     * and stores min/max lanes at `+0x240/+0x24C`.
+     */
+    void UpdateAABox();
+
+    /**
+     * Address: 0x0067A9D0 (FUN_0067A9D0, ?Intersects@Entity@Moho@@QAE_NABV?$Box3@M@Wm3@@PAUCollisionResult@2@@Z)
+     *
+     * What it does:
+     * Tests one world box against this entity's collision primitive and, on
+     * hit, stamps this entity as the source lane in `outResult`.
+     */
+    [[nodiscard]] bool Intersects(const Wm3::Box3f& box, CollisionPairResult* outResult);
+
+    /**
      * Address: 0x0067AC40 (FUN_0067AC40)
      *
      * What it does:
@@ -850,6 +1048,16 @@ namespace moho
      * relinks collision-cell membership, and refreshes cached bounds.
      */
     void SetCollisionSphereShape(const Wm3::Vec3f& localCenter, float radius);
+
+    /**
+     * Address: 0x0067AA50 (FUN_0067AA50, Moho::Entity::GetTerrainCollisionGeom)
+     *
+     * What it does:
+     * Emits terrain-collision proxy spheres from current collision primitive:
+     * eight corner points for box shapes, or one center/radius sphere for
+     * sphere shapes.
+     */
+    void GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const;
 
     /**
      * Address: 0x0067AE00 (FUN_0067AE00)
@@ -919,6 +1127,15 @@ namespace moho
      */
     void SetHealth(float newHealth);
 
+    /**
+     * Address: 0x00678E20 (FUN_00678E20, ?UpdateFractionComplete@Entity@Moho@@QAEMM@Z)
+     *
+     * What it does:
+     * Accumulates build/reclaim completion fraction with binary clamp rules and
+     * returns applied fraction delta after health-floor enforcement.
+     */
+    float UpdateFractionComplete(float delta);
+
     void MarkNeedsSyncGameData() noexcept;
 
     /**
@@ -955,6 +1172,25 @@ namespace moho
      */
     void SetStrategicUnderlay(const RResId& underlayId);
 
+    /**
+     * Address: 0x005BDC70 (FUN_005BDC70, ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
+     * Mangled: ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z
+     *
+     * What it does:
+     * Replaces strategic-underlay texture lanes from one by-value shared
+     * texture handle only when the incoming raw texture pointer differs.
+     */
+    void SetStrategicUnderlay(boost::shared_ptr<CD3DBatchTexture> underlayTexture);
+
+    /**
+     * Address: 0x005BDD20 (FUN_005BDD20, ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ)
+     * Mangled: ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ
+     *
+     * What it does:
+     * Returns one retained shared strategic-underlay texture handle.
+     */
+    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> GetStrategicUnderlay() const;
+
     [[nodiscard]] Wm3::Vec3f const& GetPositionWm3() const noexcept;
 
     [[nodiscard]] VTransform const& GetTransformWm3() const noexcept;
@@ -966,6 +1202,15 @@ namespace moho
      * Rebuilds the rolling position-history ring with identity/default samples.
      */
     void InitPositionHistory();
+
+    /**
+     * Address: 0x006794F0 (FUN_006794F0, ?GetPositionHistory@Entity@Moho@@QBEABVVTransform@2@H@Z)
+     * Mangled: ?GetPositionHistory@Entity@Moho@@QBEABVVTransform@2@H@Z
+     *
+     * What it does:
+     * Returns one position-history sample selected by reverse-tick ring lookup.
+     */
+    [[nodiscard]] const VTransform& GetPositionHistory(int tick) const;
 
     /**
      * Address: 0x00678F10 (FUN_00678F10)
@@ -1000,6 +1245,15 @@ namespace moho
      * Returns the entity's unique runtime name string.
      */
     [[nodiscard]] msvc8::string GetUniqueName() const;
+
+    /**
+     * Address: 0x00678B70 (FUN_00678B70, ?GetBlueprintId@Entity@Moho@@QBEPBDXZ)
+     *
+     * What it does:
+     * Returns this entity blueprint id text lane; falls back to an empty
+     * process-static string when no blueprint is bound.
+     */
+    [[nodiscard]] const char* GetBlueprintId() const noexcept;
 
   public:
     /**
@@ -1060,7 +1314,7 @@ namespace moho
     Wm3::Vector3f PendingPosition;                 // 0x0160
     PositionHistory* mPositionHistory;             // 0x016C
     float mPendingVelocityScale;                   // 0x0170
-    char pad_0174[4];                              // 0x0174
+    std::uint32_t mLastTickProcessed;              // 0x0174
     EntityCollisionUpdater* CollisionExtents;      // 0x0178
     msvc8::vector<Entity*> mAttachedEntities;      // 0x017C
     SEntAttachInfo mAttachInfo;                    // 0x018C
@@ -2294,6 +2548,7 @@ namespace moho
   static_assert(offsetof(Entity, PendingPosition) == 0x160, "Entity::PendingPosition offset must be 0x160");
   static_assert(offsetof(Entity, mPositionHistory) == 0x16C, "Entity::mPositionHistory offset must be 0x16C");
   static_assert(offsetof(Entity, mPendingVelocityScale) == 0x170, "Entity::mPendingVelocityScale offset must be 0x170");
+  static_assert(offsetof(Entity, mLastTickProcessed) == 0x174, "Entity::mLastTickProcessed offset must be 0x174");
   static_assert(offsetof(Entity, CollisionExtents) == 0x178, "Entity::CollisionExtents offset must be 0x178");
   static_assert(offsetof(Entity, mAttachedEntities) == 0x17C, "Entity::mAttachedEntities offset must be 0x17C");
   static_assert(offsetof(Entity, mAttachInfo) == 0x18C, "Entity::mAttachInfo offset must be 0x18C");

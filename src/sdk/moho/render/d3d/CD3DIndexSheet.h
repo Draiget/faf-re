@@ -126,6 +126,15 @@ namespace moho
     [[nodiscard]] bool IsStaticBufferType() const;
 
     /**
+     * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
+     *
+     * What it does:
+     * Forwards one index-buffer creation request through the active GAL device
+     * singleton and returns `outBuffer`.
+     */
+    static BufferHandle* CreateIndexBufferOnActiveDevice(BufferHandle* outBuffer, gpg::gal::IndexBufferContext* context);
+
+    /**
      * Address: 0x0043F700 (FUN_0043F700)
      *
      * What it does:

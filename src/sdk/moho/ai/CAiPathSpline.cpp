@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -11,6 +12,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/IUnit.h"
@@ -21,6 +23,12 @@ using namespace moho;
 namespace
 {
   using CollisionLinkWeakUnit = WeakPtr<IUnit>;
+  constexpr float kDegreesToSteeringRadiansPerTick = 0.0017453292f;
+  constexpr float kSpeedScalePerTick = 0.1f;
+  constexpr float kAccelerationScalePerTick = 0.0099999998f;
+  constexpr float kTurnSinePolyA = 0.0076100002f;
+  constexpr float kTurnSinePolyB = 0.16605f;
+  constexpr float kTurnVectorUnitTolerance = 0.001f;
 
   static_assert(sizeof(CollisionLinkWeakUnit) == sizeof(SCollisionLink), "SCollisionLink/WeakPtr<IUnit> layout mismatch");
   static_assert(
@@ -42,6 +50,199 @@ namespace
     return *reinterpret_cast<const CollisionLinkWeakUnit*>(&link);
   }
 } // namespace
+
+/**
+ * Address: 0x006990E0 (FUN_006990E0, ??0struct_SteeringParams@@QAE@@Z)
+ */
+SteeringParams::SteeringParams(
+  Unit* const unit,
+  const Wm3::Vector3f& sourcePosition,
+  const Wm3::Vector3f& destinationPosition,
+  const Wm3::Vector3f& forwardVector,
+  const float speedLimit,
+  const bool skipDynamicLimits
+) noexcept
+  : mMaxSpeed(0.0f)
+  , mMaxReverseSpeed(0.0f)
+  , mMaxAcceleration(0.0f)
+  , mMaxBrake(0.0f)
+  , mMaxSteer(0.0f)
+  , mInvTurnRadius(0.0f)
+  , mTurnRate(0.0f)
+  , mTurnFacingRate(0.0f)
+  , mDeltaX(destinationPosition.x - sourcePosition.x)
+  , mDeltaZ(-(destinationPosition.z - sourcePosition.z))
+  , mForwardXZ{forwardVector.x, -forwardVector.z}
+  , mDistance(0.0f)
+  , mDistanceSq(0.0f)
+  , mRotateOnSpot(0u)
+  , mRotateOnSpotThreshold(0.0f)
+{
+  mDistanceSq = (mDeltaX * mDeltaX) + (mDeltaZ * mDeltaZ);
+  mDistance = std::sqrt(mDistanceSq);
+  (void)mForwardXZ.Normalize();
+
+  if (unit == nullptr) {
+    return;
+  }
+
+  const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+  if (blueprint == nullptr) {
+    return;
+  }
+
+  const UnitAttributes& attributes = unit->GetAttributes();
+  const float turnMult = attributes.turnMult;
+  const RUnitBlueprintPhysics& physics = blueprint->Physics;
+
+  mTurnRate = (physics.TurnRate * turnMult) * kDegreesToSteeringRadiansPerTick;
+  mTurnFacingRate = (physics.TurnFacingRate * turnMult) * kDegreesToSteeringRadiansPerTick;
+
+  if (skipDynamicLimits) {
+    return;
+  }
+
+  const float speedMult = attributes.moveSpeedMult;
+  const float accMult = attributes.accelerationMult;
+
+  float maxSpeed = physics.MaxSpeed;
+  if (speedLimit <= maxSpeed) {
+    maxSpeed = speedLimit;
+  }
+  mMaxSpeed = (maxSpeed * speedMult) * kSpeedScalePerTick;
+
+  float maxReverseSpeed = physics.MaxSpeedReverse;
+  if (speedLimit <= maxReverseSpeed) {
+    maxReverseSpeed = speedLimit;
+  }
+  mMaxReverseSpeed = (maxReverseSpeed * speedMult) * kSpeedScalePerTick;
+
+  float maxAcceleration = (physics.MaxAcceleration * accMult) * kAccelerationScalePerTick;
+  mMaxAcceleration = maxAcceleration;
+
+  if (physics.MaxBrake != 0.0f) {
+    maxAcceleration = (physics.MaxBrake * accMult) * kAccelerationScalePerTick;
+  }
+  mMaxBrake = maxAcceleration;
+
+  if (physics.MaxSteerForce != 0.0f) {
+    mMaxSteer = (physics.MaxSteerForce * accMult) * kAccelerationScalePerTick;
+  } else {
+    mMaxSteer = mMaxAcceleration;
+  }
+
+  if (physics.TurnRadius == 0.0f) {
+    mInvTurnRadius = std::numeric_limits<float>::infinity();
+  } else {
+    mInvTurnRadius = physics.TurnRadius / turnMult;
+  }
+
+  mRotateOnSpot = physics.RotateOnSpot;
+  mRotateOnSpotThreshold = physics.RotateOnSpotThreshold;
+}
+
+/**
+ * Address: 0x00698FF0 (FUN_00698FF0)
+ */
+SteeringParams BuildSteeringParamsFromTransform(
+  Unit* const unit,
+  const VTransform& transform,
+  const Wm3::Vector3f& destination
+) noexcept
+{
+  const Wm3::Quaternionf& q = transform.orient_;
+  Wm3::Vector3f forward{};
+  forward.x = ((q.x * q.z) + (q.w * q.y)) * 2.0f;
+  forward.y = ((q.w * q.z) - (q.x * q.y)) * 2.0f;
+  forward.z = 1.0f - (((q.z * q.z) + (q.y * q.y)) * 2.0f);
+
+  Wm3::Vector3f source{};
+  source.x = transform.pos_.x;
+  source.y = 0.0f;
+  source.z = transform.pos_.z;
+
+  return SteeringParams(unit, source, destination, forward, 0.0f, true);
+}
+
+/**
+ * Address: 0x006992C0 (FUN_006992C0)
+ */
+Wm3::Vector2f* RotateDirectionTowardTargetLimited(
+  Wm3::Vector2f* const outDirection,
+  float maxTurnRadians,
+  const float sourceX,
+  const float sourceZ,
+  const float targetX,
+  const float targetZ
+) noexcept
+{
+  if (maxTurnRadians >= 3.1415927f) {
+    maxTurnRadians = 3.1415927f;
+  }
+
+  const float sourceLength = std::sqrt((sourceX * sourceX) + (sourceZ * sourceZ));
+  const float targetLength = std::sqrt((targetX * targetX) + (targetZ * targetZ));
+  const float lengthProduct = sourceLength * targetLength;
+  const float maxTurnCos = std::cos(maxTurnRadians);
+
+  if (lengthProduct == 0.0f) {
+    outDirection->x = sourceX;
+    outDirection->y = sourceZ;
+    return outDirection;
+  }
+
+  const float dot = (targetZ * sourceZ) + (targetX * sourceX);
+  if (dot >= (maxTurnCos * lengthProduct)) {
+    const float scale = sourceLength / targetLength;
+    outDirection->x = targetX * scale;
+    outDirection->y = targetZ * scale;
+    return outDirection;
+  }
+
+  const float cross = (targetZ * sourceX) - (sourceZ * targetX);
+  const float maxTurnSq = maxTurnRadians * maxTurnRadians;
+  float turnSin =
+    (((maxTurnSq * kTurnSinePolyA) - kTurnSinePolyB) * maxTurnSq + 1.0f) * maxTurnRadians;
+  if (cross < 0.0f) {
+    turnSin = -turnSin;
+  }
+
+  Wm3::Vector2f turnVector{maxTurnCos, turnSin};
+  if (std::fabs((turnSin * turnSin + maxTurnCos * maxTurnCos) - 1.0f) > kTurnVectorUnitTolerance) {
+    (void)turnVector.Normalize();
+  }
+
+  const float rotatedZ = (turnVector.x * sourceZ) + (turnVector.y * sourceX);
+  outDirection->x = (turnVector.x * sourceX) - (turnVector.y * sourceZ);
+  outDirection->y = rotatedZ;
+  return outDirection;
+}
+
+/**
+ * Address: 0x00699940 (FUN_00699940)
+ */
+Wm3::Quaternionf*
+BuildHeadingQuaternionFromDirection2D(const Wm3::Vector2f* const direction, Wm3::Quaternionf* const outOrientation) noexcept
+{
+  const float directionX = direction ? direction->x : 0.0f;
+  const float negDirectionY = direction ? -direction->y : 0.0f;
+
+  Wm3::Vector3f matrixRows[3]{};
+  matrixRows[0].x = negDirectionY;
+  matrixRows[0].y = 0.0f;
+  matrixRows[0].z = -directionX;
+  matrixRows[1].x = 0.0f;
+  matrixRows[1].y = 1.0f;
+  matrixRows[1].z = 0.0f;
+  matrixRows[2].x = directionX;
+  matrixRows[2].y = 0.0f;
+  matrixRows[2].z = negDirectionY;
+
+  Wm3::Quaternionf temp{};
+  (void)moho::MatrixToQuat(matrixRows, &temp);
+  *outOrientation = temp;
+  return outOrientation;
+}
 
 Unit* SCollisionLink::ResolveUnitFromIntrusiveSlot() const noexcept
 {
@@ -125,6 +326,13 @@ namespace
     void Init() override;
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
+    /**
+     * Address: 0x005B4AD0 (FUN_005B4AD0, gpg::RFastVectorType_CPathPoint::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `fastvector<CPathPoint>` lane and fills new slots
+     * with zero vectors plus `PPS_7` state.
+     */
     void SetCount(void* obj, int count) const override;
   };
 
@@ -1161,6 +1369,13 @@ size_t FastVectorCPathPointTypeInfo::GetCount(void* obj) const
   return view.Size();
 }
 
+/**
+ * Address: 0x005B4AD0 (FUN_005B4AD0, gpg::RFastVectorType_CPathPoint::SetCount)
+ *
+ * What it does:
+ * Resizes one reflected `fastvector<CPathPoint>` lane and fills new slots
+ * with zero vectors plus `PPS_7` state.
+ */
 void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
 {
   if (!obj || count < 0) {
@@ -1168,7 +1383,10 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
   }
 
   auto& view = gpg::AsFastVectorRuntimeView<CPathPoint>(obj);
-  const CPathPoint fill{};
+  CPathPoint fill{};
+  fill.mPosition = Wm3::Vector3f{};
+  fill.mDirection = Wm3::Vector3f{};
+  fill.mState = PPS_7;
   gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
 }
 

@@ -65,6 +65,15 @@ namespace gpg::HaStar
          * Releases a cluster shared-data reference and destroys it when refcount hits zero.
          */
         ~Cluster();
+
+        /**
+         * Address: 0x0092D8B0 (FUN_0092D8B0, ?QuantizeEdgeCost@Cluster@HaStar@gpg@@SAMMM@Z)
+         *
+         * What it does:
+         * Quantizes one edge-cost ratio into a 0..31 bucket using
+         * `ceil(ln(a / b) * 6)`.
+         */
+        [[nodiscard]] static float QuantizeEdgeCost(float a, float b);
     };
 
     struct SubclusterData
@@ -160,6 +169,38 @@ namespace gpg::HaStar
      */
     [[nodiscard]] Cluster ClusterBuild(const SubclusterData& subclusterData);
 
+    /**
+     * Address: 0x009542D0 (FUN_009542D0,
+     * ?ClusterRect@HaStar@gpg@@YA?AV?$Rect2@H@2@HHEHH@Z_0)
+     *
+     * What it does:
+     * Computes one cluster-aligned world rectangle for `(x,z)` and clamps it
+     * against per-axis cluster bounds.
+     */
+    [[nodiscard]] gpg::Rect2i ClusterRect(
+        int worldX,
+        int worldZ,
+        std::uint8_t level,
+        int maxClusterX,
+        int maxClusterZ
+    );
+
+    /**
+     * Address: 0x00954340 (FUN_00954340,
+     * ?ClusterIndexRect@HaStar@gpg@@YA?AV?$Rect2@H@2@HHEHH@Z)
+     *
+     * What it does:
+     * Computes one clamped cluster-index rectangle from world-space `(x,z)`
+     * coordinates, level shift, and per-axis cluster limits.
+     */
+    [[nodiscard]] gpg::Rect2i ClusterIndexRect(
+        int worldX,
+        int worldZ,
+        std::uint8_t level,
+        int maxClusterX,
+        int maxClusterZ
+    );
+
     class ClusterMap
     {
     public:
@@ -188,11 +229,22 @@ namespace gpg::HaStar
         ~ClusterMap();
 
         /**
-         * Address: 0x10035650 (FUN_10035650,
-         * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z_0)
+         * Address: 0x008E33E0 (FUN_008E33E0,
+         * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@HHE@Z)
          *
          * What it does:
-         * Converts a world-space rectangle into cluster-index coordinates
+         * Converts one world-space cell `(x,z)` into the corresponding
+         * clamped cluster-index rectangle for the requested level.
+         */
+        [[nodiscard]] gpg::Rect2i ClusterIndexRect(int worldX, int worldZ, std::uint8_t level) const;
+
+        /**
+         * Address: 0x008E35A0 (FUN_008E35A0,
+         * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z)
+         * Alt binary: 0x10035650 (FUN_10035650, ?...@Z_0)
+         *
+         * What it does:
+         * Converts a world-space rectangle into clamped cluster-index bounds
          * for the requested path level.
          */
         [[nodiscard]] gpg::Rect2i ClusterIndexRect(const gpg::Rect2i& worldRect, std::uint8_t level) const;

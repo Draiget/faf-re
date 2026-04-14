@@ -8,6 +8,8 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/entity/EntityTransformPayload.h"
+#include "moho/math/QuaternionMath.h"
 
 namespace
 {
@@ -104,10 +106,71 @@ namespace
     auto& runtimeView = PoseBoneRuntimeView(storage);
     gpg::FastVectorRuntimeResizeFill(&fillValue, count, runtimeView);
   }
+
+  [[nodiscard]] bool PoseTransformDiffers(const moho::VTransform& lhs, const moho::VTransform& rhs) noexcept
+  {
+    const moho::EntityTransformPayload lhsPayload = moho::ReadEntityTransformPayload(lhs);
+    const moho::EntityTransformPayload rhsPayload = moho::ReadEntityTransformPayload(rhs);
+    return moho::EntityTransformPositionDiffers(lhsPayload, rhsPayload)
+      || moho::EntityTransformOrientationDiffers(lhsPayload, rhsPayload);
+  }
+
+  struct SAniSkelBindPoseLaneView
+  {
+    const char* mBoneName;               // +0x00
+    std::int32_t mParentBoneIndex;       // +0x04
+    float mLocalOrientationX;            // +0x08
+    float mLocalOrientationY;            // +0x0C
+    float mLocalOrientationZ;            // +0x10
+    float mLocalOrientationW;            // +0x14
+    float mLocalPositionX;               // +0x18
+    float mLocalPositionY;               // +0x1C
+    float mLocalPositionZ;               // +0x20
+    std::uint8_t mReserved24_57[0x34]{}; // +0x24
+  };
+
+  static_assert(sizeof(SAniSkelBindPoseLaneView) == sizeof(moho::SAniSkelBone), "SAniSkelBindPoseLaneView size must match SAniSkelBone");
+  static_assert(
+    offsetof(SAniSkelBindPoseLaneView, mLocalOrientationX) == 0x08,
+    "SAniSkelBindPoseLaneView::mLocalOrientationX offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SAniSkelBindPoseLaneView, mLocalPositionX) == 0x18,
+    "SAniSkelBindPoseLaneView::mLocalPositionX offset must be 0x18"
+  );
+
+  [[nodiscard]] const SAniSkelBindPoseLaneView& BindPoseLaneView(const moho::SAniSkelBone& bone) noexcept
+  {
+    return reinterpret_cast<const SAniSkelBindPoseLaneView&>(bone);
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x0054C9C0 (FUN_0054C9C0, Moho::CAniPoseBone::CAniPoseBone)
+   *
+   * What it does:
+   * Copy-constructs one pose-bone lane including transform payload, owning pose
+   * link, parent link, and visibility flags.
+   */
+  CAniPoseBone::CAniPoseBone(const CAniPoseBone& copy)
+    : mCompositeTransform(copy.mCompositeTransform)
+    , mCompositeDirty(copy.mCompositeDirty)
+    , mCompositeIsLocal(copy.mCompositeIsLocal)
+    , mLocalTransform(copy.mLocalTransform)
+    , mIdx(copy.mIdx)
+    , mPose(copy.mPose)
+    , mParent(copy.mParent)
+    , mVisible(copy.mVisible)
+    , mSkipNextInterp(copy.mSkipNextInterp)
+  {
+    pad_1E_1F[0] = copy.pad_1E_1F[0];
+    pad_1E_1F[1] = copy.pad_1E_1F[1];
+    pad_4A_4B[0] = copy.pad_4A_4B[0];
+    pad_4A_4B[1] = copy.pad_4A_4B[1];
+  }
+
   /**
    * Address: 0x0054BE30 (FUN_0054BE30, Moho::CAniPoseBone::SetVisibleRecur)
    */
@@ -130,6 +193,24 @@ namespace moho
 
     mVisible = visible ? 1u : 0u;
     return boneCount;
+  }
+
+  /**
+   * Address: 0x0054F630 (FUN_0054F630, Moho::CAniPoseBone::MemberSerialize)
+   *
+   * What it does:
+   * Writes one bone's local-space flag, local transform lane, visibility, and
+   * skip-interpolation flag in archive order.
+   */
+  void CAniPoseBone::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteBool(mCompositeIsLocal);
+
+    const gpg::RRef nullOwner{};
+    archive->Write(CachedVTransformType(), &mLocalTransform, nullOwner);
+
+    archive->WriteBool(mVisible);
+    archive->WriteBool(mSkipNextInterp);
   }
 
   /**
@@ -264,6 +345,240 @@ namespace moho
       destinationBone.mLocalTransform = sourceBone.mLocalTransform;
       destinationBone.mCompositeDirty = 1u;
       destinationBone.mCompositeIsLocal = sourceBone.mCompositeIsLocal;
+    }
+  }
+
+  /**
+   * Address: 0x0054B5F0 (FUN_0054B5F0, ?UpdateBones@CAniPose@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Seeds destination pose-bone local transforms from skeleton bind lanes and
+   * resets per-bone composite invalidation flags.
+   */
+  void CAniPose::UpdateBones()
+  {
+    CAniPoseBone* const destinationBegin = mBones.begin();
+    CAniPoseBone* const destinationEnd = mBones.end();
+    if (destinationBegin == nullptr || destinationEnd == nullptr || destinationEnd <= destinationBegin) {
+      return;
+    }
+
+    const CAniSkel* const skeleton = mSkeleton.get();
+    if (skeleton == nullptr) {
+      return;
+    }
+
+    const std::int32_t destinationBoneCount = static_cast<std::int32_t>(destinationEnd - destinationBegin);
+    const float scale = mScale;
+    for (std::int32_t index = 0; index < destinationBoneCount; ++index) {
+      const SAniSkelBone* const skeletonBone = skeleton->GetBone(static_cast<std::uint32_t>(index));
+      if (skeletonBone == nullptr) {
+        continue;
+      }
+
+      const SAniSkelBindPoseLaneView& bindLane = BindPoseLaneView(*skeletonBone);
+      CAniPoseBone& destinationBone = destinationBegin[index];
+
+      destinationBone.mLocalTransform.pos_.x = bindLane.mLocalPositionX * scale;
+      destinationBone.mLocalTransform.pos_.y = bindLane.mLocalPositionY * scale;
+      destinationBone.mLocalTransform.pos_.z = bindLane.mLocalPositionZ * scale;
+
+      destinationBone.mLocalTransform.orient_.x = bindLane.mLocalOrientationX;
+      destinationBone.mLocalTransform.orient_.y = bindLane.mLocalOrientationY;
+      destinationBone.mLocalTransform.orient_.z = bindLane.mLocalOrientationZ;
+      destinationBone.mLocalTransform.orient_.w = bindLane.mLocalOrientationW;
+
+      destinationBone.mCompositeDirty = 1u;
+      destinationBone.mSkipNextInterp = 0u;
+      destinationBone.mCompositeIsLocal = 0u;
+    }
+  }
+
+  /**
+   * Address: 0x0054B6D0 (FUN_0054B6D0, ?CopyPose@CAniPose@Moho@@QAEXPBV12@_N@Z)
+   * Mangled: ?CopyPose@CAniPose@Moho@@QAEXPBV12@_N@Z
+   *
+   * What it does:
+   * Copies one source pose's local transform and bone-local lanes into this
+   * pose and marks copied destination lanes composite-dirty.
+   */
+  void CAniPose::CopyPose(const CAniPose* const sourcePose, const bool preserveSourceLane)
+  {
+    (void)preserveSourceLane;
+    if (sourcePose == nullptr) {
+      return;
+    }
+
+    mLocalTransform = sourcePose->mLocalTransform;
+
+    const CAniPoseBone* const sourceBegin = sourcePose->mBones.begin();
+    const CAniPoseBone* const sourceEnd = sourcePose->mBones.end();
+    CAniPoseBone* const destinationBegin = mBones.begin();
+    CAniPoseBone* const destinationEnd = mBones.end();
+    if (sourceBegin == nullptr || sourceEnd == nullptr || destinationBegin == nullptr || destinationEnd == nullptr) {
+      return;
+    }
+
+    std::int32_t boneCount = static_cast<std::int32_t>(destinationEnd - destinationBegin);
+    const std::int32_t sourceBoneCount = static_cast<std::int32_t>(sourceEnd - sourceBegin);
+    if (sourceBoneCount < boneCount) {
+      boneCount = sourceBoneCount;
+    }
+
+    const CAniSkel* const skeleton = mSkeleton.get();
+    if (skeleton != nullptr) {
+      const SAniSkelBone* const skeletonBegin = skeleton->mBones.begin();
+      const SAniSkelBone* const skeletonEnd = skeleton->mBones.end();
+      if (skeletonBegin != nullptr && skeletonEnd != nullptr && skeletonEnd >= skeletonBegin) {
+        const std::int32_t skeletonBoneCount = static_cast<std::int32_t>(skeletonEnd - skeletonBegin);
+        if (skeletonBoneCount < boneCount) {
+          boneCount = skeletonBoneCount;
+        }
+      }
+    }
+
+    if (boneCount <= 0) {
+      return;
+    }
+
+    for (std::int32_t index = 0; index < boneCount; ++index) {
+      const CAniPoseBone& sourceBone = sourceBegin[index];
+      CAniPoseBone& destinationBone = destinationBegin[index];
+
+      destinationBone.mLocalTransform = sourceBone.mLocalTransform;
+      destinationBone.mCompositeDirty = 1u;
+      destinationBone.mCompositeIsLocal = sourceBone.mCompositeIsLocal;
+      destinationBone.mVisible = sourceBone.mVisible;
+      destinationBone.mSkipNextInterp = sourceBone.mSkipNextInterp;
+    }
+  }
+
+  /**
+   * Address: 0x0054B550 (FUN_0054B550, ?SetWorldTransform@CAniPose@Moho@@QAEXABVVTransform@2@@Z)
+   * Mangled: ?SetWorldTransform@CAniPose@Moho@@QAEXABVVTransform@2@@Z
+   *
+   * What it does:
+   * Applies one new pose-world transform and invalidates composite caches for
+   * non-local bones whose parent lane is root or already dirty.
+   */
+  void CAniPose::SetWorldTransform(const VTransform& transform)
+  {
+    if (!PoseTransformDiffers(mLocalTransform, transform)) {
+      return;
+    }
+
+    mLocalTransform = transform;
+
+    CAniPoseBone* const bonesBegin = mBones.begin();
+    CAniPoseBone* const bonesEnd = mBones.end();
+    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesEnd <= bonesBegin) {
+      return;
+    }
+
+    for (CAniPoseBone* bone = bonesBegin; bone != bonesEnd; ++bone) {
+      if (bone->mCompositeIsLocal != 0u) {
+        continue;
+      }
+
+      CAniPoseBone* const parent = bone->mParent;
+      if (parent == nullptr || parent->mCompositeDirty != 0u) {
+        bone->mCompositeDirty = 1u;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x0054B770 (FUN_0054B770, ?InterpolatePose@CAniPose@Moho@@QAEXMPBV12@0H@Z)
+   *
+   * What it does:
+   * Interpolates pose transforms and bone lanes from two source poses using
+   * the requested blend factor.
+   */
+  void CAniPose::InterpolatePose(
+    const float interp,
+    const CAniPose* const sourcePose,
+    const CAniPose* const targetPose,
+    const int bones
+  )
+  {
+    const float sourcePosX = sourcePose->mLocalTransform.pos_.x;
+    const float sourcePosY = sourcePose->mLocalTransform.pos_.y;
+    const float sourcePosZ = sourcePose->mLocalTransform.pos_.z;
+    const float targetPosX = targetPose->mLocalTransform.pos_.x;
+    const float targetPosY = targetPose->mLocalTransform.pos_.y;
+    const float targetPosZ = targetPose->mLocalTransform.pos_.z;
+
+    mLocalTransform.pos_.x = sourcePosX + ((targetPosX - sourcePosX) * interp);
+    mLocalTransform.pos_.y = sourcePosY + ((targetPosY - sourcePosY) * interp);
+    mLocalTransform.pos_.z = sourcePosZ + ((targetPosZ - sourcePosZ) * interp);
+
+    Wm3::Quaternionf blendedOrientation{};
+    QuatLERP(&targetPose->mLocalTransform.orient_, &sourcePose->mLocalTransform.orient_, &blendedOrientation, interp);
+    mLocalTransform.orient_ = blendedOrientation;
+
+    CAniPoseBone* const destinationBegin = mBones.begin();
+    CAniPoseBone* const destinationEnd = mBones.end();
+    const int destinationBoneCount = static_cast<int>(destinationEnd - destinationBegin);
+    int boneCount = destinationBoneCount;
+    if (boneCount >= bones) {
+      boneCount = bones;
+    }
+
+    if (boneCount > 0) {
+      float poseInterp = interp;
+      float boneInterp = poseInterp;
+      int remainingBones = boneCount;
+      int index = 0;
+      do {
+        const CAniPoseBone* const sourceBone = &sourcePose->mBones.begin()[index];
+        CAniPoseBone* const destinationBone = &destinationBegin[index];
+        const CAniPoseBone* const targetBone = &targetPose->mBones.begin()[index];
+
+        destinationBone->mCompositeDirty = 1u;
+        destinationBone->mCompositeIsLocal = targetBone->mCompositeIsLocal;
+        destinationBone->mVisible = targetBone->mVisible;
+        destinationBone->mSkipNextInterp = targetBone->mSkipNextInterp;
+
+        if (targetBone->mSkipNextInterp != 0u) {
+          poseInterp = 1.0f;
+          boneInterp = 1.0f;
+        }
+
+        if (sourceBone->mCompositeIsLocal == targetBone->mCompositeIsLocal) {
+          const float sourceBonePosX = sourceBone->mLocalTransform.pos_.x;
+          const float sourceBonePosY = sourceBone->mLocalTransform.pos_.y;
+          const float sourceBonePosZ = sourceBone->mLocalTransform.pos_.z;
+          const float targetBonePosX = targetBone->mLocalTransform.pos_.x;
+          const float targetBonePosY = targetBone->mLocalTransform.pos_.y;
+          const float targetBonePosZ = targetBone->mLocalTransform.pos_.z;
+
+          destinationBone->mLocalTransform.pos_.x = sourceBonePosX + ((targetBonePosX - sourceBonePosX) * boneInterp);
+          destinationBone->mLocalTransform.pos_.y = sourceBonePosY + ((targetBonePosY - sourceBonePosY) * boneInterp);
+          destinationBone->mLocalTransform.pos_.z = sourceBonePosZ + ((targetBonePosZ - sourceBonePosZ) * boneInterp);
+
+          QuatLERP(
+            &targetBone->mLocalTransform.orient_,
+            &sourceBone->mLocalTransform.orient_,
+            &destinationBone->mLocalTransform.orient_,
+            boneInterp
+          );
+        } else {
+          destinationBone->mLocalTransform.orient_ = targetBone->mLocalTransform.orient_;
+          destinationBone->mLocalTransform.pos_ = targetBone->mLocalTransform.pos_;
+        }
+
+        boneInterp = poseInterp;
+        ++index;
+        --remainingBones;
+      } while (remainingBones != 0);
+    }
+
+    const float sourceMaxOffset = sourcePose->mMaxOffset;
+    const float targetMaxOffset = targetPose->mMaxOffset;
+    if (targetMaxOffset <= sourceMaxOffset) {
+      mMaxOffset = sourceMaxOffset;
+    } else {
+      mMaxOffset = targetMaxOffset;
     }
   }
 

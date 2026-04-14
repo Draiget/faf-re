@@ -343,6 +343,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A610 (FUN_0069A610, Moho::Projectile::IsProjectile)
+   *
+   * What it does:
+   * Returns this projectile pointer through the RTTI/downcast lane.
+   */
+  Projectile* Projectile::IsProjectile()
+  {
+    return this;
+  }
+
+  /**
    * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
    *
    * What it does:

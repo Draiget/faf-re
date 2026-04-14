@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 
 #include "EntityTransformPayload.h"
@@ -289,6 +290,73 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x007237E0 (FUN_007237E0, func_CopyCollisionResultArr2)
+   *
+   * What it does:
+   * Copies `CollisionResult` lanes backward from `[sourceBegin, sourceEnd)`
+   * into destination range ending at `outEnd`.
+   */
+  CollisionResult* CopyCollisionResultsBackward(
+    CollisionResult* const outEnd,
+    const CollisionResult* const sourceEnd,
+    const CollisionResult* const sourceBegin
+  ) noexcept
+  {
+    CollisionResult* destinationCursor = outEnd;
+    const CollisionResult* sourceCursor = sourceEnd;
+    while (sourceCursor != sourceBegin) {
+      --sourceCursor;
+      --destinationCursor;
+      *destinationCursor = *sourceCursor;
+    }
+    return destinationCursor;
+  }
+
+  /**
+   * Address: 0x00723770 (FUN_00723770, func_CopyCollisionResultArr3)
+   *
+   * What it does:
+   * Binary-twin entry point for backward `CollisionResult` range copies.
+   */
+  CollisionResult* CopyCollisionResultsBackwardAlt(
+    CollisionResult* const outEnd,
+    const CollisionResult* const sourceEnd,
+    const CollisionResult* const sourceBegin
+  ) noexcept
+  {
+    return CopyCollisionResultsBackward(outEnd, sourceEnd, sourceBegin);
+  }
+
+  /**
+   * Address: 0x00723410 (FUN_00723410, func_CopyCollisionResultArr1)
+   *
+   * What it does:
+   * Copies `CollisionResult` lanes forward from `[sourceBegin, sourceEnd)` into
+   * destination range starting at `outBegin`.
+   */
+  CollisionResult* CopyCollisionResultsForward(
+    CollisionResult* const outBegin,
+    const CollisionResult* const sourceBegin,
+    const CollisionResult* const sourceEnd
+  ) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(outBegin);
+    const std::uintptr_t stride = static_cast<std::uintptr_t>(sizeof(CollisionResult));
+
+    const CollisionResult* sourceCursor = sourceBegin;
+    while (sourceCursor != sourceEnd) {
+      if (destinationAddress != 0u) {
+        *reinterpret_cast<CollisionResult*>(destinationAddress) = *sourceCursor;
+      }
+
+      destinationAddress += stride;
+      ++sourceCursor;
+    }
+
+    return reinterpret_cast<CollisionResult*>(destinationAddress);
+  }
+
   /**
    * Address: 0x0067AC40 (FUN_0067AC40, inlined construction payload)
    *

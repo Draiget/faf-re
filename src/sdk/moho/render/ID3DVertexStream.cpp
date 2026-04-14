@@ -11,10 +11,12 @@ namespace moho
   ID3DVertexStream::ID3DVertexStream() = default;
 
   /**
-   * Address: 0x0043CCF0 (FUN_0043CCF0, sub_43CCF0)
+   * Address: 0x0043CCE0 (FUN_0043CCE0, ID3DVertexStream dtor body)
+   * Address: 0x0043CCF0 (FUN_0043CCF0, sub_43CCF0, scalar deleting destructor thunk)
    *
    * What it does:
-   * Resets base vftable state and owns the deleting-destructor entrypoint.
+   * Defaulted destructor body — compiler emits a 2-insn vtable-set + retn at
+   * 0x0043CCE0 and a separate scalar-deleting thunk at 0x0043CCF0.
    */
   ID3DVertexStream::~ID3DVertexStream() = default;
 } // namespace moho

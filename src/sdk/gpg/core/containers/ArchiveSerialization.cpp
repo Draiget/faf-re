@@ -17,6 +17,7 @@
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SConditionTriggerTypes.h"
+#include "legacy/containers/Tree.h"
 #include "ReadArchive.h"
 #include "String.h"
 #include "WriteArchive.h"
@@ -59,6 +60,14 @@ namespace gpg
   class SerSaveConstructArgsResult
   {
   public:
+    /**
+     * Address: 0x0094F750 (FUN_0094F750, gpg::SerSaveConstructArgsResult::SetOwned)
+     *
+     * What it does:
+     * Marks save-construct ownership lane as `OWNED` from the reserved state.
+     */
+    void SetOwned(unsigned int flags);
+
     /**
      * Address: 0x0094F7D0 (FUN_0094F7D0, gpg::SerSaveConstructArgsResult::SetShared)
      *
@@ -110,6 +119,63 @@ namespace
     "SerSaveConstructArgsResultView::mFlagByte4 offset must be 0x4"
   );
 
+  struct TrackedPointerTreeNodeView : msvc8::Tree<TrackedPointerTreeNodeView>
+  {
+    gpg::RRef ref;                         // +0x0C
+    std::uint8_t reserved14_24[0x11]{};   // +0x14
+    std::uint8_t isNil = 0;               // +0x25
+  };
+  static_assert(offsetof(TrackedPointerTreeNodeView, ref) == 0x0C, "TrackedPointerTreeNodeView::ref offset must be 0x0C");
+  static_assert(
+    offsetof(TrackedPointerTreeNodeView, isNil) == 0x25,
+    "TrackedPointerTreeNodeView::isNil offset must be 0x25"
+  );
+
+  struct TrackedPointerTreeView
+  {
+    void* unknown00 = nullptr;             // +0x00
+    TrackedPointerTreeNodeView* head = nullptr; // +0x04
+  };
+  static_assert(offsetof(TrackedPointerTreeView, head) == 0x04, "TrackedPointerTreeView::head offset must be 0x04");
+
+  /**
+   * Address: 0x0094FA20 (FUN_0094FA20, _Tree_RRef_TrackedPointer::_Lbound)
+   *
+   * What it does:
+   * Performs one lower-bound walk over the tracked-pointer RB-tree using
+   * `RRef` key ordering (`mType`, then `mObj`) and returns the first node not
+   * less than the probe key.
+   */
+  [[maybe_unused]] TrackedPointerTreeNodeView* FindLowerBoundTrackedPointerNode(
+    TrackedPointerTreeView* const tree,
+    const gpg::RRef& objectRef
+  ) noexcept
+  {
+    TrackedPointerTreeNodeView* result = tree->head;
+    TrackedPointerTreeNodeView* parent = result->parent;
+
+    if (parent->isNil == 0) {
+      gpg::RType* const probeType = objectRef.mType;
+      do {
+        gpg::RType* const nodeType = parent->ref.mType;
+        bool nodeLessThanProbe = nodeType < probeType;
+
+        if (nodeType == probeType) {
+          nodeLessThanProbe = parent->ref.mObj < objectRef.mObj;
+        }
+
+        if (nodeLessThanProbe) {
+          parent = parent->right;
+        } else {
+          result = parent;
+          parent = parent->left;
+        }
+      } while (parent->isNil == 0);
+    }
+
+    return result;
+  }
+
   constexpr const char* kSerializationCppPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.cpp";
 
   [[noreturn]] void ThrowSerializationError(const char* const message)
@@ -156,6 +222,19 @@ namespace
       sType = gpg::LookupRType(typeid(moho::SSessionSaveData));
     }
     return sType;
+  }
+
+  /**
+   * Address: 0x008849B0 (FUN_008849B0, func_CastSSessionSaveData)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `SSessionSaveData` and returns the
+   * typed object pointer when the source is compatible.
+   */
+  [[nodiscard]] moho::SSessionSaveData* func_CastSSessionSaveData(const gpg::RRef& source)
+  {
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSessionSaveDataType());
+    return static_cast<moho::SSessionSaveData*>(upcast.mObj);
   }
 
   [[nodiscard]] gpg::RType* CachedCAniPoseType()
@@ -221,6 +300,18 @@ namespace
       type = gpg::LookupRType(typeid(moho::CIntelGrid));
     }
     return type;
+  }
+
+  /**
+   * Address: 0x00550670 (FUN_00550670, ??1WeakPtr_CIntelGrid@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Releases one retained `boost::shared_ptr<CIntelGrid>` control-block owner
+   * from raw `(px,pi)` storage and clears both lanes.
+   */
+  void ReleaseSharedCIntelGrid(boost::SharedPtrRaw<moho::CIntelGrid>& pointer) noexcept
+  {
+    pointer.release();
   }
 
   [[nodiscard]] bool IsPointerCompatibleWithExpectedType(
@@ -364,6 +455,27 @@ void gpg::SerConstructResult::SetShared(
   view->mState = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
     view->mSharedFlag = 0;
+  }
+}
+
+/**
+ * Address: 0x0094F750 (FUN_0094F750, gpg::SerSaveConstructArgsResult::SetOwned)
+ * Mangled: ?SetOwned@SerSaveConstructArgsResult@gpg@@QAEXI@Z_0
+ *
+ * What it does:
+ * Transitions one save-construct result lane from `RESERVED` to `OWNED`
+ * and clears the byte-at-+4 lane when bit 0 in `flags` is set.
+ */
+void gpg::SerSaveConstructArgsResult::SetOwned(const unsigned int flags)
+{
+  auto* const view = reinterpret_cast<SerSaveConstructArgsResultView*>(this);
+  if (view->mOwnership != TrackedPointerState::Reserved) {
+    gpg::HandleAssertFailure("mOwnership == RESERVED", 402, kSerializationCppPath);
+  }
+
+  view->mOwnership = TrackedPointerState::Owned;
+  if ((flags & 1u) != 0u) {
+    view->mFlagByte4 = 0;
   }
 }
 
@@ -636,8 +748,11 @@ void gpg::ReadPointerShared_SSessionSaveData(
 
   EnsureTrackedPointerSharedOwnership(tracked);
 
-  gpg::RType* const expectedType = CachedSessionSaveDataType();
-  if (!IsPointerCompatibleWithExpectedType(tracked, expectedType)) {
+  gpg::RRef trackedRef{};
+  trackedRef.mObj = tracked.object;
+  trackedRef.mType = tracked.type;
+  if (func_CastSSessionSaveData(trackedRef) == nullptr) {
+    gpg::RType* const expectedType = CachedSessionSaveDataType();
     ThrowTypeMismatch(tracked, expectedType);
   }
 
@@ -785,7 +900,7 @@ void gpg::ReadPointerShared_CIntelGrid(
 
   TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
   if (!tracked.object) {
-    outPointer.release();
+    ReleaseSharedCIntelGrid(outPointer);
     return;
   }
 
@@ -816,7 +931,7 @@ void gpg::ReadPointerShared_CIntelGrid2(
 
   TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
   if (!tracked.object) {
-    outPointer.release();
+    ReleaseSharedCIntelGrid(outPointer);
     return;
   }
 
@@ -847,7 +962,7 @@ void gpg::ReadPointerShared_RScmResource(
 
   TrackedPointerInfo& tracked = ReadRawPointer(archive, ownerRef);
   if (!tracked.object) {
-    outPointer.release();
+    (void)boost::DestroySharedPtrRScmResource(&outPointer);
     return;
   }
 

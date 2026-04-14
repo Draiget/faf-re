@@ -1,5 +1,6 @@
 #include "moho/console/CConCommand.h"
 
+#include <cctype>
 #include <cstddef>
 #include <cstdarg>
 #include <cstdlib>
@@ -301,6 +302,55 @@ namespace
     msvc8::string out;
     out.assign_owned(joined);
     return out;
+  }
+
+  struct LowercasedCopyResult
+  {
+    char* begin;
+    char* end;
+  };
+
+  [[maybe_unused]] Wm3::Vector2f lastMouseScreenPos{};
+  static_assert(sizeof(Wm3::Vector2f) == 0x8, "Wm3::Vector2f size must be 0x8");
+
+  /**
+   * Address: 0x00835C80 (FUN_00835C80, cmp_LastMouseScreenPos)
+   *
+   * What it does:
+   * Byte-compares one screen-space cursor point against the cached
+   * create-unit cursor point and returns `-1`, `0`, or `1`.
+   */
+  [[maybe_unused]]
+  [[nodiscard]]
+  int cmp_LastMouseScreenPos(const Wm3::Vector2f& mouseScreenPos) noexcept
+  {
+    const int rawCompare = std::memcmp(&mouseScreenPos, &lastMouseScreenPos, sizeof(Wm3::Vector2f));
+    if (rawCompare > 0) {
+      return 1;
+    }
+    if (rawCompare < 0) {
+      return -1;
+    }
+    return 0;
+  }
+
+  /**
+   * Address: 0x00835D10 (FUN_00835D10, func_tolower)
+   *
+   * What it does:
+   * Copies one byte range into an output buffer while lowercasing each source
+   * byte.
+   * Returns the original output begin and the advanced output cursor.
+   */
+  [[nodiscard]]
+  LowercasedCopyResult CopyLowercasedRange(char* outputBegin, const char* inputBegin, const char* inputEnd) noexcept
+  {
+    char* outputCursor = outputBegin;
+    for (const char* inputCursor = inputBegin; inputCursor != inputEnd; ++inputCursor) {
+      *outputCursor++ = static_cast<char>(std::tolower(static_cast<unsigned char>(*inputCursor)));
+    }
+
+    return {outputBegin, outputCursor};
   }
 
   [[nodiscard]]
@@ -1467,6 +1517,36 @@ void moho::CON_p4_IsOpenedForEdit(void* const commandArgs)
 }
 
 /**
+ * Address: 0x007ADFC0 (FUN_007ADFC0, Moho::CAM_SetLOD)
+ *
+ * What it does:
+ * Parses `cam_SetLOD <cameraName> <lodScale>` and applies the parsed LOD
+ * scale to the named camera view lane.
+ */
+void moho::CAM_SetLOD(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() < 3u) {
+    return;
+  }
+
+  const msvc8::string* const cameraName = args.At(1u);
+  const msvc8::string* const lodScaleToken = args.At(2u);
+  if (cameraName == nullptr || lodScaleToken == nullptr) {
+    return;
+  }
+
+  RCamManager* const manager = CAM_GetManager();
+  CameraImpl* const camera = (manager != nullptr) ? manager->GetCamera(cameraName->c_str()) : nullptr;
+  if (camera == nullptr) {
+    return;
+  }
+
+  GeomCamera3& cameraView = const_cast<GeomCamera3&>(camera->CameraGetView());
+  cameraView.SetLODScale(ParseFloatToken(lodScaleToken));
+}
+
+/**
  * Address: 0x007AE040 (FUN_007AE040, Moho::CON_DumpCamera)
  *
  * What it does:
@@ -1693,6 +1773,50 @@ void moho::CON_UI_CreateHead1Map(void* const commandArgs)
 }
 
 /**
+ * Address: 0x008349C0 (FUN_008349C0, Moho::UI_Quit)
+ *
+ * What it does:
+ * Shows the escape dialog through UI main callback lane.
+ */
+void moho::UI_Quit(void* const commandArgs)
+{
+  (void)commandArgs;
+  (void)ShowEscapeDialog(false);
+}
+
+/**
+ * Address: 0x007ADF50 (FUN_007ADF50, Moho::UI_ResetView)
+ *
+ * What it does:
+ * Resolves each camera-name token from argument index 1 onward and resets
+ * each camera that exists in the current camera manager.
+ */
+void moho::UI_ResetView(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() <= 1u) {
+    return;
+  }
+
+  RCamManager* const cameraManager = CAM_GetManager();
+  if (cameraManager == nullptr) {
+    return;
+  }
+
+  for (std::size_t index = 1u; index < args.Count(); ++index) {
+    const msvc8::string* const cameraName = args.At(index);
+    if (cameraName == nullptr) {
+      continue;
+    }
+
+    CameraImpl* const camera = cameraManager->GetCamera(cameraName->c_str());
+    if (camera != nullptr) {
+      camera->CameraReset();
+    }
+  }
+}
+
+/**
  * Address: 0x00834E50 (FUN_00834E50, Moho::SetFocusArmy)
  *
  * What it does:
@@ -1776,6 +1900,51 @@ void moho::UI_ShowRenameDialog()
   }
 
   ShowRenameDialogLua(selectedUnit->GetCustomName());
+}
+
+/**
+ * Address: 0x00835A40 (FUN_00835A40, Moho::UI_DumpControls)
+ *
+ * What it does:
+ * Walks each root UI frame and logs every control via depth-first traversal.
+ */
+void moho::UI_DumpControls(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
+  if (uiManager == nullptr) {
+    return;
+  }
+
+  const std::size_t frameCount = uiManager->mFrames.Size();
+  for (std::size_t frameIndex = 0u; frameIndex < frameCount; ++frameIndex) {
+    CMauiControl* const frameRoot = uiManager->mFrames[frameIndex].get();
+    if (frameRoot == nullptr) {
+      continue;
+    }
+
+    for (CMauiControl* control = frameRoot; control != nullptr; control = control->DepthFirstSuccessor(frameRoot)) {
+      control->Dump();
+    }
+  }
+}
+
+/**
+ * Address: 0x00835AA0 (FUN_00835AA0, Moho::UI_DumpControlsUnderCursor)
+ *
+ * What it does:
+ * Dispatches `DumpControlsUnderMouse()` on the active UI manager when one is
+ * available.
+ */
+void moho::UI_DumpControlsUnderCursor(void* const commandArgs)
+{
+  (void)commandArgs;
+
+  IUIManager* const uiManager = UI_GetManager();
+  if (uiManager != nullptr) {
+    uiManager->DumpControlsUnderMouse();
+  }
 }
 
 /**
@@ -2431,6 +2600,7 @@ namespace
   constexpr const char* kConsoleStartupConLuaDescription = "Execute one Lua command line in the user Lua state.";
   constexpr const char* kConsoleStartupConExecutePasteBufferDescription =
     "Execute UTF-8 clipboard text as a Lua chunk.";
+  constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset one or more named cameras.";
   constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
   constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
@@ -2473,6 +2643,7 @@ namespace
   CConFunc gCConFunc_LUADOC{};
   CConFunc gCConFunc_LUA{};
   CConFunc gCConFunc_ExecutePasteBuffer{};
+  CConFunc gCConFunc_UI_ResetView{};
   CConFunc gCConFunc_GetVersion{};
   CConFunc gCConFunc_CON_ExecuteLastCommand{};
   CConFunc gCConFunc_d3d_AntiAliasingSamples{};
@@ -2992,6 +3163,34 @@ namespace moho
       "ExecutePasteBuffer",
       reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecutePasteBuffer),
       &cleanup_CConFunc_ExecutePasteBuffer
+    );
+  }
+
+  /**
+   * Address: 0x00C03620 (FUN_00C03620, ??1CConFunc_UI_ResetView@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup command storage for `UI_ResetView`.
+   */
+  void cleanup_CConFunc_UI_ResetView()
+  {
+    CleanupStartupConCommand(gCConFunc_UI_ResetView);
+  }
+
+  /**
+   * Address: 0x00BDF780 (FUN_00BDF780, register_CConFunc_UI_ResetView)
+   *
+   * What it does:
+   * Registers startup console callback for `UI_ResetView`.
+   */
+  void register_CConFunc_UI_ResetView()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_UI_ResetView,
+      kConsoleStartupConUiResetViewDescription,
+      "UI_ResetView",
+      &moho::UI_ResetView,
+      &cleanup_CConFunc_UI_ResetView
     );
   }
 
@@ -3821,6 +4020,7 @@ namespace
       moho::register_CConFunc_LUADOC();
       moho::register_CConFunc_LUA();
       moho::register_CConFunc_ExecutePasteBuffer();
+      moho::register_CConFunc_UI_ResetView();
       moho::register_CConFunc_PrintStats();
       moho::register_CConFunc_ClearStats();
       moho::register_CConFunc_BeginLoggingStats();

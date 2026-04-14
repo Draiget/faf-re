@@ -38,6 +38,7 @@ namespace moho
   }
 
   /**
+   * Address: 0x0066B1E0 (FUN_0066B1E0, Moho::IEffectManager::~IEffectManager base lane)
    * Address: 0x0066B1F0 (FUN_0066B1F0, Moho::IEffectManager::dtr)
    */
   IEffectManager::~IEffectManager() = default;

@@ -501,6 +501,25 @@ namespace moho
      */
     virtual void Disconnect();
 
+  private:
+    /**
+     * Address: 0x0053EEC0 (FUN_0053EEC0)
+     *
+     * What it does:
+     * Returns whether all non-ejected clients have queued data through `beat`.
+     * Clients marked `mEjectPending` are treated as non-blocking.
+     */
+    [[nodiscard]] bool ClientNeedsFullyQueuedBeatsUntil(int beat);
+
+    /**
+     * Address: 0x0053EF30 (FUN_0053EF30, Moho::CClientManagerImpl::EveryoneResponsiveSince)
+     *
+     * What it does:
+     * Returns whether every client reports readiness for `beat` via
+     * `CClientBase::IsReadyForBeat`.
+     */
+    [[nodiscard]] bool EveryoneResponsiveSince(int beat);
+
   public:
     boost::recursive_mutex mLock;
     IClientMgrUIInterface* mInterface{nullptr};

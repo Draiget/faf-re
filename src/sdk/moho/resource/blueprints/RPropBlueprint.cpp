@@ -15,6 +15,28 @@ namespace moho
   gpg::RType* RPropBlueprint::sType = nullptr;
 
   /**
+   * Address: 0x0051D250 (FUN_0051D250, ??0RPropBlueprint@Moho@@QAE@@Z)
+   * Mangled: ??0RPropBlueprint@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Runs base entity-blueprint construction and restores prop blueprint
+   * display/defense/economy defaults.
+   */
+  RPropBlueprint::RPropBlueprint()
+    : REntityBlueprint()
+    , Display()
+    , Defense()
+    , Economy()
+  {
+    Display.MeshBlueprint.name.tidy(false, 0U);
+    Display.UniformScale = 1.0f;
+    Defense.MaxHealth = 1.0f;
+    Defense.Health = 1.0f;
+    Economy.ReclaimMassMax = 0.0f;
+    Economy.ReclaimEnergyMax = 0.0f;
+  }
+
+  /**
    * Address: 0x0051D210 (FUN_0051D210)
    * Mangled: ?GetClass@RPropBlueprint@Moho@@UBEPAVRType@gpg@@XZ
    *

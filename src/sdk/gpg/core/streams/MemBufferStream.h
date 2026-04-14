@@ -46,6 +46,8 @@ namespace gpg
         /**
          * Address: 0x0042D1A0 (FUN_0042D1A0, __imp_??1?$MemBuffer@$$CBD@gpg@@QAE@XZ)
          * Address: 0x0042D1E0 (FUN_0042D1E0, __imp_??1?$MemBuffer@D@gpg@@QAE@XZ)
+         * Address: 0x004CE280 (FUN_004CE280, gpg::MemBuffer<char const>::~MemBuffer<char const>)
+         * Address: 0x004CEE70 (FUN_004CEE70, gpg::MemBuffer<char const>::~MemBuffer<char const> alias)
          *
          * What it does:
          * Releases one shared ownership lane for the buffer/control block.
@@ -61,7 +63,12 @@ namespace gpg
         {
         }
 
-        /** Construct from owner + raw range [begin, end). */
+        /**
+         * Address: 0x0094E0F0 (FUN_0094E0F0, gpg::MemBuffer<char>::MemBuffer<char>)
+         *
+         * What it does:
+         * Copies one shared owner lane and binds explicit begin/end pointers.
+         */
         MemBuffer(boost::shared_ptr<type> ptr, type* begin, type* end) noexcept
             : mData{ ptr }, mBegin{ begin }, mEnd{ end } {
         }
@@ -131,6 +138,27 @@ namespace gpg
         std::size_t Size() const noexcept
         {
             return static_cast<std::size_t>(mEnd - mBegin);
+        }
+
+        /**
+         * Address: 0x00539E40 (FUN_00539E40, gpg::MemBuffer::GetSharedPtr)
+         *
+         * boost::shared_ptr<T>
+         *
+         * IDA signature:
+         * boost::shared_ptr_char * __stdcall
+         *   gpg::MemBuffer::GetSharedPtr(gpg::MemBuffer *this, boost::shared_ptr_char *out);
+         *
+         * What it does:
+         * Returns one shared owner that aliases this view's begin pointer while
+         * retaining the original control block.
+         */
+        [[nodiscard]] boost::shared_ptr<type> GetSharedPtr() const
+        {
+            if (!mData) {
+                return {};
+            }
+            return boost::shared_ptr<type>(mData, mBegin);
         }
 
         /**
@@ -282,6 +310,15 @@ namespace gpg
         void VirtFlush() override;
 
         /**
+         * Address: 0x008E59F0 (FUN_008E59F0, gpg::MemBufferStream::GetLength)
+         *
+         * What it does:
+         * Returns the current logical length of the stream from the active
+         * write window when present, otherwise from the read window.
+         */
+        unsigned int GetLength() const;
+
+        /**
          * Address: 0x004CCCD0 (FUN_004CCCD0, gpg::MemBufferStream::GetBuffer)
          *
          * What it does:
@@ -289,6 +326,14 @@ namespace gpg
          * immutable stream instances.
          */
         MemBuffer<char> GetBuffer() const;
+
+        /**
+         * Address: 0x0088B7E0 (FUN_0088B7E0, gpg::MemBufferStream::GetConstBuffer)
+         *
+         * What it does:
+         * Returns one immutable shared view over the stream output window.
+         */
+        MemBuffer<const char> GetConstBuffer() const;
 
     private:
         /**
@@ -317,6 +362,14 @@ namespace gpg
      * Creates one owned immutable byte view by copying `size` bytes from `source`.
      */
     MemBuffer<const char> CopyMemBuffer(const void* source, std::size_t size);
+
+    /**
+     * Address: 0x0094E5D0 (FUN_0094E5D0, ?CopyMemBuffer@gpg@@YA?AU?$MemBuffer@D@1@ABU?$MemBuffer@$$CBD@1@@Z)
+     *
+     * What it does:
+     * Copies one immutable mem-buffer view into a new owned immutable byte view.
+     */
+    MemBuffer<char> CopyMemBuffer(const MemBuffer<const char>& source);
 
     /**
      * What it does:

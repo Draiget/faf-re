@@ -20,6 +20,9 @@ namespace moho
   template <class TEvent>
   class ManyToOneBroadcaster;
 
+  template <class TEvent>
+  class ManyToOneListener;
+
   template <>
   class ManyToOneBroadcaster<ECollisionBeamEvent>
   {
@@ -29,6 +32,15 @@ namespace moho
   public:
     void* ownerLinkSlot; // +0x00
     void* nextInOwner;   // +0x04
+
+    /**
+     * Address: 0x005DC340 (FUN_005DC340, Moho::ManyToOneBroadcaster_ECollisionBeamEvent::BroadcastEvent)
+     *
+     * What it does:
+     * Rebinds this collision-beam broadcaster node to the supplied listener
+     * chain head while preserving intrusive owner-chain integrity.
+     */
+    void BroadcastEvent(ManyToOneListener<ECollisionBeamEvent>* listener);
   };
 
   using ManyToOneBroadcaster_ECollisionBeamEvent = ManyToOneBroadcaster<ECollisionBeamEvent>;

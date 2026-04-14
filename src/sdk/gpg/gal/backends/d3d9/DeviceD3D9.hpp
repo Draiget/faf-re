@@ -23,12 +23,14 @@ namespace gal {
     class OutputContext;
     class CubeRenderTargetContext;
     class DepthStencilTargetContext;
+    class EffectContext;
     class IndexBufferContext;
     class RenderTargetContext;
     class TextureContext;
     class VertexBufferContext;
     class CubeRenderTargetD3D9;
     class DepthStencilTargetD3D9;
+    class EffectD3D9;
     class IndexBufferD3D9;
     class PipelineStateD3D9;
     class RenderTargetD3D9;
@@ -124,11 +126,18 @@ namespace gal {
           boost::shared_ptr<PipelineStateD3D9>* outPipelineState
        );
       /**
-       * Address: 0x008F13D0
+       * Address: 0x008F13D0 (FUN_008F13D0)
        * Slot: 9
        * Demangled: gpg::gal::DeviceD3D9::CreateEffect
+       *
+       * What it does:
+       * Dispatches `Func1` and chooses source-compile vs cached-binary effect
+       * creation based on `EffectContext::useCache`.
        */
-      virtual void CreateEffect();
+      virtual boost::shared_ptr<EffectD3D9>* CreateEffect(
+          boost::shared_ptr<EffectD3D9>* outEffect,
+          EffectContext* context
+       );
       /**
        * Address: 0x008EACC0 (FUN_008EACC0)
        * Slot: 10

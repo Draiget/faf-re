@@ -13,6 +13,19 @@ namespace moho
   class EntitySetTemplate;
 
   /**
+   * Address: 0x00582EB0 (FUN_00582EB0, func_GetUnitIdPosInVec_BinarySearch)
+   *
+   * What it does:
+   * Returns the lower-bound insertion cursor for `unit` in one sorted
+   * `Entity*` span ordered by entity id.
+   */
+  [[nodiscard]]
+  Entity** LowerBoundUnitEntityById(Unit* unit, Entity** vecStart, Entity** vecEnd) noexcept;
+
+  [[nodiscard]]
+  Entity* const* LowerBoundUnitEntityById(const Unit* unit, Entity* const* vecStart, Entity* const* vecEnd) noexcept;
+
+  /**
    * Address context:
    * - 0x0057DDD0 (FUN_0057DDD0, Moho::EntitySetTemplate_Unit::Add)
    * - 0x005E8960 (FUN_005E8960, Moho::EntitySetTemplate_Unit::Remove)

@@ -1,5 +1,6 @@
 #include "CScriptEvent.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -40,7 +41,14 @@ using namespace moho;
 
 namespace
 {
+  alignas(moho::CScriptEventTypeInfo) std::byte gCScriptEventTypeInfoStorage[sizeof(moho::CScriptEventTypeInfo)]{};
+  bool gCScriptEventTypeInfoConstructed = false;
   moho::CScriptEventSerializer gCScriptEventSerializer{};
+
+  [[nodiscard]] moho::CScriptEventTypeInfo& CScriptEventTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CScriptEventTypeInfo*>(gCScriptEventTypeInfoStorage);
+  }
 
   [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
   {
@@ -67,6 +75,43 @@ namespace
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
+  }
+
+  /**
+   * Address: 0x004CA110 (FUN_004CA110, CScriptEvent startup type-info pre-registration)
+   *
+   * What it does:
+   * Materializes one startup `CScriptEventTypeInfo` storage lane and
+   * pre-registers reflected metadata for `typeid(CScriptEvent)`.
+   */
+  [[nodiscard]] gpg::RType* PreRegisterCScriptEventTypeInfo()
+  {
+    if (!gCScriptEventTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CScriptEventTypeInfoSlot())) moho::CScriptEventTypeInfo();
+      gCScriptEventTypeInfoConstructed = true;
+    }
+
+    gpg::PreRegisterRType(typeid(CScriptEvent), &CScriptEventTypeInfoSlot());
+    return &CScriptEventTypeInfoSlot();
+  }
+
+  /**
+   * Address: 0x00BF0B20 (FUN_00BF0B20, CScriptEvent type-info cleanup at exit)
+   *
+   * What it does:
+   * Releases dynamic field/base arrays from startup CScriptEvent type-info
+   * storage and tears down placement-constructed type metadata.
+   */
+  void CleanupCScriptEventTypeInfoAtExit()
+  {
+    if (!gCScriptEventTypeInfoConstructed) {
+      return;
+    }
+
+    CScriptEventTypeInfoSlot().fields_ = msvc8::vector<gpg::RField>{};
+    CScriptEventTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
+    CScriptEventTypeInfoSlot().~CScriptEventTypeInfo();
+    gCScriptEventTypeInfoConstructed = false;
   }
 
   template <typename TSerializer>
@@ -686,6 +731,32 @@ namespace
     return static_cast<CScriptObject**>(upcast.mObj);
   }
 
+  /**
+   * Address: 0x004C8F00 (FUN_004C8F00, CScriptObject-pointer reflected ref store helper)
+   *
+   * What it does:
+   * Writes one `gpg::RRef` lane for a `CScriptObject*` slot pointer into
+   * caller-provided output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreCScriptObjectPointerRef(
+    gpg::RRef* const outRef, CScriptObject** const scriptObjectSlot
+  )
+  {
+    return gpg::RRef_CScriptObject_P(outRef, scriptObjectSlot);
+  }
+
+  /**
+   * Address: 0x004CBB30 (FUN_004CBB30, CScriptEvent reflected ref store helper)
+   *
+   * What it does:
+   * Writes one `gpg::RRef` lane for a CScriptEvent pointer into
+   * caller-provided output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreCScriptEventRef(gpg::RRef* const outRef, CScriptEvent* const event)
+  {
+    return gpg::RRef_CScriptEvent(outRef, event);
+  }
+
   template <typename T>
   gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
   {
@@ -757,6 +828,58 @@ namespace
     if (event) {
       event->~CScriptEvent();
     }
+  }
+
+  /**
+   * Address: 0x004CB440 (FUN_004CB440, CScriptEventTypeInfo callback assignment A)
+   *
+   * What it does:
+   * Assigns `newRefFunc_` and `ctorRefFunc_` callback lanes on one RType.
+   */
+  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCreateCallbacks(gpg::RType* const typeInfo)
+  {
+    typeInfo->newRefFunc_ = &CreateScriptEventRefOwned;
+    typeInfo->ctorRefFunc_ = &ConstructScriptEventRefInPlace;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x004CB450 (FUN_004CB450, CScriptEventTypeInfo callback assignment B)
+   *
+   * What it does:
+   * Assigns `deleteFunc_` and `dtrFunc_` callback lanes on one RType.
+   */
+  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefDestroyCallbacks(gpg::RType* const typeInfo)
+  {
+    typeInfo->deleteFunc_ = &DeleteScriptEventOwned;
+    typeInfo->dtrFunc_ = &DestroyScriptEventInPlace;
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x004CB050 (FUN_004CB050, CScriptEventTypeInfo callback assignment aggregate)
+   *
+   * What it does:
+   * Assigns all reflection object-lifecycle callback lanes on one RType.
+   */
+  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCallbacks(gpg::RType* const typeInfo)
+  {
+    (void)ConfigureScriptEventRefCreateCallbacks(typeInfo);
+    (void)ConfigureScriptEventRefDestroyCallbacks(typeInfo);
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x004CB150 (FUN_004CB150, null RRef initializer helper)
+   *
+   * What it does:
+   * Clears one reflected reference payload to `{nullptr, nullptr}`.
+   */
+  [[maybe_unused]] gpg::RRef* ClearRRef(gpg::RRef* const outRef)
+  {
+    outRef->mObj = nullptr;
+    outRef->mType = nullptr;
+    return outRef;
   }
 } // namespace
 
@@ -2883,9 +3006,42 @@ static void CleanupCScriptEventSerializerAtExit()
   (void)moho::cleanup_CScriptEventSerializer();
 }
 
-gpg::SerHelperBase* moho::cleanup_CScriptEventSerializer()
+/**
+ * Address: 0x004CA2D0 (FUN_004CA2D0, CScriptEvent serializer cleanup alias A)
+ */
+[[nodiscard]] gpg::SerHelperBase* CleanupCScriptEventSerializerVariantAliasA()
 {
   return UnlinkSerializerNode(gCScriptEventSerializer);
+}
+
+/**
+ * Address: 0x004CA300 (FUN_004CA300, CScriptEvent serializer cleanup alias B)
+ */
+[[nodiscard]] gpg::SerHelperBase* CleanupCScriptEventSerializerVariantAliasB()
+{
+  return UnlinkSerializerNode(gCScriptEventSerializer);
+}
+
+gpg::SerHelperBase* moho::cleanup_CScriptEventSerializer()
+{
+  return CleanupCScriptEventSerializerVariantAliasA();
+}
+
+/**
+ * Address: 0x00BC6220 (FUN_00BC6220, CScriptEvent startup type-info registration)
+ *
+ * What it does:
+ * Pre-registers `CScriptEvent` reflected type descriptor and schedules
+ * teardown of startup type-info storage at process exit.
+ */
+void moho::register_CScriptEventTypeInfo()
+{
+  static const bool kRegistered = []() {
+    (void)PreRegisterCScriptEventTypeInfo();
+    (void)std::atexit(&CleanupCScriptEventTypeInfoAtExit);
+    return true;
+  }();
+  (void)kRegistered;
 }
 
 /**
@@ -2950,10 +3106,7 @@ const char* CScriptEventTypeInfo::GetName() const
 void CScriptEventTypeInfo::Init()
 {
   size_ = sizeof(CScriptEvent);
-  newRefFunc_ = &CreateScriptEventRefOwned;
-  deleteFunc_ = &DeleteScriptEventOwned;
-  ctorRefFunc_ = &ConstructScriptEventRefInPlace;
-  dtrFunc_ = &DestroyScriptEventInPlace;
+  (void)ConfigureScriptEventRefCallbacks(this);
   gpg::RType::Init();
   AddBase_CScriptObject(this);
   AddBase_CTaskEvent(this);

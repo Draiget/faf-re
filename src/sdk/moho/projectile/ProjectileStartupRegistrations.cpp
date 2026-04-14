@@ -12,6 +12,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/console/CConCommand.h"
+#include "moho/unit/tasks/CAcquireTargetTask.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
@@ -495,6 +496,47 @@ namespace
     return &typeInfo;
   }
 
+} // namespace
+
+/**
+ * Address: 0x005DC230 (FUN_005DC230, Moho::ManyToOneBroadcaster_EProjectileImpactEvent::BroadcastEvent)
+ *
+ * What it does:
+ * Rebinds one projectile-impact broadcaster node to the supplied listener
+ * chain head while preserving intrusive owner-chain integrity.
+ */
+void moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>::BroadcastEvent(
+  moho::ManyToOneListener_EProjectileImpactEvent* const listener
+)
+{
+  void** const newOwnerLinkSlot = listener != nullptr
+    ? reinterpret_cast<void**>(static_cast<moho::WeakObject*>(listener)->WeakLinkHeadSlot())
+    : nullptr;
+  void** const currentOwnerLinkSlot = static_cast<void**>(ownerLinkSlot);
+  if (newOwnerLinkSlot == currentOwnerLinkSlot) {
+    return;
+  }
+
+  if (currentOwnerLinkSlot != nullptr) {
+    void** cursor = currentOwnerLinkSlot;
+    while (static_cast<moho::ManyToOneBroadcaster_EProjectileImpactEvent*>(*cursor) != this) {
+      cursor = &static_cast<moho::ManyToOneBroadcaster_EProjectileImpactEvent*>(*cursor)->nextInOwner;
+    }
+    *cursor = nextInOwner;
+  }
+
+  ownerLinkSlot = newOwnerLinkSlot;
+  if (newOwnerLinkSlot != nullptr) {
+    nextInOwner = *newOwnerLinkSlot;
+    *newOwnerLinkSlot = this;
+  } else {
+    nextInOwner = nullptr;
+  }
+}
+
+namespace
+{
+
   /**
    * Address: 0x0069EEC0 (FUN_0069EEC0)
    */
@@ -617,6 +659,24 @@ namespace moho
   CScrLuaMetatableFactory<Projectile>& CScrLuaMetatableFactory<Projectile>::Instance()
   {
     return sInstance;
+  }
+
+  /**
+   * Address: 0x0067F0E0 (FUN_0067F0E0, func_GetProjectileFactory)
+   *
+   * What it does:
+   * Returns cached `Projectile` metatable object from Lua object-factory
+   * storage.
+   */
+  LuaPlus::LuaObject*
+  func_GetProjectileFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<Projectile>::Instance().Get(state);
+    return object;
   }
 
   /**

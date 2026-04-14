@@ -43,6 +43,15 @@ namespace moho
     CUnitCarrierLaunch(CCommandTask* parentTask, const SNavGoal& launchGoal, const SCommandUnitSet& commandUnits);
 
     /**
+     * Address: 0x00606F90 (FUN_00606F90, Moho::CUnitCarrierLaunch::~CUnitCarrierLaunch)
+     *
+     * What it does:
+     * Clears the carrier-launch state bit on the owning unit before normal
+     * carried-set and base-task teardown.
+     */
+    ~CUnitCarrierLaunch() override;
+
+    /**
      * Address: 0x00607680 (FUN_00607680, Moho::CUnitCarrierLaunch::operator new)
      *
      * What it does:

@@ -93,12 +93,17 @@
   "C_Cpp.files.exclude": {
     "**/bin/**": true,
     "**/buildstage/**": true,
+    "**/dependencies/**": true,
     "**/dumps/**": true,
     "**/decomp/**": true,
     "**/build/**": true,
     "**/out/**": true,
     "**/output/**": true,
     "**/obj/**": true,
+    "**/tmp/**": true,
+    "**/mcp/**": true,
+    "**/skills/**": true,
+    "**/scripts/**": true,
     "**/.vscode/**": true
   }
 }

@@ -890,6 +890,15 @@ namespace moho
   static_assert(sizeof(CScriptEventTypeInfo) == 0x64, "CScriptEventTypeInfo size must be 0x64");
 
   /**
+   * Address: 0x00BC6220 (FUN_00BC6220, CScriptEvent startup type-info registration)
+   *
+   * What it does:
+   * Pre-registers `CScriptEvent` reflected type metadata and schedules
+   * type-info cleanup at process exit.
+   */
+  void register_CScriptEventTypeInfo();
+
+  /**
    * Address: 0x00BC6240 (FUN_00BC6240, register_CScriptEventSerializer)
    *
    * What it does:
@@ -899,6 +908,9 @@ namespace moho
   void register_CScriptEventSerializer();
 
   /**
+   * Address: 0x004CA2D0 (FUN_004CA2D0, serializer cleanup alias A)
+   * Address: 0x004CA300 (FUN_004CA300, serializer cleanup alias B)
+   *
    * What it does:
    * Unlinks static serializer helper node from the intrusive helper list and
    * restores self-links.

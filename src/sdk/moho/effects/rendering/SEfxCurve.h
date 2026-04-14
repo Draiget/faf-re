@@ -16,6 +16,8 @@ namespace gpg
 
 namespace moho
 {
+  class REmitterBlueprintCurve;
+
   /**
    * Runtime emitter curve sample set.
    *
@@ -67,10 +69,37 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /**
+     * Address: 0x00514E50 (FUN_00514E50, Moho::SEfxCurve::GetValue)
+     *
+     * What it does:
+     * Evaluates one interpolated curve sample at `interp` and applies per-key
+     * random spread (Z lane) through the process-global random helper.
+     */
+    [[nodiscard]] float GetValue(float interp) const;
+
     Wm3::Vector2f mBoundsMin;
     Wm3::Vector2f mBoundsMax;
     gpg::fastvector_n<Wm3::Vector3f, 2> mKeys;
   };
+
+  /**
+   * Address: 0x005151B0 (FUN_005151B0, insert_emitter_curve_key)
+   *
+   * What it does:
+   * Inserts one `(x,y,z)` key into a curve in ascending-X order and
+   * recomputes the Y bounds from all keys.
+   */
+  void InsertEmitterCurveKey(SEfxCurve& curve, const Wm3::Vector3f& key);
+
+  /**
+   * Address: 0x00515320 (FUN_00515320, make_emitter_curve_from_blueprint)
+   *
+   * What it does:
+   * Rebuilds runtime curve keys/bounds from one blueprint curve key list,
+   * or emits one default key when the source list is empty.
+   */
+  void BuildEmitterCurveFromBlueprint(SEfxCurve& destination, const REmitterBlueprintCurve& source);
 
   static_assert(sizeof(SEfxCurve) == 0x38, "SEfxCurve size must be 0x38");
 } // namespace moho

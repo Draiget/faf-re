@@ -319,6 +319,17 @@ namespace moho
   COGrid::~COGrid() = default;
 
   /**
+   * Address: 0x007206E0 (FUN_007206E0, Moho::COGrid::OccupyRect)
+   *
+   * What it does:
+   * Marks `mOccupation` set over `rect` by filling the rectangle extents.
+   */
+  void COGrid::OccupyRect(const gpg::Rect2i& rect)
+  {
+    mOccupation.FillRect(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, true);
+  }
+
+  /**
    * Address: 0x004FCE10 (FUN_004FCE10, ??1EntityOccupationManager@Moho@@QAE@@Z)
    */
   EntityOccupationManager::~EntityOccupationManager()
@@ -612,6 +623,17 @@ namespace moho
       resultEntry.distanceFromLineStart = collisionResult.distanceFromLineStart;
       outCollisions.PushBack(resultEntry);
     }
+  }
+
+  /**
+   * Address: 0x004FCA10 (FUN_004FCA10, Moho::CollisionDBRect::NotEqual)
+   *
+   * What it does:
+   * Returns `true` when `this` and `other` differ in any lane.
+   */
+  bool CollisionDBRect::NotEqual(const CollisionDBRect& other) const noexcept
+  {
+    return other.mStartX != mStartX || other.mWidth != mWidth || other.mStartZ != mStartZ || other.mHeight != mHeight;
   }
 
   /**

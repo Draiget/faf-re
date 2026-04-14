@@ -16,6 +16,24 @@ namespace gpg::gal
   class AdapterD3D9
   {
   public:
+    AdapterD3D9() = default;
+
+    /**
+     * Address: 0x009410A0 (FUN_009410A0, gpg::gal::AdapterD3D9::AdapterD3D9)
+     * Mangled: ??0AdapterD3D9@gal@gpg@@QAE@@Z
+     *
+     * What it does:
+     * Initializes adapter vendor/device identifiers, copies adapter identity
+     * strings, and clears the mode vector lanes.
+     */
+    AdapterD3D9(
+      std::uint32_t vendorId,
+      std::uint32_t deviceId,
+      const msvc8::string& driver,
+      const msvc8::string& device,
+      const msvc8::string& desc
+    );
+
     /**
      * Address: 0x00940C90 (FUN_00940C90)
      * Scalar-deleting wrapper: 0x008F0040 (FUN_008F0040)

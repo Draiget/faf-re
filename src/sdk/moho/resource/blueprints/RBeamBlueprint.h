@@ -27,6 +27,15 @@ namespace moho
    */
   struct RBeamBlueprint : public REffectBlueprint
   {
+    /**
+     * Address: 0x0050EEF0 (FUN_0050EEF0, ??0RBeamBlueprint@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Initializes base effect-blueprint ownership lanes and beam defaults:
+     * length/lifetime/thickness, texture/color ramps, LOD cutoff, and blend mode.
+     */
+    RBeamBlueprint();
+
     float Length{10.0f};                         // +0x28
     float Lifetime{1.0f};                        // +0x2C
     float Thickness{1.0f};                       // +0x30

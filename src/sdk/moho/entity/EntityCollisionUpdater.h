@@ -10,6 +10,8 @@
 
 namespace moho
 {
+  class Entity;
+
   struct EntityTransformPayload;
 
   struct EntityCollisionBoundsView
@@ -48,7 +50,7 @@ namespace moho
   struct CollisionPairResult
   {
     std::uint32_t reserved00; // +0x00
-    std::uint32_t reserved04; // +0x04
+    Entity* sourceEntity;     // +0x04
     Wm3::Vec3f direction;     // +0x08
     float penetrationDepth;   // +0x14
   };
@@ -82,6 +84,51 @@ namespace moho
 
   using CollisionResult = CollisionPairResult;
   using CollisionEntry = CollisionLineResult;
+
+  /**
+   * Address: 0x007237E0 (FUN_007237E0, func_CopyCollisionResultArr2)
+   *
+   * What it does:
+   * Copies one `CollisionResult` range backward from `[sourceBegin, sourceEnd)`
+   * into output ending at `outEnd`; returns the destination begin pointer.
+   */
+  [[nodiscard]] CollisionResult* CopyCollisionResultsBackward(
+    CollisionResult* outEnd,
+    const CollisionResult* sourceEnd,
+    const CollisionResult* sourceBegin
+  ) noexcept;
+
+  /**
+   * Address: 0x00723770 (FUN_00723770, func_CopyCollisionResultArr3)
+   *
+   * What it does:
+   * Binary twin of `CopyCollisionResultsBackward`; copies one
+   * `CollisionResult` range backward from `[sourceBegin, sourceEnd)` into
+   * output ending at `outEnd` and returns the destination begin pointer.
+   */
+  [[nodiscard]] CollisionResult* CopyCollisionResultsBackwardAlt(
+    CollisionResult* outEnd,
+    const CollisionResult* sourceEnd,
+    const CollisionResult* sourceBegin
+  ) noexcept;
+
+  /**
+   * Address: 0x00723410 (FUN_00723410, func_CopyCollisionResultArr1)
+   *
+   * What it does:
+   * Copies one `CollisionResult` range forward from `[sourceBegin, sourceEnd)`
+   * into output beginning at `outBegin`; returns the destination end pointer.
+   *
+   * Binary note:
+   * The original helper increments the destination cursor even when `outBegin`
+   * is null (used as a size/cursor lane by callers). The implementation keeps
+   * that behavior.
+   */
+  [[nodiscard]] CollisionResult* CopyCollisionResultsForward(
+    CollisionResult* outBegin,
+    const CollisionResult* sourceBegin,
+    const CollisionResult* sourceEnd
+  ) noexcept;
 
   /**
    * Address: 0x0057E9D0 (FUN_0057E9D0, gpg::fastvector_n_CollisionResult::~fastvector_n_CollisionResult)

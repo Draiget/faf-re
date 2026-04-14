@@ -15,6 +15,7 @@
 #include "moho/animation/CSlideManipulator.h"
 #include "moho/console/CConCommand.h"
 #include "moho/containers/BitStorage32.h"
+#include "legacy/containers/Vector.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
@@ -130,6 +131,14 @@ namespace
     void Init() override;
     static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x00641DB0 (FUN_00641DB0, gpg::RVectorType_bool::SubscriptIndex)
+     *
+     * What it does:
+     * Builds one reflected proxy reference to the indexed legacy
+     * `vector<bool>::reference` bit lane.
+     */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -151,7 +160,7 @@ namespace
 
   alignas(RVectorTypeBool) unsigned char gRecoveredRVectorTypeBoolStorage[sizeof(RVectorTypeBool)] = {};
   bool gRecoveredRVectorTypeBoolConstructed = false;
-  thread_local bool gRecoveredRVectorTypeBoolSubscriptScratch = false;
+  thread_local msvc8::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
   msvc8::string gRecoveredRVectorTypeBoolName;
   bool gRecoveredRVectorTypeBoolNameCleanupRegistered = false;
 
@@ -328,19 +337,25 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x00641DB0 (FUN_00641DB0, gpg::RVectorType_bool::SubscriptIndex)
+   *
+   * What it does:
+   * Builds one reflected proxy reference to the indexed legacy
+   * `vector<bool>::reference` bit lane.
+   */
   gpg::RRef RVectorTypeBool::SubscriptIndex(void* const obj, const int ind) const
   {
     auto* const storage = static_cast<VectorBoolStorage*>(obj);
+    GPG_ASSERT(storage != nullptr);
+
+    gRecoveredRVectorTypeBoolSubscriptCursorScratch.word = storage ? storage->mWords : nullptr;
+    gRecoveredRVectorTypeBoolSubscriptCursorScratch.bit = 0;
+    (void)msvc8::detail::AdvanceCursorBits(&gRecoveredRVectorTypeBoolSubscriptCursorScratch, ind);
 
     gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = ResolveBoolType();
-    if (!storage || ind < 0 || static_cast<std::uint32_t>(ind) >= storage->mBitCount) {
-      return out;
-    }
-
-    gRecoveredRVectorTypeBoolSubscriptScratch = storage->TestBit(static_cast<std::uint32_t>(ind));
-    out.mObj = &gRecoveredRVectorTypeBoolSubscriptScratch;
+    auto* const reference = reinterpret_cast<std::vector<bool>::reference*>(&gRecoveredRVectorTypeBoolSubscriptCursorScratch);
+    (void)gpg::RRef_VectorBoolReference(&out, reference);
     return out;
   }
 

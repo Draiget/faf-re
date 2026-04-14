@@ -62,6 +62,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x006300F0 (FUN_006300F0, ??0CAimManipulator@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes weak owner links, label/runtime defaults, tracking state,
+     * and identity quaternions for both watched aim bones.
+     */
+    CAimManipulator();
+
+    /**
      * Address: 0x0062FDF0 (FUN_0062FDF0, Moho::CAimManipulator::StaticGetClass)
      *
      * What it does:
@@ -85,6 +94,15 @@ namespace moho
      * Builds one reflected object reference for this manipulator instance.
      */
     [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+
+    /**
+     * Address: 0x006306A0 (FUN_006306A0, Moho::CAniManipulator::~CAniManipulator)
+     *
+     * What it does:
+     * Clears weak owner links and label storage before running
+     * `IAniManipulator` base teardown.
+     */
+    virtual ~CAimManipulator();
 
     /**
      * Address: 0x00630200 (FUN_00630200, Moho::CAimManipulator::dtr)

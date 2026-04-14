@@ -64,11 +64,26 @@ bool STransportPickUpInfo::HasUnit(const Unit* const unit) const noexcept
   return mUnits.ContainsUnit(unit);
 }
 
+/**
+ * Address: 0x005E4480 (FUN_005E4480, Moho::STransportPickUpInfo::AddUnit)
+ *
+ * What it does:
+ * Finds the first pickup-entry matching `unit`, removes that slot from the
+ * contiguous vector storage, and clears `mHasSpace` when the set is empty.
+ */
 void STransportPickUpInfo::RemoveUnit(Unit* const unit) noexcept
 {
-  (void)mUnits.RemoveUnit(unit);
-  if (mUnits.Empty()) {
-    mHasSpace = 0;
+  Entity** const begin = mUnits.mVec.begin();
+  Entity** const end = mUnits.mVec.end();
+  for (Entity** it = begin; it != end; ++it) {
+    if (SEntitySetTemplateUnit::UnitFromEntry(*it) == unit) {
+      (void)mUnits.mVec.erase(it);
+      break;
+    }
+  }
+
+  if (mUnits.mVec.begin() == mUnits.mVec.end()) {
+    mHasSpace = 0u;
   }
 }
 
@@ -268,6 +283,229 @@ namespace
     const float dy = lhs.y - rhs.y;
     const float dz = lhs.z - rhs.z;
     return (dx * dx) + (dy * dy) + (dz * dz);
+  }
+
+  [[nodiscard]] SAttachPoint*
+  CopyAttachPointRangeNullable(SAttachPoint* destination, const SAttachPoint* sourceBegin, const SAttachPoint* sourceEnd) noexcept;
+
+  /**
+   * Address: 0x005EE110 (FUN_005EE110, func_CopyAttachDataVector)
+   *
+   * What it does:
+   * Copies one contiguous `SAttachPoint` range into destination storage and
+   * returns the advanced destination cursor.
+   */
+  [[nodiscard]] SAttachPoint*
+  CopyAttachPointRange(SAttachPoint* destination, const SAttachPoint* sourceBegin, const SAttachPoint* sourceEnd) noexcept
+  {
+    return CopyAttachPointRangeNullable(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EC510 (FUN_005EC510, func_SAttachPointPtr_memcpy)
+   *
+   * What it does:
+   * Adapts the VC8 vector-copy calling lane `(end, start, dest)` into the
+   * typed contiguous attach-point range copy helper call shape.
+   */
+  [[nodiscard]] SAttachPoint* CopyAttachPointRangeAdapter(
+    const SAttachPoint* sourceEnd,
+    const SAttachPoint* sourceBegin,
+    SAttachPoint* destination
+  ) noexcept
+  {
+    return CopyAttachPointRange(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005EF660 (FUN_005EF660, func_SAttachPointPtr::memcpy)
+   *
+   * What it does:
+   * Copies one contiguous `SAttachPoint` range into destination storage when
+   * destination is non-null; still advances and returns the destination cursor.
+   */
+  [[nodiscard]] SAttachPoint* CopyAttachPointRangeNullable(
+    SAttachPoint* destination,
+    const SAttachPoint* sourceBegin,
+    const SAttachPoint* sourceEnd
+  ) noexcept
+  {
+    const SAttachPoint* source = sourceBegin;
+    while (source != sourceEnd) {
+      if (destination != nullptr) {
+        destination->index = source->index;
+        destination->localPos.x = source->localPos.x;
+        destination->localPos.y = source->localPos.y;
+        destination->localPos.z = source->localPos.z;
+        destination->distSq = source->distSq;
+      }
+
+      ++source;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x005F05E0 (FUN_005F05E0, func_BinaryInsertAttachDataAtLowest)
+   *
+   * What it does:
+   * Inserts one attach-point record into the heap window
+   * `[lowerBoundIndex, upperSearchIndex]` by bubbling parent lanes downward
+   * until `data.distSq` no longer exceeds the parent distance.
+   */
+  [[maybe_unused]] void InsertAttachPointIntoMaxHeapWindow(
+    int upperSearchIndex,
+    const int lowerBoundIndex,
+    SAttachPoint* const vec,
+    const SAttachPoint& data
+  ) noexcept
+  {
+    int parentIndex = (upperSearchIndex - 1) / 2;
+    while (lowerBoundIndex < upperSearchIndex) {
+      SAttachPoint* const parent = &vec[parentIndex];
+      if (data.distSq <= parent->distSq) {
+        break;
+      }
+
+      vec[upperSearchIndex] = *parent;
+      upperSearchIndex = parentIndex;
+      parentIndex = (parentIndex - 1) / 2;
+    }
+
+    vec[upperSearchIndex] = data;
+  }
+
+  /**
+   * Address: 0x005F0330 (FUN_005F0330, func_AttachDataInsert)
+   *
+   * What it does:
+   * Sifts one attach-point heap lane downward from `lower` within `[0, upper)`,
+   * then re-inserts `data` at the final position via parent-walk insertion.
+   */
+  [[maybe_unused]] void SiftDownAttachPointHeapAndInsert(
+    int lower,
+    const int upper,
+    SAttachPoint* const vec,
+    const SAttachPoint& data
+  ) noexcept
+  {
+    int childIndex = (2 * lower) + 2;
+    const int lowerStart = lower;
+    bool childEqualsUpper = (childIndex == upper);
+
+    while (childIndex < upper) {
+      if (vec[childIndex - 1].distSq > vec[childIndex].distSq) {
+        --childIndex;
+      }
+
+      vec[lower] = vec[childIndex];
+      lower = childIndex;
+      childIndex = (2 * childIndex) + 2;
+      childEqualsUpper = (childIndex == upper);
+    }
+
+    if (childEqualsUpper) {
+      vec[lower] = vec[upper - 1];
+      lower = upper - 1;
+    }
+
+    InsertAttachPointIntoMaxHeapWindow(lower, lowerStart, vec, data);
+  }
+
+  /**
+   * Address: 0x005EEDA0 (FUN_005EEDA0, func_CombSortAttachData_Small)
+   *
+   * What it does:
+   * Sorts a small contiguous attach-point span by ascending `distSq` using the
+   * same insertion-shift semantics as the binary small-range fallback lane.
+   */
+  [[maybe_unused]] void SortSmallAttachPointRangeByDistance(SAttachPoint* const start, SAttachPoint* const end) noexcept
+  {
+    if (start == nullptr || end == nullptr || start == end) {
+      return;
+    }
+
+    for (SAttachPoint* current = start + 1; current != end; ++current) {
+      const SAttachPoint value = *current;
+      SAttachPoint* cursor = current;
+      while (cursor != start && (cursor - 1)->distSq > value.distSq) {
+        *cursor = *(cursor - 1);
+        --cursor;
+      }
+      if (cursor != current) {
+        *cursor = value;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x005EFAD0 (FUN_005EFAD0, func_SortAttachData2)
+   *
+   * What it does:
+   * Heapifies the attach-point range by replaying every parent lane from the
+   * middle of the range down to zero through `SiftDownAttachPointHeapAndInsert`.
+   */
+  [[maybe_unused]] void BuildAttachPointMaxHeap(SAttachPoint* const start, SAttachPoint* const end) noexcept
+  {
+    const int upper = static_cast<int>(end - start);
+    int parentIndex = upper / 2;
+    while (parentIndex > 0) {
+      --parentIndex;
+      const SAttachPoint node = start[parentIndex];
+      SiftDownAttachPointHeapAndInsert(parentIndex, upper, start, node);
+    }
+  }
+
+  /**
+   * Address: 0x005F06C0 (FUN_005F06C0, func_CombSortAttachData)
+   *
+   * What it does:
+   * Rotates one attach-point range `[start, end)` so `tooth` becomes the new
+   * front, using the original cycle decomposition by `gcd(distance, shift)`.
+   */
+  [[maybe_unused]] void RotateAttachPointRangeByGcdCycles(
+    SAttachPoint* const start,
+    SAttachPoint* const tooth,
+    SAttachPoint* const end
+  ) noexcept
+  {
+    const int shift = static_cast<int>(tooth - start);
+    const int distance = static_cast<int>(end - start);
+
+    int cycleCount = distance;
+    int remainder = shift;
+    while (remainder != 0) {
+      const int nextRemainder = cycleCount % remainder;
+      cycleCount = remainder;
+      remainder = nextRemainder;
+    }
+
+    if (!(cycleCount > 0 && cycleCount < distance)) {
+      return;
+    }
+
+    SAttachPoint* cycleStart = start + cycleCount;
+    for (int remainingCycles = cycleCount; remainingCycles > 0; --remainingCycles, --cycleStart) {
+      const SAttachPoint carried = *cycleStart;
+      SAttachPoint* current = cycleStart;
+      SAttachPoint* next = (current + shift == end) ? start : (current + shift);
+
+      while (next != cycleStart) {
+        *current = *next;
+        current = next;
+
+        const int separationToEnd = static_cast<int>(end - current);
+        if (shift >= separationToEnd) {
+          next = start + (shift - separationToEnd);
+        } else {
+          next = current + shift;
+        }
+      }
+
+      *current = carried;
+    }
   }
 
   /**
@@ -1152,7 +1390,10 @@ msvc8::vector<SAttachPoint>* CAiTransportImpl::CopyAttachPointVector(
   }
 
   destination.resize(source.size());
-  (void)std::copy(source.begin(), source.end(), destination.begin());
+  SAttachPoint* const destinationBegin = destination.begin();
+  const SAttachPoint* const sourceBegin = source.begin();
+  const SAttachPoint* const sourceEnd = source.end();
+  (void)CopyAttachPointRangeAdapter(sourceEnd, sourceBegin, destinationBegin);
   return &destination;
 }
 
@@ -1242,9 +1483,18 @@ msvc8::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
     it->distSq = DistSq(attachTransform.pos_, hookTransform.pos_);
   }
 
-  std::sort(attachPoints.begin(), attachPoints.end(), [](const SAttachPoint& lhs, const SAttachPoint& rhs) {
-    return lhs.distSq < rhs.distSq;
-  });
+  SAttachPoint* const sortBegin = attachPoints.begin();
+  SAttachPoint* const sortEnd = attachPoints.end();
+  if (sortBegin != nullptr && sortEnd != nullptr) {
+    const std::size_t attachCount = attachPoints.size();
+    if (attachCount <= 32u) {
+      SortSmallAttachPointRangeByDistance(sortBegin, sortEnd);
+    } else {
+      std::sort(sortBegin, sortEnd, [](const SAttachPoint& lhs, const SAttachPoint& rhs) {
+        return lhs.distSq < rhs.distSq;
+      });
+    }
+  }
 
   for (const SAttachPoint* it = attachPoints.begin();
        it != attachPoints.end() && attachSize > 0;

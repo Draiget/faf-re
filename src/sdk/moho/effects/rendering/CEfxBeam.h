@@ -59,6 +59,24 @@ namespace moho
     [[nodiscard]] bool CanSeeCam(const GeomCamera3* camera);
 
     /**
+     * Address: 0x00654D40 (FUN_00654D40, Moho::CEfxBeam::Reset)
+     *
+     * What it does:
+     * Rebuilds beam render parameters from effect params, rebinding beam
+     * textures and width/scroll/repeat lanes.
+     */
+    void Reset();
+
+    /**
+     * Address: 0x00654F30 (FUN_00654F30, Moho::CEfxBeam::Update)
+     *
+     * What it does:
+     * Updates beam endpoint transforms from current attachment state and
+     * handles detach/destroy paths for invalid source attachments.
+     */
+    [[nodiscard]] bool Update();
+
+    /**
      * What it does:
      * Returns the cached reflection descriptor for `CEfxBeam`.
      */

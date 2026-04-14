@@ -20,6 +20,7 @@ namespace gpg
 namespace moho
 {
   class Unit;
+  class CEconomy;
 
   /**
    * Runtime economy pair used by CEconomyEvent serializers and transfer logic.
@@ -48,6 +49,17 @@ namespace moho
    */
   struct CEconRequest
   {
+    CEconRequest() = default;
+
+    /**
+     * Address: 0x00773630 (FUN_00773630, ??0CEconRequest@Moho@@QAE@ABUSEconValue@1@PAVCEconomy@1@@Z)
+     *
+     * What it does:
+     * Initializes one economy-request node from requested-per-second values
+     * and links it into `economy->mConsumptionData`.
+     */
+    CEconRequest(const SEconValue& perSecond, CEconomy* economy);
+
     /**
      * Address: 0x00773990 (FUN_00773990, Moho::CEconRequest::MemberConstruct)
      *
@@ -72,6 +84,15 @@ namespace moho
      * Serializes requested and granted economy-value lanes.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00773770 (FUN_00773770, Moho::CEconRequest::LimitingRate)
+     *
+     * What it does:
+     * Computes limiting economy fulfillment ratio as min(granted/requested)
+     * across energy and mass lanes when requested values are positive.
+     */
+    [[nodiscard]] float LimitingRate() const;
 
     TDatListItem<void, void> mNode; // +0x00
     SEconValue mRequested;          // +0x08

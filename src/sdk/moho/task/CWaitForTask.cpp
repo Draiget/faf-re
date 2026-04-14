@@ -1,5 +1,6 @@
 #include "CWaitForTask.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <string>
 #include <typeinfo>
@@ -13,7 +14,21 @@ using namespace moho;
 
 namespace
 {
+  alignas(moho::CWaitForTaskTypeInfo) std::byte gCWaitForTaskTypeInfoStorage[sizeof(moho::CWaitForTaskTypeInfo)]{};
+  bool gCWaitForTaskTypeInfoConstructed = false;
+  alignas(moho::CWaitForTaskConstruct) std::byte gCWaitForTaskConstructStorage[sizeof(moho::CWaitForTaskConstruct)]{};
+  bool gCWaitForTaskConstructInitialized = false;
   moho::CWaitForTaskSerializer gCWaitForTaskSerializer{};
+
+  [[nodiscard]] moho::CWaitForTaskTypeInfo& CWaitForTaskTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CWaitForTaskTypeInfo*>(gCWaitForTaskTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::CWaitForTaskConstruct& CWaitForTaskConstructSlot()
+  {
+    return *reinterpret_cast<moho::CWaitForTaskConstruct*>(gCWaitForTaskConstructStorage);
+  }
 
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
@@ -50,6 +65,147 @@ namespace
     (void)UnlinkSerializerNode(serializer);
   }
 
+  /**
+   * Address: 0x004CA330 (FUN_004CA330, CWaitForTask startup type-info pre-registration)
+   *
+   * What it does:
+   * Materializes one startup `CWaitForTaskTypeInfo` storage lane and
+   * pre-registers reflected metadata for `typeid(CWaitForTask)`.
+   */
+  [[nodiscard]] gpg::RType* PreRegisterCWaitForTaskTypeInfo()
+  {
+    if (!gCWaitForTaskTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CWaitForTaskTypeInfoSlot())) moho::CWaitForTaskTypeInfo();
+      gCWaitForTaskTypeInfoConstructed = true;
+    }
+
+    gpg::PreRegisterRType(typeid(CWaitForTask), &CWaitForTaskTypeInfoSlot());
+    return &CWaitForTaskTypeInfoSlot();
+  }
+
+  /**
+   * Address: 0x00BF0BB0 (FUN_00BF0BB0, CWaitForTask type-info cleanup at exit)
+   *
+   * What it does:
+   * Releases dynamic field/base arrays from startup CWaitForTask type-info
+   * storage and tears down placement-constructed type metadata.
+   */
+  void CleanupCWaitForTaskTypeInfoAtExit()
+  {
+    if (!gCWaitForTaskTypeInfoConstructed) {
+      return;
+    }
+
+    CWaitForTaskTypeInfoSlot().fields_ = msvc8::vector<gpg::RField>{};
+    CWaitForTaskTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
+    CWaitForTaskTypeInfoSlot().~CWaitForTaskTypeInfo();
+    gCWaitForTaskTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x004CBA10 (FUN_004CBA10, CWaitForTask reflected ref store helper)
+   *
+   * What it does:
+   * Writes one `gpg::RRef` lane for a CWaitForTask pointer into
+   * caller-provided output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreCWaitForTaskRef(gpg::RRef* const outRef, CWaitForTask* const task)
+  {
+    return gpg::RRef_CWaitForTask(outRef, task);
+  }
+
+  /**
+   * Address: 0x004CA750 (FUN_004CA750, CWaitForTask construct callback body)
+   *
+   * What it does:
+   * Placement-constructs one CWaitForTask object in caller-provided storage
+   * for reflection construct-function registration.
+   */
+  void ConstructCWaitForTaskInPlace(void* const objectStorage)
+  {
+    if (objectStorage != nullptr) {
+      (void)::new (objectStorage) CWaitForTask();
+    }
+  }
+
+  /**
+   * Address: 0x004CB9E0 (FUN_004CB9E0, CWaitForTask construct delete callback)
+   *
+   * What it does:
+   * Deletes one construct-path CWaitForTask object through its virtual
+   * deleting destructor.
+   */
+  void DeleteConstructedCWaitForTask(void* const objectStorage)
+  {
+    auto* const task = static_cast<CWaitForTask*>(objectStorage);
+    if (!task) {
+      return;
+    }
+    delete task;
+  }
+
+  /**
+   * Address: 0x00BF0C10 (FUN_00BF0C10, CWaitForTask construct cleanup primary)
+   *
+   * What it does:
+   * Unlinks startup CWaitForTask construct helper node from the intrusive
+   * helper chain and restores self-links.
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskConstructVariantPrimary()
+  {
+    return UnlinkSerializerNode(CWaitForTaskConstructSlot());
+  }
+
+  /**
+   * Address: 0x004CA6E0 (FUN_004CA6E0, CWaitForTask construct cleanup alias A)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskConstructVariantAliasA()
+  {
+    return CleanupCWaitForTaskConstructVariantPrimary();
+  }
+
+  /**
+   * Address: 0x004CA710 (FUN_004CA710, CWaitForTask construct cleanup alias B)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskConstructVariantAliasB()
+  {
+    return CleanupCWaitForTaskConstructVariantPrimary();
+  }
+
+  /**
+   * Address: 0x004CA830 (FUN_004CA830, CWaitForTask serializer cleanup alias A)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskSerializerVariantAliasA()
+  {
+    return UnlinkSerializerNode(gCWaitForTaskSerializer);
+  }
+
+  /**
+   * Address: 0x004CA860 (FUN_004CA860, CWaitForTask serializer cleanup alias B)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCWaitForTaskSerializerVariantAliasB()
+  {
+    return UnlinkSerializerNode(gCWaitForTaskSerializer);
+  }
+
+  void InitializeCWaitForTaskConstructHelper()
+  {
+    if (!gCWaitForTaskConstructInitialized) {
+      ::new (static_cast<void*>(&CWaitForTaskConstructSlot())) moho::CWaitForTaskConstruct();
+      gCWaitForTaskConstructInitialized = true;
+    }
+
+    auto& constructHelper = CWaitForTaskConstructSlot();
+    ResetSerializerNode(constructHelper);
+    constructHelper.mSerConstructFunc = &ConstructCWaitForTaskInPlace;
+    constructHelper.mDeleteFunc = &DeleteConstructedCWaitForTask;
+  }
+
+  void CleanupCWaitForTaskConstructAtExit()
+  {
+    (void)CleanupCWaitForTaskConstructVariantPrimary();
+  }
+
   gpg::RType* CachedCWaitForTaskType()
   {
     static gpg::RType* cached = nullptr;
@@ -68,24 +224,12 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedWeakPtrSTaskEventLinkageType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<STaskEventLinkage>));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedLuaObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(LuaPlus::LuaObject));
-    }
-    return cached;
-  }
-
+  /**
+   * Address: 0x004CB920 (FUN_004CB920, CWaitForTaskTypeInfo::AddBase_CTask)
+   *
+   * What it does:
+   * Adds reflected `CTask` base metadata at subobject offset `0x00`.
+   */
   void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
   {
     gpg::RType* const taskType = CachedCTaskType();
@@ -213,18 +357,6 @@ int CWaitForTask::Execute()
  */
 void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  gpg::RType* taskType = CTask::sType;
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CTask));
-    CTask::sType = taskType;
-  }
-
-  gpg::RType* weakLinkType = WeakPtr<STaskEventLinkage>::sType;
-  if (!weakLinkType) {
-    weakLinkType = gpg::LookupRType(typeid(WeakPtr<STaskEventLinkage>));
-    WeakPtr<STaskEventLinkage>::sType = weakLinkType;
-  }
-
   gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
   if (!luaObjectType) {
     luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
@@ -232,8 +364,8 @@ void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   gpg::RRef ownerRef{};
-  archive->Read(taskType, this, ownerRef);
-  archive->Read(weakLinkType, &mEventLinkRef, ownerRef);
+  moho::ReadCTaskBase(archive, this, ownerRef);
+  WeakPtr_STaskEventLinkage::Read(archive, &mEventLinkRef, ownerRef);
   archive->Read(luaObjectType, &mEventObject, ownerRef);
 }
 
@@ -242,18 +374,6 @@ void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
  */
 void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive)
 {
-  gpg::RType* taskType = CTask::sType;
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CTask));
-    CTask::sType = taskType;
-  }
-
-  gpg::RType* weakLinkType = WeakPtr<STaskEventLinkage>::sType;
-  if (!weakLinkType) {
-    weakLinkType = gpg::LookupRType(typeid(WeakPtr<STaskEventLinkage>));
-    WeakPtr<STaskEventLinkage>::sType = weakLinkType;
-  }
-
   gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
   if (!luaObjectType) {
     luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
@@ -261,8 +381,8 @@ void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive)
   }
 
   gpg::RRef ownerRef{};
-  archive->Write(taskType, this, ownerRef);
-  archive->Write(weakLinkType, &mEventLinkRef, ownerRef);
+  moho::WriteCTaskBase(archive, this, ownerRef);
+  WeakPtr_STaskEventLinkage::Write(archive, &mEventLinkRef, ownerRef);
   archive->Write(luaObjectType, &mEventObject, ownerRef);
 }
 
@@ -289,9 +409,52 @@ void CWaitForTaskSerializer::RegisterSerializeFunctions()
   type->serSaveFunc_ = &SerializeCWaitForTask;
 }
 
+/**
+ * Address: 0x00BC6280 (FUN_00BC6280, CWaitForTask startup type-info registration)
+ *
+ * What it does:
+ * Pre-registers `CWaitForTask` reflected type descriptor and schedules
+ * teardown of startup type-info storage at process exit.
+ */
+void moho::register_CWaitForTaskTypeInfo()
+{
+  static const bool kRegistered = []() {
+    (void)PreRegisterCWaitForTaskTypeInfo();
+    (void)std::atexit(&CleanupCWaitForTaskTypeInfoAtExit);
+    return true;
+  }();
+  (void)kRegistered;
+}
+
+/**
+ * Address: 0x00BC62A0 (FUN_00BC62A0, CWaitForTask startup construct registration)
+ *
+ * What it does:
+ * Initializes construct helper callbacks for CWaitForTask reflected serializer
+ * construction and schedules intrusive helper cleanup at process exit.
+ */
+void moho::register_CWaitForTaskConstruct()
+{
+  static const bool kRegistered = []() {
+    InitializeCWaitForTaskConstructHelper();
+    CWaitForTaskConstructSlot().RegisterConstructFunction();
+    (void)std::atexit(&CleanupCWaitForTaskConstructAtExit);
+    return true;
+  }();
+  (void)kRegistered;
+}
+
+/**
+ * Address: 0x004CA830 (FUN_004CA830, serializer cleanup alias A)
+ * Address: 0x004CA860 (FUN_004CA860, serializer cleanup alias B)
+ *
+ * What it does:
+ * Unlinks static CWaitForTask serializer helper node from the intrusive
+ * helper list and restores self-links.
+ */
 gpg::SerHelperBase* moho::cleanup_CWaitForTaskSerializer()
 {
-  return UnlinkSerializerNode(gCWaitForTaskSerializer);
+  return CleanupCWaitForTaskSerializerVariantAliasA();
 }
 
 /**

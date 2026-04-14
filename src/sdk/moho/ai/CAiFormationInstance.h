@@ -173,6 +173,24 @@ namespace moho
     SCoordsVec2 position;      // +0x00
     std::int32_t footprintSize; // +0x08
     std::int32_t laneToken;     // +0x0C
+
+    /**
+     * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Loads one occupied-slot lane: assigned 2D position, footprint size, and
+     * lane token.
+     */
+    static void MemberDeserialize(SFormationOccupiedSlot* slot, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00570E80 (FUN_00570E80, Moho::SAssignedLocInfo::MemberSerialize)
+     *
+     * What it does:
+     * Stores one occupied-slot lane: assigned 2D position, footprint size, and
+     * lane token.
+     */
+    static void MemberSerialize(const SFormationOccupiedSlot* slot, gpg::WriteArchive* archive);
   };
   static_assert(sizeof(SFormationOccupiedSlot) == 0x10, "SFormationOccupiedSlot size must be 0x10");
   static_assert(
@@ -230,6 +248,16 @@ namespace moho
   class CAiFormationInstance : public IFormationInstance
   {
   public:
+    /**
+     * Address: 0x0059A500 (FUN_0059A500, ??1CAiFormationInstance@Moho@@QAE@@Z)
+     * Mangled: ??1CAiFormationInstance@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Tears down transient formation caches/lane state, unregisters this
+     * instance from the owning formation DB, then tears down unit-link lanes.
+     */
+    ~CAiFormationInstance();
+
     /**
      * Address: 0x0059BD60 (FUN_0059BD60, ??3CAiFormationInstance@Moho@@QAE@@Z)
      *
@@ -535,4 +563,13 @@ namespace moho
   );
   static_assert(offsetof(CAiFormationInstance, mSim) == 0x328, "CAiFormationInstance::mSim offset must be 0x328");
   static_assert(sizeof(CAiFormationInstance) == 0x330, "CAiFormationInstance size must be 0x330");
+
+  /**
+   * Address: 0x00569CA0 (FUN_00569CA0, Moho::CFormationInstance::CalcFormationSpeed)
+   *
+   * What it does:
+   * Represents the base-formation default speed stub lane used by
+   * `CFormationInstance` vftables; returns `0.0f`.
+   */
+  float CFormationInstanceCalcFormationSpeedFallback(Unit* unit, float* speedScaleOut, SFormationLaneEntry* laneEntry);
 } // namespace moho

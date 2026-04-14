@@ -7,6 +7,7 @@
 #include <exception>
 #include <ios>
 #include <mutex>
+#include <new>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -242,13 +243,45 @@ private:
     std::int32_t mReplayDepth = 0;
 };
 
+/**
+ * Address: 0x008E4B10 (FUN_008E4B10, HistoryLogTarget::dtr)
+ *
+ * What it does:
+ * Runs `HistoryLogTarget` destructor behavior and frees storage when the
+ * scalar-delete flag is set.
+ */
+[[maybe_unused]] static HistoryLogTarget* func_HistoryLogTargetDeletingDtor(
+  HistoryLogTarget* const target, const char deleteFlags
+)
+{
+  target->~HistoryLogTarget();
+  if ((deleteFlags & 1) != 0) {
+    ::operator delete(target);
+  }
+  return target;
+}
+
 HistoryLogTarget* gLogHistoryTarget = nullptr;
 std::once_flag gLogHistoryAtexitOnce;
 
 void DestroyLogHistoryTarget()
 {
-    delete gLogHistoryTarget;
-    gLogHistoryTarget = nullptr;
+  delete gLogHistoryTarget;
+  gLogHistoryTarget = nullptr;
+}
+
+/**
+ * Address: 0x00936D20 (FUN_00936D20, ??1sLogContext@gpg@@QAE@@Z)
+ *
+ * What it does:
+ * Clears the global log-context singleton pointer and destroys the previous
+ * instance when one was installed.
+ */
+void DestroyLogContextSingleton()
+{
+    LogContext* const previous = gpg::g_LogCtx;
+    gpg::g_LogCtx = nullptr;
+    delete previous;
 }
 
 void EnsureThreadContextCapacity(gpg::ThreadState* const tls, const std::size_t wantedCount)
@@ -381,10 +414,7 @@ void gpg::InitLogContextSingleton()
     }
 
     g_LogCtx = new LogContext();
-    std::atexit([] {
-        delete g_LogCtx;
-        g_LogCtx = nullptr;
-    });
+    std::atexit(&DestroyLogContextSingleton);
 }
 
 /**
@@ -628,11 +658,14 @@ StreamLogTarget::StreamLogTarget(std::ostream& stream, const unsigned int flags)
 }
 
 /**
+ * Address: 0x00906C30 (FUN_00906C30, ??1StreamLogTarget@gpg@@UAE@XZ)
  * Address: 0x00906CA0 (FUN_00906CA0)
+ * Demangled: gpg::StreamLogTarget::~StreamLogTarget
  * Demangled: gpg::StreamLogTarget deleting dtor thunk
  *
  * What it does:
- * Tears down owned stream (when flagged) and unregisters from logging dispatch.
+ * Tears down owned stream (when flagged) and then lets the base
+ * `LogTarget` destructor unregister this sink from global dispatch.
  */
 StreamLogTarget::~StreamLogTarget()
 {
@@ -1494,3 +1527,4 @@ msvc8::string gpg::FileTimeToString(const LONGLONG time)
         static_cast<unsigned>(st.wMilliseconds)
     );
 }
+

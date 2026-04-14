@@ -275,13 +275,12 @@ namespace moho
       return false;
     }
 
-    gpg::gal::DeviceD3D9* const deviceD3D9 = mDevice->GetDeviceD3D9();
-    if (deviceD3D9 == nullptr) {
+    if (mDevice->GetDeviceD3D9() == nullptr) {
       mTexture.reset();
       return false;
     }
 
-    deviceD3D9->CreateTexture(&mTexture, &mContext);
+    (void)CreateTextureOnActiveDevice(mTexture, mContext);
     return mTexture.get() != nullptr;
   }
 } // namespace moho

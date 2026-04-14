@@ -4161,6 +4161,241 @@
   }
 
   /**
+   * Runtime view for M2V concealment paths (`_concealOn*` lane family).
+   */
+  struct M2vConcealRuntimeView
+  {
+    std::uint8_t mUnknown0000_01B7[0x1B8]{};
+    std::int32_t concealDisableFlag = 0; // +0x1B8
+    std::uint8_t mUnknown01BC_01D7[0x1C]{};
+    std::int32_t macroblocksPerRow = 0; // +0x1D8
+    std::uint8_t mUnknown01DC_01E7[0x0C]{};
+    std::int32_t decodeStage = 0; // +0x1E8
+    std::uint8_t mUnknown01EC_0293[0xA8]{};
+    std::uint8_t* chromaPlaneUBase = nullptr; // +0x294
+    std::uint8_t* chromaPlaneVBase = nullptr; // +0x298
+    std::uint8_t* lumaPlaneBase = nullptr; // +0x29C
+    std::int16_t chromaRowStride = 0; // +0x2A0
+    std::int16_t lumaRowStride = 0; // +0x2A2
+    std::uint8_t mUnknown02A4_02C3[0x20]{};
+    void(__cdecl* concealDispatchFn)(std::int32_t decoderAddress, std::int32_t macroblockCount) = nullptr; // +0x2C4
+    std::uint8_t mUnknown02C8_0307[0x40]{};
+    std::int32_t concealStateWord308 = 0; // +0x308
+    std::int32_t concealStateWord30C = 0; // +0x30C
+    std::uint8_t mUnknown0310_032B[0x1C]{};
+    std::int32_t concealStateWord32C = 0; // +0x32C
+    std::int32_t concealStateWord330 = 0; // +0x330
+    std::uint8_t mUnknown0334_0337[0x4]{};
+    std::int32_t macroblockCount = 0; // +0x338
+    std::uint8_t mUnknown033C_0347[0x0C]{};
+    std::int32_t concealFlags = 0; // +0x348
+    std::uint8_t mUnknown034C_139B[0x1050]{};
+    std::int32_t concealStartMacroblock = 0; // +0x139C
+    std::int32_t concealDeferredFlag = 0; // +0x13A0
+  };
+  static_assert(offsetof(M2vConcealRuntimeView, concealDisableFlag) == 0x1B8);
+  static_assert(offsetof(M2vConcealRuntimeView, macroblocksPerRow) == 0x1D8);
+  static_assert(offsetof(M2vConcealRuntimeView, decodeStage) == 0x1E8);
+  static_assert(offsetof(M2vConcealRuntimeView, chromaPlaneUBase) == 0x294);
+  static_assert(offsetof(M2vConcealRuntimeView, chromaPlaneVBase) == 0x298);
+  static_assert(offsetof(M2vConcealRuntimeView, lumaPlaneBase) == 0x29C);
+  static_assert(offsetof(M2vConcealRuntimeView, chromaRowStride) == 0x2A0);
+  static_assert(offsetof(M2vConcealRuntimeView, lumaRowStride) == 0x2A2);
+  static_assert(offsetof(M2vConcealRuntimeView, concealDispatchFn) == 0x2C4);
+  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord308) == 0x308);
+  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord30C) == 0x30C);
+  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord32C) == 0x32C);
+  static_assert(offsetof(M2vConcealRuntimeView, concealStateWord330) == 0x330);
+  static_assert(offsetof(M2vConcealRuntimeView, macroblockCount) == 0x338);
+  static_assert(offsetof(M2vConcealRuntimeView, concealFlags) == 0x348);
+  static_assert(offsetof(M2vConcealRuntimeView, concealStartMacroblock) == 0x139C);
+  static_assert(offsetof(M2vConcealRuntimeView, concealDeferredFlag) == 0x13A0);
+
+  [[nodiscard]] inline M2vConcealRuntimeView* AsM2vConcealRuntime(const std::int32_t decoderAddress) noexcept
+  {
+    return reinterpret_cast<M2vConcealRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoderAddress)));
+  }
+
+  /**
+   * Address: 0x00B00EB0 (FUN_00B00EB0, _concealOnExec)
+   *
+   * What it does:
+   * Fills macroblock lanes from the conceal start index to frame end by
+   * cloning previous-row pixels (or left-edge/constant fallback for first row).
+   */
+  extern "C" unsigned int __cdecl concealOnExec(const std::int32_t decoderAddress, const unsigned int startMacroblock)
+  {
+    auto* const runtime = AsM2vConcealRuntime(decoderAddress);
+    unsigned int result = static_cast<unsigned int>(runtime->concealDisableFlag);
+    if (result != 0u) {
+      return result;
+    }
+
+    const std::int32_t lumaStride = static_cast<std::int32_t>(runtime->lumaRowStride);
+    const std::int32_t chromaStride = static_cast<std::int32_t>(runtime->chromaRowStride);
+    const unsigned int macroblockLimit = static_cast<unsigned int>(runtime->macroblockCount);
+    unsigned int macroblockIndex = startMacroblock;
+    if (macroblockIndex < macroblockLimit) {
+      const std::int32_t lumaRowAdvance = static_cast<std::int32_t>((static_cast<std::uint32_t>(lumaStride) >> 2u) << 2u);
+      const std::int32_t chromaRowAdvance = static_cast<std::int32_t>((static_cast<std::uint32_t>(chromaStride) >> 2u) << 2u);
+      do {
+        const unsigned int macroblocksPerRow = static_cast<unsigned int>(runtime->macroblocksPerRow);
+        const std::int32_t macroblockColumn = static_cast<std::int32_t>(macroblockIndex % macroblocksPerRow);
+        const std::int32_t lumaRowBase = static_cast<std::int32_t>((macroblockIndex / macroblocksPerRow) << 4u);
+        const std::int32_t chromaRowBase = lumaRowBase >> 1;
+
+        std::uint8_t* const lumaCurrent =
+          runtime->lumaPlaneBase + static_cast<std::ptrdiff_t>((macroblockColumn << 4) + (lumaStride * lumaRowBase));
+        const std::uint8_t* const lumaPrevious =
+          runtime->lumaPlaneBase + static_cast<std::ptrdiff_t>((macroblockColumn << 4) + (lumaStride * (lumaRowBase - 1)));
+
+        const std::int32_t chromaColumn = (macroblockColumn << 4) >> 1;
+        std::uint8_t* const chromaUCurrent =
+          runtime->chromaPlaneUBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * chromaRowBase));
+        const std::uint8_t* const chromaUPrevious =
+          runtime->chromaPlaneUBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * (chromaRowBase - 1)));
+        std::uint8_t* const chromaVCurrent =
+          runtime->chromaPlaneVBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * chromaRowBase));
+        const std::uint8_t* const chromaVPrevious =
+          runtime->chromaPlaneVBase + static_cast<std::ptrdiff_t>(chromaColumn + (chromaStride * (chromaRowBase - 1)));
+
+        if (chromaRowBase != 0) {
+          std::uint8_t* lumaWrite = lumaCurrent;
+          const std::uint8_t* lumaRead = lumaPrevious;
+          for (std::int32_t row = 0; row < 16; ++row) {
+            std::memcpy(lumaWrite, lumaRead, 16u);
+            lumaWrite += lumaRowAdvance;
+            lumaRead += lumaRowAdvance;
+          }
+
+          std::uint8_t* chromaUWrite = chromaUCurrent;
+          const std::uint8_t* chromaURead = chromaUPrevious;
+          for (std::int32_t row = 0; row < 8; ++row) {
+            std::memcpy(chromaUWrite, chromaURead, 8u);
+            chromaUWrite += chromaRowAdvance;
+            chromaURead += chromaRowAdvance;
+          }
+
+          std::uint8_t* chromaVWrite = chromaVCurrent;
+          const std::uint8_t* chromaVRead = chromaVPrevious;
+          for (std::int32_t row = 0; row < 8; ++row) {
+            std::memcpy(chromaVWrite, chromaVRead, 8u);
+            chromaVWrite += chromaRowAdvance;
+            chromaVRead += chromaRowAdvance;
+          }
+        } else if (chromaColumn != 0) {
+          std::uint8_t* lumaWrite = lumaCurrent;
+          for (std::int32_t row = 0; row < 16; ++row) {
+            std::memset(lumaWrite, static_cast<int>(lumaWrite[-1]), 16u);
+            lumaWrite += lumaRowAdvance;
+          }
+
+          std::uint8_t* chromaUWrite = chromaUCurrent;
+          for (std::int32_t row = 0; row < 8; ++row) {
+            std::memset(chromaUWrite, static_cast<int>(chromaUWrite[-1]), 8u);
+            chromaUWrite += chromaRowAdvance;
+          }
+
+          std::uint8_t* chromaVWrite = chromaVCurrent;
+          for (std::int32_t row = 0; row < 8; ++row) {
+            std::memset(chromaVWrite, static_cast<int>(chromaVWrite[-1]), 8u);
+            chromaVWrite += chromaRowAdvance;
+          }
+        } else {
+          std::uint8_t* lumaWrite = lumaCurrent;
+          for (std::int32_t row = 0; row < 16; ++row) {
+            std::memset(lumaWrite, 0x10, 16u);
+            lumaWrite += lumaRowAdvance;
+          }
+
+          std::uint8_t* chromaUWrite = chromaUCurrent;
+          for (std::int32_t row = 0; row < 8; ++row) {
+            std::memset(chromaUWrite, 0x80, 8u);
+            chromaUWrite += chromaRowAdvance;
+          }
+
+          std::uint8_t* chromaVWrite = chromaVCurrent;
+          for (std::int32_t row = 0; row < 8; ++row) {
+            std::memset(chromaVWrite, 0x80, 8u);
+            chromaVWrite += chromaRowAdvance;
+          }
+        }
+
+        result = ++macroblockIndex;
+      } while (macroblockIndex < macroblockLimit);
+    }
+
+    return result;
+  }
+
+  /**
+   * Address: 0x00B00D80 (FUN_00B00D80, _concealOff)
+   *
+   * What it does:
+   * Preserves the conceal-off callback lane as a deliberate no-op.
+   */
+  extern "C" std::int32_t __cdecl concealOff(const std::int32_t decoderAddress)
+  {
+    static_cast<void>(decoderAddress);
+    return 0;
+  }
+
+  /**
+   * Address: 0x00B00D90 (FUN_00B00D90, _concealOn)
+   *
+   * What it does:
+   * Applies conceal-mode state transitions, runs the conceal dispatch lane,
+   * then restores decoder state words captured before conceal execution.
+   */
+  extern "C" std::int32_t __cdecl concealOn(const std::int32_t decoderAddress)
+  {
+    auto* const runtime = AsM2vConcealRuntime(decoderAddress);
+    const std::int32_t concealStartMacroblock = (runtime->concealStartMacroblock < 0) ? 0 : runtime->concealStartMacroblock;
+
+    const std::int32_t decodeStage = runtime->decodeStage;
+    if (decodeStage == 1 && runtime->concealDeferredFlag == 0) {
+      return static_cast<std::int32_t>(concealOnExec(decoderAddress, static_cast<unsigned int>(concealStartMacroblock)));
+    }
+
+    const std::int32_t savedState330 = runtime->concealStateWord330;
+    const std::int32_t savedState308 = runtime->concealStateWord308;
+    const std::int32_t savedState30C = runtime->concealStateWord30C;
+    const std::int32_t savedState32C = runtime->concealStateWord32C;
+    const std::int32_t savedConcealFlags = runtime->concealFlags;
+    const std::int32_t savedDecodeStage = decodeStage;
+
+    if (decodeStage == 1) {
+      runtime->decodeStage = 2;
+      runtime->concealFlags = 8;
+    }
+
+    if (runtime->decodeStage == 2) {
+      runtime->concealFlags |= 8;
+    }
+    if (runtime->decodeStage == 3) {
+      const std::int32_t flags = runtime->concealFlags;
+      if ((flags & 0x0C) == 0) {
+        runtime->concealFlags = flags | 4;
+      }
+    }
+
+    const std::int32_t remainingMacroblocks = runtime->macroblockCount - concealStartMacroblock;
+    runtime->concealStateWord308 = 0;
+    runtime->concealStateWord30C = 0;
+    runtime->concealStateWord32C = 0;
+    runtime->concealStateWord330 = 0;
+    runtime->concealDispatchFn(decoderAddress, remainingMacroblocks + 1);
+
+    runtime->concealStateWord32C = savedState32C;
+    runtime->concealStateWord30C = savedState30C;
+    runtime->concealStateWord308 = savedState308;
+    runtime->concealStateWord330 = savedState330;
+    runtime->decodeStage = savedDecodeStage;
+    runtime->concealFlags = savedConcealFlags;
+    return savedConcealFlags;
+  }
+
+  /**
    * Address: 0x00B01200 (FUN_00B01200, _M2P_Init)
    *
    * What it does:
@@ -15044,22 +15279,32 @@
   /// the existing `SFXA_Destroy` definition in SofdecSvmTransferRuntime.cpp.
   void SFXA_Destroy(std::int32_t sfxaHandleAddress);
 
-  /// SFD-side YCbCr420 plane geometry calculator. Fills four output dwords:
-  /// the addresses of the Y/Cb/Cr planes plus the Y plane stride. Used as a
-  /// stage-1 step in `mwPlyCalcYccPlane`.
-  void SFD_CalcYccPlane(
+  /**
+   * Address: 0x00AD1870 (FUN_00AD1870, _SFD_CalcYccPlane)
+   *
+   * What it does:
+   * Stage-1 YCC420 plane geometry setup: computes Y/Cb/Cr plane bases and
+   * per-plane pitch lanes in one packed 16-byte scratch block.
+   */
+  std::int32_t SFD_CalcYccPlane(
     std::int32_t baseAddress,
     std::int32_t planeWidth,
     std::int32_t planeHeight,
     std::int32_t outYccGeometryAddress
   );
 
-  /// Adapter that copies SFD-side YCbCr plane geometry into the four-dword
-  /// SFX-side layout consumed by `mwsfsfx_SetYcc420plnInfToSfx`. Returns the
-  /// caller-supplied output buffer address.
+  struct MwsfdSfxYccPlaneGeometry;
+
+  /**
+   * Address: 0x00ACA6F0 (FUN_00ACA6F0, _mwl_convYccPlaneFromSFD)
+   *
+   * What it does:
+   * Converts one packed SFD-side YCC geometry scratch block into the SFX-side
+   * six-dword plane geometry tuple used by `mwsfsfx_SetYcc420plnInfToSfx`.
+   */
   std::int32_t mwl_convYccPlaneFromSFD(
     std::int32_t sfdGeometryAddress,
-    std::int32_t* outSfxGeometry
+    MwsfdSfxYccPlaneGeometry* outSfxGeometry
   );
 
   /// SUD (Sofdec Universal Dispatch) helper that classifies one SFD frame's
@@ -15139,6 +15384,58 @@
     std::int32_t height;
   };
   static_assert(sizeof(MwsfdSfxBufInf) == 0x0C, "MwsfdSfxBufInf must be 12 bytes");
+
+  /**
+   * SFD-side scratch geometry emitted by `SFD_CalcYccPlane`.
+   *
+   * The stack object is 16 bytes in the binary (`_BYTE v5[16]`) and is then
+   * repacked by `mwl_convYccPlaneFromSFD` into the SFX-side six-dword geometry.
+   */
+  struct MwsfdSfdYccPlaneScratch
+  {
+    std::int32_t cbPlaneAddress;   ///< +0x00
+    std::int32_t crPlaneAddress;   ///< +0x04
+    std::int32_t yPlaneAddress;    ///< +0x08
+    std::int16_t chromaPitch;      ///< +0x0C (sign-extended by the binary)
+    std::int16_t lumaPitch;        ///< +0x0E (sign-extended by the binary)
+  };
+  static_assert(sizeof(MwsfdSfdYccPlaneScratch) == 0x10, "MwsfdSfdYccPlaneScratch must be 16 bytes");
+  static_assert(
+    offsetof(MwsfdSfdYccPlaneScratch, yPlaneAddress) == 0x08,
+    "MwsfdSfdYccPlaneScratch::yPlaneAddress offset must be 0x08"
+  );
+  static_assert(
+    offsetof(MwsfdSfdYccPlaneScratch, chromaPitch) == 0x0C,
+    "MwsfdSfdYccPlaneScratch::chromaPitch offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(MwsfdSfdYccPlaneScratch, lumaPitch) == 0x0E,
+    "MwsfdSfdYccPlaneScratch::lumaPitch offset must be 0x0E"
+  );
+
+  /// SFX-side expanded Y/Cb/Cr geometry used by `mwsfsfx_SetYcc420plnInfToSfx`.
+  struct MwsfdSfxYccPlaneGeometry
+  {
+    std::int32_t yPlaneAddress;    ///< +0x00
+    std::int32_t cbPlaneAddress;   ///< +0x04
+    std::int32_t crPlaneAddress;   ///< +0x08
+    std::int32_t yPitch;           ///< +0x0C
+    std::int32_t cbPitch;          ///< +0x10
+    std::int32_t crPitch;          ///< +0x14
+  };
+  static_assert(sizeof(MwsfdSfxYccPlaneGeometry) == 0x18, "MwsfdSfxYccPlaneGeometry must be 24 bytes");
+  static_assert(
+    offsetof(MwsfdSfxYccPlaneGeometry, yPitch) == 0x0C,
+    "MwsfdSfxYccPlaneGeometry::yPitch offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(MwsfdSfxYccPlaneGeometry, cbPitch) == 0x10,
+    "MwsfdSfxYccPlaneGeometry::cbPitch offset must be 0x10"
+  );
+  static_assert(
+    offsetof(MwsfdSfxYccPlaneGeometry, crPitch) == 0x14,
+    "MwsfdSfxYccPlaneGeometry::crPitch offset must be 0x14"
+  );
 
   /**
    * Recovered SFX-side per-frame info struct populated by
@@ -15287,7 +15584,7 @@
     std::int32_t baseAddress,
     std::int32_t planeWidth,
     std::int32_t planeHeight,
-    std::int32_t* outSfxGeometry
+    MwsfdSfxYccPlaneGeometry* outSfxGeometry
   );
 
   // ---------------------------------------------------------------------------
@@ -15622,6 +15919,42 @@
   }
 
   /**
+   * Address: 0x00ACA410 (FUN_00ACA410, _mwl_convBufFmtFromSFD)
+   *
+   * What it does:
+   * Maps one SFD-side buffer-format lane into the MWSFD-side lane using the
+   * binary identity map for known values (`1`, `2`) and fallback `3`.
+   */
+  std::int32_t mwl_convBufFmtFromSFD(const std::int32_t bufferFormat)
+  {
+    if (bufferFormat == 1) {
+      return 1;
+    }
+    if (bufferFormat == 2) {
+      return 2;
+    }
+    return 3;
+  }
+
+  /**
+   * Address: 0x00ACA680 (FUN_00ACA680, _mwl_convBufFmtToSFD)
+   *
+   * What it does:
+   * Maps one MWSFD-side buffer-format lane back into the SFD-side lane using
+   * the same identity map for values (`1`, `2`) and fallback `3`.
+   */
+  std::int32_t mwl_convBufFmtToSFD(const std::int32_t bufferFormat)
+  {
+    if (bufferFormat == 1) {
+      return 1;
+    }
+    if (bufferFormat == 2) {
+      return 2;
+    }
+    return 3;
+  }
+
+  /**
    * Address: 0x00AC6880 (FUN_00AC6880, _mwsfsfx_CnvFrmFmtTypeToSfx)
    *
    * IDA signature:
@@ -15681,13 +16014,13 @@
 
     // YCC 4:2:0: derive per-plane <address, pitch> pairs and lay out the
     // chroma planes with half-height.
-    std::int32_t yccGeometry[4]{};
-    (void)mwPlyCalcYccPlane(bufferAddress, planeWidth, planeHeight, yccGeometry);
+    MwsfdSfxYccPlaneGeometry yccGeometry{};
+    (void)mwPlyCalcYccPlane(bufferAddress, planeWidth, planeHeight, &yccGeometry);
 
-    mwsfsfx_SetSfxBufInf(&outSfx->yPlane, yccGeometry[0], yccGeometry[3], planeHeight);
+    mwsfsfx_SetSfxBufInf(&outSfx->yPlane, yccGeometry.yPlaneAddress, yccGeometry.yPitch, planeHeight);
     const std::int32_t chromaHeight = planeHeight / 2;
-    mwsfsfx_SetSfxBufInf(&outSfx->cbPlane, yccGeometry[1], yccGeometry[3], chromaHeight);
-    mwsfsfx_SetSfxBufInf(&outSfx->crPlane, yccGeometry[2], yccGeometry[3], chromaHeight);
+    mwsfsfx_SetSfxBufInf(&outSfx->cbPlane, yccGeometry.cbPlaneAddress, yccGeometry.cbPitch, chromaHeight);
+    mwsfsfx_SetSfxBufInf(&outSfx->crPlane, yccGeometry.crPlaneAddress, yccGeometry.crPitch, chromaHeight);
     return &outSfx->crPlane;
   }
 
@@ -15863,6 +16196,83 @@
   // ---------------------------------------------------------------------------
 
   /**
+   * Address: 0x00AD1870 (FUN_00AD1870, _SFD_CalcYccPlane)
+   *
+   * IDA signature:
+   * int __cdecl SFD_CalcYccPlane(int baseAddress, int planeWidth, int planeHeight, int outYccGeometryAddress);
+   *
+   * What it does:
+   * Computes one packed SFD-side YCC420 geometry scratch block:
+   * - base Y plane address
+   * - base Cb/Cr plane addresses
+   * - luma/chroma pitches (16-bit lanes)
+   */
+  std::int32_t SFD_CalcYccPlane(
+    const std::int32_t baseAddress,
+    const std::int32_t planeWidth,
+    const std::int32_t planeHeight,
+    const std::int32_t outYccGeometryAddress
+  )
+  {
+    auto* const outGeometry = reinterpret_cast<MwsfdSfdYccPlaneScratch*>(
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(outYccGeometryAddress))
+    );
+
+    const std::int32_t alignedLumaWidth = 16 * ((planeWidth + 15) / 16);
+    outGeometry->yPlaneAddress = baseAddress;
+
+    const std::int32_t lumaPitchBlocks = (alignedLumaWidth + 31) / 32;
+    outGeometry->lumaPitch = static_cast<std::int16_t>(32 * lumaPitchBlocks);
+
+    const std::int32_t chromaPitchBlocks = ((alignedLumaWidth / 2) + 31) / 32;
+    outGeometry->chromaPitch = static_cast<std::int16_t>(32 * chromaPitchBlocks);
+
+    const std::int32_t tileRows = (planeHeight + 31) / 32;
+    const std::int32_t cbPlaneAddress = ((lumaPitchBlocks * tileRows) << 10) + baseAddress;
+    outGeometry->cbPlaneAddress = cbPlaneAddress;
+
+    const std::int32_t crPlaneAddress =
+      cbPlaneAddress + 32 * chromaPitchBlocks * ((32 * tileRows) / 2);
+    outGeometry->crPlaneAddress = crPlaneAddress;
+    return crPlaneAddress;
+  }
+
+  /**
+   * Address: 0x00ACA6F0 (FUN_00ACA6F0, _mwl_convYccPlaneFromSFD)
+   *
+   * IDA signature:
+   * int __cdecl mwl_convYccPlaneFromSFD(int sfdGeometryAddress, _DWORD* outSfxGeometry);
+   *
+   * What it does:
+   * Reorders one 16-byte SFD YCC geometry scratch block into the SFX-side
+   * six-dword layout used by the Y/Cb/Cr setup path:
+   * `<yAddr, cbAddr, crAddr, yPitch, cbPitch, crPitch>`.
+   *
+   * The binary sign-extends both 16-bit pitch lanes from the scratch block.
+   * The chroma pitch lane (`+0x0C`) is written to both `cbPitch` and
+   * `crPitch`, and returned in EAX.
+   */
+  std::int32_t mwl_convYccPlaneFromSFD(
+    const std::int32_t sfdGeometryAddress,
+    MwsfdSfxYccPlaneGeometry* const outSfxGeometry
+  )
+  {
+    const auto* const sfdGeometry = reinterpret_cast<const MwsfdSfdYccPlaneScratch*>(
+      static_cast<std::uintptr_t>(sfdGeometryAddress)
+    );
+
+    outSfxGeometry->yPlaneAddress = sfdGeometry->yPlaneAddress;
+    outSfxGeometry->cbPlaneAddress = sfdGeometry->cbPlaneAddress;
+    outSfxGeometry->crPlaneAddress = sfdGeometry->crPlaneAddress;
+    outSfxGeometry->yPitch = sfdGeometry->lumaPitch;
+
+    const std::int32_t chromaPitch = sfdGeometry->chromaPitch;
+    outSfxGeometry->cbPitch = chromaPitch;
+    outSfxGeometry->crPitch = chromaPitch;
+    return chromaPitch;
+  }
+
+  /**
    * Address: 0x00ACCD30 (FUN_00ACCD30, _SFX_SetCompoMode)
    *
    * IDA signature:
@@ -15925,25 +16335,25 @@
    * for the YCC 4:2:0 buffer-format path. Stage 1 (`SFD_CalcYccPlane`) writes
    * the SFD-side geometry into a 16-byte stack scratchpad. Stage 2
    * (`mwl_convYccPlaneFromSFD`) repacks that scratchpad into the SFX-side
-   * 4-dword geometry buffer. Returns whatever `mwl_convYccPlaneFromSFD`
-   * returns (typically the output buffer address).
+   * 6-dword geometry buffer. Returns whatever `mwl_convYccPlaneFromSFD`
+   * returns (the chroma pitch lane).
    */
   std::int32_t mwPlyCalcYccPlane(
     const std::int32_t baseAddress,
     const std::int32_t planeWidth,
     const std::int32_t planeHeight,
-    std::int32_t* const outSfxGeometry
+    MwsfdSfxYccPlaneGeometry* const outSfxGeometry
   )
   {
-    std::uint8_t sfdGeometry[16]{};
+    MwsfdSfdYccPlaneScratch sfdGeometry{};
     SFD_CalcYccPlane(
       baseAddress,
       planeWidth,
       planeHeight,
-      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sfdGeometry))
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&sfdGeometry))
     );
     return mwl_convYccPlaneFromSFD(
-      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(sfdGeometry)),
+      static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(&sfdGeometry)),
       outSfxGeometry
     );
   }

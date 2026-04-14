@@ -6,9 +6,13 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/ai/EFormationdStatusTypeInfo.h"
+#include "moho/unit/Broadcaster.h"
 
 namespace
 {
@@ -47,6 +51,26 @@ namespace
   [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
   {
     return CachedRType<moho::IFormationInstance>();
+  }
+
+  struct IFormationInstanceSerializationRuntimeView
+  {
+    std::uint8_t reserved00[0x8];
+    moho::BroadcasterEventTag<moho::EFormationdStatus> broadcaster;
+  };
+
+  static_assert(
+    offsetof(IFormationInstanceSerializationRuntimeView, broadcaster) == 0x8,
+    "IFormationInstanceSerializationRuntimeView::broadcaster offset must be 0x8"
+  );
+
+  [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::BroadcasterEventTag<moho::EFormationdStatus>));
+    }
+    return cached;
   }
 
   void EnsureIFormationInstanceTypeCacheInitialized(IFormationInstanceTypeCache& cache)
@@ -238,6 +262,21 @@ namespace gpg
 namespace moho
 {
   /**
+   * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
+   *
+   * What it does:
+   * Unlinks the embedded `Broadcaster<EFormationdStatus>` lane from its
+   * intrusive listener list.
+   */
+  IFormationInstance::~IFormationInstance()
+  {
+    auto* const view = reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(this);
+    if (view != nullptr) {
+      view->broadcaster.ListUnlink();
+    }
+  }
+
+  /**
    * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
    *
    * What it does:
@@ -257,6 +296,56 @@ namespace moho
     }
 
     return cached;
+  }
+
+  /**
+   * Address: 0x00570D80 (FUN_00570D80, Moho::IFormationInstance::MemberDeserialize)
+   *
+   * What it does:
+   * Loads reflected `Broadcaster<EFormationdStatus>` payload from archive into
+   * this instance's broadcaster subobject lane.
+   */
+  void IFormationInstance::MemberDeserialize(
+    IFormationInstance* const object,
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    auto* const view = reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(object);
+    const gpg::RRef ownerRef{};
+    archive->Read(
+      CachedBroadcasterEFormationdStatusType(),
+      view != nullptr ? static_cast<void*>(&view->broadcaster) : nullptr,
+      ownerRef
+    );
+  }
+
+  /**
+   * Address: 0x00570DD0 (FUN_00570DD0, Moho::IFormationInstance::MemberSerialize)
+   *
+   * What it does:
+   * Saves reflected `Broadcaster<EFormationdStatus>` payload from this
+   * instance's broadcaster subobject lane into archive.
+   */
+  void IFormationInstance::MemberSerialize(
+    const IFormationInstance* const object,
+    gpg::WriteArchive* const archive
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const auto* const view = reinterpret_cast<const IFormationInstanceSerializationRuntimeView*>(object);
+    const gpg::RRef ownerRef{};
+    archive->Write(
+      CachedBroadcasterEFormationdStatusType(),
+      view != nullptr ? static_cast<const void*>(&view->broadcaster) : nullptr,
+      ownerRef
+    );
   }
 
   /**

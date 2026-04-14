@@ -30,8 +30,25 @@ namespace gpg
 	static_assert(sizeof(HeapStats) == 0x14, "gpg::HeapStats size must be 0x14");
 
 	void HandleAssertFailure(const char* msg, int lineNum, const char* file); // 0x0093EDE0
-	die_handler_t SetDieHandler(die_handler_t handler); // 0x00938FE0
-	void InvokeDieHandler(const char*); // 0x00938FF0
+
+	/**
+	 * Address: 0x00938FE0 (FUN_00938FE0, gpg::SetDieHandler)
+	 * Mangled: ?SetDieHandler@gpg@@YAP6AXPBD@ZP6AX0@Z@Z
+	 *
+	 * What it does:
+	 * Installs one process-global fatal-error callback and returns the previous
+	 * callback pointer.
+	 */
+	die_handler_t SetDieHandler(die_handler_t handler);
+
+	/**
+	 * Address: 0x00938FF0 (FUN_00938FF0, gpg::InvokeDieHandler)
+	 * Mangled: ?InvokeDieHandler@gpg@@YAXPBD@Z
+	 *
+	 * What it does:
+	 * Dispatches one message to the current process-global die handler when set.
+	 */
+	void InvokeDieHandler(const char*);
 	void Die(const char* args, ...); // 0x00939000
 
 	/**
@@ -53,13 +70,11 @@ namespace gpg
 	void GetHeapInfo(HeapStats* outStats);
 
 	/**
-	 * Parse integer in [start,end) with base auto-detection:
-	 *  - optional leading '-'
-	 *  - if starts with '0x'/'0X' => base 16
-	 *  - else if starts with '0'  => base 8
-	 *  - else => base 10
-	 *  Returns true on success and stores into *dest.
-	 *  Accepts only ASCII digits/letters; requires that the entire span is valid.
+	 * Address: 0x008D8FA0 (FUN_008D8FA0, func_ParseNum)
+	 *
+	 * What it does:
+	 * Parses one signed integer from `[start,end)` using legacy base autodetect
+	 * rules (`0x` hex, leading `0` octal, otherwise decimal).
 	 */
 	bool ParseNum(const char* start, const char* end, int* dest) noexcept;
 

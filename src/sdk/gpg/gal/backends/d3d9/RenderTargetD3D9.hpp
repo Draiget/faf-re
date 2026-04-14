@@ -25,6 +25,20 @@ namespace gpg::gal
         RenderTargetD3D9(const RenderTargetContext* context, void* renderTexture);
 
         /**
+         * Address: 0x008F5470 (FUN_008F5470, gpg::gal::RenderTargetD3D9::RenderTargetD3D9 `_0` overload)
+         * Mangled: ??0RenderTargetD3D9@gal@gpg@@QAE@@Z_0
+         *
+         * What it does:
+         * Surface-wrap overload used by `DeviceD3D9::CreateHeads`. Wraps one
+         * pre-existing `IDirect3DSurface9*` without an owning render-target
+         * context, resets lane state, stores the surface as the retained
+         * render-target payload, then queries surface width/height from the
+         * D3D9 surface description and caches them into the embedded
+         * `RenderTargetContext` dimension lane.
+         */
+        explicit RenderTargetD3D9(void* backBufferSurface);
+
+        /**
          * Address: 0x008F5450 (FUN_008F5450)
          *
          * What it does:
@@ -39,6 +53,18 @@ namespace gpg::gal
          * Returns the embedded render-target context lane at `this+0x04`.
          */
         virtual RenderTargetContext* GetContext();
+
+        /**
+         * Address: 0x008F52D0 (FUN_008F52D0, Moho::D3DSurface::GetSurface)
+         * Mangled: ?GetSurface@D3DSurface@Moho@@QAEPAUIDirect3DSurface9@@XZ
+         *
+         * What it does:
+         * Returns the retained render-target texture/surface payload lane at
+         * `this+0x14`. Callers in `DeviceD3D9::StretchRect`,
+         * `CreateRenderTarget`, `Func4`, and `ClearTarget` use this lane as an
+         * `IDirect3DSurface9*` handle.
+         */
+        void* GetSurface();
 
         /**
          * Address: 0x008F52E0 (FUN_008F52E0)

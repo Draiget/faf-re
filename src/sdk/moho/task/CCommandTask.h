@@ -29,6 +29,19 @@ namespace moho
     ~CCommandTask() override;
 
     /**
+     * VFTable SLOT: 1 (CTask::Execute)
+     *
+     * What it does:
+     * Default body for the `CCommandTask` vtable slot. Concrete task
+     * subclasses (e.g. `CUnitMeleeAttackTargetTask`) override this with
+     * real per-tick logic; the binary's `CCommandTask` vtable slot 1 is
+     * `_purecall`, and reaching this fallback in a recovered build means
+     * the derived vtable pointer was not written into `mCommandTaskStorage`.
+     * Matches that intent by terminating.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x00598A20 (FUN_00598A20, ??0CCommandTask@Moho@@QAE@@Z_0)
      *
      * Unit *, Sim *

@@ -207,6 +207,34 @@ namespace moho
   }
 
   /**
+   * Address: 0x0052CBD0 (FUN_0052CBD0, Moho::EntityCategory::end)
+   *
+   * What it does:
+   * Builds one past-end legacy category iterator payload from category set
+   * storage (`firstWordIndex + wordCount`, then `* 32`).
+   */
+  EntityCategoryIterator*
+  BuildEntityCategoryEndIterator(EntityCategoryIterator* const out, EntityCategorySet* const categorySet) noexcept
+  {
+    if (out == nullptr || categorySet == nullptr) {
+      return out;
+    }
+
+    BVIntSet* const bits = &categorySet->mBits;
+
+    std::size_t wordCount = 0u;
+    if (bits->mWords.start_ != nullptr && bits->mWords.end_ != nullptr && bits->mWords.end_ >= bits->mWords.start_) {
+      wordCount = static_cast<std::size_t>(bits->mWords.end_ - bits->mWords.start_);
+    }
+
+    const std::uint32_t endWordIndex = bits->mFirstWordIndex + static_cast<std::uint32_t>(wordCount);
+    out->mWordUniverseHandle = categorySet->mUniverse.mWordUniverseHandle;
+    out->mSet = bits;
+    out->mCurBit = static_cast<std::int32_t>(endWordIndex << 5u);
+    return out;
+  }
+
+  /**
    * Address: 0x005575E0 (FUN_005575E0, func_GetCObj_EntityCategory)
    */
   EntityCategorySet* func_GetCObj_EntityCategory(const LuaPlus::LuaObject& valueObject)

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <new>
 #include <string>
 #include <stdexcept>
@@ -318,6 +319,11 @@ moho::StatItem* moho::InstanceCounter<moho::CCommandTask>::GetStatItem()
 CCommandTask::~CCommandTask()
 {
   AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), -1);
+}
+
+int CCommandTask::Execute()
+{
+  std::terminate();
 }
 
 /**

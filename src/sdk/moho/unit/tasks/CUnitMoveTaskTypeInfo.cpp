@@ -69,15 +69,6 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  gpg::RRef CtrRef_CUnitMoveTask(void* const objectStorage)
-  {
-    auto* const task = static_cast<moho::CUnitMoveTask*>(objectStorage);
-    if (task) {
-      new (task) moho::CUnitMoveTask();
-    }
-    return gpg::RRef{task, CachedCUnitMoveTaskType()};
-  }
-
   void Delete_CUnitMoveTask(void* const objectStorage)
   {
     delete static_cast<moho::CUnitMoveTask*>(objectStorage);
@@ -106,16 +97,52 @@ namespace moho
   void CUnitMoveTaskTypeInfo::Init()
   {
     size_ = sizeof(CUnitMoveTask);
-    newRefFunc_ = &CUnitMoveTaskTypeInfo::NewRef;
-    ctorRefFunc_ = &CtrRef_CUnitMoveTask;
-    deleteFunc_ = &Delete_CUnitMoveTask;
-    dtrFunc_ = &Destruct_CUnitMoveTask;
+    AssignAllLifecycleCallbacks(*this);
     gpg::RType::Init();
     AddBaseField(this, CachedCCommandTaskType(), 0);
     AddBaseField(this, CachedListenerEAiNavigatorEventType(), 0x34);
     AddBaseField(this, CachedListenerEFormationdStatusType(), 0x44);
     AddBaseField(this, CachedListenerECommandEventType(), 0x54);
     Finish();
+  }
+
+  /**
+   * Address: 0x00619BD0 (FUN_00619BD0, callback shard)
+   *
+   * What it does:
+   * Assigns all lifecycle callbacks (`NewRef`, `CtrRef`, delete, destruct)
+   * onto one move-task type descriptor.
+   */
+  void CUnitMoveTaskTypeInfo::AssignAllLifecycleCallbacks(CUnitMoveTaskTypeInfo& typeInfo)
+  {
+    AssignCtorCallbacks(typeInfo);
+    AssignDtorCallbacks(typeInfo);
+  }
+
+  /**
+   * Address: 0x00619D50 (FUN_00619D50, callback shard)
+   *
+   * What it does:
+   * Assigns constructor-lane callbacks (`NewRef`, `CtrRef`) to one move-task
+   * type descriptor.
+   */
+  void CUnitMoveTaskTypeInfo::AssignCtorCallbacks(CUnitMoveTaskTypeInfo& typeInfo)
+  {
+    typeInfo.newRefFunc_ = &CUnitMoveTaskTypeInfo::NewRef;
+    typeInfo.ctorRefFunc_ = &CUnitMoveTaskTypeInfo::CtrRef;
+  }
+
+  /**
+   * Address: 0x00619D60 (FUN_00619D60, callback shard)
+   *
+   * What it does:
+   * Assigns destructor-lane callbacks (delete + in-place destruct) to one
+   * move-task type descriptor.
+   */
+  void CUnitMoveTaskTypeInfo::AssignDtorCallbacks(CUnitMoveTaskTypeInfo& typeInfo)
+  {
+    typeInfo.deleteFunc_ = &Delete_CUnitMoveTask;
+    typeInfo.dtrFunc_ = &Destruct_CUnitMoveTask;
   }
 
   /**
@@ -127,6 +154,23 @@ namespace moho
   gpg::RRef CUnitMoveTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitMoveTask();
+    return gpg::RRef{task, CachedCUnitMoveTaskType()};
+  }
+
+  /**
+   * Address: 0x00619E70 (FUN_00619E70, Moho::CUnitMoveTaskTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Placement-constructs one `CUnitMoveTask` in caller storage and returns
+   * a typed reflection ref.
+   */
+  gpg::RRef CUnitMoveTaskTypeInfo::CtrRef(void* const objectStorage)
+  {
+    auto* const task = static_cast<CUnitMoveTask*>(objectStorage);
+    if (task) {
+      new (task) CUnitMoveTask();
+    }
+
     return gpg::RRef{task, CachedCUnitMoveTaskType()};
   }
 } // namespace moho

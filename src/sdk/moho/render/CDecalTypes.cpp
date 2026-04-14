@@ -6,7 +6,9 @@
 
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Vector.h"
 
 namespace gpg
 {
@@ -28,6 +30,33 @@ namespace gpg
      * Formats inherited list lexical text with current `SDecalInfo` list size.
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x0077A800 (FUN_0077A800, gpg::RListType_SDecalInfo::Init)
+     *
+     * What it does:
+     * Configures reflected `list<SDecalInfo>` layout/version lanes and installs
+     * list serializer callbacks.
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x0077B260 (FUN_0077B260, gpg::RListType_SDecalInfo::SerLoad)
+     *
+     * What it does:
+     * Clears one reflected `list<SDecalInfo>`, reads element count, then
+     * deserializes each decal entry in archive order.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0077B420 (FUN_0077B420, gpg::RListType_SDecalInfo::SerSave)
+     *
+     * What it does:
+     * Writes reflected `list<SDecalInfo>` element count, then serializes each
+     * entry in list traversal order.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
   };
 } // namespace gpg
 
@@ -114,6 +143,97 @@ msvc8::string gpg::RListType_SDecalInfo::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), CountSDecalInfoListElements(ref.mObj));
+}
+
+/**
+ * Address: 0x0077A800 (FUN_0077A800, gpg::RListType_SDecalInfo::Init)
+ *
+ * What it does:
+ * Configures reflected `list<SDecalInfo>` layout/version lanes and installs
+ * list serializer callbacks.
+ */
+void gpg::RListType_SDecalInfo::Init()
+{
+  size_ = sizeof(msvc8::list<moho::SDecalInfo>);
+  version_ = 1;
+  serLoadFunc_ = &gpg::RListType_SDecalInfo::SerLoad;
+  serSaveFunc_ = &gpg::RListType_SDecalInfo::SerSave;
+}
+
+/**
+ * Address: 0x0077B260 (FUN_0077B260, gpg::RListType_SDecalInfo::SerLoad)
+ *
+ * What it does:
+ * Clears one reflected `list<SDecalInfo>`, reads element count, then
+ * deserializes each decal entry in archive order.
+ */
+void gpg::RListType_SDecalInfo::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  auto* const list = reinterpret_cast<msvc8::list<moho::SDecalInfo>*>(
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+  );
+  if (archive == nullptr || list == nullptr) {
+    return;
+  }
+
+  unsigned int count = 0u;
+  archive->ReadUInt(&count);
+  list->clear();
+
+  gpg::RType* const elementType = CachedSDecalInfoType();
+  if (elementType == nullptr) {
+    return;
+  }
+
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  for (unsigned int i = 0u; i < count; ++i) {
+    moho::SDecalInfo value{};
+    archive->Read(elementType, &value, owner);
+    list->push_back(value);
+  }
+}
+
+/**
+ * Address: 0x0077B420 (FUN_0077B420, gpg::RListType_SDecalInfo::SerSave)
+ *
+ * What it does:
+ * Writes reflected `list<SDecalInfo>` element count, then serializes each
+ * entry in list traversal order.
+ */
+void gpg::RListType_SDecalInfo::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  const auto* const list = reinterpret_cast<const msvc8::list<moho::SDecalInfo>*>(
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+  );
+  if (archive == nullptr) {
+    return;
+  }
+
+  const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
+  archive->WriteUInt(count);
+  if (list == nullptr) {
+    return;
+  }
+
+  gpg::RType* const elementType = CachedSDecalInfoType();
+  if (elementType == nullptr) {
+    return;
+  }
+
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  for (const moho::SDecalInfo& value : *list) {
+    archive->Write(elementType, &value, owner);
+  }
 }
 
 namespace moho

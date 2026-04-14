@@ -109,6 +109,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x00606F90 (FUN_00606F90, Moho::CUnitCarrierLaunch::~CUnitCarrierLaunch)
+   *
+   * What it does:
+   * Clears the carrier-launch unit-state bit before member/base teardown.
+   */
+  CUnitCarrierLaunch::~CUnitCarrierLaunch()
+  {
+    if (mUnit != nullptr) {
+      mUnit->UnitStateMask &= ~kUnitStateMaskCarrierLaunch;
+    }
+  }
+
+  /**
    * Address: 0x00607680 (FUN_00607680, Moho::CUnitCarrierLaunch::operator new)
    *
    * What it does:

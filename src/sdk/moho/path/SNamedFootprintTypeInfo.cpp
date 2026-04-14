@@ -402,6 +402,13 @@ namespace
     return reinterpret_cast<SNamedFootprintListTypeInfo*>(gSNamedFootprintListTypeInfoStorage);
   }
 
+  /**
+   * Address: 0x00514110 (FUN_00514110, gpg::RListType_SNamedFootprint::SerLoad)
+   *
+   * What it does:
+   * Reads a uint count then iteratively reflects each `SNamedFootprint`
+   * element from the archive into the destination list.
+   */
   void LoadSNamedFootprintList(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
   {
     auto* const list = reinterpret_cast<std::list<moho::SNamedFootprint>*>(objectPtr);
@@ -425,6 +432,13 @@ namespace
     list->swap(loaded);
   }
 
+  /**
+   * Address: 0x00514240 (FUN_00514240, gpg::RListType_SNamedFootprint::SerSave)
+   *
+   * What it does:
+   * Writes list element count, then reflects each `SNamedFootprint` value to
+   * the archive with the incoming owner context.
+   */
   void SaveSNamedFootprintList(
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
   )

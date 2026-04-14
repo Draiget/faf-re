@@ -13,6 +13,7 @@ namespace gpg
 namespace moho
 {
   class CEconStorage;
+  enum EEconResource : std::int32_t;
   using IntrusiveNode = TDatListItem<void, void>;
 
   struct SEconPair
@@ -48,6 +49,15 @@ namespace moho
      * the archive's WriteUInt64 virtual slot.
      */
     void MemberSerialize(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00585920 (FUN_00585920, Moho::SEconTotals::MaxStorageOf)
+     *
+     * What it does:
+     * Returns the max-storage lane (`ENERGY`/`MASS`) selected by one
+     * `EEconResource` enum value as a floating-point scalar.
+     */
+    [[nodiscard]] double MaxStorageOf(EEconResource resource) const noexcept;
   };
 
   class CSimArmyEconomyInfo

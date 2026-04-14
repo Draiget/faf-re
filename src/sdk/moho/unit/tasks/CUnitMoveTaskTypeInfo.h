@@ -30,6 +30,43 @@ namespace moho
      * Allocates one `CUnitMoveTask` and returns a typed reflection ref.
      */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x00619E70 (FUN_00619E70, Moho::CUnitMoveTaskTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Placement-constructs one `CUnitMoveTask` in caller storage and returns
+     * a typed reflection ref.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+  private:
+    /**
+     * Address: 0x00619BD0 (FUN_00619BD0, callback shard)
+     *
+     * What it does:
+     * Assigns all lifecycle callbacks (`NewRef`, `CtrRef`, delete, destruct)
+     * onto one move-task type descriptor.
+     */
+    static void AssignAllLifecycleCallbacks(CUnitMoveTaskTypeInfo& typeInfo);
+
+    /**
+     * Address: 0x00619D50 (FUN_00619D50, callback shard)
+     *
+     * What it does:
+     * Assigns constructor-lane callbacks (`NewRef`, `CtrRef`) to one move-task
+     * type descriptor.
+     */
+    static void AssignCtorCallbacks(CUnitMoveTaskTypeInfo& typeInfo);
+
+    /**
+     * Address: 0x00619D60 (FUN_00619D60, callback shard)
+     *
+     * What it does:
+     * Assigns destructor-lane callbacks (delete + in-place destruct) to one
+     * move-task type descriptor.
+     */
+    static void AssignDtorCallbacks(CUnitMoveTaskTypeInfo& typeInfo);
   };
 
   static_assert(sizeof(CUnitMoveTaskTypeInfo) == 0x64, "CUnitMoveTaskTypeInfo size must be 0x64");

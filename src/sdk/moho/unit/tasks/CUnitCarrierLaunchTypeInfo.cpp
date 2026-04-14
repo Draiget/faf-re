@@ -30,5 +30,21 @@ namespace moho
     auto* const task = new (std::nothrow) CUnitCarrierLaunch();
     return gpg::RRef{task, CachedCUnitCarrierLaunchType()};
   }
-} // namespace moho
 
+  /**
+   * Address: 0x00607DA0 (FUN_00607DA0, Moho::CUnitCarrierLaunchTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Placement-constructs one `CUnitCarrierLaunch` in caller storage and
+   * returns a typed reflection ref.
+   */
+  gpg::RRef CUnitCarrierLaunchTypeInfo::CtrRef(void* const objectStorage)
+  {
+    auto* const task = static_cast<CUnitCarrierLaunch*>(objectStorage);
+    if (task) {
+      new (task) CUnitCarrierLaunch();
+    }
+
+    return gpg::RRef{task, CachedCUnitCarrierLaunchType()};
+  }
+} // namespace moho

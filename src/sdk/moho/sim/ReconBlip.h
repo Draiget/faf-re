@@ -242,6 +242,23 @@ namespace moho
     void CreateInterface(SSyncData* syncData) override;
 
     /**
+     * Address: 0x005BEE40 (FUN_005BEE40, Moho::ReconBlip::UpdateVisibility)
+     *
+     * What it does:
+     * Recomputes base entity visibility lanes, then applies focused-army recon
+     * flush gating to the blip visibility state.
+     */
+    void UpdateVisibility() override;
+
+    /**
+     * Address: 0x005BDE70 (FUN_005BDE70, Moho::ReconBlip::GetDerivedObjectRef)
+     *
+     * What it does:
+     * Returns one typed reflection reference for this recon blip instance.
+     */
+    gpg::RRef GetDerivedObjectRef() override;
+
+    /**
      * Address: 0x005BDE90 (FUN_005BDE90)
      *
      * What it does:

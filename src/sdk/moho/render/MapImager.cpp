@@ -1,18 +1,47 @@
 // MapImager recovered implementation.
 
 #include "moho/render/MapImager.h"
-#include "moho/mesh/Mesh.h"
-#include "moho/app/WxRuntimeTypes.h"
-#include "moho/lua/CScrLuaBinder.h"
-#include "moho/lua/CScrLuaInitForm.h"
+
+#include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
+#include "moho/app/WxRuntimeTypes.h"
+#include "moho/console/CConCommand.h"
+#include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/mesh/Mesh.h"
+#include "moho/resource/RResId.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/STIMap.h"
 
 namespace
 {
   constexpr const char* kMapBorderClearName = "MapBorderClear";
   constexpr const char* kMapBorderClearHelpText = "MapBorderClear()";
   constexpr const char* kGlobalLuaClassName = "<global>";
+
+  struct WRenViewportMapImagerView
+  {
+    std::uint8_t pad[0x32C];
+    moho::MapImager mMapImager;
+  };
+
+  static_assert(
+    offsetof(WRenViewportMapImagerView, mMapImager) == 0x32C,
+    "WRenViewportMapImagerView::mMapImager offset must be 0x32C"
+  );
+
+  struct CWldTerrainResRuntimeView
+  {
+    void* vftable;
+    moho::STIMap* mMap;
+  };
+
+  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x08, "CWldTerrainResRuntimeView size must be 0x08");
+  static_assert(offsetof(CWldTerrainResRuntimeView, mMap) == 0x04, "CWldTerrainResRuntimeView::mMap offset must be 0x04");
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
@@ -23,10 +52,28 @@ namespace
     static moho::CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
   }
+
+  [[nodiscard]] moho::MapImager* ActiveViewportMapImager() noexcept
+  {
+    if (moho::ren_Viewport == nullptr) {
+      return nullptr;
+    }
+
+    auto* const viewportView = reinterpret_cast<WRenViewportMapImagerView*>(moho::ren_Viewport);
+    return &viewportView->mMapImager;
+  }
+
+  void ClearActiveViewportMapBorder() noexcept
+  {
+    if (moho::MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
+      mapImager->ClearBorder();
+    }
+  }
 } // namespace
 
 namespace moho
 {
+bool ren_ShowSkeletons = false;
 
 /**
  * Address: 0x007D9BB0 (FUN_007D9BB0, Moho::MapImager::~MapImager)
@@ -49,16 +96,128 @@ MapImager::~MapImager()
  */
 void MapImager::ClearBorder()
 {
-  // Touch the MeshRenderer singleton to ensure it is initialized.
   MeshRenderer::GetInstance();
 
-  // Release each border mesh instance via its virtual destructor dispatch.
   for (auto* instance : mMeshInstances) {
     instance->Release(1);
   }
 
-  // Truncate the vector (equivalent to clear without deallocation).
   mMeshInstances.clear();
+}
+
+/**
+ * Address: 0x007D9C10 (FUN_007D9C10, Moho::MapImager::AddBorder)
+ *
+ * IDA signature:
+ * void __stdcall Moho::MapImager::AddBorder(Moho::MapImager *arg0, std::string *arg4);
+ *
+ * What it does:
+ * Resolves the active terrain blueprint, builds one border mesh instance from
+ * the requested mesh blueprint name, and appends it to the border instance
+ * vector when creation succeeds.
+ */
+void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
+{
+  const CWldSession* const session = WLD_GetActiveSession();
+  if (session == nullptr || session->mRules == nullptr || session->mWldMap == nullptr || session->mWldMap->mTerrainRes == nullptr) {
+    return;
+  }
+
+  MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
+  if (meshRenderer == nullptr) {
+    return;
+  }
+
+  const auto* const terrainResView = reinterpret_cast<const CWldTerrainResRuntimeView*>(session->mWldMap->mTerrainRes);
+  const STIMap* const terrainMap = terrainResView->mMap;
+  if (terrainMap == nullptr || terrainMap->mHeightField.get() == nullptr) {
+    return;
+  }
+
+  const Wm3::AxisAlignedBox3f terrainBounds = terrainMap->mHeightField->GetBounds3D();
+  const float elevationOffset = 0.0f;
+
+  const Wm3::Vec3f borderPosition{
+    (terrainBounds.Min.x + terrainBounds.Max.x) * 0.5f,
+    ((terrainBounds.Min.y + terrainBounds.Max.y) * 0.5f) + elevationOffset,
+    (terrainBounds.Min.z + terrainBounds.Max.z) * 0.5f,
+  };
+  const Wm3::Quaternionf borderOrientation = Wm3::Quaternionf::Identity();
+  const VTransform borderTransform(borderPosition, borderOrientation);
+
+  msvc8::string normalizedBlueprintPath{};
+  gpg::STR_CopyFilename(&normalizedBlueprintPath, &meshBlueprintPath);
+
+  RResId meshBlueprintId{};
+  meshBlueprintId.name = normalizedBlueprintPath;
+
+  RMeshBlueprint* const meshBlueprint = session->mRules->GetMeshBlueprint(meshBlueprintId);
+  if (meshBlueprint == nullptr) {
+    return;
+  }
+
+  const float borderScale = (terrainBounds.Max.x - terrainBounds.Min.x) * meshBlueprint->mUniformScale;
+  const Wm3::Vec3f borderScaleVec{borderScale, borderScale, borderScale};
+
+  MeshInstance* const instance =
+    meshRenderer->CreateMeshInstance(0, -1, meshBlueprint, borderScaleVec, false, boost::shared_ptr<MeshMaterial>{});
+  if (instance == nullptr) {
+    return;
+  }
+
+  instance->SetStance(borderTransform, borderTransform);
+  mMeshInstances.push_back(instance);
+}
+
+/**
+ * Address: 0x007F6530 (FUN_007F6530, Moho::REN_ShowSkeletons)
+ *
+ * What it does:
+ * Toggles global skeleton-debug rendering and mirrors that bool lane into the
+ * active simulation-driver sync-filter option flag when present.
+ */
+void REN_ShowSkeletons()
+{
+  const bool showSkeletons = !moho::ren_ShowSkeletons;
+  moho::ren_ShowSkeletons = showSkeletons;
+
+  if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
+    activeDriver->SetSyncFilterOptionFlag(showSkeletons);
+  }
+}
+
+/**
+ * Address: 0x007F6560 (FUN_007F6560, Moho::REN_MapBorderAdd)
+ *
+ * What it does:
+ * Console callback that expects exactly two tokens and adds the requested
+ * border mesh blueprint to the active viewport's MapImager.
+ */
+void REN_MapBorderAdd(void* const commandArgs)
+{
+  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
+  if (args.Count() != 2u) {
+    return;
+  }
+
+  if (moho::ren_Viewport == nullptr) {
+    return;
+  }
+
+  ActiveViewportMapImager()->AddBorder(*args.At(1));
+}
+
+/**
+ * Address: 0x007F65B0 (FUN_007F65B0, Moho::REN_MapBorderClear)
+ *
+ * What it does:
+ * Console callback that clears the active viewport's MapImager border
+ * decoration meshes when a viewport is present.
+ */
+void REN_MapBorderClear(void* const commandArgs)
+{
+  (void)commandArgs;
+  ClearActiveViewportMapBorder();
 }
 
 /**
@@ -82,13 +241,7 @@ int cfunc_MapBorderClear(lua_State* rawState)
     LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kHelpText, 0, argCount);
   }
 
-  // The binary embeds a `MapImager` at `ren_Viewport + 0x32C` and clears it
-  // here, but `WRenViewport` (in moho/app/WxRuntimeTypes.h) does not yet
-  // expose a `GetMapImager()` accessor — that requires recovering the full
-  // 0x350+-byte WRenViewport layout. Re-enable when WRenViewport gains the
-  // embedded MapImager and accessor.
-  (void)ren_Viewport;
-
+  ClearActiveViewportMapBorder();
   return 0;
 }
 

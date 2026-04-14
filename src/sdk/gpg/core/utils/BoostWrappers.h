@@ -7,6 +7,11 @@
 
 #include "boost/shared_ptr.h"
 
+namespace moho
+{
+    class RScmResource;
+}
+
 namespace boost
 {
     class bad_ptr_container_operation;
@@ -151,22 +156,26 @@ namespace boost
         /**
          * Address: 0x00422B80 (FUN_00422B80, Moho::WeakPtr_CD3DDynamicTextureSheet::Release)
          * Address: 0x004260B0 (FUN_004260B0, Moho::WeakPtr_CD3DBatchTexture::Release)
+         * Address: 0x004D7A20 (FUN_004D7A20, Moho::WeakPtr_AudioEngine::Release)
          * Address: 0x00442BD0 (FUN_00442BD0)
          * Address: 0x00442C40 (FUN_00442C40)
          * Address: 0x00442C90 (FUN_00442C90, boost::shared_ptr_TextureD3D9::reset)
          * Address: 0x00442F20 (FUN_00442F20)
          * Address: 0x00442FA0 (FUN_00442FA0)
+         * Address: 0x007D1CD0 (FUN_007D1CD0, boost::shared_ptr_CD3DBatchTexture::~shared_ptr_CD3DBatchTexture)
+         * Address: 0x00873780 (FUN_00873780, boost::shared_ptr_UICommandGraph::~shared_ptr_UICommandGraph)
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
          * on last use, and clears the borrowed raw-ptr lanes.
          */
         void release() noexcept {
-            if (pi != nullptr) {
-                pi->release();
-            }
+            detail::sp_counted_base* const control = pi;
             px = nullptr;
             pi = nullptr;
+            if (control != nullptr) {
+                control->release();
+            }
         }
 
         /**
@@ -227,6 +236,23 @@ namespace boost
     };
 
     static_assert(sizeof(SharedCountPairWithTail) == 0x10, "SharedCountPairWithTail size must be 0x10");
+
+    /**
+     * Address: 0x0055AA90 (FUN_0055AA90, boost::shared_ptr_RScmResource::~shared_ptr_RScmResource)
+     *
+     * What it does:
+     * Clears one `boost::shared_ptr<RScmResource>` pair and releases one shared
+     * owner reference from its control block.
+     */
+    [[nodiscard]] inline SharedPtrRaw<moho::RScmResource>* DestroySharedPtrRScmResource(
+        SharedPtrRaw<moho::RScmResource>* const sharedResource
+    ) noexcept
+    {
+        if (sharedResource != nullptr) {
+            sharedResource->release();
+        }
+        return sharedResource;
+    }
 
     /**
      * Address: 0x00445550 (FUN_00445550)

@@ -44,6 +44,16 @@ namespace moho
      */
     RUnitBlueprintGeneral();
 
+    /**
+     * Address: 0x0051E6F0 (FUN_0051E6F0, Moho::RUnitBlueprintGeneral::~RUnitBlueprintGeneral)
+     * Mangled: ??1RUnitBlueprintGeneral@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Releases upgrade/seed string-id lanes owned by general blueprint
+     * metadata.
+     */
+    ~RUnitBlueprintGeneral();
+
     ERuleBPUnitCommandCaps CommandCaps; // +0x00
     ERuleBPUnitToggleCaps ToggleCaps;   // +0x04
     RResId UpgradesTo;                  // +0x08
@@ -73,6 +83,15 @@ namespace moho
    */
   struct RUnitBlueprintDisplay
   {
+    /**
+     * Address: 0x0051E770 (FUN_0051E770, Moho::RUnitBlueprintDisplay::~RUnitBlueprintDisplay)
+     * Mangled: ??1RUnitBlueprintDisplay@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Releases display-name, mesh, placeholder, and icon string-id lanes.
+     */
+    ~RUnitBlueprintDisplay();
+
     msvc8::string DisplayName;         // +0x00
     RResId MeshBlueprint;              // +0x1C
     msvc8::string PlaceholderMeshName; // +0x38
@@ -202,6 +221,15 @@ namespace moho
      */
     RUnitBlueprintPhysics();
 
+    /**
+     * Address: 0x0051E7F0 (FUN_0051E7F0, Moho::RUnitBlueprintPhysics::~RUnitBlueprintPhysics)
+     * Mangled: ??1RUnitBlueprintPhysics@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Releases occupancy and raised-platform vector storage lanes.
+     */
+    ~RUnitBlueprintPhysics();
+
     std::uint8_t FlattenSkirt;                                   // +0x00
     std::uint8_t pad_0001_0004[0x03];                            // +0x01
     float SkirtOffsetX;                                          // +0x04
@@ -308,6 +336,15 @@ namespace moho
    */
   struct RUnitBlueprintAir
   {
+    /**
+     * Address: 0x0051EF00 (FUN_0051EF00, Moho::RUnitBlueprintAir::RUnitBlueprintAir)
+     *
+     * What it does:
+     * Initializes air-movement tuning, circling heuristics, and engagement
+     * defaults for unit blueprints.
+     */
+    RUnitBlueprintAir();
+
     std::uint8_t CanFly;                  // +0x00
     std::uint8_t Winged;                  // +0x01
     std::uint8_t FlyInWater;              // +0x02
@@ -448,6 +485,15 @@ namespace moho
      * transport/beacon metadata.
      */
     RUnitBlueprintAI();
+
+    /**
+     * Address: 0x0051E870 (FUN_0051E870, ??1RUnitBlueprintAI@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Destroys target-bone strings, releases heap-backed bone storage, and
+     * resets beacon/guard formation names to their legacy empty-state layout.
+     */
+    ~RUnitBlueprintAI();
 
     float GuardScanRadius;                    // +0x00
     float GuardReturnRadius;                  // +0x04
@@ -647,6 +693,16 @@ namespace moho
      */
     RUnitBlueprintEconomy(RRuleGameRules* rules = nullptr);
 
+    /**
+     * Address: 0x0051E8F0 (FUN_0051E8F0, Moho::RUnitBlueprintEconomy::~RUnitBlueprintEconomy)
+     * Mangled: ??1RUnitBlueprintEconomy@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Releases dynamic category-cache words and restores inline storage lanes
+     * before member vector destructors run.
+     */
+    ~RUnitBlueprintEconomy();
+
     float BuildCostEnergy;                            // +0x00
     float BuildCostMass;                              // +0x04
     float BuildRate;                                  // +0x08
@@ -695,6 +751,17 @@ namespace moho
     RUnitBlueprintEconomy Economy;     // +0x4E8
 
     /**
+     * Address: 0x0051E480 (FUN_0051E480, Moho::RUnitBlueprint::RUnitBlueprint)
+     * Mangled: ??0RUnitBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Constructs unit-blueprint subsection lanes on top of
+     * `REntityBlueprint`, seeds gameplay defaults, and enables life-bar
+     * rendering.
+     */
+    RUnitBlueprint(RRuleGameRules* owner, const RResId& resId);
+
+    /**
      * Address: 0x0051E980 (FUN_0051E980)
      * Mangled: ??1RUnitBlueprint@Moho@@QAE@@Z
      *
@@ -723,6 +790,32 @@ namespace moho
     [[nodiscard]] static gpg::RType* GetPointerType();
 
     /**
+     * Address: 0x0051E400 (FUN_0051E400, ?StaticGetClass@RUnitBlueprint@Moho@@SAPAVRType@gpg@@XZ)
+     *
+     * What it does:
+     * Lazily resolves and caches the reflection descriptor for
+     * `RUnitBlueprint`.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x0051E420 (FUN_0051E420, ?GetClass@RUnitBlueprint@Moho@@UBEPAVRType@gpg@@XZ)
+     *
+     * What it does:
+     * Returns the reflected runtime type descriptor for this
+     * `RUnitBlueprint` instance.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const;
+
+    /**
+     * Address: 0x0051E440 (FUN_0051E440, ?GetDerivedObjectRef@RUnitBlueprint@Moho@@UAE?AVRRef@gpg@@XZ)
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflected object reference handle.
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+
+    /**
      * Address: 0x0051E460 (FUN_0051E460)
      * Mangled: ?IsMobile@RUnitBlueprint@Moho@@UBE_NXZ
      *
@@ -739,6 +832,16 @@ namespace moho
      * Returns `this` to mark the entity blueprint as a unit blueprint.
      */
     [[nodiscard]] const RUnitBlueprint* IsUnitBlueprint() const;
+
+    /**
+     * Address: 0x0051ED80 (FUN_0051ED80)
+     * Mangled: ?GetFootprintRect@RUnitBlueprint@Moho@@QBE?AV?$Rect2@H@gpg@@ABUSCoordsVec2@2@@Z
+     *
+     * What it does:
+     * Builds the grid-aligned footprint occupancy rectangle centered around
+     * `position` using `mFootprint.{mSizeX,mSizeZ}` extents.
+     */
+    [[nodiscard]] gpg::Rect2i GetFootprintRect(const SCoordsVec2& position) const;
 
     /**
      * Address: 0x0051EC50 (FUN_0051EC50)

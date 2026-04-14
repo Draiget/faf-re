@@ -24,6 +24,7 @@ namespace gpg
 namespace moho
 {
   class Unit;
+  class IUnit;
   class UnitWeapon;
 
   template <class T>
@@ -60,6 +61,33 @@ namespace moho
 
     void* ownerLinkSlot;     // points to owner weak-link slot (owner + kOwnerLinkOffset) or nullptr/sentinel
     WeakPtr<T>* nextInOwner; // intrusive next node in owner chain
+
+    WeakPtr() noexcept
+      : ownerLinkSlot(nullptr)
+      , nextInOwner(nullptr)
+    {}
+
+    /**
+     * Address (WeakPtr<IUnit> instantiation): 0x0056AA00 (FUN_0056AA00, Moho::WeakPtr_IUnit::WeakPtr_IUnit)
+     *
+     * What it does:
+     * Initializes one weak-pointer node from an owner object pointer and links
+     * it at the head of the owner's intrusive weak-link chain.
+     */
+    explicit WeakPtr(T* object) noexcept
+      : ownerLinkSlot(nullptr)
+      , nextInOwner(nullptr)
+    {
+      BindObjectUnlinked(object);
+      (void)LinkIntoOwnerChainHeadUnlinked();
+    }
+
+    // Recovered aggregate-like initialization lane used by serializer/runtime
+    // wrappers that materialize weak nodes from raw intrusive fields.
+    WeakPtr(void* encodedOwnerLinkSlot, WeakPtr<T>* nextNode) noexcept
+      : ownerLinkSlot(encodedOwnerLinkSlot)
+      , nextInOwner(nextNode)
+    {}
 
     [[nodiscard]] static bool IsSentinelSlot(void* slot) noexcept
     {
@@ -185,6 +213,14 @@ namespace moho
       return true;
     }
 
+    /**
+     * Address: 0x0057D610 (FUN_0057D610)
+     *
+     * What it does:
+     * Rebinds this weak-pointer node to a new owner-link slot, detaches the
+     * node from its previous intrusive owner chain when needed, and inserts it
+     * at the head of the new owner chain.
+     */
     void ResetFromOwnerLinkSlot(void* newOwnerLinkSlot) noexcept
     {
       if (newOwnerLinkSlot == ownerLinkSlot) {

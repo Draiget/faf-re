@@ -18,6 +18,7 @@ namespace gpg
 {
   class ReadArchive;
   class SerConstructResult;
+  class RRef;
   class RType;
   class WriteArchive;
 }
@@ -58,6 +59,14 @@ namespace moho
   public:
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x006E7D10 (FUN_006E7D10, Moho::CUnitCommand::GetDerivedObjectRef)
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    gpg::RRef GetDerivedObjectRef();
 
     /**
      * Address: 0x006E81B0 (FUN_006E81B0, ??0CUnitCommand@Moho@@QAE@PAVSim@1@ABUSSTICommandIssueData@1@@Z)
@@ -189,6 +198,23 @@ namespace moho
      * live unit entity.
      */
     [[nodiscard]] static Unit* GetTarget(CUnitCommand* command);
+
+    /**
+     * Address: 0x005F24E0 (FUN_005F24E0, Moho::CUnitCommand::IsCoordinating)
+     *
+     * What it does:
+     * Returns true when this command has at least one coordinating-order link.
+     */
+    [[nodiscard]] bool IsCoordinating() const;
+
+    /**
+     * Address: 0x006E90A0 (FUN_006E90A0, Moho::CUnitCommand::IsDone)
+     *
+     * What it does:
+     * Returns true when this command is done and all coordinating-order peers
+     * that still resolve are done as well.
+     */
+    [[nodiscard]] bool IsDone() const;
 
     /**
      * Address: 0x006F1650

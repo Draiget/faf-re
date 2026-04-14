@@ -29,6 +29,14 @@ namespace moho
     std::uint16_t mStartZ;
     std::uint16_t mWidth;
     std::uint16_t mHeight;
+
+    /**
+     * Address: 0x004FCA10 (FUN_004FCA10, Moho::CollisionDBRect::NotEqual)
+     *
+     * What it does:
+     * Returns `true` when any collision-rect lane differs from `other`.
+     */
+    [[nodiscard]] bool NotEqual(const CollisionDBRect& other) const noexcept;
   };
   static_assert(sizeof(CollisionDBRect) == 0x08, "CollisionDBRect size must be 0x08");
 
@@ -154,6 +162,14 @@ namespace moho
      * manager in reverse construction order.
      */
     ~COGrid();
+
+    /**
+     * Address: 0x007206E0 (FUN_007206E0, Moho::COGrid::OccupyRect)
+     *
+     * What it does:
+     * Marks `mOccupation` bits set for the provided grid-space rectangle.
+     */
+    void OccupyRect(const gpg::Rect2i& rect);
 
     /**
      * Address: 0x00721A90 (FUN_00721A90, Moho::COGrid::ExecuteOccupy)

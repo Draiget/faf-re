@@ -442,6 +442,60 @@ RType* CachedRBlueprintType()
     return cached;
 }
 
+  struct LegacyRTypeMapNodeRuntime
+  {
+    LegacyRTypeMapNodeRuntime* left;
+    LegacyRTypeMapNodeRuntime* parent;
+    LegacyRTypeMapNodeRuntime* right;
+    void* payload0;
+    void* payload1;
+    std::uint8_t color;
+    std::uint8_t isNil;
+    std::uint16_t padding;
+  };
+
+  /**
+   * Address: 0x008DA1A0 (FUN_008DA1A0, func_CreateRTypeNode)
+   *
+   * What it does:
+   * Allocates and initializes one red-black tree node header used by the
+   * preregistered RTTI map bootstrap lane.
+   */
+  [[maybe_unused]] LegacyRTypeMapNodeRuntime* AllocatePreregisteredRTypeMapNode()
+  {
+    auto* const node = static_cast<LegacyRTypeMapNodeRuntime*>(::operator new(sizeof(LegacyRTypeMapNodeRuntime)));
+    node->left = nullptr;
+    node->parent = nullptr;
+    node->right = nullptr;
+    node->payload0 = nullptr;
+    node->payload1 = nullptr;
+    node->color = 1u;
+    node->isNil = 0u;
+    node->padding = 0u;
+    return node;
+  }
+
+  /**
+   * Address: 0x008DA1F0 (FUN_008DA1F0, func_CreateRTypeNode_0)
+   *
+   * What it does:
+   * Allocates and initializes one red-black tree node header used by the
+   * named runtime type map bootstrap lane.
+   */
+  [[maybe_unused]] LegacyRTypeMapNodeRuntime* AllocateRuntimeTypeMapNode()
+  {
+    auto* const node = static_cast<LegacyRTypeMapNodeRuntime*>(::operator new(sizeof(LegacyRTypeMapNodeRuntime)));
+    node->left = nullptr;
+    node->parent = nullptr;
+    node->right = nullptr;
+    node->payload0 = nullptr;
+    node->payload1 = nullptr;
+    node->color = 1u;
+    node->isNil = 0u;
+    node->padding = 0u;
+    return node;
+  }
+
   constexpr const char* kReflectionHeaderPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\reflection.h";
 
   template <class TPointee>
@@ -848,6 +902,7 @@ RType* CachedRBlueprintType()
   thread_local TypeInfoCache3 gCAniPoseBoneRRefCache{false, {}};
   gpg::RType* gSharedPtrCAniPoseRRefType = nullptr;
   thread_local TypeInfoCache3 gSharedPtrCAniPoseRRefCache{false, {}};
+  thread_local TypeInfoCache3 gCScriptObjectRRefCache{false, {}};
   thread_local TypeInfoCache3 gCScriptEventRRefCache{false, {}};
   gpg::RType* gCSndParamsRRefType = nullptr;
   thread_local TypeInfoCache3 gCSndParamsRRefCache{false, {}};
@@ -1760,6 +1815,149 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
     storage.constructed = false;
   }
 
+  struct PreregisteredTypeInfoMapNodeRuntime
+  {
+    PreregisteredTypeInfoMapNodeRuntime* left;
+    PreregisteredTypeInfoMapNodeRuntime* parent;
+    PreregisteredTypeInfoMapNodeRuntime* right;
+    const std::type_info* typeInfo;
+    gpg::RType* type;
+    std::uint8_t color;
+    std::uint8_t isNil;
+    std::uint8_t reserved16[2];
+  };
+  static_assert(
+    sizeof(PreregisteredTypeInfoMapNodeRuntime) == 0x18,
+    "PreregisteredTypeInfoMapNodeRuntime size must be 0x18"
+  );
+  static_assert(
+    offsetof(PreregisteredTypeInfoMapNodeRuntime, isNil) == 0x15,
+    "PreregisteredTypeInfoMapNodeRuntime::isNil offset must be 0x15"
+  );
+
+  struct RuntimeTypeInfoMapOwnerView
+  {
+    void* unknown00;
+    PreregisteredTypeInfoMapNodeRuntime* head;
+  };
+  static_assert(offsetof(RuntimeTypeInfoMapOwnerView, head) == 0x04, "RuntimeTypeInfoMapOwnerView::head offset must be 0x04");
+
+  [[nodiscard]] PreregisteredTypeInfoMapNodeRuntime* RotateRuntimeTypeNodeLeft(
+    PreregisteredTypeInfoMapNodeRuntime* const head,
+    PreregisteredTypeInfoMapNodeRuntime* const node
+  ) noexcept
+  {
+    PreregisteredTypeInfoMapNodeRuntime* const pivot = node->right;
+    node->right = pivot->left;
+    if (node->right->isNil == 0u) {
+      node->right->parent = node;
+    }
+
+    pivot->parent = node->parent;
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else {
+      PreregisteredTypeInfoMapNodeRuntime* const nodeParent = node->parent;
+      if (node == nodeParent->left) {
+        nodeParent->left = pivot;
+      } else {
+        nodeParent->right = pivot;
+      }
+    }
+
+    pivot->left = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  [[nodiscard]] PreregisteredTypeInfoMapNodeRuntime* RotateRuntimeTypeNodeRight(
+    PreregisteredTypeInfoMapNodeRuntime* const head,
+    PreregisteredTypeInfoMapNodeRuntime* const node
+  ) noexcept
+  {
+    PreregisteredTypeInfoMapNodeRuntime* const pivot = node->left;
+    node->left = pivot->right;
+    if (node->left->isNil == 0u) {
+      node->left->parent = node;
+    }
+
+    pivot->parent = node->parent;
+    if (node == head->parent) {
+      head->parent = pivot;
+    } else {
+      PreregisteredTypeInfoMapNodeRuntime* const nodeParent = node->parent;
+      if (node == nodeParent->right) {
+        nodeParent->right = pivot;
+      } else {
+        nodeParent->left = pivot;
+      }
+    }
+
+    pivot->right = node;
+    node->parent = pivot;
+    return pivot;
+  }
+
+  /**
+   * Address: 0x008D9930 (FUN_008D9930, func_TreeRotateLeft02)
+   *
+   * What it does:
+   * Rotates one runtime type-info RB-tree node left around `node`, using
+   * the sentinel head node passed directly as `head`.
+   */
+  [[maybe_unused]] void RotateRuntimeTypeTreeLeftOnHead(
+    PreregisteredTypeInfoMapNodeRuntime* const head,
+    PreregisteredTypeInfoMapNodeRuntime* const node
+  ) noexcept
+  {
+    (void)RotateRuntimeTypeNodeLeft(head, node);
+  }
+
+  /**
+   * Address: 0x008D9980 (FUN_008D9980, func_TreeRotateRight02)
+   *
+   * What it does:
+   * Rotates one runtime type-info RB-tree node right around `node`, using
+   * the sentinel head node passed directly as `head`.
+   */
+  [[maybe_unused]] void RotateRuntimeTypeTreeRightOnHead(
+    PreregisteredTypeInfoMapNodeRuntime* const head,
+    PreregisteredTypeInfoMapNodeRuntime* const node
+  ) noexcept
+  {
+    (void)RotateRuntimeTypeNodeRight(head, node);
+  }
+
+  /**
+   * Address: 0x008D8CB0 (FUN_008D8CB0, _Tree::_Rrotate)
+   *
+   * What it does:
+   * Rotates one runtime type-info RB-tree node right around `node`, using
+   * the tree owner object's sentinel-head lane at `+0x04`.
+   */
+  [[maybe_unused]] [[nodiscard]] PreregisteredTypeInfoMapNodeRuntime* RotateRuntimeTypeTreeRight(
+    RuntimeTypeInfoMapOwnerView* const tree,
+    PreregisteredTypeInfoMapNodeRuntime* const node
+  ) noexcept
+  {
+    return RotateRuntimeTypeNodeRight(tree->head, node);
+  }
+
+  /**
+   * Address: 0x008D9BC0 (FUN_008D9BC0, _Tree::_Lrotate)
+   *
+   * What it does:
+   * Rotates one runtime type-info RB-tree node left around `node`, using
+   * the tree owner object's sentinel-head lane at `+0x04`.
+   */
+  [[maybe_unused]] [[nodiscard]] PreregisteredTypeInfoMapNodeRuntime* RotateRuntimeTypeTreeLeft(
+    RuntimeTypeInfoMapOwnerView* const tree,
+    PreregisteredTypeInfoMapNodeRuntime* const node
+  ) noexcept
+  {
+    return RotateRuntimeTypeNodeLeft(tree->head, node);
+  }
+
   TypeInfoStorage<gpg::Rect2iTypeInfo> gRect2iTypeInfoStorage{};
   TypeInfoStorage<gpg::Rect2fTypeInfo> gRect2fTypeInfoStorage{};
   gpg::Rect2iSerializer gRect2iSerializer;
@@ -1803,6 +2001,168 @@ RRef MoveCSndParamsPointerSlotRef(void* const slotObject, RRef* const sourceRef)
   [[nodiscard]] gpg::Rect2fTypeInfo& GetRect2fTypeInfo() noexcept
   {
     return EnsureTypeInfo(gRect2fTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x008DA2A0 (FUN_008DA2A0, func_DeleteTreeNode)
+   *
+   * What it does:
+   * Recursively releases one preregistered RTTI-map subtree by walking the
+   * right branch first, then deleting each traversed node while following left
+   * links.
+   */
+  [[maybe_unused]] void DestroyPreregisteredTypeInfoTree(
+    PreregisteredTypeInfoMapNodeRuntime* node
+  ) noexcept
+  {
+    PreregisteredTypeInfoMapNodeRuntime* current = node;
+    if (current->isNil != 0u) {
+      return;
+    }
+
+    do {
+      DestroyPreregisteredTypeInfoTree(current->right);
+      PreregisteredTypeInfoMapNodeRuntime* const next = current->left;
+      ::operator delete(current);
+      current = next;
+    } while (current->isNil == 0u);
+  }
+
+  /**
+   * Address: 0x008DA2E0 (FUN_008DA2E0, erase_Node)
+   *
+   * What it does:
+   * Recursively releases one RTTI-map subtree by visiting the right branch
+   * first, then deleting each traversed node while following left links.
+   */
+  [[maybe_unused]] void DestroyRuntimeTypeMapTree(
+    PreregisteredTypeInfoMapNodeRuntime* node
+  ) noexcept
+  {
+    PreregisteredTypeInfoMapNodeRuntime* current = node;
+    if (current->isNil != 0u) {
+      return;
+    }
+
+    do {
+      DestroyRuntimeTypeMapTree(current->right);
+      PreregisteredTypeInfoMapNodeRuntime* const next = current->left;
+      ::operator delete(current);
+      current = next;
+    } while (current->isNil == 0u);
+  }
+
+  /**
+   * Address: 0x008D8EB0 (func_TreeNodeSetNextFree)
+   *
+   * What it does:
+   * Advances one RTTI-map cursor to the next in-order live node, following the
+   * same right-subtree / parent-climb successor rules as the binary helper.
+   */
+  [[maybe_unused]] PreregisteredTypeInfoMapNodeRuntime* AdvanceRuntimeTypeMapCursor(
+    PreregisteredTypeInfoMapNodeRuntime** cursor
+  ) noexcept
+  {
+    PreregisteredTypeInfoMapNodeRuntime* node = *cursor;
+    if (node->isNil == 0u) {
+      PreregisteredTypeInfoMapNodeRuntime* right = node->right;
+      if (right->isNil == 0u) {
+        for (node = right->left; node->isNil == 0u; node = node->left) {
+          right = node;
+        }
+        *cursor = right;
+      } else {
+        for (node = node->parent; node->isNil == 0u; node = node->parent) {
+          if (*cursor != node->right) {
+            break;
+          }
+          *cursor = node;
+        }
+        *cursor = node;
+      }
+    }
+    return node;
+  }
+
+  /**
+   * Address: 0x008D98E0 (FUN_008D98E0, func_RTypeTreeFind)
+   *
+   * What it does:
+   * Finds the first preregistered type-map node that is not strictly less than
+   * `*lookupTypeInfo`, following the original tree-lane traversal.
+   */
+  [[maybe_unused]] [[nodiscard]] PreregisteredTypeInfoMapNodeRuntime* FindRuntimeTypeInfoLowerBoundNode(
+    PreregisteredTypeInfoMapNodeRuntime* const treeHeader,
+    const std::type_info* const* const lookupTypeInfo
+  ) noexcept
+  {
+    PreregisteredTypeInfoMapNodeRuntime* const result = treeHeader->parent;
+    PreregisteredTypeInfoMapNodeRuntime* parent = result->parent;
+    PreregisteredTypeInfoMapNodeRuntime* candidate = result;
+
+    if (parent->isNil == 0u) {
+      while (true) {
+        const std::type_info* const nodeTypeInfo = parent->typeInfo;
+        const bool hasLookup = lookupTypeInfo != nullptr && *lookupTypeInfo != nullptr;
+        const bool goRight = (nodeTypeInfo != nullptr)
+          ? (hasLookup && nodeTypeInfo->before(**lookupTypeInfo))
+          : hasLookup;
+
+        if (goRight) {
+          parent = parent->right;
+        } else {
+          candidate = parent;
+          parent = parent->left;
+        }
+
+        if (parent->isNil != 0u) {
+          return candidate;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  struct NamedTypeMapNodeRuntime
+  {
+    NamedTypeMapNodeRuntime* left;
+    NamedTypeMapNodeRuntime* parent;
+    NamedTypeMapNodeRuntime* right;
+    const char* typeName;
+    gpg::RType* type;
+    std::uint8_t color;
+    std::uint8_t isNil;
+    std::uint8_t reserved16[2];
+  };
+  static_assert(sizeof(NamedTypeMapNodeRuntime) == 0x18, "NamedTypeMapNodeRuntime size must be 0x18");
+  static_assert(offsetof(NamedTypeMapNodeRuntime, isNil) == 0x15, "NamedTypeMapNodeRuntime::isNil offset must be 0x15");
+
+  /**
+   * Address: 0x008D9A50 (FUN_008D9A50, _Tree::_Lbound)
+   *
+   * What it does:
+   * Finds the first named-type map node whose key is not lexically less than
+   * `*lookupTypeName`, following the original header-sentinel tree traversal.
+   */
+  [[maybe_unused]] [[nodiscard]] NamedTypeMapNodeRuntime* FindNamedTypeMapLowerBoundNode(
+    NamedTypeMapNodeRuntime* const treeHeader,
+    const char* const* const lookupTypeName
+  ) noexcept
+  {
+    NamedTypeMapNodeRuntime* result = treeHeader;
+    NamedTypeMapNodeRuntime* parent = result->parent;
+
+    while (parent->isNil == 0u) {
+      if (std::strcmp(parent->typeName, *lookupTypeName) < 0) {
+        parent = parent->right;
+      } else {
+        result = parent;
+        parent = parent->left;
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -1926,10 +2286,39 @@ RField::RField(const char* name, RType* type, const int offset, const int v, con
   , mDesc(desc)
 {}
 
+/**
+ * Address: 0x008DA730 (FUN_008DA730, func_RTypeTreeSetToFind)
+ *
+ * What it does:
+ * Resolves one preregistered RTTI-map node for `lookupTypeInfo` and returns
+ * end-iterator when the lower-bound candidate is not an exact/equivalent key.
+ */
+[[nodiscard]] static TypeInfoMap::iterator FindRTypePreregisteredNode(
+  TypeInfoMap& preregistered,
+  const std::type_info* const lookupTypeInfo
+)
+{
+  const TypeInfoMap::iterator found = preregistered.lower_bound(lookupTypeInfo);
+  if (found == preregistered.end()) {
+    return found;
+  }
+
+  const std::type_info* const candidateTypeInfo = found->first;
+  if (lookupTypeInfo != nullptr) {
+    if (candidateTypeInfo == nullptr || !lookupTypeInfo->before(*candidateTypeInfo)) {
+      return found;
+    }
+  } else if (candidateTypeInfo == nullptr) {
+    return found;
+  }
+
+  return preregistered.end();
+}
+
 RType* gpg::LookupRType(const std::type_info& typeInfo)
 {
   TypeInfoMap& preregistered = GetRTypePreregisteredMap();
-  const TypeInfoMap::iterator it = preregistered.find(&typeInfo);
+  const TypeInfoMap::iterator it = FindRTypePreregisteredNode(preregistered, &typeInfo);
   if (it == preregistered.end()) {
     const msvc8::string msg =
       STR_Printf("Attempting to lookup the RType for %s before it is registered.", typeInfo.name());
@@ -1991,6 +2380,13 @@ const RType* gpg::REF_GetTypeIndexed(const int index)
   return GetRTypeVec()[index];
 }
 
+/**
+ * Address: 0x008DF910 (FUN_008DF910, gpg::REF_FindTypeNamed `_0` overload)
+ *
+ * What it does:
+ * Looks up one reflected type by exact name and returns null when the input
+ * name is null or missing from the global RTTI map.
+ */
 RType* gpg::REF_FindTypeNamed(const char* const name)
 {
   if (!name) {
@@ -3146,6 +3542,40 @@ gpg::RRef* gpg::RRef_shared_ptr_CAniPose(RRef* const out, boost::shared_ptr<moho
     gSharedPtrCAniPoseRRefType,
     gSharedPtrCAniPoseRRefCache
   );
+}
+
+/**
+ * Address: 0x004C9030 (FUN_004C9030, gpg::RRef_CScriptObject)
+ *
+ * What it does:
+ * Builds a reflected reference for one `moho::CScriptObject` pointer with
+ * derived-type normalization.
+ */
+gpg::RRef* gpg::RRef_CScriptObject(RRef* const out, moho::CScriptObject* const value)
+{
+  return BuildTypedRefWithCache<moho::CScriptObject>(
+    out,
+    value,
+    typeid(moho::CScriptObject),
+    moho::CScriptObject::sType,
+    gCScriptObjectRRefCache
+  );
+}
+
+/**
+ * Address: 0x004C8EC0 (FUN_004C8EC0, sub_4C8EC0)
+ *
+ * What it does:
+ * Builds one temporary `gpg::RRef` for a script object and copies `{mObj,mType}`
+ * into caller-provided output storage.
+ */
+[[maybe_unused]] static gpg::RRef* CopyScriptObjectRefToOutput(moho::CScriptObject* const value, gpg::RRef* const out)
+{
+  gpg::RRef ref{};
+  gpg::RRef_CScriptObject(&ref, value);
+  out->mObj = ref.mObj;
+  out->mType = ref.mType;
+  return out;
 }
 
 /**
@@ -6249,6 +6679,12 @@ const RIndexed* RRef::IsIndexed() const
   return mType->IsIndexed();
 }
 
+/**
+ * Address: 0x004CC9E0 (FUN_004CC9E0, gpg::RRef::IsPointer)
+ *
+ * What it does:
+ * Returns pointer-view support for the bound type.
+ */
 const RIndexed* RRef::IsPointer() const
 {
   return mType->IsPointer();
@@ -6275,6 +6711,12 @@ RRef RRef::GetBase(const int ind) const
   return out;
 }
 
+/**
+ * Address: 0x004CC9B0 (FUN_004CC9B0, gpg::RRef::GetNumFields)
+ *
+ * What it does:
+ * Returns reflected field count for the bound type.
+ */
 int RRef::GetNumFields() const
 {
   const RField* first = mType->fields_.begin();

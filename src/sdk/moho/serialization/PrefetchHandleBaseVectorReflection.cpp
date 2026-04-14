@@ -76,6 +76,13 @@ namespace
 
   struct PrefetchHandleBaseVectorRegistration
   {
+    /**
+     * Address: 0x004A8260 (FUN_004A8260)
+     *
+     * What it does:
+     * Constructs the global `RVectorType<PrefetchHandleBase>` reflection type
+     * instance and pre-registers it for `msvc8::vector<PrefetchHandleBase>`.
+     */
     PrefetchHandleBaseVectorRegistration()
     {
       gpg::PreRegisterRType(typeid(msvc8::vector<moho::PrefetchHandleBase>), &gPrefetchHandleBaseVectorType);

@@ -11,6 +11,7 @@
 namespace moho
 {
   class CUnitCommand;
+  enum class EUnitCommandType : std::int32_t;
   struct SOCellPos;
 
   class CUnitMoveTask : public CCommandTask
@@ -109,6 +110,15 @@ namespace moho
     offsetof(CUnitMoveTask, mHasPreparedDynamicGoal) == 0x95,
     "CUnitMoveTask::mHasPreparedDynamicGoal offset must be 0x95"
   );
+
+  /**
+   * Address: 0x006189C0 (FUN_006189C0, Moho::CommandIsInstant)
+   *
+   * What it does:
+   * Returns whether one unit command type is treated as an instant command lane
+   * by move-task teardown/relink logic.
+   */
+  [[nodiscard]] bool CommandIsInstant(EUnitCommandType commandType) noexcept;
 
   /**
    * Address: 0x006190A0 (FUN_006190A0, Moho::NewMoveTask)

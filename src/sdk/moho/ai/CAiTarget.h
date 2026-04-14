@@ -18,6 +18,7 @@ namespace moho
   class Entity;
   class Sim;
   struct SSTITarget;
+  enum EImpactType : std::int32_t;
 
   class CAiTarget
   {
@@ -84,6 +85,23 @@ namespace moho
     [[nodiscard]] bool HasTarget() const;
 
     /**
+     * Address: 0x005E2D40 (FUN_005E2D40, Moho::CAiTarget::HasSameTargetEntity)
+     *
+     * What it does:
+     * Returns whether both targets resolve to the same live target-entity lane.
+     */
+    [[nodiscard]] bool HasSameTargetEntity(const CAiTarget& other) const;
+
+    /**
+     * Address: 0x005E2DB0 (FUN_005E2DB0, Moho::CAiTarget::NoTarget)
+     *
+     * What it does:
+     * Returns true when this target has a bound weak-entity lane but resolves
+     * to either a missing entity or a dead entity.
+     */
+    [[nodiscard]] bool NoTarget() const;
+
+    /**
      * Address: 0x005E2CE0 (FUN_005E2CE0, Moho::CAiTarget::GetEntity)
      *
      * What it does:
@@ -91,6 +109,15 @@ namespace moho
      * resolves to that blip's source unit entity.
      */
     [[nodiscard]] Entity* GetEntity() const;
+
+    /**
+     * Address: 0x0062A900 (FUN_0062A900, Moho::CAiTarget::ImpactDidHitEntity)
+     *
+     * What it does:
+     * Tests whether one impact event actually hit this target's entity/ground
+     * payload, including one-level parent-attach fallback for entity targets.
+     */
+    [[nodiscard]] bool ImpactDidHitEntity(Entity* entity, EImpactType impactType);
 
     /**
      * Address: 0x005E2860 (FUN_005E2860)

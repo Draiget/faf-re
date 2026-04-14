@@ -55,6 +55,20 @@ namespace
   std::unordered_map<moho::CSndParams*, std::unique_ptr<moho::HSndEntityLoop>> gSharedAmbientLoopsByParams;
   moho::HSndEntityLoop gDefaultSharedAmbientLoop{nullptr, -1, nullptr};
 
+  struct CSndParamsTemp
+  {
+    msvc8::string mCue1;      // +0x00
+    msvc8::string mBank;      // +0x1C
+    msvc8::string mLodCutoff; // +0x38
+    msvc8::string mCue2;      // +0x54
+  };
+
+  static_assert(offsetof(CSndParamsTemp, mCue1) == 0x00, "CSndParamsTemp::mCue1 offset must be 0x00");
+  static_assert(offsetof(CSndParamsTemp, mBank) == 0x1C, "CSndParamsTemp::mBank offset must be 0x1C");
+  static_assert(offsetof(CSndParamsTemp, mLodCutoff) == 0x38, "CSndParamsTemp::mLodCutoff offset must be 0x38");
+  static_assert(offsetof(CSndParamsTemp, mCue2) == 0x54, "CSndParamsTemp::mCue2 offset must be 0x54");
+  static_assert(sizeof(CSndParamsTemp) == 0x70, "CSndParamsTemp size must be 0x70");
+
   /**
    * Address: 0x004DFA50 (FUN_004DFA50, func_RegisterCSndParams)
    *
@@ -194,6 +208,21 @@ namespace
     return lhs.mCueName == rhs.mCueName && lhs.mBankName == rhs.mBankName
       && lhs.mLodCutoffVariableName == rhs.mLodCutoffVariableName
       && lhs.mRpcLoopVariableName == rhs.mRpcLoopVariableName;
+  }
+
+  /**
+   * Address: 0x004DECC0 (FUN_004DECC0, struct_CSndParamsTemp::~struct_CSndParamsTemp)
+   *
+   * What it does:
+   * Releases all four temporary string lanes used during Lua sound-parameter
+   * parsing and restores empty SSO state.
+   */
+  void ResetSndParamsTemp(CSndParamsTemp& temp)
+  {
+    temp.mCue2.tidy(true, 0U);
+    temp.mLodCutoff.tidy(true, 0U);
+    temp.mBank.tidy(true, 0U);
+    temp.mCue1.tidy(true, 0U);
   }
 
   [[nodiscard]] moho::CSndParams* FindCachedSndParamsByHashLocked(const moho::SParamKey& key, const std::uint32_t hash)
@@ -375,12 +404,21 @@ namespace
     const bool hasRpcLoopVar
   )
   {
+    CSndParamsTemp temp{};
+    temp.mCue1 = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Cue");
+    temp.mBank = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Bank");
+    temp.mLodCutoff = ReadOptionalTableStringField(tableObject.m_state, tableObject.m_stackIndex, "LodCutoff");
+    temp.mCue2 = hasRpcLoopVar ? temp.mCue1 : msvc8::string("");
+
     moho::SParamKey key{};
-    key.mCueName = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Cue");
-    key.mBankName = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Bank");
-    key.mLodCutoffVariableName = ReadOptionalTableStringField(tableObject.m_state, tableObject.m_stackIndex, "LodCutoff");
-    key.mRpcLoopVariableName = hasRpcLoopVar ? key.mCueName : msvc8::string("");
-    return FindOrCreateSndParamsByKey(key);
+    key.mCueName = temp.mCue1;
+    key.mBankName = temp.mBank;
+    key.mLodCutoffVariableName = temp.mLodCutoff;
+    key.mRpcLoopVariableName = temp.mCue2;
+
+    moho::CSndParams* const params = FindOrCreateSndParamsByKey(key);
+    ResetSndParamsTemp(temp);
+    return params;
   }
 
   class CSndParamsPointerMetatableFactory final : public moho::CScrLuaObjectFactory

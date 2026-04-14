@@ -453,6 +453,14 @@ namespace
   {
     (void)UnlinkHelperNode(gEntityConstruct);
   }
+
+  /**
+   * Address: 0x0067E150 (FUN_0067E150, nullsub_1733)
+   *
+   * What it does:
+   * Preserves one legacy no-op callback lane installed by PositionHistory RTTI init.
+   */
+  void PositionHistoryTypeInfoNoOpCallback(void* /*self*/) {}
 } // namespace
 
 namespace moho
@@ -642,6 +650,7 @@ namespace moho
   void PositionHistoryTypeInfo::Init()
   {
     size_ = sizeof(PositionHistory);
+    dtrFunc_ = &PositionHistoryTypeInfoNoOpCallback;
     gpg::RType::Init();
     Finish();
   }

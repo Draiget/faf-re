@@ -79,11 +79,6 @@ namespace
     return fallbackSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject func_CreateCAnimationManipulatorObject(LuaPlus::LuaState* const state)
-  {
-    return moho::CScrLuaMetatableFactory<moho::CAnimationManipulator>::Instance().Get(state);
-  }
-
   struct AnimationClipHeaderView
   {
     std::uint8_t mReserved00[0x08];
@@ -556,6 +551,17 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x006423C0 (FUN_006423C0, func_CreateCAnimationManipulatorObject)
+   *
+   * What it does:
+   * Materializes the `CAnimationManipulator` Lua userdata factory object.
+   */
+  [[nodiscard]] LuaPlus::LuaObject func_CreateCAnimationManipulatorObject(LuaPlus::LuaState* const state)
+  {
+    return CScrLuaMetatableFactory<CAnimationManipulator>::Instance().Get(state);
+  }
+
   int cfunc_CreateAnimator(lua_State* luaContext);
   int cfunc_CAnimationManipulatorPlayAnim(lua_State* luaContext);
 

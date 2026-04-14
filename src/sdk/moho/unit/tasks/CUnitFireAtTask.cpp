@@ -36,6 +36,24 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x0060B800 (FUN_0060B800, ??1CUnitFireAtTask@Moho@@QAE@@Z)
+   * Mangled: ??1CUnitFireAtTask@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Clears the owner-unit busy bit, unlinks the embedded target weak node,
+   * and then falls through to inherited command-task teardown.
+   */
+  CUnitFireAtTask::~CUnitFireAtTask()
+  {
+    if (mUnit != nullptr) {
+      mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Busy));
+    }
+
+    mTarget.targetEntity.UnlinkFromOwnerChain();
+    mTarget.targetEntity.ClearLinkState();
+  }
+
+  /**
    * Address: 0x0060B1B0 (FUN_0060B1B0, ??2CUnitFireAtTask@Moho@@QAE@@Z)
    *
    * What it does:

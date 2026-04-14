@@ -1,7 +1,36 @@
 #include "moho/sim/SSTICommandSource.h"
 
+#include <cstring>
+#include <string_view>
+
 namespace moho
 {
+/**
+ * Address: 0x007BF390 (FUN_007BF390, ??0SSTICommandSource@Moho@@QAE@@Z)
+ * Mangled: ??0SSTICommandSource@Moho@@QAE@IHPBD@Z
+ *
+ * What it does:
+ * Stores command-source scalar lanes, rewrites the legacy string lane into
+ * empty SSO state, then deep-copies `playerName` bytes before committing
+ * `mTimeouts`.
+ */
+SSTICommandSource::SSTICommandSource(
+  const std::uint32_t index,
+  const char* const playerName,
+  const std::int32_t timeouts
+)
+  : mIndex(index)
+  , mName()
+{
+  mName.myRes = 15U;
+  mName.mySize = 0U;
+  mName.bx.buf[0] = '\0';
+
+  const std::size_t nameLength = std::strlen(playerName);
+  mName.assign_owned(std::string_view(playerName, nameLength));
+  mTimeouts = timeouts;
+}
+
 /**
  * Address: 0x005452B0 (FUN_005452B0, ??1SSTICommandSource@Moho@@QAE@@Z)
  * Mangled: ??1SSTICommandSource@Moho@@QAE@@Z
@@ -61,5 +90,19 @@ void CopyAssignSSTICommandSourceRange(
     }
     throw;
   }
+}
+
+/**
+ * Address: 0x007C84D0 (FUN_007C84D0, func_vec_SSTICommandSource_Append)
+ *
+ * What it does:
+ * Appends one source entry into the command-source vector lane.
+ */
+void AppendSSTICommandSource(
+  msvc8::vector<SSTICommandSource>& commandSources,
+  const SSTICommandSource& entry
+)
+{
+  commandSources.push_back(entry);
 }
 } // namespace moho

@@ -542,12 +542,16 @@ namespace
     return static_cast<std::uint32_t>((std::max)(floorValue, static_cast<std::uint32_t>((std::max)(0, parsed))));
   }
 
+  /**
+   * Address: 0x008D0160 (FUN_008D0160, func_ValidWindowOption)
+   *
+   * What it does:
+   * Validates composed dual-head command-line options by accepting either
+   * two positive integers (`width,height`) or four positive integers
+   * (`w0,h0,w1,h1`).
+   */
   [[nodiscard]] bool TryGetWindowOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
   {
-    if (outArgs == nullptr) {
-      return false;
-    }
-
     if (moho::CFG_GetArgOptionComposedAliases(
           moho::CFG_GetDualOptionAliases(),
           moho::CFG_GetHeadOptionAliases(),
@@ -570,20 +574,32 @@ namespace
     return false;
   }
 
+  /**
+   * Address: 0x008D0260 (FUN_008D0260, func_ValidFullscreenArg)
+   *
+   * What it does:
+   * Validates fullscreen command-line option arguments as two positive
+   * integer dimensions.
+   */
   [[nodiscard]] bool TryGetFullscreenOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
   {
-    if (outArgs == nullptr ||
-        !moho::CFG_GetArgOptionAliases(moho::CFG_GetFullscreenOptionAliases(), 2, outArgs)) {
+    if (!moho::CFG_GetArgOptionAliases(moho::CFG_GetFullscreenOptionAliases(), 2, outArgs)) {
       return false;
     }
 
     return outArgs->size() == 2 && IsPositiveIntegerArg((*outArgs)[0]) && IsPositiveIntegerArg((*outArgs)[1]);
   }
 
+  /**
+   * Address: 0x008D02D0 (FUN_008D02D0, func_ValidWindowedOption)
+   *
+   * What it does:
+   * Validates windowed command-line option arguments as two positive
+   * integer dimensions.
+   */
   [[nodiscard]] bool TryGetWindowedOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
   {
-    if (outArgs == nullptr ||
-        !moho::CFG_GetArgOptionAliases(moho::CFG_GetWindowedOptionAliases(), 2, outArgs)) {
+    if (!moho::CFG_GetArgOptionAliases(moho::CFG_GetWindowedOptionAliases(), 2, outArgs)) {
       return false;
     }
 

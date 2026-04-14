@@ -4,6 +4,9 @@ __pycache__/
 !.vscode/settings.json
 !.vscode/c_cpp_properties.json
 
+# Temporary files of scripts
+scripts/**/*.txt
+
 .vs/
 .tmp/
 .tmp*/

@@ -5,6 +5,8 @@
 namespace gpg
 {
   class RType;
+  class ReadArchive;
+  class WriteArchive;
 }
 
 namespace moho
@@ -26,6 +28,15 @@ namespace moho
     inline static gpg::RType* sPointerType = nullptr;
 
     /**
+     * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
+     *
+     * What it does:
+     * Unlinks the embedded formation-status broadcaster lane from its
+     * intrusive listener list.
+     */
+    ~IFormationInstance();
+
+    /**
      * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
      *
      * What it does:
@@ -33,6 +44,22 @@ namespace moho
      * `IFormationInstance*`.
      */
     [[nodiscard]] static gpg::RType* GetPointerType();
+
+    /**
+     * Address: 0x00570D80 (FUN_00570D80, Moho::IFormationInstance::MemberDeserialize)
+     *
+     * What it does:
+     * Loads reflected formation-status broadcaster payload for this instance.
+     */
+    static void MemberDeserialize(IFormationInstance* object, gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x00570DD0 (FUN_00570DD0, Moho::IFormationInstance::MemberSerialize)
+     *
+     * What it does:
+     * Saves reflected formation-status broadcaster payload for this instance.
+     */
+    static void MemberSerialize(const IFormationInstance* object, gpg::WriteArchive* archive);
 
     virtual void operator_delete(std::int32_t deleteFlags) = 0;
   };

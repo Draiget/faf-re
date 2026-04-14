@@ -302,6 +302,23 @@ namespace
   }
 
   /**
+   * Address: 0x00693F90 (FUN_00693F90, gpg::fastvector_Entity::Resize)
+   *
+   * What it does:
+   * Resizes one `fastvector<Entity*>` runtime lane and fills appended slots
+   * with the caller-provided item pointer.
+   */
+  void ResizeFastVectorEntityPointers(
+    const unsigned int newSize,
+    moho::Entity* const* fillItem,
+    gpg::fastvector_runtime_view<moho::Entity*>& view
+  )
+  {
+    moho::Entity* fill = fillItem ? *fillItem : nullptr;
+    gpg::FastVectorRuntimeResizeFill(&fill, newSize, view);
+  }
+
+  /**
    * Address: 0x00BFC8D0 family (cleanup_WeakPtrEntityTypeName_00BFC8D0)
    */
   void cleanup_WeakPtrEntityTypeName()
@@ -678,7 +695,7 @@ namespace gpg
 
     auto& view = gpg::AsFastVectorRuntimeView<moho::Entity*>(obj);
     moho::Entity* fill = nullptr;
-    gpg::FastVectorRuntimeResizeFill(&fill, static_cast<unsigned int>(count), view);
+    ResizeFastVectorEntityPointers(static_cast<unsigned int>(count), &fill, view);
   }
 } // namespace gpg
 
