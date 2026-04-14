@@ -51,6 +51,8 @@ namespace gpg::gal
     static void SetInstance(Device* device);
 
     /**
+     * Address: 0x008E6700 (FUN_008E6700, func_DeivceD3DDtr)
+     *
      * What it does:
      * Destroys and clears the global active device singleton when present.
      */

@@ -11,10 +11,13 @@ namespace moho
   ID3DRenderTarget::ID3DRenderTarget() = default;
 
   /**
-   * Address: 0x0043CC90 (FUN_0043CC90, sub_43CC90)
+   * Address: 0x0043CC80 (FUN_0043CC80, ID3DRenderTarget dtor body)
+   * Address: 0x0043CC90 (FUN_0043CC90, sub_43CC90, scalar deleting destructor thunk)
    *
    * What it does:
-   * Resets base vftable state and owns the deleting-destructor entrypoint.
+   * Defaulted destructor body — compiler emits a 2-insn vtable-set + retn at
+   * 0x0043CC80 and a separate scalar-deleting thunk at 0x0043CC90. Both
+   * addresses cover this defaulted dtor.
    */
   ID3DRenderTarget::~ID3DRenderTarget() = default;
 } // namespace moho

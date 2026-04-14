@@ -122,6 +122,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0051B740 (FUN_0051B740, Moho::RProjectileBlueprint::RProjectileBlueprint)
+     *
+     * What it does:
+     * Runs base entity-blueprint construction and seeds projectile-specific
+     * display/economy/physics defaults.
+     */
+    RProjectileBlueprint(RRuleGameRules* owner, const RResId& resId);
+
+    /**
      * Address: 0x0051B580 (FUN_0051B580)
      * Mangled: ?GetClass@RProjectileBlueprint@Moho@@UBEPAVRType@gpg@@XZ
      *
@@ -159,6 +168,16 @@ namespace moho
      * random spread from `Physics.RotationalVelocityRange`.
      */
     [[nodiscard]] Wm3::Vector3f GetAngularVelocity(CRandomStream* randomStream) const;
+
+    /**
+     * Address: 0x0051C680 (?GetRandomInitialSpeed@RProjectileBlueprint@Moho@@QBEMPAVCRandomStream@2@@Z)
+     * Mangled: ?GetRandomInitialSpeed@RProjectileBlueprint@Moho@@QBEMPAVCRandomStream@2@@Z
+     *
+     * What it does:
+     * Samples a symmetric launch-speed offset around `Physics.InitialSpeed`
+     * using `Physics.InitialSpeedRange`.
+     */
+    [[nodiscard]] float GetRandomInitialSpeed(CRandomStream* randomStream) const;
   };
 
   static_assert(sizeof(RProjectileBlueprintDisplay) == 0x38, "RProjectileBlueprintDisplay size must be 0x38");

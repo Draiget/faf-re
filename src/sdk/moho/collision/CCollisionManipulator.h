@@ -252,6 +252,16 @@ namespace moho
   static_assert(sizeof(CCollisionManipulatorTypeInfo) == 0x64, "CCollisionManipulatorTypeInfo size must be 0x64");
 
   /**
+   * Address: 0x00638950 (FUN_00638950, func_CreateCollisionManipulatorObject)
+   *
+   * What it does:
+   * Resolves one cached `CCollisionManipulator` metatable object and writes it
+   * into the caller-provided LuaObject slot.
+   */
+  [[nodiscard]] LuaPlus::LuaObject*
+  func_CreateCollisionManipulatorObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x00637FA0 (FUN_00637FA0, cfunc_CreateCollisionDetector)
    *
    * What it does:

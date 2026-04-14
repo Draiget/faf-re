@@ -62,6 +62,29 @@ namespace moho
   }
 
   /**
+   * Address: 0x008158D0 (FUN_008158D0, ?SetCirrusContext@SkyDome@Moho@@QAEXMABV?$Vector3@M@Wm3@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   *
+   * What it does:
+   * Restores the cirrus multiplier lane to `1.8f`, copies direction
+   * components, drops any previous cirrus texture reference, and records the
+   * new cirrus texture path.
+   */
+  void SkyDome::SetCirrusContext(
+    const float speed,
+    const Wm3::Vector3f& direction,
+    const msvc8::string& texturePath
+  )
+  {
+    (void)speed;
+    mCirrusMultiplier = 1.8f;
+    mCirrusColor_R = direction.x;
+    mCirrusColor_G = direction.y;
+    mCirrusColor_B = direction.z;
+    mCirrusTex.reset();
+    mCirrusTexPath.reset_and_assign(texturePath);
+  }
+
+  /**
    * Address: 0x008177B0 (FUN_008177B0, ?CreateRenderAbility@SkyDome@Moho@@AAEXXZ)
    *
    * What it does:
@@ -78,6 +101,54 @@ namespace moho
     CreateDecalVertexBuffers();
     CreateDecalIndexBuffer();
   }
+
+  /**
+   * Address: 0x00817160 (FUN_00817160, ?Reset@SkyDome@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Clears all retained sky-dome GPU resources, zeros dome index/vertex
+   * counters, and marks the runtime for a full rebuild.
+   */
+  void SkyDome::Reset()
+  {
+    mCloudsTexture = {};
+    mHorizonLookupTex = {};
+    mCirrusTex = {};
+    mDecalVertBuf3 = {};
+    mDecalFormat2 = {};
+    mDecalTex3 = {};
+    mDecalTex2 = {};
+    mDecalTex1 = {};
+    mDecalVertBuf2 = {};
+    mDecalFormat1 = {};
+    mAtmosphereTex = {};
+    mAtmosphereTex2 = {};
+    mDecalIndexBuf = {};
+    mDecalVertBuf1 = {};
+    mDomeFormat = {};
+    mDomeVertBuf = {};
+    mDomeIndexBuf = {};
+    mDomeVertexCount = 0;
+    mDomeIndexCount = 0;
+    mNeedsRebuild = true;
+  }
+
+  /**
+   * Address: 0x008175D0 (FUN_008175D0, Moho::SkyDome::Destroy)
+   *
+   * What it does:
+   * Releases sky texture resource handles used by runtime sky layers.
+   */
+void SkyDome::Destroy()
+{
+    mHorizonLookupTex = {};
+    mCirrusTex = {};
+    mDecalTex3 = {};
+    mDecalTex1 = {};
+    mDecalTex2 = {};
+    mAtmosphereTex = {};
+    mAtmosphereTex2 = {};
+}
 
   /**
    * Address: 0x00817810 (FUN_00817810, ?GetEffect@SkyDome@Moho@@AAE?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@XZ)
@@ -310,5 +381,31 @@ namespace moho
     std::int16_t* const indices = mDecalIndexBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
     std::memcpy(indices, kDecalQuadIndices.data(), sizeof(kDecalQuadIndices));
     mDecalIndexBuf->Unlock();
+  }
+
+  /**
+   * Address: 0x0081A190 (FUN_0081A190, Moho::SkyDome::UpdateDecalBuffer)
+   *
+   * What it does:
+   * Uploads queued sky-decal vertex records to the dynamic decal vertex
+   * buffer and clears the pending rebuild latch.
+   */
+  void SkyDome::UpdateDecalBuffer()
+  {
+    if (!mNeedsRebuild) {
+      return;
+    }
+
+    std::uint8_t* writeCursor =
+      static_cast<std::uint8_t*>(mDecalVertBuf2->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0)));
+
+    SkyDomeDecalUploadNode* const listHead = mDecalUploadHead;
+    for (SkyDomeDecalUploadNode* node = listHead->mNext; node != listHead; node = node->mNext) {
+      std::memcpy(writeCursor, node->mVertexData, sizeof(node->mVertexData));
+      writeCursor += sizeof(node->mVertexData);
+    }
+
+    mDecalVertBuf2->Unlock();
+    mNeedsRebuild = false;
   }
 } // namespace moho

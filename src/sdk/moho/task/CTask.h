@@ -89,6 +89,22 @@ namespace moho
   static_assert(offsetof(CTask, mSubtask) == 0x10, "CTask::mSubtask offset must be 0x10");
   static_assert(offsetof(CTask, mAutoDelete) == 0x14, "CTask::mAutoDelete offset must be 0x14");
 
+  /**
+   * Address: 0x004CC750 (FUN_004CC750)
+   *
+   * What it does:
+   * Loads one `CTask` base lane through reflected type metadata.
+   */
+  void ReadCTaskBase(gpg::ReadArchive* archive, void* object, const gpg::RRef& ownerRef);
+
+  /**
+   * Address: 0x004CC780 (FUN_004CC780)
+   *
+   * What it does:
+   * Saves one `CTask` base lane through reflected type metadata.
+   */
+  void WriteCTaskBase(gpg::WriteArchive* archive, const void* object, const gpg::RRef& ownerRef);
+
   class CTaskSerializer
   {
   public:

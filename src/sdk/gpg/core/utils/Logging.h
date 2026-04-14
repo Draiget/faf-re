@@ -134,11 +134,14 @@ namespace gpg
         StreamLogTarget(std::ostream& stream, unsigned int flags);
 
         /**
+         * Address: 0x00906C30 (FUN_00906C30, ??1StreamLogTarget@gpg@@UAE@XZ)
          * Address: 0x00906CA0 (FUN_00906CA0)
+         * Demangled: gpg::StreamLogTarget::~StreamLogTarget
          * Demangled: gpg::StreamLogTarget deleting dtor thunk
          *
          * What it does:
-         * Tears down owned stream (when flagged) and unregisters from logging dispatch.
+         * Tears down owned stream (when flagged) and then lets the base
+         * `LogTarget` destructor unregister this sink from global dispatch.
          */
         ~StreamLogTarget() override;
 
@@ -613,3 +616,4 @@ namespace gpg
     static_assert(offsetof(LogScopeEntry, severity) == 0x50,
         "LogScopeEntry severity must live at +0x50");
 } // namespace gpg
+

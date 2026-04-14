@@ -16,6 +16,15 @@ namespace moho
 {
   class ID3DTextureSheet;
   class IWldTerrainRes;
+}
+
+namespace gpg
+{
+  class BinaryWriter;
+}
+
+namespace moho
+{
 
   struct CWldTerrainDecalLink
   {
@@ -30,6 +39,16 @@ namespace moho
   class CWldTerrainDecal
   {
   public:
+    /**
+     * Address: 0x0089D190 (FUN_0089D190, ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     * Mangled: ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+     *
+     * What it does:
+     * Resolves one decal type enum from the static decal-type descriptor table
+     * and warns when the descriptor text is unknown.
+     */
+    [[nodiscard]] static EWldTerrainDecalType LookupDecalType(const msvc8::string& typeDescription);
+
     struct Quad
     {
       Wm3::Vec3f mCorner0; // +0x00
@@ -56,6 +75,16 @@ namespace moho
      * registration before object teardown.
      */
     virtual ~CWldTerrainDecal();
+
+    /**
+     * Address: 0x0089CF30 (FUN_0089CF30, ?DecalSave@CWldTerrainDecal@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
+     * Mangled: ?DecalSave@CWldTerrainDecal@Moho@@QAEXAAVBinaryWriter@gpg@@@Z
+     *
+     * What it does:
+     * Serializes decal runtime payload to the binary writer in engine save
+     * order (index/type/name slots/transforms/lod lanes).
+     */
+    void DecalSave(gpg::BinaryWriter& writer);
 
     /**
      * Address: 0x0089D1F0 (Moho::CWldTerrainDecal::SetName)
@@ -109,6 +138,15 @@ namespace moho
     virtual float ComputeCutoffLOD(float distance) const;
 
     /**
+     * Address: 0x0089D400 (FUN_0089D400, Moho::CWldTerrainDecal::GetLODAlpha)
+     *
+     * What it does:
+     * Computes distance-fade alpha against either near-cutoff or far-cutoff
+     * lanes using `ren_DecalFadeFraction`.
+     */
+    [[nodiscard]] float GetLODAlpha(float distance) const;
+
+    /**
      * Address: 0x0089D3C0 (FUN_0089D3C0, Moho::CWldTerrainDecal::SetCutoffLOD)
      *
      * What it does:
@@ -123,6 +161,8 @@ namespace moho
      * Advances runtime decal state for the current frame.
      */
     virtual void Update();
+
+    static msvc8::string sTypeDesc[10];
 
   public:
     CWldTerrainDecalLink* mLinkHead;           // +0x04

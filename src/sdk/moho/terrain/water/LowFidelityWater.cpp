@@ -2,41 +2,22 @@
 
 #include <cstdint>
 
+#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DVertexStream.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterShaderRuntimeView.h"
+#include "moho/terrain/water/WaterShaderVars.h"
 
 namespace moho
 {
-  struct TerrainHeightFieldRuntimeView
-  {
-    std::uint16_t* data; // +0x00
-    std::int32_t width;  // +0x04
-    std::int32_t height; // +0x08
-  };
-
-  struct TerrainMapRuntimeView
-  {
-    TerrainHeightFieldRuntimeView* mHeightFieldObject; // +0x0000
-    void* mHeightFieldRef;                             // +0x0004
-    std::uint8_t pad_0008_1534[0x152C];               // +0x0008
-    std::uint8_t mWaterEnabled;                       // +0x1534
-    std::uint8_t pad_1535_1537[3];                    // +0x1535
-    float mWaterElevation;                            // +0x1538
-  };
-
-  static_assert(
-    offsetof(TerrainMapRuntimeView, mWaterEnabled) == 0x1534,
-    "TerrainMapRuntimeView::mWaterEnabled offset must be 0x1534"
-  );
-  static_assert(
-    offsetof(TerrainMapRuntimeView, mWaterElevation) == 0x1538,
-    "TerrainMapRuntimeView::mWaterElevation offset must be 0x1538"
-  );
-
   namespace
   {
     constexpr float kDisabledWaterElevation = -10000.0f;
@@ -68,7 +49,32 @@ namespace moho
       const float halfHeight = static_cast<float>((field->height - 1) >> 1);
       return {halfWidth * 2.0f, halfHeight * 2.0f};
     }
+
+    void SetShaderVarMem(ShaderVar& shaderVar, const std::uint32_t floatCount, const float* const values)
+    {
+      if (shaderVar.Exists()) {
+        shaderVar.mEffectVariable->SetMem(floatCount, values);
+      }
+    }
+
+    void BindTextureShaderVar(ShaderVar& shaderVar, const boost::shared_ptr<ID3DTextureSheet>& texture)
+    {
+      shaderVar.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+    }
   } // namespace
+
+  /**
+   * Address: 0x0080F970 (??1LowFidelityWater@Moho@@QAE@@Z)
+   * Mangled: ??1LowFidelityWater@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Releases retained low-fidelity render sheets and clears the bound
+   * terrain-resource lane.
+   */
+  LowFidelityWater::~LowFidelityWater()
+  {
+    ReleaseRenderSheets();
+  }
 
   /**
    * Address: 0x0080FA10 (FUN_0080FA10)
@@ -88,7 +94,7 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
 
     mTerrainRes = terrainRes;
-    TerrainMapRuntimeView* const terrainMap = reinterpret_cast<TerrainMapRuntimeView*>(terrainRes->mMap);
+    TerrainMapRuntimeView* const terrainMap = terrainRes->mMap;
     mWaterElevation = terrainMap->mWaterEnabled != 0 ? terrainMap->mWaterElevation : kDisabledWaterElevation;
 
     CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(kLowFidelityWaterVertexFormatToken);
@@ -170,12 +176,79 @@ namespace moho
   /**
    * Address: 0x0080FC70 (FUN_0080FC70)
    *
-   * std::uint32_t
+   * What it does:
+   * No-op water alpha-mask lane retained for low-fidelity slot parity.
+   */
+  bool LowFidelityWater::RenderWaterLayerAlphaMask(const GeomCamera3* const /*camera*/)
+  {
+    return true;
+  }
+
+  /**
+   * Address: 0x0080FC80 (FUN_0080FC80, Moho::LowFidelityWater::Func3)
    *
    * What it does:
-   * No-op reserved virtual lane retained for binary slot fidelity.
+   * Binds `water2/TWater`, updates water shader uniforms from camera/properties,
+   * binds normal and water-map textures, and draws the retained water sheet.
    */
-  void LowFidelityWater::ReservedNoOp(const std::uint32_t /*reservedToken*/)
+  bool LowFidelityWater::RenderWaterSurface(
+    const std::int32_t tick,
+    const float tickLerp,
+    const GeomCamera3* const camera,
+    const CWaterShaderProperties* const shaderProperties,
+    boost::weak_ptr<gpg::gal::TextureD3D9> refractionTexture,
+    boost::weak_ptr<gpg::gal::TextureD3D9> reflectionTexture
+  )
   {
+    (void)refractionTexture;
+    (void)reflectionTexture;
+
+    CD3DDevice* const device = D3D_GetDevice();
+    device->SelectFxFile("water2");
+    device->SelectTechnique("TWater");
+
+    const float viewPosition[3] = {
+      camera->inverseView.r[3].x,
+      camera->inverseView.r[3].y,
+      camera->inverseView.r[3].z,
+    };
+    SetShaderVarMem(GetWater2ViewPositionShaderVar(), 3U, viewPosition);
+    GetWater2WaterElevationShaderVar().SetFloat(mWaterElevation);
+    GetWater2TimeShaderVar().SetFloat(static_cast<float>(tick) + tickLerp);
+
+    const WaterShaderRuntimeView& shaderState = AsWaterShaderRuntimeView(*shaderProperties);
+
+    SetShaderVarMem(GetWater2WaterColorShaderVar(), 3U, shaderState.mWaterColor);
+    SetShaderVarMem(GetWater2WaterLerpShaderVar(), 2U, shaderState.mWaterLerp);
+    GetWater2SunShininessShaderVar().SetFloat(shaderState.mSunShininess);
+    GetWater2SunReflectionAmountShaderVar().SetFloat(shaderState.mSunReflectionAmount);
+    SetShaderVarMem(GetWater2SunDirectionShaderVar(), 3U, shaderState.mSunDirection);
+
+    const float sunColor[3] = {
+      shaderState.mSunColor[0] * shaderState.mSunReflectionAmount,
+      shaderState.mSunColor[1] * shaderState.mSunReflectionAmount,
+      shaderState.mSunColor[2] * shaderState.mSunReflectionAmount,
+    };
+    SetShaderVarMem(GetWater2SunColorShaderVar(), 3U, sunColor);
+
+    GetWater2WorldToViewShaderVar().SetMatrix4x4(&camera->view);
+    GetWater2ProjectionShaderVar().SetMatrix4x4(&camera->projection);
+
+    SetShaderVarMem(GetWater2NormalRepeatRateShaderVar(), 4U, shaderState.mNormalRepeatRate);
+    SetShaderVarMem(GetWater2Normal1MovementShaderVar(), 2U, shaderState.mNormal1Movement);
+    SetShaderVarMem(GetWater2Normal2MovementShaderVar(), 2U, shaderState.mNormal2Movement);
+    SetShaderVarMem(GetWater2Normal3MovementShaderVar(), 2U, shaderState.mNormal3Movement);
+    SetShaderVarMem(GetWater2Normal4MovementShaderVar(), 2U, shaderState.mNormal4Movement);
+
+    BindTextureShaderVar(GetWater2NormalMap0ShaderVar(), shaderProperties->GetNormalMap(0));
+    BindTextureShaderVar(GetWater2NormalMap1ShaderVar(), shaderProperties->GetNormalMap(1));
+    BindTextureShaderVar(GetWater2NormalMap2ShaderVar(), shaderProperties->GetNormalMap(2));
+    BindTextureShaderVar(GetWater2NormalMap3ShaderVar(), shaderProperties->GetNormalMap(3));
+
+    IWldTerrainRes* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainRes);
+    BindTextureShaderVar(GetWater2FresnelLookupShaderVar(), terrainRes->GetWaterMap());
+
+    std::int32_t primitiveType = 4;
+    return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
   }
 } // namespace moho

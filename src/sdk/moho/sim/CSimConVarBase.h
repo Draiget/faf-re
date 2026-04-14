@@ -86,6 +86,24 @@ namespace moho
     T mDefaultValue; // 0x10
   };
 
+  /**
+   * Address: 0x0057DED0 (FUN_0057DED0, Moho::TSimConVar_bool::NewInstance)
+   *
+   * What it does:
+   * Allocates one bool convar-instance object and seeds its name/default value.
+   */
+  template <>
+  CSimConVarInstanceBase* TSimConVar<bool>::CreateInstance();
+
+  /**
+   * Address: 0x005D3CE0 (FUN_005D3CE0, Moho::TSimConVar_float::NewInstance)
+   *
+   * What it does:
+   * Allocates one float convar-instance object and seeds its name/default value.
+   */
+  template <>
+  CSimConVarInstanceBase* TSimConVar<float>::CreateInstance();
+
   static_assert(
     offsetof(TSimConVar<bool>, mDefaultValue) == 0x10, "TSimConVar<bool>::mDefaultValue offset must be 0x10"
   );

@@ -205,6 +205,19 @@ namespace moho
   }
 
   /**
+   * Address: 0x0051B5C0 (FUN_0051B5C0, Moho::CRandomStream::FRand)
+   *
+   * What it does:
+   * Returns one uniform random sample in [lower, upper) from the embedded twister.
+   */
+  float CRandomStream::FRand(const float lower, const float upper) noexcept
+  {
+    const double unit = static_cast<double>(twister.NextUInt32()) * kInvTwoTo32;
+    const double range = static_cast<double>(upper) - static_cast<double>(lower);
+    return static_cast<float>(static_cast<double>(lower) + range * unit);
+  }
+
+  /**
    * Address: 0x0040F030 (FUN_0040F030, Moho::CRandomStream::Checksum)
    *
    * What it does:

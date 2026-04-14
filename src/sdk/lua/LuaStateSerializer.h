@@ -4,6 +4,8 @@
 
 namespace LuaPlus
 {
+	class LuaState;
+
 	/**
 	 * VFTABLE: 0x00D44F54
 	 * COL: 0x00E518F4
@@ -17,6 +19,15 @@ namespace LuaPlus
 		 * Demangled: sub_90B6F0
 		 */
 		virtual void RegisterSerializeFunctions();
+
+		/**
+		 * Address: 0x0090BD60 (FUN_0090BD60, LuaPlus::LuaStateSerializer::Deserialize)
+		 *
+		 * What it does:
+		 * Restores one serialized LuaState wrapper by reading root/current pointer
+		 * lanes and rebinding the wrapper through `LuaState::SetState`.
+		 */
+		static void Deserialize(gpg::ReadArchive* archive, LuaState* state, int version, const gpg::RRef* ownerRef);
 
 	public:
 		void* mNext;

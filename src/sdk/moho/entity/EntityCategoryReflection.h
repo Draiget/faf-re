@@ -51,6 +51,31 @@ namespace moho
   using CategoryWordRangeView = EntityCategorySet;
 
   /**
+   * Address: 0x0052CBD0 (FUN_0052CBD0, Moho::EntityCategory::end)
+   *
+   * What it does:
+   * Legacy iterator payload for category-word traversal; stores universe handle,
+   * bitset owner, and one current bit index cursor.
+   */
+  struct EntityCategoryIterator
+  {
+    std::uint32_t mWordUniverseHandle; // +0x00
+    BVIntSet* mSet;                    // +0x04
+    std::int32_t mCurBit;              // +0x08
+  };
+  static_assert(sizeof(EntityCategoryIterator) == 0x0C, "EntityCategoryIterator size must be 0x0C");
+
+  /**
+   * Address: 0x0052CBD0 (FUN_0052CBD0, Moho::EntityCategory::end)
+   *
+   * What it does:
+   * Builds the legacy past-end iterator view for one category set by wiring
+   * universe handle, bitset pointer, and `Max()`-equivalent cursor (`wordEnd * 32`).
+   */
+  [[nodiscard]] EntityCategoryIterator*
+    BuildEntityCategoryEndIterator(EntityCategoryIterator* out, EntityCategorySet* categorySet) noexcept;
+
+  /**
    * Address family:
    * - 0x005567F0 (FUN_005567F0, SerSave)
    * - 0x00556870 (FUN_00556870, SerLoad)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdarg>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -38,7 +39,10 @@ static_assert(sizeof(wxSize) == 0x8, "wxSize size must be 0x8");
 struct wxStringRuntime;
 struct wxColourRuntime;
 class wxMoveEventRuntime;
+class wxCloseEventRuntime;
 class wxCursor;
+struct wxMouseEventRuntime;
+class wxBitmapListRuntime;
 
 /**
  * Address: 0x009ACE50 (FUN_009ACE50, wxENTER_CRIT_SECT)
@@ -81,6 +85,22 @@ void wxLEAVE_CRIT_SECT(_RTL_CRITICAL_SECTION* criticalSection);
 [[nodiscard]] bool wxWakeUpMainThread();
 
 /**
+ * Address: 0x009674D0 (FUN_009674D0, wxIsShiftDown)
+ *
+ * What it does:
+ * Returns whether the Win32 Shift key is currently pressed.
+ */
+[[nodiscard]] bool wxIsShiftDown();
+
+/**
+ * Address: 0x009674F0 (FUN_009674F0, wxIsCtrlDown)
+ *
+ * What it does:
+ * Returns whether the Win32 Control key is currently pressed.
+ */
+[[nodiscard]] bool wxIsCtrlDown();
+
+/**
  * Address: 0x009ADC20 (FUN_009ADC20, wxMutexGuiLeave)
  *
  * What it does:
@@ -116,6 +136,320 @@ int wxGetOsVersion(int* majorVsn, int* minorVsn);
 void wxLogDebug(...);
 
 /**
+ * Address: 0x00962910 (FUN_00962910, wxLogTrace)
+ *
+ * What it does:
+ * Preserves the wx trace-log call lane as a deliberate no-op.
+ */
+void wxLogTrace(...);
+
+/**
+ * Address: 0x00966E60 (FUN_00966E60, nullsub_3482)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackH();
+
+/**
+ * Address: 0x00966E70 (FUN_00966E70, nullsub_3483)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackI();
+
+/**
+ * Address: 0x00967010 (FUN_00967010, nullsub_3484)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1G(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00983420 (FUN_00983420, nullsub_3491)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1H(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00978200 (FUN_00978200, nullsub_3488)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackA();
+
+/**
+ * Address: 0x00999B70 (FUN_00999B70, nullsub_3495)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x009A8EE0 (FUN_009A8EE0, nullsub_3496)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackB();
+
+/**
+ * Address: 0x009AD4F0 (FUN_009AD4F0, nullsub_3501)
+ *
+ * What it does:
+ * Preserves one `wxThread` vtable virtual lane as an intentional no-op.
+ */
+void wxThreadNoOpVirtualSlot();
+
+/**
+ * Address: 0x009C5EE0 (FUN_009C5EE0, nullsub_3505)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with two stack arguments as
+ * an intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall2A(std::int32_t reservedArg0, std::int32_t reservedArg1);
+
+/**
+ * Address: 0x009C5EF0 (FUN_009C5EF0, nullsub_3506)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with two stack arguments as
+ * an intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall2B(std::int32_t reservedArg0, std::int32_t reservedArg1);
+
+/**
+ * Address: 0x009C5F00 (FUN_009C5F00, nullsub_3507)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1B(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x009C88E0 (FUN_009C88E0, nullsub_3509)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackC();
+
+/**
+ * Address: 0x009C88F0 (FUN_009C88F0, nullsub_3510)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackD();
+
+/**
+ * Address: 0x009C8900 (FUN_009C8900, nullsub_3511)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackE();
+
+/**
+ * Address: 0x009C9DE0 (FUN_009C9DE0, nullsub_3512)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackJ();
+
+/**
+ * Address: 0x009C9DF0 (FUN_009C9DF0, nullsub_3513)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackK();
+
+/**
+ * Address: 0x009C9E00 (FUN_009C9E00, nullsub_3514)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackL();
+
+/**
+ * Address: 0x009D2F00 (FUN_009D2F00, nullsub_3515)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackM();
+
+/**
+ * Address: 0x00A06BF0 (FUN_00A06BF0, nullsub_3517)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1C(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00A07DD0 (FUN_00A07DD0, nullsub_3518)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with two stack arguments as
+ * an intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall2C(std::int32_t reservedArg0, std::int32_t reservedArg1);
+
+/**
+ * Address: 0x00A0B3F0 (FUN_00A0B3F0, nullsub_3519)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1D(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00A0DC40 (FUN_00A0DC40, nullsub_3520)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackF();
+
+/**
+ * Address: 0x00A0E400 (FUN_00A0E400, nullsub_3521)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1I(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00A0E410 (FUN_00A0E410, nullsub_3522)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1J(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00A18DB0 (FUN_00A18DB0, nullsub_3523)
+ *
+ * What it does:
+ * Preserves one wx runtime callback lane as an intentional no-op.
+ */
+void wxNoOpRuntimeCallbackG();
+
+/**
+ * Address: 0x00A20780 (FUN_00A20780, nullsub_8)
+ *
+ * What it does:
+ * Preserves one runtime function-pointer dispatch lane as an intentional
+ * no-op.
+ */
+void wxNoOpRuntimeDispatchSlot();
+
+/**
+ * Address: 0x00A27140 (FUN_00A27140, nullsub_3525)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1F(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00A37F30 (FUN_00A37F30, nullsub_3526)
+ *
+ * What it does:
+ * Preserves one stdcall wx runtime callback lane with one stack argument as an
+ * intentional no-op.
+ */
+void __stdcall wxNoOpRuntimeStdCall1E(std::int32_t reservedArg0);
+
+/**
+ * Address: 0x00A312A0 (FUN_00A312A0, sub_A312A0)
+ *
+ * What it does:
+ * Formats one DDE error-code lane into a human-readable wx string payload.
+ */
+wxStringRuntime* wxFormatDdeErrorString(wxStringRuntime* outText, unsigned int ddeErrorCode);
+
+/**
+ * Address: 0x00968990 (FUN_00968990, wxYieldForCommandsOnly)
+ *
+ * What it does:
+ * Pumps only `WM_COMMAND` messages from the thread queue and reposts quit
+ * state when a `WM_QUIT` lane is encountered.
+ */
+void wxYieldForCommandsOnly();
+
+/**
+ * Address: 0x00992B90 (FUN_00992B90, wxEntryStart)
+ *
+ * What it does:
+ * Runs the wx app initialization lane used by `wxEntry` startup.
+ */
+[[nodiscard]] bool wxEntryStart();
+
+/**
+ * Address: 0x00992020 (FUN_00992020, wxEntryInitGui)
+ *
+ * What it does:
+ * Calls the wx app's `OnInitGui` virtual lane and forwards its success flag.
+ */
+[[nodiscard]] bool wxEntryInitGui();
+
+/**
+ * Address: 0x00992FE0 (FUN_00992FE0, wxEntryCleanup)
+ *
+ * What it does:
+ * Runs the wx app cleanup lane used by `wxEntry` shutdown.
+ */
+void wxEntryCleanup();
+
+/**
+ * Address: 0x009BCDD0 (FUN_009BCDD0, wxDeleteStockLists)
+ *
+ * What it does:
+ * Destroys global wx stock brush/pen/font/bitmap list singletons and resets
+ * their runtime pointers.
+ */
+void wxDeleteStockLists();
+
+/**
+ * Address: 0x009C4860 (FUN_009C4860, wxSafeShowMessage)
+ *
+ * What it does:
+ * Formats one fatal-log message into the wx runtime buffer lane and shows a
+ * modal Win32 error message box titled `"Fatal Error"`.
+ */
+int wxSafeShowMessage(const wchar_t* formatText, va_list argList);
+
+/**
+ * Address: 0x009C4940 (FUN_009C4940, wxVLogFatalError)
+ *
+ * What it does:
+ * Routes one variadic fatal-log message through `wxSafeShowMessage` and then
+ * terminates the process via `abort()`.
+ */
+[[noreturn]] void wxVLogFatalError(wchar_t* formatText, ...);
+
+/**
  * Address: 0x009C7BB0 (FUN_009C7BB0, wxBeginBusyCursor)
  *
  * What it does:
@@ -124,6 +458,55 @@ void wxLogDebug(...);
  * is absent), while saving the previous cursor lane.
  */
 void wxBeginBusyCursor(wxCursor* cursor);
+
+/**
+ * Address: 0x009C7D70 (FUN_009C7D70, wxColourDisplay)
+ *
+ * What it does:
+ * Caches and returns whether the current display device reports color output.
+ */
+BOOL wxColourDisplay();
+
+/**
+ * Address: 0x009BCE40 (FUN_009BCE40, wxBitmapListInit)
+ *
+ * What it does:
+ * Runs the stock wx bitmap-list constructor lane used by the global list
+ * initializers.
+ */
+[[nodiscard]] wxBitmapListRuntime* wxBitmapListInit(wxBitmapListRuntime* object) noexcept;
+
+/**
+ * Address: 0x00976400 (FUN_00976400, wxCreateDIB)
+ *
+ * What it does:
+ * Allocates one palette-backed DIB header block, seeds its metadata, and
+ * converts the palette entries into bitmap color-table order for the caller.
+ */
+bool wxCreateDIB(
+  std::int32_t xSize,
+  std::int32_t ySize,
+  std::int32_t bitsPerPixel,
+  HPALETTE hpal,
+  LPBITMAPINFO* lpDIBHeader
+);
+
+/**
+ * Address: 0x009764C0 (FUN_009764C0, wxFreeDIB)
+ *
+ * What it does:
+ * Releases one DIB header block previously allocated by `wxCreateDIB()`.
+ */
+void wxFreeDIB(void* ptr);
+
+/**
+ * Address: 0x009C6900 (FUN_009C6900, wxRGBToColour)
+ *
+ * What it does:
+ * Initializes one `wxColourRuntime` from packed `0x00BBGGRR` RGB bytes and
+ * returns the output pointer.
+ */
+wxColourRuntime* wxRGBToColour(wxColourRuntime* outColour, std::uint32_t packedRgb);
 
 namespace wx
 {
@@ -1063,6 +1446,76 @@ struct wxStringRuntime
 static_assert(sizeof(wxStringRuntime) == 0x4, "wxStringRuntime size must be 0x4");
 
 /**
+ * Minimal recovered `wxNativeFontInfo` runtime projection.
+ *
+ * Layout matches Win32 `LOGFONTW` storage lanes used by wx font parsing code.
+ */
+class wxNativeFontInfoRuntime
+{
+public:
+  /**
+   * Address: 0x0096E1D0 (FUN_0096E1D0, wxNativeFontInfo::wxNativeFontInfo)
+   * Mangled: ??0wxNativeFontInfo@@QAE@@Z
+   *
+   * What it does:
+   * Constructs one native-font descriptor and seeds default weight/charset
+   * lanes.
+   */
+  wxNativeFontInfoRuntime();
+
+  /**
+   * Address: 0x0097EEF0 (FUN_0097EEF0, wxNativeFontInfo::FromString)
+   * Mangled: ?FromString@wxNativeFontInfo@@QAE_NABVwxString@@@Z
+   *
+   * What it does:
+   * Resets this descriptor, tokenizes one textual font description, then
+   * applies point-size/style/weight/underline/charset/facename lanes.
+   */
+  [[nodiscard]] bool FromString(const wxStringRuntime& description);
+
+  void Init() noexcept;
+  void SetPointSize(std::int32_t pointSize) noexcept;
+  void SetWeight(std::int32_t weight) noexcept;
+  void SetStyle(std::int32_t style) noexcept;
+  void SetUnderlined(bool underlined) noexcept;
+  void SetFaceName(const wxStringRuntime& faceName) noexcept;
+  void SetEncoding(std::int32_t encoding) noexcept;
+
+public:
+  std::int32_t mHeight = 0;
+  std::int32_t mWidth = 0;
+  std::int32_t mEscapement = 0;
+  std::int32_t mOrientation = 0;
+  std::int32_t mWeight = 0;
+  std::uint8_t mItalic = 0;
+  std::uint8_t mUnderline = 0;
+  std::uint8_t mStrikeOut = 0;
+  std::uint8_t mCharSet = 0;
+  std::uint8_t mOutPrecision = 0;
+  std::uint8_t mClipPrecision = 0;
+  std::uint8_t mQuality = 0;
+  std::uint8_t mPitchAndFamily = 0;
+  wchar_t mFaceName[32]{};
+};
+
+static_assert(offsetof(wxNativeFontInfoRuntime, mWeight) == 0x10, "wxNativeFontInfoRuntime::mWeight offset must be 0x10");
+static_assert(
+  offsetof(wxNativeFontInfoRuntime, mFaceName) == 0x1C,
+  "wxNativeFontInfoRuntime::mFaceName offset must be 0x1C"
+);
+static_assert(sizeof(wxNativeFontInfoRuntime) == 0x5C, "wxNativeFontInfoRuntime size must be 0x5C");
+
+/**
+ * Address: 0x0097F440 (FUN_0097F440, wxFontBase::SetNativeFontInfo)
+ * Mangled: ?SetNativeFontInfo@wxFontBase@@QAEXABVwxString@@@Z
+ *
+ * What it does:
+ * Parses one textual native-font descriptor and forwards the parsed
+ * `wxNativeFontInfo` payload into the font object's virtual native-info lane.
+ */
+void WX_FontBaseSetNativeFontInfoFromString(void* fontObject, const wxStringRuntime& description);
+
+/**
  * Minimal recovered `wxStreamBase` lane used by input stream constructors.
  */
 class wxStreamBase
@@ -1311,6 +1764,65 @@ public:
 };
 
 static_assert(sizeof(wxClientDataRuntime) == 0x4, "wxClientDataRuntime size must be 0x4");
+
+/**
+ * Minimal recovered `wxSizer` client-data container subobject used by sizer
+ * `wxClientDataContainer` vtable lanes.
+ */
+class wxSizerClientDataRuntime
+{
+public:
+  static constexpr std::uint32_t kClientPayloadObject = 1;
+  static constexpr std::uint32_t kClientPayloadData = 2;
+
+  /**
+   * Address: 0x009F34B0 (FUN_009F34B0, wxSizer::DoSetClientObject)
+   *
+   * What it does:
+   * Deletes the previous client-object payload (when present), then stores one
+   * new client-object lane and marks payload type as object-backed.
+   */
+  virtual void DoSetClientObject(void* clientObject);
+
+  /**
+   * Address: 0x009F34F0 (FUN_009F34F0, wxSizer::DoGetClientObject)
+   *
+   * What it does:
+   * Returns the stored client payload pointer lane.
+   */
+  [[nodiscard]] virtual void* DoGetClientObject() const;
+
+  /**
+   * Address: 0x009F3500 (FUN_009F3500, wxSizer::DoSetClientData)
+   *
+   * What it does:
+   * Stores one raw client-data payload pointer and marks payload type as raw
+   * client-data.
+   */
+  virtual void DoSetClientData(void* clientData);
+
+  /**
+   * Address: 0x009F3520 (FUN_009F3520, wxSizer::DoGetClientData)
+   *
+   * What it does:
+   * Returns the stored client payload pointer lane.
+   */
+  [[nodiscard]] virtual void* DoGetClientData() const;
+
+public:
+  void* mClientPayload = nullptr;           // +0x04
+  std::uint32_t mClientPayloadType = 0;     // +0x08
+};
+
+static_assert(
+  offsetof(wxSizerClientDataRuntime, mClientPayload) == 0x4,
+  "wxSizerClientDataRuntime::mClientPayload offset must be 0x4"
+);
+static_assert(
+  offsetof(wxSizerClientDataRuntime, mClientPayloadType) == 0x8,
+  "wxSizerClientDataRuntime::mClientPayloadType offset must be 0x8"
+);
+static_assert(sizeof(wxSizerClientDataRuntime) == 0xC, "wxSizerClientDataRuntime size must be 0xC");
 
 /**
  * Minimal recovered `wxImageHandler` runtime layout used by image codec startup
@@ -1945,12 +2457,99 @@ static_assert(sizeof(wxTopLevelWindowRootRuntime) == 0x4, "wxTopLevelWindowRootR
 [[nodiscard]] void** WX_FrameBaseGetClassInfo() noexcept;
 
 /**
+ * Address: 0x009C7EF0 (FUN_009C7EF0, wxGetWindowId)
+ *
+ * What it does:
+ * Returns one Win32 window-id lane (`GWL_ID`) from the provided native HWND.
+ */
+[[nodiscard]] long wxGetWindowId(void* nativeWindow) noexcept;
+
+/**
  * Address: 0x0099E8A0 (FUN_0099E8A0)
  *
  * What it does:
  * Runs non-deleting frame-runtime teardown for frame-derived windows.
  */
 [[nodiscard]] wxTopLevelWindowRuntime* WX_FrameDestroyWithoutDelete(wxTopLevelWindowRuntime* frame) noexcept;
+
+class wxLogWindowRuntime;
+
+/**
+ * Minimal recovered `wxLogFrame` runtime projection.
+ */
+class wxLogFrameRuntime : public wxTopLevelWindowRuntime
+{
+public:
+  /**
+   * Address: 0x00A0AB50 (FUN_00A0AB50, wxLogFrame::wxLogFrame)
+   * Mangled: ??0wxLogFrame@@QAE@PAVwxFrame@@PAVwxLogWindow@@PBD@Z
+   *
+   * What it does:
+   * Builds one log-output frame lane, creates the embedded multiline text
+   * control, and seeds menu/status metadata used by wx log-window plumbing.
+   */
+  wxLogFrameRuntime(
+    wxTopLevelWindowRuntime* parentFrame,
+    wxLogWindowRuntime* ownerLogWindow,
+    const wchar_t* titleText
+  );
+
+  [[nodiscard]] wxTextCtrlRuntime* TextCtrl() const noexcept;
+
+public:
+  std::uint8_t mUnknown004To177[0x174]{};
+  wxTextCtrlRuntime* mTextControl = nullptr;          // +0x178
+  wxLogWindowRuntime* mOwnerLogWindow = nullptr;      // +0x17C
+};
+
+static_assert(
+  offsetof(wxLogFrameRuntime, mTextControl) == 0x178,
+  "wxLogFrameRuntime::mTextControl offset must be 0x178"
+);
+static_assert(
+  offsetof(wxLogFrameRuntime, mOwnerLogWindow) == 0x17C,
+  "wxLogFrameRuntime::mOwnerLogWindow offset must be 0x17C"
+);
+static_assert(sizeof(wxLogFrameRuntime) == 0x180, "wxLogFrameRuntime size must be 0x180");
+
+/**
+ * Minimal recovered `wxLogWindow` runtime projection.
+ */
+class wxLogWindowRuntime
+{
+public:
+  /**
+   * Address: 0x00A0BC80 (FUN_00A0BC80, wxLogWindow::wxLogWindow)
+   * Mangled: ??0wxLogWindow@@QAE@PAVwxFrame@@PBD_N2@Z
+   *
+   * What it does:
+   * Builds one log-window owner lane, allocates the backing log frame, and
+   * optionally shows that frame immediately.
+   */
+  wxLogWindowRuntime(
+    wxTopLevelWindowRuntime* parentFrame,
+    const wchar_t* titleText,
+    bool showAtStartup,
+    bool passToOldLog
+  );
+
+  [[nodiscard]] wxLogFrameRuntime* GetFrame() const noexcept;
+
+  virtual ~wxLogWindowRuntime() = default;
+
+public:
+  std::uint8_t mUnknown04To0F[0x0C]{};
+  std::uint8_t mPassToOldLog = 0; // +0x10
+  std::uint8_t mPadding11To13[0x3]{};
+  wxLogFrameRuntime* mFrame = nullptr; // +0x14
+};
+
+static_assert(
+  offsetof(wxLogWindowRuntime, mPassToOldLog) == 0x10,
+  "wxLogWindowRuntime::mPassToOldLog offset must be 0x10"
+);
+static_assert(offsetof(wxLogWindowRuntime, mFrame) == 0x14, "wxLogWindowRuntime::mFrame offset must be 0x14");
+static_assert(sizeof(wxLogWindowRuntime) == 0x18, "wxLogWindowRuntime size must be 0x18");
 
 /**
  * Minimal recovered runtime projection for `wxControlContainer`.
@@ -2396,6 +2995,15 @@ public:
   virtual bool ProcessMessage(void** message) = 0;
 
   /**
+   * Address: 0x009927E0 (FUN_009927E0)
+   * Mangled: ?Initialize@wxApp@@SA_NXZ
+   *
+   * What it does:
+   * Runs process-wide wx app initialization and returns success.
+   */
+  static bool Initialize();
+
+  /**
    * Import thunk address: 0x00992E10
    * Mangled: __imp_?CleanUp@wxApp@@SAXXZ
    */
@@ -2500,6 +3108,23 @@ class WSupComFrame : public wxTopLevelWindowRuntime
 {
 public:
   /**
+   * Address: 0x008CE060 (FUN_008CE060, WSupComFrame::dtr)
+   *
+   * What it does:
+   * Implements deleting-dtor thunk semantics for SupCom frame runtime lanes.
+   */
+  static WSupComFrame* DeleteWithFlag(WSupComFrame* object, std::uint8_t deleteFlags) noexcept;
+
+  /**
+   * Address: 0x008CDAA0 (FUN_008CDAA0, WSupComFrame::OnCloseWindow)
+   *
+   * What it does:
+   * If the frame is iconized, exits the wx main loop; otherwise requests the
+   * Moho escape dialog.
+   */
+  void OnCloseWindow(wxCloseEventRuntime& event);
+
+  /**
    * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
    *
    * What it does:
@@ -2507,6 +3132,16 @@ public:
    * while the main frame is windowed and not device-locked.
    */
   void OnMove(wxMoveEventRuntime& event);
+
+  /**
+   * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
+   *
+   * What it does:
+   * Handles SupCom system-command defaults, including pending-maximize sync
+   * priming and Alt-menu suppression, then forwards other lanes to base wx
+   * default window-proc dispatch.
+   */
+  long MSWDefWindowProc(unsigned int message, unsigned int wParam, long lParam) override;
 
   /**
    * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
@@ -2630,6 +3265,14 @@ public:
    * ownership via the base unref tail.
    */
   ~wxCommandEventRuntime();
+
+  /**
+   * Address: synthetic (runtime clone helper)
+   *
+   * What it does:
+   * Clones one command-event payload including command/client lanes.
+   */
+  wxCommandEventRuntime* Clone() const override;
 
   wxStringRuntime mCommandString{};
   std::int32_t mCommandInt = 0;
@@ -3033,6 +3676,96 @@ namespace moho
 
 namespace moho
 {
+  class CD3DPrimBatcher;
+  class IRenderWorldView;
+  class TerrainCommon;
+  class IWldTerrainRes;
+
+  /**
+   * Runtime app shell owning SupCom wx startup loop lanes.
+   *
+   * Evidence:
+   * - `FUN_004F1E50` returns constant success for `OnInit`.
+   * - `FUN_004F1E80` clears `wxApp::m_keepGoing` (`+0x5C`) to stop the main
+   *   loop.
+   */
+  struct MohoApp : wxApp
+  {
+    /**
+     * Address: 0x004F1E50 (FUN_004F1E50, Moho::MohoApp::OnInit)
+     * Mangled: ?OnInit@MohoApp@Moho@@UAE_NXZ
+     *
+     * What it does:
+     * Returns startup success for the app bootstrap lane.
+     */
+    bool OnInit() override;
+
+    /**
+     * Address: 0x004F1E80 (FUN_004F1E80, Moho::MohoApp::ExitMainLoop)
+     * Mangled: ?ExitMainLoop@MohoApp@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Clears the loop-keepalive flag so wx main-loop pumping exits.
+     */
+    void ExitMainLoop() override;
+  };
+
+  /**
+   * Recovered bitmap-backed panel control runtime.
+   *
+   * Evidence:
+   * - ctor `FUN_004FBCC0` stores panel image lane at `+0x134`.
+   * - `FUN_004FBCB0` returns this type's static event-table lane.
+   */
+  struct WBitmapPanel : wxWindowMswRuntime
+  {
+    std::uint8_t mUnknown04To133[0x130]{};
+    void* mBitmapLane = nullptr; // +0x134
+
+    /**
+     * Address: 0x004FBCB0 (FUN_004FBCB0, ?GetEventTable@WBitmapPanel@Moho@@MBEPBUwxEventTable@@XZ)
+     * Mangled: ?GetEventTable@WBitmapPanel@Moho@@MBEPBUwxEventTable@@XZ
+     *
+     * What it does:
+     * Returns the static event-table lane for this bitmap-panel runtime type.
+     */
+    [[nodiscard]] const void* GetEventTable() const override;
+
+    static void* sm_eventTable[1];
+  };
+
+  static_assert(offsetof(WBitmapPanel, mBitmapLane) == 0x134, "moho::WBitmapPanel::mBitmapLane offset must be 0x134");
+
+  /**
+   * Recovered bitmap check-box control runtime.
+   *
+   * Evidence:
+   * - ctor `FUN_004FBE30` initializes checked state lane at `+0x168`.
+   * - `FUN_004FBE20` returns this type's static event-table lane.
+   */
+  struct WBitmapCheckBox : wxWindowMswRuntime
+  {
+    std::uint8_t mUnknown04To167[0x164]{};
+    std::uint8_t mIsChecked = 0; // +0x168
+
+    /**
+     * Address: 0x004FBE20 (FUN_004FBE20, ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ)
+     * Mangled: ?GetEventTable@WBitmapCheckBox@Moho@@MBEPBUwxEventTable@@XZ
+     *
+     * What it does:
+     * Returns the static event-table lane for this bitmap-check-box runtime
+     * type.
+     */
+    [[nodiscard]] const void* GetEventTable() const override;
+
+    static void* sm_eventTable[1];
+  };
+
+  static_assert(
+    offsetof(WBitmapCheckBox, mIsChecked) == 0x168,
+    "moho::WBitmapCheckBox::mIsChecked offset must be 0x168"
+  );
+
   // Main owner window used by WinMain lifecycle paths (`WIN_OkBox`,
   // crash handling, and startup viewport bootstrap).
   //
@@ -3050,6 +3783,8 @@ namespace moho
    * - `CScApp::CreateAppFrame` (0x008CF8C0) reads `viewport->m_parent`
    *   before calling `GetHandle()` on both parent and viewport.
    */
+  struct WPreviewImageRuntime;
+
   struct WRenViewport : wxWindowMswRuntime
   {
     std::uint8_t mUnknown04To0C[0x08];
@@ -3058,6 +3793,24 @@ namespace moho
     std::uint8_t mEnabled = 0;
     std::uint8_t mUnknown1ETo2B[0x0E];
     wxWindowBase* m_parent;
+
+    /**
+     * Address: 0x007F6690 (FUN_007F6690, ?GetEventTable@WRenViewport@Moho@@MBEPBUwxEventTable@@XZ)
+     * Mangled: ?GetEventTable@WRenViewport@Moho@@MBEPBUwxEventTable@@XZ
+     *
+     * What it does:
+     * Returns the static event-table lane for this viewport runtime type.
+     */
+    [[nodiscard]] const void* GetEventTable() const override;
+
+    /**
+     * Address: 0x007F6600 (FUN_007F6600, ?GetPrimBatcher@WRenViewport@Moho@@UBEPAVCD3DPrimBatcher@2@XZ)
+     * Mangled: ?GetPrimBatcher@WRenViewport@Moho@@UBEPAVCD3DPrimBatcher@2@XZ
+     *
+     * What it does:
+     * Returns the viewport debug-canvas primary batcher lane.
+     */
+    [[nodiscard]] virtual CD3DPrimBatcher* GetPrimBatcher() const;
 
     /**
      * Address: 0x00453AA0 (FUN_00453AA0, sub_453AA0)
@@ -3070,6 +3823,52 @@ namespace moho
     void ResetRenderState0C() noexcept;
 
     /**
+     * Address: 0x007F9E60 (FUN_007F9E60, ?AddWorldView@WRenViewport@Moho@@QAEXPAVIRenderWorldView@2@HH@Z)
+     *
+     * What it does:
+     * Inserts one world-view lane sorted by depth and creates one terrain
+     * renderer instance bound to the active world-map terrain resource.
+     */
+    void AddWorldView(IRenderWorldView* worldView, int head, int depth);
+
+    /**
+     * Address: 0x007FA090 (FUN_007FA090, ?RemoveWorldView@WRenViewport@Moho@@QAEXPAVIRenderWorldView@2@@Z)
+     *
+     * What it does:
+     * Removes the first matching world-view entry from the viewport world-view
+     * vector lane.
+     */
+    void RemoveWorldView(IRenderWorldView* worldView);
+
+    /**
+     * Address: 0x007F6610 (FUN_007F6610, ?OnMouseEnter@WRenViewport@Moho@@QAEXAAVwxMouseEvent@@@Z)
+     *
+     * What it does:
+     * When GAL device runtime is ready, focuses the primary head window handle
+     * so mouse-enter viewport transitions keep keyboard input ownership in sync.
+     */
+    void OnMouseEnter(wxMouseEventRuntime& mouseEvent);
+
+    /**
+     * Address: 0x007F65D0 (FUN_007F65D0, ?GetPreviewImage@WRenViewport@Moho@@UAE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
+     *
+     * What it does:
+     * Returns one retained preview-image shared-pointer lane from viewport
+     * runtime storage.
+     */
+    [[nodiscard]] virtual WPreviewImageRuntime GetPreviewImage() const;
+
+    /**
+     * Address: 0x007F81C0 (FUN_007F81C0, ?RenderCompositeTerrain@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
+     * Mangled: ?RenderCompositeTerrain@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
+     *
+     * What it does:
+     * Binds the active viewport head and draws terrain normal-composite lanes
+     * for the current frame, then renders the terrain skirt pass.
+     */
+    void RenderCompositeTerrain(TerrainCommon* terrain);
+
+    /**
      * Address: 0x007F8290 (FUN_007F8290, Moho::WRenViewport::RenderMeshes)
      *
      * What it does:
@@ -3078,6 +3877,77 @@ namespace moho
      * mesh batch renderer depending on `ren_ShowSkeletons`.
      */
     void RenderMeshes(int meshFlags, bool mirrored);
+
+    /**
+     * Address: 0x007F8560 (FUN_007F8560, Moho::WRenViewport::RenderEffects)
+     *
+     * What it does:
+     * Binds the viewport render target and viewport lanes for the active head,
+     * configures color writes for FX, then renders world-particle effects.
+     */
+    void RenderEffects(bool renderWaterSurface);
+
+    /**
+     * Address: 0x007F86F0 (FUN_007F86F0, ?RenderWater@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
+     * Mangled: ?RenderWater@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
+     *
+     * What it does:
+     * Binds the active viewport head to the water render target, restores the
+     * viewport rectangle, and forwards the current frame lanes to terrain
+     * water rendering.
+     */
+    void RenderWater(TerrainCommon* terrain);
+
+    /**
+     * Address: 0x007F7DF0 (FUN_007F7DF0, ?RenderReflections@WRenViewport@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Binds reflection render-target/depth lanes for the active head slot and,
+     * when enabled, renders reflection meshes through `MeshRenderer`.
+     */
+    void RenderReflections();
+
+    /**
+     * Address: 0x007F7EA0 (FUN_007F7EA0, ?SetViewportToLocalScreen@WRenViewport@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Applies this viewport's cached local-screen rectangle to the active D3D
+     * device viewport state.
+     */
+    void SetViewportToLocalScreen();
+
+    /**
+     * Address: 0x007F87F0 (FUN_007F87F0, ?UpdateRenderViewportCoordinates@WRenViewport@Moho@@AAEXXZ)
+     * Mangled: ?UpdateRenderViewportCoordinates@WRenViewport@Moho@@AAEXXZ
+     *
+     * What it does:
+     * Refreshes full-head screen dimensions and per-camera local viewport
+     * rectangle lanes used by render passes.
+     */
+    void UpdateRenderViewportCoordinates();
+
+    /**
+     * Address: 0x007F8B70 (FUN_007F8B70, ?FogOff@WRenViewport@Moho@@AAEXXZ)
+     * Mangled: ?FogOff@WRenViewport@Moho@@AAEXXZ
+     *
+     * What it does:
+     * Disables fog in the active GAL D3D9 pipeline state and restores default
+     * fog range lanes (`0.0f` to `1.0f`) with zero fog color.
+     */
+    void FogOff();
+
+    /**
+     * Address: 0x007F7F10 (FUN_007F7F10, ?RenderTerrainNormals@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z)
+     * Mangled: ?RenderTerrainNormals@WRenViewport@Moho@@AAEXPAVIRenTerrain@2@@Z
+     *
+     * What it does:
+     * Binds the terrain-normal render target and viewport lanes for the
+     * active head, then renders terrain normals when terrain debugging is
+     * enabled.
+     */
+    void RenderTerrainNormals(TerrainCommon* terrain);
+
+    static void* sm_eventTable[1];
   };
 
   static_assert(offsetof(WRenViewport, mRenderState0C) == 0x0C, "moho::WRenViewport::mRenderState0C offset must be 0x0C");
@@ -3172,12 +4042,12 @@ namespace moho
     /**
      * Address: 0x0042BB30 (FUN_0042BB30)
      */
-    [[nodiscard]] virtual WPreviewImageRuntime GetPreviewImage() const;
+    [[nodiscard]] WPreviewImageRuntime GetPreviewImage() const override;
 
     /**
      * Address: 0x0042BB50 (FUN_0042BB50)
      */
-    [[nodiscard]] virtual void* GetPrimBatcher() const;
+    [[nodiscard]] CD3DPrimBatcher* GetPrimBatcher() const override;
 
     /**
      * Address: 0x00430AC0
@@ -3220,6 +4090,24 @@ namespace moho
   [[nodiscard]] WD3DViewport* REN_CreateGameViewport(
     wxWindowBase* parentWindow, const char* title, const wxSize& size, bool hasSecondHead
   );
+
+  /**
+   * Address: 0x007F6530 (FUN_007F6530, Moho::REN_ShowSkeletons)
+   *
+   * What it does:
+   * Toggles the skeleton-visualization render flag and forwards the same bool
+   * lane into the active sim-driver sync-filter option hook when present.
+   */
+  void REN_ShowSkeletons();
+
+  /**
+   * Address: 0x007FA170 (FUN_007FA170, ?REN_GetTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
+   *
+   * What it does:
+   * Returns the active world-map terrain resource when one map is currently
+   * bound; otherwise returns null.
+   */
+  [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
 
   // 0x010A6428 in FA.
   extern WRenViewport* ren_Viewport;

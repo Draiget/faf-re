@@ -9,6 +9,17 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/thread.hpp>
 
+/**
+ * Address: 0x00AC6070 (FUN_00AC6070, tss_cleanup_implemented)
+ *
+ * What it does:
+ * Placeholder TSS cleanup hook used by the boost thread-local bootstrap lane;
+ * this binary variant is a no-op.
+ */
+void tss_cleanup_implemented()
+{
+}
+
 namespace boost
 {
   namespace detail
@@ -90,7 +101,7 @@ namespace boost
       detail::sp_counted_base* const sourceControl = sourcePair->pi;
       if (sourceControl != outPair->pi) {
         if (sourceControl != nullptr) {
-          sourceControl->add_ref_copy();
+          sourceControl->weak_add_ref();
         }
         if (outPair->pi != nullptr) {
           outPair->pi->weak_release();
@@ -135,6 +146,7 @@ namespace boost
    * Address: 0x004414F0 (FUN_004414F0)
    * Address: 0x0043F7E0 (FUN_0043F7E0)
    * Address: 0x0043FCF0 (FUN_0043FCF0)
+   * Address: 0x0089AE50 (FUN_0089AE50, Moho::WeakPtr_UICommandGraph::cpy)
    *
    * What it does:
    * Executes the same weak-owner pair rebind as `AssignWeakPairFromShared`,

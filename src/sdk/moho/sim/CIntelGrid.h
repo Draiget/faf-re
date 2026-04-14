@@ -107,6 +107,22 @@ namespace moho
     [[nodiscard]] bool IsVisible(std::int32_t x, std::int32_t z) const;
 
     /**
+     * Address: 0x005BE1C0 (FUN_005BE1C0, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z)
+     *
+     * Wm3::Vector3<float> const &
+     *
+     * IDA signature:
+     * bool __usercall Moho::CIntelGrid::IsVisible@<al>(
+     *   Moho::CIntelGrid *this@<edi>,
+     *   Wm3::Vector3f *position@<esi>)
+     *
+     * What it does:
+     * Converts world-space position to grid coordinates and returns true when
+     * the mapped cell is inside bounds and has non-zero visibility.
+     */
+    [[nodiscard]] bool IsVisible(const Wm3::Vec3f& position) const;
+
+    /**
      * Address: 0x005BE210 (FUN_005BE210, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Rect2@H@gpg@@_N@Z)
      *
      * What it does:

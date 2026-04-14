@@ -66,6 +66,41 @@ namespace moho
   struct WeakPtr_STaskEventLinkage
   {
     /**
+     * Address: 0x010C6C74 (.data, Moho::WeakPtr_STaskEventLinkage::sType)
+     *
+     * What it does:
+     * Caches reflected RTTI metadata for `WeakPtr<STaskEventLinkage>`.
+     */
+    static gpg::RType* sType;
+
+    /**
+     * Address: 0x004CC810 (FUN_004CC810)
+     *
+     * What it does:
+     * Resolves/caches the reflected type metadata for
+     * `WeakPtr<STaskEventLinkage>`.
+     */
+    static gpg::RType* ResolveType();
+
+    /**
+     * Address: 0x004CC7B0 (FUN_004CC7B0)
+     *
+     * What it does:
+     * Loads one `WeakPtr<STaskEventLinkage>` lane through reflected type
+     * metadata.
+     */
+    static void Read(gpg::ReadArchive* archive, void* object, const gpg::RRef& ownerRef);
+
+    /**
+     * Address: 0x004CC7E0 (FUN_004CC7E0)
+     *
+     * What it does:
+     * Saves one `WeakPtr<STaskEventLinkage>` lane through reflected type
+     * metadata.
+     */
+    static void Write(gpg::WriteArchive* archive, const void* object, const gpg::RRef& ownerRef);
+
+    /**
      * Address: 0x004078B0 (FUN_004078B0, Moho::WeakPtr_STaskEventLinkage::SetObject)
      *
      * What it does:

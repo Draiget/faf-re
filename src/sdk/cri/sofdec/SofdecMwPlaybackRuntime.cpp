@@ -85,6 +85,71 @@
     return ADXSTM_GetStat(SjAddressToPointer(streamHandleAddress)) == kAdxstmStatusFilesystemError;
   }
 
+  std::int32_t ADXM_WaitVsync();
+
+  /**
+   * Address: 0x00AED7D0 (FUN_00AED7D0, _mwPlySwitchToIdle)
+   *
+   * What it does:
+   * Thunk alias to ADXM vertical-sync wait lane.
+   */
+  extern "C" std::int32_t mwPlySwitchToIdle()
+  {
+    return ADXM_WaitVsync();
+  }
+
+  /**
+   * Address: 0x00AED800 (FUN_00AED800, nullsub_39)
+   *
+   * What it does:
+   * Reserved playback-resource save hook (no-op in this build).
+   */
+  void nullsub_39()
+  {
+  }
+
+  /**
+   * Address: 0x00AED810 (FUN_00AED810, nullsub_27)
+   *
+   * What it does:
+   * Reserved playback-resource restore hook (no-op in this build).
+   */
+  void nullsub_27()
+  {
+  }
+
+  /**
+   * Address: 0x00AED7E0 (FUN_00AED7E0, _mwPlySaveRsc)
+   *
+   * What it does:
+   * Dispatches playback-resource save hook.
+   */
+  extern "C" void mwPlySaveRsc()
+  {
+    nullsub_39();
+  }
+
+  /**
+   * Address: 0x00AED7F0 (FUN_00AED7F0, _mwPlyRestoreRsc)
+   *
+   * What it does:
+   * Dispatches playback-resource restore hook.
+   */
+  extern "C" void mwPlyRestoreRsc()
+  {
+    nullsub_27();
+  }
+
+  /**
+   * Address: 0x00AED820 (FUN_00AED820, nullsub_3605)
+   *
+   * What it does:
+   * Reserved no-op lane.
+   */
+  void nullsub_3605()
+  {
+  }
+
   /**
    * Address: 0x00B165D0 (FUN_00B165D0, sub_B165D0)
    *

@@ -52,6 +52,67 @@ namespace moho
   };
   static_assert(sizeof(StatSampleBuffer) == 0x0C, "StatSampleBuffer size must be 0x0C");
 
+  struct CTimeStamp
+  {
+    struct SInfo
+    {
+      std::uint16_t year{0};    // +0x00
+      std::uint8_t month{0};    // +0x02
+      std::uint8_t day{0};      // +0x03
+      std::uint8_t hour{0};     // +0x04
+      std::uint8_t minute{0};   // +0x05
+      std::uint8_t second{0};   // +0x06
+      std::uint8_t weekDay{0};  // +0x07
+      std::uint16_t yearDay{0}; // +0x08
+    };
+
+    /**
+     * Address: 0x004E9C50 (FUN_004E9C50, ??0CTimeStamp@Moho@@QAE@XZ)
+     * Mangled: ??0CTimeStamp@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Captures current wall-clock second lanes and millisecond remainder lanes
+     * from CRT time/ftime calls.
+     */
+    CTimeStamp() noexcept;
+
+    /**
+     * Address: 0x004E9CF0 (FUN_004E9CF0, ?GetString@CTimeStamp@Moho@@QBEPBDXZ)
+     * Mangled: ?GetString@CTimeStamp@Moho@@QBEPBDXZ
+     *
+     * What it does:
+     * Formats the timestamp as ctime text, strips trailing newline, and
+     * returns one process-global text buffer.
+     */
+    [[nodiscard]] const char* GetString() const noexcept;
+
+    /**
+     * Address: 0x004E9C90 (FUN_004E9C90, ?GetInfo@CTimeStamp@Moho@@QBE_NAAUSInfo@12@_N@Z)
+     * Mangled: ?GetInfo@CTimeStamp@Moho@@QBE_NAAUSInfo@12@_N@Z
+     *
+     * What it does:
+     * Converts one timestamp lane to local-calendar fields and stores year,
+     * month/day, clock time, weekday, and yearday into the output record.
+     */
+    [[nodiscard]] bool GetInfo(SInfo& outInfo, bool useFineTime) const noexcept;
+
+    std::int64_t time{0};  // +0x00
+    std::int64_t ftime{0}; // +0x08
+    std::uint16_t millis{0}; // +0x10
+  };
+  static_assert(offsetof(CTimeStamp::SInfo, year) == 0x00, "CTimeStamp::SInfo::year offset must be 0x00");
+  static_assert(offsetof(CTimeStamp::SInfo, month) == 0x02, "CTimeStamp::SInfo::month offset must be 0x02");
+  static_assert(offsetof(CTimeStamp::SInfo, day) == 0x03, "CTimeStamp::SInfo::day offset must be 0x03");
+  static_assert(offsetof(CTimeStamp::SInfo, hour) == 0x04, "CTimeStamp::SInfo::hour offset must be 0x04");
+  static_assert(offsetof(CTimeStamp::SInfo, minute) == 0x05, "CTimeStamp::SInfo::minute offset must be 0x05");
+  static_assert(offsetof(CTimeStamp::SInfo, second) == 0x06, "CTimeStamp::SInfo::second offset must be 0x06");
+  static_assert(offsetof(CTimeStamp::SInfo, weekDay) == 0x07, "CTimeStamp::SInfo::weekDay offset must be 0x07");
+  static_assert(offsetof(CTimeStamp::SInfo, yearDay) == 0x08, "CTimeStamp::SInfo::yearDay offset must be 0x08");
+  static_assert(sizeof(CTimeStamp::SInfo) == 0x0A, "CTimeStamp::SInfo size must be 0x0A");
+  static_assert(offsetof(CTimeStamp, time) == 0x00, "CTimeStamp::time offset must be 0x00");
+  static_assert(offsetof(CTimeStamp, ftime) == 0x08, "CTimeStamp::ftime offset must be 0x08");
+  static_assert(offsetof(CTimeStamp, millis) == 0x10, "CTimeStamp::millis offset must be 0x10");
+
   class StatItem : public TDatTreeItem<StatItem>
   {
   public:
@@ -89,6 +150,24 @@ namespace moho
      * Address: 0x00418990 (FUN_00418990, Moho::StatItem::GetFloat)
      */
     [[nodiscard]] float GetFloat(bool useRealtimeValue);
+
+    /**
+     * Address: 0x00585870 (FUN_00585870, Moho::StatItem::AddFloat)
+     *
+     * What it does:
+     * Atomically adds `*delta` to this stat's primary numeric lane using a
+     * compare-and-swap retry loop over the stored float bit pattern.
+     */
+    [[nodiscard]] std::int32_t AddFloat(float* delta);
+
+    /**
+     * Address: 0x00751370 (FUN_00751370, Moho::StatItem::SetInt)
+     *
+     * What it does:
+     * Atomically replaces the primary numeric lane with `*value` (or `0` when
+     * `value == nullptr`) and returns the previous integer bits.
+     */
+    [[nodiscard]] std::int32_t SetInt(const std::int32_t* value);
 
     /**
      * Address: 0x00417FE0 (FUN_00417FE0, Moho::StatItem::SetValue_0)

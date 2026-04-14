@@ -6,6 +6,10 @@
 #include <stdexcept>
 #include <typeinfo>
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
@@ -67,6 +71,39 @@ namespace
   [[nodiscard]] int CompareNameIndexKey(const msvc8::string& lhs, const msvc8::string& rhs)
   {
     return std::strcmp(lhs.c_str(), rhs.c_str());
+  }
+
+  [[nodiscard]] std::int32_t AtomicExchangeAddI32(volatile std::int32_t* const slot, const std::int32_t value) noexcept
+  {
+#if defined(_MSC_VER)
+    return static_cast<std::int32_t>(
+      _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(slot), static_cast<long>(value))
+    );
+#else
+    const std::int32_t previous = *slot;
+    *slot = previous + value;
+    return previous;
+#endif
+  }
+
+  [[nodiscard]] std::int32_t
+  AtomicCompareExchangeI32(volatile std::int32_t* const slot, const std::int32_t desired, const std::int32_t expected) noexcept
+  {
+#if defined(_MSC_VER)
+    return static_cast<std::int32_t>(
+      _InterlockedCompareExchange(
+        reinterpret_cast<volatile long*>(slot),
+        static_cast<long>(desired),
+        static_cast<long>(expected)
+      )
+    );
+#else
+    const std::int32_t observed = *slot;
+    if (observed == expected) {
+      *slot = desired;
+    }
+    return observed;
+#endif
   }
 
   [[nodiscard]] moho::ArmyNameIndexNode* FindNameIndexNode(
@@ -990,6 +1027,56 @@ namespace moho
     item->Release(0);
     InsertOrAssignNameIndexNode(&mNameIndex, key, item);
     return item;
+  }
+
+  /**
+   * Address: 0x005945E0 (FUN_005945E0, Moho::CArmyStats::GetItem)
+   */
+  CArmyStatItem* CArmyStats::GetItem(const char* const statPath)
+  {
+    const msvc8::string key(statPath);
+    if (ArmyNameIndexNode* const foundNode = FindNameIndexNode(&mNameIndex, key)) {
+      return foundNode->value;
+    }
+
+    CArmyStatItem* const item = TraverseTables(statPath, true);
+    item->Release(0);
+    InsertOrAssignNameIndexNode(&mNameIndex, key, item);
+    return item;
+  }
+
+  /**
+   * Address: 0x00593260 (FUN_00593260, func_UpdateUnitStat)
+   */
+  std::int32_t CArmyStats::UpdateUnitStat(const char* const statPath, const std::int32_t* const delta)
+  {
+    CArmyStatItem* const item = GetItem(statPath);
+    item->SynchronizeAsInt();
+    return AtomicExchangeAddI32(&item->mPrimaryValueBits, *delta);
+  }
+
+  /**
+   * Address: 0x005932C0 (FUN_005932C0, sub_5932C0)
+   */
+  std::int32_t CArmyStats::SetUnitStatGreaterOf(const char* const statPath, const std::int32_t* const candidate)
+  {
+    CArmyStatItem* const item = GetItem(statPath);
+    volatile std::int32_t* const counter = &item->mPrimaryValueBits;
+
+    std::int32_t result = AtomicCompareExchangeI32(counter, 0, 0);
+    const std::int32_t targetValue = *candidate;
+    if (targetValue > result) {
+      item->SynchronizeAsInt();
+      for (;;) {
+        const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
+        result = AtomicCompareExchangeI32(counter, targetValue, observed);
+        if (result == observed) {
+          break;
+        }
+      }
+    }
+
+    return result;
   }
 
   /**

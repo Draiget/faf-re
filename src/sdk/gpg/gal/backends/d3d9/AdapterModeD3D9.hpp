@@ -13,6 +13,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x00940990 (FUN_00940990, ??0AdapterModeD3D9@gal@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Initializes one adapter-mode lane with width/height/refresh-rate
+         * scalar values.
+         */
+        AdapterModeD3D9(std::uint32_t width, std::uint32_t height, std::uint32_t refreshRate);
+
+        /**
          * Address: 0x008E8E40 (FUN_008E8E40)
          *
          * What it does:

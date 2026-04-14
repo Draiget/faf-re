@@ -7,10 +7,12 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/effects/rendering/IEffect.h"
+#include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/CollisionBeamStartupRegistrations.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CDebugCanvas.h"
@@ -109,11 +111,76 @@ namespace
     auto& weakLink = reinterpret_cast<moho::WeakPtr<void>&>(listener);
     weakLink.UnlinkFromOwnerChain();
   }
+
+  struct CollisionBeamHelperRuntimeView
+  {
+    std::uint8_t mUnknown00_07[0x08];
+    moho::WeakPtr<moho::Entity> mTargetEntity; // +0x08
+    std::uint8_t mUnknown10_23[0x14];
+    moho::WeakPtr<moho::Entity> mSourceEntity; // +0x24
+  };
+  static_assert(sizeof(CollisionBeamHelperRuntimeView) == 0x2C, "CollisionBeamHelperRuntimeView size must be 0x2C");
+  static_assert(
+    offsetof(CollisionBeamHelperRuntimeView, mTargetEntity) == 0x08,
+    "CollisionBeamHelperRuntimeView::mTargetEntity offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CollisionBeamHelperRuntimeView, mSourceEntity) == 0x24,
+    "CollisionBeamHelperRuntimeView::mSourceEntity offset must be 0x24"
+  );
+
+  /**
+   * Address: 0x00673580 (FUN_00673580, Moho::CollisionBeamHelper::~CollisionBeamHelper)
+   *
+   * What it does:
+   * Unlinks source and target entity weak-link lanes from their owner chains.
+   */
+  [[maybe_unused]] void DestroyCollisionBeamHelperLinks(CollisionBeamHelperRuntimeView& helper) noexcept
+  {
+    helper.mSourceEntity.UnlinkFromOwnerChain();
+    helper.mTargetEntity.UnlinkFromOwnerChain();
+  }
 } // namespace
 
 namespace moho
 {
   gpg::RType* CollisionBeamEntity::sType = nullptr;
+
+  /**
+   * Address: 0x005DC340 (FUN_005DC340, Moho::ManyToOneBroadcaster_ECollisionBeamEvent::BroadcastEvent)
+   *
+   * What it does:
+   * Rebinds one collision-beam broadcaster node to the supplied listener chain
+   * head while preserving intrusive owner-chain integrity.
+   */
+  void ManyToOneBroadcaster<ECollisionBeamEvent>::BroadcastEvent(
+    ManyToOneListener<ECollisionBeamEvent>* const listener
+  )
+  {
+    void** const newOwnerLinkSlot = listener != nullptr
+      ? reinterpret_cast<void**>(reinterpret_cast<WeakObject*>(listener)->WeakLinkHeadSlot())
+      : nullptr;
+    void** const currentOwnerLinkSlot = static_cast<void**>(ownerLinkSlot);
+    if (newOwnerLinkSlot == currentOwnerLinkSlot) {
+      return;
+    }
+
+    if (currentOwnerLinkSlot != nullptr) {
+      void** cursor = currentOwnerLinkSlot;
+      while (static_cast<ManyToOneBroadcaster<ECollisionBeamEvent>*>(*cursor) != this) {
+        cursor = &static_cast<ManyToOneBroadcaster<ECollisionBeamEvent>*>(*cursor)->nextInOwner;
+      }
+      *cursor = nextInOwner;
+    }
+
+    ownerLinkSlot = newOwnerLinkSlot;
+    if (newOwnerLinkSlot != nullptr) {
+      nextInOwner = *newOwnerLinkSlot;
+      *newOwnerLinkSlot = this;
+    } else {
+      nextInOwner = nullptr;
+    }
+  }
 
   /**
    * Address: 0x00675070 (FUN_00675070, Moho::InstanceCounter<Moho::CollisionBeamEntity>::GetStatItem)
@@ -226,6 +293,69 @@ namespace moho
   }
 
   /**
+   * Address: 0x00672C00 (FUN_00672C00, Moho::CollisionBeamEntity::GetDerivedObjectRef)
+   */
+  gpg::RRef CollisionBeamEntity::GetDerivedObjectRef()
+  {
+    gpg::RRef out{};
+    out.mObj = this;
+    out.mType = GetClass();
+    return out;
+  }
+
+  /**
+   * Address: 0x00672C20 (FUN_00672C20, Moho::CollisionBeamEntity::IsCollisionBeam)
+   */
+  CollisionBeamEntity* CollisionBeamEntity::IsCollisionBeam()
+  {
+    return this;
+  }
+
+  /**
+   * Address: 0x00672CB0 (FUN_00672CB0, Moho::CollisionBeamEntity::GetBoneCount)
+   */
+  int CollisionBeamEntity::GetBoneCount() const
+  {
+    return 3;
+  }
+
+  /**
+   * Address: 0x006730B0 (FUN_006730B0, Moho::CollisionBeamEntity::GetBoneWorldTransform)
+   *
+   * What it does:
+   * Returns the current entity world transform and, for non-zero bone indices,
+   * offsets translation by `mLastBeamLength` along the transform's local +Z axis.
+   */
+  VTransform CollisionBeamEntity::GetBoneWorldTransform(const int boneIndex) const
+  {
+    VTransform result{};
+    result.orient_.w = Orientation.x;
+    result.orient_.x = Orientation.y;
+    result.orient_.y = Orientation.z;
+    result.orient_.z = Orientation.w;
+    result.pos_.x = Position.x;
+    result.pos_.y = Position.y;
+    result.pos_.z = Position.z;
+
+    if (boneIndex != 0) {
+      const float orientationW = result.orient_.w;
+      const float orientationX = result.orient_.x;
+      const float orientationY = result.orient_.y;
+      const float orientationZ = result.orient_.z;
+
+      const float rotatedXTerm = (orientationW * orientationY) + (orientationZ * orientationX);
+      const float rotatedYTerm = (orientationZ * orientationY) - (orientationW * orientationX);
+      const float rotatedZTerm = 1.0f - ((orientationY * orientationY + orientationX * orientationX) * 2.0f);
+
+      result.pos_.x += (rotatedXTerm * 2.0f) * mLastBeamLength;
+      result.pos_.y += (rotatedYTerm * 2.0f) * mLastBeamLength;
+      result.pos_.z += rotatedZTerm * mLastBeamLength;
+    }
+
+    return result;
+  }
+
+  /**
    * Address: 0x006731A0 (FUN_006731A0, Moho::CollisionBeamEntity::GetBoneLocalTransform)
    */
   VTransform CollisionBeamEntity::GetBoneLocalTransform(const int boneIndex) const
@@ -311,6 +441,23 @@ namespace moho
     }
 
     return 1;
+  }
+
+  /**
+   * Address: 0x006736B0 (FUN_006736B0, Moho::CollisionBeamEntity::OnDestroy)
+   *
+   * What it does:
+   * Forwards base destroy flow, tears down active beam effect ownership, and
+   * unlinks the effect weak-pointer lane from its owner chain.
+   */
+  void CollisionBeamEntity::OnDestroy()
+  {
+    Entity::OnDestroy();
+
+    if (IEffect* const activeEffect = mEffect.GetObjectPtr(); activeEffect != nullptr) {
+      reinterpret_cast<IEffectManager*>(SimulationRef->mEffectManager)->DestroyEffect(activeEffect);
+      mEffect.UnlinkFromOwnerChain();
+    }
   }
 
   /**

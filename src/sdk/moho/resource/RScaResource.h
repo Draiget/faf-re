@@ -138,6 +138,15 @@ namespace moho
     using ResourceHandle = boost::shared_ptr<RScaResource>;
 
     /**
+     * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
+     *
+     * What it does:
+     * Resolves cached `RScaResource` RTTI and updates the prefetch/resource
+     * type lanes used by factory virtual dispatch.
+     */
+    void Init() override;
+
+    /**
      * Address: 0x0053AAD0 (FUN_0053AAD0)
      * Mangled: ?Load@CScaResourceFactory@Moho@@UAEAAV?$shared_ptr@VRScaResource@Moho@@@boost@@AAV34@PBD@Z
      *
@@ -153,6 +162,15 @@ namespace moho
      * `LoadScaFile`, and resets the out handle on failure.
      */
     ResourceHandle& Load(ResourceHandle& outResource, const char* path) override;
+
+    /**
+     * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
+     *
+     * What it does:
+     * Clones prefetch handle lane, forwards into `LoadFromImpl`, and assigns
+     * the loaded resource handle to `outResource`.
+     */
+    ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, ResourceHandle prefetchData) override;
 
     /**
      * Forwarded by the base `LoadImpl` lane.

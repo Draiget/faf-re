@@ -192,15 +192,23 @@ namespace
 
   struct SofdecCreateInfoRuntimeView
   {
-    std::int32_t headerWord0 = 0;          // +0x00
-    std::int32_t headerWord1 = 0;          // +0x04
-    std::int32_t frameRateTimes1000 = 0;   // +0x08
-    std::int32_t height = 0;               // +0x0C
-    std::int32_t width = 0;                // +0x10
-    std::int32_t frameCount = 0;           // +0x14
-    std::int32_t extraFrameMetric = 0;     // +0x18
+    std::uint8_t headerWord0 = 0; // +0x00
+    std::uint8_t headerWord1 = 0; // +0x01
+    std::uint8_t reserved02_03[0x02]{}; // +0x02
+    const void* streamDescriptor = nullptr; // +0x04
+    const void* videoDescriptor = nullptr; // +0x08
+    const void* audioDescriptor = nullptr; // +0x0C
+    std::int32_t packetSizeBytes = 0; // +0x10
+    std::int32_t videoWidthPixels = 0; // +0x14
+    std::int32_t videoHeightPixels = 0; // +0x18
+    std::int32_t streamTimingMetric = 0; // +0x1C
+    std::int32_t videoFrameMetric = 0; // +0x20
+    std::int32_t videoBitRate = 0; // +0x24
+    std::int32_t frameCountMetric = 0; // +0x28
+    std::int32_t extraMetric = 0; // +0x2C
+    std::uint8_t reserved30_3F[0x10]{}; // +0x30
   };
-  static_assert(sizeof(SofdecCreateInfoRuntimeView) == 0x1C, "SofdecCreateInfoRuntimeView size must be 0x1C");
+  static_assert(sizeof(SofdecCreateInfoRuntimeView) == 0x40, "SofdecCreateInfoRuntimeView size must be 0x40");
 
   extern "C" void SFD_AnalyCreInf(const char* buffer, std::int32_t size, SofdecCreateInfoRuntimeView* outInfo);
   extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const SofdecCreateInfoRuntimeView* headerInfo);
@@ -312,11 +320,11 @@ namespace
     }
 
     parsedHeader.streamType = mwsfcre_DecideFtypeByHdrInf(&createInfo);
-    parsedHeader.frameRateTimes1000 = createInfo.frameRateTimes1000;
-    parsedHeader.reserved18 = createInfo.height;
-    parsedHeader.reserved1C = createInfo.width;
-    parsedHeader.frameCount = createInfo.frameCount;
-    parsedHeader.reserved24 = createInfo.extraFrameMetric;
+    parsedHeader.frameRateTimes1000 = createInfo.videoFrameMetric;
+    parsedHeader.reserved18 = createInfo.videoHeightPixels;
+    parsedHeader.reserved1C = createInfo.videoWidthPixels;
+    parsedHeader.frameCount = createInfo.frameCountMetric;
+    parsedHeader.reserved24 = createInfo.extraMetric;
     MWSFFRM_AnalyzeSofdecHeader(buffer, size, &parsedHeader);
     parsedHeader.headerValid = mwsfdcre_IsPlayableByHdrInf(&parsedHeader);
     std::memcpy(outHeaderInfo, &parsedHeader, sizeof(parsedHeader));
@@ -1460,15 +1468,21 @@ namespace
      */
     ~CUserPrefsRuntime();
 
-    msvc8::string* GetStr1() override
-    {
-      return &mPreferencesFilePath;
-    }
+    /**
+     * Address: 0x008C7540 (FUN_008C7540, Moho::CUserPrefs::GetStr1)
+     *
+     * What it does:
+     * Returns mutable access to the preferences file-path string lane.
+     */
+    msvc8::string* GetStr1() override;
 
-    msvc8::string* GetStr2() override
-    {
-      return &mPreferencesProfileName;
-    }
+    /**
+     * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
+     *
+     * What it does:
+     * Returns mutable access to the preferences profile-name string lane.
+     */
+    msvc8::string* GetStr2() override;
 
     void RefreshCurrentProfile() override
     {
@@ -1483,34 +1497,55 @@ namespace
       }
     }
 
+    /**
+     * Address: 0x008C7560 (FUN_008C7560, Moho::CUserPrefs::GetBoolean)
+     *
+     * What it does:
+     * Looks up one key from the root preferences table and returns fallback when
+     * the key is nil; otherwise returns Lua boolean conversion of that value.
+     */
     bool GetBoolean(const msvc8::string& key, const bool fallback) override
     {
-      bool valueAsBool = fallback;
-      const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
-      if (TryGetBooleanFromLuaValue(value, &valueAsBool)) {
-        return valueAsBool;
+      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      if (value.IsNil()) {
+        return fallback;
       }
-      return fallback;
+
+      return value.GetBoolean();
     }
 
+    /**
+     * Address: 0x008C75F0 (FUN_008C75F0, Moho::CUserPrefs::GetInteger)
+     *
+     * What it does:
+     * Looks up one key from the root preferences table and returns fallback when
+     * the key is nil; otherwise returns Lua integer conversion of that value.
+     */
     std::int32_t GetInteger(const msvc8::string& key, const std::int32_t fallback) override
     {
-      std::int32_t valueAsInteger = fallback;
-      const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
-      if (TryGetIntegerFromLuaValue(value, &valueAsInteger)) {
-        return valueAsInteger;
+      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      if (value.IsNil()) {
+        return fallback;
       }
-      return fallback;
+
+      return value.GetInteger();
     }
 
+    /**
+     * Address: 0x008C7680 (FUN_008C7680, Moho::CUserPrefs::GetNumber)
+     *
+     * What it does:
+     * Looks up one key from the root preferences table and returns fallback when
+     * the key is nil; otherwise returns Lua number conversion of that value.
+     */
     float GetNumber(const msvc8::string& key, const float fallback) override
     {
-      float valueAsNumber = fallback;
-      const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
-      if (TryGetNumberFromLuaValue(value, &valueAsNumber)) {
-        return valueAsNumber;
+      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      if (value.IsNil()) {
+        return fallback;
       }
-      return fallback;
+
+      return static_cast<float>(value.GetNumber());
     }
 
     /**
@@ -1706,10 +1741,13 @@ namespace
       SetPreferenceObjectRecursive(&mState, &mRoot, key, *static_cast<LuaPlus::LuaObject*>(valueObject));
     }
 
-    void* GetState() override
-    {
-      return &mState;
-    }
+    /**
+     * Address: 0x008C8610 (FUN_008C8610, Moho::CUserPrefs::GetState)
+     *
+     * What it does:
+     * Returns the underlying Lua state object pointer used by preferences.
+     */
+    void* GetState() override;
 
   private:
     msvc8::string mPreferencesFilePath;
@@ -1727,6 +1765,39 @@ namespace
    * string lanes) before restoring base interface vftable ownership.
    */
   CUserPrefsRuntime::~CUserPrefsRuntime() = default;
+
+  /**
+   * Address: 0x008C7540 (FUN_008C7540, Moho::CUserPrefs::GetStr1)
+   *
+   * What it does:
+   * Returns mutable access to the preferences file-path string lane.
+   */
+  msvc8::string* CUserPrefsRuntime::GetStr1()
+  {
+    return &mPreferencesFilePath;
+  }
+
+  /**
+   * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
+   *
+   * What it does:
+   * Returns mutable access to the preferences profile-name string lane.
+   */
+  msvc8::string* CUserPrefsRuntime::GetStr2()
+  {
+    return &mPreferencesProfileName;
+  }
+
+  /**
+   * Address: 0x008C8610 (FUN_008C8610, Moho::CUserPrefs::GetState)
+   *
+   * What it does:
+   * Returns the underlying Lua state object pointer used by preferences.
+   */
+  void* CUserPrefsRuntime::GetState()
+  {
+    return &mState;
+  }
 
   static_assert(sizeof(CUserPrefsRuntime) == 0x84, "CUserPrefsRuntime size must be 0x84");
 } // namespace
@@ -3110,6 +3181,57 @@ namespace
     }
 
     return path;
+  }
+
+  /**
+   * Address: 0x008CD160 (FUN_008CD160, func_StringCopyInitFilename)
+   *
+   * What it does:
+   * Initializes one raw `msvc8::string` lane to empty SSO state, then appends
+   * one filename segment using startup filename normalization rules.
+   */
+  [[maybe_unused]] msvc8::string*
+  InitializeFilenameBufferWithSegment(msvc8::string* const outPath, const char* const filenameSegment)
+  {
+    if (outPath == nullptr) {
+      return nullptr;
+    }
+
+    outPath->myRes = 15;
+    outPath->mySize = 0;
+    outPath->bx.buf[0] = '\0';
+    return func_StringAppendFilename(filenameSegment, outPath);
+  }
+
+  /**
+   * Address: 0x008CD020 (FUN_008CD020, func_StringComposeFilename)
+   *
+   * What it does:
+   * Builds one joined path by copying `directoryPath`, appending one filename
+   * segment with startup normalization rules, and assigning into `outPath`.
+   */
+  [[maybe_unused]] msvc8::string* ComposeDirectoryAndFilenameSegment(
+    msvc8::string* const outPath,
+    const msvc8::string& directoryPath,
+    const char* const filenameSegment
+  )
+  {
+    if (outPath == nullptr) {
+      return nullptr;
+    }
+
+    msvc8::string normalizedFilename{};
+    (void)InitializeFilenameBufferWithSegment(&normalizedFilename, filenameSegment);
+
+    msvc8::string joinedPath{};
+    joinedPath.assign_owned(directoryPath.view());
+    (void)func_StringAppendFilename(normalizedFilename.c_str(), &joinedPath);
+
+    outPath->myRes = 15;
+    outPath->mySize = 0;
+    outPath->bx.buf[0] = '\0';
+    outPath->assign_owned(joinedPath.view());
+    return outPath;
   }
 
   /**
@@ -5291,6 +5413,29 @@ std::int32_t moho::OPTIONS_GetInt(const gpg::StrArg key)
   msvc8::string optionKey;
   optionKey.assign_owned(key != nullptr ? key : "");
   return preferences->GetInteger(optionKey, 0);
+}
+
+/**
+ * Address: 0x008C69A0 (FUN_008C69A0)
+ * Mangled: ?OPTIONS_GetFloat@Moho@@YAMVStrArg@gpg@@@Z
+ *
+ * What it does:
+ * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the resulting Lua
+ * value as one floating-point lane.
+ */
+float moho::OPTIONS_GetFloat(const gpg::StrArg key)
+{
+  try {
+    LuaPlus::LuaState* const state = USER_GetLuaState();
+    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
+    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
+    LuaPlus::LuaObject optionValue = getOptionFn(key);
+    return optionValue.GetNumber();
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
+    return 0.0f;
+  }
 }
 
 /**

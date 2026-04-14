@@ -11,10 +11,12 @@ namespace moho
   ID3DDepthStencil::ID3DDepthStencil() = default;
 
   /**
-   * Address: 0x0043CCC0 (FUN_0043CCC0, sub_43CCC0)
+   * Address: 0x0043CCB0 (FUN_0043CCB0, ID3DDepthStencil dtor body)
+   * Address: 0x0043CCC0 (FUN_0043CCC0, sub_43CCC0, scalar deleting destructor thunk)
    *
    * What it does:
-   * Resets base vftable state and owns the deleting-destructor entrypoint.
+   * Defaulted destructor body — compiler emits a 2-insn vtable-set + retn at
+   * 0x0043CCB0 and a separate scalar-deleting thunk at 0x0043CCC0.
    */
   ID3DDepthStencil::~ID3DDepthStencil() = default;
 } // namespace moho

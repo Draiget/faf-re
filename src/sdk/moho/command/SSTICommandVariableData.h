@@ -43,7 +43,14 @@ namespace moho
     std::int32_t mCount;
     std::uint32_t v23;
 
-    SSTICommandVariableData() = default;
+    /**
+     * Address: 0x00552A00 (FUN_00552A00, Moho::SSTICommandVariableData::SSTICommandVariableData)
+     *
+     * What it does:
+     * Initializes command-variable payload lanes to default/empty command state
+     * (`None` targets, empty vectors, and unset count limits).
+     */
+    SSTICommandVariableData();
 
     /**
      * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)

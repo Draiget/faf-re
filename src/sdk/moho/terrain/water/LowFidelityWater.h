@@ -3,30 +3,26 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "moho/terrain/water/WaterSurface.h"
+
 namespace moho
 {
   class CD3DIndexSheet;
   class CD3DVertexSheet;
-  struct TerrainMapRuntimeView;
 
-  /**
-   * Recovered leading layout for terrain-resource lanes consumed by
-   * low-fidelity water initialization.
-   */
-  struct TerrainWaterResourceView
-  {
-    void* mVtable; // +0x00
-    TerrainMapRuntimeView* mMap; // +0x04
-  };
-
-  static_assert(
-    offsetof(TerrainWaterResourceView, mMap) == 0x04,
-    "TerrainWaterResourceView::mMap offset must be 0x04"
-  );
-
-  class LowFidelityWater
+  class LowFidelityWater : public WaterSurface
   {
   public:
+    /**
+     * Address: 0x0080F970 (??1LowFidelityWater@Moho@@QAE@@Z)
+     * Mangled: ??1LowFidelityWater@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Releases retained low-fidelity render sheets and clears the bound
+     * terrain-resource lane.
+     */
+    ~LowFidelityWater() override;
+
     /**
      * Address: 0x0080FA10 (FUN_0080FA10)
      *
@@ -39,7 +35,7 @@ namespace moho
      * Rebuilds one low-fidelity water quad vertex/index-sheet pair from the
      * current terrain map dimensions and water elevation.
      */
-    bool InitVerts(TerrainWaterResourceView* terrainResource);
+    bool InitVerts(TerrainWaterResourceView* terrainResource) override;
 
     /**
      * Address: 0x0080FC40 (FUN_0080FC40)
@@ -51,20 +47,33 @@ namespace moho
     std::int32_t ReleaseRenderSheets();
 
     /**
-     * Address: 0x0080FC70 (FUN_0080FC70)
-     *
-     * std::uint32_t
+     * Address: 0x0080FC70 (FUN_0080FC70, Moho::LowFidelityWater::Func2)
      *
      * What it does:
-     * No-op reserved virtual lane retained for binary slot fidelity.
+     * No-op water alpha-mask lane retained for low-fidelity slot parity.
      */
-    void ReservedNoOp(std::uint32_t reservedToken);
+    bool RenderWaterLayerAlphaMask(const GeomCamera3* camera) override;
 
-    void* mVtable;                            // +0x00
-    TerrainWaterResourceView* mTerrainRes;   // +0x04
-    float mWaterElevation;                    // +0x08
-    CD3DVertexSheet* mVertexSheet;            // +0x0C
-    CD3DIndexSheet* mIndexSheet;              // +0x10
+    /**
+     * Address: 0x0080FC80 (FUN_0080FC80, Moho::LowFidelityWater::Func3)
+     *
+     * What it does:
+     * Binds `water2/TWater`, updates water shader uniforms from camera and
+     * properties, binds normal/water-map textures, and draws the retained quad.
+     */
+    bool RenderWaterSurface(
+      std::int32_t tick,
+      float tickLerp,
+      const GeomCamera3* camera,
+      const CWaterShaderProperties* shaderProperties,
+      boost::weak_ptr<gpg::gal::TextureD3D9> refractionTexture,
+      boost::weak_ptr<gpg::gal::TextureD3D9> reflectionTexture
+    ) override;
+
+    TerrainWaterResourceView* mTerrainRes = nullptr; // +0x04
+    float mWaterElevation = 0.0F;                    // +0x08
+    CD3DVertexSheet* mVertexSheet = nullptr;         // +0x0C
+    CD3DIndexSheet* mIndexSheet = nullptr;           // +0x10
   };
 
   static_assert(offsetof(LowFidelityWater, mTerrainRes) == 0x04, "LowFidelityWater::mTerrainRes offset must be 0x04");

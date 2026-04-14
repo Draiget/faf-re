@@ -10,6 +10,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/render/camera/VTransform.h"
 
 #pragma init_seg(lib)
 
@@ -273,6 +274,50 @@ namespace
 namespace moho
 {
   gpg::RType* SPhysBody::sType = nullptr;
+
+  /**
+   * Address: 0x006975B0 (FUN_006975B0, Moho::SPhysBody::SPhysBody)
+   *
+   * What it does:
+   * Initializes one body from constants + physical params, seeding identity
+   * orientation and zeroed position/velocity/impulse lanes.
+   */
+  SPhysBody::SPhysBody(SPhysConstants* const constants, const SPhysBodyParams& params)
+    : mConstants(constants)
+    , mMass(1.0f)
+    , mInvInertiaTensor(1.0f, 1.0f, 1.0f)
+    , mCollisionOffset(0.0f, 0.0f, 0.0f)
+    , mPos(0.0f, 0.0f, 0.0f)
+    , mOrientation(1.0f, 0.0f, 0.0f, 0.0f)
+    , mVelocity(0.0f, 0.0f, 0.0f)
+    , mWorldImpulse(0.0f, 0.0f, 0.0f)
+  {
+    mCollisionOffset = params.collisionOffset;
+    mMass = params.mass;
+    mInvInertiaTensor.x = 1.0f / (params.mass * params.inertiaTensor.x);
+    mInvInertiaTensor.y = 1.0f / (params.mass * params.inertiaTensor.y);
+    mInvInertiaTensor.z = 1.0f / (params.mass * params.inertiaTensor.z);
+  }
+
+  /**
+   * Address: 0x006976E0 (FUN_006976E0, Moho::SPhysBody::SetTransform)
+   *
+   * What it does:
+   * Copies incoming orientation, rotates the local collision offset into world
+   * orientation space, then stores world position as offset plus transform
+   * translation lanes.
+   */
+  void SPhysBody::SetTransform(const VTransform& transform)
+  {
+    mOrientation = transform.orient_;
+
+    Wm3::Vec3f rotatedOffset{};
+    Wm3::MultiplyQuaternionVector(&rotatedOffset, mCollisionOffset, transform.orient_);
+
+    mPos.x = rotatedOffset.x + transform.pos_.x;
+    mPos.y = rotatedOffset.y + transform.pos_.y;
+    mPos.z = rotatedOffset.z + transform.pos_.z;
+  }
 
   /**
    * Address: 0x00697E70 (FUN_00697E70, Moho::SPhysBody::GetImpulse)

@@ -3,18 +3,23 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <new>
+#include <stdexcept>
 
 #include "lua/LuaObject.h"
+#include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
+#include "gpg/core/time/Timer.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/render/RCamManager.h"
+#include "moho/script/CScriptObject.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CWldSession.h"
@@ -25,26 +30,35 @@ namespace moho
 {
   int cfunc_GetCameraL(LuaPlus::LuaState* state);
   extern float cam_NearZoom;
+  extern float cam_ZoomAmount;
   extern float cam_NearFOV;
   extern float cam_FarFOV;
   extern float cam_FarPitch;
+  extern float cam_SpinSpeed;
+  extern float cam_MinSpinPitch;
   extern float cam_ShakeMult;
   extern float ren_BorderSize;
   int cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* state);
   int cfunc_CameraImplReset(lua_State* luaContext);
   int cfunc_CameraImplResetL(LuaPlus::LuaState* state);
   int cfunc_CameraImplTrackEntities(lua_State* luaContext);
+  int cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* state);
   int cfunc_CameraImplTargetEntities(lua_State* luaContext);
+  int cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* state);
   int cfunc_CameraImplNoseCam(lua_State* luaContext);
+  int cfunc_CameraImplNoseCamL(LuaPlus::LuaState* state);
   int cfunc_CameraImplHoldRotation(lua_State* luaContext);
   int cfunc_CameraImplHoldRotationL(LuaPlus::LuaState* state);
   int cfunc_CameraImplRevertRotation(lua_State* luaContext);
   int cfunc_CameraImplRevertRotationL(LuaPlus::LuaState* state);
   int cfunc_CameraImplGetZoom(lua_State* luaContext);
+  int cfunc_CameraImplGetZoomL(LuaPlus::LuaState* state);
   int cfunc_CameraImplGetFocusPosition(lua_State* luaContext);
   int cfunc_CameraImplGetFocusPositionL(LuaPlus::LuaState* state);
   int cfunc_CameraImplSaveSettings(lua_State* luaContext);
+  int cfunc_CameraImplSaveSettingsL(LuaPlus::LuaState* state);
   int cfunc_CameraImplRestoreSettings(lua_State* luaContext);
+  int cfunc_CameraImplRestoreSettingsL(LuaPlus::LuaState* state);
   int cfunc_CameraImplUseGameClock(lua_State* luaContext);
   int cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* state);
   int cfunc_CameraImplUseSystemClock(lua_State* luaContext);
@@ -116,9 +130,11 @@ namespace
   constexpr float kDegreesToRadians = 0.017453292f;
   constexpr float kPi = 3.1415927f;
   constexpr float kTwoPi = 6.2831855f;
+  constexpr float kCameraSpinPitchUpperBound = 1.5607964f;
   constexpr std::int32_t kCameraTargetTypeLocation = 0;
   constexpr std::int32_t kCameraTargetTypeBox = 1;
   constexpr std::int32_t kCameraTargetTypeEntity = 2;
+  constexpr std::int32_t kCameraTargetTypeNoseCam = 3;
   constexpr std::int32_t kCameraTargetTypeHermite = 4;
   constexpr std::int32_t kCameraTimeSourceSystem = 0;
   constexpr std::int32_t kCameraTimeSourceGame = 1;
@@ -164,10 +180,65 @@ namespace
   );
   static_assert(offsetof(CameraShakeParamsView, mScale) == 0x20, "CameraShakeParamsView::mScale offset must be 0x20");
 
+  struct CameraTargetEntityNode
+  {
+    CameraTargetEntityNode* mNext = nullptr;      // +0x00
+    CameraTargetEntityNode* mPrev = nullptr;      // +0x04
+    moho::SSelectionWeakRefUserEntity mWeakRef{}; // +0x08
+  };
+
+  static_assert(sizeof(CameraTargetEntityNode) == 0x10, "CameraTargetEntityNode size must be 0x10");
+  static_assert(
+    offsetof(CameraTargetEntityNode, mWeakRef) == 0x08,
+    "CameraTargetEntityNode::mWeakRef offset must be 0x08"
+  );
+
+  struct CameraTargetEntityList
+  {
+    void* mAllocProxy = nullptr;            // +0x00
+    CameraTargetEntityNode* mHead = nullptr; // +0x04
+    std::int32_t mSize = 0;                 // +0x08
+  };
+
+  static_assert(sizeof(CameraTargetEntityList) == 0x0C, "CameraTargetEntityList size must be 0x0C");
+  static_assert(
+    offsetof(CameraTargetEntityList, mHead) == 0x04,
+    "CameraTargetEntityList::mHead offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CameraTargetEntityList, mSize) == 0x08,
+    "CameraTargetEntityList::mSize offset must be 0x08"
+  );
+
   class CameraTimeSourceRuntime
   {
   public:
     virtual float Time() = 0;
+  };
+
+  class GameTimeSource final : public CameraTimeSourceRuntime
+  {
+  public:
+    /**
+     * Address: 0x007A66A0 (FUN_007A66A0, Moho::GameTimeSource::Time)
+     *
+     * What it does:
+     * Returns active world-session game time (`(tick + partialTick) * 0.1f`)
+     * or zero when no world-session is active.
+     */
+    float Time() override;
+  };
+
+  class SystemTimeSource final : public CameraTimeSourceRuntime
+  {
+  public:
+    /**
+     * Address: 0x004E9DC0 (FUN_004E9DC0, Moho::SystemTimeSource::Time)
+     *
+     * What it does:
+     * Returns elapsed wall-clock time in seconds from the global system timer.
+     */
+    float Time() override;
   };
 
   struct CameraImplRuntimeView
@@ -178,18 +249,18 @@ namespace
     moho::STIMap* mTerrainMap = nullptr;                  // +0x06C
     moho::GeomCamera3 mCam{};                             // +0x070
     float mVerticalZoomMetricScale = 0.0f;                // +0x338
-    std::uint8_t mUnknown33CTo33C[0x01]{};                // +0x33C
+    std::uint8_t mIsOrtho = 0;                            // +0x33C
     std::uint8_t mIsRotated = 0;                          // +0x33D
     std::uint8_t mRevertRotation = 0;                     // +0x33E
     std::uint8_t mUnknown33FTo33F[0x01]{};                // +0x33F
     float mFarFov = 0.0f;                                 // +0x340
-    float mHeading = 0.0f;                                // +0x344
+    float mFarPitch = 0.0f;                               // +0x344
     float mCurrentPitch = 0.0f;                           // +0x348
-    float mFarPitch = 0.0f;                               // +0x34C
+    float mHeading = 0.0f;                                // +0x34C
     float mHeadingZoom = 0.0f;                            // +0x350
     float mTargetZoom = 0.0f;                             // +0x354
     float mNearZoom = 0.0f;                               // +0x358
-    std::uint8_t mUnknown35CTo35F[0x04]{};                // +0x35C
+    float mZoom = 0.0f;                                   // +0x35C
     Wm3::Vec3f mOffset{};                                 // +0x360
     std::uint8_t mUnknown36CTo373[0x08]{};                // +0x36C
     float mHeadingRate = 0.0f;                            // +0x374
@@ -197,7 +268,8 @@ namespace
     std::int32_t mTargetType = 0;                         // +0x37C
     Wm3::Vec3f mTargetLocation{};                         // +0x380
     Wm3::AxisAlignedBox3f mTargetBox{};                   // +0x38C
-    std::uint8_t mUnknown3A4To3B3[0x10]{};                // +0x3A4
+    CameraTargetEntityList mTargetEntities{};             // +0x3A4
+    CameraTargetEntityNode* mActiveTargetEntityNode = nullptr; // +0x3B0
     float mTargetTimeLeft = 0.0f;                         // +0x3B4
     std::uint8_t mTargetTime = 0;                         // +0x3B8
     std::uint8_t mUnknown3B9To3BB[0x03]{};                // +0x3B9
@@ -222,13 +294,18 @@ namespace
     float mHermiteZoomStartDelta = 0.0f;                  // +0x420
     float mHermiteZoomEndDelta = 0.0f;                    // +0x424
     CameraShakeParamsView mCamShakeParams{};              // +0x428
-    std::uint8_t mUnknown44CTo44F[0x04]{};                // +0x44C
+    std::uint8_t mCanShake = 0;                           // +0x44C
+    std::uint8_t mUnknown44DTo44F[0x03]{};                // +0x44D
     std::int32_t mAccType = 0;                            // +0x450
   };
 
   static_assert(
     offsetof(CameraImplRuntimeView, mLuaObject) == 0x03C,
     "CameraImplRuntimeView::mLuaObject offset must be 0x03C"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mIsOrtho) == 0x33C,
+    "CameraImplRuntimeView::mIsOrtho offset must be 0x33C"
   );
   static_assert(
     offsetof(CameraImplRuntimeView, mIsRotated) == 0x33D,
@@ -252,12 +329,12 @@ namespace
     "CameraImplRuntimeView::mVerticalZoomMetricScale offset must be 0x338"
   );
   static_assert(
-    offsetof(CameraImplRuntimeView, mHeading) == 0x344,
-    "CameraImplRuntimeView::mHeading offset must be 0x344"
+    offsetof(CameraImplRuntimeView, mFarPitch) == 0x344,
+    "CameraImplRuntimeView::mFarPitch offset must be 0x344"
   );
   static_assert(
-    offsetof(CameraImplRuntimeView, mFarPitch) == 0x34C,
-    "CameraImplRuntimeView::mFarPitch offset must be 0x34C"
+    offsetof(CameraImplRuntimeView, mHeading) == 0x34C,
+    "CameraImplRuntimeView::mHeading offset must be 0x34C"
   );
   static_assert(
     offsetof(CameraImplRuntimeView, mTargetZoom) == 0x354,
@@ -266,6 +343,10 @@ namespace
   static_assert(
     offsetof(CameraImplRuntimeView, mNearZoom) == 0x358,
     "CameraImplRuntimeView::mNearZoom offset must be 0x358"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mZoom) == 0x35C,
+    "CameraImplRuntimeView::mZoom offset must be 0x35C"
   );
   static_assert(
     offsetof(CameraImplRuntimeView, mOffset) == 0x360,
@@ -290,6 +371,14 @@ namespace
   static_assert(
     offsetof(CameraImplRuntimeView, mTargetBox) == 0x38C,
     "CameraImplRuntimeView::mTargetBox offset must be 0x38C"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTargetEntities) == 0x3A4,
+    "CameraImplRuntimeView::mTargetEntities offset must be 0x3A4"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mActiveTargetEntityNode) == 0x3B0,
+    "CameraImplRuntimeView::mActiveTargetEntityNode offset must be 0x3B0"
   );
   static_assert(
     offsetof(CameraImplRuntimeView, mTargetTimeLeft) == 0x3B4,
@@ -340,6 +429,10 @@ namespace
     "CameraImplRuntimeView::mCamShakeParams offset must be 0x428"
   );
   static_assert(
+    offsetof(CameraImplRuntimeView, mCanShake) == 0x44C,
+    "CameraImplRuntimeView::mCanShake offset must be 0x44C"
+  );
+  static_assert(
     offsetof(CameraImplRuntimeView, mAccType) == 0x450,
     "CameraImplRuntimeView::mAccType offset must be 0x450"
   );
@@ -353,6 +446,34 @@ namespace
   [[nodiscard]] const CameraImplRuntimeView* AsRuntimeView(const moho::CameraImpl* const camera) noexcept
   {
     return reinterpret_cast<const CameraImplRuntimeView*>(camera);
+  }
+
+  /**
+   * Address: 0x007A66A0 (FUN_007A66A0, Moho::GameTimeSource::Time)
+   *
+   * What it does:
+   * Returns active world-session game time (`(tick + partialTick) * 0.1f`)
+   * or zero when no world-session is active.
+   */
+  float GameTimeSource::Time()
+  {
+    const moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
+    if (activeSession == nullptr) {
+      return 0.0f;
+    }
+
+    return (static_cast<float>(activeSession->mGameTick) + activeSession->mTimeSinceLastTick) * 0.1f;
+  }
+
+  /**
+   * Address: 0x004E9DC0 (FUN_004E9DC0, Moho::SystemTimeSource::Time)
+   *
+   * What it does:
+   * Returns elapsed wall-clock time in seconds from the global system timer.
+   */
+  float SystemTimeSource::Time()
+  {
+    return gpg::time::GetSystemTimer().ElapsedSeconds();
   }
 
   struct CameraTransitionFlagView
@@ -506,6 +627,353 @@ namespace
   }
 
   /**
+   * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
+   *
+   * What it does:
+   * Stops entity tracking notifications when needed and resets camera target
+   * mode/timing lanes back to untargeted location mode.
+   */
+  void TargetNothingRuntime(moho::CameraImpl* const camera)
+  {
+    CameraImplRuntimeView* const runtime = AsRuntimeView(camera);
+    if (runtime->mTargetType == kCameraTargetTypeEntity) {
+      BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(camera), runtime->mName, 0u);
+    }
+
+    runtime->mTargetType = kCameraTargetTypeLocation;
+    runtime->mTargetTime = 0u;
+    runtime->mTargetTimeLeft = 0.0f;
+  }
+
+  void UnlinkSelectionWeakOwnerRef(moho::SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    auto** ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
+    if (ownerLinkSlot == nullptr) {
+      weakRef.mOwnerLinkSlot = nullptr;
+      weakRef.mNextOwner = nullptr;
+      return;
+    }
+
+    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
+      ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
+    }
+
+    if (*ownerLinkSlot == &weakRef) {
+      *ownerLinkSlot = weakRef.mNextOwner;
+    }
+
+    weakRef.mOwnerLinkSlot = nullptr;
+    weakRef.mNextOwner = nullptr;
+  }
+
+  [[nodiscard]] moho::SSelectionNodeUserEntity* AllocateSelectionSetHead()
+  {
+    auto* const head = static_cast<moho::SSelectionNodeUserEntity*>(::operator new(sizeof(moho::SSelectionNodeUserEntity)));
+    head->mLeft = head;
+    head->mParent = head;
+    head->mRight = head;
+    head->mKey = 0u;
+    head->mEnt.mOwnerLinkSlot = nullptr;
+    head->mEnt.mNextOwner = nullptr;
+    head->mColor = 1u;
+    head->mIsSentinel = 1u;
+    head->pad_1A[0] = 0u;
+    head->pad_1A[1] = 0u;
+    return head;
+  }
+
+  void InitializeTemporarySelectionSet(moho::SSelectionSetUserEntity& set)
+  {
+    set.mAllocProxy = nullptr;
+    set.mHead = AllocateSelectionSetHead();
+    set.mSize = 0u;
+    set.mSizeMirrorOrUnused = 0u;
+  }
+
+  void DestroyTemporarySelectionSet(moho::SSelectionSetUserEntity& set) noexcept
+  {
+    moho::SSelectionNodeUserEntity* const head = set.mHead;
+    if (head == nullptr) {
+      return;
+    }
+
+    msvc8::vector<moho::SSelectionNodeUserEntity*> nodes{};
+    moho::SSelectionNodeUserEntity* cursor = nullptr;
+    moho::SSelectionNodeUserEntity* node = moho::SSelectionSetUserEntity::find(&set, head->mLeft, &cursor);
+    while (node != head) {
+      nodes.push_back(node);
+      moho::SSelectionSetUserEntity::Iterator_inc(&cursor);
+      node = moho::SSelectionSetUserEntity::find(&set, cursor, &cursor);
+    }
+
+    for (moho::SSelectionNodeUserEntity* const liveNode : nodes) {
+      UnlinkSelectionWeakOwnerRef(liveNode->mEnt);
+      ::operator delete(liveNode);
+    }
+
+    ::operator delete(head);
+    set.mAllocProxy = nullptr;
+    set.mHead = nullptr;
+    set.mSize = 0u;
+    set.mSizeMirrorOrUnused = 0u;
+  }
+
+  class ScopedTemporarySelectionSet final
+  {
+  public:
+    ScopedTemporarySelectionSet()
+    {
+      InitializeTemporarySelectionSet(mSet);
+    }
+
+    ~ScopedTemporarySelectionSet()
+    {
+      DestroyTemporarySelectionSet(mSet);
+    }
+
+    ScopedTemporarySelectionSet(const ScopedTemporarySelectionSet&) = delete;
+    ScopedTemporarySelectionSet& operator=(const ScopedTemporarySelectionSet&) = delete;
+
+    [[nodiscard]] moho::SSelectionSetUserEntity& get() noexcept
+    {
+      return mSet;
+    }
+
+    [[nodiscard]] const moho::SSelectionSetUserEntity& get() const noexcept
+    {
+      return mSet;
+    }
+
+  private:
+    moho::SSelectionSetUserEntity mSet{};
+  };
+
+  struct SessionEntityMapNodeView
+  {
+    SessionEntityMapNodeView* mLeft = nullptr;   // +0x00
+    SessionEntityMapNodeView* mParent = nullptr; // +0x04
+    SessionEntityMapNodeView* mRight = nullptr;  // +0x08
+    std::uint32_t mEntityId = 0;                 // +0x0C
+    moho::UserEntity* mEntity = nullptr;         // +0x10
+    std::uint8_t mPad14_17[0x04]{};              // +0x14
+    std::uint8_t mColor = 0;                     // +0x18
+    std::uint8_t mIsSentinel = 0;                // +0x19
+    std::uint8_t mPad1A_1B[0x02]{};              // +0x1A
+  };
+
+  static_assert(sizeof(SessionEntityMapNodeView) == 0x1C, "SessionEntityMapNodeView size must be 0x1C");
+  static_assert(
+    offsetof(SessionEntityMapNodeView, mEntityId) == 0x0C,
+    "SessionEntityMapNodeView::mEntityId offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SessionEntityMapNodeView, mEntity) == 0x10,
+    "SessionEntityMapNodeView::mEntity offset must be 0x10"
+  );
+  static_assert(
+    offsetof(SessionEntityMapNodeView, mIsSentinel) == 0x19,
+    "SessionEntityMapNodeView::mIsSentinel offset must be 0x19"
+  );
+
+  struct SessionEntityMapView
+  {
+    void* mAllocProxy = nullptr;          // +0x00
+    SessionEntityMapNodeView* mHead = nullptr; // +0x04
+    std::uint32_t mSize = 0;              // +0x08
+  };
+
+  static_assert(sizeof(SessionEntityMapView) == 0x0C, "SessionEntityMapView size must be 0x0C");
+  static_assert(offsetof(SessionEntityMapView, mHead) == 0x04, "SessionEntityMapView::mHead offset must be 0x04");
+  static_assert(offsetof(SessionEntityMapView, mSize) == 0x08, "SessionEntityMapView::mSize offset must be 0x08");
+
+  [[nodiscard]] SessionEntityMapView* GetSessionEntityMap(moho::CWldSession* const session) noexcept
+  {
+    if (session == nullptr) {
+      return nullptr;
+    }
+
+    static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must stay 0x44");
+    static_assert(
+      offsetof(moho::CWldSession, mSaveSourceTreeHead) == 0x48,
+      "CWldSession::mSaveSourceTreeHead offset must stay 0x48"
+    );
+    return reinterpret_cast<SessionEntityMapView*>(&session->mUnknownOwner44);
+  }
+
+  [[nodiscard]] moho::UserEntity* FindSessionEntityById(moho::CWldSession* const session, const std::int32_t entityId)
+  {
+    return session != nullptr ? session->LookupEntityId(static_cast<moho::EntId>(entityId)) : nullptr;
+  }
+
+  void AppendLuaEntityIdArrayToSelectionSet(
+    LuaPlus::LuaState* const state,
+    const int tableArgIndex,
+    moho::SSelectionSetUserEntity& outSet
+  )
+  {
+    lua_State* const rawState = state->m_state;
+    const int count = static_cast<int>(lua_getn(rawState, tableArgIndex));
+    if (count < 1) {
+      return;
+    }
+
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    for (int entryIndex = 1; entryIndex <= count; ++entryIndex) {
+      lua_rawgeti(rawState, tableArgIndex, entryIndex);
+      const int stackIndex = lua_gettop(rawState);
+      const char* const entityIdText = lua_tostring(rawState, stackIndex);
+      if (entityIdText == nullptr) {
+        const LuaPlus::LuaStackObject valueArg(state, stackIndex);
+        valueArg.TypeError("string");
+      }
+
+      const int entityId = entityIdText != nullptr ? std::atoi(entityIdText) : 0;
+      if (moho::UserEntity* const entity = FindSessionEntityById(session, entityId); entity != nullptr) {
+        moho::SSelectionSetUserEntity::AddResult addResult{};
+        (void)moho::SSelectionSetUserEntity::Add(&addResult, &outSet, entity);
+      }
+    }
+  }
+
+  void CameraTargetListIncrementSize(CameraTargetEntityList& list)
+  {
+    if (list.mSize == 0x1FFFFFFF) {
+      throw std::length_error("list<T> too long");
+    }
+    ++list.mSize;
+  }
+
+  void EnsureCameraTargetListInitialized(CameraTargetEntityList& list)
+  {
+    if (list.mHead != nullptr) {
+      return;
+    }
+
+    auto* const head = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
+    head->mNext = head;
+    head->mPrev = head;
+    head->mWeakRef.mOwnerLinkSlot = nullptr;
+    head->mWeakRef.mNextOwner = nullptr;
+    list.mAllocProxy = nullptr;
+    list.mHead = head;
+    list.mSize = 0;
+  }
+
+  void CameraTargetListAppendWeakRef(CameraTargetEntityList& list, const moho::SSelectionWeakRefUserEntity& weakRef)
+  {
+    EnsureCameraTargetListInitialized(list);
+    auto* const node = static_cast<CameraTargetEntityNode*>(::operator new(sizeof(CameraTargetEntityNode)));
+    node->mNext = list.mHead;
+    node->mPrev = list.mHead->mPrev;
+    node->mWeakRef.mOwnerLinkSlot = weakRef.mOwnerLinkSlot;
+
+    auto** ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
+    if (ownerLinkSlot == nullptr) {
+      node->mWeakRef.mNextOwner = nullptr;
+    } else {
+      node->mWeakRef.mNextOwner = *ownerLinkSlot;
+      *ownerLinkSlot = &node->mWeakRef;
+    }
+
+    CameraTargetListIncrementSize(list);
+    list.mHead->mPrev = node;
+    node->mPrev->mNext = node;
+  }
+
+  void CameraTargetListClear(CameraTargetEntityList& list)
+  {
+    EnsureCameraTargetListInitialized(list);
+
+    CameraTargetEntityNode* node = list.mHead->mNext;
+    list.mHead->mNext = list.mHead;
+    list.mHead->mPrev = list.mHead;
+    list.mSize = 0;
+
+    while (node != list.mHead) {
+      CameraTargetEntityNode* const next = node->mNext;
+      UnlinkSelectionWeakOwnerRef(node->mWeakRef);
+      ::operator delete(node);
+      node = next;
+    }
+  }
+
+  void CameraTargetListEraseNode(CameraTargetEntityList& list, CameraTargetEntityNode* const node)
+  {
+    if (node == nullptr || node == list.mHead) {
+      return;
+    }
+
+    node->mPrev->mNext = node->mNext;
+    node->mNext->mPrev = node->mPrev;
+    UnlinkSelectionWeakOwnerRef(node->mWeakRef);
+    ::operator delete(node);
+    --list.mSize;
+  }
+
+  void CopySelectionSetToCameraTargetList(const moho::SSelectionSetUserEntity& sourceSet, CameraTargetEntityList& outList)
+  {
+    if (sourceSet.mHead == nullptr) {
+      return;
+    }
+
+    moho::SSelectionNodeUserEntity* cursor = nullptr;
+    moho::SSelectionNodeUserEntity* node =
+      moho::SSelectionSetUserEntity::find(const_cast<moho::SSelectionSetUserEntity*>(&sourceSet), sourceSet.mHead->mLeft, &cursor);
+    while (node != sourceSet.mHead) {
+      CameraTargetListAppendWeakRef(outList, node->mEnt);
+      moho::SSelectionSetUserEntity::Iterator_inc(&cursor);
+      node = moho::SSelectionSetUserEntity::find(
+        const_cast<moho::SSelectionSetUserEntity*>(&sourceSet), cursor, &cursor
+      );
+    }
+  }
+
+  [[nodiscard]] moho::UserEntity* DecodeUserEntityWeakRef(const moho::SSelectionWeakRefUserEntity& weakRef) noexcept
+  {
+    constexpr std::uintptr_t kOwnerOffset = 0x08;
+
+    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(weakRef.mOwnerLinkSlot);
+    if (raw == 0u || raw == kOwnerOffset || raw < kOwnerOffset) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::UserEntity*>(raw - kOwnerOffset);
+  }
+
+  [[nodiscard]] moho::UserEntity* ActiveCameraTargetEntity(CameraImplRuntimeView& runtime) noexcept
+  {
+    CameraTargetEntityNode* const node = runtime.mActiveTargetEntityNode;
+    if (node == nullptr || node == runtime.mTargetEntities.mHead) {
+      return nullptr;
+    }
+    return DecodeUserEntityWeakRef(node->mWeakRef);
+  }
+
+  [[nodiscard]] float HeadingFromEntityOrientation(const Wm3::Quatf& orientation) noexcept
+  {
+    const float headingNumerator = ((orientation.z * orientation.x) + (orientation.y * orientation.w)) * 2.0f;
+    const float headingDenominator = 1.0f - ((orientation.y * orientation.y + orientation.x * orientation.x) * 2.0f);
+    return static_cast<float>(std::atan2(headingNumerator, headingDenominator));
+  }
+
+  [[nodiscard]] float PitchFromEntityOrientation(const Wm3::Quatf& orientation) noexcept
+  {
+    float pitchCarrier = ((orientation.w * orientation.z) - (orientation.y * orientation.x)) * -2.0f;
+    if (pitchCarrier >= 1.0f) {
+      pitchCarrier = 1.0f;
+    } else if (pitchCarrier < -1.0f) {
+      pitchCarrier = -1.0f;
+    }
+
+    const float sqrtTerm = std::sqrt(1.0f - pitchCarrier);
+    const float poly =
+      pitchCarrier *
+        ((pitchCarrier * ((pitchCarrier * -0.018729299f) + 0.074261002f)) - 0.21211439f) +
+      1.5707288f;
+    return 1.5707963f - (sqrtTerm * poly);
+  }
+
+  /**
    * Address: 0x007A67C0 (FUN_007A67C0, func_CameraImplUpdateShake)
    *
    * What it does:
@@ -639,6 +1107,23 @@ namespace moho
   {
     return SCR_CreateSimpleMetatable(state);
   }
+
+  /**
+   * Address: 0x007B0A90 (FUN_007B0A90, func_CreateLuaCameraImpl)
+   *
+   * What it does:
+   * Returns cached `CameraImpl` metatable object from Lua object-factory
+   * storage.
+   */
+  LuaPlus::LuaObject* func_CreateLuaCameraImpl(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<CameraImpl>::Instance().Get(state);
+    return object;
+  }
 } // namespace moho
 
 /**
@@ -653,11 +1138,7 @@ namespace moho
   RuntimeCameraBaseView* const base = AsRuntimeCameraBaseView(camera);
 
   if (RCamManager* const manager = CAM_GetManager(); manager != nullptr) {
-    auto& cameras = manager->mCams;
-    const auto cameraIt = std::find(cameras.begin(), cameras.end(), camera);
-    if (cameraIt != cameras.end()) {
-      cameras.erase(cameraIt);
-    }
+    manager->ForgetCamera(camera);
   }
 
   moho::Broadcaster& broadcaster = base->mBroadcaster;
@@ -707,6 +1188,92 @@ void moho::CameraImpl::CameraSetAccType(const msvc8::string& accType)
   if (_stricmp(accType.c_str(), kCameraAccTypeSlowInOutName) == 0) {
     runtime->mAccType = kCameraAccTypeSlowInOut;
   }
+}
+
+/**
+ * Address: 0x007A6CE0 (FUN_007A6CE0, Moho::CameraImpl::CameraSpin)
+ * Mangled: ?CameraSpin@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
+ *
+ * What it does:
+ * Applies heading/pitch spin deltas from one 2D input vector using the current
+ * zoom metric scale, then normalizes heading and clamps pitch.
+ */
+void moho::CameraImpl::CameraSpin(const Wm3::Vector2f& spinDelta)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  const float spinScale = (cam_SpinSpeed / runtime->mVerticalZoomMetricScale) * kDegreesToRadians;
+  const float headingDelta = spinDelta.x * spinScale;
+  const float pitchDelta = spinDelta.y * spinScale;
+
+  runtime->mIsRotated = 1u;
+  runtime->mRevertRotation = 0u;
+
+  CameraSetHeading(moho::NormalizeAngleSignedRadians(runtime->mHeading - headingDelta));
+
+  float pitch = runtime->mFarPitch + pitchDelta;
+  if (pitch > kCameraSpinPitchUpperBound) {
+    pitch = kCameraSpinPitchUpperBound;
+  }
+  if (pitch < cam_MinSpinPitch) {
+    pitch = cam_MinSpinPitch;
+  }
+
+  CameraSetPitch(pitch);
+}
+
+/**
+ * Address: 0x007A8260 (FUN_007A8260, Moho::CameraImpl::CameraZoom)
+ * Mangled: ?CameraZoom@CameraImpl@Moho@@UAEXM@Z
+ *
+ * What it does:
+ * Applies exponential zoom scaling from one input delta and clamps the
+ * resulting near-zoom lane against min/max zoom bounds.
+ */
+void moho::CameraImpl::CameraZoom(const float zoomDelta)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  runtime->mNearZoom = std::exp2((-cam_ZoomAmount) * zoomDelta) * runtime->mNearZoom;
+
+  const float maxZoom = GetMaxZoom();
+  float clampedZoom = runtime->mNearZoom;
+  if (maxZoom <= clampedZoom) {
+    clampedZoom = maxZoom;
+  }
+  if (cam_NearZoom > clampedZoom) {
+    clampedZoom = cam_NearZoom;
+  }
+
+  runtime->mNearZoom = clampedZoom;
+}
+
+/**
+ * Address: 0x007A6DF0 (FUN_007A6DF0, Moho::CameraImpl::CameraSetPitch)
+ * Mangled: ?CameraSetPitch@CameraImpl@Moho@@UAEXM@Z
+ *
+ * What it does:
+ * Arms rotated mode, clears revert state, and stores current pitch lane.
+ */
+void moho::CameraImpl::CameraSetPitch(const float pitchRadians)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  runtime->mIsRotated = 1u;
+  runtime->mRevertRotation = 0u;
+  runtime->mFarPitch = pitchRadians;
+}
+
+/**
+ * Address: 0x007A6E10 (FUN_007A6E10, Moho::CameraImpl::CameraSetHeading)
+ * Mangled: ?CameraSetHeading@CameraImpl@Moho@@UAEXM@Z
+ *
+ * What it does:
+ * Arms rotated mode, clears revert state, and stores current heading lane.
+ */
+void moho::CameraImpl::CameraSetHeading(const float headingRadians)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  runtime->mIsRotated = 1u;
+  runtime->mRevertRotation = 0u;
+  runtime->mHeading = headingRadians;
 }
 
 /**
@@ -790,6 +1357,22 @@ void moho::CameraImpl::CameraReset()
 }
 
 /**
+ * Address: 0x007A69D0 (FUN_007A69D0, Moho::CameraImpl::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{scriptSubobject, scriptSubobject->GetClass()}` as a reflected
+ * object reference.
+ */
+gpg::RRef moho::CameraImpl::GetDerivedObjectRef()
+{
+  auto* const scriptSubobject = reinterpret_cast<moho::CScriptObject*>(reinterpret_cast<std::uint8_t*>(this) - 0x1Cu);
+  gpg::RRef objectRef{};
+  objectRef.mObj = scriptSubobject;
+  objectRef.mType = scriptSubobject->GetClass();
+  return objectRef;
+}
+
+/**
  * Address: 0x007A69F0 (FUN_007A69F0, Moho::CameraImpl::CameraGetName)
  *
  * What it does:
@@ -809,6 +1392,244 @@ const char* moho::CameraImpl::CameraGetName() const
 const moho::GeomCamera3& moho::CameraImpl::CameraGetView() const
 {
   return AsRuntimeView(this)->mCam;
+}
+
+/**
+ * Address: 0x007A6A80 (FUN_007A6A80, Moho::CameraImpl::CameraSetViewport)
+ * Mangled: ?CameraSetViewport@CameraImpl@Moho@@QAEPAV?$Vector2@M@Wm3@@ABV34@0@Z
+ *
+ * What it does:
+ * Stores viewport origin/extent lanes in camera state, rebuilds normalized
+ * row-2 viewport coefficients from row-1 using inverse width, and updates
+ * camera zoom metric scale from viewport aspect ratio.
+ */
+void moho::CameraImpl::CameraSetViewport(const Wm3::Vector2f& viewportOrigin, const Wm3::Vector2f& viewportSize)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  VMatrix4& viewport = runtime->mCam.viewport;
+
+  viewport.r[3].x = viewportOrigin.x;
+  viewport.r[3].y = viewportOrigin.y;
+  viewport.r[3].z = viewportSize.x;
+  viewport.r[3].w = viewportSize.y;
+
+  const float inverseViewportWidth = 1.0f / viewport.r[3].z;
+  viewport.r[2].x = viewport.r[1].x * inverseViewportWidth;
+  viewport.r[2].y = viewport.r[1].y * inverseViewportWidth;
+  viewport.r[2].z = viewport.r[1].z * inverseViewportWidth;
+  viewport.r[2].w = viewport.r[1].w * inverseViewportWidth;
+
+  runtime->mVerticalZoomMetricScale = viewportSize.x / viewportSize.y;
+}
+
+/**
+ * Address: 0x007A6A10 (FUN_007A6A10, Moho::CameraImpl::CameraSetOrtho)
+ * Mangled: ?CameraSetOrtho@CameraImpl@Moho@@UAEX_N@Z
+ *
+ * What it does:
+ * Stores orthographic-camera mode flag lane.
+ */
+void moho::CameraImpl::CameraSetOrtho(const bool enabled)
+{
+  AsRuntimeView(this)->mIsOrtho = static_cast<std::uint8_t>(enabled ? 1 : 0);
+}
+
+/**
+ * Address: 0x007A6A20 (FUN_007A6A20, Moho::CameraImpl::CameraIsOrtho)
+ *
+ * What it does:
+ * Returns orthographic-camera mode flag lane.
+ */
+bool moho::CameraImpl::CameraIsOrtho()
+{
+  return AsRuntimeView(this)->mIsOrtho != 0;
+}
+
+/**
+ * Address: 0x007A6B20 (FUN_007A6B20, Moho::CameraImpl::CameraGetViewport)
+ *
+ * What it does:
+ * Returns current camera viewport origin and viewport size lanes.
+ */
+void moho::CameraImpl::CameraGetViewport(Wm3::Vector2f& viewportOrigin, Wm3::Vector2f& viewportSize) const
+{
+  const CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  const VMatrix4& viewport = runtime->mCam.viewport;
+  viewportOrigin.x = viewport.r[3].x;
+  viewportOrigin.y = viewport.r[3].y;
+  viewportSize.x = viewport.r[3].z;
+  viewportSize.y = viewport.r[3].w;
+}
+
+/**
+ * Address: 0x007A6C90 (FUN_007A6C90, Moho::CameraImpl::CameraGetZoom)
+ *
+ * What it does:
+ * Returns current camera zoom lane.
+ */
+float moho::CameraImpl::CameraGetZoom() const
+{
+  return AsRuntimeView(this)->mZoom;
+}
+
+/**
+ * Address: 0x007A6CC0 (FUN_007A6CC0, Moho::CameraImpl::CameraGetHeading)
+ * Mangled: ?CameraGetHeading@CameraImpl@Moho@@UBEMXZ
+ *
+ * What it does:
+ * Returns current camera heading lane in radians.
+ */
+float moho::CameraImpl::CameraGetHeading() const
+{
+  return AsRuntimeView(this)->mHeading;
+}
+
+/**
+ * Address: 0x007A6CD0 (FUN_007A6CD0, Moho::CameraImpl::CameraGetPitch)
+ * Mangled: ?CameraGetPitch@CameraImpl@Moho@@UBEMXZ
+ *
+ * What it does:
+ * Returns current camera pitch lane in radians.
+ */
+float moho::CameraImpl::CameraGetPitch() const
+{
+  return AsRuntimeView(this)->mFarPitch;
+}
+
+/**
+ * Address: 0x007A6E30 (FUN_007A6E30, Moho::CameraImpl::CameraIsRotated)
+ * Mangled: ?CameraIsRotated@CameraImpl@Moho@@UBE_NXZ
+ *
+ * What it does:
+ * Returns whether rotated-camera mode is currently enabled.
+ */
+bool moho::CameraImpl::CameraIsRotated() const
+{
+  return AsRuntimeView(this)->mIsRotated != 0;
+}
+
+/**
+ * Address: 0x007A6B50 (FUN_007A6B50, ?Project@CameraImpl@Moho@@UBE?AV?$Vector2@M@Wm3@@ABV?$Vector3@M@4@@Z)
+ *
+ * What it does:
+ * Projects one world-space point through the embedded camera view and
+ * returns screen-space coordinates.
+ */
+Wm3::Vector2f moho::CameraImpl::Project(const Wm3::Vector3f& worldPoint) const
+{
+  return AsRuntimeView(this)->mCam.Project(worldPoint);
+}
+
+/**
+ * Address: 0x007A6B70 (FUN_007A6B70, ?Unproject@CameraImpl@Moho@@UBE?AU?$GeomLine3@M@2@ABV?$Vector2@M@Wm3@@@Z)
+ *
+ * What it does:
+ * Builds one world-space ray from a screen-space point using the embedded
+ * camera view/projection/viewport lanes.
+ */
+moho::GeomLine3 moho::CameraImpl::Unproject(const Wm3::Vector2f& screenPoint) const
+{
+  return AsRuntimeView(this)->mCam.Unproject(screenPoint);
+}
+
+/**
+ * Address: 0x007A6BB0 (FUN_007A6BB0, ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
+ *
+ * What it does:
+ * Unprojects one screen-space point and resolves the terrain/water surface
+ * intersection point on the active map.
+ */
+Wm3::Vector3f moho::CameraImpl::CameraScreenToSurface(const Wm3::Vector2f& screenPoint) const
+{
+  const GeomLine3 worldRay = Unproject(screenPoint);
+  return AsRuntimeView(this)->mTerrainMap->SurfaceIntersection(worldRay, nullptr);
+}
+
+/**
+ * Address: 0x007A72F0 (FUN_007A72F0, ?SetLODScale@CameraImpl@Moho@@UAEXM@Z)
+ *
+ * What it does:
+ * Updates embedded camera LOD scale used by projection/unprojection lanes.
+ */
+void moho::CameraImpl::SetLODScale(const float scale)
+{
+  AsRuntimeView(this)->mCam.SetLODScale(scale);
+}
+
+/**
+ * Address: 0x007A7120 (FUN_007A7120, Moho::CameraImpl::CanShake)
+ * Mangled: ?CanShake@CameraImpl@Moho@@UAEX_N@Z
+ *
+ * What it does:
+ * Enables or disables camera-shake application for this camera runtime.
+ */
+void moho::CameraImpl::CanShake(const bool canShake)
+{
+  AsRuntimeView(this)->mCanShake = canShake ? 1u : 0u;
+}
+
+/**
+ * Address: 0x007A7130 (FUN_007A7130, Moho::CameraImpl::CameraShake)
+ * Mangled: ?CameraShake@CameraImpl@Moho@@UAEXABUSCamShakeParams@2@@Z
+ *
+ * What it does:
+ * Arms camera shake params when shaking is enabled and either the previous
+ * shake finished or incoming shake has stronger minimum magnitude.
+ */
+void moho::CameraImpl::CameraShake(const SCamShakeParams& shakeParams)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mCanShake == 0u) {
+    return;
+  }
+
+  if (
+    runtime->mCamShakeParams.mElapsed < runtime->mCamShakeParams.mDuration &&
+    shakeParams.mMinMagnitude <= runtime->mCamShakeParams.mMinMagnitude
+  ) {
+    return;
+  }
+
+  runtime->mCamShakeParams.mCenter = shakeParams.mCenter;
+  runtime->mCamShakeParams.mMaxRange = shakeParams.mMaxRange;
+  runtime->mCamShakeParams.mMinMagnitude = shakeParams.mMinMagnitude;
+  runtime->mCamShakeParams.mMaxMagnitude = shakeParams.mMaxMagnitude;
+  runtime->mCamShakeParams.mDuration = shakeParams.mDuration;
+  runtime->mCamShakeParams.mElapsed = 0.0f;
+}
+
+/**
+ * Address: 0x007A7290 (FUN_007A7290, Moho::CameraImpl::GetTargetEntity)
+ * Mangled: ?GetTargetEntity@CameraImpl@Moho@@UBEPAVUserEntity@2@XZ
+ *
+ * What it does:
+ * Returns current live entity target when target mode is entity/nose-cam.
+ */
+moho::UserEntity* moho::CameraImpl::GetTargetEntity() const
+{
+  const CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mTargetType != kCameraTargetTypeEntity && runtime->mTargetType != kCameraTargetTypeNoseCam) {
+    return nullptr;
+  }
+
+  const CameraTargetEntityNode* const node = runtime->mActiveTargetEntityNode;
+  if (node == nullptr || node == runtime->mTargetEntities.mHead) {
+    return nullptr;
+  }
+
+  return DecodeUserEntityWeakRef(node->mWeakRef);
+}
+
+/**
+ * Address: 0x007A73E0 (FUN_007A73E0, Moho::CameraImpl::GetTargetPosition)
+ * Mangled: ?GetTargetPosition@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@XZ
+ *
+ * What it does:
+ * Returns current target-position lane by value.
+ */
+Wm3::Vector3f moho::CameraImpl::GetTargetPosition() const
+{
+  return AsRuntimeView(this)->mTargetLocation;
 }
 
 /**
@@ -910,6 +1731,29 @@ float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
 void moho::CameraImpl::SetMaxZoomMult(const float maxZoomMult)
 {
   AsZoomLimitView(this)->mMaxZoomMult = maxZoomMult;
+}
+
+/**
+ * Address: 0x007A7410 (FUN_007A7410, ?GetViewBox@CameraImpl@Moho@@UBE?AV?$AxisAlignedBox3@M@Wm3@@XZ)
+ * Mangled: ?GetViewBox@CameraImpl@Moho@@UBE?AV?$AxisAlignedBox3@M@Wm3@@XZ
+ *
+ * What it does:
+ * Builds one target-centered AABB using half of current near-zoom for X/Z
+ * extent while preserving the target Y lane in both min/max bounds.
+ */
+Wm3::AxisAlignedBox3f moho::CameraImpl::GetViewBox() const
+{
+  const CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  const float halfZoom = runtime->mNearZoom * 0.5f;
+
+  Wm3::AxisAlignedBox3f viewBox{};
+  viewBox.Min.x = runtime->mTargetLocation.x - halfZoom;
+  viewBox.Min.y = runtime->mTargetLocation.y;
+  viewBox.Min.z = runtime->mTargetLocation.z - halfZoom;
+  viewBox.Max.x = runtime->mTargetLocation.x + halfZoom;
+  viewBox.Max.y = runtime->mTargetLocation.y;
+  viewBox.Max.z = runtime->mTargetLocation.z + halfZoom;
+  return viewBox;
 }
 
 /**
@@ -1140,6 +1984,19 @@ void moho::CameraImpl::CalculateFOV()
 }
 
 /**
+ * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
+ * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
+ *
+ * What it does:
+ * Stops entity-tracking mode and returns camera targeting to location mode
+ * with cleared target-time lanes.
+ */
+void moho::CameraImpl::TargetNothing()
+{
+  TargetNothingRuntime(this);
+}
+
+/**
  * Address: 0x007A82F0 (FUN_007A82F0, Moho::CameraImpl::TargetLocation)
  * Mangled: ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z
  *
@@ -1210,6 +2067,167 @@ void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const f
   } else {
     SetupHermite();
   }
+}
+
+/**
+ * Address: 0x007A8640 (FUN_007A8640, Moho::CameraImpl::TargetEntities)
+ * Mangled: ?TargetEntities@CameraImpl@Moho@@UAEXABV?$WeakSet@VUserEntity@Moho@@@2@_NMM@Z
+ *
+ * What it does:
+ * Replaces the camera target weak-list from one entity weak-set, seeds timed
+ * move toward the first target entity, and optionally enters/clears
+ * entity-tracking mode with broadcaster notifications.
+ */
+void moho::CameraImpl::TargetEntities(
+  const SSelectionSetUserEntity& entities,
+  const bool trackEntities,
+  const float zoom,
+  const float seconds
+)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+
+  runtime->mTargetTimeLeft = 0.0f;
+  runtime->mTargetTime = 0u;
+  CameraTargetListClear(runtime->mTargetEntities);
+  CopySelectionSetToCameraTargetList(entities, runtime->mTargetEntities);
+
+  runtime->mActiveTargetEntityNode = runtime->mTargetEntities.mHead != nullptr ? runtime->mTargetEntities.mHead->mNext : nullptr;
+  if (runtime->mTargetEntities.mSize == 0) {
+    return;
+  }
+
+  TimedMoveInit(seconds, 0.0f);
+
+  const UserEntity* const targetEntity = ActiveCameraTargetEntity(*runtime);
+  if (targetEntity == nullptr) {
+    return;
+  }
+
+  runtime->mTargetLocation = targetEntity->mVariableData.mCurTransform.pos_;
+  runtime->mNearZoom = zoom;
+
+  if (trackEntities) {
+    runtime->mTargetType = kCameraTargetTypeEntity;
+    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 1u);
+  } else {
+    if (runtime->mTargetType == kCameraTargetTypeEntity) {
+      BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+    }
+    runtime->mTargetType = kCameraTargetTypeLocation;
+  }
+
+  SetupHermite();
+}
+
+/**
+ * Address: 0x007A8EE0 (FUN_007A8EE0, Moho::CameraImpl::TargetNextEntity)
+ * Mangled: ?TargetNextEntity@CameraImpl@Moho@@UAEXXZ
+ *
+ * What it does:
+ * Advances active entity-target cursor to the next live weak target entry,
+ * removing stale weak-link nodes and broadcasting tracking stop/start updates.
+ */
+void moho::CameraImpl::TargetNextEntity()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mTargetEntities.mSize == 0 || runtime->mTargetEntities.mHead == nullptr) {
+    return;
+  }
+
+  while (true) {
+    CameraTargetEntityNode* active = runtime->mActiveTargetEntityNode;
+    if (active == nullptr) {
+      active = runtime->mTargetEntities.mHead;
+      runtime->mActiveTargetEntityNode = active;
+    }
+
+    if (active != runtime->mTargetEntities.mHead) {
+      runtime->mActiveTargetEntityNode = active->mNext;
+    }
+
+    if (runtime->mActiveTargetEntityNode == runtime->mTargetEntities.mHead) {
+      runtime->mActiveTargetEntityNode = runtime->mTargetEntities.mHead->mNext;
+    }
+
+    active = runtime->mActiveTargetEntityNode;
+    const UserEntity* const activeEntity =
+      (active != nullptr && active != runtime->mTargetEntities.mHead) ? DecodeUserEntityWeakRef(active->mWeakRef) : nullptr;
+    if (activeEntity != nullptr) {
+      runtime->mTargetType = kCameraTargetTypeEntity;
+      runtime->mTargetTimeLeft = 0.0f;
+      runtime->mTargetTime = 0u;
+      BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 1u);
+      return;
+    }
+
+    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+
+    CameraTargetEntityNode* const next = (active != nullptr) ? active->mNext : nullptr;
+    if (active != nullptr && active != runtime->mTargetEntities.mHead) {
+      CameraTargetListEraseNode(runtime->mTargetEntities, active);
+    }
+
+    runtime->mActiveTargetEntityNode = next;
+    if (runtime->mTargetEntities.mSize == 0) {
+      return;
+    }
+  }
+}
+
+/**
+ * Address: 0x007A8A20 (FUN_007A8A20, Moho::CameraImpl::TargetNoseCam)
+ * Mangled: ?TargetNoseCam@CameraImpl@Moho@@QAEXABV?$WeakSet@VUserEntity@Moho@@@2@MMMM@Z
+ *
+ * What it does:
+ * Replaces target weak-list, seeds timed transition by `seconds` and
+ * `transition`, then aligns camera heading/pitch/zoom to the first entity's
+ * current transform plus pitch-adjust lane.
+ */
+void moho::CameraImpl::TargetNoseCam(
+  const SSelectionSetUserEntity& entities,
+  const float pitchAdjust,
+  const float zoom,
+  const float seconds,
+  const float transition
+)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mTargetType == kCameraTargetTypeEntity) {
+    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+  }
+
+  runtime->mTargetTimeLeft = 0.0f;
+  runtime->mTargetTime = 0u;
+  CameraTargetListClear(runtime->mTargetEntities);
+  CopySelectionSetToCameraTargetList(entities, runtime->mTargetEntities);
+
+  runtime->mActiveTargetEntityNode = runtime->mTargetEntities.mHead != nullptr ? runtime->mTargetEntities.mHead->mNext : nullptr;
+  if (runtime->mTargetEntities.mSize == 0) {
+    return;
+  }
+
+  TimedMoveInit(seconds, transition);
+
+  const UserEntity* const targetEntity = ActiveCameraTargetEntity(*runtime);
+  if (targetEntity == nullptr) {
+    return;
+  }
+
+  const VTransform& targetTransform = targetEntity->mVariableData.mCurTransform;
+  runtime->mTargetLocation = targetTransform.pos_;
+  runtime->mHeadingZoom =
+    NormalizeQuadrantRelative(HeadingFromEntityOrientation(targetTransform.orient_), runtime->mTimedMoveHeading);
+  runtime->mCurrentPitch = PitchFromEntityOrientation(targetTransform.orient_) + pitchAdjust;
+  runtime->mNearZoom = zoom;
+  runtime->mUnknown3D0 = pitchAdjust;
+  runtime->mFarPitch = runtime->mCurrentPitch;
+  runtime->mTargetType = kCameraTargetTypeNoseCam;
+  runtime->mHeading = runtime->mHeadingZoom;
+  runtime->mTargetZoom = runtime->mNearZoom;
+  runtime->mOffset = runtime->mTargetLocation;
+  ClampFocusPos();
+  CalculateFOV();
 }
 
 /**
@@ -1417,6 +2435,63 @@ moho::CScrLuaInitForm* moho::func_CameraImplMoveToRegion_LuaFuncDef()
     kCameraImplMoveToRegionHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x007AB230 (FUN_007AB230, cfunc_CameraImplMoveToRegionL)
+ *
+ * What it does:
+ * Validates `Camera:MoveTo(region[,seconds])`, quantizes region corners to
+ * terrain grid cell centers, samples corner elevations, and targets one world
+ * box transition.
+ */
+int moho::cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount < 2 || argumentCount > 3) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedBetweenArgsWarning, kCameraImplMoveToRegionHelpText, 2, 3, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaObject regionObject(LuaPlus::LuaStackObject(state, 2));
+  const gpg::Rect2f regionRect = SCR_FromLuaCopy<gpg::Rect2f>(regionObject);
+
+  float transitionSeconds = 0.0f;
+  if (argumentCount > 2) {
+    const LuaPlus::LuaStackObject secondsArg(state, 3);
+    if (lua_type(rawState, 3) != LUA_TNUMBER) {
+      secondsArg.TypeError("number");
+    }
+    transitionSeconds = static_cast<float>(lua_tonumber(rawState, 3));
+  }
+
+  const std::int16_t startXCell = static_cast<std::int16_t>(static_cast<int>(regionRect.x0 - 0.5f));
+  const std::int16_t startZCell = static_cast<std::int16_t>(static_cast<int>(regionRect.z0 - 0.5f));
+  const std::int16_t endXCell = static_cast<std::int16_t>(static_cast<int>(regionRect.x1 - 0.5f));
+  const std::int16_t endZCell = static_cast<std::int16_t>(static_cast<int>(regionRect.z1 - 0.5f));
+
+  const float startX = static_cast<float>(startXCell) + 0.5f;
+  const float startZ = static_cast<float>(startZCell) + 0.5f;
+  const float endX = static_cast<float>(endXCell) + 0.5f;
+  const float endZ = static_cast<float>(endZCell) + 0.5f;
+
+  const CameraImplRuntimeView* const runtime = AsRuntimeView(camera);
+  const CHeightField* const heightField = runtime->mTerrainMap->mHeightField.get();
+  const float startElevation = heightField->GetElevation(startX, startZ);
+  const float endElevation = heightField->GetElevation(endX, endZ);
+
+  Wm3::AxisAlignedBox3f targetBox{};
+  targetBox.Min.x = startX;
+  targetBox.Min.y = startElevation;
+  targetBox.Min.z = startZ;
+  targetBox.Max.x = endX;
+  targetBox.Max.y = endElevation;
+  targetBox.Max.z = endZ;
+  camera->TargetBox(targetBox, transitionSeconds);
+  return 0;
 }
 
 /**
@@ -1914,6 +2989,180 @@ moho::CScrLuaInitForm* moho::func_CameraImplTrackEntities_LuaFuncDef()
 }
 
 /**
+ * Address: 0x007ABA60 (FUN_007ABA60, cfunc_CameraImplTrackEntities)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplTrackEntitiesL`.
+ */
+int moho::cfunc_CameraImplTrackEntities(lua_State* const luaContext)
+{
+  return cfunc_CameraImplTrackEntitiesL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ABAE0 (FUN_007ABAE0, cfunc_CameraImplTrackEntitiesL)
+ *
+ * What it does:
+ * Validates `Camera:TrackEntities(ents,zoom,seconds)`, resolves one camera plus
+ * weak-set of session entities from Lua string IDs, and dispatches
+ * tracked-entity targeting.
+ */
+int moho::cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplTrackEntitiesHelpText, 4, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject secondsArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    secondsArg.TypeError("number");
+  }
+  const float seconds = static_cast<float>(lua_tonumber(rawState, 4));
+
+  const LuaPlus::LuaStackObject zoomArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    zoomArg.TypeError("number");
+  }
+  const float zoom = static_cast<float>(lua_tonumber(rawState, 3));
+
+  ScopedTemporarySelectionSet entitySetGuard{};
+  SSelectionSetUserEntity& entitySet = entitySetGuard.get();
+  AppendLuaEntityIdArrayToSelectionSet(state, 2, entitySet);
+
+  camera->TargetEntities(entitySet, true, zoom, seconds);
+  return 0;
+}
+
+/**
+ * Address: 0x007ABE40 (FUN_007ABE40, cfunc_CameraImplTargetEntities)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplTargetEntitiesL`.
+ */
+int moho::cfunc_CameraImplTargetEntities(lua_State* const luaContext)
+{
+  return cfunc_CameraImplTargetEntitiesL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ABEC0 (FUN_007ABEC0, cfunc_CameraImplTargetEntitiesL)
+ *
+ * What it does:
+ * Validates `Camera:TargetEntities(ents,zoom,seconds)`, resolves one camera
+ * plus weak-set of session entities from Lua string IDs, and dispatches
+ * non-tracking multi-entity targeting.
+ */
+int moho::cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 4) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplTargetEntitiesHelpText, 4, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject secondsArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    secondsArg.TypeError("number");
+  }
+  const float seconds = static_cast<float>(lua_tonumber(rawState, 4));
+
+  const LuaPlus::LuaStackObject zoomArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    zoomArg.TypeError("number");
+  }
+  const float zoom = static_cast<float>(lua_tonumber(rawState, 3));
+
+  ScopedTemporarySelectionSet entitySetGuard{};
+  SSelectionSetUserEntity& entitySet = entitySetGuard.get();
+  AppendLuaEntityIdArrayToSelectionSet(state, 2, entitySet);
+
+  camera->TargetEntities(entitySet, false, zoom, seconds);
+  return 0;
+}
+
+/**
+ * Address: 0x007AC1C0 (FUN_007AC1C0, cfunc_CameraImplNoseCam)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplNoseCamL`.
+ */
+int moho::cfunc_CameraImplNoseCam(lua_State* const luaContext)
+{
+  return cfunc_CameraImplNoseCamL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AC240 (FUN_007AC240, cfunc_CameraImplNoseCamL)
+ *
+ * What it does:
+ * Validates `Camera:NoseCam(ent,pitchAdjust,zoom,seconds,transition)`,
+ * resolves one target entity by string ID, and dispatches nose-camera target
+ * alignment.
+ */
+int moho::cfunc_CameraImplNoseCamL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 6) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplNoseCamHelpText, 6, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  const LuaPlus::LuaStackObject entityIdArg(state, 2);
+  const char* const entityIdText = lua_tostring(rawState, 2);
+  if (entityIdText == nullptr) {
+    entityIdArg.TypeError("string");
+  }
+
+  ScopedTemporarySelectionSet entitySetGuard{};
+  SSelectionSetUserEntity& entitySet = entitySetGuard.get();
+  const int entityId = entityIdText != nullptr ? std::atoi(entityIdText) : 0;
+  if (UserEntity* const entity = FindSessionEntityById(moho::WLD_GetActiveSession(), entityId); entity != nullptr) {
+    SSelectionSetUserEntity::AddResult addResult{};
+    (void)SSelectionSetUserEntity::Add(&addResult, &entitySet, entity);
+  }
+
+  const LuaPlus::LuaStackObject transitionArg(state, 6);
+  if (lua_type(rawState, 6) != LUA_TNUMBER) {
+    transitionArg.TypeError("number");
+  }
+  const float transition = static_cast<float>(lua_tonumber(rawState, 6));
+
+  const LuaPlus::LuaStackObject secondsArg(state, 5);
+  if (lua_type(rawState, 5) != LUA_TNUMBER) {
+    secondsArg.TypeError("number");
+  }
+  const float seconds = static_cast<float>(lua_tonumber(rawState, 5));
+
+  const LuaPlus::LuaStackObject zoomArg(state, 4);
+  if (lua_type(rawState, 4) != LUA_TNUMBER) {
+    zoomArg.TypeError("number");
+  }
+  const float zoom = static_cast<float>(lua_tonumber(rawState, 4));
+
+  const LuaPlus::LuaStackObject pitchAdjustArg(state, 3);
+  if (lua_type(rawState, 3) != LUA_TNUMBER) {
+    pitchAdjustArg.TypeError("number");
+  }
+  const float pitchAdjust = static_cast<float>(lua_tonumber(rawState, 3));
+
+  camera->TargetNoseCam(entitySet, pitchAdjust, zoom, seconds, transition);
+  return 0;
+}
+
+/**
  * Address: 0x007ABE60 (FUN_007ABE60, func_CameraImplTargetEntities_LuaFuncDef)
  *
  * What it does:
@@ -2056,6 +3305,39 @@ moho::CScrLuaInitForm* moho::func_CameraImplRevertRotation_LuaFuncDef()
 }
 
 /**
+ * Address: 0x007ACC40 (FUN_007ACC40, cfunc_CameraImplGetZoom)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplGetZoomL`.
+ */
+int moho::cfunc_CameraImplGetZoom(lua_State* const luaContext)
+{
+  return cfunc_CameraImplGetZoomL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ACCC0 (FUN_007ACCC0, cfunc_CameraImplGetZoomL)
+ *
+ * What it does:
+ * Validates `Camera:GetZoom()`, resolves one camera payload, and pushes the
+ * current target-zoom scalar.
+ */
+int moho::cfunc_CameraImplGetZoomL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplGetZoomHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  lua_pushnumber(rawState, camera->CameraGetTargetZoom());
+  (void)lua_gettop(rawState);
+  return 1;
+}
+
+/**
  * Address: 0x007ACC60 (FUN_007ACC60, func_CameraImplGetZoom_LuaFuncDef)
  *
  * What it does:
@@ -2127,6 +3409,49 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetFocusPosition_LuaFuncDef()
 }
 
 /**
+ * Address: 0x007ACEE0 (FUN_007ACEE0, cfunc_CameraImplSaveSettings)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplSaveSettingsL`.
+ */
+int moho::cfunc_CameraImplSaveSettings(lua_State* const luaContext)
+{
+  return cfunc_CameraImplSaveSettingsL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007ACF60 (FUN_007ACF60, cfunc_CameraImplSaveSettingsL)
+ *
+ * What it does:
+ * Captures one camera snapshot table (`Focus`, `Zoom`, `Pitch`, `Heading`)
+ * from the current camera runtime and returns it to Lua.
+ */
+int moho::cfunc_CameraImplSaveSettingsL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 1) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplSaveSettingsHelpText, 1, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+  const CameraImplRuntimeView* const runtime = AsRuntimeView(camera);
+
+  LuaPlus::LuaObject settingsObject;
+  settingsObject.AssignNewTable(state, 0, 0);
+
+  LuaPlus::LuaObject focusObject = SCR_ToLua<Wm3::Vector3<float>>(state, camera->CameraGetOffset());
+  settingsObject.SetObject("Focus", focusObject);
+  settingsObject.SetNumber("Zoom", camera->CameraGetTargetZoom());
+  settingsObject.SetNumber("Pitch", runtime->mFarPitch);
+  settingsObject.SetNumber("Heading", runtime->mHeading);
+  settingsObject.PushStack(state);
+  return 1;
+}
+
+/**
  * Address: 0x007ACF00 (FUN_007ACF00, func_CameraImplSaveSettings_LuaFuncDef)
  *
  * What it does:
@@ -2143,6 +3468,75 @@ moho::CScrLuaInitForm* moho::func_CameraImplSaveSettings_LuaFuncDef()
     kCameraImplSaveSettingsHelpText
   );
   return &binder;
+}
+
+/**
+ * Address: 0x007AD0D0 (FUN_007AD0D0, cfunc_CameraImplRestoreSettings)
+ *
+ * What it does:
+ * Unwraps raw Lua callback context and forwards to
+ * `cfunc_CameraImplRestoreSettingsL`.
+ */
+int moho::cfunc_CameraImplRestoreSettings(lua_State* const luaContext)
+{
+  return cfunc_CameraImplRestoreSettingsL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x007AD150 (FUN_007AD150, cfunc_CameraImplRestoreSettingsL)
+ *
+ * What it does:
+ * Reads one saved camera snapshot table (`Focus`, `Zoom`, `Pitch`,
+ * `Heading`), restores manual target state immediately, then clears timed
+ * targeting and reapplies rotation-revert semantics.
+ */
+int moho::cfunc_CameraImplRestoreSettingsL(LuaPlus::LuaState* const state)
+{
+  lua_State* const rawState = state->m_state;
+  const int argumentCount = lua_gettop(rawState);
+  if (argumentCount != 2) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCameraImplRestoreSettingsHelpText, 2, argumentCount);
+  }
+
+  const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
+  CameraImpl* const camera = SCR_FromLua_CameraImpl(cameraObject, state);
+
+  lua_pushstring(rawState, "Focus");
+  lua_rawget(rawState, 2);
+  const LuaPlus::LuaObject focusObject(LuaPlus::LuaStackObject(state, lua_gettop(rawState)));
+
+  lua_pushstring(rawState, "Zoom");
+  lua_rawget(rawState, 2);
+  const int zoomIndex = lua_gettop(rawState);
+  const LuaPlus::LuaStackObject zoomArg(state, zoomIndex);
+  if (lua_type(rawState, zoomIndex) != LUA_TNUMBER) {
+    zoomArg.TypeError("number");
+  }
+  const float zoom = static_cast<float>(lua_tonumber(rawState, zoomIndex));
+
+  lua_pushstring(rawState, "Pitch");
+  lua_rawget(rawState, 2);
+  const int pitchIndex = lua_gettop(rawState);
+  const LuaPlus::LuaStackObject pitchArg(state, pitchIndex);
+  if (lua_type(rawState, pitchIndex) != LUA_TNUMBER) {
+    pitchArg.TypeError("number");
+  }
+  const float pitch = static_cast<float>(lua_tonumber(rawState, pitchIndex));
+
+  lua_pushstring(rawState, "Heading");
+  lua_rawget(rawState, 2);
+  const int headingIndex = lua_gettop(rawState);
+  const LuaPlus::LuaStackObject headingArg(state, headingIndex);
+  if (lua_type(rawState, headingIndex) != LUA_TNUMBER) {
+    headingArg.TypeError("number");
+  }
+  const float heading = static_cast<float>(lua_tonumber(rawState, headingIndex));
+
+  const Wm3::Vec3f focus = SCR_FromLuaCopy<Wm3::Vec3f>(focusObject);
+  camera->TargetManual(focus, heading, pitch, zoom, 0.0f);
+  TargetNothingRuntime(camera);
+  camera->CameraRevertRotation();
+  return 0;
 }
 
 /**
@@ -2479,6 +3873,3 @@ moho::CScrLuaInitForm* moho::func_CameraImplDisableEaseInOut_LuaFuncDef()
   );
   return &binder;
 }
-
-
-

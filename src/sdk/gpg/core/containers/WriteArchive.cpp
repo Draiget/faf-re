@@ -486,11 +486,12 @@ WriteArchive::WriteArchive()
 }
 
 /**
- * Address: 0x00953C80 (FUN_00953C80)
- * Demangled: gpg::WriteArchive::dtr
+ * Address: 0x00953150 (FUN_00953150, ??1WriteArchive@gpg@@UAE@XZ)
+ * Address: 0x00953C80 (FUN_00953C80, scalar deleting destructor thunk)
  *
  * What it does:
- * Destroys write-archive bookkeeping state.
+ * Destroys write-archive bookkeeping state. Binary body is the compiler-emitted
+ * defaulted destructor (sets vtable + member subobject teardown).
  */
 WriteArchive::~WriteArchive() = default;
 
@@ -505,6 +506,96 @@ WriteArchive* WriteArchive::WriteValue(const void* const valueLane, const int /*
 {
     const auto* const value = static_cast<const LegacyValueFloatLane*>(valueLane);
     WriteFloat(value->number);
+    return this;
+}
+
+/**
+ * Address: 0x0090B380 (FUN_0090B380, gpg::WriteArchive::WriteTThread)
+ *
+ * What it does:
+ * Wraps one Lua `lua_State*` pointer lane into an `RRef` and forwards it as
+ * one unowned tracked pointer entry with caller-provided owner context.
+ */
+WriteArchive* WriteArchive::WriteTThread(lua_State* const threadState, const RRef& ownerRef)
+{
+    RRef objectRef{};
+    (void)RRef_lua_State(&objectRef, threadState);
+    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+    return this;
+}
+
+/**
+ * Address: 0x00920870 (FUN_00920870, gpg::WriteArchive::WriteTString)
+ *
+ * What it does:
+ * Wraps one Lua `TString*` pointer lane into an `RRef` and forwards it as one
+ * unowned tracked pointer entry with caller-provided owner context.
+ */
+WriteArchive* WriteArchive::WriteTString(TString* const value, const RRef& ownerRef)
+{
+    RRef objectRef{};
+    (void)RRef_TString(&objectRef, value);
+    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+    return this;
+}
+
+/**
+ * Address: 0x009208B0 (FUN_009208B0, gpg::WriteArchive::WriteTTable)
+ *
+ * What it does:
+ * Wraps one Lua `Table*` pointer lane into an `RRef` and forwards it as one
+ * unowned tracked pointer entry with caller-provided owner context.
+ */
+WriteArchive* WriteArchive::WriteTTable(Table* const table, const RRef& ownerRef)
+{
+    RRef objectRef{};
+    (void)RRef_Table(&objectRef, table);
+    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+    return this;
+}
+
+/**
+ * Address: 0x009208F0 (FUN_009208F0, gpg::WriteArchive::WriteFunction)
+ *
+ * What it does:
+ * Wraps one Lua `LClosure*` pointer lane into an `RRef` and forwards it as
+ * one unowned tracked pointer entry with caller-provided owner context.
+ */
+WriteArchive* WriteArchive::WriteFunction(LClosure* const closure, const RRef& ownerRef)
+{
+    RRef objectRef{};
+    (void)RRef_LClosure(&objectRef, closure);
+    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+    return this;
+}
+
+/**
+ * Address: 0x00920930 (FUN_00920930, gpg::WriteArchive::WriteUserdata)
+ *
+ * What it does:
+ * Wraps one Lua `Udata*` pointer lane into an `RRef` and forwards it as one
+ * unowned tracked pointer entry with caller-provided owner context.
+ */
+WriteArchive* WriteArchive::WriteUserdata(Udata* const userdata, const RRef& ownerRef)
+{
+    RRef objectRef{};
+    (void)RRef_Udata(&objectRef, userdata);
+    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+    return this;
+}
+
+/**
+ * Address: 0x00921240 (FUN_00921240, gpg::WriteArchive::WriteCFunction)
+ *
+ * What it does:
+ * Wraps one Lua `CClosure*` pointer lane into an `RRef` and forwards it as
+ * one unowned tracked pointer entry with caller-provided owner context.
+ */
+WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& ownerRef)
+{
+    RRef objectRef{};
+    (void)RRef_CClosure(&objectRef, closure);
+    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
     return this;
 }
 

@@ -381,11 +381,14 @@ int moho::FORMATION_PickBestFormation(
 }
 
 /**
+ * Address: 0x0059BFE0 (FUN_0059BFE0, non-deleting dtor body)
  * Address: 0x0059C340 (FUN_0059C340)
+ *
+ * What it does:
+ * Resets inline-backed formation-instance storage before base teardown.
  */
 CAiFormationDBImpl::~CAiFormationDBImpl()
 {
-  // Mirrors FUN_0059BFE0 storage teardown semantics before base destruction.
   mFormInstances.ResetStorageToInline();
 }
 

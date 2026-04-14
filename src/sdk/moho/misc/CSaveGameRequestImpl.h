@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <stdexcept>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
@@ -26,6 +27,44 @@ namespace moho
   struct SFileStarCloser
   {
     void operator()(std::FILE* file) const noexcept;
+  };
+
+  /**
+   * Exception payload used by legacy save/load codepaths.
+   */
+  class SaveLoadError : public std::runtime_error
+  {
+  public:
+    /**
+     * Address: 0x0087FDC0 (FUN_0087FDC0, Moho::SaveLoadError::SaveLoadError)
+     *
+     * What it does:
+     * Builds the formatted runtime-error message and stores the raw save/load
+     * message fragment for later reporting.
+     */
+    explicit SaveLoadError(const char* message);
+
+    /**
+     * Address: 0x00880700 (FUN_00880700, Moho::SaveLoadError::SaveLoadError copy-ctor)
+     *
+     * What it does:
+     * Copies base exception payload and duplicated save/load message fragment.
+     */
+    SaveLoadError(const SaveLoadError& other);
+
+    /**
+     * Address: 0x0087FE90 (FUN_0087FE90, Moho::SaveLoadError::~SaveLoadError)
+     *
+     * What it does:
+     * Releases saved message storage then tears down `std::runtime_error`
+     * and `std::exception` lanes.
+     */
+    ~SaveLoadError() noexcept override;
+
+    [[nodiscard]] const msvc8::string& GetRawMessage() const noexcept;
+
+  private:
+    msvc8::string mRawMessage;
   };
 
   /**

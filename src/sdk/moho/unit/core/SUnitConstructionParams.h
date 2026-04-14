@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "moho/render/camera/VTransform.h"
+#include "Wm3Vector3.h"
 
 namespace moho
 {
@@ -22,6 +23,40 @@ namespace moho
    */
   struct SUnitConstructionParams
   {
+    /**
+     * Address: 0x00585AB0 (FUN_00585AB0, Moho::SUnitConstructionParams::SUnitConstructionParams)
+     * Mangled: ??0SUnitConstructionParams@Moho@@QAE@HABUdeprecated_struct_VecQuatB@@PAVCArmyImpl@1@PAVRUnitBlueprint@1@PAVUnit@1@E@Z
+     *
+     * What it does:
+     * Initializes one unit-construction payload from full transform/layer/
+     * owner inputs and applies the original layer-elevation gate.
+     */
+    SUnitConstructionParams(
+      std::int32_t layer,
+      const VTransform& transform,
+      CArmyImpl* army,
+      const RUnitBlueprint* blueprint,
+      Unit* linkSourceUnit,
+      bool complete
+    );
+
+    /**
+     * Address: 0x005F54D0 (FUN_005F54D0, Moho::SUnitConstructionParams::SUnitConstructionParams)
+     * Mangled: ??0SUnitConstructionParams@Moho@@QAE@@Z_0
+     *
+     * What it does:
+     * Initializes one unit-construction payload from layer/position/owner
+     * inputs, writes identity orientation, and configures elevation handling.
+     */
+    SUnitConstructionParams(
+      std::int32_t layer,
+      const Wm3::Vector3f& position,
+      CArmyImpl* army,
+      const RUnitBlueprint* blueprint,
+      Unit* linkSourceUnit,
+      bool complete
+    );
+
     CArmyImpl* mArmy;                 // +0x00
     const RUnitBlueprint* mBlueprint; // +0x04
     VTransform mTransform;            // +0x08

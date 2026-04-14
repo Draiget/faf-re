@@ -24,6 +24,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/projectile/Projectile.h"
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -2257,6 +2258,32 @@ namespace moho
   }
 
   /**
+   * Address: 0x006A4C70 (FUN_006A4C70, Moho::UnitWeapon::GetCat1)
+   *
+   * What it does:
+   * Copies this weapon primary target category set into caller-provided
+   * output storage.
+   */
+  EntityCategorySet* UnitWeapon::GetCat1(EntityCategorySet* const outCategory) const
+  {
+    *outCategory = mCat1;
+    return outCategory;
+  }
+
+  /**
+   * Address: 0x006A4CA0 (FUN_006A4CA0, Moho::UnitWeapon::GetCat2)
+   *
+   * What it does:
+   * Copies this weapon secondary target category set into caller-provided
+   * output storage.
+   */
+  EntityCategorySet* UnitWeapon::GetCat2(EntityCategorySet* const outCategory) const
+  {
+    *outCategory = mCat2;
+    return outCategory;
+  }
+
+  /**
    * Address: 0x006D53C0 (FUN_006D53C0, Moho::UnitWeapon::ChangeProjectileBlueprint)
    *
    * What it does:
@@ -2270,6 +2297,28 @@ namespace moho
     }
 
     UpdateProjectileBlueprintFromText(this, blueprint.c_str());
+  }
+
+  /**
+   * Address: 0x006D5330 (FUN_006D5330, Moho::UnitWeapon::GetTransform)
+   *
+   * What it does:
+   * Writes this weapon world position into caller-provided output storage,
+   * using muzzle-bone transform when a valid muzzle bone is configured.
+   */
+  Wm3::Vector3f* UnitWeapon::GetTransform(Wm3::Vector3f* const outPosition) const
+  {
+    VTransform transform{};
+    const VTransform* source = nullptr;
+    if (mBone >= 0) {
+      transform = mUnit->GetBoneWorldTransform(mBone);
+      source = &transform;
+    } else {
+      source = &mUnit->GetTransform();
+    }
+
+    *outPosition = source->pos_;
+    return outPosition;
   }
 
   /**
@@ -2381,6 +2430,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x006D5500 (FUN_006D5500, Moho::UnitWeapon::CheckSilo)
+   *
+   * What it does:
+   * Returns true when this weapon does not require counted-projectile silo
+   * storage, or when required silo storage is currently available.
+   */
+  bool UnitWeapon::CheckSilo()
+  {
+    if (mWeaponBlueprint == nullptr || mWeaponBlueprint->CountedProjectile == 0u) {
+      return true;
+    }
+
+    if (mUnit == nullptr || mUnit->AiSiloBuild == nullptr) {
+      return true;
+    }
+
+    return mUnit->AiSiloBuild->SiloGetStorageCount(static_cast<ESiloType>(mWeaponBlueprint->NukeWeapon)) != 0;
+  }
+
+  /**
    * Address: 0x006D5720 (FUN_006D5720, Moho::UnitWeapon::CanAttackTarget)
    *
    * What it does:
@@ -2430,6 +2499,67 @@ namespace moho
     }
 
     return false;
+  }
+
+  /**
+   * Address: 0x006D6A00 (FUN_006D6A00, Moho::UnitWeapon::GetClosestCollision)
+   *
+   * What it does:
+   * Scans collision candidates, applies script and ally filters, and returns
+   * the nearest surviving collision lane.
+   */
+  WeaponCollisionEntry* UnitWeapon::GetClosestCollision(
+    WeaponCollisionEntryVec* const collisions,
+    UnitWeapon* const weapon,
+    Unit* const ownerUnit,
+    const bool ignoreAlly
+  )
+  {
+    if (collisions == nullptr) {
+      return nullptr;
+    }
+
+    WeaponCollisionEntry* const begin = collisions->begin();
+    WeaponCollisionEntry* const end = collisions->end();
+    if (begin == nullptr || end == nullptr || begin == end) {
+      return nullptr;
+    }
+
+    std::int32_t closestIndex = -1;
+    float closestDistance = std::numeric_limits<float>::infinity();
+    const std::size_t collisionCount = static_cast<std::size_t>(end - begin);
+    for (std::size_t index = 0; index < collisionCount; ++index) {
+      WeaponCollisionEntry& candidate = begin[index];
+      Entity* const candidateEntity = candidate.entity;
+      if (candidateEntity != nullptr && !candidateEntity->RunScriptOnCollisionCheckWeapon(weapon)) {
+        continue;
+      }
+
+      if (ignoreAlly && ownerUnit != nullptr && candidateEntity != nullptr) {
+        Unit* const candidateUnit = candidateEntity->IsUnit();
+        if (candidateUnit != nullptr && candidateUnit->mCurrentLayer == LAYER_Air && ownerUnit->ArmyRef != nullptr) {
+          const std::uint32_t candidateArmyIndex = (candidateUnit->ArmyRef != nullptr)
+            ? static_cast<std::uint32_t>(candidateUnit->ArmyRef->ArmyId)
+            : std::numeric_limits<std::uint32_t>::max();
+          if (!ownerUnit->ArmyRef->IsEnemy(candidateArmyIndex)) {
+            continue;
+          }
+        }
+      }
+
+      if (closestDistance > candidate.dist) {
+        if (candidateEntity == nullptr || candidateEntity->IsUnit() != ownerUnit) {
+          closestIndex = static_cast<std::int32_t>(index);
+          closestDistance = candidate.dist;
+        }
+      }
+    }
+
+    if (closestIndex < 0) {
+      return nullptr;
+    }
+
+    return begin + closestIndex;
   }
 
   /**

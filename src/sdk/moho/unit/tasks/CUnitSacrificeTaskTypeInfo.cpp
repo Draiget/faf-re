@@ -6,15 +6,9 @@
 #include <typeinfo>
 
 #include "moho/misc/Listener.h"
-#include "moho/misc/WeakPtr.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitSacrificeTask.h"
-
-namespace moho
-{
-  class CUnitCommand;
-}
 
 namespace
 {
@@ -59,64 +53,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::CUnitSacrificeTask));
     }
     return cached;
-  }
-
-  struct CUnitSacrificeTaskListenerPad
-  {
-    std::uint32_t mListenerPad{};
-  };
-
-  static_assert(sizeof(CUnitSacrificeTaskListenerPad) == 0x04, "CUnitSacrificeTask listener pad must be 0x04");
-
-  class CUnitSacrificeTaskRuntimeView final
-    : public moho::CCommandTask
-    , public CUnitSacrificeTaskListenerPad
-    , public moho::Listener<moho::ECommandEvent>
-  {
-  public:
-    moho::CUnitCommand* mCommand;       // 0x40
-    moho::WeakPtr<moho::Unit> mTarget;  // 0x44
-
-    CUnitSacrificeTaskRuntimeView()
-      : CCommandTask()
-      , CUnitSacrificeTaskListenerPad{}
-      , Listener<moho::ECommandEvent>()
-      , mCommand(nullptr)
-      , mTarget{}
-    {
-      mListenerPad = 0;
-      mTarget.ownerLinkSlot = nullptr;
-      mTarget.nextInOwner = nullptr;
-
-      auto& listenerLink = static_cast<moho::Listener<moho::ECommandEvent>&>(*this).mListenerLink;
-      listenerLink.mPrev = &listenerLink;
-      listenerLink.mNext = &listenerLink;
-    }
-
-    ~CUnitSacrificeTaskRuntimeView() override
-    {
-      mTarget.UnlinkFromOwnerChain();
-    }
-
-    int Execute() override
-    {
-      return -1;
-    }
-
-    void OnEvent(moho::ECommandEvent) override {}
-  };
-
-  static_assert(sizeof(CUnitSacrificeTaskRuntimeView) == 0x4C, "CUnitSacrificeTaskRuntimeView size must be 0x4C");
-  static_assert(
-    offsetof(CUnitSacrificeTaskRuntimeView, mCommand) == 0x40, "CUnitSacrificeTaskRuntimeView::mCommand offset must be 0x40"
-  );
-  static_assert(
-    offsetof(CUnitSacrificeTaskRuntimeView, mTarget) == 0x44, "CUnitSacrificeTaskRuntimeView::mTarget offset must be 0x44"
-  );
-
-  [[nodiscard]] CUnitSacrificeTaskRuntimeView* ToRuntimeView(moho::CUnitSacrificeTask* const task) noexcept
-  {
-    return reinterpret_cast<CUnitSacrificeTaskRuntimeView*>(task);
   }
 
   void cleanup()
@@ -225,12 +161,12 @@ namespace moho
    */
   gpg::RRef CUnitSacrificeTaskTypeInfo::NewRef()
   {
-    auto* const task = new (std::nothrow) CUnitSacrificeTaskRuntimeView();
+    auto* const task = new (std::nothrow) CUnitSacrificeTask(nullptr, nullptr);
     if (!task) {
       return gpg::RRef{nullptr, CachedCUnitSacrificeTaskType()};
     }
 
-    return gpg::RRef{reinterpret_cast<CUnitSacrificeTask*>(task), CachedCUnitSacrificeTaskType()};
+    return gpg::RRef{task, CachedCUnitSacrificeTaskType()};
   }
 
   /**
@@ -242,12 +178,12 @@ namespace moho
    */
   gpg::RRef CUnitSacrificeTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitSacrificeTaskRuntimeView*>(objectStorage);
+    auto* const task = static_cast<CUnitSacrificeTask*>(objectStorage);
     if (task) {
-      new (task) CUnitSacrificeTaskRuntimeView();
+      new (task) CUnitSacrificeTask(nullptr, nullptr);
     }
 
-    return gpg::RRef{reinterpret_cast<CUnitSacrificeTask*>(task), CachedCUnitSacrificeTaskType()};
+    return gpg::RRef{task, CachedCUnitSacrificeTaskType()};
   }
 
   /**
@@ -258,7 +194,7 @@ namespace moho
    */
   void CUnitSacrificeTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete ToRuntimeView(static_cast<CUnitSacrificeTask*>(objectStorage));
+    delete static_cast<CUnitSacrificeTask*>(objectStorage);
   }
 
   /**
@@ -274,7 +210,7 @@ namespace moho
       return;
     }
 
-    ToRuntimeView(static_cast<CUnitSacrificeTask*>(objectStorage))->~CUnitSacrificeTaskRuntimeView();
+    static_cast<CUnitSacrificeTask*>(objectStorage)->~CUnitSacrificeTask();
   }
 
   /**

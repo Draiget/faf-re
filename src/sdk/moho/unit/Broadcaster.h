@@ -18,6 +18,16 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006E94A0 (FUN_006E94A0,
+     * ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)
+     *
+     * What it does:
+     * Broadcasts one command event to all linked listeners while preserving
+     * iteration safety when listeners relink/unlink during callback.
+     */
+    void BroadcastEvent(ECommandEvent event);
+
+    /**
      * Address: 0x006F8070 (FUN_006F8070,
      * ?BroadcastEvent@?$Broadcaster@W4EUnitCommandQueueStatus@Moho@@@Moho@@IAEXW4EUnitCommandQueueStatus@2@@Z)
      *

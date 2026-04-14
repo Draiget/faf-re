@@ -15,6 +15,16 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0060B800 (FUN_0060B800, ??1CUnitFireAtTask@Moho@@QAE@@Z)
+     * Mangled: ??1CUnitFireAtTask@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Clears the owner-unit busy bit, unlinks the embedded fire-target weak
+     * lane, and then lets the inherited command-task teardown continue.
+     */
+    ~CUnitFireAtTask() override;
+
+    /**
      * Address: 0x0060B1B0 (FUN_0060B1B0, ??2CUnitFireAtTask@Moho@@QAE@@Z)
      *
      * What it does:

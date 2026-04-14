@@ -2,30 +2,30 @@
 
 Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (`14/04/2026`, `fa_full_2026_03_26`)
+## Recovery Coverage (`16/04/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
-- Total FAF functions: `67,168`
+- Total FAF functions: `67,167`
   - *IDA index, exported*
-- Progress coverage:  **`50.46%`**
+- Progress coverage:  **`55.57%`**
   - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
-  - *Total amount of recovered functions: `35,916`*
+  - *Total amount of completed tokens: `37,324`*
 
-Progress DB status breakdown: 
+Progress DB status breakdown:
 
-- `recovered`: `25,354` (70.36%)
-- `skip`: `4,798` (13.32%) — CRT-internal / compiler-generated
-- `external_dependency`: `3,739` (10.38%) — third-party libs 
+- `recovered`: `27,766` (74.39%)
+- `skip`: `5,774` (15.47%) — CRT-internal / compiler-generated / orphan template instantiations / static-init glue
+- `external_dependency`: `3,784` (10.14%) — third-party libs
   - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
-- `needs_evidence`: `1,697` (4.71%)
-- **`blocked`: `443` (1.23%)** 
-  - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*
-  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `2,140`*
-  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `~2,142`*
+- `needs_evidence`: `614` (1.65%)
+- **`blocked`: `516` (1.38%)**
+  - *strict circular/dep-blocked (in-DB literal `status == "blocked"`)*  
+  - *combined with `needs_evidence`, the "not-yet-recovered non-engine-external" bucket is `1,130`*
+  - *the `stats` tool's `blocked_count` aggregates the same two buckets and reports `1,130`*
     — functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.
 
-## Build Quickstart + Paches
+## Build Quickstart + Patches
 
 Use a Visual Studio developer shell before `msbuild`:
 
@@ -46,7 +46,13 @@ Build:
 msbuild src\sdk\sdk.vcxproj /t:Build /p:Configuration=Debug /p:Platform=Win32
 ```
 
-This command is validated in a VS developer shell; expected result is `0 Error(s)` (warnings remain).
+This command is validated in a VS developer shell; expected result is `0 Error(s), 0 Warning(s)`.
+
+Latest build coverage snapshot (`16/04/2026`):
+
+- Command: `build_sdk.bat`
+- Result: `0 Error(s), 0 Warning(s)`
+- Verification log: `tmp/build_sdk_stdout_pass4.log`
 
 Recommended hang-safe build wrapper:
 

@@ -64,6 +64,14 @@ namespace moho
     STransportPickUpInfo();
 
     [[nodiscard]] bool HasUnit(const Unit* unit) const noexcept;
+
+    /**
+     * Address: 0x005E4480 (FUN_005E4480, Moho::STransportPickUpInfo::AddUnit)
+     *
+     * What it does:
+     * Removes one matching unit from pickup storage (if present) and clears the
+     * `mHasSpace` flag when pickup storage becomes empty.
+     */
     void RemoveUnit(Unit* unit) noexcept;
 
     /**

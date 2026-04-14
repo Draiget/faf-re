@@ -144,6 +144,16 @@ namespace moho
     virtual void UpdateVisibility();
 
     /**
+     * Address: 0x008B9670 (FUN_008B9670, ?OrphanUpdate@UserEntity@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Destroys this orphan entity when the focus-army lane is invalid/missing,
+     * when the entity is on underwater-only layers, or when focus army vision
+     * can currently see its world position.
+     */
+    void OrphanUpdate();
+
+    /**
      * Address: 0x008B8530 (FUN_008B8530, ?RequiresUIRefresh@UserEntity@Moho@@UBE_NXZ)
      *
      * What it does:
@@ -201,6 +211,15 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> GetSelectionBracketTexture(const UserArmy* viewingArmy) const;
 
     /**
+     * Address: 0x0085B050 (FUN_0085B050, Moho::WeakPtr_CD3DBatchTexture::WeakPtr_CD3DBatchTexture)
+     *
+     * What it does:
+     * Returns one retained strategic-underlay texture shared owner lane from
+     * this entity variable-data payload.
+     */
+    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> GetStrategicUnderlayTexture() const;
+
+    /**
      * Address: 0x008B97C0 (FUN_008B97C0,
      * ?IsInCategory@UserEntity@Moho@@QBE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
      *
@@ -217,6 +236,34 @@ namespace moho
      * returns the cached transform by value.
      */
     [[nodiscard]] VTransform GetInterpolatedTransform(float interpolationAlpha) const;
+
+    /**
+     * Address: 0x007EC2F0 (FUN_007EC2F0, ?GetInterpolatedPosition@UserEntity@Moho@@QBE?AV?$Vector3@M@Wm3@@M@Z)
+     *
+     * What it does:
+     * Returns interpolated world-position lanes extracted from
+     * `GetInterpolatedTransform(interpolationAlpha)`.
+     */
+    [[nodiscard]] Wm3::Vec3f GetInterpolatedPosition(float interpolationAlpha) const;
+
+    /**
+     * Address: 0x008B8BC0 (FUN_008B8BC0, ?SetPose@UserEntity@Moho@@QAEXABV?$shared_ptr@VCAniPose@Moho@@@boost@@@Z)
+     *
+     * What it does:
+     * Applies one shared animation pose to both runtime pose lanes, ensures
+     * static-pose mesh stance mode, and refreshes spatial-db bounds.
+     */
+    void SetPose(const boost::shared_ptr<CAniPose>& pose);
+
+    /**
+     * Address: 0x00838030 (FUN_00838030, ?GetAttachmentParent@UserEntity@Moho@@QAEPAV12@XZ)
+     * Mangled: ?GetAttachmentParent@UserEntity@Moho@@QAEPAV12@XZ
+     *
+     * What it does:
+     * Resolves the current attachment-parent entity id against the owning
+     * session entity map and returns the live parent entity when present.
+     */
+    [[nodiscard]] UserEntity* GetAttachmentParent();
 
   public:
     void* mWeakObjectRuntimeHead;               // 0x04

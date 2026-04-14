@@ -10,6 +10,34 @@
 
 namespace gpg::core
 {
+  namespace detail
+  {
+    /**
+     * Address: 0x00581270 (FUN_00581270, gpg::fastvector_Entity copy helper lane)
+     * Address: 0x00822990 (FUN_00822990, gpg::fastvector_UserUnit copy helper lane)
+     *
+     * What it does:
+     * Copies one dword lane range `[sourceBegin, sourceEnd)` into `destination`
+     * and returns the advanced destination pointer. When destination is null, it
+     * only advances the pointer lane.
+     */
+    [[nodiscard]] inline std::uint32_t* CopyDwordRangeForward(
+      std::uint32_t* destination,
+      const std::uint32_t* sourceBegin,
+      const std::uint32_t* sourceEnd
+    ) noexcept
+    {
+      std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+      for (const std::uint32_t* source = sourceBegin; source != sourceEnd; ++source) {
+        if (destinationAddress != 0u) {
+          *reinterpret_cast<std::uint32_t*>(destinationAddress) = *source;
+        }
+        destinationAddress += sizeof(std::uint32_t);
+      }
+      return reinterpret_cast<std::uint32_t*>(destinationAddress);
+    }
+  } // namespace detail
+
   /**
    * Three-pointer vector with raw ownership. Size math is done in bytes to avoid
    * compiler quirks and to support T=void (elem size is 1 in that case).
@@ -270,6 +298,40 @@ namespace gpg::core
       Clear();
     }
 
+    void resize(const size_t n)
+    {
+      const size_t current = Size();
+      if (n <= current) {
+        end_ = ptr_at(start_, n);
+        return;
+      }
+
+      Reserve(n);
+      if constexpr (std::is_trivially_constructible_v<T>) {
+        std::memset(ptr_at(start_, current), 0, (n - current) * elem_);
+      } else {
+        for (size_t i = current; i < n; ++i) {
+          start_[i] = T{};
+        }
+      }
+      end_ = ptr_at(start_, n);
+    }
+
+    void resize(const size_t n, const value_type& value)
+    {
+      const size_t current = Size();
+      if (n <= current) {
+        end_ = ptr_at(start_, n);
+        return;
+      }
+
+      Reserve(n);
+      for (size_t i = current; i < n; ++i) {
+        start_[i] = value;
+      }
+      end_ = ptr_at(start_, n);
+    }
+
     iterator erase(iterator pos)
     {
       return erase(pos, pos + 1);
@@ -412,11 +474,28 @@ namespace gpg::core
      */
     void PushBack(const T& v)
     {
+      push_back(v);
+    }
+
+    /**
+     * Address: 0x0059C750 (FUN_0059C750, gpg::fastvector_n64_SAssignedLocInfo::push_back)
+     *
+     * What it does:
+     * Appends one element into the active lane. If storage is full, routes
+     * through insert-grow lane with a one-element source window; otherwise
+     * writes directly at `end_` and advances by one element.
+     */
+    void push_back(const T& value)
+    {
       if (this->end_ == this->capacity_) {
-        const size_t newCap = this->Capacity() ? this->Capacity() * 2 : N;
-        Reserve(newCap);
+        InsertAt(this->end_, &value, &value + 1);
+        return;
       }
-      *this->end_++ = v;
+
+      if (this->end_ != nullptr) {
+        *this->end_ = value;
+      }
+      ++this->end_;
     }
 
     /**
@@ -647,6 +726,13 @@ namespace gpg::core
      */
     static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd) noexcept
     {
+      if constexpr (std::is_trivially_copyable_v<T> && ElemSize == sizeof(std::uint32_t)) {
+        auto* const destWords = reinterpret_cast<std::uint32_t*>(dest);
+        auto* const beginWords = reinterpret_cast<const std::uint32_t*>(copyBegin);
+        auto* const endWords = reinterpret_cast<const std::uint32_t*>(copyEnd);
+        return reinterpret_cast<T*>(detail::CopyDwordRangeForward(destWords, beginWords, endWords));
+      }
+
       std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(dest);
       for (const T* cur = copyBegin; cur != copyEnd; ++cur) {
         if (destinationAddress != 0u) {
@@ -799,6 +885,13 @@ namespace gpg::core
     template <class T>
     [[nodiscard]] inline T* CopyRangeForward(T* out, const T* srcBegin, const T* srcEnd) noexcept
     {
+      if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) == sizeof(std::uint32_t)) {
+        auto* const outWords = reinterpret_cast<std::uint32_t*>(out);
+        auto* const beginWords = reinterpret_cast<const std::uint32_t*>(srcBegin);
+        auto* const endWords = reinterpret_cast<const std::uint32_t*>(srcEnd);
+        return reinterpret_cast<T*>(detail::CopyDwordRangeForward(outWords, beginWords, endWords));
+      }
+
       std::uintptr_t outAddress = reinterpret_cast<std::uintptr_t>(out);
       for (const T* cur = srcBegin; cur != srcEnd; ++cur) {
         if (outAddress != 0u) {

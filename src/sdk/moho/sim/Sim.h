@@ -840,6 +840,15 @@ namespace moho
     void SaveState(gpg::WriteArchive* archive);
 
     /**
+     * Address: 0x007457F0 (FUN_007457F0, ?Shutdown@Sim@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Destroys live units, drains the deferred deletion queue, shuts down the
+     * sim sound manager, and latches `mDidProcess`.
+     */
+    void Shutdown();
+
+    /**
      * Runtime bridge for recovered Lua registration paths that need unit
      * construction through `SUnitConstructionParams`.
      */
@@ -892,6 +901,15 @@ namespace moho
      */
     const char* GetCurrentCommandSourceName() const;
 
+    /**
+     * Address: 0x0062CBD0 (FUN_0062CBD0, ?CenterOfMap@Sim@Moho@@QBE?AV?$Vector3@M@Wm3@@XZ)
+     *
+     * What it does:
+     * Returns the terrain-grid center of the current map using the backing
+     * heightfield dimensions, with zero Y.
+     */
+    [[nodiscard]] Wm3::Vec3f CenterOfMap() const;
+
   private:
     /**
      * Address: 0x007491C0
@@ -938,6 +956,15 @@ namespace moho
     void SerializeLoadBody(gpg::ReadArchive* archive);
 
     /**
+     * Address: 0x00745020 (FUN_00745020, ?SerMapData@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Serializes `mMapData->mPlayableRect`, then writes the internal loaded
+     * `Rect2i` vector lane as count + element records.
+     */
+    void SerMapData(gpg::WriteArchive* archive);
+
+    /**
      * Address: 0x00745120 (FUN_00745120, ?SerMapData@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
      *
      * What it does:
@@ -945,6 +972,42 @@ namespace moho
      * and refreshes the two internal cached `Rect2i` vector lanes.
      */
     void SerMapData(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x007452B0 (FUN_007452B0, ?SerArmies@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Serializes owned army pointers from `mArmiesList` as count + owned
+     * `SimArmy` raw-pointer entries.
+     */
+    void SerArmies(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00745330 (FUN_00745330, ?SerArmies@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Reads owned army pointers from archive into `mArmiesList` using
+     * archive-count resize + per-entry owned pointer load.
+     */
+    void SerArmies(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x007456D0 (FUN_007456D0, ?SerDirtyEnts@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Writes one unowned entity-pointer chain from `mCoordEntities` and
+     * terminates the stream with a null entity sentinel.
+     */
+    void SerDirtyEnts(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00745760 (FUN_00745760, ?SerDirtyEnts@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Reads one unowned entity-pointer chain and relinks each entity's
+     * `mCoordNode` into `mCoordEntities` until a null sentinel is reached.
+     */
+    void SerDirtyEnts(gpg::ReadArchive* archive);
 
     /**
      * Address: 0x00745390 (FUN_00745390, ?SerVars@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
@@ -2928,6 +2991,15 @@ namespace moho
    * `GetUnitCommandFromCommandCap`.
    */
   CScrLuaInitForm* func_GetUnitCommandFromCommandCap_LuaFuncDef();
+
+  /**
+   * Address: 0x00821F50 (FUN_00821F50, Moho::UnitCommandCapToCommandType)
+   *
+   * What it does:
+   * Converts one `RULEUCC_*` capability enum value into its corresponding
+   * `UNITCOMMAND_*` command type.
+   */
+  EUnitCommandType UnitCommandCapToCommandType(ERuleBPUnitCommandCaps commandCap);
 
   /**
    * Address: 0x008408C0 (FUN_008408C0, cfunc_GetUnitCommandFromCommandCapL)

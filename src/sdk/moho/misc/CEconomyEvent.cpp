@@ -14,6 +14,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
@@ -561,6 +562,21 @@ namespace moho
   CScrLuaMetatableFactory<CEconomyEvent> CScrLuaMetatableFactory<CEconomyEvent>::sInstance{};
 
   /**
+   * Address: 0x00773630 (FUN_00773630, ??0CEconRequest@Moho@@QAE@ABUSEconValue@1@PAVCEconomy@1@@Z)
+   *
+   * What it does:
+   * Initializes one economy-request node with requested-per-second values,
+   * clears granted lanes, and links into the economy consumption list head.
+   */
+  CEconRequest::CEconRequest(const SEconValue& perSecond, CEconomy* const economy)
+    : mNode()
+    , mRequested(perSecond)
+    , mGranted{}
+  {
+    mNode.ListLinkAfter(&economy->mConsumptionData);
+  }
+
+  /**
    * Address: 0x00773990 (FUN_00773990, Moho::CEconRequest::MemberConstruct)
    *
    * What it does:
@@ -618,6 +634,34 @@ namespace moho
 
     archive->Write(econValueType, &mRequested, nullOwner);
     archive->Write(econValueType, &mGranted, nullOwner);
+  }
+
+  /**
+   * Address: 0x00773770 (FUN_00773770, Moho::CEconRequest::LimitingRate)
+   *
+   * What it does:
+   * Computes limiting fulfillment ratio for requested economy lanes by
+   * selecting the smallest granted/requested ratio across energy and mass.
+   */
+  float CEconRequest::LimitingRate() const
+  {
+    float limitingRate = 1.0f;
+
+    if (mRequested.energy > 0.0f) {
+      const float energyRatio = mGranted.energy / mRequested.energy;
+      if (energyRatio <= limitingRate) {
+        limitingRate = energyRatio;
+      }
+    }
+
+    if (mRequested.mass > 0.0f) {
+      const float massRatio = mGranted.mass / mRequested.mass;
+      if (massRatio <= limitingRate) {
+        limitingRate = massRatio;
+      }
+    }
+
+    return limitingRate;
   }
 } // namespace moho
 

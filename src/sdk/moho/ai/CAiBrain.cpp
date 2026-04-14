@@ -251,6 +251,45 @@ namespace
     return path;
   }
 
+  /**
+   * Address: 0x0057C9F0 (FUN_0057C9F0, func_CopySPointVector)
+   *
+   * What it does:
+   * Copies one `SPointVector` payload into destination storage and returns
+   * the destination pointer.
+   */
+  [[maybe_unused]] [[nodiscard]] SPointVector* CopySPointVectorAndReturnDestination(
+    SPointVector* const destination,
+    const SPointVector* const source
+  ) noexcept
+  {
+    destination->point = source->point;
+    destination->vector = source->vector;
+    return destination;
+  }
+
+  /**
+   * Address: 0x00583130 (FUN_00583130, func_CopyPointVects)
+   *
+   * What it does:
+   * Copies one half-open `SPointVector` range into destination storage and
+   * returns the end pointer reached by the copy loop.
+   */
+  [[maybe_unused]] [[nodiscard]] SPointVector* CopyPointVectorRangeAndReturnEnd(
+    SPointVector* destination,
+    const SPointVector* sourceBegin,
+    const SPointVector* sourceEnd
+  ) noexcept
+  {
+    while (sourceBegin != sourceEnd) {
+      (void)CopySPointVectorAndReturnDestination(destination, sourceBegin);
+      ++destination;
+      ++sourceBegin;
+    }
+
+    return destination;
+  }
+
   struct CSquadUnitsRuntimeView
   {
     std::uint8_t pad_0000_0010[0x10];
@@ -867,6 +906,18 @@ namespace
   }
 
   /**
+   * Address: 0x00581910 (FUN_00581910, func_CreateCAiBrainLuaObject)
+   *
+   * What it does:
+   * Returns one cached `CAiBrain` metatable object from
+   * `CScrLuaMetatableFactory<CAiBrain>`.
+   */
+  [[nodiscard]] LuaPlus::LuaObject CreateCAiBrainLuaObject(LuaPlus::LuaState* const state)
+  {
+    return CScrLuaMetatableFactory<CAiBrain>::Instance().Get(state);
+  }
+
+  /**
    * Address: 0x0057A350 (FUN_0057A350, func_LoadAiBrain)
    *
    * What it does:
@@ -885,7 +936,7 @@ namespace
     }
 
     gpg::Logf("Can't find AIBrain, using CAiBrain directly");
-    return CScrLuaMetatableFactory<CScriptObject*>::Instance().Get(state);
+    return CreateCAiBrainLuaObject(state);
   }
 
   [[nodiscard]] SBuildStructurePositionNode* AllocateBuildStructureNode()

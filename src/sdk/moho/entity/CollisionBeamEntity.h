@@ -69,6 +69,33 @@ namespace moho
     void SetCollisionCheckInterval(std::int32_t intervalTicks);
 
     /**
+     * Address: 0x00672C00 (FUN_00672C00, Moho::CollisionBeamEntity::GetDerivedObjectRef)
+     * Mangled: ?GetDerivedObjectRef@CollisionBeamEntity@Moho@@UAE?AVRRef@gpg@@XZ
+     *
+     * What it does:
+     * Returns a typed reflection reference pair for this collision-beam entity.
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
+
+    /**
+     * Address: 0x00672C20 (FUN_00672C20, Moho::CollisionBeamEntity::IsCollisionBeam)
+     * Mangled: ?IsCollisionBeam@CollisionBeamEntity@Moho@@UAEPAV12@XZ
+     *
+     * What it does:
+     * Returns `this` to identify the runtime entity as a collision-beam owner.
+     */
+    [[nodiscard]] CollisionBeamEntity* IsCollisionBeam() override;
+
+    /**
+     * Address: 0x00672CB0 (FUN_00672CB0, Moho::CollisionBeamEntity::GetBoneCount)
+     * Mangled: ?GetBoneCount@CollisionBeamEntity@Moho@@UBEHXZ
+     *
+     * What it does:
+     * Returns the fixed collision-beam skeleton bone count.
+     */
+    [[nodiscard]] int GetBoneCount() const override;
+
+    /**
      * Address: 0x006731A0 (FUN_006731A0, Moho::CollisionBeamEntity::GetBoneLocalTransform)
      * Mangled: ?GetBoneLocalTransform@CollisionBeamEntity@Moho@@UBE?AVVTransform@2@H@Z
      *
@@ -77,6 +104,16 @@ namespace moho
      * length for bone index `1`.
      */
     [[nodiscard]] VTransform GetBoneLocalTransform(int boneIndex) const override;
+
+    /**
+     * Address: 0x006730B0 (FUN_006730B0, Moho::CollisionBeamEntity::GetBoneWorldTransform)
+     * Mangled: ?GetBoneWorldTransform@CollisionBeamEntity@Moho@@UBE?AVVTransform@2@H@Z
+     *
+     * What it does:
+     * Returns entity world transform lanes and extends translation by beam
+     * length along oriented local +Z when `boneIndex != 0`.
+     */
+    [[nodiscard]] VTransform GetBoneWorldTransform(int boneIndex) const override;
 
     /**
      * Address: 0x006731F0 (FUN_006731F0, Moho::CollisionBeamEntity::EnableCollisionCheck)
@@ -105,6 +142,16 @@ namespace moho
      * and draws optional debug wireframe for active beam state.
      */
     int MotionTick() override;
+
+    /**
+     * Address: 0x006736B0 (FUN_006736B0, Moho::CollisionBeamEntity::OnDestroy)
+     * Mangled: ?OnDestroy@CollisionBeamEntity@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Forwards base destroy flow, tears down active beam effect ownership, and
+     * unlinks the effect weak-pointer lane from its owner chain.
+     */
+    void OnDestroy() override;
 
     /**
      * Address: 0x00673A50 (FUN_00673A50, Moho::CollisionBeamEntity::MemberConstruct)

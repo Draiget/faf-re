@@ -70,6 +70,14 @@ namespace moho
     float FRand() noexcept;
 
     /**
+     * Address: 0x0051B5C0 (FUN_0051B5C0, Moho::CRandomStream::FRand)
+     *
+     * What it does:
+     * Returns one uniform random sample in [lower, upper) from the embedded twister.
+     */
+    float FRand(float lower, float upper) noexcept;
+
+    /**
      * Address: 0x0040F030 (FUN_0040F030, Moho::CRandomStream::Checksum)
      *
      * What it does:

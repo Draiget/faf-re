@@ -116,6 +116,28 @@ namespace
   }
 
   /**
+   * Address: 0x007CB8E0 (FUN_007CB8E0, func_CopyLaunchInfoBasePtr)
+   *
+   * What it does:
+   * Copies one `shared_ptr<LaunchInfoNew>` lane into a
+   * `shared_ptr<LaunchInfoBase>` output slot through swap-based temporary
+   * ownership transfer.
+   */
+  boost::shared_ptr<moho::LaunchInfoBase>* CopyLaunchInfoBasePtr(
+    boost::shared_ptr<moho::LaunchInfoBase>* const outBase,
+    const boost::shared_ptr<moho::LaunchInfoNew>& source
+  )
+  {
+    if (outBase == nullptr) {
+      return nullptr;
+    }
+
+    boost::shared_ptr<moho::LaunchInfoBase> temp(source);
+    temp.swap(*outBase);
+    return outBase;
+  }
+
+  /**
    * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
    *
    * What it does:
@@ -135,7 +157,7 @@ namespace
     localCommandSource.mIndex = 0u;
     localCommandSource.mName = localPlayerName;
     localCommandSource.mTimeouts = -1;
-    launchInfo->mCommandSources.mSrcs.push_back(localCommandSource);
+    moho::AppendSSTICommandSource(launchInfo->mCommandSources.mSrcs, localCommandSource);
 
     sessionInfo.mSourceId = 0u;
 
@@ -324,7 +346,7 @@ namespace moho
       source.mIndex = sourceIndex;
       replayReader.ReadString(&source.mName);
       replayReader.ReadExact(source.mTimeouts);
-      launchInfo->mCommandSources.mSrcs.push_back(source);
+      moho::AppendSSTICommandSource(launchInfo->mCommandSources.mSrcs, source);
       (void)replayCommandSources.Add(sourceIndex);
     }
 
@@ -360,7 +382,7 @@ namespace moho
 
     msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     sessionInfo->mMapName = replayMapName;
-    sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
+    (void)CopyLaunchInfoBasePtr(&sessionInfo->mLaunchInfo, launchInfo);
     sessionInfo->mIsBeingRecorded = false;
     sessionInfo->mIsReplay = true;
     sessionInfo->mIsMultiplayer = false;
@@ -909,7 +931,7 @@ namespace moho
     source.mIndex = 0;
     source.mName = localArmyName;
     source.mTimeouts = -1;
-    launchInfo->mCommandSources.mSrcs.push_back(source);
+    moho::AppendSSTICommandSource(launchInfo->mCommandSources.mSrcs, source);
 
     launchInfo->mArmyLaunchInfo.clear();
     launchInfo->mArmyLaunchInfo.reserve(mHeader.mArmyInfo.size());

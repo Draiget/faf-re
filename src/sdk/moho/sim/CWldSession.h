@@ -22,6 +22,8 @@
 
 namespace moho
 {
+  using EntId = std::int32_t;
+
   class UserArmy;
   class UserUnit;
   enum EMauiEventModifier : std::uint32_t;
@@ -64,6 +66,32 @@ namespace moho
 
   struct MouseInfo
   {
+    MouseInfo();
+
+    /**
+     * Address: 0x0081CF00 (FUN_0081CF00, ??0UICursorInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Copy-constructs cursor info and relinks weak hovered-unit ownership to this instance.
+     */
+    MouseInfo(const MouseInfo& other);
+
+    /**
+     * Address: 0x00893140 (FUN_00893140, ??1UICursorInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks this cursor info from the hovered-unit weak-owner chain.
+     */
+    ~MouseInfo();
+
+    /**
+     * Address: 0x0082B270 (FUN_0082B270, Moho::UICursorInfo::Copy)
+     *
+     * What it does:
+     * Assigns cursor info and updates hovered-unit weak-owner chain links.
+     */
+    MouseInfo& operator=(const MouseInfo& other);
+
     std::uint8_t mHitValid; // +0x00
     std::uint8_t pad_01[3];
     Wm3::Vector3f mMouseWorldPos;  // +0x04
@@ -91,6 +119,25 @@ namespace moho
 
   struct CommandModeData
   {
+    CommandModeData() = default;
+
+    /**
+     * Address: 0x0081F6C0 (FUN_0081F6C0, ??0SCommandModeData@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Copy-constructs command mode state, including both cursor snapshots.
+     */
+    CommandModeData(const CommandModeData& other);
+
+    /**
+     * Address: 0x0082B230 (FUN_0082B230, ??0SCommandModeData@Moho@@QAE@@Z_0)
+     *
+     * What it does:
+     * Assigns command mode state from another value, using `MouseInfo::operator=`
+     * for both drag-snapshot lanes.
+     */
+    CommandModeData& operator=(const CommandModeData& other);
+
     ECommandMode mMode;
     ERuleBPUnitCommandCaps mCommandCaps;
     void* mBlueprint;
@@ -204,12 +251,27 @@ namespace moho
     {
       SSelectionSetUserEntity* mOwnerSet; // +0x00
       SSelectionNodeUserEntity* mNode;    // +0x04
+
+      /**
+       * Address: 0x007AE7E0 (FUN_007AE7E0, Moho::WeakSet_UserEntity::Iterator::Next)
+       *
+       * What it does:
+       * Advances iterator cursor one RB-tree successor and then skips tombstone
+       * nodes through `find`, updating `mNode` in-place.
+       */
+      [[nodiscard]] Index* Next();
     };
 
     struct AddResult : Index
     {
       std::uint8_t mWasInserted;          // +0x08
       std::uint8_t mReserved09_0B[3]{};   // +0x09
+    };
+
+    struct FindResult
+    {
+      SSelectionSetUserEntity* mSet;   // +0x00
+      SSelectionNodeUserEntity* mRes;  // +0x04
     };
 
     /**
@@ -221,6 +283,17 @@ namespace moho
      */
     [[nodiscard]] static AddResult*
       Add(AddResult* outResult, SSelectionSetUserEntity* set, UserEntity* entity);
+
+    /**
+     * Address: 0x007FDD50 (FUN_007FDD50, Moho::WeakSet_UserEntity::Find)
+     *
+     * What it does:
+     * Resolves one weak-set tree node by user-entity key and writes one
+     * `{set,node}` pair to `outResult`, using the transient weak-link guard lane
+     * required by the original weak-pointer map lookup path.
+     */
+    [[nodiscard]] static FindResult*
+      Find(FindResult* outResult, SSelectionSetUserEntity* set, UserEntity* entity);
 
     /**
      * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
@@ -242,6 +315,15 @@ namespace moho
      */
     [[nodiscard]] static SSelectionNodeUserEntity*
       find(SSelectionSetUserEntity* set, SSelectionNodeUserEntity* start, SSelectionNodeUserEntity** outNode);
+
+    /**
+     * Address: 0x0066A060 (FUN_0066A060, Moho::WeakSet_UserEntity::First)
+     *
+     * What it does:
+     * Starts weak-set iteration at the left-most tree node and returns one
+     * `{set,node}` cursor pair after tombstone filtering through `find`.
+     */
+    [[nodiscard]] FindResult* First(FindResult* outResult);
 
     /**
      * Address: 0x0066ADD0 (FUN_0066ADD0, Moho::WeakSet_UserEntity::Iterator::inc)
@@ -270,6 +352,7 @@ namespace moho
     "SSelectionSetUserEntity::AddResult::mWasInserted offset must be 0x08"
   );
   static_assert(sizeof(SSelectionSetUserEntity::AddResult) == 0x0C, "SSelectionSetUserEntity::AddResult size must be 0x0C");
+  static_assert(sizeof(SSelectionSetUserEntity::FindResult) == 0x08, "SSelectionSetUserEntity::FindResult size must be 0x08");
 
   struct SSessionSaveData
   {
@@ -341,10 +424,28 @@ namespace moho
     [[nodiscard]] bool TryGetPlayableMapRect(VisibilityRect& outRect) const;
 
     /**
-     * Address: 0x008B9580 callsite (focus army lookup path).
+     * Address: 0x007A6360 (FUN_007A6360, ?GetFocusArmy@CWldSession@Moho@@QBEPAVUserArmy@2@XZ)
      *
      * What it does:
-     * Returns the currently focused user army, or nullptr for invalid focus.
+     * Returns the currently focused army pointer, or `nullptr` when focus is
+     * disabled (`FocusArmy < 0`).
+     */
+    [[nodiscard]] UserArmy* GetFocusArmy() const;
+
+    /**
+     * Address: 0x00896590 (FUN_00896590, ?IsObserver@CWldSession@Moho@@QBE_NXZ)
+     *
+     * What it does:
+     * Returns true when focus army is disabled (`FocusArmy < 0`) or when the
+     * focused army lane has no live `UserArmy*` owner.
+     */
+    [[nodiscard]] bool IsObserver() const;
+
+    /**
+     * Address context: compatibility wrapper lane used by recovered callsites.
+     *
+     * What it does:
+     * Exposes focused army accessor for user-session code paths.
      */
     [[nodiscard]] UserArmy* GetFocusUserArmy();
     [[nodiscard]] const UserArmy* GetFocusUserArmy() const;
@@ -454,6 +555,15 @@ namespace moho
     void GetValidAttackingUnits(msvc8::vector<UserUnit*>& outUnits) const;
 
     /**
+     * Address: 0x00894280 (FUN_00894280, ?LookupEntityId@CWldSession@Moho@@QAEPAVUserEntity@2@VEntId@2@@Z)
+     *
+     * What it does:
+     * Performs one ordered entity-id lookup in the world-session entity map
+     * and returns the live `UserEntity*` when the key is present.
+     */
+    [[nodiscard]] UserEntity* LookupEntityId(EntId entityId);
+
+    /**
      * Address context:
      * - `cfunc_SelectUnitsL` / `cfunc_AddSelectUnitsL` user-Lua selection paths.
      *
@@ -519,6 +629,15 @@ namespace moho
     void ClearExtraSelectList();
 
     /**
+     * Address: 0x0081DC70 (FUN_0081DC70, Moho::CWldSession::UnitFirstInSelection)
+     *
+     * What it does:
+     * Returns true when selection is empty or every live selected entity
+     * resolves to the supplied user-unit pointer.
+     */
+    [[nodiscard]] bool UnitFirstInSelection(const UserUnit* unit) const;
+
+    /**
      * Address: 0x00896960 (FUN_00896960, ?SyncPlayableRect@CWldSession@Moho@@QAEXABV?$Rect2@H@gpg@@@Z)
      *
      * What it does:
@@ -535,6 +654,15 @@ namespace moho
      * Builds a save-data snapshot for current world-session entities.
      */
     [[nodiscard]] boost::shared_ptr<SSessionSaveData> GetSaveData() const;
+
+    /**
+     * Address: 0x0087FC90 (FUN_0087FC90,
+     * ?GetScenarioInfo@CWldSession@Moho@@QBE?AVLuaObject@LuaPlus@@XZ)
+     *
+     * What it does:
+     * Returns one value-copy of the session scenario-info Lua object.
+     */
+    [[nodiscard]] LuaPlus::LuaObject GetScenarioInfo() const;
 
     /**
      * Address: 0x0081F7B0 (FUN_0081F7B0,
@@ -599,6 +727,15 @@ namespace moho
      * and clears template placement args.
      */
     void ClearBuildTemplates();
+
+    /**
+     * Address: 0x00895F70 (FUN_00895F70, ?DirtyCommandGraph@CWldSession@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Locks the cached UI command-graph weak handle, marks it dirty when
+     * present, and releases the temporary shared hold.
+     */
+    void DirtyCommandGraph();
 
   private:
     /**
@@ -683,7 +820,7 @@ namespace moho
     uint8_t IsGameOver;                                     // 0x048C
     char pad_048D[19];                                      // 0x048D
     SSelectionSetUserEntity mSelection;                     // 0x04A0
-    char pad_04B0[4];                                       // 0x04B0
+    std::uint8_t mCursorWorldState[4];                      // 0x04B0
     Wm3::Vector3f CursorWorldPos;                           // 0x04B4
     char pad_04C0[8];                                       // 0x04C0
     int32_t HighlightCommandId;                             // 0x04C8
@@ -733,6 +870,11 @@ namespace moho
   );
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
   static_assert(offsetof(CWldSession, mSelection) == 0x4A0, "CWldSession::mSelection offset must be 0x4A0");
+  static_assert(
+    offsetof(CWldSession, mCursorWorldState) == 0x4B0, "CWldSession::mCursorWorldState offset must be 0x4B0"
+  );
+  static_assert(offsetof(CWldSession, CursorWorldPos) == 0x4B4, "CWldSession::CursorWorldPos offset must be 0x4B4");
+  static_assert(offsetof(CWldSession, CursorScreenPos) == 0x4CC, "CWldSession::CursorScreenPos offset must be 0x4CC");
   static_assert(
     offsetof(CWldSession, mOverlayFilters) == 0x4D8, "CWldSession::mOverlayFilters offset must be 0x4D8"
   );
@@ -845,6 +987,33 @@ namespace moho
    * skew-rate adjustment limits.
    */
   [[nodiscard]] float WLD_GetSimRate();
+
+  /**
+   * Address: 0x0088D1B0 (FUN_0088D1B0, ?WLD_IncreaseSimRate@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Raises requested sim rate by one step (up to +50) for authorized local
+   * session contexts.
+   */
+  void WLD_IncreaseSimRate();
+
+  /**
+   * Address: 0x0088D220 (FUN_0088D220, ?WLD_ResetSimRate@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Resets requested sim rate back to neutral (`0`) for authorized local
+   * session contexts.
+   */
+  void WLD_ResetSimRate();
+
+  /**
+   * Address: 0x0088D280 (FUN_0088D280, ?WLD_DecreaseSimRate@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Lowers requested sim rate by one step (down to `-10`) for authorized
+   * local session contexts.
+   */
+  void WLD_DecreaseSimRate();
 
   /**
    * Address context:

@@ -5,6 +5,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/BoostUtils.h"
+#include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/math/GridPos.h"
 #include "ResourceDeposit.h"
@@ -59,6 +60,15 @@ namespace moho
     virtual bool FindClosestDeposit(GridPos* from, GridPos* outPos, float radius, EDepositType type) = 0;
     virtual bool AreaHasDeposit(EDepositType type, gpg::Rect2f* area) = 0;
   };
+
+  /**
+   * Address: 0x005491C0 (FUN_005491C0, func_SearchStringArrayFor)
+   *
+   * What it does:
+   * Scans one contiguous string array range for an exact match and returns the
+   * first matching element or `end` when no match is found.
+   */
+  msvc8::string* SearchStringArrayFor(msvc8::string* begin, msvc8::string* end, const msvc8::string* value);
 
   static_assert(sizeof(IResources) == 0x4, "IResources size must be 0x4");
   static_assert(std::is_polymorphic<IResources>::value, "IResources must remain polymorphic");

@@ -66,6 +66,18 @@ namespace moho
 
   private:
     /**
+     * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
+     *
+     * What it does:
+     * Forwards one vertex-buffer creation request through the active GAL device
+     * singleton and returns `outBuffer`.
+     */
+    static BufferHandle* CreateVertexBufferOnActiveDevice(
+      BufferHandle* outBuffer,
+      gpg::gal::VertexBufferContext* context
+    );
+
+    /**
      * Address: 0x0043FD20 (FUN_0043FD20, sub_43FD20)
      *
      * What it does:

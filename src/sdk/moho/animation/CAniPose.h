@@ -20,6 +20,17 @@ namespace moho
   class CAniPoseBone
   {
   public:
+    CAniPoseBone() = default;
+
+    /**
+     * Address: 0x0054C9C0 (FUN_0054C9C0, Moho::CAniPoseBone::CAniPoseBone)
+     *
+     * What it does:
+     * Copy-constructs one pose-bone lane including transform, parent/pose links,
+     * and visibility/interpolation flags.
+     */
+    CAniPoseBone(const CAniPoseBone& copy);
+
     /**
      * Address: 0x0054BE30 (FUN_0054BE30, Moho::CAniPoseBone::SetVisibleRecur)
      *
@@ -46,6 +57,15 @@ namespace moho
      * lanes when dirty.
      */
     [[nodiscard]] const VTransform& GetCompositeTransform() const;
+
+    /**
+     * Address: 0x0054F630 (FUN_0054F630, Moho::CAniPoseBone::MemberSerialize)
+     *
+     * What it does:
+     * Stores per-bone pose serialization lanes (local-space flag, local
+     * transform, visibility, interpolation-skip flag).
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
      * Address: 0x0054F5C0 (FUN_0054F5C0, Moho::CAniPoseBone::MemberDeserialize)
@@ -131,6 +151,44 @@ namespace moho
      * links from this pose's skeleton hierarchy.
      */
     void OverwritePose(const CAniPose& copy);
+
+    /**
+     * Address: 0x0054B5F0 (FUN_0054B5F0, ?UpdateBones@CAniPose@Moho@@QAEXXZ)
+     *
+     * What it does:
+     * Seeds per-bone local transforms from the skeleton bind lanes, applying
+     * pose scale to local position and resetting composite dirty flags.
+     */
+    void UpdateBones();
+
+    /**
+     * Address: 0x0054B6D0 (FUN_0054B6D0, ?CopyPose@CAniPose@Moho@@QAEXPBV12@_N@Z)
+     * Mangled: ?CopyPose@CAniPose@Moho@@QAEXPBV12@_N@Z
+     *
+     * What it does:
+     * Copies local pose transform and per-bone local lanes from one source
+     * pose into this pose while marking destination composite lanes dirty.
+     */
+    void CopyPose(const CAniPose* sourcePose, bool preserveSourceLane);
+
+    /**
+     * Address: 0x0054B550 (FUN_0054B550, ?SetWorldTransform@CAniPose@Moho@@QAEXABVVTransform@2@@Z)
+     * Mangled: ?SetWorldTransform@CAniPose@Moho@@QAEXABVVTransform@2@@Z
+     *
+     * What it does:
+     * Updates pose world transform when orientation/position lanes differ and
+     * marks affected non-local bone composite lanes dirty.
+     */
+    void SetWorldTransform(const VTransform& transform);
+
+    /**
+     * Address: 0x0054B770 (FUN_0054B770, ?InterpolatePose@CAniPose@Moho@@QAEXMPBV12@0H@Z)
+     *
+     * What it does:
+     * Interpolates pose transforms and bone lanes from two source poses using
+     * the requested blend factor.
+     */
+    void InterpolatePose(float interp, const CAniPose* sourcePose, const CAniPose* targetPose, int bones);
 
     /**
      * Address: 0x005E3B10 (FUN_005E3B10, ?GetSkeleton@CAniPose@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)

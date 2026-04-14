@@ -1,6 +1,7 @@
 #include "STIMap.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -2386,6 +2387,25 @@ namespace moho
   }
 
   /**
+   * Address: 0x00577660 (FUN_00577660, Moho::CHeightField::GetBounds3D)
+   *
+   * IDA signature:
+   * Wm3::AxisAlignedBox3f *__usercall Moho::CHeightField::GetBounds3D@<eax>(
+   *   Wm3::AxisAlignedBox3f *out@<ebx>, Moho::CHeightField *this@<edi>);
+   *
+   * What it does:
+   * Computes `tierCount` from `mGrids` and returns `GetTierBox(0, 0, tierCount)`.
+   */
+  Wm3::AxisAlignedBox3f CHeightField::GetBounds3D() const
+  {
+    const CHeightFieldTier* const firstTier = mGrids.begin();
+    const std::int32_t tierCount = firstTier != nullptr
+                                     ? static_cast<std::int32_t>(mGrids.end() - firstTier)
+                                     : 0;
+    return GetTierBox(0, 0, tierCount);
+  }
+
+  /**
    * Address: 0x00476260 (FUN_00476260, Moho::CHeightField::UpdateError)
    *
    * What it does:
@@ -3606,6 +3626,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A6F0 (FUN_0069A6F0, ?GetTerrainNormal@STIMap@Moho@@QBE?AV?$Vector3@M@Wm3@@MM@Z)
+   *
+   * What it does:
+   * Returns terrain normal sampled from the backing height field at `(x, z)`.
+   */
+  Wm3::Vec3f STIMap::GetTerrainNormal(const float x, const float z) const
+  {
+    return mHeightField.get()->GetNormal(x, z);
+  }
+
+  /**
    * Address: 0x00577B60 (FUN_00577B60)
    *
    * IDA signature:
@@ -3711,6 +3742,48 @@ namespace moho
   }
 
   /**
+   * Address: 0x005ADC20 (FUN_005ADC20)
+   *
+   * Wm3::Vector3<float> const &
+   *
+   * IDA signature:
+   * bool callcnv_F3 Moho::STIMap::AboveWater@<al>(Moho::STIMap *this@<esi>, Wm3::Vector3f position);
+   *
+   * What it does:
+   * Returns whether terrain elevation at `position` is above the active water
+   * elevation (or `-10000.0f` when water is disabled).
+   */
+  bool STIMap::AboveWater(const Wm3::Vec3f& position) const
+  {
+    const float terrainElevation = mHeightField->GetElevation(position.x, position.z);
+    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    return terrainElevation > waterElevation;
+  }
+
+  /**
+   * Address: 0x0086DA60 (FUN_0086DA60)
+   * Mangled: ?IsPlayable@STIMap@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z
+   *
+   * Wm3::Vector3<float> const &
+   *
+   * IDA signature:
+   * BOOL __usercall Moho::STIMap::IsPlayable@<eax>(Moho::STIMap *this@<eax>, Wm3::Vector3f *position@<ecx>);
+   *
+   * What it does:
+   * Truncates world-space `x/z` to ints and checks they lie inside
+   * `mPlayableRect` using `[min,max)` bounds.
+   */
+  bool STIMap::IsPlayable(const Wm3::Vec3f& position) const
+  {
+    const std::int32_t z = static_cast<std::int32_t>(position.z);
+    const std::int32_t x = static_cast<std::int32_t>(position.x);
+    return x >= mPlayableRect.x0 &&
+           x < mPlayableRect.x1 &&
+           z >= mPlayableRect.z0 &&
+           z < mPlayableRect.z1;
+  }
+
+  /**
    * Address: 0x00541A30 (FUN_00541A30), 0x1012F3B0 (FUN_1012F3B0)
    *
    * Wm3::Vector3<float> const &
@@ -3729,6 +3802,60 @@ namespace moho
     }
 
     return mWaterElevation > terrainElevation ? mWaterElevation : terrainElevation;
+  }
+
+  /**
+   * Address: 0x0062D620 (FUN_0062D620, Moho::STIMap::LookAheadForMaxTerrain)
+   *
+   * What it does:
+   * Samples terrain ahead of movement. For short lookahead ranges it reads
+   * direct elevation; for long ranges it samples tier max-bounds and then
+   * applies water-floor policy when the mover cannot fly in water.
+   */
+  float STIMap::LookAheadForMaxTerrain(const Wm3::Vec3f& position, const bool flyInWater, const float lookahead) const
+  {
+    const CHeightField* const field = mHeightField.get();
+    if (lookahead < 1.0f) {
+      const float terrainElevation = field->GetElevation(position.x, position.z);
+      if (flyInWater) {
+        return terrainElevation;
+      }
+
+      if (mWaterEnabled == 0u) {
+        return terrainElevation;
+      }
+
+      return (mWaterElevation > terrainElevation) ? mWaterElevation : terrainElevation;
+    }
+
+    const int mapTierInput = std::min(field->height - 1, field->width - 1) - 1;
+    const int maxMapTier =
+      static_cast<int>(std::bit_width(static_cast<unsigned int>(std::max(mapTierInput, 0))));
+
+    const int lookaheadTierInput = static_cast<int>(std::lrintf(lookahead * 0.5f));
+    const int lookaheadTier =
+      static_cast<int>(std::bit_width(static_cast<unsigned int>(std::max(lookaheadTierInput, 0))));
+
+    int sampleTier = std::min(maxMapTier, lookaheadTier);
+    if (sampleTier < 1) {
+      sampleTier = 1;
+    }
+
+    const int sampleX = static_cast<int>(std::lrintf(position.x));
+    const int sampleZ = static_cast<int>(std::lrintf(position.z));
+    const SMinMax<std::uint16_t> tierBounds = field->GetTierBoundsUWord(
+      sampleTier,
+      sampleX >> sampleTier,
+      sampleZ >> sampleTier
+    );
+    const float terrainTierMax = static_cast<float>(tierBounds.max) * kHeightWordScale;
+
+    if (flyInWater) {
+      return terrainTierMax;
+    }
+
+    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    return (waterElevation > terrainTierMax) ? waterElevation : terrainTierMax;
   }
 
   /**
@@ -3957,9 +4084,46 @@ namespace moho
     return OCCUPY_FootprintFits(grid, pos, footprint, caps);
   }
 
+  /**
+   * Address: 0x007F7B00 (FUN_007F7B00, Moho::STIMap::GetHeightField)
+   *
+   * What it does:
+   * Copies this map's shared height-field ownership lane into
+   * `outHeightField`.
+   */
+  void STIMap::GetHeightField(boost::shared_ptr<CHeightField>& outHeightField) const
+  {
+    outHeightField = mHeightField;
+  }
+
   CHeightField* STIMap::GetHeightField() const noexcept
   {
     return mHeightField.get();
+  }
+
+  /**
+   * Address: 0x006BC400 (FUN_006BC400, ?GetElevation@CHeightField@Moho@@QBEMHH@Z)
+   *
+   * What it does:
+   * Clamps one integer terrain sample coordinate pair into this map's
+   * heightfield bounds, scales the raw uint16 height word to world units, and
+   * enforces the water-floor when water is active.
+   */
+  float STIMap::GetElevation(const std::int32_t x, const std::int32_t z) const
+  {
+    constexpr float kHeightWordScale = 1.0f / 128.0f;
+
+    const CHeightField* const field = mHeightField.get();
+    const std::int32_t clampedX = std::clamp(x, 0, field->width - 1);
+    const std::int32_t clampedZ = std::clamp(z, 0, field->height - 1);
+    const std::size_t sampleIndex =
+      static_cast<std::size_t>(clampedX) + (static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(field->width));
+
+    float terrainElevation = static_cast<float>(field->data[sampleIndex]) * kHeightWordScale;
+    if (mWaterEnabled != 0u && mWaterElevation > terrainElevation) {
+      terrainElevation = mWaterElevation;
+    }
+    return terrainElevation;
   }
 
   bool STIMap::IsWaterEnabled() const noexcept

@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "Wm3AxisAlignedBox3.h"
+
 namespace moho
 {
   class CHeightField;
@@ -193,8 +195,17 @@ namespace moho
     ClutterRegion* mPrev; // +0x08
     std::int32_t mX; // +0x0C
     std::int32_t mZ; // +0x10
-    std::uint8_t reserved14[0x18]; // +0x14
+    Wm3::AxisAlignedBox3f mBox; // +0x14
     ClutterRegionMapState mMap; // +0x2C
+
+    /**
+     * Address: 0x007D5EE0 (FUN_007D5EE0, ??0Region@Clutter@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes region links and key coordinates, then allocates one empty
+     * region-map list sentinel.
+     */
+    ClutterRegion();
 
     /**
      * Address: 0x007D5F20 (FUN_007D5F20, ??1Region@Clutter@Moho@@QAE@@Z)
@@ -210,6 +221,7 @@ namespace moho
   static_assert(offsetof(ClutterRegion, mPrev) == 0x08, "ClutterRegion::mPrev offset must be 0x08");
   static_assert(offsetof(ClutterRegion, mX) == 0x0C, "ClutterRegion::mX offset must be 0x0C");
   static_assert(offsetof(ClutterRegion, mZ) == 0x10, "ClutterRegion::mZ offset must be 0x10");
+  static_assert(offsetof(ClutterRegion, mBox) == 0x14, "ClutterRegion::mBox offset must be 0x14");
   static_assert(offsetof(ClutterRegion, mMap) == 0x2C, "ClutterRegion::mMap offset must be 0x2C");
 
   class Clutter
@@ -261,6 +273,24 @@ namespace moho
     void DestroyRegion(ClutterRegion* region);
 
   private:
+    /**
+     * Address: 0x007D6410 (FUN_007D6410, ?IsVisible@Clutter@Moho@@AAE_NPBVGeomCamera3@2@ABV?$AxisAlignedBox3@M@Wm3@@@Z)
+     *
+     * What it does:
+     * Returns whether one region AABB is both within clutter radius distance
+     * from the camera and intersecting the camera frustum-solid lane.
+     */
+    bool IsVisible(const GeomCamera3* camera, const Wm3::AxisAlignedBox3f& regionBox);
+
+    /**
+     * Address: 0x007D6510 (FUN_007D6510, ?UpdateCurrent@Clutter@Moho@@AAEXPBVGeomCamera3@2@@Z)
+     *
+     * What it does:
+     * Culls active clutter regions that move beyond the configured clutter radius
+     * or outside the current camera frustum-solid lane.
+     */
+    void UpdateCurrent(const GeomCamera3* camera);
+
     /**
      * Address: 0x007D7150 (FUN_007D7150, ?GetSurface@Clutter@Moho@@AAEABVSurface@12@E@Z)
      *

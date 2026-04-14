@@ -217,6 +217,8 @@ namespace gpg
 
     /**
      * Address: 0x0043D130 (FUN_0043D130)
+     * Address: 0x004D4E00 (FUN_004D4E00, __imp_?Write@Stream@gpg@@QAEXPBXI@Z)
+     * Address: 0x004D4E30 (FUN_004D4E30, __imp_?Write@Stream@gpg@@QAEXPBXI@Z alias)
      *
      * What it does:
      * Writes one byte span through inline-buffer fast path or virtual write fallback.
@@ -307,6 +309,15 @@ namespace gpg
      * Rewinds one previously-read byte with validation, or delegates to virtual unget when at read window start.
      */
     void UnGetByte(int value);
+
+    /**
+     * Address: 0x004D29F0 (FUN_004D29F0, gpg::Stream::CheckByte)
+     *
+     * What it does:
+     * Peeks one byte from stream read lane and restores stream cursor via
+     * `UnGetByte`; returns `255` when no byte can be read.
+     */
+    int CheckByte();
 
     /**
      * NOTE: Inlined (e.g. - 0x0047BF13)

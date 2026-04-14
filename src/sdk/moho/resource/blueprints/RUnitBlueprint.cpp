@@ -84,6 +84,7 @@ namespace moho
       gpg::STR_NormalizeFilenameLowerSlash(normalized);
       destination.assign_owned(normalized);
     }
+
   } // namespace
 
   /**
@@ -106,6 +107,78 @@ namespace moho
     gpg::STR_InitFilename(&UpgradesFromBase.name, "none");
     gpg::STR_InitFilename(&SeedUnit.name, "");
   }
+
+  /**
+   * Address: 0x0051E6F0 (FUN_0051E6F0, Moho::RUnitBlueprintGeneral::~RUnitBlueprintGeneral)
+   * Mangled: ??1RUnitBlueprintGeneral@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Tears down all general-lane string-id members (`UpgradesTo`,
+   * `UpgradesFrom`, `UpgradesFromBase`, `SeedUnit`).
+   */
+  RUnitBlueprintGeneral::~RUnitBlueprintGeneral() = default;
+
+  /**
+   * Address: 0x0051E770 (FUN_0051E770, Moho::RUnitBlueprintDisplay::~RUnitBlueprintDisplay)
+   * Mangled: ??1RUnitBlueprintDisplay@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Tears down display-lane string and string-id members.
+   */
+  RUnitBlueprintDisplay::~RUnitBlueprintDisplay() = default;
+
+  /**
+   * Address: 0x0051EF00 (FUN_0051EF00, Moho::RUnitBlueprintAir::RUnitBlueprintAir)
+   *
+   * What it does:
+   * Seeds air blueprint defaults for turn/bank control, circling behavior,
+   * and combat-state randomization lanes.
+   */
+  RUnitBlueprintAir::RUnitBlueprintAir()
+    : CanFly(0)
+    , Winged(0)
+    , FlyInWater(0)
+    , pad_0003_0004{0}
+    , AutoLandTime(0.0f)
+    , MaxAirspeed(0.0f)
+    , MinAirspeed(0.0f)
+    , TurnSpeed(1.0f)
+    , CombatTurnSpeed(1.0f)
+    , StartTurnDistance(0.0f)
+    , TightTurnMultiplier(1.0f)
+    , SustainedTurnThreshold(10.0f)
+    , LiftFactor(5.0f)
+    , BankFactor(0.5f)
+    , BankForward(0)
+    , pad_002D_0030{0, 0, 0}
+    , EngageDistance(0.0f)
+    , BreakOffTrigger(0.0f)
+    , BreakOffDistance(0.0f)
+    , BreakOffIfNearNewTarget(0)
+    , pad_003D_0040{0, 0, 0}
+    , KMove(1.0f)
+    , KMoveDamping(1.0f)
+    , KLift(1.0f)
+    , KLiftDamping(1.0f)
+    , KTurn(3.0f)
+    , KTurnDamping(3.0f)
+    , KRoll(3.0f)
+    , KRollDamping(3.0f)
+    , CirclingTurnMult(3.0f)
+    , CirclingRadiusChangeMinRatio(0.60000002f)
+    , CirclingRadiusChangeMaxRatio(0.89999998f)
+    , CirclingRadiusVsAirMult(1.0f)
+    , CirclingElevationChangeRatio(0.25f)
+    , CirclingFlightChangeFrequency(2.0f)
+    , CirclingDirChange(1)
+    , HoverOverAttack(0)
+    , pad_007A_007C{0, 0}
+    , RandomBreakOffDistanceMult(1.5f)
+    , RandomMinChangeCombatStateTime(3.0f)
+    , RandomMaxChangeCombatStateTime(6.0f)
+    , TransportHoverHeight(0.0f)
+    , PredictAheadForBombDrop(0.0f)
+  {}
 
   /**
    * Address: 0x0051F090 (FUN_0051F090, Moho::RUnitBlueprintPhysics::RUnitBlueprintPhysics)
@@ -163,6 +236,15 @@ namespace moho
   {}
 
   /**
+   * Address: 0x0051E7F0 (FUN_0051E7F0, Moho::RUnitBlueprintPhysics::~RUnitBlueprintPhysics)
+   * Mangled: ??1RUnitBlueprintPhysics@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Tears down occupancy and raised-platform vector storage.
+   */
+  RUnitBlueprintPhysics::~RUnitBlueprintPhysics() = default;
+
+  /**
    * Address: 0x0051F7D0 (FUN_0051F7D0, ??0RUnitBlueprintAI@Moho@@QAE@@Z)
    *
    * What it does:
@@ -186,6 +268,42 @@ namespace moho
     , AutoSurfaceToAttack(1)
     , AttackAngle(0.0f)
   {}
+
+  /**
+   * Address: 0x0051E870 (FUN_0051E870, ??1RUnitBlueprintAI@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Destroys target-bone strings, releases heap-backed bone storage, and
+   * resets beacon/guard formation names to their legacy empty-state layout.
+   */
+  RUnitBlueprintAI::~RUnitBlueprintAI()
+  {
+    auto& targetBonesView = msvc8::AsVectorRuntimeView(TargetBones);
+    if (targetBonesView.begin != nullptr) {
+      for (msvc8::string* cursor = targetBonesView.begin; cursor != targetBonesView.end; ++cursor) {
+        cursor->~string();
+      }
+      ::operator delete(targetBonesView.begin);
+    }
+
+    targetBonesView.begin = nullptr;
+    targetBonesView.end = nullptr;
+    targetBonesView.capacityEnd = nullptr;
+
+    if (BeaconName.myRes >= 0x10U) {
+      ::operator delete(BeaconName.bx.ptr);
+    }
+    BeaconName.myRes = 15U;
+    BeaconName.mySize = 0U;
+    BeaconName.bx.buf[0] = '\0';
+
+    if (GuardFormationName.myRes >= 0x10U) {
+      ::operator delete(GuardFormationName.bx.ptr);
+    }
+    GuardFormationName.mySize = 0U;
+    GuardFormationName.myRes = 15U;
+    GuardFormationName.bx.buf[0] = '\0';
+  }
 
   /**
    * Address: 0x0051F990 (FUN_0051F990, Moho::RUnitBlueprintEconomy::RUnitBlueprintEconomy)
@@ -224,6 +342,94 @@ namespace moho
     CategoryCache.Last = CategoryCache.InlineStorage;
     CategoryCache.End = reinterpret_cast<std::uint32_t*>(&InitialRallyX);
     CategoryCache.InlineStoragePtr = CategoryCache.InlineStorage;
+  }
+
+  /**
+   * Address: 0x0051E8F0 (FUN_0051E8F0, Moho::RUnitBlueprintEconomy::~RUnitBlueprintEconomy)
+   * Mangled: ??1RUnitBlueprintEconomy@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Frees dynamic category-cache storage when detached from inline lanes and
+   * restores inline start/end pointers before member vector destruction.
+   */
+  RUnitBlueprintEconomy::~RUnitBlueprintEconomy()
+  {
+    if (CategoryCache.First != CategoryCache.InlineStoragePtr) {
+      ::operator delete[](CategoryCache.First);
+      CategoryCache.First = CategoryCache.InlineStoragePtr;
+      CategoryCache.End =
+        reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*CategoryCache.InlineStoragePtr));
+    }
+
+    CategoryCache.Last = CategoryCache.First;
+  }
+
+  /**
+   * Address: 0x0051E480 (FUN_0051E480, Moho::RUnitBlueprint::RUnitBlueprint)
+   * Mangled: ??0RUnitBlueprint@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Constructs unit-blueprint subsection lanes on top of `REntityBlueprint`,
+   * seeds gameplay defaults, and enables life-bar rendering.
+   */
+  RUnitBlueprint::RUnitBlueprint(RRuleGameRules* const owner, const RResId& resId)
+    : REntityBlueprint(owner, resId)
+    , General()
+    , Physics()
+    , Air()
+    , AI()
+    , Economy(owner)
+  {
+    Display.UniformScale = 1.0f;
+    Display.SpawnRandomRotation = 0;
+    Display.HideLifebars = 0;
+
+    Intel.VisionRadius = 10;
+    Intel.WaterVisionRadius = 10;
+    Intel.RadarRadius = 0;
+    Intel.SonarRadius = 0;
+    Intel.OmniRadius = 0;
+    Intel.RadarStealth = 0;
+    Intel.SonarStealth = 0;
+    Intel.Cloak = 0;
+    Intel.ShowIntelOnSelect = 0;
+    Intel.RadarStealthFieldRadius = 0;
+    Intel.SonarStealthFieldRadius = 0;
+    Intel.CloakFieldRadius = 0;
+    Intel.JamRadius.min = 0;
+    Intel.JamRadius.max = 0;
+    Intel.JammerBlips = 0;
+    Intel.SpoofRadius.min = 0;
+    Intel.SpoofRadius.max = 0;
+
+    Transport.TransportClass = 1;
+    Transport.ClassGenericUpTo = 0;
+    Transport.Class2AttachSize = 2;
+    Transport.Class3AttachSize = 6;
+    Transport.Class4AttachSize = 1;
+    Transport.ClassSAttachSize = 0;
+    Transport.AirClass = 0;
+    Transport.StorageSlots = 0;
+    Transport.DockingSlots = 0;
+    Transport.RepairRate = 0.0f;
+
+    Defense.MaxHealth = 1.0f;
+    Defense.Health = 1.0f;
+    Defense.RegenRate = 0.0f;
+    Defense.AirThreatLevel = 0.0f;
+    Defense.SurfaceThreatLevel = 0.0f;
+    Defense.SubThreatLevel = 0.0f;
+    Defense.EconomyThreatLevel = 0.0f;
+    Defense.ArmorType = "Default";
+    Defense.Shield.ShieldSize = 0.0f;
+    Defense.Shield.RegenAssistMult = 1.0f;
+
+    auto& weaponBlueprintsView = msvc8::AsVectorRuntimeView(Weapons.WeaponBlueprints);
+    weaponBlueprintsView.begin = nullptr;
+    weaponBlueprintsView.end = nullptr;
+    weaponBlueprintsView.capacityEnd = nullptr;
+
+    mLifeBarRender = 1;
   }
 
   /**
@@ -365,6 +571,49 @@ namespace moho
   }
 
   /**
+   * Address: 0x0051E400 (FUN_0051E400, ?StaticGetClass@RUnitBlueprint@Moho@@SAPAVRType@gpg@@XZ)
+   *
+   * What it does:
+   * Lazily resolves and caches the reflection descriptor for
+   * `RUnitBlueprint`.
+   */
+  gpg::RType* RUnitBlueprint::StaticGetClass()
+  {
+    gpg::RType* cached = RUnitBlueprint::sType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(RUnitBlueprint));
+      RUnitBlueprint::sType = cached;
+    }
+    return cached;
+  }
+
+  /**
+   * Address: 0x0051E420 (FUN_0051E420, ?GetClass@RUnitBlueprint@Moho@@UBEPAVRType@gpg@@XZ)
+   *
+   * What it does:
+   * Returns the reflected runtime type descriptor for this
+   * `RUnitBlueprint` instance.
+   */
+  gpg::RType* RUnitBlueprint::GetClass() const
+  {
+    return StaticGetClass();
+  }
+
+  /**
+   * Address: 0x0051E440 (FUN_0051E440, ?GetDerivedObjectRef@RUnitBlueprint@Moho@@UAE?AVRRef@gpg@@XZ)
+   *
+   * What it does:
+   * Packs `{this, GetClass()}` as a reflected object reference handle.
+   */
+  gpg::RRef RUnitBlueprint::GetDerivedObjectRef()
+  {
+    gpg::RRef out{};
+    out.mObj = this;
+    out.mType = GetClass();
+    return out;
+  }
+
+  /**
    * Address: 0x005A1330 (FUN_005A1330, Moho::RUnitBlueprint::GetPointerType)
    *
    * What it does:
@@ -403,6 +652,32 @@ namespace moho
   const RUnitBlueprint* RUnitBlueprint::IsUnitBlueprint() const
   {
     return this;
+  }
+
+  /**
+   * Address: 0x0051ED80 (FUN_0051ED80)
+   * Mangled: ?GetFootprintRect@RUnitBlueprint@Moho@@QBE?AV?$Rect2@H@gpg@@ABUSCoordsVec2@2@@Z
+   *
+   * What it does:
+   * Builds the integer occupancy footprint rectangle centered around
+   * `position`.
+   */
+  gpg::Rect2i RUnitBlueprint::GetFootprintRect(const SCoordsVec2& position) const
+  {
+    const std::int32_t footprintSizeX = static_cast<std::int32_t>(mFootprint.mSizeX);
+    const std::int32_t footprintSizeZ = static_cast<std::int32_t>(mFootprint.mSizeZ);
+
+    const std::int32_t x0 =
+      static_cast<std::int32_t>(position.x - (static_cast<float>(footprintSizeX) * 0.5f));
+    const std::int32_t z0 =
+      static_cast<std::int32_t>(position.z - (static_cast<float>(footprintSizeZ) * 0.5f));
+
+    gpg::Rect2i footprintRect{};
+    footprintRect.x0 = x0;
+    footprintRect.z0 = z0;
+    footprintRect.x1 = x0 + footprintSizeX;
+    footprintRect.z1 = z0 + footprintSizeZ;
+    return footprintRect;
   }
 
   /**

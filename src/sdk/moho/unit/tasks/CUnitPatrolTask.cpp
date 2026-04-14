@@ -29,4 +29,32 @@ namespace moho
       throw;
     }
   }
+
+  /**
+   * Address: 0x0061C4E0 (FUN_0061C4E0, Moho::CUnitPatrolTask::operator new `_0` overload)
+   * Mangled: ??2CUnitPatrolTask@Moho@@QAE@@Z_0
+   *
+   * What it does:
+   * Formation-instance allocation overload used by
+   * `IAiCommandDispatchImpl::DispatchTask` when an existing
+   * `IFormationInstance` must be bound to the new patrol task.
+   */
+  CUnitPatrolTask* CUnitPatrolTask::CreateWithFormation(
+    CCommandTask* const dispatchTask,
+    const void* const goalPayload,
+    IFormationInstance* const formationInstance
+  )
+  {
+    void* const storage = ::operator new(sizeof(CUnitPatrolTask));
+    if (!storage) {
+      return nullptr;
+    }
+
+    try {
+      return ::new (storage) CUnitPatrolTask(dispatchTask, goalPayload, formationInstance, false);
+    } catch (...) {
+      ::operator delete(storage);
+      throw;
+    }
+  }
 } // namespace moho

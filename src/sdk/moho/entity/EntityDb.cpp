@@ -21,6 +21,7 @@
 #include "moho/entity/Prop.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/IdPool.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
@@ -694,6 +695,63 @@ namespace
     head->prev = head;
   }
 
+  using RegisteredEntitySetList = moho::TDatList<moho::EntitySetBase, void>;
+
+  [[nodiscard]] RegisteredEntitySetList& AccessRegisteredEntitySetList(moho::CEntityDb& entityDb) noexcept
+  {
+    return *reinterpret_cast<RegisteredEntitySetList*>(&entityDb.mRegisteredEntitySets);
+  }
+
+  void PurgeRegisteredEntitySets(moho::CEntityDb& entityDb)
+  {
+    RegisteredEntitySetList& registry = AccessRegisteredEntitySetList(entityDb);
+    for (auto* node = registry.mNext; node != &registry; node = node->mNext) {
+      auto* const entitySet = static_cast<moho::EntitySetBase*>(static_cast<void*>(node));
+      auto& entities = entitySet->mVec;
+      for (auto it = entities.begin(); it != entities.end();) {
+        moho::Entity* const entity = *it;
+        if (entity != nullptr && entity->mOnDestroyDispatched == 0u) {
+          ++it;
+          continue;
+        }
+
+        it = entities.erase(it, it + 1);
+      }
+    }
+  }
+
+  void PurgeTrackedEntities(msvc8::list<moho::Entity*>& entities)
+  {
+    for (auto it = entities.begin(); it != entities.end();) {
+      moho::Entity* const entity = *it;
+      it = entities.erase(it);
+      if (entity != nullptr) {
+        delete entity;
+      }
+    }
+  }
+
+  void AdvanceRuntimeIdPools(moho::CEntityDb& entityDb)
+  {
+    auto poolsIt = gRuntimePools.find(&entityDb);
+    if (poolsIt == gRuntimePools.end()) {
+      return;
+    }
+
+    for (auto& [familySourceBits, pool] : poolsIt->second) {
+      (void)familySourceBits;
+
+      moho::IdPool mirroredPool{};
+      mirroredPool.mNextLowId = static_cast<std::int32_t>(pool.mNextSerial);
+      mirroredPool.mReleasedLows = pool.mReleasedSerials;
+      mirroredPool.Update();
+
+      const std::uint32_t mirroredNextSerial = static_cast<std::uint32_t>(mirroredPool.mNextLowId);
+      pool.mNextSerial = mirroredNextSerial == 0u ? 1u : mirroredNextSerial;
+      pool.mReleasedSerials = mirroredPool.mReleasedLows;
+    }
+  }
+
   [[nodiscard]] bool
   IdExistsInList(const msvc8::list<moho::Entity*>& entities, const std::uint32_t entityIdCandidate) noexcept
   {
@@ -936,14 +994,89 @@ namespace
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
 
+    /**
+     * Address: 0x00685E70 (FUN_00685E70, gpg::RListType_EntityP::Init)
+     *
+     * What it does:
+     * Configures reflected `list<Entity*>` layout/version lanes and installs
+     * list serializer callbacks.
+     */
     void Init() override
     {
       size_ = sizeof(std::list<moho::Entity*>);
-      gpg::RType::Init();
-      Finish();
+      version_ = 1;
+      serLoadFunc_ = &EntityDbEntityListTypeInfo::SerLoad;
+      serSaveFunc_ = &EntityDbEntityListTypeInfo::SerSave;
     }
+
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };
   static_assert(sizeof(EntityDbEntityListTypeInfo) == 0x64, "EntityDbEntityListTypeInfo size must be 0x64");
+
+  /**
+   * Address: 0x00686B90 (FUN_00686B90, gpg::RListType_EntityP::SerLoad)
+   *
+   * What it does:
+   * Clears one reflected `list<Entity*>`, reads element count, then
+   * deserializes each tracked entity pointer in archive order.
+   */
+  void EntityDbEntityListTypeInfo::SerLoad(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    auto* const list = reinterpret_cast<std::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr || list == nullptr) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+    list->clear();
+
+    gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      moho::Entity* entity = nullptr;
+      (void)archive->ReadPointer_Entity(&entity, &owner);
+      list->push_back(entity);
+    }
+  }
+
+  /**
+   * Address: 0x00686C10 (FUN_00686C10, gpg::RListType_EntityP::SerSave)
+   *
+   * What it does:
+   * Writes reflected `list<Entity*>` element count, then serializes each
+   * entity pointer in list traversal order as an unowned tracked pointer.
+   */
+  void EntityDbEntityListTypeInfo::SerSave(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    const auto* const list = reinterpret_cast<const std::list<moho::Entity*>*>(static_cast<std::uintptr_t>(objectPtr));
+    if (archive == nullptr) {
+      return;
+    }
+
+    const unsigned int count = list ? static_cast<unsigned int>(list->size()) : 0u;
+    archive->WriteUInt(count);
+    if (list == nullptr) {
+      return;
+    }
+
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (moho::Entity* const entity : *list) {
+      gpg::RRef entityRef{};
+      (void)gpg::RRef_Entity(&entityRef, entity);
+      gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, owner);
+    }
+  }
 
   alignas(EntityDbTypeInfo) std::byte gEntityDbTypeInfoStorage[sizeof(EntityDbTypeInfo)]{};
   bool gEntityDbTypeInfoConstructed = false;
@@ -1077,6 +1210,59 @@ namespace moho
     gRuntimeBoundedProps.erase(this);
     gRuntimeEntityLists.erase(this);
     gRuntimePools.erase(this);
+  }
+
+  /**
+   * Address: 0x00684560 (FUN_00684560)
+   * Mangled: ?Purge@EntityDB@Moho@@QAEXXZ
+   *
+   * What it does:
+   * Removes destroy-dispatched entities from registered entity sets, destroys
+   * every tracked entity, and advances the DB id-pool runtime lanes.
+   */
+  void CEntityDb::Purge()
+  {
+    PurgeRegisteredEntitySets(*this);
+
+    msvc8::list<Entity*>& entities = Entities();
+    PurgeTrackedEntities(entities);
+
+    if (mEntityList.head) {
+      ClearEntityListNodes(mEntityList.head);
+      mEntityList.size = 0u;
+    }
+
+    AdvanceRuntimeIdPools(*this);
+  }
+
+  /**
+   * Address: 0x006B69D0 (FUN_006B69D0, Moho::CUnitIterAllArmies::CUnitIterAllArmies)
+   *
+   * What it does:
+   * Initializes one all-armies unit iterator from one concrete army source by
+   * setting `[source, source + 1)` bounds over the all-units tree.
+   */
+  CUnitIterAllArmies::CUnitIterAllArmies(CArmyImpl* const army)
+    : mItr(nullptr)
+    , mEnd(nullptr)
+    , mCur(nullptr)
+  {
+    if (army == nullptr) {
+      return;
+    }
+
+    Sim* const sim = army->GetSim();
+    if (sim == nullptr || sim->mEntityDB == nullptr) {
+      return;
+    }
+
+    CEntityDb* const entityDb = sim->mEntityDB;
+    const std::uint32_t sourceIndex = static_cast<std::uint32_t>(army->ArmyId);
+    mItr = entityDb->AllUnitsEnd(sourceIndex);
+    mEnd = entityDb->AllUnitsEnd(sourceIndex + 1u);
+    if (mItr != mEnd) {
+      mCur = DecodeAllUnitsIteratorPayload(mItr);
+    }
   }
 
   /**

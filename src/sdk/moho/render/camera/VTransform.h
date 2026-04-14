@@ -10,6 +10,7 @@
 
 namespace gpg
 {
+  class BinaryReader;
   class ReadArchive;
   class WriteArchive;
 } // namespace gpg
@@ -72,6 +73,15 @@ namespace moho
     VTransform& operator=(const VTransform& rhs) noexcept;
 
     /**
+     * Address: 0x00549DC0 (FUN_00549DC0)
+     *
+     * What it does:
+     * Returns true when either translation or orientation lanes differ,
+     * matching the binary short-circuit comparison order.
+     */
+    [[nodiscard]] bool Compare(const VTransform& rhs) const noexcept;
+
+    /**
      * Address: 0x0046FBF0 (FUN_0046FBF0)
      *
      * What it does:
@@ -99,6 +109,15 @@ namespace moho
      * Composes transforms in the same order and quaternion algebra as FA binary.
      */
     [[nodiscard]] static VTransform Compose(const VTransform& lhs, const VTransform& rhs) noexcept;
+
+    /**
+     * Address: 0x006E58C0 (FUN_006E58C0, Moho::VTransform::Load)
+     *
+     * What it does:
+     * Initializes an identity fallback transform, then reads one full
+     * transform payload from a binary reader into caller storage.
+     */
+    static VTransform* Load(gpg::BinaryReader* reader, VTransform* outTransform);
 
     /**
      * Address: 0x004F0970 (FUN_004F0970, Moho::VTransform::MemberDeserialize)

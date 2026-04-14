@@ -251,6 +251,40 @@ gpg::RType* CTask::StaticGetClass()
 }
 
 /**
+ * Address: 0x004CC750 (FUN_004CC750)
+ *
+ * What it does:
+ * Loads one `CTask` base lane through reflected type metadata.
+ */
+void moho::ReadCTaskBase(gpg::ReadArchive* const archive, void* const object, const gpg::RRef& ownerRef)
+{
+  gpg::RType* taskType = CTask::sType;
+  if (!taskType) {
+    taskType = gpg::LookupRType(typeid(CTask));
+    CTask::sType = taskType;
+  }
+
+  archive->Read(taskType, object, ownerRef);
+}
+
+/**
+ * Address: 0x004CC780 (FUN_004CC780)
+ *
+ * What it does:
+ * Saves one `CTask` base lane through reflected type metadata.
+ */
+void moho::WriteCTaskBase(gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& ownerRef)
+{
+  gpg::RType* taskType = CTask::sType;
+  if (!taskType) {
+    taskType = gpg::LookupRType(typeid(CTask));
+    CTask::sType = taskType;
+  }
+
+  archive->Write(taskType, object, ownerRef);
+}
+
+/**
  * Address: 0x0040AB50 (FUN_0040AB50, Moho::InstanceCounter<Moho::CTask>::GetStatItem)
  *
  * What it does:

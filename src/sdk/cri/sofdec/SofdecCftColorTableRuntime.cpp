@@ -341,6 +341,146 @@ namespace
   }
 } // namespace
 
+namespace
+{
+  struct CftYcc420A256SourceView
+  {
+    std::int32_t sourceRowAddress = 0;   // +0x00
+    std::int32_t reserved04Address = 0;  // +0x04
+    std::int32_t reserved08Address = 0;  // +0x08
+    std::int32_t sourceStrideBytes = 0;  // +0x0C
+  };
+  static_assert(offsetof(CftYcc420A256SourceView, sourceRowAddress) == 0x00, "CftYcc420A256SourceView::sourceRowAddress offset must be 0x00");
+  static_assert(offsetof(CftYcc420A256SourceView, sourceStrideBytes) == 0x0C, "CftYcc420A256SourceView::sourceStrideBytes offset must be 0x0C");
+  static_assert(sizeof(CftYcc420A256SourceView) == 0x10, "CftYcc420A256SourceView size must be 0x10");
+
+  struct CftYcc420A256TargetView
+  {
+    std::int32_t destinationAddress = 0;      // +0x00
+    std::int32_t widthPixels = 0;             // +0x04
+    std::int32_t heightPixels = 0;            // +0x08
+    std::int32_t destinationStrideBytes = 0;  // +0x0C
+  };
+  static_assert(offsetof(CftYcc420A256TargetView, destinationAddress) == 0x00, "CftYcc420A256TargetView::destinationAddress offset must be 0x00");
+  static_assert(offsetof(CftYcc420A256TargetView, widthPixels) == 0x04, "CftYcc420A256TargetView::widthPixels offset must be 0x04");
+  static_assert(offsetof(CftYcc420A256TargetView, heightPixels) == 0x08, "CftYcc420A256TargetView::heightPixels offset must be 0x08");
+  static_assert(
+    offsetof(CftYcc420A256TargetView, destinationStrideBytes) == 0x0C,
+    "CftYcc420A256TargetView::destinationStrideBytes offset must be 0x0C"
+  );
+  static_assert(sizeof(CftYcc420A256TargetView) == 0x10, "CftYcc420A256TargetView size must be 0x10");
+
+  [[nodiscard]] std::int32_t PointerToAddress32(const void* const pointer)
+  {
+    return static_cast<std::int32_t>(
+      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer))
+    );
+  }
+}
+
+/**
+ * Address: 0x00AED8C0 (FUN_00AED8C0, _cnvStaticYcc420plnToA256V)
+ *
+ * What it does:
+ * Copies one YCC420 source lane into destination alpha channel (`A256`) using
+ * fixed source bytes.
+ */
+std::uint8_t* cnvStaticYcc420plnToA256V(
+  const CftYcc420A256SourceView* const sourceView,
+  const CftYcc420A256TargetView* const targetView
+)
+{
+  const std::int32_t widthPixels = targetView->widthPixels;
+  std::uint8_t* destinationCursor = ResolveAddress<std::uint8_t>(targetView->destinationAddress) + 3;
+  const std::int32_t destinationRowAdvance = targetView->destinationStrideBytes - (4 * widthPixels);
+
+  std::uint8_t* sourceCursor = ResolveAddress<std::uint8_t>(sourceView->sourceRowAddress);
+  const std::int32_t sourceRowAdvance = sourceView->sourceStrideBytes - widthPixels;
+
+  for (std::int32_t row = 0; row < targetView->heightPixels; ++row) {
+    for (std::int32_t column = 0; column < widthPixels; ++column) {
+      *destinationCursor = *sourceCursor;
+      ++sourceCursor;
+      destinationCursor += 4;
+    }
+
+    destinationCursor += destinationRowAdvance;
+    sourceCursor += sourceRowAdvance;
+  }
+
+  return destinationCursor;
+}
+
+/**
+ * Address: 0x00AED920 (FUN_00AED920, _cnvDynamicYcc420plnToA256UserTable)
+ *
+ * What it does:
+ * Copies one YCC420 source lane into destination alpha channel (`A256`)
+ * through one caller-provided 256-byte remap table.
+ */
+std::int32_t cnvDynamicYcc420plnToA256UserTable(
+  const CftYcc420A256SourceView* const sourceView,
+  const CftYcc420A256TargetView* const targetView,
+  const std::int32_t userTableAddress
+)
+{
+  const std::int32_t widthPixels = targetView->widthPixels;
+  std::uint8_t* destinationCursor = ResolveAddress<std::uint8_t>(targetView->destinationAddress) + 3;
+  const std::int32_t destinationRowAdvance = targetView->destinationStrideBytes - (4 * widthPixels);
+
+  std::uint8_t* sourceCursor = ResolveAddress<std::uint8_t>(sourceView->sourceRowAddress);
+  const std::int32_t sourceRowAdvance = sourceView->sourceStrideBytes - widthPixels;
+  const std::uint8_t* const userTable = ResolveAddress<std::uint8_t>(userTableAddress);
+
+  for (std::int32_t row = 0; row < targetView->heightPixels; ++row) {
+    for (std::int32_t column = 0; column < widthPixels; ++column) {
+      const std::uint8_t sourceValue = *sourceCursor;
+      ++sourceCursor;
+      *destinationCursor = userTable[sourceValue];
+      destinationCursor += 4;
+    }
+
+    destinationCursor += destinationRowAdvance;
+    sourceCursor += sourceRowAdvance;
+  }
+
+  return PointerToAddress32(destinationCursor);
+}
+
+/**
+ * Address: 0x00AED830 (FUN_00AED830, _CFT_Ycc420plnToA256V)
+ *
+ * What it does:
+ * Dispatches YCC420-to-A256 alpha conversion using either static copy or a
+ * caller-provided user remap table.
+ */
+std::uint8_t* CFT_Ycc420plnToA256V(
+  std::uint8_t** const sourcePlanes,
+  const std::int32_t* const conversionWords,
+  const std::int32_t* const userTableAddress
+)
+{
+  CftYcc420A256SourceView sourceView{};
+  sourceView.sourceRowAddress = PointerToAddress32(sourcePlanes[1]);
+  sourceView.reserved04Address = PointerToAddress32(sourcePlanes[5]);
+  sourceView.reserved08Address = PointerToAddress32(sourcePlanes[9]);
+  sourceView.sourceStrideBytes = PointerToAddress32(sourcePlanes[4]);
+
+  CftYcc420A256TargetView targetView{};
+  targetView.destinationAddress = conversionWords[1];
+  targetView.widthPixels = conversionWords[2];
+  targetView.heightPixels = conversionWords[3];
+  targetView.destinationStrideBytes = conversionWords[4];
+
+  if (*userTableAddress != 0) {
+    const std::int32_t convertedAddress =
+      cnvDynamicYcc420plnToA256UserTable(&sourceView, &targetView, *userTableAddress);
+    return ResolveAddress<std::uint8_t>(convertedAddress);
+  }
+
+  return cnvStaticYcc420plnToA256V(&sourceView, &targetView);
+}
+
 /**
  * Address: 0x00AEDF40 (FUN_00AEDF40, _CFT_MakeYcc422ColAdjTbl)
  *

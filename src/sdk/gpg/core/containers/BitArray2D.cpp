@@ -193,6 +193,18 @@ bool BitArray2D::GetRectOr(int x0, int z0, const int w, const int h, const bool 
     return orBits != 0;
 }
 
+/**
+ * Address: 0x00720580 (FUN_00720580, gpg::BitArray2D::GetRectNeg)
+ *
+ * What it does:
+ * Adapts one `Rect2i` lane into `GetRectOr` with strict negative-range
+ * handling enabled.
+ */
+bool BitArray2D::GetRectNeg(const Rect2i& rect) const
+{
+  return GetRectOr(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, true);
+}
+
 bool BitArray2D::IsBitSetOrOutOfBounds(const int x, const int z) const
 {
     if (!ptr || x < 0 || z < 0 || x >= width || z >= height) {

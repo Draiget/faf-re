@@ -101,6 +101,70 @@ namespace
     implBase.mTraveler.mNext = &implBase.mTraveler;
     implBase.mTraveler.mPrev = &implBase.mTraveler;
   }
+
+  void ResetPathQueueNodeLinks(PathQueueIntrusiveNode& node)
+  {
+    node.mNext = &node;
+    node.mPrev = &node;
+  }
+
+  void UnlinkAndResetPathQueueNode(PathQueueIntrusiveNode& node)
+  {
+    PathQueueIntrusiveNode* const next = node.mNext;
+    PathQueueIntrusiveNode* const prev = node.mPrev;
+    next->mPrev = prev;
+    prev->mNext = next;
+    ResetPathQueueNodeLinks(node);
+  }
+
+  void ResetPathQueuePointerTriplet(PathQueuePointerTriplet& triplet)
+  {
+    if (triplet.mFirst != nullptr) {
+      ::operator delete(triplet.mFirst);
+    }
+
+    triplet.mFirst = nullptr;
+    triplet.mLast = nullptr;
+    triplet.mCapacity = nullptr;
+  }
+
+  void ClearOwnedPathQueueNodes(PathQueueOwnedNodeLane& owner)
+  {
+    PathQueueIntrusiveNode* const sentinel = owner.mSentinel;
+    if (sentinel == nullptr) {
+      owner.mCount = 0;
+      return;
+    }
+
+    PathQueueIntrusiveNode* node = sentinel->mNext;
+    ResetPathQueueNodeLinks(*sentinel);
+    owner.mCount = 0;
+
+    while (node != sentinel) {
+      PathQueueIntrusiveNode* const next = node->mNext;
+      ::operator delete(node);
+      node = next;
+    }
+  }
+
+  void DestroyPathQueueImplBase(PathQueueImplBaseRuntime& implBase)
+  {
+    // Address: 0x00765C30 (FUN_00765C30, Moho::PathQueue::ImplBase::~ImplBase)
+    ResetPathQueuePointerTriplet(implBase.mBucketB);
+    ResetPathQueuePointerTriplet(implBase.mBucketA);
+    ResetPathQueuePointerTriplet(implBase.mClusters);
+    ClearOwnedPathQueueNodes(implBase.mOwnedNodes);
+    ::operator delete(implBase.mOwnedNodes.mSentinel);
+    implBase.mOwnedNodes.mSentinel = nullptr;
+  }
+
+  void DestroyPathQueueImpl(PathQueueImplBaseRuntime& implBase)
+  {
+    // Address: 0x00765BE0 (FUN_00765BE0), PathQueue implementation teardown prefix.
+    ResetPathQueuePointerTriplet(implBase.mPending);
+    UnlinkAndResetPathQueueNode(implBase.mTraveler);
+    DestroyPathQueueImplBase(implBase);
+  }
 } // namespace
 
 namespace moho
@@ -232,6 +296,32 @@ namespace moho
     InitializePathQueueImplBase(impl->mBase);
     impl->mSize = size;
     mImpl = impl;
+  }
+
+  /**
+   * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
+   *
+   * What it does:
+   * Replaces one owner slot with a new queue pointer, then tears down and
+   * frees the previous queue payload when present.
+   */
+  void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
+  {
+    PathQueue* const previous = *slot;
+    *slot = replacement;
+
+    if (previous == nullptr) {
+      return;
+    }
+
+    Impl* const impl = previous->mImpl;
+    if (impl != nullptr) {
+      DestroyPathQueueImpl(impl->mBase);
+      UnlinkAndResetPathQueueNode(impl->mHeightSentinel);
+      ::operator delete(impl);
+    }
+
+    ::operator delete(previous);
   }
 
   /**

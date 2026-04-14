@@ -23,6 +23,46 @@ namespace moho
   [[nodiscard]] bool VecSetLength(Wm3::Vector3f* vector, float targetLength);
 
   /**
+   * Address: 0x0069A360 (FUN_0069A360, func_VecSetLengthTo)
+   *
+   * What it does:
+   * Writes `sourceVector` scaled to the magnitude of `targetLengthVector`
+   * into `destination`; if `sourceVector` is zero-length, copies
+   * `targetLengthVector` directly.
+   */
+  [[nodiscard]] Wm3::Vector3f* VecSetLengthTo(
+    Wm3::Vector3f* destination,
+    const Wm3::Vector3f* targetLengthVector,
+    const Wm3::Vector3f* sourceVector
+  ) noexcept;
+
+  /**
+   * Address: 0x005657F0 (FUN_005657F0, Moho::IsValid_Vector3f)
+   *
+   * What it does:
+   * Returns true when all three lanes of the input vector are non-NaN. Shared
+   * validator with 54+ callsites across unit motion, tasks, and command lanes.
+   */
+  [[nodiscard]] bool IsValidVector3f(const Wm3::Vector3f& value) noexcept;
+
+  /**
+   * Address: 0x004CC960 (FUN_004CC960)
+   *
+   * What it does:
+   * Returns squared Euclidean 3D distance between two Vector3f points.
+   */
+  [[nodiscard]] float DistanceSquared3D(const Wm3::Vector3f& from, const Wm3::Vector3f& to) noexcept;
+
+  /**
+   * Address: 0x005382E0 (FUN_005382E0, Moho::VEC_LargestAxis)
+   *
+   * What it does:
+   * Returns index of the axis with the largest absolute component
+   * (`0=x`, `1=y`, `2=z`).
+   */
+  [[nodiscard]] int VEC_LargestAxis(const Wm3::Vector3f& value) noexcept;
+
+  /**
    * Address: 0x00570750 (FUN_00570750, Moho::EulerRollToQuat)
    *
    * What it does:

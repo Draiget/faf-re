@@ -44,10 +44,35 @@ namespace
   {
     return ResolveCachedType<moho::SWorldBeam::BlendMode>(moho::SWorldBeam::sBlendModeType);
   }
+
+  void InitializeIdentityBeamTransform(moho::VTransform& transform) noexcept
+  {
+    transform.orient_.w = 1.0f;
+    transform.orient_.x = 0.0f;
+    transform.orient_.y = 0.0f;
+    transform.orient_.z = 0.0f;
+    transform.pos_.x = 0.0f;
+    transform.pos_.y = 0.0f;
+    transform.pos_.z = 0.0f;
+  }
 } // namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00655CC0 (FUN_00655CC0, Moho::SWorldBeam::SWorldBeam)
+   */
+  SWorldBeam::SWorldBeam()
+  {
+    InitializeIdentityBeamTransform(mCurStart);
+    InitializeIdentityBeamTransform(mLastStart);
+    InitializeIdentityBeamTransform(mCurEnd);
+    InitializeIdentityBeamTransform(mLastEnd);
+
+    mTexture1 = CountedPtr_CParticleTexture{};
+    mTexture2 = CountedPtr_CParticleTexture{};
+  }
+
   /**
    * Address: 0x00490000 (FUN_00490000, Moho::SWorldBeam::MemberDeserialize)
    */

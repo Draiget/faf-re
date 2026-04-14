@@ -74,6 +74,44 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x00582EB0 (FUN_00582EB0, func_GetUnitIdPosInVec_BinarySearch)
+   *
+   * What it does:
+   * Returns the lower-bound insertion cursor for one unit pointer in a sorted
+   * `Entity*` span keyed by `Entity::id_`.
+   */
+  Entity** LowerBoundUnitEntityById(Unit* const unit, Entity** vecStart, Entity** vecEnd) noexcept
+  {
+    std::ptrdiff_t count = vecEnd - vecStart;
+    const std::uint32_t needleKey = EntitySetSortKey(unit ? static_cast<Entity*>(unit) : nullptr);
+    while (count > 0) {
+      const std::ptrdiff_t step = count / 2;
+      Entity* const candidate = vecStart[step];
+      if (EntitySetSortKey(candidate) >= needleKey) {
+        count = step;
+      } else {
+        vecStart += step + 1;
+        count -= step + 1;
+      }
+    }
+
+    return vecStart;
+  }
+
+  Entity* const* LowerBoundUnitEntityById(
+    const Unit* const unit,
+    Entity* const* const vecStart,
+    Entity* const* const vecEnd
+  ) noexcept
+  {
+    return LowerBoundUnitEntityById(
+      const_cast<Unit*>(unit),
+      const_cast<Entity**>(vecStart),
+      const_cast<Entity**>(vecEnd)
+    );
+  }
+
+  /**
    * Address: 0x00579500 (FUN_00579500, copy-construct lane)
    *
    * What it does:
@@ -156,13 +194,10 @@ namespace moho
       return false;
     }
 
-    const Entity* const needle = static_cast<const Entity*>(unit);
-    const std::uint32_t needleKey = EntitySetSortKey(needle);
     Entity* const* const begin = mVec.begin();
     Entity* const* const end = mVec.end();
-    Entity* const* const it = std::lower_bound(begin, end, needleKey, [](const Entity* const candidate, const std::uint32_t key) {
-      return EntitySetSortKey(candidate) < key;
-    });
+    Entity* const* const it = LowerBoundUnitEntityById(unit, begin, end);
+    const Entity* const needle = static_cast<const Entity*>(unit);
     return it != end && *it == needle;
   }
 
@@ -176,12 +211,9 @@ namespace moho
   bool SEntitySetTemplateUnit::AddUnit(Unit* const unit)
   {
     Entity* const value = unit ? static_cast<Entity*>(unit) : nullptr;
-    const std::uint32_t key = EntitySetSortKey(value);
     Entity** const begin = mVec.begin();
     Entity** const end = mVec.end();
-    Entity** const it = std::lower_bound(begin, end, key, [](const Entity* const candidate, const std::uint32_t targetId) {
-      return EntitySetSortKey(candidate) < targetId;
-    });
+    Entity** const it = LowerBoundUnitEntityById(unit, begin, end);
     if (it != end && *it == value) {
       return false;
     }
@@ -204,12 +236,9 @@ namespace moho
     }
 
     Entity* const needle = static_cast<Entity*>(unit);
-    const std::uint32_t key = EntitySetSortKey(needle);
     Entity** const begin = mVec.begin();
     Entity** const end = mVec.end();
-    Entity** const it = std::lower_bound(begin, end, key, [](const Entity* const candidate, const std::uint32_t targetId) {
-      return EntitySetSortKey(candidate) < targetId;
-    });
+    Entity** const it = LowerBoundUnitEntityById(unit, begin, end);
     if (it == end || *it != needle) {
       return false;
     }

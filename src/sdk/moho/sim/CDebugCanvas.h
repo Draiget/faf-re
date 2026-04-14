@@ -173,6 +173,15 @@ namespace moho
     void DebugDrawLine(const SDebugLine& line);
 
     /**
+     * Address: 0x00652C00 (FUN_00652C00, Moho::CDebugCanvas::AddText)
+     *
+     * What it does:
+     * Builds one world-space text entry from position/text/style/depth lanes
+     * and appends it to the debug world-text buffer.
+     */
+    void AddText(const Wm3::Vector3f& position, const char* text, std::int32_t style, std::uint32_t depth);
+
+    /**
      * Address: 0x006531D0 (FUN_006531D0, helper used by Moho::RDebugWeapons::OnTick)
      *
      * What it does:

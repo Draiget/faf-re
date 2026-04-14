@@ -5,7 +5,10 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiTransportImpl.h"
 #include "moho/ai/CAiTransportImplConstruct.h"
@@ -44,6 +47,26 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005E9E40 (FUN_005E9E40, moho::RBroadcasterRType_EAiTransportEvent::SerLoad)
+     *
+     * What it does:
+     * Deserializes one intrusive `Broadcaster<EAiTransportEvent>` lane by
+     * reading listener pointers until a null sentinel and relinking each
+     * listener node into the broadcaster ring.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005E9EB0 (FUN_005E9EB0, moho::RBroadcasterRType_EAiTransportEvent::SerSave)
+     *
+     * What it does:
+     * Serializes one intrusive `Broadcaster<EAiTransportEvent>` lane by writing
+     * each linked listener pointer as `UNOWNED` and terminating with one null
+     * pointer record.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
      * Address: 0x005ECC40 (FUN_005ECC40, moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent)
      *
      * What it does:
@@ -57,6 +80,8 @@ namespace moho
     void Init() override
     {
       size_ = sizeof(Broadcaster);
+      serLoadFunc_ = &RBroadcasterRType_EAiTransportEvent::SerLoad;
+      serSaveFunc_ = &RBroadcasterRType_EAiTransportEvent::SerSave;
       Finish();
     }
   };
@@ -531,6 +556,78 @@ const char* moho::RBroadcasterRType_EAiTransportEvent::GetName() const
     (void)std::atexit(&cleanup_RBroadcasterRType_EAiTransportEvent_GetName);
   }
   return cache.value.c_str();
+}
+
+/**
+ * Address: 0x005E9E40 (FUN_005E9E40, moho::RBroadcasterRType_EAiTransportEvent::SerLoad)
+ *
+ * What it does:
+ * Reads listener pointers until a null sentinel and relinks each listener's
+ * intrusive broadcaster node before the destination broadcaster sentinel.
+ */
+void moho::RBroadcasterRType_EAiTransportEvent::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(broadcaster != nullptr);
+  if (!archive || !broadcaster) {
+    return;
+  }
+
+  moho::Listener<moho::EAiTransportEvent>* listener = nullptr;
+  archive->ReadPointer_Listener_EAiTransportEvent(&listener, ownerRef);
+  while (listener != nullptr) {
+    listener->mListenerLink.ListLinkBefore(broadcaster);
+    archive->ReadPointer_Listener_EAiTransportEvent(&listener, ownerRef);
+  }
+}
+
+/**
+ * Address: 0x005E9EB0 (FUN_005E9EB0, moho::RBroadcasterRType_EAiTransportEvent::SerSave)
+ *
+ * What it does:
+ * Serializes one intrusive broadcaster lane by writing each listener pointer
+ * as `UNOWNED` and appending a null sentinel pointer.
+ */
+void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const
+)
+{
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(broadcaster != nullptr);
+  if (!archive || !broadcaster) {
+    return;
+  }
+
+  const gpg::RRef nullOwner{};
+  gpg::RRef pointerRef{};
+
+  for (
+    moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
+    node != broadcaster;
+    node = static_cast<moho::Broadcaster*>(node->mNext)
+  ) {
+    moho::Listener<moho::EAiTransportEvent>* listener = nullptr;
+    if (node != nullptr) {
+      moho::IAiTransportEventListener* const eventListener = moho::IAiTransportEventListener::FromListenerLink(node);
+      listener = reinterpret_cast<moho::Listener<moho::EAiTransportEvent>*>(eventListener);
+    }
+
+    (void)gpg::RRef_Listener_EAiTransportEvent(&pointerRef, listener);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  }
+
+  (void)gpg::RRef_Listener_EAiTransportEvent(&pointerRef, nullptr);
+  gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
 }
 
 /**

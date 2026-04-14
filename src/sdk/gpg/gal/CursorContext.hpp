@@ -17,6 +17,14 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x0093EEA0 (FUN_0093EEA0, __imp_??0CursorContext@gal@gpg@@QAE@XZ)
+         *
+         * What it does:
+         * Initializes cursor hotspot/pixel-source/control lanes to zero/null.
+         */
+        CursorContext();
+
+        /**
          * Address: 0x0093EEC0 (FUN_0093EEC0)
          *
          * What it does:

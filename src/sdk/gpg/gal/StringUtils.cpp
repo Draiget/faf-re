@@ -1,6 +1,7 @@
 #include "gpg/gal/StringUtils.h"
 
 #include <cstdint>
+#include <cstring>
 
 namespace gpg::gal
 {
@@ -71,5 +72,40 @@ namespace gpg::gal
       return -1;
     }
     return 1;
+  }
+
+  /**
+   * Address: 0x008EA3B0 (FUN_008EA3B0, gpg::gal::STR_FindInRange)
+   *
+   * What it does:
+   * Iterates `[start, end)` and returns the first string that exactly matches
+   * `*search`; returns `end` when no exact match is present.
+   */
+  msvc8::string* STR_FindInRange(
+    msvc8::string* start, msvc8::string* end, const char* const* search
+  ) noexcept
+  {
+    msvc8::string* iter = start;
+    if (iter == end) {
+      return iter;
+    }
+
+    const char* const needle = *search;
+    do {
+      const std::size_t needleLength = std::strlen(needle);
+      const std::size_t candidateLength = iter->size();
+      const std::size_t compareLength = (candidateLength < needleLength) ? candidateLength : needleLength;
+
+      const int compareResult = STR_Compare(iter->raw_data_unsafe(), needle, compareLength);
+      if (compareResult == 0 && candidateLength >= needleLength) {
+        if (candidateLength == needleLength) {
+          break;
+        }
+      }
+
+      ++iter;
+    } while (iter != end);
+
+    return iter;
   }
 } // namespace gpg::gal

@@ -19,6 +19,7 @@ namespace moho
   public:
     /**
      * Address: 0x100BEAF0 (FUN_100BEAF0)
+     * Address: 0x004CCF80 (FUN_004CCF80, Moho::CScrLuaInitFormSet::CScrLuaInitFormSet)
      *
      * char const *
      *
@@ -29,6 +30,7 @@ namespace moho
 
     /**
      * Address: 0x100158D0 (FUN_100158D0)
+     * Address: 0x004CCB90 (FUN_004CCB90, Moho::CScrLuaInitFormSet::GetFirst)
      *
      * CScrLuaInitFormSet *
      *
@@ -39,6 +41,7 @@ namespace moho
 
     /**
      * Address: 0x100158E0 (FUN_100158E0)
+     * Address: 0x004CCBA0 (FUN_004CCBA0, Moho::CScrLuaInitFormSet::GetNext)
      *
      * CScrLuaInitFormSet *
      *
@@ -59,6 +62,7 @@ namespace moho
 
     /**
      * Address: 0x100BEB10 (FUN_100BEB10)
+     * Address: 0x004CCFA0 (FUN_004CCFA0, Moho::CScrLuaInitFormSet::AddInit)
      *
      * CScrLuaInitForm *
      *
@@ -107,6 +111,7 @@ namespace moho
   public:
     /**
      * Address: 0x100BEE50 (FUN_100BEE50)
+     * Address: 0x004CD370 (FUN_004CD370, Moho::CScrLuaInitForm::CScrLuaInitForm)
      *
      * CScrLuaInitFormSet &, char const *, char const *, char const *
      *
@@ -135,6 +140,7 @@ namespace moho
 
     /**
      * Address: 0x10015910 (FUN_10015910)
+     * Address: 0x004CCBB0 (FUN_004CCBB0, Moho::CScrLuaInitForm::GetName)
      *
      * char const *
      *
@@ -145,6 +151,7 @@ namespace moho
 
     /**
      * Address: 0x10015920 (FUN_10015920)
+     * Address: 0x004CCBC0 (FUN_004CCBC0, Moho::CScrLuaInitForm::GetGroupName)
      *
      * char const *
      *

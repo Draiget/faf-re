@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -77,23 +77,23 @@
     <Wm3IncludePath>$(Wm3FoundationDir);$(Wm3FoundationDir)\Approximation;$(Wm3FoundationDir)\Collision;$(Wm3FoundationDir)\Containment;$(Wm3FoundationDir)\Controllers;$(Wm3FoundationDir)\Curves;$(Wm3FoundationDir)\Detail;$(Wm3FoundationDir)\Distance;$(Wm3FoundationDir)\Effects;$(Wm3FoundationDir)\ImageAnalysis;$(Wm3FoundationDir)\Interpolation;$(Wm3FoundationDir)\Intersection;$(Wm3FoundationDir)\Math;$(Wm3FoundationDir)\Meshes;$(Wm3FoundationDir)\Miscellaneous;$(Wm3FoundationDir)\Numerics;$(Wm3FoundationDir)\ObjectSystem;$(Wm3FoundationDir)\Physics;$(Wm3FoundationDir)\RationalArithmetic;$(Wm3FoundationDir)\SceneGraph;$(Wm3FoundationDir)\Shaders;$(Wm3FoundationDir)\SharedArrays;$(Wm3FoundationDir)\Sorting;$(Wm3FoundationDir)\Surfaces;$(Wm3FoundationDir)\System;$(Wm3FoundationDir)\Terrain;$(Wm3FoundationDir)\Tessellation;$(FafRepoRoot)dependencies\WildMagic3p8\Renderers\Dx9Renderer;$(FafRepoRoot)dependencies\WildMagic3p8\Applications</Wm3IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
-    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
-    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
-    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)</OutDir>
-    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)</IntDir>
+    <OutDir>$(FafRepoRoot)output\$(ProjectName)\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(FafRepoRoot)buildstage\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(FafRepoRoot)src\sdk;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\include;$(FafRepoRoot)dependencies\LuaPlus_Build1081\Src\LuaPlus\src;$(FafRepoRoot)dependencies\boost_1_34_1;$(Wm3IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -191,6 +191,7 @@
     <ClCompile Include="gpg\core\algorithms\MD5.cpp" />
     <ClCompile Include="gpg\core\containers\ArchiveSerialization.cpp" />
     <ClCompile Include="gpg\core\containers\ArchiveTokenTypeInfo.cpp" />
+    <ClCompile Include="gpg\core\containers\Array2D.cpp" />
     <ClCompile Include="gpg\core\containers\BitArray2D.cpp" />
     <ClCompile Include="gpg\core\containers\ReadArchive.cpp" />
     <ClCompile Include="gpg\core\containers\SerSaveLoadHelper_Box3f.cpp" />
@@ -230,10 +231,12 @@
     <ClCompile Include="moho\serialization\SSavedGameArmyInfoVectorReflection.cpp" />
     <ClCompile Include="gpg\core\reflection\SerializationError.cpp" />
     <ClCompile Include="gpg\core\streams\BinaryReader.cpp" />
+    <ClCompile Include="gpg\core\streams\BinaryWriter.cpp" />
     <ClCompile Include="gpg\core\streams\FileStream.cpp" />
     <ClCompile Include="gpg\core\streams\MemBufferStream.cpp" />
     <ClCompile Include="gpg\core\streams\PipeStream.cpp" />
     <ClCompile Include="gpg\core\streams\Stream.cpp" />
+    <ClCompile Include="gpg\core\streams\ZLibDeflateRuntime.cpp" />
     <ClCompile Include="gpg\core\streams\ZLibOutputFilterStream.cpp" />
     <ClCompile Include="gpg\core\time\Timer.cpp" />
     <ClCompile Include="gpg\core\utils\BoostWrappers.cpp" />
@@ -241,7 +244,9 @@
     <ClCompile Include="gpg\core\utils\Logging.cpp" />
     <ClCompile Include="gpg\gal\ContextInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Device.cpp" />
+    <ClCompile Include="gpg\gal\Effect.cpp" />
     <ClCompile Include="gpg\gal\GalInterfaces.cpp" />
+    <ClCompile Include="gpg\gal\Matrix.cpp" />
     <ClCompile Include="gpg\gal\MeshFormatter.cpp" />
     <ClCompile Include="gpg\gal\StateCache.cpp" />
     <ClCompile Include="gpg\gal\StringUtils.cpp">
@@ -263,6 +268,7 @@
     <ClCompile Include="lua\LuaParser.cpp" />
     <ClCompile Include="lua\LuaObjectSerializer.cpp" />
     <ClCompile Include="lua\LuaObjectTypeInfo.cpp" />
+    <ClCompile Include="lua\LuaRuntimeTypeInfo.cpp" />
     <ClCompile Include="lua\LuaStateConstruct.cpp" />
     <ClCompile Include="lua\LuaStateSaveConstruct.cpp" />
     <ClCompile Include="lua\LuaStateSerializer.cpp" />
@@ -289,6 +295,8 @@
     <ClCompile Include="moho\ai\CAiFormationInstanceSerializer.cpp" />
     <ClCompile Include="moho\ai\CAiFormationInstanceTypeInfo.cpp" />
     <ClCompile Include="moho\ai\IFormationInstanceCountedPtrReflection.cpp" />
+    <ClCompile Include="moho\ai\CBuilderArmManipulator.cpp" />
+    <ClCompile Include="moho\ai\CBuilderArmManipulatorTypeInfo.cpp" />
     <ClCompile Include="moho\ai\CAimManipulator.cpp" />
     <ClCompile Include="moho\ai\CAimManipulatorSerializer.cpp" />
     <ClCompile Include="moho\ai\CAimManipulatorTypeInfo.cpp" />
@@ -411,6 +419,7 @@
     <ClCompile Include="moho\animation\CAniSkel.cpp" />
     <ClCompile Include="moho\animation\CAniSkelTypeInfo.cpp" />
     <ClCompile Include="moho\animation\IAniManipulator.cpp" />
+    <ClCompile Include="moho\animation\CRotateManipulator.cpp" />
     <ClCompile Include="moho\animation\CSlideManipulator.cpp" />
     <ClCompile Include="moho\animation\CSlaveManipulator.cpp" />
     <ClCompile Include="moho\animation\SAniManipBindingReflection.cpp" />
@@ -559,6 +568,8 @@
     <ClCompile Include="moho\effects\rendering\CEfxBeam.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxBeamSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxBeamTypeInfo.cpp" />
+    <ClCompile Include="moho\effects\rendering\CEfxEmitter.cpp" />
+    <ClCompile Include="moho\effects\rendering\CEfxTrailEmitter.cpp" />
     <ClCompile Include="moho\effects\rendering\CEfxEmitterTypeInfo.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectManagerImpl.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectManagerImplConstruct.cpp" />
@@ -566,6 +577,8 @@
     <ClCompile Include="moho\effects\rendering\CEffectManagerImplSerializer.cpp" />
     <ClCompile Include="moho\effects\rendering\CEffectManagerImplTypeInfo.cpp" />
     <ClCompile Include="moho\render\CDecalBuffer.cpp" />
+    <ClCompile Include="moho\render\IDecalGroup.cpp" />
+    <ClCompile Include="moho\render\CDecalGroup.cpp" />
     <ClCompile Include="moho\render\SParticleBuffer.cpp" />
     <ClCompile Include="moho\render\CDecalBufferSerializer.cpp" />
     <ClCompile Include="moho\render\CDecalBufferTypeInfo.cpp" />
@@ -581,6 +594,7 @@
     <ClCompile Include="moho\render\RCamManager.cpp" />
     <ClCompile Include="moho\render\RangeRenderer.cpp" />
     <ClCompile Include="moho\render\Cartographic.cpp" />
+    <ClCompile Include="moho\render\Shadow.cpp" />
     <ClCompile Include="moho\render\SelectionBracketParams.cpp" />
     <ClCompile Include="moho\render\RenderGeometryBuffers.cpp" />
     <ClCompile Include="moho\render\VisionRenderer.cpp" />
@@ -637,6 +651,7 @@
     </ClCompile>
     <ClCompile Include="moho\particles\SWorldParticle.cpp" />
     <ClCompile Include="moho\misc\CDecoder.cpp" />
+    <ClCompile Include="moho\movie\CMovie.cpp" />
     <ClCompile Include="moho\movie\MPVDecoder.cpp" />
     <ClCompile Include="moho\misc\CombinedMilitaryExtractor.cpp" />
     <ClCompile Include="moho\misc\CountermeasureExtractor.cpp" />
@@ -668,7 +683,10 @@
     <ClCompile Include="moho\misc\XFileError.cpp" />
     <ClCompile Include="moho\misc\TimeBar.cpp" />
     <ClCompile Include="moho\misc\TypeInfo.cpp" />
-    <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp" />
+    <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="moho\misc\DName.cpp" />
     <ClCompile Include="moho\misc\StringUtils.cpp" />
     <ClCompile Include="moho\misc\ID3DDeviceResources.cpp" />
     <ClCompile Include="moho\misc\FileWaitHandleSet.cpp" />
@@ -776,6 +794,7 @@
     <ClCompile Include="moho\resource\RResIdSerializer.cpp" />
     <ClCompile Include="moho\resource\SScmFile.cpp" />
     <ClCompile Include="moho\resource\ResourceDeposit.cpp" />
+    <ClCompile Include="moho\resource\ResourceDepositVectorReflection.cpp" />
     <ClCompile Include="moho\resource\CResourceWatcher.cpp" />
     <ClCompile Include="moho\resource\ResourceManager.cpp" />
     <ClCompile Include="moho\resource\blueprints\RBeamBlueprint.cpp" />
@@ -816,6 +835,7 @@
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponConstruct.cpp" />
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponSaveConstruct.cpp" />
+    <ClCompile Include="moho\resource\blueprints\RUnitBlueprintWeaponVectorReflection.cpp" />
     <ClCompile Include="moho\script\CUnitScriptTask.cpp" />
     <ClCompile Include="moho\script\CUnitScriptTaskSerializer.cpp" />
     <ClCompile Include="moho\script\CUnitScriptTaskTypeInfo.cpp" />
@@ -951,12 +971,19 @@
     <ClCompile Include="moho\task\CTaskThreadReflectionBootstrap.cpp" />
     <ClCompile Include="moho\task\CTaskThreadWeakPtrReflection.cpp" />
     <ClCompile Include="moho\task\CWaitForTask.cpp" />
+    <ClCompile Include="moho\terrain\HighFidelityTerrain.cpp" />
+    <ClCompile Include="moho\terrain\LowFidelityTerrain.cpp" />
+    <ClCompile Include="moho\terrain\MediumFidelityTerrain.cpp" />
     <ClCompile Include="moho\terrain\StratumMaterial.cpp" />
     <ClCompile Include="moho\terrain\splat\CWldSplat.cpp" />
     <ClCompile Include="moho\terrain\TerrainCommon.cpp" />
+    <ClCompile Include="moho\terrain\TerrainDynamicTextureHelpers.cpp" />
+    <ClCompile Include="moho\terrain\TerrainFactory.cpp" />
     <ClCompile Include="moho\terrain\water\CWaterShaderProperties.cpp" />
     <ClCompile Include="moho\terrain\water\HighFidelityWater.cpp" />
     <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp" />
+    <ClCompile Include="moho\terrain\water\WaterFactory.cpp" />
+    <ClCompile Include="moho\terrain\water\WaterShaderVars.cpp" />
     <ClCompile Include="moho\terrain\water\WaveSystem.cpp" />
     <ClCompile Include="moho\terrain\water\Shoreline.cpp" />
     <ClCompile Include="moho\ui\CUIManager.cpp" />
@@ -971,6 +998,7 @@
     <ClCompile Include="moho\ui\CUIWorldMesh.cpp" />
     <ClCompile Include="moho\ui\CUIWorldMeshTypeInfo.cpp" />
     <ClCompile Include="moho\ui\IUIManager.cpp" />
+    <ClCompile Include="moho\ui\SelectionDragger.cpp" />
     <ClCompile Include="moho\ui\UiRuntimeTypes.cpp" />
     <ClCompile Include="moho\unit\core\IUnit.cpp" />
     <ClCompile Include="moho\unit\core\IUnitWeakPtrReflection.cpp" />
@@ -1000,12 +1028,18 @@
     <ClCompile Include="moho\unit\tasks\CFactoryBuildTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CFactoryBuildTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CBuildTaskHelperTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitCaptureTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitAssistMoveTaskTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitGuardTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitGuardTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitFerryTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitFormAndMoveTaskTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitFormAndMoveTask.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitReclaimTaskTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\tasks\CUnitReclaimTask.cpp" />
     <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTask.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitAttackTargetTaskTypeInfo.cpp" />
       <ClCompile Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.cpp" />
@@ -1037,6 +1071,7 @@
     <ClCompile Include="moho\unit\core\EUnitStateTypeInfo.cpp" />
     <ClCompile Include="moho\unit\core\RDebugWeapons.cpp" />
     <ClCompile Include="moho\unit\core\RDebugWeaponsTypeInfo.cpp" />
+    <ClCompile Include="moho\unit\core\SUnitConstructionParams.cpp" />
     <ClCompile Include="moho\unit\core\Unit.cpp" />
     <ClCompile Include="moho\unit\core\UnitSerHelpers.cpp" />
     <ClCompile Include="moho\unit\core\UnitSaveConstruct.cpp" />
@@ -1071,6 +1106,32 @@
     <ClCompile Include="moho\vision\VisionDB.cpp" />
     <ClCompile Include="moho\math\Wm3DistanceFafExtras.cpp" />
     <ClCompile Include="moho\math\Wm3AxisAlignedBox3FafExtras.cpp" />
+  
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boost\condition.h" />
@@ -1084,6 +1145,7 @@
     <ClInclude Include="boost\xtime.h" />
     <ClInclude Include="gpg\core\algorithms\Cluster.h" />
     <ClInclude Include="gpg\core\algorithms\MD5.h" />
+    <ClInclude Include="gpg\core\containers\Array2D.h" />
     <ClInclude Include="gpg\core\containers\BitArray2D.h" />
     <ClInclude Include="gpg\core\containers\ArchiveSerialization.h" />
     <ClInclude Include="gpg\core\containers\ArchiveTokenTypeInfo.h" />
@@ -1124,10 +1186,12 @@
     <ClInclude Include="gpg\core\reflection\SerializationError.h" />
     <ClInclude Include="gpg\core\containers\WriteArchive.h" />
     <ClInclude Include="gpg\core\streams\BinaryReader.h" />
+    <ClInclude Include="gpg\core\streams\BinaryWriter.h" />
     <ClInclude Include="gpg\core\streams\FileStream.h" />
     <ClInclude Include="gpg\core\streams\MemBufferStream.h" />
     <ClInclude Include="gpg\core\streams\PipeStream.h" />
     <ClInclude Include="gpg\core\streams\Stream.h" />
+    <ClInclude Include="gpg\core\streams\ZLibDeflateRuntime.h" />
     <ClInclude Include="gpg\core\streams\ZLibOutputFilterStream.h" />
     <ClInclude Include="gpg\core\time\Timer.h" />
     <ClInclude Include="gpg\core\utils\BoostUtils.h" />
@@ -1234,6 +1298,7 @@
     <ClInclude Include="moho\animation\CAniSkel.h" />
     <ClInclude Include="moho\animation\CAniSkelTypeInfo.h" />
     <ClInclude Include="moho\animation\IAniManipulator.h" />
+    <ClInclude Include="moho\animation\CRotateManipulator.h" />
     <ClInclude Include="moho\animation\CSlideManipulator.h" />
     <ClInclude Include="moho\animation\CSlaveManipulator.h" />
     <ClInclude Include="moho\animation\CAnimationManipulator.h" />
@@ -1347,6 +1412,7 @@
     <ClInclude Include="moho\effects\rendering\CEfxBeamSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEfxBeamTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitter.h" />
+    <ClInclude Include="moho\effects\rendering\CEfxTrailEmitter.h" />
     <ClInclude Include="moho\effects\rendering\CEfxEmitterTypeInfo.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImpl.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplConstruct.h" />
@@ -1354,6 +1420,8 @@
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEffectManagerImplTypeInfo.h" />
     <ClInclude Include="moho\render\CDecalBuffer.h" />
+    <ClInclude Include="moho\render\IDecalGroup.h" />
+    <ClInclude Include="moho\render\CDecalGroup.h" />
     <ClInclude Include="moho\render\CDecalBufferSerializer.h" />
     <ClInclude Include="moho\render\CDecalBufferTypeInfo.h" />
     <ClInclude Include="moho\render\CWldTerrainDecal.h" />
@@ -1456,6 +1524,7 @@
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponConstruct.h" />
     <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponSaveConstruct.h" />
+    <ClInclude Include="moho\resource\blueprints\RUnitBlueprintWeaponVectorReflection.h" />
     <ClInclude Include="moho\sim\CSimConCommand.h" />
     <ClInclude Include="moho\sim\CSimConFunc.h" />
     <ClInclude Include="moho\sim\CArmyStatItem.h" />
@@ -1483,6 +1552,7 @@
     <ClInclude Include="moho\sim\IdPoolSerializer.h" />
     <ClInclude Include="moho\sim\SMinMaxTypeInfo.h" />
     <ClInclude Include="moho\misc\ID3DDeviceResources.h" />
+    <ClInclude Include="moho\misc\DName.h" />
     <ClInclude Include="moho\misc\StringUtils.h" />
     <ClInclude Include="moho\misc\FileWaitHandleSet.h" />
     <ClInclude Include="moho\misc\StartupHelpers.h" />
@@ -1525,6 +1595,7 @@
     <ClInclude Include="lua\LuaDebug.h" />
     <ClInclude Include="lua\LuaObject.h" />
     <ClInclude Include="lua\LuaPrimitives.h" />
+    <ClInclude Include="lua\LuaRuntimeTypeInfo.h" />
     <ClInclude Include="lua\LuaRuntimeTypes.h" />
     <ClInclude Include="moho\ai\CAiAttackerImpl.h" />
     <ClInclude Include="moho\ai\CAiAttackerImplConstruct.h" />
@@ -1547,6 +1618,8 @@
     <ClInclude Include="moho\ai\IFormationInstanceCountedPtrReflection.h" />
     <ClInclude Include="moho\ai\CAiFormationInstanceSerializer.h" />
     <ClInclude Include="moho\ai\CAiFormationInstanceTypeInfo.h" />
+    <ClInclude Include="moho\ai\CBuilderArmManipulator.h" />
+    <ClInclude Include="moho\ai\CBuilderArmManipulatorTypeInfo.h" />
     <ClInclude Include="moho\ai\CAimManipulator.h" />
     <ClInclude Include="moho\ai\CAimManipulatorSerializer.h" />
     <ClInclude Include="moho\ai\CAimManipulatorTypeInfo.h" />
@@ -1691,6 +1764,7 @@
     <ClInclude Include="moho\math\Vector4f.h" />
     <ClInclude Include="moho\math\VMatrix4.h" />
     <ClInclude Include="moho\misc\CDecoder.h" />
+    <ClInclude Include="moho\movie\CMovie.h" />
     <ClInclude Include="moho\movie\MPVDecoder.h" />
     <ClInclude Include="moho\misc\CSaveGameRequestImpl.h" />
     <ClInclude Include="moho\misc\ISaveRequest.h" />
@@ -1809,6 +1883,7 @@
     <ClInclude Include="moho\resource\ResourceReflectionHelpers.h" />
     <ClInclude Include="moho\resource\SScmFile.h" />
     <ClInclude Include="moho\resource\ResourceDeposit.h" />
+    <ClInclude Include="moho\resource\ResourceDepositVectorReflection.h" />
     <ClInclude Include="moho\resource\ResourceManager.h" />
     <ClInclude Include="moho\resource\RScmResource.h" />
     <ClInclude Include="moho\resource\RScaResource.h" />
@@ -1931,6 +2006,7 @@
     <ClInclude Include="moho\terrain\water\LowFidelityWater.h" />
     <ClInclude Include="moho\terrain\water\WaveSystem.h" />
     <ClInclude Include="moho\terrain\water\Shoreline.h" />
+    <ClInclude Include="moho\terrain\water\ShoreCell.h" />
     <ClInclude Include="moho\ui\CMauiControlTypeInfo.h" />
     <ClInclude Include="moho\ui\CMauiFrameTypeInfo.h" />
     <ClInclude Include="moho\ui\CUIWorldMesh.h" />
@@ -1942,6 +2018,7 @@
     <ClInclude Include="moho\ui\EMauiEventTypeTypeInfo.h" />
     <ClInclude Include="moho\ui\EMauiKeyCodeTypeInfo.h" />
     <ClInclude Include="moho\ui\IUIManager.h" />
+    <ClInclude Include="moho\ui\SelectionDragger.h" />
     <ClInclude Include="moho\ui\SDebugLine.h" />
     <ClInclude Include="moho\ui\SDebugWorldText.h" />
     <ClInclude Include="moho\ui\UiRuntimeTypes.h" />
@@ -1994,6 +2071,10 @@
     <ClInclude Include="moho\unit\tasks\CUnitFerryTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitFormAndMoveTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitFormAndMoveTaskTypeInfo.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitReclaimTask.h" />
+    <ClInclude Include="moho\unit\tasks\CUnitReclaimTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTask.h" />
     <ClInclude Include="moho\unit\tasks\CUnitMobileBuildTaskTypeInfo.h" />
     <ClInclude Include="moho\unit\tasks\CUnitRepairTask.h" />
@@ -2056,6 +2137,32 @@
     <ClInclude Include="util\VTCall.h" />
     <ClInclude Include="moho\math\Wm3DistanceFafExtras.h" />
     <ClInclude Include="moho\math\Wm3AxisAlignedBox3FafExtras.h" />
+  
+    <ClInclude Include="gpg\core\reflection\RBoolType.h" />
+    <ClInclude Include="gpg\core\reflection\RFloatType.h" />
+    <ClInclude Include="gpg\core\reflection\RIntegerTypes.h" />
+    <ClInclude Include="gpg\core\reflection\RObjectTypeInfo.h" />
+    <ClInclude Include="gpg\core\reflection\RStringType.h" />
+    <ClInclude Include="gpg\core\reflection\RTypeTypeInfo.h" />
+    <ClInclude Include="gpg\core\reflection\voidTypeInfo.h" />
+    <ClInclude Include="gpg\gal\StringUtils.h" />
+    <ClInclude Include="lua\LuaError.h" />
+    <ClInclude Include="moho\entity\EntityCategoryTypeInfo.h" />
+    <ClInclude Include="moho\render\Cartographic.h" />
+    <ClInclude Include="moho\render\Shadow.h" />
+    <ClInclude Include="moho\sim\EReconFlagsTypeInfo.h" />
+    <ClInclude Include="moho\sim\ESTITargetTypeTypeInfo.h" />
+    <ClInclude Include="moho\terrain\HighFidelityTerrain.h" />
+    <ClInclude Include="moho\terrain\LowFidelityTerrain.h" />
+    <ClInclude Include="moho\terrain\MediumFidelityTerrain.h" />
+    <ClInclude Include="moho\terrain\TerrainCommon.h" />
+    <ClInclude Include="moho\terrain\TerrainDynamicTextureHelpers.h" />
+    <ClInclude Include="moho\terrain\TerrainFactory.h" />
+    <ClInclude Include="moho\terrain\water\HighFidelityWater.h" />
+    <ClInclude Include="moho\terrain\water\WaterFactory.h" />
+    <ClInclude Include="moho\terrain\water\WaterShaderVars.h" />
+    <ClInclude Include="moho\terrain\water\WaterSurface.h" />
+    <ClInclude Include="moho\ui\EUIActionTypeTypeInfo.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cri\sofdec\SofdecAdxCodecRuntime.cpp" />
@@ -2114,6 +2221,13 @@
     <ClCompile Include="moho\serialization\typeinfo\ECompareTypeTypeInfo.cpp" />
     <ClCompile Include="moho\serialization\typeinfo\SBuildReserveInfoTypeInfo.cpp" />
     <ClCompile Include="moho\sim\SPhysBody.cpp" />
+  
+    <None Include="gpg\core\reflection\RFloatType.cpp" />
+    <None Include="gpg\core\reflection\RIntegerTypes.cpp" />
+    <None Include="gpg\core\reflection\RStringType.cpp" />
+    <None Include="lua\LuaError.cpp" />
+    <None Include="moho\command\SSTICommandIssueData.cpp" />
+    <None Include="moho\render\d3d\D3DResUnreachableStubs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gpg\gal\AppRuntimeView.h" />

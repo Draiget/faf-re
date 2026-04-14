@@ -42,6 +42,23 @@ namespace
   constexpr float kSiloMinimumBuildRate = 0.1f;
   constexpr std::uint64_t kSiloBuildingStateMask = (1ull << static_cast<std::uint32_t>(UNITSTATE_SiloBuildingAmmo));
 
+  /**
+   * Address: 0x005CEB20 (FUN_005CEB20, func_ZeroVec3)
+   *
+   * What it does:
+   * Clears one `SSiloBuildInfo` lane (`weapon/ammo/maxStorage`) to all zeros.
+   */
+  void ZeroSiloBuildInfoWords(SSiloBuildInfo* const info) noexcept
+  {
+    if (!info) {
+      return;
+    }
+
+    info->mWeapon = nullptr;
+    info->mAmmo = 0;
+    info->mMaxStorageCount = 0;
+  }
+
   template <class TObject>
   [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
   {
@@ -380,6 +397,8 @@ CAiSiloBuildImpl::CAiSiloBuildImpl()
   , mSegments(1.0f)
   , mCurSegments(0)
 {
+  ZeroSiloBuildInfoWords(&mSiloInfo[0]);
+  ZeroSiloBuildInfoWords(&mSiloInfo[1]);
   InitializeSiloTypeList(mSiloTypes);
 }
 

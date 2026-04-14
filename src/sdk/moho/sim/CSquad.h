@@ -74,6 +74,43 @@ namespace moho
     [[nodiscard]] static CSquad* AllocateOnPlatoon(CPlatoon* parentPlatoon, ESquadClass squadClass, const char* name);
 
     /**
+     * Address: 0x00724220 (FUN_00724220, Moho::CSquad::CountUnitsWithBP)
+     *
+     * What it does:
+     * Counts live squad units whose blueprint id matches `blueprintId`
+     * case-insensitively.
+     */
+    [[nodiscard]] int CountUnitsWithBP(const char* blueprintId) const;
+
+    /**
+     * Address: 0x007242B0 (FUN_007242B0, Moho::CSquad::CountUnitsInCategory)
+     *
+     * What it does:
+     * Counts live squad units whose blueprint category bit belongs to
+     * `categorySet`.
+     */
+    [[nodiscard]] int CountUnitsInCategory(const EntityCategorySet* categorySet) const;
+
+    /**
+     * Address: 0x007244E0 (FUN_007244E0, Moho::CSquad::CanAttackTarget)
+     *
+     * What it does:
+     * Scans live squad units and returns true as soon as any unit attacker can
+     * pick the supplied target entity. Empty slots, dead units, and units
+     * without attackers are skipped.
+     */
+    [[nodiscard]] bool CanAttackTarget(Unit* target);
+
+    /**
+     * Address: 0x00724750 (FUN_00724750, Moho::CSquad::HasUnitWithState)
+     *
+     * What it does:
+     * Returns true when any live unit in this squad reports the requested
+     * unit-state lane.
+     */
+    [[nodiscard]] bool HasUnitWithState(EUnitState state) const;
+
+    /**
      * Address: 0x00724350 (FUN_00724350, Moho::CSquad::AppendUnitsWithBP)
      *
      * What it does:
@@ -85,6 +122,16 @@ namespace moho
     void AppendUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
 
     /**
+     * Address: 0x00724400 (FUN_00724400, Moho::CSquad::AppendUnitsInCategory)
+     *
+     * What it does:
+     * Walks this squad's unit list and appends every live (not dead, not
+     * destroying, not under-construction) unit whose blueprint category bit is
+     * present in `categorySet`, stopping once `maxCount` matches are added.
+     */
+    void AppendUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, SEntitySetTemplateUnit& outUnits);
+
+    /**
      * Address: 0x00724550 (FUN_00724550, Moho::CSquad::FitsAt)
      *
      * What it does:
@@ -92,6 +139,16 @@ namespace moho
      * against terrain occupancy using per-motion-type layer checks.
      */
     [[nodiscard]] bool FitsAt(const Wm3::Vec3f& position) const;
+
+    /**
+     * Address: 0x00724020 (FUN_00724020, Moho::CSquad::GetCenter)
+     *
+     * What it does:
+     * Zeros the output vector, accumulates every unit position in this squad,
+     * and returns the averaged center pointer. Empty squads return the zero
+     * vector immediately.
+     */
+    [[nodiscard]] Wm3::Vector3f* GetCenter(Wm3::Vector3f* outPos) const;
 
   public:
     Sim* mSim;                                                // +0x00

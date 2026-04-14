@@ -11,6 +11,23 @@ namespace moho
 {
   class ID3DVertexSheet;
   class ShoreCell;
+  struct TerrainWaterResourceView;
+
+  /**
+   * Address: 0x010A6442 (?ren_Shoreline@Moho@@3_NA)
+   *
+   * What it does:
+   * Global shoreline render enable lane toggled by shoreline generation.
+   */
+  extern bool ren_Shoreline;
+
+  /**
+   * Address: 0x00F57D64 (?ren_ShorelineCutoff@Moho@@3MA)
+   *
+   * What it does:
+   * Dissolve-cutoff value propagated into generated shoreline spatial-db cells.
+   */
+  extern float ren_ShorelineCutoff;
 
   /**
    * Terrain-water shoreline runtime owner.
@@ -54,6 +71,15 @@ namespace moho
      */
     void Destroy();
 
+    /**
+     * Address: 0x008129B0 (FUN_008129B0, Moho::Shoreline::Generate)
+     *
+     * What it does:
+     * Rebuilds shoreline cells from terrain-water heightfield masks, recreates
+     * shoreline vertex-sheet ownership, and updates shoreline-cell stats.
+     */
+    void Generate(TerrainWaterResourceView* terrainResource);
+
   public:
     SpatialDB_MeshInstance mSpatialDbEntry;                      // +0x04
     std::uint8_t mUnknown0C_93[0x88]{};                          // +0x0C..+0x93
@@ -68,4 +94,3 @@ namespace moho
   static_assert(offsetof(Shoreline, mShorelineTris) == 0xAC, "Shoreline::mShorelineTris offset must be 0xAC");
   static_assert(sizeof(Shoreline) == 0xB0, "Shoreline size must be 0xB0");
 } // namespace moho
-

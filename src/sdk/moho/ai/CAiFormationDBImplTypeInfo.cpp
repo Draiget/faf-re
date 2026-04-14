@@ -65,6 +65,23 @@ namespace
     return reinterpret_cast<CAiFormationDBImplTypeInfo*>(gCAiFormationDBImplTypeInfoStorage);
   }
 
+  [[nodiscard]] gpg::RRef MakeCAiFormationDBImplRef(CAiFormationDBImpl* const object) noexcept
+  {
+    gpg::RRef out{};
+    (void)gpg::RRef_CAiFormationDBImpl(&out, object);
+    return out;
+  }
+
+  void InitializeCAiFormationDBImpl(CAiFormationDBImpl* const object) noexcept
+  {
+    if (!object) {
+      return;
+    }
+
+    object->mSim = nullptr;
+    object->mFormInstances.ResetStorageToInline();
+  }
+
   [[nodiscard]] IFormationInstanceFastVectorTypeInfo* AcquireFastVectorIFormationInstanceType()
   {
     if (!gFastVectorIFormationInstanceTypeConstructed) {
@@ -382,6 +399,10 @@ const char* CAiFormationDBImplTypeInfo::GetName() const
 void CAiFormationDBImplTypeInfo::Init()
 {
   size_ = sizeof(CAiFormationDBImpl);
+  newRefFunc_ = &CAiFormationDBImplTypeInfo::NewRef;
+  ctorRefFunc_ = &CAiFormationDBImplTypeInfo::CtrRef;
+  deleteFunc_ = &CAiFormationDBImplTypeInfo::Delete;
+  dtrFunc_ = &CAiFormationDBImplTypeInfo::Destruct;
   gpg::RType::Init();
 
   static gpg::RType* sCachedIAiFormationDBType = nullptr;
@@ -401,6 +422,73 @@ void CAiFormationDBImplTypeInfo::Init()
   }
 
   Finish();
+}
+
+/**
+ * Address: 0x0059D390 (FUN_0059D390, Moho::CAiFormationDBImplTypeInfo::NewRef)
+ *
+ * What it does:
+ * Allocates a reflected `CAiFormationDBImpl`, clears its owned AI-sim lane,
+ * and returns the object as a typed `gpg::RRef`.
+ */
+gpg::RRef CAiFormationDBImplTypeInfo::NewRef()
+{
+  CAiFormationDBImpl* const object = new (std::nothrow) CAiFormationDBImpl();
+  InitializeCAiFormationDBImpl(object);
+  return MakeCAiFormationDBImplRef(object);
+}
+
+/**
+ * Address: 0x0059D430 (FUN_0059D430, Moho::CAiFormationDBImplTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Placement-constructs one `CAiFormationDBImpl` in caller storage, resets its
+ * owned sim lane, and returns a typed `gpg::RRef`.
+ */
+gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(void* const objectStorage)
+{
+  CAiFormationDBImpl* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
+  if (object) {
+    new (object) CAiFormationDBImpl();
+    InitializeCAiFormationDBImpl(object);
+  }
+
+  return MakeCAiFormationDBImplRef(object);
+}
+
+/**
+ * Address: 0x0059D410 (FUN_0059D410, Moho::CAiFormationDBImplTypeInfo::Delete)
+ *
+ * What it does:
+ * Runs deleting-dtor behavior for one reflected `CAiFormationDBImpl`
+ * storage lane.
+ */
+void CAiFormationDBImplTypeInfo::Delete(void* const objectStorage)
+{
+  auto* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
+  if (!object) {
+    return;
+  }
+
+  object->~CAiFormationDBImpl();
+  ::operator delete(object);
+}
+
+/**
+ * Address: 0x0059D4B0 (FUN_0059D4B0, Moho::CAiFormationDBImplTypeInfo::Destruct)
+ *
+ * What it does:
+ * Runs in-place teardown for one reflected `CAiFormationDBImpl` storage lane
+ * without freeing the backing allocation.
+ */
+void CAiFormationDBImplTypeInfo::Destruct(void* const objectStorage)
+{
+  auto* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
+  if (!object) {
+    return;
+  }
+
+  object->~CAiFormationDBImpl();
 }
 
 /**

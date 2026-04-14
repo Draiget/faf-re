@@ -5,17 +5,27 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 
 using namespace moho;
 
 namespace
 {
+  using SPointVectorVector = msvc8::vector<moho::SPointVector>;
+  using SPointVectorVectorType = gpg::RVectorType<moho::SPointVector>;
+
   alignas(SPointVectorTypeInfo) unsigned char gSPointVectorTypeInfoStorage[sizeof(SPointVectorTypeInfo)] = {};
   bool gSPointVectorTypeInfoConstructed = false;
 
   alignas(SPointVectorSerializer) unsigned char gSPointVectorSerializerStorage[sizeof(SPointVectorSerializer)] = {};
   bool gSPointVectorSerializerConstructed = false;
+
+  alignas(SPointVectorVectorType) unsigned char gSPointVectorVectorTypeStorage[sizeof(SPointVectorVectorType)] = {};
+  bool gSPointVectorVectorTypeConstructed = false;
+
+  msvc8::string gSPointVectorVectorTypeName;
+  bool gSPointVectorVectorTypeNameCleanupRegistered = false;
 
   [[nodiscard]] SPointVectorTypeInfo& AcquireSPointVectorTypeInfo()
   {
@@ -35,6 +45,25 @@ namespace
     }
 
     return *reinterpret_cast<SPointVectorSerializer*>(gSPointVectorSerializerStorage);
+  }
+
+  [[nodiscard]] SPointVectorVectorType& AcquireSPointVectorVectorType()
+  {
+    if (!gSPointVectorVectorTypeConstructed) {
+      new (gSPointVectorVectorTypeStorage) SPointVectorVectorType();
+      gSPointVectorVectorTypeConstructed = true;
+    }
+
+    return *reinterpret_cast<SPointVectorVectorType*>(gSPointVectorVectorTypeStorage);
+  }
+
+  [[nodiscard]] SPointVectorVectorType* PeekSPointVectorVectorType() noexcept
+  {
+    if (!gSPointVectorVectorTypeConstructed) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<SPointVectorVectorType*>(gSPointVectorVectorTypeStorage);
   }
 
   template <typename TSerializer>
@@ -82,6 +111,12 @@ namespace
     return cached;
   }
 
+  [[nodiscard]] moho::SPointVector ZeroSPointVector() noexcept
+  {
+    const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
+    return moho::SPointVector{zero, zero};
+  }
+
   void cleanup_SPointVectorTypeInfo()
   {
     if (!gSPointVectorTypeInfoConstructed) {
@@ -102,6 +137,35 @@ namespace
     UnlinkSerializerNode(serializer);
     serializer.~SPointVectorSerializer();
     gSPointVectorSerializerConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BF6350 (FUN_00BF6350, cleanup_SPointVectorVectorTypeName)
+   *
+   * What it does:
+   * Releases cached lexical name storage for `vector<SPointVector>`.
+   */
+  void cleanup_SPointVectorVectorTypeName()
+  {
+    gSPointVectorVectorTypeName = msvc8::string{};
+    gSPointVectorVectorTypeNameCleanupRegistered = false;
+  }
+
+  /**
+   * Address: 0x00BF63E0 (FUN_00BF63E0, cleanup_SPointVectorVectorType)
+   *
+   * What it does:
+   * Destroys startup-owned `vector<SPointVector>` reflection storage lanes.
+   */
+  void cleanup_SPointVectorVectorType()
+  {
+    SPointVectorVectorType* const type = PeekSPointVectorVectorType();
+    if (!type) {
+      return;
+    }
+
+    type->~SPointVectorVectorType();
+    gSPointVectorVectorTypeConstructed = false;
   }
 } // namespace
 
@@ -220,6 +284,201 @@ void SPointVectorSerializer::Serialize(gpg::WriteArchive* const archive, SPointV
 }
 
 /**
+ * Address: 0x0057DF60 (FUN_0057DF60, gpg::RVectorType_SPointVector::GetName)
+ *
+ * What it does:
+ * Lazily builds and caches the reflected type label `vector<SPointVector>`.
+ */
+const char* gpg::RVectorType<moho::SPointVector>::GetName() const
+{
+  if (gSPointVectorVectorTypeName.empty()) {
+    const gpg::RType* const elementType = CachedSPointVectorType();
+    const char* const elementName = elementType ? elementType->GetName() : "SPointVector";
+    gSPointVectorVectorTypeName = gpg::STR_Printf("vector<%s>", elementName ? elementName : "SPointVector");
+
+    if (!gSPointVectorVectorTypeNameCleanupRegistered) {
+      gSPointVectorVectorTypeNameCleanupRegistered = true;
+      (void)std::atexit(&cleanup_SPointVectorVectorTypeName);
+    }
+  }
+
+  return gSPointVectorVectorTypeName.c_str();
+}
+
+/**
+ * Address: 0x0057E020 (FUN_0057E020, gpg::RVectorType_SPointVector::GetLexical)
+ *
+ * What it does:
+ * Returns one base lexical string plus `size=<count>` for reflected
+ * `vector<SPointVector>` payloads.
+ */
+msvc8::string gpg::RVectorType<moho::SPointVector>::GetLexical(const gpg::RRef& ref) const
+{
+  const msvc8::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+}
+
+/**
+ * Address: 0x0057E0B0 (FUN_0057E0B0, gpg::RVectorType_SPointVector::IsIndexed)
+ *
+ * What it does:
+ * Exposes the `RIndexed` subobject for `vector<SPointVector>`.
+ */
+const gpg::RIndexed* gpg::RVectorType<moho::SPointVector>::IsIndexed() const
+{
+  return this;
+}
+
+/**
+ * Address: 0x0057E000 (FUN_0057E000, gpg::RVectorType_SPointVector::Init)
+ *
+ * What it does:
+ * Initializes reflected size/version lanes and vector serializer callbacks.
+ */
+void gpg::RVectorType<moho::SPointVector>::Init()
+{
+  size_ = sizeof(SPointVectorVector);
+  version_ = 1;
+  serLoadFunc_ = &gpg::RVectorType<moho::SPointVector>::SerLoad;
+  serSaveFunc_ = &gpg::RVectorType<moho::SPointVector>::SerSave;
+}
+
+/**
+ * Address: 0x0057F2D0 (FUN_0057F2D0, gpg::RVectorType_SPointVector::SerLoad)
+ *
+ * What it does:
+ * Loads one `vector<SPointVector>` payload from archive and replaces
+ * destination storage in one assignment.
+ */
+void gpg::RVectorType<moho::SPointVector>::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const
+)
+{
+  auto* const storage = reinterpret_cast<SPointVectorVector*>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  SPointVectorVector loaded{};
+  loaded.reserve(static_cast<std::size_t>(count));
+
+  gpg::RType* const elementType = CachedSPointVectorType();
+  const gpg::RRef ownerRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    moho::SPointVector value = ZeroSPointVector();
+    if (elementType) {
+      archive->Read(elementType, &value, ownerRef);
+    } else {
+      value.MemberDeserialize(archive);
+    }
+    loaded.push_back(value);
+  }
+
+  *storage = loaded;
+}
+
+/**
+ * Address: 0x0057F400 (FUN_0057F400, gpg::RVectorType_SPointVector::SerSave)
+ *
+ * What it does:
+ * Saves one `vector<SPointVector>` payload to archive element-by-element.
+ */
+void gpg::RVectorType<moho::SPointVector>::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  const auto* const storage = reinterpret_cast<const SPointVectorVector*>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  const unsigned int count = static_cast<unsigned int>(storage->size());
+  archive->WriteUInt(count);
+  if (count == 0u) {
+    return;
+  }
+
+  gpg::RType* const elementType = CachedSPointVectorType();
+  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    const moho::SPointVector& value = (*storage)[static_cast<std::size_t>(i)];
+    if (elementType) {
+      archive->Write(elementType, &value, owner);
+    } else {
+      value.MemberSerialize(archive);
+    }
+  }
+}
+
+/**
+ * Address: 0x0057E160 (FUN_0057E160, gpg::RVectorType_SPointVector::SubscriptIndex)
+ *
+ * What it does:
+ * Builds one reflected element reference at index `ind`.
+ */
+gpg::RRef gpg::RVectorType<moho::SPointVector>::SubscriptIndex(void* const obj, const int ind) const
+{
+  gpg::RRef out{};
+  gpg::RRef_SPointVector(&out, nullptr);
+
+  auto* const storage = static_cast<SPointVectorVector*>(obj);
+  GPG_ASSERT(storage != nullptr);
+  GPG_ASSERT(ind >= 0);
+  GPG_ASSERT(storage != nullptr && static_cast<std::size_t>(ind) < storage->size());
+  if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
+    return out;
+  }
+
+  gpg::RRef_SPointVector(&out, &(*storage)[static_cast<std::size_t>(ind)]);
+  return out;
+}
+
+/**
+ * Address: 0x0057E0C0 (FUN_0057E0C0, gpg::RVectorType_SPointVector::GetCount)
+ *
+ * What it does:
+ * Returns element count for one reflected `vector<SPointVector>` payload.
+ */
+size_t gpg::RVectorType<moho::SPointVector>::GetCount(void* const obj) const
+{
+  const auto* const storage = static_cast<const SPointVectorVector*>(obj);
+  return storage ? storage->size() : 0u;
+}
+
+/**
+ * Address: 0x0057E0F0 (FUN_0057E0F0, gpg::RVectorType_SPointVector::SetCount)
+ *
+ * What it does:
+ * Resizes one reflected `vector<SPointVector>` payload using zero
+ * `SPointVector` fill on growth lanes.
+ */
+void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int count) const
+{
+  auto* const storage = static_cast<SPointVectorVector*>(obj);
+  GPG_ASSERT(storage != nullptr);
+  GPG_ASSERT(count >= 0);
+  if (!storage || count < 0) {
+    return;
+  }
+
+  const moho::SPointVector fill = ZeroSPointVector();
+  storage->resize(static_cast<std::size_t>(count), fill);
+}
+
+/**
  * Address: 0x00BC7E00 (FUN_00BC7E00, register_SPointVectorSerializer)
  *
  * What it does:
@@ -248,6 +507,31 @@ int moho::register_SPointVectorTypeInfo()
   return std::atexit(&cleanup_SPointVectorTypeInfo);
 }
 
+/**
+ * Address: 0x005825A0 (FUN_005825A0, register_SPointVectorVectorType)
+ *
+ * What it does:
+ * Constructs/preregisters RTTI for `msvc8::vector<moho::SPointVector>`.
+ */
+gpg::RType* moho::register_SPointVectorVectorType()
+{
+  auto* const type = &AcquireSPointVectorVectorType();
+  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SPointVector>), type);
+  return type;
+}
+
+/**
+ * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorType_AtExit)
+ *
+ * What it does:
+ * Registers `vector<SPointVector>` reflection and installs `atexit` cleanup.
+ */
+int moho::register_SPointVectorVectorType_AtExit()
+{
+  (void)register_SPointVectorVectorType();
+  return std::atexit(&cleanup_SPointVectorVectorType);
+}
+
 namespace
 {
   struct SPointVectorSerializerBootstrap
@@ -266,6 +550,15 @@ namespace
     }
   };
 
+  struct SPointVectorVectorTypeBootstrap
+  {
+    SPointVectorVectorTypeBootstrap()
+    {
+      (void)moho::register_SPointVectorVectorType_AtExit();
+    }
+  };
+
   [[maybe_unused]] SPointVectorSerializerBootstrap gSPointVectorSerializerBootstrap;
   [[maybe_unused]] SPointVectorTypeInfoBootstrap gSPointVectorTypeInfoBootstrap;
+  [[maybe_unused]] SPointVectorVectorTypeBootstrap gSPointVectorVectorTypeBootstrap;
 } // namespace

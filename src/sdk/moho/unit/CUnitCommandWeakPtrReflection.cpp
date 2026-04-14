@@ -247,6 +247,117 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x005A2220 (FUN_005A2220, Moho::WeakPtr_CUnitCommand::move_range)
+   *
+   * What it does:
+   * Rebinds one half-open weak-pointer range onto destination storage by
+   * unlinking each destination node from its old owner chain and relinking it
+   * to the source owner chain head.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* MoveWeakPtrCUnitCommandRangeAndReturnEnd(
+    WeakPtr<CUnitCommand>* destination,
+    WeakPtr<CUnitCommand>* sourceBegin,
+    WeakPtr<CUnitCommand>* sourceEnd
+  )
+  {
+    while (sourceBegin != sourceEnd) {
+      WeakPtr<CUnitCommand>& destinationNode = *destination;
+      const WeakPtr<CUnitCommand>& sourceNode = *sourceBegin;
+
+      if (destinationNode.ownerLinkSlot != sourceNode.ownerLinkSlot) {
+        if (destinationNode.ownerLinkSlot != nullptr) {
+          auto** link = reinterpret_cast<WeakPtr<CUnitCommand>**>(destinationNode.ownerLinkSlot);
+          while (*link != &destinationNode) {
+            link = &(*link)->nextInOwner;
+          }
+          *link = destinationNode.nextInOwner;
+        }
+
+        destinationNode.ownerLinkSlot = sourceNode.ownerLinkSlot;
+        if (sourceNode.ownerLinkSlot == nullptr) {
+          destinationNode.nextInOwner = nullptr;
+        } else {
+          auto** const sourceHead = reinterpret_cast<WeakPtr<CUnitCommand>**>(sourceNode.ownerLinkSlot);
+          destinationNode.nextInOwner = *sourceHead;
+          *sourceHead = &destinationNode;
+        }
+      }
+
+      ++sourceBegin;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x005A1D00 (FUN_005A1D00, Moho::WeakPtr_CUnitCommand::move_range_0)
+   *
+   * What it does:
+   * Adapts the end-first argument order used by one vector-move lane and
+   * forwards to `move_range` with canonical destination-first ordering.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* MoveWeakPtrCUnitCommandRangeAdapter(
+    WeakPtr<CUnitCommand>* sourceEnd,
+    WeakPtr<CUnitCommand>* sourceBegin,
+    WeakPtr<CUnitCommand>* destination
+  )
+  {
+    return MoveWeakPtrCUnitCommandRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
+   * Address: 0x005FF400 (FUN_005FF400, Moho::WeakPtr_CUnitCommand::cpy_range)
+   *
+   * What it does:
+   * Copies one half-open weak-pointer range, rebinding each destination node to
+   * the source owner slot and relinking live nodes at the owner-chain head.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* CopyWeakPtrCUnitCommandRangeAndReturnEnd(
+    WeakPtr<CUnitCommand>* destination,
+    const WeakPtr<CUnitCommand>* sourceBegin,
+    const WeakPtr<CUnitCommand>* sourceEnd
+  )
+  {
+    while (sourceBegin != sourceEnd) {
+      WeakPtr<CUnitCommand>* const destNode = destination;
+      const WeakPtr<CUnitCommand>& sourceNode = *sourceBegin;
+
+      if (destNode != nullptr) {
+        destNode->ownerLinkSlot = sourceNode.ownerLinkSlot;
+        if (sourceNode.ownerLinkSlot != nullptr) {
+          auto** const ownerHead = reinterpret_cast<WeakPtr<CUnitCommand>**>(sourceNode.ownerLinkSlot);
+          destNode->nextInOwner = *ownerHead;
+          *ownerHead = destNode;
+        } else {
+          destNode->nextInOwner = nullptr;
+        }
+      }
+
+      ++sourceBegin;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  /**
+   * Address: 0x005FD580 (FUN_005FD580, Moho::WeakPtr_CUnitCommand::cpy_range_0)
+   *
+   * What it does:
+   * Adapts the source-first operand order from one VC8 vector-copy lane and
+   * forwards into canonical `cpy_range(destination, begin, end)` ordering.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* CopyWeakPtrCUnitCommandRangeAdapter(
+    const WeakPtr<CUnitCommand>* sourceBegin,
+    const WeakPtr<CUnitCommand>* sourceEnd,
+    WeakPtr<CUnitCommand>* destination
+  )
+  {
+    return CopyWeakPtrCUnitCommandRangeAndReturnEnd(destination, sourceBegin, sourceEnd);
+  }
+
+  /**
    * Address: 0x005A2270 (FUN_005A2270, Moho::WeakPtr_CUnitCommand::destruct_range)
    *
    * What it does:
@@ -286,8 +397,13 @@ namespace moho
     msvc8::vector<WeakPtr<CUnitCommand>>& destination
   )
   {
-    if (source.size() > 0x1FFFFFFFu) {
+    const std::size_t sourceSize = source.size();
+    if (sourceSize > 0x1FFFFFFFu) {
       throw std::length_error("vector<T> too long");
+    }
+
+    if (&source == &destination) {
+      return &destination;
     }
 
     if (!destination.empty()) {
@@ -297,7 +413,13 @@ namespace moho
       }
     }
 
-    destination = source;
+    destination.resize(sourceSize);
+    if (sourceSize != 0u) {
+      auto& destinationView = msvc8::AsVectorRuntimeView(destination);
+      const auto& sourceView = msvc8::AsVectorRuntimeView(source);
+      (void)CopyWeakPtrCUnitCommandRangeAndReturnEnd(destinationView.begin, sourceView.begin, sourceView.end);
+    }
+
     return &destination;
   }
 } // namespace moho

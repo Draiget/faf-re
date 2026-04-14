@@ -31,6 +31,15 @@ namespace moho
      * Address: 0x0050F5C0 (FUN_0050F5C0, Moho::REmitterBlueprintTypeInfo::AddFields)
      */
     static void AddFields(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00510BB0 (FUN_00510BB0, Moho::REmitterBlueprintTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Placement-constructs one `REmitterBlueprint` in caller storage and
+     * returns a typed reflection ref.
+     */
+    static gpg::RRef CtrRef(void* objectMemory);
   };
 
   /**
@@ -40,4 +49,3 @@ namespace moho
 
   static_assert(sizeof(REmitterBlueprintTypeInfo) == 0x64, "REmitterBlueprintTypeInfo size must be 0x64");
 } // namespace moho
-

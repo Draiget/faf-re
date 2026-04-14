@@ -75,6 +75,34 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00773250 (FUN_00773250, Moho::CEconStorage::CEconStorage)
+   *
+   * What it does:
+   * Binds one economy owner pointer, copies amount lanes, and applies this
+   * storage lane into economy max-storage totals.
+   */
+  CEconStorage::CEconStorage(const SEconValue& amount, CEconomy* const economy)
+  {
+    mEconomy = economy;
+    mAmt = amount;
+    (void)Chng(1);
+  }
+
+  /**
+   * Address: 0x00773280 (FUN_00773280, Moho::CEconStorage::ChangeAmt)
+   *
+   * What it does:
+   * Removes previous amount contribution, copies new amount lanes, then
+   * reapplies contribution to economy max-storage totals.
+   */
+  std::int64_t CEconStorage::ChangeAmt(const SEconValue& amount)
+  {
+    (void)Chng(-1);
+    mAmt = amount;
+    return Chng(1);
+  }
+
+  /**
    * Address: 0x00773500 (FUN_00773500, Moho::CEconStorage::MemberConstruct)
    *
    * What it does:

@@ -40,6 +40,23 @@ namespace moho
       bool inFormation
     );
 
+    /**
+     * Address: 0x0061C4E0 (FUN_0061C4E0, Moho::CUnitPatrolTask::operator new `_0` overload)
+     * Mangled: ??2CUnitPatrolTask@Moho@@QAE@@Z_0
+     *
+     * What it does:
+     * Formation-instance allocation overload. Called by
+     * `IAiCommandDispatchImpl::DispatchTask` when the task dispatch lane has
+     * an existing `IFormationInstance` to bind rather than a simple
+     * "in-formation" flag. Allocates 0xF0 bytes and in-place constructs with
+     * the formation-instance lane set and `inFormation=false`.
+     */
+    [[nodiscard]] static CUnitPatrolTask* CreateWithFormation(
+      CCommandTask* dispatchTask,
+      const void* goalPayload,
+      IFormationInstance* formationInstance
+    );
+
   private:
     unsigned char mPadding[0xF0];
   };

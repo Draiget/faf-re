@@ -1048,7 +1048,6 @@ int CNetUDPConnection::SendData()
         );
       }
       mState = kNetStateTimedOut;
-      [[fallthrough]];
     } else {
       SNetPacket* packet = nullptr;
       if (!mUnAckedPayloads.empty() && curTime >= mUnAckedPayloads.ListGetNext()->mSentTime) {

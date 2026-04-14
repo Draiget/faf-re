@@ -24,6 +24,7 @@
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityMotor.h"
+#include "moho/entity/Prop.h"
 #include "moho/entity/MotorFallDown.h"
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/entity/EVisibilityModeTypeInfo.h"
@@ -38,10 +39,13 @@
 #include "moho/resource/RResId.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/misc/StatItem.h"
 #include "moho/sim/COGrid.h"
@@ -201,6 +205,13 @@ namespace
     "    min - size of shaking in world units, when at 'radius' distance or farther\n"
     "    duration - length of time to shake for, in seconds";
   constexpr const char* kEntityLuaClassName = "Entity";
+  constexpr std::uint32_t kEntityAttributeRangeMask = 0x7FFFFFFFu;
+  constexpr std::uint32_t kEntityAttributeEnabledMask = 0x80000000u;
+
+  [[nodiscard]] constexpr std::uint32_t EncodeIntelRangeLane(const std::uint32_t range) noexcept
+  {
+    return (range != 0u) ? (range | kEntityAttributeEnabledMask) : 0u;
+  }
 
   struct EntityProjectileVelocityRuntimeView
   {
@@ -260,47 +271,75 @@ namespace
     return AccessEntityLuaBindingRuntime(entity).mTextureScroller;
   }
 
+  struct EntityTextureScrollRuntimeView
+  {
+    std::uint8_t pad_0000_00F8[0xF8];
+    Wm3::Vector2f mScroll1; // +0xF8
+    Wm3::Vector2f mScroll2; // +0x100
+  };
+  static_assert(
+    offsetof(EntityTextureScrollRuntimeView, mScroll1) == 0xF8,
+    "EntityTextureScrollRuntimeView::mScroll1 offset must be 0xF8"
+  );
+  static_assert(
+    offsetof(EntityTextureScrollRuntimeView, mScroll2) == 0x100,
+    "EntityTextureScrollRuntimeView::mScroll2 offset must be 0x100"
+  );
+  static_assert(sizeof(EntityTextureScrollRuntimeView) == 0x108, "EntityTextureScrollRuntimeView size must be 0x108");
+
+  [[nodiscard]] EntityTextureScrollRuntimeView& AccessEntityTextureScrollRuntime(moho::Entity& entity) noexcept
+  {
+    return *reinterpret_cast<EntityTextureScrollRuntimeView*>(&entity);
+  }
+
+  /**
+   * Address: 0x00777690 (FUN_00777690, Moho::Entity::AddScroller)
+   *
+   * What it does:
+   * Copies one incoming `SScroller` payload into runtime storage, then applies
+   * mode-specific fixups for none/thread lanes exactly as the binary helper.
+   */
+  std::int32_t ApplyTextureScrollerDefinition(
+    TextureScrollerRuntimeView& scroller,
+    const TextureScrollerDefinition& definition
+  ) noexcept
+  {
+    scroller.mScroller = definition;
+    const std::int32_t scrollerType = scroller.mScroller.mType;
+
+    if (scrollerType == static_cast<std::int32_t>(TextureScrollerMode::None)) {
+      EntityTextureScrollRuntimeView& entityScrollRuntime = AccessEntityTextureScrollRuntime(*scroller.mEntity);
+      entityScrollRuntime.mScroll2 = entityScrollRuntime.mScroll1;
+      return scrollerType;
+    }
+
+    if (scrollerType == static_cast<std::int32_t>(TextureScrollerMode::Thread)) {
+      scroller.mDir[0] = 0u;
+      scroller.mDir[1] = 0u;
+      scroller.mSpeed[0] = 0;
+      scroller.mSpeed[1] = 0;
+    }
+
+    return scrollerType;
+  }
+
   void InitializeTextureScrollerRuntime(TextureScrollerRuntimeView& scroller, moho::Entity* const owner) noexcept
   {
+    TextureScrollerDefinition definition{};
+    definition.mType = static_cast<std::int32_t>(TextureScrollerMode::None);
     scroller.mEntity = owner;
-    scroller.mScroller.mType = static_cast<std::int32_t>(TextureScrollerMode::None);
-    scroller.mScroller.mFloat04 = 0.0f;
-    scroller.mScroller.mFloat08 = 0.0f;
-    scroller.mScroller.mFloat0C = 0.0f;
-    scroller.mScroller.mFloat10 = 0.0f;
-    scroller.mScroller.mScroll1.x = 0.0f;
-    scroller.mScroller.mScroll1.y = 0.0f;
-    scroller.mScroller.mScroll2.x = 0.0f;
-    scroller.mScroller.mScroll2.y = 0.0f;
-    scroller.mScroller.mFloat24 = 1.0f;
-    scroller.mScroller.mFloat28 = 1.0f;
+    ApplyTextureScrollerDefinition(scroller, definition);
     scroller.mDir[0] = 0u;
     scroller.mDir[1] = 0u;
     scroller.mSpeed[0] = 0;
     scroller.mSpeed[1] = 0;
   }
 
-  void ApplyTextureScrollerDefinition(
-    TextureScrollerRuntimeView& scroller,
-    const TextureScrollerDefinition& definition
-  ) noexcept
-  {
-    scroller.mScroller = definition;
-
-    if (definition.mType == static_cast<std::int32_t>(TextureScrollerMode::Thread)) {
-      scroller.mDir[0] = 0u;
-      scroller.mDir[1] = 0u;
-      scroller.mSpeed[0] = 0;
-      scroller.mSpeed[1] = 0;
-    }
-  }
-
   [[nodiscard]] TextureScrollerRuntimeView* EnsureEntityTextureScroller(moho::Entity& entity)
   {
     TextureScrollerRuntimeView*& scroller = AccessEntityTextureScrollerSlot(entity);
     if (scroller == nullptr) {
-      scroller = new TextureScrollerRuntimeView{};
-      InitializeTextureScrollerRuntime(*scroller, &entity);
+      scroller = new TextureScrollerRuntimeView(&entity);
     }
     return scroller;
   }
@@ -748,6 +787,25 @@ namespace
     return nullptr;
   }
 
+  /**
+   * Address: 0x0067F100 (FUN_0067F100, func_CastRPropBlueprint)
+   *
+   * What it does:
+   * Upcasts one reflected object reference to `RPropBlueprint` and returns
+   * the typed pointer when compatible.
+   */
+  [[nodiscard]] moho::RPropBlueprint* func_CastRPropBlueprint(const gpg::RRef& source)
+  {
+    gpg::RType* type = moho::RPropBlueprint::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::RPropBlueprint));
+      moho::RPropBlueprint::sType = type;
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
+    return static_cast<moho::RPropBlueprint*>(upcast.mObj);
+  }
+
   enum class BlueprintKind : std::uint8_t
   {
     Unknown = 0,
@@ -865,6 +923,21 @@ namespace
       return {};
     }
 
+    LuaPlus::LuaObject defaultFactory{};
+    switch (kind) {
+    case BlueprintKind::Unit:
+      (void)moho::func_GetUnitFactory(&defaultFactory, sim->mLuaState);
+      break;
+    case BlueprintKind::Projectile:
+      (void)moho::func_GetProjectileFactory(&defaultFactory, sim->mLuaState);
+      break;
+    case BlueprintKind::Prop:
+      (void)moho::func_GetPropFactory(&defaultFactory, sim->mLuaState);
+      break;
+    default:
+      break;
+    }
+
     const char* requestedClass = "TypeClass";
     if (blueprint && !blueprint->mScriptClass.empty()) {
       requestedClass = blueprint->mScriptClass.c_str();
@@ -924,7 +997,7 @@ namespace
       gpg::Warnf("Can't find module '%s'.  No scripts for you -- one year.", fallback.module);
     }
 
-    return {};
+    return defaultFactory;
   }
 
   [[nodiscard]] moho::CArmyImpl* ResolveEntityArmyFromEntityId(moho::Sim* sim, const moho::EntId entityId) noexcept
@@ -1364,18 +1437,7 @@ namespace
 
   void RefreshCollisionBoundsSnapshot(moho::Entity& entity)
   {
-    if (!entity.CollisionExtents) {
-      return;
-    }
-
-    moho::EntityCollisionBoundsScratch scratchBounds{};
-    const moho::EntityCollisionBoundsView* const bounds = entity.CollisionExtents->GetBoundingBox(&scratchBounds);
-    entity.mCollisionBoundsMin.x = bounds->minX;
-    entity.mCollisionBoundsMin.y = bounds->minY;
-    entity.mCollisionBoundsMin.z = bounds->minZ;
-    entity.mCollisionBoundsMax.x = bounds->maxX;
-    entity.mCollisionBoundsMax.y = bounds->maxY;
-    entity.mCollisionBoundsMax.z = bounds->maxZ;
+    entity.UpdateAABox();
   }
 
   /**
@@ -1459,28 +1521,6 @@ namespace
   static_assert(
     offsetof(MeshObjectBoneSpanView, boneEnd) == 0x14, "MeshObjectBoneSpanView::boneEnd offset must be 0x14"
   );
-
-  [[nodiscard]] const char* ResolveMeshBoneName(const moho::Entity* const entity, const int boneIndex) noexcept
-  {
-    if (entity == nullptr || entity->mMeshRef.mObj == nullptr || boneIndex < 0) {
-      return nullptr;
-    }
-
-    const auto* const meshObject = static_cast<const MeshObjectBoneSpanView*>(entity->mMeshRef.mObj);
-    const MeshBoneEntryView* const begin = meshObject->boneBegin;
-    const MeshBoneEntryView* const end = meshObject->boneEnd;
-    if (begin == nullptr || end == nullptr || end <= begin) {
-      return nullptr;
-    }
-
-    const std::ptrdiff_t boneCount = end - begin;
-    if (boneIndex >= boneCount) {
-      return nullptr;
-    }
-
-    const auto* const bone = reinterpret_cast<const moho::SAniSkelBone*>(begin + boneIndex);
-    return bone->mBoneName;
-  }
 
   [[nodiscard]] LuaPlus::LuaObject GetBlueprintLuaObject(
     const moho::REntityBlueprint* const blueprint,
@@ -1621,6 +1661,81 @@ namespace
     dst.mRelativePosZ = src.mRelativePosZ;
   }
 
+  [[nodiscard]] moho::VTransform ReadAttachRelativeTransform(const moho::SEntAttachInfo& attachInfo) noexcept
+  {
+    moho::VTransform relative{};
+    // Attach payload stores quaternion lanes as scalar-first packed float4.
+    relative.orient_.w = attachInfo.mRelativeOrientX;
+    relative.orient_.x = attachInfo.mRelativeOrientY;
+    relative.orient_.y = attachInfo.mRelativeOrientZ;
+    relative.orient_.z = attachInfo.mRelativeOrientW;
+    relative.pos_.x = attachInfo.mRelativePosX;
+    relative.pos_.y = attachInfo.mRelativePosY;
+    relative.pos_.z = attachInfo.mRelativePosZ;
+    return relative;
+  }
+
+  /**
+   * Address: 0x00676850 (FUN_00676850, sub_676850)
+   *
+   * What it does:
+   * Solves owner-world transform from child-bone local transform and already
+   * composed parent-bone world transform.
+   */
+  [[nodiscard]] moho::VTransform SolveAttachedWorldTransformFromChildLocal(
+    const moho::VTransform& childLocalTransform,
+    const moho::VTransform& parentComposedTransform
+  ) noexcept
+  {
+    moho::VTransform out{};
+    out.orient_.w = 1.0f;
+    out.orient_.x = 0.0f;
+    out.orient_.y = 0.0f;
+    out.orient_.z = 0.0f;
+    out.pos_.x = 0.0f;
+    out.pos_.y = 0.0f;
+    out.pos_.z = 0.0f;
+
+    const float parentW = parentComposedTransform.orient_.w;
+    const float parentX = parentComposedTransform.orient_.x;
+    const float parentY = parentComposedTransform.orient_.y;
+    const float parentZ = parentComposedTransform.orient_.z;
+
+    const float negChildX = -childLocalTransform.orient_.x;
+    const float negChildY = -childLocalTransform.orient_.y;
+    const float negChildZ = -childLocalTransform.orient_.z;
+
+    const float outW = (((parentW * childLocalTransform.orient_.w) - (parentX * negChildX)) - (parentY * negChildY)) -
+                       (parentZ * negChildZ);
+    const float outX =
+      (((parentY * negChildZ) + (parentW * negChildX)) + (parentX * childLocalTransform.orient_.w)) -
+      (parentZ * negChildY);
+    const float outY =
+      (((parentZ * negChildX) + (parentW * negChildY)) + (parentY * childLocalTransform.orient_.w)) -
+      (parentX * negChildZ);
+    const float outZ =
+      (((parentX * negChildY) + (parentW * negChildZ)) + (parentZ * childLocalTransform.orient_.w)) -
+      (parentY * negChildX);
+
+    out.orient_.w = outW;
+    out.orient_.x = outX;
+    out.orient_.y = outY;
+    out.orient_.z = outZ;
+
+    const Wm3::Vector3f negChildPos{
+      -childLocalTransform.pos_.x,
+      -childLocalTransform.pos_.y,
+      -childLocalTransform.pos_.z,
+    };
+
+    Wm3::Vector3f rotatedNegChildPos{};
+    Wm3::MultiplyQuaternionVector(&rotatedNegChildPos, negChildPos, out.orient_);
+    out.pos_.x = rotatedNegChildPos.x + parentComposedTransform.pos_.x;
+    out.pos_.y = rotatedNegChildPos.y + parentComposedTransform.pos_.y;
+    out.pos_.z = rotatedNegChildPos.z + parentComposedTransform.pos_.z;
+    return out;
+  }
+
   struct DestroyQueueNodeView
   {
     DestroyQueueNodeView* next;
@@ -1679,12 +1794,189 @@ namespace
 
 namespace moho
 {
-  Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2);
   int cfunc_EntityPushOver(lua_State* luaContext);
   int cfunc_EntityFallDown(lua_State* luaContext);
   int cfunc_EntityFallDownL(LuaPlus::LuaState* state);
   int cfunc_MotorFallDownWhack(lua_State* luaContext);
   int cfunc_EntitySinkAway(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BD530 (FUN_005BD530, Moho::EntityAttributes::GetRange)
+   *
+   * What it does:
+   * Returns the masked range magnitude for intel-bearing lanes and zero for
+   * the non-range field lanes.
+   */
+  std::uint32_t EntityAttributes::GetRange(const EEntityAttribute attribute) const noexcept
+  {
+    switch (attribute) {
+    case ENTATTR_Vision:
+      return vision & kEntityAttributeRangeMask;
+    case ENTATTR_WaterVision:
+      return waterVision & kEntityAttributeRangeMask;
+    case ENTATTR_Radar:
+      return radar & kEntityAttributeRangeMask;
+    case ENTATTR_Sonar:
+      return sonar & kEntityAttributeRangeMask;
+    case ENTATTR_Omni:
+      return omni & kEntityAttributeRangeMask;
+    case ENTATTR_RadarStealthField:
+    case ENTATTR_SonarStealthField:
+    case ENTATTR_CloakField:
+    case ENTATTR_Jammer:
+    case ENTATTR_Spoof:
+      return 0u;
+    case ENTATTR_Cloak:
+      return cloak & kEntityAttributeRangeMask;
+    case ENTATTR_RadarStealth:
+      return radarStealth & kEntityAttributeRangeMask;
+    case ENTATTR_SonarStealth:
+      return sonarStealth & kEntityAttributeRangeMask;
+    }
+    return 0u;
+  }
+
+  /**
+   * Address: 0x008B8330 (FUN_008B8330, Moho::EntityAttributes::IsEnabled)
+   *
+   * What it does:
+   * Returns the high-bit enable flag for range-bearing intel lanes and false
+   * for field/jammer/spoof lanes.
+   */
+  bool EntityAttributes::IsEnabled(const EEntityAttribute attribute) const noexcept
+  {
+    switch (attribute) {
+    case ENTATTR_Vision:
+      return (vision >> 31u) != 0u;
+    case ENTATTR_WaterVision:
+      return (waterVision >> 31u) != 0u;
+    case ENTATTR_Radar:
+      return (radar >> 31u) != 0u;
+    case ENTATTR_Sonar:
+      return (sonar >> 31u) != 0u;
+    case ENTATTR_Omni:
+      return (omni >> 31u) != 0u;
+    case ENTATTR_RadarStealthField:
+    case ENTATTR_SonarStealthField:
+    case ENTATTR_CloakField:
+    case ENTATTR_Jammer:
+    case ENTATTR_Spoof:
+      return false;
+    case ENTATTR_Cloak:
+      return (cloak >> 31u) != 0u;
+    case ENTATTR_RadarStealth:
+      return (radarStealth >> 31u) != 0u;
+    case ENTATTR_SonarStealth:
+      return (sonarStealth >> 31u) != 0u;
+    }
+    return false;
+  }
+
+  /**
+   * Address: 0x005BD470 (FUN_005BD470, Moho::EntityAttributes::SetIntelRadius)
+   *
+   * IDA signature:
+   * void __usercall Moho::EntityAttributes::SetIntelRadius(
+   *   Moho::EntityAttributes *result@<eax>,
+   *   Moho::EEntityAttribute type@<edx>,
+   *   int rad@<ecx>);
+   *
+   * What it does:
+   * Writes one new intel radius magnitude into the matching payload lane while
+   * preserving the lane's sign bit. The non-radius field lanes are left alone.
+   */
+  void EntityAttributes::SetIntelRadius(const EEntityAttribute attribute, const int radius) noexcept
+  {
+    const std::uint32_t newRadius = static_cast<std::uint32_t>(radius);
+
+    switch (attribute) {
+    case ENTATTR_Vision:
+      vision = newRadius | (vision & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_WaterVision:
+      waterVision = newRadius | (waterVision & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_Radar:
+      radar = newRadius | (radar & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_Sonar:
+      sonar = newRadius | (sonar & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_Omni:
+      omni = newRadius | (omni & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_RadarStealthField:
+    case ENTATTR_SonarStealthField:
+    case ENTATTR_CloakField:
+    case ENTATTR_Jammer:
+    case ENTATTR_Spoof:
+      return;
+    case ENTATTR_Cloak:
+      cloak = newRadius | (cloak & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_RadarStealth:
+      radarStealth = newRadius | (radarStealth & kEntityAttributeEnabledMask);
+      return;
+    case ENTATTR_SonarStealth:
+      sonarStealth = newRadius | (sonarStealth & kEntityAttributeEnabledMask);
+      return;
+    }
+  }
+
+  /**
+   * Address: 0x00559350 (FUN_00559350, Moho::EntityAttributes::MemberDeserialize)
+   *
+   * What it does:
+   * Loads all eight intel payload lanes from archive storage in field order.
+   */
+  void EntityAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    archive->ReadUInt(&vision);
+    archive->ReadUInt(&waterVision);
+    archive->ReadUInt(&radar);
+    archive->ReadUInt(&sonar);
+    archive->ReadUInt(&omni);
+    archive->ReadUInt(&radarStealth);
+    archive->ReadUInt(&sonarStealth);
+    archive->ReadUInt(&cloak);
+  }
+
+  /**
+   * Address: 0x005593D0 (FUN_005593D0, Moho::EntityAttributes::MemberSerialize)
+   *
+   * What it does:
+   * Stores all eight intel payload lanes to archive storage in field order.
+   */
+  void EntityAttributes::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    archive->WriteUInt(vision);
+    archive->WriteUInt(waterVision);
+    archive->WriteUInt(radar);
+    archive->WriteUInt(sonar);
+    archive->WriteUInt(omni);
+    archive->WriteUInt(radarStealth);
+    archive->WriteUInt(sonarStealth);
+    archive->WriteUInt(cloak);
+  }
+
+  /**
+   * Address: 0x006A46A0 (FUN_006A46A0, Moho::EntityAttributes::Initialize)
+   *
+   * What it does:
+   * Seeds intel lanes from unit-blueprint intel radii, setting the enable
+   * sign bit for non-zero ranges.
+   */
+  void EntityAttributes::Initialize(const RUnitBlueprint* const blueprint)
+  {
+    vision = EncodeIntelRangeLane(blueprint->Intel.VisionRadius);
+    waterVision = EncodeIntelRangeLane(blueprint->Intel.WaterVisionRadius);
+    radar = EncodeIntelRangeLane(blueprint->Intel.RadarRadius);
+    sonar = EncodeIntelRangeLane(blueprint->Intel.SonarRadius);
+    omni = EncodeIntelRangeLane(blueprint->Intel.OmniRadius);
+    radarStealth = EncodeIntelRangeLane(blueprint->Intel.RadarStealthFieldRadius);
+    sonarStealth = EncodeIntelRangeLane(blueprint->Intel.SonarStealthFieldRadius);
+    cloak = EncodeIntelRangeLane(blueprint->Intel.CloakFieldRadius);
+  }
 
   /**
    * Address: 0x0067CBC0 (FUN_0067CBC0, Moho::InstanceCounter<Moho::Entity>::GetStatItem)
@@ -1840,7 +2132,6 @@ namespace moho
   {
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
-    std::memset(pad_0174, 0, sizeof(pad_0174));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
@@ -1894,6 +2185,7 @@ namespace moho
     PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 0.0f;
+    mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
     mAttachedEntities.clear();
@@ -1930,7 +2222,6 @@ namespace moho
   {
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
-    std::memset(pad_0174, 0, sizeof(pad_0174));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
@@ -1990,6 +2281,7 @@ namespace moho
     PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 1.0f;
+    mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
     mAttachInfo = SEntAttachInfo::MakeDetached();
@@ -2029,7 +2321,6 @@ namespace moho
   {
     std::memset(pad_011E, 0, sizeof(pad_011E));
     std::memset(pad_0128, 0, sizeof(pad_0128));
-    std::memset(pad_0174, 0, sizeof(pad_0174));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     std::memset(pad_01F8_01FC, 0, sizeof(pad_01F8_01FC));
@@ -2083,6 +2374,7 @@ namespace moho
     PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 1.0f;
+    mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
     mAttachInfo = SEntAttachInfo::MakeDetached();
@@ -2123,6 +2415,7 @@ namespace moho
     Dead = 0u;
     mCurrentLayer = LAYER_None;
     mPendingVelocityScale = 1.0f;
+    mLastTickProcessed = 0u;
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
     mOnDestroyDispatched = 0u;
@@ -2269,6 +2562,61 @@ namespace moho
   }
 
   /**
+   * Address: 0x00678C30 (FUN_00678C30, ?GetBoneName@Entity@Moho@@QBEPBDH@Z)
+   *
+   * What it does:
+   * Resolves one bone index through the current mesh skeleton and returns the
+   * bone-name pointer, or null when the mesh/skeleton lane is unavailable.
+   */
+  const char* Entity::GetBoneName(const std::uint32_t boneIndex) const
+  {
+    auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj);
+    if (scmResource == nullptr) {
+      return nullptr;
+    }
+
+    const boost::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
+    const CAniSkel* const skel = skeleton.get();
+    if (skel == nullptr) {
+      return nullptr;
+    }
+
+    const SAniSkelBone* const bone = skel->GetBone(boneIndex);
+    return (bone != nullptr) ? bone->mBoneName : nullptr;
+  }
+
+  /**
+   * Address: 0x005BDB90 (FUN_005BDB90, Moho::Entity::GetMesh)
+   *
+   * What it does:
+   * Copies this entity's mesh shared-handle lanes and retains one shared
+   * owner on the control block when present.
+   */
+  boost::SharedPtrRaw<RScmResource> Entity::GetMesh() const
+  {
+    const auto* const source = reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&mMeshRef);
+    boost::SharedPtrRaw<RScmResource> result{};
+    result.px = source->px;
+    result.pi = source->pi;
+    if (result.pi != nullptr) {
+      result.pi->add_ref_copy();
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x0062CB60 (FUN_0062CB60, Moho::Entity::IsInBounds)
+   *
+   * What it does:
+   * Tests this entity's current transform position against simulation map
+   * bounds with caller-selected whole-map border semantics.
+   */
+  bool Entity::IsInBounds(const bool wholeMap, const float border) const
+  {
+    return SimulationRef->mMapData->IsWithin(Position, border, wholeMap);
+  }
+
+  /**
    * Address: 0x00678B90 (FUN_00678B90, Moho::Entity::GetArmyIndex)
    *
    * What it does:
@@ -2401,10 +2749,37 @@ namespace moho
    * Address: 0x00679F70
    *
    * What it does:
-   * CTask execution entry point, forwarding to motion tick logic.
+   * CTask execution entry point, forwarding to full entity task-tick logic.
    */
   int Entity::Execute()
   {
+    return TaskTick();
+  }
+
+  /**
+   * Address: 0x00679C40 (FUN_00679C40, ?TaskTick@Entity@Moho@@EAE?AW4ETaskStatus@2@XZ)
+   *
+   * What it does:
+   * Ticks texture-scroller runtime, advances attach-follow pending transform,
+   * updates last-processed tick, prunes invalid shooters, then executes motion.
+   */
+  int Entity::TaskTick()
+  {
+    if (CTextureScroller* const scroller = AccessEntityTextureScrollerSlot(*this); scroller != nullptr) {
+      scroller->Tick();
+    }
+
+    if (Entity* const attachTarget = mAttachInfo.GetAttachTargetEntity(); attachTarget != nullptr) {
+      if (attachTarget->mLastTickProcessed == mLastTickProcessed) {
+        return -4;
+      }
+
+      const VTransform attachedTransform = CalculateAttachedTransform();
+      SetPendingTransform(attachedTransform, 1.0f);
+    }
+
+    mLastTickProcessed = SimulationRef->mCurTick;
+    ProcessEntitiesShootingAtMe();
     return MotionTick();
   }
 
@@ -2461,6 +2836,64 @@ namespace moho
   }
 
   /**
+   * Address: 0x0067A020 (FUN_0067A020, ?CalculateAttachedTransform@Entity@Moho@@QAE?AVVTransform@2@XZ)
+   *
+   * What it does:
+   * Calculates entity world transform that satisfies current attach-relative
+   * payload against parent/child bone transforms.
+   */
+  VTransform Entity::CalculateAttachedTransform()
+  {
+    const VTransform childLocalTransform = GetBoneLocalTransform(mAttachInfo.mChildBoneIndex);
+    Entity* const parentEntity = mAttachInfo.GetAttachTargetEntity();
+    if (parentEntity == nullptr) {
+      return {};
+    }
+
+    const VTransform parentBoneTransform = parentEntity->GetBoneWorldTransform(mAttachInfo.mParentBoneIndex);
+    const VTransform attachRelativeTransform = ReadAttachRelativeTransform(mAttachInfo);
+    const VTransform parentComposedTransform = VTransform::Compose(attachRelativeTransform, parentBoneTransform);
+    VTransform attachedTransform = SolveAttachedWorldTransformFromChildLocal(childLocalTransform, parentComposedTransform);
+    NormalizeQuatInPlace(&attachedTransform.orient_);
+    return attachedTransform;
+  }
+
+  /**
+   * Address: 0x0067A130 (FUN_0067A130, ?AddShooter@Entity@Moho@@QAEXPAV12@@Z)
+   *
+   * What it does:
+   * Inserts one shooter entry into this entity's shooter ownership set when
+   * the shooter pointer is non-null.
+   */
+  void Entity::AddShooter(Entity* const shooter)
+  {
+    if (shooter == nullptr) {
+      return;
+    }
+
+    (void)mShooters.Add(shooter);
+  }
+
+  /**
+   * Address: 0x0067A190 (FUN_0067A190, ?ProcessEntitiesShootingAtMe@Entity@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Removes null/destroyed/dead shooter entries from the shooter container.
+   */
+  void Entity::ProcessEntitiesShootingAtMe()
+  {
+    auto& shooters = mShooters.mVec;
+    for (Entity** it = shooters.begin(); it != shooters.end();) {
+      Entity* const shooter = *it;
+      if (shooter == nullptr || shooter->DestroyQueuedFlag != 0u || shooter->Dead != 0u) {
+        it = shooters.erase(it, it + 1);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  /**
    * Address: 0x00679120 (FUN_00679120, Moho::Entity::UpdateIntel)
    *
    * What it does:
@@ -2498,42 +2931,33 @@ namespace moho
       return cachedBody;
     }
 
-    float mass = 1.0f;
-    Wm3::Vector3f inertiaTensor{1.0f, 1.0f, 1.0f};
-    Wm3::Vector3f collisionOffset{};
+    SPhysBodyParams physicsParams{
+      1.0f,
+      Wm3::Vector3f{1.0f, 1.0f, 1.0f},
+      Wm3::Vector3f{0.0f, 0.0f, 0.0f},
+    };
     if (BluePrint != nullptr) {
-      collisionOffset.x = BluePrint->mCollisionOffsetX;
-      collisionOffset.y = (BluePrint->mSizeY * 0.5f) + BluePrint->mCollisionOffsetY;
-      collisionOffset.z = BluePrint->mCollisionOffsetZ;
-      mass = (BluePrint->mAverageDensity * BluePrint->mSizeZ) * BluePrint->mSizeX * BluePrint->mSizeY;
-      inertiaTensor.x = BluePrint->mInertiaTensorX;
-      inertiaTensor.y = BluePrint->mInertiaTensorY;
-      inertiaTensor.z = BluePrint->mInertiaTensorZ;
+      physicsParams.collisionOffset.x = BluePrint->mCollisionOffsetX;
+      physicsParams.collisionOffset.y = (BluePrint->mSizeY * 0.5f) + BluePrint->mCollisionOffsetY;
+      physicsParams.collisionOffset.z = BluePrint->mCollisionOffsetZ;
+      physicsParams.mass = (BluePrint->mAverageDensity * BluePrint->mSizeZ) * BluePrint->mSizeX * BluePrint->mSizeY;
+      physicsParams.inertiaTensor.x = BluePrint->mInertiaTensorX;
+      physicsParams.inertiaTensor.y = BluePrint->mInertiaTensorY;
+      physicsParams.inertiaTensor.z = BluePrint->mInertiaTensorZ;
     }
 
-    SPhysBody* const newBody = new (std::nothrow) SPhysBody{};
-    if (newBody != nullptr) {
-      newBody->mConstants = SimulationRef ? SimulationRef->mPhysConstants : nullptr;
-      newBody->mMass = mass;
-      newBody->mInvInertiaTensor.x = 1.0f / (mass * inertiaTensor.x);
-      newBody->mInvInertiaTensor.y = 1.0f / (mass * inertiaTensor.y);
-      newBody->mInvInertiaTensor.z = 1.0f / (mass * inertiaTensor.z);
-      newBody->mCollisionOffset = collisionOffset;
-      newBody->mPos = {};
-      newBody->mOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-      newBody->mVelocity = {};
-      newBody->mWorldImpulse = {};
-
-      const Wm3::Vector3f rotatedOffset = RotateVectorByQuaternion(Orientation, newBody->mCollisionOffset);
-      newBody->mOrientation = {Orientation.x, Orientation.y, Orientation.z, Orientation.w};
-      newBody->mPos.x = rotatedOffset.x + Position.x;
-      newBody->mPos.y = rotatedOffset.y + Position.y;
-      newBody->mPos.z = rotatedOffset.z + Position.z;
-    }
+    SPhysConstants* const constants = SimulationRef ? SimulationRef->mPhysConstants : nullptr;
+    SPhysBody* const newBody = new (std::nothrow) SPhysBody(constants, physicsParams);
 
     SPhysBody* const oldBody = cachedBody;
     cachedBody = newBody;
     delete oldBody;
+
+    if (cachedBody != nullptr) {
+      const VTransform transform = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(Orientation, Position));
+      cachedBody->SetTransform(transform);
+    }
+
     return cachedBody;
   }
 
@@ -2759,6 +3183,45 @@ namespace moho
   }
 
   /**
+   * Address: 0x00678E20 (FUN_00678E20, ?UpdateFractionComplete@Entity@Moho@@QAEMM@Z)
+   *
+   * What it does:
+   * Accumulates completion fraction by `delta`, enforces binary clamp rules
+   * and health-derived floor, then returns the applied fraction delta.
+   */
+  float Entity::UpdateFractionComplete(const float delta)
+  {
+    if (delta == 0.0f) {
+      return 0.0f;
+    }
+
+    const float previousFraction = FractionCompleted;
+    float nextFraction = previousFraction + delta;
+    float healthFloor = 0.0f;
+
+    if (delta <= 0.0f) {
+      if (nextFraction >= 1.0f) {
+        nextFraction = 1.0f;
+      }
+    } else {
+      if (nextFraction >= 1.0f) {
+        nextFraction = 1.0f;
+      }
+      if (nextFraction < 0.0f) {
+        nextFraction = 0.0f;
+      }
+      healthFloor = Health / MaxHealth;
+    }
+
+    if (healthFloor > nextFraction) {
+      nextFraction = healthFloor;
+    }
+
+    FractionCompleted = nextFraction;
+    return nextFraction - previousFraction;
+  }
+
+  /**
    * Address: 0x00679940
    *
    * What it does:
@@ -2886,6 +3349,29 @@ namespace moho
   }
 
   /**
+   * Address: 0x00679180 (FUN_00679180, ?UpdateAABox@Entity@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Reads one world-space AABB from the active collision primitive and updates
+   * the cached min/max bounds lanes at `+0x240/+0x24C`.
+   */
+  void Entity::UpdateAABox()
+  {
+    if (CollisionExtents == nullptr) {
+      return;
+    }
+
+    EntityCollisionBoundsScratch scratchBounds{};
+    const EntityCollisionBoundsView* const bounds = CollisionExtents->GetBoundingBox(&scratchBounds);
+    mCollisionBoundsMin.x = bounds->minX;
+    mCollisionBoundsMin.y = bounds->minY;
+    mCollisionBoundsMin.z = bounds->minZ;
+    mCollisionBoundsMax.x = bounds->maxX;
+    mCollisionBoundsMax.y = bounds->maxY;
+    mCollisionBoundsMax.z = bounds->maxZ;
+  }
+
+  /**
    * Address: 0x006791D0 (FUN_006791D0)
    *
    * What it does:
@@ -2902,7 +3388,73 @@ namespace moho
     const EntityTransformPayload current = ReadEntityTransformPayload(Orientation, Position);
     collision->SetTransform(current);
     RelinkSpanFromCollisionPrimitive(mCollisionCellSpan, collision);
-    RefreshCollisionBoundsSnapshot(*this);
+    UpdateAABox();
+  }
+
+  /**
+   * Address: 0x0067A9D0 (FUN_0067A9D0, ?Intersects@Entity@Moho@@QAE_NABV?$Box3@M@Wm3@@PAUCollisionResult@2@@Z)
+   *
+   * What it does:
+   * Tests one world-space box against this entity's active collision primitive.
+   * On hit, stamps this entity as the collision source lane in `outResult`.
+   */
+  bool Entity::Intersects(const Wm3::Box3f& box, CollisionPairResult* const outResult)
+  {
+    EntityCollisionUpdater* const collision = CollisionExtents;
+    if (collision == nullptr || !collision->CollideBox(&box, outResult)) {
+      return false;
+    }
+
+    outResult->sourceEntity = this;
+    return true;
+  }
+
+  /**
+   * Address: 0x0067AA50 (FUN_0067AA50, ?GetTerrainCollisionGeom@Entity@Moho@@QBEXAAV?$fastvector@V?$Sphere3@M@Wm3@@@gpg@@@Z)
+   *
+   * What it does:
+   * Emits one terrain-collision proxy sphere list from the active collision
+   * primitive: eight corner points for box primitives, or one center/radius
+   * sphere for sphere primitives.
+   */
+  void Entity::GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const
+  {
+    Wm3::Vec3f center{};
+    CollisionExtents->GetCenter(&center);
+
+    if (const Wm3::Box3f* const box = CollisionExtents->GetBox(); box != nullptr) {
+      const float minX = center.x - box->Extent[0];
+      const float maxX = center.x + box->Extent[0];
+      const float minY = center.y - box->Extent[1];
+      const float maxY = center.y + box->Extent[1];
+      const float minZ = center.z - box->Extent[2];
+      const float maxZ = center.z + box->Extent[2];
+
+      outSpheres.resize(8u);
+      outSpheres[0].Center = Wm3::Vec3f(minX, minY, minZ);
+      outSpheres[0].Radius = 0.0f;
+      outSpheres[1].Center = Wm3::Vec3f(maxX, minY, minZ);
+      outSpheres[1].Radius = 0.0f;
+      outSpheres[2].Center = Wm3::Vec3f(minX, maxY, minZ);
+      outSpheres[2].Radius = 0.0f;
+      outSpheres[3].Center = Wm3::Vec3f(maxX, maxY, minZ);
+      outSpheres[3].Radius = 0.0f;
+      outSpheres[4].Center = Wm3::Vec3f(minX, minY, maxZ);
+      outSpheres[4].Radius = 0.0f;
+      outSpheres[5].Center = Wm3::Vec3f(maxX, minY, maxZ);
+      outSpheres[5].Radius = 0.0f;
+      outSpheres[6].Center = Wm3::Vec3f(minX, maxY, maxZ);
+      outSpheres[6].Radius = 0.0f;
+      outSpheres[7].Center = Wm3::Vec3f(maxX, maxY, maxZ);
+      outSpheres[7].Radius = 0.0f;
+      return;
+    }
+
+    if (const Wm3::Sphere3f* const sphere = CollisionExtents->GetSphere(); sphere != nullptr) {
+      outSpheres.resize(1u);
+      outSpheres[0].Center = center;
+      outSpheres[0].Radius = sphere->Radius;
+    }
   }
 
   /**
@@ -2980,6 +3532,18 @@ namespace moho
   msvc8::string Entity::GetUniqueName() const
   {
     return msvc8::string(mUniqueName.data(), mUniqueName.size());
+  }
+
+  /**
+   * Address: 0x00678B70 (FUN_00678B70, ?GetBlueprintId@Entity@Moho@@QBEPBDXZ)
+   *
+   * What it does:
+   * Returns the bound blueprint id text lane, or process-static empty string
+   * when this entity has no blueprint.
+   */
+  const char* Entity::GetBlueprintId() const noexcept
+  {
+    return ResolveEntityBlueprintId(this);
   }
 
   /**
@@ -3076,6 +3640,35 @@ namespace moho
     mCoordNode.ListLinkBefore(&SimulationRef->mCoordEntities);
   }
 
+  /**
+   * Address: 0x005BDC70 (FUN_005BDC70, ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
+   * Mangled: ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z
+   *
+   * What it does:
+   * Updates strategic-underlay texture pointer/control lanes from one by-value
+   * shared handle when the incoming raw texture pointer differs.
+   */
+  void Entity::SetStrategicUnderlay(boost::shared_ptr<CD3DBatchTexture> underlayTexture)
+  {
+    if (mStrategicUnderlayTexture.get() == underlayTexture.get()) {
+      return;
+    }
+
+    mStrategicUnderlayTexture = underlayTexture;
+  }
+
+  /**
+   * Address: 0x005BDD20 (FUN_005BDD20, ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ)
+   * Mangled: ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ
+   *
+   * What it does:
+   * Returns one retained shared strategic-underlay texture handle.
+   */
+  boost::shared_ptr<CD3DBatchTexture> Entity::GetStrategicUnderlay() const
+  {
+    return mStrategicUnderlayTexture;
+  }
+
   Wm3::Vec3f const& Entity::GetPositionWm3() const noexcept
   {
     return *reinterpret_cast<Wm3::Vec3f const*>(&Position);
@@ -3101,6 +3694,25 @@ namespace moho
 
     delete mPositionHistory;
     mPositionHistory = rebuiltHistory;
+  }
+
+  /**
+   * Address: 0x006794F0 (FUN_006794F0, ?GetPositionHistory@Entity@Moho@@QBEABVVTransform@2@H@Z)
+   *
+   * What it does:
+   * Maps one requested tick to the rolling 25-entry position-history ring and
+   * returns the selected sample as a `VTransform` view.
+   */
+  VTransform const& Entity::GetPositionHistory(const int tick) const
+  {
+    static_assert(sizeof(VTransform) == sizeof(EntityTransformPayload), "VTransform payload size must match history sample");
+
+    const PositionHistory* const positionHistory = mPositionHistory;
+    const std::int32_t delta = positionHistory->cursor - tick;
+    const std::int32_t historyIndex = (delta < 0)
+      ? (((delta + 1) % kEntityPositionHistorySampleCount) + (kEntityPositionHistorySampleCount - 1))
+      : (delta % kEntityPositionHistorySampleCount);
+    return *reinterpret_cast<const VTransform*>(&positionHistory->samples[static_cast<std::size_t>(historyIndex)]);
   }
 
   /**
@@ -4057,7 +4669,8 @@ namespace moho
     }
 
     const int boneIndex = static_cast<int>(lua_tonumber(rawState, 2));
-    const char* const boneName = ResolveMeshBoneName(entity, boneIndex);
+    const char* const boneName =
+      (entity != nullptr && boneIndex >= 0) ? entity->GetBoneName(static_cast<std::uint32_t>(boneIndex)) : nullptr;
     if (boneName != nullptr) {
       lua_pushstring(rawState, boneName);
     } else {
@@ -6471,6 +7084,31 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050B300 (FUN_0050B300, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@MMM@Z)
+   *
+   * What it does:
+   * Builds a heading/pitch orientation quaternion from half-angle sine/cosine
+   * products, preserving the original lane order used by camera/weapon code.
+   */
+  Wm3::Quaternionf COORDS_Orient(const float heading, const float pitch) noexcept
+  {
+    const float halfHeading = heading * 0.5f;
+    const float halfPitch = pitch * 0.5f;
+
+    const float cosHeading = std::cos(halfHeading);
+    const float sinHeading = std::sin(halfHeading);
+    const float cosPitch = std::cos(halfPitch);
+    const float sinPitch = std::sin(halfPitch);
+
+    Wm3::Quaternionf orientation{};
+    orientation.w = cosHeading * cosPitch;
+    orientation.x = cosHeading * sinPitch;
+    orientation.y = sinHeading * cosPitch;
+    orientation.z = -(sinHeading * sinPitch);
+    return orientation;
+  }
+
+  /**
    * Address: 0x0050B480 (FUN_0050B480, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@ABV?$Vector3@M@3@@Z)
    *
    * What it does:
@@ -6540,6 +7178,115 @@ namespace moho
   }
 
   /**
+   * Address: 0x0050B710 (FUN_0050B710, ?COORDS_Pitch@Moho@@YAMABV?$Vector3@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Computes the negative fast-asin pitch approximation used by the engine's
+   * aim and sound lanes from a 3D velocity vector.
+   */
+  [[nodiscard]] float COORDS_Pitch(const Wm3::Vector3f& velocity) noexcept
+  {
+    const float length = std::sqrt((velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
+    const float normalizedY = velocity.y / length;
+    const float rootTerm = std::sqrt(1.0f - normalizedY);
+    const float polynomial =
+      normalizedY * (((normalizedY * -0.018729299f) + 0.074261002f) * normalizedY - 0.21211439f) + 1.5707288f;
+    return (rootTerm * polynomial) - 1.5707963f;
+  }
+
+  /**
+   * Address: 0x0050B790 (FUN_0050B790, ?COORDS_Pitch@Moho@@YAMABV?$Quaternion@M@Wm3@@@Z)
+   *
+   * What it does:
+   * Computes pitch from quaternion orientation lanes using the binary's
+   * clamped fast-asin polynomial path.
+   */
+  [[nodiscard]] float COORDS_Pitch(const Wm3::Quaternionf& orientation) noexcept
+  {
+    float clamped =
+      ((orientation.w * orientation.z) - (orientation.y * orientation.x)) * -2.0f;
+    if (clamped > 1.0f) {
+      clamped = 1.0f;
+    }
+    if (clamped < -1.0f) {
+      clamped = -1.0f;
+    }
+
+    const float rootTerm = std::sqrt(1.0f - clamped);
+    const float polynomial =
+      clamped * (((clamped * -0.018729299f) + 0.074261002f) * clamped - 0.21211439f) + 1.5707288f;
+    return 1.5707963f - (rootTerm * polynomial);
+  }
+
+  /**
+   * Address: 0x0050D140 (FUN_0050D140, fabs)
+   *
+   * What it does:
+   * Returns one float absolute-value lane through the x87-compatible scalar path.
+   */
+  [[nodiscard]] static double CoordsAbsFloat(const float value) noexcept
+  {
+    return std::fabs(static_cast<double>(value));
+  }
+
+  /**
+   * Address: 0x0050D150 (FUN_0050D150, inv_sqrt)
+   *
+   * What it does:
+   * Returns one reciprocal-square-root lane through scalar math path.
+   */
+  [[nodiscard]] static double CoordsInvSqrt(const float value) noexcept
+  {
+    return 1.0 / std::sqrt(static_cast<double>(value));
+  }
+
+  /**
+   * Address: 0x0050CB50 (FUN_0050CB50, sub_50CB50)
+   *
+   * What it does:
+   * Builds the shortest-arc tilt delta from `currentUp` toward `targetNormal`,
+   * including the anti-parallel fallback axis selection used by COORDS_Tilt.
+   */
+  [[nodiscard]] static Wm3::Quaternionf*
+  BuildTiltShortestArcDelta(const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp)
+  {
+    if (outDelta == nullptr) {
+      return nullptr;
+    }
+
+    Wm3::Vector3f halfAxis{
+      currentUp.x + targetNormal.x,
+      currentUp.y + targetNormal.y,
+      currentUp.z + targetNormal.z,
+    };
+    (void)Wm3::Vector3f::Normalize(&halfAxis);
+
+    const float scalar = (currentUp.x * halfAxis.x) + (currentUp.y * halfAxis.y) + (currentUp.z * halfAxis.z);
+    outDelta->x = scalar;
+    if (scalar == 0.0f) {
+      const double upAbsX = CoordsAbsFloat(currentUp.x);
+      const double upAbsY = CoordsAbsFloat(currentUp.y);
+      if (upAbsX < upAbsY) {
+        const double inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
+        outDelta->y = 0.0f;
+        outDelta->z = static_cast<float>(inverseLength * static_cast<double>(currentUp.z));
+        outDelta->w = static_cast<float>(-inverseLength * static_cast<double>(currentUp.y));
+      } else {
+        const double inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
+        outDelta->z = 0.0f;
+        outDelta->y = static_cast<float>(-inverseLength * static_cast<double>(currentUp.z));
+        outDelta->w = static_cast<float>(inverseLength * static_cast<double>(currentUp.x));
+      }
+      return outDelta;
+    }
+
+    outDelta->y = (currentUp.y * halfAxis.z) - (currentUp.z * halfAxis.y);
+    outDelta->z = (currentUp.z * halfAxis.x) - (currentUp.x * halfAxis.z);
+    outDelta->w = (currentUp.x * halfAxis.y) - (currentUp.y * halfAxis.x);
+    return outDelta;
+  }
+
+  /**
    * Address: 0x0050B820 (FUN_0050B820, ?COORDS_Tilt@Moho@@YAXPAV?$Quaternion@M@Wm3@@V?$Vector3@M@3@@Z)
    *
    * What it does:
@@ -6564,7 +7311,7 @@ namespace moho
     };
 
     Wm3::Quaternionf tiltDelta{};
-    QuatCrossAdd(&tiltDelta, currentUp, surfaceNormal);
+    (void)BuildTiltShortestArcDelta(surfaceNormal, &tiltDelta, currentUp);
     *orientation = Wm3::Quaternionf::Multiply(tiltDelta, oldOrientation);
   }
 

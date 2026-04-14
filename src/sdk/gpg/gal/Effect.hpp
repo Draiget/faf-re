@@ -15,7 +15,13 @@ namespace gal {
     class Effect {
     public:
       /**
+       * Address: 0x0093F5B0 (FUN_0093F5B0)
+       * Mangled: ?Create@Effect@gal@gpg@@SA?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@ABVEffectContext@23@@Z
+       *
        * EffectContext const &
+       *
+       * IDA signature:
+       * int __cdecl gpg::gal::Effect::Create(int a1, int a2);
        *
        * What it does:
        * Creates one backend effect instance from one prepared effect context.
@@ -65,5 +71,7 @@ namespace gal {
        */
       virtual void purecall6() = 0;
     };
+
+    static_assert(sizeof(Effect) == 0x4, "gpg::gal::Effect size must be 0x4");
 } // namespace gal
 } // namespace gpg

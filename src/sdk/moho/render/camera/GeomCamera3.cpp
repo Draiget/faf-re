@@ -388,6 +388,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x00741850 (FUN_00741850, func_CpyGeomCameras)
+   *
+   * What it does:
+   * Copies one half-open source camera range into destination storage by
+   * calling `GeomCamera3::operator=` per element and returns destination end.
+   */
+  [[nodiscard]] GeomCamera3* CopyGeomCameraRangeAndReturnEnd(
+    const GeomCamera3* sourceBegin,
+    GeomCamera3* destinationBegin,
+    const GeomCamera3* sourceEnd
+  )
+  {
+    const GeomCamera3* source = sourceBegin;
+    GeomCamera3* destination = destinationBegin;
+    while (source != sourceEnd) {
+      *destination = *source;
+      ++source;
+      ++destination;
+    }
+
+    return destination;
+  }
+
+  /**
    * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
    *
    * What it does:
@@ -626,6 +650,44 @@ namespace moho
   }
 
   /**
+   * Address: 0x004EFDD0 (FUN_004EFDD0, Moho::VEC_D3DProjectionMatrixFOV)
+   *
+   * What it does:
+   * Builds one D3D-style perspective projection matrix from caller FOV/depth
+   * lanes and returns it by value.
+   */
+  VMatrix4
+  VEC_D3DProjectionMatrixFOV(
+    const float fovXRadians,
+    const float fovYRadians,
+    const float nearDepth,
+    const float farDepth,
+    const float aspectRatio
+  )
+  {
+    return BuildD3DProjectionMatrixFov(fovXRadians, fovYRadians, nearDepth, farDepth, aspectRatio);
+  }
+
+  /**
+   * Address: 0x004EF6E0 (FUN_004EF6E0, ?VEC_LookAtMatrix@Moho@@YA?AUVMatrix4@1@ABV?$Vector3@M@Wm3@@00@Z)
+   *
+   * What it does:
+   * Builds one right-handed view matrix from eye/target/up vectors with the
+   * same forward-collinear fallback lane the binary uses, then writes the
+   * result into `dest` and returns it for expression chaining.
+   */
+  VMatrix4* VEC_LookAtMatrix(
+    const Wm3::Vector3f& eye,
+    const Wm3::Vector3f& target,
+    VMatrix4* const dest,
+    const Wm3::Vector3f& up
+  )
+  {
+    *dest = BuildLookAtMatrix(eye, target, up);
+    return dest;
+  }
+
+  /**
    * Address: 0x00471540 (FUN_00471540, Moho::GeomCamera3::LookAt)
    *
    * Wm3::Vector3<float> const&, Wm3::Vector3<float> const&, Wm3::Vector3<float> const&
@@ -698,7 +760,7 @@ namespace moho
     (void)nearDepth;
     (void)farDepth;
 
-    const VMatrix4 perspectiveProjection = BuildD3DProjectionMatrixFov(
+    const VMatrix4 perspectiveProjection = VEC_D3DProjectionMatrixFOV(
       kPerspectiveDefaultFovXRadians,
       kPerspectiveDefaultFovYRadians,
       kPerspectiveDefaultNearDepth,

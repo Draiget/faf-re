@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 
 struct lua_State;
@@ -56,11 +57,54 @@ namespace moho
      */
     void ClearBorder();
 
+    /**
+     * Address: 0x007D9C10 (FUN_007D9C10, Moho::MapImager::AddBorder)
+     *
+     * IDA signature:
+     * void __stdcall Moho::MapImager::AddBorder(Moho::MapImager *arg0, std::string *arg4);
+     *
+     * What it does:
+     * Resolves the active terrain blueprint, builds one border mesh instance
+     * from the requested mesh blueprint name, and appends it to the border
+     * instance vector when creation succeeds.
+     */
+    void AddBorder(const msvc8::string& meshBlueprintPath);
+
   public:
     msvc8::vector<MeshInstance*> mMeshInstances;          // +0x04
   };
 
+#if defined(MOHO_ABI_MSVC8_COMPAT)
   static_assert(offsetof(MapImager, mMeshInstances)  == 0x04);
+  static_assert(sizeof(MapImager) == 0x10, "MapImager size must be 0x10");
+#endif
+
+  /**
+   * Address: 0x007F6530 (FUN_007F6530, Moho::REN_ShowSkeletons)
+   *
+   * What it does:
+   * Toggles global skeleton-debug rendering and mirrors that bool lane into
+   * the active simulation-driver sync-filter option flag when present.
+   */
+  void REN_ShowSkeletons();
+
+  /**
+   * Address: 0x007F6560 (FUN_007F6560, Moho::REN_MapBorderAdd)
+   *
+   * What it does:
+   * Console callback that expects exactly two tokens and adds the requested
+   * border mesh blueprint to the active viewport's MapImager.
+   */
+  void REN_MapBorderAdd(void* commandArgs);
+
+  /**
+   * Address: 0x007F65B0 (FUN_007F65B0, Moho::REN_MapBorderClear)
+   *
+   * What it does:
+   * Console callback that clears the active viewport's MapImager border
+   * decoration meshes when a viewport is present.
+   */
+  void REN_MapBorderClear(void* commandArgs);
 
   /**
    * Address: 0x008483D0 (FUN_008483D0)

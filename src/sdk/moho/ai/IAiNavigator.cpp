@@ -8,6 +8,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiNavigatorAir.h"
 #include "moho/ai/CAiNavigatorLand.h"
 #include "moho/misc/Listener.h"
 
@@ -333,6 +334,19 @@ gpg::RType* IAiNavigator::sType = nullptr;
 IAiNavigator* moho::AI_CreatePathingNavigator(Unit* const unit)
 {
   auto* const navigator = new (std::nothrow) CAiNavigatorLand(unit);
+  return navigator;
+}
+
+/**
+ * Address: 0x005A5800 (FUN_005A5800, ?AI_CreateAirNavigator@Moho@@YAPAVIAiNavigator@1@PAVUnit@1@@Z)
+ *
+ * What it does:
+ * Allocates one `CAiNavigatorAir` instance bound to `unit` and returns it as
+ * the `IAiNavigator` interface pointer.
+ */
+IAiNavigator* moho::AI_CreateAirNavigator(Unit* const unit)
+{
+  auto* const navigator = new (std::nothrow) CAiNavigatorAir(unit);
   return navigator;
 }
 

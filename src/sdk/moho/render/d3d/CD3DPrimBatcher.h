@@ -22,6 +22,7 @@ namespace moho
   class CD3DTextureBatcher;
   class CD3DVertexSheet;
   class CD3DDynamicTextureSheet;
+  class ID3DTextureSheet;
 
   class CD3DPrimBatcher
   {
@@ -88,6 +89,18 @@ namespace moho
      * Binds one retained batch texture for subsequent primitive draws.
      */
     void SetTexture(const boost::shared_ptr<CD3DBatchTexture>& texture);
+
+    /**
+     * Address: 0x00438870 (FUN_00438870, ?SetTexture@CD3DPrimBatcher@Moho@@QAEXV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
+     *
+     * What it does:
+     * Binds one retained dynamic texture sheet directly (no atlas route),
+     * releasing any previously-held batch texture handle and resetting UV
+     * scale/border lanes to the identity (0,0)-(1,1). Takes the ID3DTextureSheet
+     * base interface; the runtime invariant is that the concrete sheet is
+     * always a CD3DDynamicTextureSheet (binary stores the derived pointer).
+     */
+    void SetTexture(boost::shared_ptr<ID3DTextureSheet> sheet);
 
     /**
      * Address: 0x004389A0 (?DrawQuad@CD3DPrimBatcher@Moho@@QAEXABUVertex@12@000@Z)

@@ -18,6 +18,8 @@ namespace gpg::gal
   class CubeRenderTargetD3D9;
   class DeviceD3D9;
   class DeviceContext;
+  class TextureContext;
+  class TextureD3D9;
 } // namespace gpg::gal
 
 namespace Wm3
@@ -777,6 +779,18 @@ namespace moho
   CD3DDevice* D3D_GetDevice();
 
   /**
+   * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
+   *
+   * What it does:
+   * Pulls the active GAL device singleton and forwards one texture-create
+   * request into its virtual `CreateTexture` lane.
+   */
+  boost::shared_ptr<gpg::gal::TextureD3D9>& CreateTextureOnActiveDevice(
+    boost::shared_ptr<gpg::gal::TextureD3D9>& outTexture,
+    const gpg::gal::TextureContext& context
+  );
+
+  /**
    * Address: 0x004305F0 (FUN_004305F0, ?REN_Init@Moho@@YAXXZ)
    *
    * What it does:
@@ -794,4 +808,25 @@ namespace moho
    * stat counters.
    */
   void REN_Frame(int gameTick, float simDeltaSeconds, float frameSeconds);
+
+  /**
+   * What it does:
+   * Returns the last render-frame sim delta published by `REN_Frame`.
+   */
+  [[nodiscard]] float REN_GetSimDeltaSeconds();
+
+  /**
+   * What it does:
+   * Returns the current render-frame game tick published by `REN_Frame`.
+   */
+  [[nodiscard]] int REN_GetGameTick();
+
+  /**
+   * Address: 0x008E7540 (FUN_008E7540, func_ResetHarwareVertexFormatter)
+   *
+   * What it does:
+   * Clears the cached hardware-vertex formatter lane so the next mesh pass
+   * re-resolves formatter state.
+   */
+  void REN_ResetHardwareVertexFormatter() noexcept;
 } // namespace moho

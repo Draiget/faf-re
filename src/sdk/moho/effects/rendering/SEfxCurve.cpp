@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdlib>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -10,6 +11,8 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/math/MathReflection.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
 
 namespace gpg
 {
@@ -261,6 +264,24 @@ namespace gpg
 
 namespace moho
 {
+  namespace
+  {
+    void RecomputeEmitterCurveYBounds(SEfxCurve& curve)
+    {
+      curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
+      curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
+
+      for (Wm3::Vector3f* key = curve.mKeys.begin(); key != curve.mKeys.end(); ++key) {
+        if (curve.mBoundsMin.y > key->y) {
+          curve.mBoundsMin.y = key->y;
+        }
+        if (key->y > curve.mBoundsMax.y) {
+          curve.mBoundsMax.y = key->y;
+        }
+      }
+    }
+  } // namespace
+
   SEfxCurve::SEfxCurve(const SEfxCurve& other)
     : mBoundsMin(other.mBoundsMin)
     , mBoundsMax(other.mBoundsMax)
@@ -279,6 +300,92 @@ namespace moho
     mBoundsMax = other.mBoundsMax;
     mKeys.ResetFrom(other.mKeys);
     return *this;
+  }
+
+  /**
+   * Address: 0x00514E50 (FUN_00514E50, Moho::SEfxCurve::GetValue)
+   *
+   * What it does:
+   * Evaluates one interpolated curve sample at `interp` and applies per-key
+   * random spread (Z lane) through the process-global random helper.
+   */
+  float SEfxCurve::GetValue(const float interp) const
+  {
+    const Wm3::Vector3f* const keysBegin = mKeys.begin();
+    const Wm3::Vector3f* const keysEnd = mKeys.end();
+    if (keysBegin == keysEnd) {
+      return 0.0f;
+    }
+
+    const auto RandomizedValue = [](const float center, const float spread) {
+      const double randomUnit = moho::MathGlobalRandomUnitSafe();
+      return static_cast<float>((randomUnit - 0.5) * spread + center);
+    };
+
+    const Wm3::Vector3f* key = keysBegin;
+    while (key != keysEnd && key->x <= interp) {
+      ++key;
+    }
+
+    if (key == keysEnd) {
+      const Wm3::Vector3f& lastKey = keysEnd[-1];
+      return RandomizedValue(lastKey.y, lastKey.z);
+    }
+
+    if (key == keysBegin) {
+      return RandomizedValue(key->y, key->z);
+    }
+
+    const Wm3::Vector3f& currentKey = *key;
+    const Wm3::Vector3f& previousKey = key[-1];
+    const float interpolation = (interp - previousKey.x) / (currentKey.x - previousKey.x);
+    const float yCenter = previousKey.y + (currentKey.y - previousKey.y) * interpolation;
+    const float zSpread = previousKey.z + (currentKey.z - previousKey.z) * interpolation;
+    return RandomizedValue(yCenter, zSpread);
+  }
+
+  /**
+   * Address: 0x005151B0 (FUN_005151B0, insert_emitter_curve_key)
+   *
+   * What it does:
+   * Inserts one key into ascending-X order and refreshes Y bounds from all
+   * retained keys.
+   */
+  void InsertEmitterCurveKey(SEfxCurve& curve, const Wm3::Vector3f& key)
+  {
+    Wm3::Vector3f* insertPosition = curve.mKeys.begin();
+    while (insertPosition != curve.mKeys.end() && insertPosition->x <= key.x) {
+      ++insertPosition;
+    }
+
+    curve.mKeys.InsertAt(insertPosition, &key, &key + 1);
+    RecomputeEmitterCurveYBounds(curve);
+  }
+
+  /**
+   * Address: 0x00515320 (FUN_00515320, make_emitter_curve_from_blueprint)
+   *
+   * What it does:
+   * Clears runtime key storage, imports all blueprint keys in ascending-X
+   * order, and assigns default bounds/key when source keys are empty.
+   */
+  void BuildEmitterCurveFromBlueprint(SEfxCurve& destination, const REmitterBlueprintCurve& source)
+  {
+    destination.mKeys.ResetStorageToInline();
+
+    if (!source.Keys.Empty()) {
+      for (const REmitterCurveKey* key = source.Keys.mBegin; key != source.Keys.mEnd; ++key) {
+        InsertEmitterCurveKey(destination, Wm3::Vector3f(key->X, key->Y, key->Z));
+      }
+
+      destination.mBoundsMin.x = 0.0f;
+      destination.mBoundsMax.x = source.XRange;
+      return;
+    }
+
+    destination.mBoundsMin.x = 0.0f;
+    destination.mBoundsMax.x = 10.0f;
+    InsertEmitterCurveKey(destination, Wm3::Vector3f(5.0f, 0.0f, 0.0f));
   }
 
   gpg::RType* SEfxCurve::sType = nullptr;

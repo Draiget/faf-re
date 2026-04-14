@@ -2,11 +2,13 @@
 
 #include <array>
 #include <climits>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <new>
 #include <unordered_map>
+#include <vector>
 
 #include <intrin.h>
 
@@ -297,6 +299,169 @@ namespace
             return !SubclusterKeyLess(lhs, rhs) && !SubclusterKeyLess(rhs, lhs);
         }
     };
+
+    struct ClusterNodeSearchState
+    {
+        std::int32_t mOwnerNodeIndex;        // +0x00
+        std::uint32_t mPackedNodeCoordinate; // +0x04
+        std::int32_t mState;                 // +0x08
+        std::int32_t mHeapLane;              // +0x0C
+        float mPathCost;                     // +0x10
+        float mHeuristicCost;                // +0x14
+        std::int32_t mOpenListHandle;        // +0x18
+    };
+    static_assert(sizeof(ClusterNodeSearchState) == 0x1C, "ClusterNodeSearchState size must be 0x1C");
+
+    struct ClusterNodeSearchStateHash
+    {
+        [[nodiscard]] std::size_t operator()(const std::uint16_t packedCoordinate) const noexcept
+        {
+            return static_cast<std::size_t>(ScrambleParkMiller(static_cast<std::uint32_t>(packedCoordinate)));
+        }
+    };
+
+    struct ClusterSearchScratchNode
+    {
+        std::int32_t mNodeIndex = 0;        // +0x00
+        std::int32_t mPreviousNodeIndex = 0; // +0x04
+        float mTraversalCost = 0.0f;         // +0x08
+    };
+    static_assert(sizeof(ClusterSearchScratchNode) == 0x0C, "ClusterSearchScratchNode size must be 0x0C");
+
+    struct ClusterSearchScratch
+    {
+        std::vector<ClusterSearchScratchNode> mPendingNodes;
+        std::vector<std::int32_t> mFrontierNodeIndices;
+        std::int32_t mActiveNodeIndex = -1;
+
+        /**
+         * Address: 0x0092EF80 (FUN_0092EF80, struct_Ha2::Reset)
+         *
+         * What it does:
+         * Clears search frontier/state vectors and resets the active-node
+         * marker used during subcluster cluster-build traversal.
+         */
+        void Reset();
+    };
+
+    void ClusterSearchScratch::Reset()
+    {
+        mPendingNodes.clear();
+        mFrontierNodeIndices.clear();
+        mActiveNodeIndex = -1;
+    }
+
+    using ClusterNodeSearchStateMap =
+        std::unordered_map<std::uint16_t, ClusterNodeSearchState, ClusterNodeSearchStateHash>;
+
+    [[nodiscard]] std::uint16_t PackClusterNodeCoordinate(const std::uint8_t x, const std::uint8_t z) noexcept
+    {
+        return static_cast<std::uint16_t>(x) | (static_cast<std::uint16_t>(z) << 8u);
+    }
+
+    /**
+     * Address: 0x00930BA0 (FUN_00930BA0, std::hash_map_unk_unk::operator[])
+     *
+     * What it does:
+     * Returns one node-search state lane for `(x,z)` by key lookup, inserting
+     * a zero-initialized state when the key is not present.
+     */
+    [[maybe_unused]] [[nodiscard]] ClusterNodeSearchState&
+    ClusterNodeStateMapIndex(ClusterNodeSearchStateMap& stateByCoordinate, const std::uint8_t nodeX, const std::uint8_t nodeZ)
+    {
+        const std::uint16_t packedCoordinate = PackClusterNodeCoordinate(nodeX, nodeZ);
+        const auto result = stateByCoordinate.try_emplace(packedCoordinate);
+        auto it = result.first;
+        if (result.second) {
+            it->second = {};
+        }
+        return it->second;
+    }
+
+    struct FastVectorN12CharRuntime
+    {
+        char* start;        // +0x00
+        char* end;          // +0x04
+        char* capacityEnd;  // +0x08
+        char* inlineOrigin; // +0x0C
+    };
+    static_assert(sizeof(FastVectorN12CharRuntime) == 0x10, "FastVectorN12CharRuntime size must be 0x10");
+    static_assert(
+        offsetof(FastVectorN12CharRuntime, capacityEnd) == 0x08,
+        "FastVectorN12CharRuntime::capacityEnd offset must be 0x08"
+    );
+    static_assert(
+        offsetof(FastVectorN12CharRuntime, inlineOrigin) == 0x0C,
+        "FastVectorN12CharRuntime::inlineOrigin offset must be 0x0C"
+    );
+
+    [[maybe_unused]] void EnsureFastVectorN12CharCapacity(FastVectorN12CharRuntime& view, const unsigned int requiredCount)
+    {
+        const auto currentCapacity = (view.start != nullptr && view.capacityEnd != nullptr)
+            ? static_cast<unsigned int>(view.capacityEnd - view.start)
+            : 0u;
+        if (requiredCount <= currentCapacity) {
+            return;
+        }
+
+        const auto oldCount = (view.start != nullptr && view.end != nullptr)
+            ? static_cast<unsigned int>(view.end - view.start)
+            : 0u;
+        char* const newStorage = static_cast<char*>(::operator new[](requiredCount));
+        if (oldCount != 0u && view.start != nullptr) {
+            std::memcpy(newStorage, view.start, oldCount);
+        }
+
+        if (view.start == view.inlineOrigin) {
+            if (view.inlineOrigin != nullptr) {
+                *reinterpret_cast<char**>(view.inlineOrigin) = view.capacityEnd;
+            }
+        }
+        else if (view.start != nullptr) {
+            ::operator delete[](view.start);
+        }
+
+        view.start = newStorage;
+        view.end = newStorage + oldCount;
+        view.capacityEnd = newStorage + requiredCount;
+    }
+
+    /**
+     * Address: 0x009545D0 (FUN_009545D0, gpg::fastvector_char::Resize)
+     *
+     * What it does:
+     * Resizes one `fastvector_n<char,12>` lane to `newSize`, truncating when
+     * shrinking and fill-writing one byte value into appended slots when
+     * growing.
+     */
+    [[maybe_unused]] void
+    FastVectorN12CharResize(FastVectorN12CharRuntime& view, const unsigned int newSize, const char* const fillValue)
+    {
+        const auto currentSize = (view.start != nullptr && view.end != nullptr)
+            ? static_cast<unsigned int>(view.end - view.start)
+            : 0u;
+        if (newSize < currentSize) {
+            char* const newEnd = view.start + newSize;
+            if (newEnd != view.end) {
+                view.end = newEnd;
+            }
+            return;
+        }
+        if (newSize == currentSize) {
+            return;
+        }
+
+        EnsureFastVectorN12CharCapacity(view, newSize);
+        const char fillByte = fillValue ? *fillValue : '\0';
+        char* const desiredEnd = view.start + newSize;
+        while (view.end != desiredEnd) {
+            char* const slot = view.end;
+            view.end = slot + 1;
+            if (slot != nullptr) {
+                *slot = fillByte;
+            }
+        }
+    }
 
     struct RuntimeClusterCacheStore
     {
@@ -662,6 +827,25 @@ Cluster::~Cluster()
 }
 
 /**
+ * Address: 0x0092D8B0 (FUN_0092D8B0, ?QuantizeEdgeCost@Cluster@HaStar@gpg@@SAMMM@Z)
+ *
+ * What it does:
+ * Quantizes one edge-cost ratio into a 0..31 cost bucket.
+ */
+float Cluster::QuantizeEdgeCost(const float a, const float b)
+{
+    const float scaled = std::log(a / b) * 6.0f;
+    int quantized = static_cast<int>(std::ceil(scaled));
+    if (quantized > 31) {
+        quantized = 31;
+    }
+    if (quantized < 0) {
+        quantized = 0;
+    }
+    return static_cast<float>(quantized);
+}
+
+/**
  * Address: 0x009552D0 (FUN_009552D0,
  * ?ClusterBuild@HaStar@gpg@@YA?AVCluster@12@ABUOccupationData@12@@Z)
  */
@@ -684,6 +868,8 @@ Cluster ClusterBuild(const OccupationData& occupationData)
  */
 Cluster ClusterBuild(const SubclusterData& subclusterData)
 {
+    [[maybe_unused]] ClusterSearchScratch searchScratch{};
+    searchScratch.Reset();
     (void)subclusterData;
 
     Cluster cluster{};
@@ -823,14 +1009,108 @@ Cluster ClusterCache::FetchCluster(const SubclusterData& subclusterData)
 }
 
 /**
- * Address: 0x10035650 (FUN_10035650,
- * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z_0)
+ * Address: 0x009542D0 (FUN_009542D0,
+ * ?ClusterRect@HaStar@gpg@@YA?AV?$Rect2@H@2@HHEHH@Z_0)
  */
-gpg::Rect2i ClusterMap::ClusterIndexRect(const gpg::Rect2i& worldRect, const std::uint8_t level) const
+gpg::Rect2i ClusterRect(
+    const int worldX,
+    const int worldZ,
+    const std::uint8_t level,
+    const int maxClusterX,
+    const int maxClusterZ
+)
+{
+    const std::uint8_t clusterSize = (level < kClusterSizeCount)
+        ? kClusterSizeByLevel[level]
+        : kClusterSizeByLevel[kClusterSizeCount - 1];
+    const int alignMask = -static_cast<int>(clusterSize);
+    const int clusterSizeSigned = static_cast<int>(clusterSize);
+
+    gpg::Rect2i out{};
+    out.z1 = (alignMask & (clusterSizeSigned + worldZ)) + 1;
+    if (out.z1 >= maxClusterZ) {
+        out.z1 = maxClusterZ;
+    }
+
+    out.x1 = (alignMask & (clusterSizeSigned + worldX)) + 1;
+    if (out.x1 >= maxClusterX) {
+        out.x1 = maxClusterX;
+    }
+
+    out.z0 = alignMask & (worldZ - 1);
+    if (out.z0 < 0) {
+        out.z0 = 0;
+    }
+
+    out.x0 = alignMask & (worldX - 1);
+    if (out.x0 < 0) {
+        out.x0 = 0;
+    }
+
+    return out;
+}
+
+/**
+ * Address: 0x00954340 (FUN_00954340,
+ * ?ClusterIndexRect@HaStar@gpg@@YA?AV?$Rect2@H@2@HHEHH@Z)
+ */
+gpg::Rect2i ClusterIndexRect(
+    const int worldX,
+    const int worldZ,
+    const std::uint8_t level,
+    const int maxClusterX,
+    const int maxClusterZ
+)
 {
     const std::uint8_t shift = (level < kClusterSizeLog2Count)
         ? kClusterSizeLog2ByLevel[level]
         : kClusterSizeLog2ByLevel[kClusterSizeLog2Count - 1];
+
+    gpg::Rect2i out{};
+    out.z1 = (worldZ >> shift) + 1;
+    if (out.z1 >= maxClusterZ) {
+        out.z1 = maxClusterZ;
+    }
+
+    out.x1 = (worldX >> shift) + 1;
+    if (out.x1 >= maxClusterX) {
+        out.x1 = maxClusterX;
+    }
+
+    out.z0 = (worldZ - 1) >> shift;
+    if (out.z0 < 0) {
+        out.z0 = 0;
+    }
+
+    out.x0 = (worldX - 1) >> shift;
+    if (out.x0 < 0) {
+        out.x0 = 0;
+    }
+
+    return out;
+}
+
+/**
+ * Address: 0x008E33E0 (FUN_008E33E0,
+ * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@HHE@Z)
+ */
+gpg::Rect2i ClusterMap::ClusterIndexRect(const int worldX, const int worldZ, const std::uint8_t level) const
+{
+    const std::uint8_t shift = (level < kClusterSizeLog2Count)
+        ? kClusterSizeLog2ByLevel[level]
+        : kClusterSizeLog2ByLevel[kClusterSizeLog2Count - 1];
+
+    return gpg::HaStar::ClusterIndexRect(worldX, worldZ, level, (mWidth >> shift), (mHeight >> shift));
+}
+
+/**
+ * Address: 0x008E35A0 (FUN_008E35A0,
+ * ?ClusterIndexRect@ClusterMap@HaStar@gpg@@QBE?AV?$Rect2@H@3@ABV43@E@Z)
+ * Alt binary: 0x10035650 (FUN_10035650, ?...@Z_0)
+ */
+gpg::Rect2i ClusterMap::ClusterIndexRect(const gpg::Rect2i& worldRect, const std::uint8_t level) const
+{
+    const std::uint8_t shift = kClusterSizeLog2ByLevel[level];
 
     gpg::Rect2i out{};
     out.z1 = ((worldRect.z1 - 1) >> shift) + 1;
@@ -859,7 +1139,7 @@ gpg::Rect2i ClusterMap::ClusterIndexRect(const gpg::Rect2i& worldRect, const std
 }
 
 /**
- * Address: 0x100356F0 (FUN_100356F0,
+ * Address: 0x008E3620 (FUN_008E3620,
  * ?DirtyRect@ClusterMap@HaStar@gpg@@QAEXABV?$Rect2@H@3@@Z_0)
  */
 void ClusterMap::DirtyRect(const gpg::Rect2i& worldRect)

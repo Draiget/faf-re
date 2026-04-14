@@ -13,6 +13,7 @@
 #include <typeinfo>
 #include <vector>
 
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
@@ -25,6 +26,8 @@
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/app/WinApp.h"
+#include "moho/net/CGpgNetInterface.h"
 #include "moho/resource/RResId.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
@@ -33,20 +36,434 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "moho/render/IRenderWorldView.h"
 #include "moho/render/RCamManager.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/SimDriver.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/ui/CUIManager.h"
+#include "moho/ui/EMauiKeyCodeTypeInfo.h"
+#include "moho/ui/EMauiScrollAxisTypeInfo.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
 
-int wxCharCodeWXToMSW(int keyCode, bool* isSpecial);
-int wxCharCodeMSWToWX(int keyCode);
+namespace moho
+{
+  bool WIN_CopyToClipboard(const wchar_t* text);
+}
+
+/**
+ * Address: 0x0096B5B0 (FUN_0096B5B0, func_GetCursorPos)
+ *
+ * What it does:
+ * Captures one Win32 cursor position into a local lane, copies X/Y into the
+ * caller-provided `POINT`, and returns that destination pointer.
+ */
+POINT* WX_ReadCursorPositionPoint(POINT* const outPosition)
+{
+  POINT cursorPosition{};
+  ::GetCursorPos(&cursorPosition);
+  outPosition->x = cursorPosition.x;
+  outPosition->y = cursorPosition.y;
+  return outPosition;
+}
+
+moho::CommandModeData* func_GetRightMouseButtonAction(
+  moho::CommandModeData* commandData,
+  moho::MouseInfo* mouseInfo,
+  int modifiers,
+  moho::CWldSession* wldSession
+);
+
+/**
+ * Address: 0x0096AFC0 (FUN_0096AFC0, wxCharCodeWXToMSW)
+ *
+ * What it does:
+ * Translates one MAUI keycode into its Win32 virtual-key equivalent and
+ * reports whether the key is handled as a special mapping lane.
+ */
+int wxCharCodeWXToMSW(
+  int keyCode,
+  bool* const isSpecial
+)
+{
+  int mswKeyCode = keyCode;
+  *isSpecial = true;
+
+  if (keyCode > moho::MKEY_CANCEL) {
+    switch (static_cast<moho::EMauiKeyCode>(keyCode)) {
+    case moho::MKEY_CLEAR:
+      mswKeyCode = 12;
+      break;
+    case moho::MKEY_SHIFT:
+      mswKeyCode = 16;
+      break;
+    case moho::MKEY_CONTROL:
+      mswKeyCode = 17;
+      break;
+    case moho::MKEY_MENU:
+      mswKeyCode = 18;
+      break;
+    case moho::MKEY_PAUSE:
+      mswKeyCode = 19;
+      break;
+    case moho::MKEY_CAPITAL:
+      mswKeyCode = 20;
+      break;
+    case moho::MKEY_PRIOR:
+      mswKeyCode = 33;
+      break;
+    case moho::MKEY_NEXT:
+      mswKeyCode = 34;
+      break;
+    case moho::MKEY_END:
+      mswKeyCode = 35;
+      break;
+    case moho::MKEY_HOME:
+      mswKeyCode = 36;
+      break;
+    case moho::MKEY_LEFT:
+      mswKeyCode = 37;
+      break;
+    case moho::MKEY_UP:
+      mswKeyCode = 38;
+      break;
+    case moho::MKEY_RIGHT:
+      mswKeyCode = 39;
+      break;
+    case moho::MKEY_DOWN:
+      mswKeyCode = 40;
+      break;
+    case moho::MKEY_SELECT:
+      mswKeyCode = 41;
+      break;
+    case moho::MKEY_PRINT:
+      mswKeyCode = 42;
+      break;
+    case moho::MKEY_EXECUTE:
+      mswKeyCode = 43;
+      break;
+    case moho::MKEY_INSERT:
+      mswKeyCode = 45;
+      break;
+    case moho::MKEY_HELP:
+      mswKeyCode = 47;
+      break;
+    case moho::MKEY_NUMPAD0:
+      mswKeyCode = 96;
+      break;
+    case moho::MKEY_NUMPAD1:
+      mswKeyCode = 97;
+      break;
+    case moho::MKEY_NUMPAD2:
+      mswKeyCode = 98;
+      break;
+    case moho::MKEY_NUMPAD3:
+      mswKeyCode = 99;
+      break;
+    case moho::MKEY_NUMPAD4:
+      mswKeyCode = 100;
+      break;
+    case moho::MKEY_NUMPAD5:
+      mswKeyCode = 101;
+      break;
+    case moho::MKEY_NUMPAD6:
+      mswKeyCode = 102;
+      break;
+    case moho::MKEY_NUMPAD7:
+      mswKeyCode = 103;
+      break;
+    case moho::MKEY_NUMPAD8:
+      mswKeyCode = 104;
+      break;
+    case moho::MKEY_NUMPAD9:
+      mswKeyCode = 105;
+      break;
+    case moho::MKEY_F1:
+      mswKeyCode = 112;
+      break;
+    case moho::MKEY_F2:
+      mswKeyCode = 113;
+      break;
+    case moho::MKEY_F3:
+      mswKeyCode = 114;
+      break;
+    case moho::MKEY_F4:
+      mswKeyCode = 115;
+      break;
+    case moho::MKEY_F5:
+      mswKeyCode = 116;
+      break;
+    case moho::MKEY_F6:
+      mswKeyCode = 117;
+      break;
+    case moho::MKEY_F7:
+      mswKeyCode = 118;
+      break;
+    case moho::MKEY_F8:
+      mswKeyCode = 119;
+      break;
+    case moho::MKEY_F9:
+      mswKeyCode = 120;
+      break;
+    case moho::MKEY_F10:
+      mswKeyCode = 121;
+      break;
+    case moho::MKEY_F11:
+      mswKeyCode = 122;
+      break;
+    case moho::MKEY_F12:
+      mswKeyCode = 123;
+      break;
+    case moho::MKEY_F13:
+      mswKeyCode = 124;
+      break;
+    case moho::MKEY_F14:
+      mswKeyCode = 125;
+      break;
+    case moho::MKEY_F15:
+      mswKeyCode = 126;
+      break;
+    case moho::MKEY_F16:
+      mswKeyCode = 127;
+      break;
+    case moho::MKEY_F17:
+      mswKeyCode = 128;
+      break;
+    case moho::MKEY_F18:
+      mswKeyCode = 129;
+      break;
+    case moho::MKEY_F19:
+      mswKeyCode = 130;
+      break;
+    case moho::MKEY_F20:
+      mswKeyCode = 131;
+      break;
+    case moho::MKEY_F21:
+      mswKeyCode = 132;
+      break;
+    case moho::MKEY_F22:
+      mswKeyCode = 133;
+      break;
+    case moho::MKEY_F23:
+      mswKeyCode = 134;
+      break;
+    case moho::MKEY_F24:
+      mswKeyCode = 135;
+      break;
+    case moho::MKEY_NUMLOCK:
+      mswKeyCode = 144;
+      break;
+    case moho::MKEY_SCROLL:
+      mswKeyCode = 145;
+      break;
+    case moho::MKEY_NUMPAD_MULTIPLY:
+      mswKeyCode = 106;
+      break;
+    case moho::MKEY_NUMPAD_ADD:
+      mswKeyCode = 107;
+      break;
+    case moho::MKEY_NUMPAD_SUBTRACT:
+      mswKeyCode = 109;
+      break;
+    case moho::MKEY_NUMPAD_DECIMAL:
+      mswKeyCode = 110;
+      break;
+    case moho::MKEY_NUMPAD_DIVIDE:
+      mswKeyCode = 111;
+      break;
+    default:
+      *isSpecial = false;
+      break;
+    }
+  } else if (keyCode == moho::MKEY_CANCEL) {
+    return 3;
+  } else if (keyCode == moho::MKEY_DELETE) {
+    return 46;
+  } else {
+    *isSpecial = false;
+  }
+
+  return mswKeyCode;
+}
+
+/**
+ * Address: 0x0096ABB0 (FUN_0096ABB0, wxCharCodeMSWToWX)
+ *
+ * What it does:
+ * Maps one Win32 virtual-key lane into the MAUI keycode enum/value space used
+ * by UI event dispatch.
+ */
+int wxCharCodeMSWToWX(
+  const int keyCode
+)
+{
+  switch (keyCode) {
+  case 3:
+    return moho::MKEY_CANCEL;
+  case 8:
+    return moho::MKEY_BACK;
+  case 9:
+    return moho::MKEY_TAB;
+  case 12:
+    return moho::MKEY_CLEAR;
+  case 13:
+    return moho::MKEY_RETURN;
+  case 16:
+    return moho::MKEY_SHIFT;
+  case 17:
+    return moho::MKEY_CONTROL;
+  case 18:
+    return moho::MKEY_MENU;
+  case 19:
+    return moho::MKEY_PAUSE;
+  case 20:
+    return moho::MKEY_CAPITAL;
+  case 27:
+    return moho::MKEY_ESCAPE;
+  case 32:
+    return moho::MKEY_SPACE;
+  case 33:
+    return moho::MKEY_PRIOR;
+  case 34:
+    return moho::MKEY_NEXT;
+  case 35:
+    return moho::MKEY_END;
+  case 36:
+    return moho::MKEY_HOME;
+  case 37:
+    return moho::MKEY_LEFT;
+  case 38:
+    return moho::MKEY_UP;
+  case 39:
+    return moho::MKEY_RIGHT;
+  case 40:
+    return moho::MKEY_DOWN;
+  case 41:
+    return moho::MKEY_SELECT;
+  case 42:
+    return moho::MKEY_PRINT;
+  case 43:
+    return moho::MKEY_EXECUTE;
+  case 45:
+    return moho::MKEY_INSERT;
+  case 46:
+    return moho::MKEY_DELETE;
+  case 47:
+    return moho::MKEY_HELP;
+  case 96:
+    return moho::MKEY_NUMPAD0;
+  case 97:
+    return moho::MKEY_NUMPAD1;
+  case 98:
+    return moho::MKEY_NUMPAD2;
+  case 99:
+    return moho::MKEY_NUMPAD3;
+  case 100:
+    return moho::MKEY_NUMPAD4;
+  case 101:
+    return moho::MKEY_NUMPAD5;
+  case 102:
+    return moho::MKEY_NUMPAD6;
+  case 103:
+    return moho::MKEY_NUMPAD7;
+  case 104:
+    return moho::MKEY_NUMPAD8;
+  case 105:
+    return moho::MKEY_NUMPAD9;
+  case 106:
+    return moho::MKEY_NUMPAD_MULTIPLY;
+  case 107:
+    return moho::MKEY_NUMPAD_ADD;
+  case 109:
+    return moho::MKEY_NUMPAD_SUBTRACT;
+  case 110:
+    return moho::MKEY_NUMPAD_DECIMAL;
+  case 111:
+    return moho::MKEY_NUMPAD_DIVIDE;
+  case 112:
+    return moho::MKEY_F1;
+  case 113:
+    return moho::MKEY_F2;
+  case 114:
+    return moho::MKEY_F3;
+  case 115:
+    return moho::MKEY_F4;
+  case 116:
+    return moho::MKEY_F5;
+  case 117:
+    return moho::MKEY_F6;
+  case 118:
+    return moho::MKEY_F7;
+  case 119:
+    return moho::MKEY_F8;
+  case 120:
+    return moho::MKEY_F9;
+  case 121:
+    return moho::MKEY_F10;
+  case 122:
+    return moho::MKEY_F11;
+  case 123:
+    return moho::MKEY_F12;
+  case 124:
+    return moho::MKEY_F13;
+  case 125:
+    return moho::MKEY_F14;
+  case 126:
+    return moho::MKEY_F15;
+  case 127:
+    return moho::MKEY_F16;
+  case 128:
+    return moho::MKEY_F17;
+  case 129:
+    return moho::MKEY_F18;
+  case 130:
+    return moho::MKEY_F19;
+  case 131:
+    return moho::MKEY_F20;
+  case 132:
+    return moho::MKEY_F21;
+  case 133:
+    return moho::MKEY_F22;
+  case 134:
+    return moho::MKEY_F23;
+  case 135:
+    return moho::MKEY_F24;
+  case 144:
+    return moho::MKEY_NUMLOCK;
+  case 145:
+    return moho::MKEY_SCROLL;
+  case 186:
+    return ';';
+  case 187:
+    return '+';
+  case 188:
+    return ',';
+  case 189:
+    return '-';
+  case 190:
+    return '.';
+  case 191:
+    return '/';
+  case 192:
+    return '~';
+  case 219:
+    return '[';
+  case 220:
+    return '\\';
+  case 221:
+    return ']';
+  case 222:
+    return '\'';
+  default:
+    return 0;
+  }
+}
 
 namespace moho
 {
@@ -728,13 +1145,6 @@ namespace
     return moho::g_UIManager->mLuaState;
   }
 
-  moho::CommandModeData* func_GetRightMouseButtonAction(
-    moho::CommandModeData* commandData,
-    moho::MouseInfo* mouseInfo,
-    int modifiers,
-    moho::CWldSession* wldSession
-  );
-
   template <typename TInvoke>
   bool InvokeUiLuaCallback(
     LuaPlus::LuaState* const state, const char* const modulePath, const char* const callbackName, TInvoke&& invoke
@@ -1155,6 +1565,16 @@ namespace
       auto* const fn = reinterpret_cast<ApplyWheelZoomRatioFn>(table[31]);
       fn(this, zoomRatio);
     }
+
+    [[nodiscard]] float CameraGetTargetZoom() const
+    {
+      return reinterpret_cast<const moho::CameraImpl*>(this)->CameraGetTargetZoom();
+    }
+
+    [[nodiscard]] float CameraGetZoom() const
+    {
+      return reinterpret_cast<const moho::CameraImpl*>(this)->CameraGetZoom();
+    }
   };
 
   struct CameraTargetRuntimeView
@@ -1178,43 +1598,185 @@ namespace
   struct CRenderWorldViewRuntimeView
   {
     void* vftable = nullptr;
+    moho::CameraImpl* mCamera = nullptr; // +0x04
+    std::uint8_t mUnknown08To17[0x10]{};
+    std::uint8_t mCanShake = 0; // +0x18
+    std::uint8_t mIsMiniMap = 0; // +0x19
+    std::uint8_t mUnknown1ATo1B[0x02]{};
 
+    /**
+     * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CRenderWorldView::GetCamera)
+     *
+     * What it does:
+     * Returns the retained world-view camera pointer lane.
+     */
     [[nodiscard]] CameraZoomRuntimeView* GetCamera()
     {
-      using GetCameraFn = CameraZoomRuntimeView*(__thiscall*)(CRenderWorldViewRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<GetCameraFn>(table[3]);
-      return fn(this);
+      return reinterpret_cast<CameraZoomRuntimeView*>(mCamera);
     }
 
+    /**
+     * Address: 0x0086DC90 (FUN_0086DC90, Moho::CRenderWorldView::IsMiniMap)
+     *
+     * What it does:
+     * Returns minimap-view toggle lane.
+     */
+    [[nodiscard]] bool IsMiniMap() const
+    {
+      return mIsMiniMap != 0;
+    }
+
+    /**
+     * Address: 0x0086EC10 (FUN_0086EC10, Moho::CRenderWorldView::CameraGetTargetZoom)
+     *
+     * What it does:
+     * Returns target zoom from the retained camera lane.
+     */
+    [[nodiscard]] float CameraGetTargetZoom() const
+    {
+      return mCamera->CameraGetTargetZoom();
+    }
+
+    /**
+     * Address: 0x0086EC30 (FUN_0086EC30, Moho::CRenderWorldView::CameraGetZoom)
+     *
+     * What it does:
+     * Returns current zoom from the retained camera lane.
+     */
+    [[nodiscard]] float CameraGetZoom() const
+    {
+      return mCamera->CameraGetZoom();
+    }
+
+    /**
+     * Address: 0x0086DC00 (FUN_0086DC00, Moho::CRenderWorldView::SetOrthographic)
+     *
+     * What it does:
+     * Stores the orthographic toggle lane and mirrors it to the active camera:
+     * enabling orthographic disables camera shake; disabling orthographic
+     * re-enables camera shake.
+     */
     void SetOrthographic(const bool orthographicEnabled)
     {
-      using SetOrthographicFn = void(__thiscall*)(CRenderWorldViewRuntimeView*, bool);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<SetOrthographicFn>(table[11]);
-      fn(this, orthographicEnabled);
+      mCanShake = static_cast<std::uint8_t>(orthographicEnabled ? 1 : 0);
+
+      if (mCamera == nullptr) {
+        return;
+      }
+
+      mCamera->CameraSetOrtho(orthographicEnabled);
+      mCamera->CanShake(!orthographicEnabled);
     }
 
-    [[nodiscard]] bool IsOrthographic()
+    /**
+     * Address: 0x0086DC60 (FUN_0086DC60, Moho::CRenderWorldView::CanShake)
+     *
+     * What it does:
+     * Returns the stored orthographic toggle lane.
+     */
+    [[nodiscard]] bool CanShake() const
     {
-      using IsOrthographicFn = bool(__thiscall*)(CRenderWorldViewRuntimeView*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<IsOrthographicFn>(table[12]);
-      return fn(this);
+      return mCanShake != 0;
+    }
+
+    [[nodiscard]] bool IsOrthographic() const
+    {
+      return CanShake();
     }
   };
 
+  static_assert(
+    offsetof(CRenderWorldViewRuntimeView, mCamera) == 0x04,
+    "CRenderWorldViewRuntimeView::mCamera offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CRenderWorldViewRuntimeView, mCanShake) == 0x18,
+    "CRenderWorldViewRuntimeView::mCanShake offset must be 0x18"
+  );
+  static_assert(
+    offsetof(CRenderWorldViewRuntimeView, mIsMiniMap) == 0x19,
+    "CRenderWorldViewRuntimeView::mIsMiniMap offset must be 0x19"
+  );
+
+  struct CRenderWorldViewViewportRuntimeView
+  {
+    void* vftable = nullptr;
+
+    void SetViewRect(const Wm3::Vector2f& minPoint, const Wm3::Vector2f& maxPoint)
+    {
+      using SetViewRectFn = void(__thiscall*)(
+        CRenderWorldViewViewportRuntimeView*,
+        const Wm3::Vector2f*,
+        const Wm3::Vector2f*
+      );
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<SetViewRectFn>(table[3]);
+      fn(this, &minPoint, &maxPoint);
+    }
+  };
+
+  struct CUIWorldViewOverlayRuntimeView
+  {
+    void* vftable = nullptr;
+
+    void Draw(moho::CD3DPrimBatcher* const primBatcher)
+    {
+      using DrawFn = void(__thiscall*)(CUIWorldViewOverlayRuntimeView*, moho::CD3DPrimBatcher*);
+      auto** const table = reinterpret_cast<void**>(vftable);
+      auto* const fn = reinterpret_cast<DrawFn>(table[4]);
+      fn(this, primBatcher);
+    }
+  };
+
+  struct CRenderWorldViewRuntimeHandle
+  {
+    CRenderWorldViewRuntimeView* mPtr = nullptr; // +0x00
+
+    [[nodiscard]] CameraZoomRuntimeView* GetCamera() const
+    {
+      return mPtr != nullptr ? mPtr->GetCamera() : nullptr;
+    }
+
+    void SetOrthographic(const bool orthographicEnabled) const
+    {
+      if (mPtr != nullptr) {
+        mPtr->SetOrthographic(orthographicEnabled);
+      }
+    }
+
+    [[nodiscard]] bool IsOrthographic() const
+    {
+      return mPtr != nullptr && mPtr->IsOrthographic();
+    }
+  };
+
+  static_assert(sizeof(CRenderWorldViewRuntimeHandle) == 0x04);
+
   struct CUIWorldViewRuntimeView
   {
-    std::uint8_t mUnknown00To11B[0x11C]{};
-    CRenderWorldViewRuntimeView mRenderWorldView{};
-    std::uint8_t mUnknown120To135[0x16]{};
+    std::uint8_t mUnknown00To47[0x48]{};
+    moho::CScriptLazyVar_float mViewLeft{};   // +0x48
+    std::uint8_t mUnknown5CTo6F[0x14]{};
+    moho::CScriptLazyVar_float mViewTop{};    // +0x70
+    std::uint8_t mUnknown84To97[0x14]{};
+    moho::CScriptLazyVar_float mViewRight{};  // +0x98
+    moho::CScriptLazyVar_float mViewBottom{}; // +0xAC
+    std::uint8_t mUnknownC0To11B[0x5C]{};
+    CRenderWorldViewRuntimeHandle mRenderWorldView{};
+    CRenderWorldViewViewportRuntimeView* mViewportCallback = nullptr; // +0x120
+    float mCachedViewLeft = 0.0f;   // +0x124
+    float mCachedViewTop = 0.0f;    // +0x128
+    float mCachedViewRight = 0.0f;  // +0x12C
+    float mCachedViewBottom = 0.0f; // +0x130
+    std::uint8_t mUnknown134To135[0x2]{};
     std::uint8_t mEnableResourceRendering = 0; // +0x136
     std::uint8_t mUnknown137 = 0;
     std::int32_t mInputLocks = 0; // +0x138
     std::uint8_t mUnknown13CTo273[0x138]{};
     std::uint8_t mShowConvertToPatrolCursor = 0; // +0x274
-    std::uint8_t mUnknown275To2A3[0x2F]{};
+    std::uint8_t mUnknown275To29B[0x27]{};
+    std::uint32_t mOverlayDrawToken = 0; // +0x29C
+    std::uint8_t mUnknown2A0To2A3[0x4]{};
     std::uint8_t mHighlightEnabled = 0; // +0x2A4
     std::uint8_t mUnknown2A5 = 0;
     std::uint8_t mGetsGlobalCameraCommands = 0; // +0x2A6
@@ -1228,6 +1790,37 @@ namespace
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mRenderWorldView) == 0x11C,
     "CUIWorldViewRuntimeView::mRenderWorldView offset must be 0x11C"
+  );
+  static_assert(offsetof(CUIWorldViewRuntimeView, mViewLeft) == 0x48, "CUIWorldViewRuntimeView::mViewLeft offset must be 0x48");
+  static_assert(offsetof(CUIWorldViewRuntimeView, mViewTop) == 0x70, "CUIWorldViewRuntimeView::mViewTop offset must be 0x70");
+  static_assert(offsetof(CUIWorldViewRuntimeView, mViewRight) == 0x98, "CUIWorldViewRuntimeView::mViewRight offset must be 0x98");
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mViewBottom) == 0xAC,
+    "CUIWorldViewRuntimeView::mViewBottom offset must be 0xAC"
+  );
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mViewportCallback) == 0x120,
+    "CUIWorldViewRuntimeView::mViewportCallback offset must be 0x120"
+  );
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mCachedViewLeft) == 0x124,
+    "CUIWorldViewRuntimeView::mCachedViewLeft offset must be 0x124"
+  );
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mCachedViewTop) == 0x128,
+    "CUIWorldViewRuntimeView::mCachedViewTop offset must be 0x128"
+  );
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mCachedViewRight) == 0x12C,
+    "CUIWorldViewRuntimeView::mCachedViewRight offset must be 0x12C"
+  );
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mCachedViewBottom) == 0x130,
+    "CUIWorldViewRuntimeView::mCachedViewBottom offset must be 0x130"
+  );
+  static_assert(
+    offsetof(CUIWorldViewRuntimeView, mOverlayDrawToken) == 0x29C,
+    "CUIWorldViewRuntimeView::mOverlayDrawToken offset must be 0x29C"
   );
   static_assert(
     offsetof(CUIWorldViewRuntimeView, mShowConvertToPatrolCursor) == 0x274,
@@ -1284,14 +1877,7 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  class IMauiDragger
-  {
-  public:
-    virtual ~IMauiDragger() = default;
-    virtual void DragMove(const moho::SMauiEventData* eventData) = 0;
-    virtual void DragRelease(const moho::SMauiEventData* eventData) = 0;
-    virtual void OnCurrentDraggerReplaced() = 0;
-  };
+  using IMauiDragger = moho::IMauiDragger;
 
   using DraggerLink = moho::TDatListItem<IMauiDragger, void>;
 
@@ -2194,6 +2780,21 @@ namespace
 
     editView->mClipLength = gpg::STR_Utf8Len(visibleText.c_str());
     editView->mClipOffset = caretPosition - editView->mClipLength;
+  }
+
+  void CopyUtf8TextToClipboard(const msvc8::string& text)
+  {
+    const std::wstring wideText = gpg::STR_Utf8ToWide(text.c_str());
+    (void)moho::WIN_CopyToClipboard(wideText.c_str());
+  }
+
+  void CopyEditSelectionToClipboard(moho::CMauiEdit* const edit)
+  {
+    if (edit == nullptr) {
+      return;
+    }
+
+    CopyUtf8TextToClipboard(edit->GetSelection());
   }
 
   [[nodiscard]] IMauiDragger* ResolveEditClickDragger(CMauiEditRuntimeView* const editView) noexcept
@@ -6252,6 +6853,37 @@ int moho::cfunc_CMauiFrameSetTargetHeadL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x00822FA0 (FUN_00822FA0, ??0UIBuildDragger@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Captures the current world cursor position as both start/end drag points and
+ * mirrors those lanes into the world-view build-drag state.
+ */
+moho::UIBuildDragger::UIBuildDragger(
+  moho::CWldSession* const session,
+  moho::CUIWorldViewBuildDragRuntimeView* const worldView,
+  moho::CameraImpl* const camera
+)
+  : mList(nullptr)
+  , mWldSession(session)
+  , mWldView(worldView)
+  , mCam(camera)
+  , mStart(0.0f, 0.0f, 0.0f)
+  , mEnd(0.0f, 0.0f, 0.0f)
+{
+  if (mWldSession != nullptr) {
+    mStart = mWldSession->CursorWorldPos;
+  }
+
+  mEnd = mStart;
+
+  if (mWldView != nullptr) {
+    mWldView->mStart = mStart;
+    mWldView->mEnd = mEnd;
+  }
+}
+
+/**
  * Address: 0x0078DDC0 (FUN_0078DDC0, sub_78DDC0)
  *
  * What it does:
@@ -9170,20 +9802,34 @@ int moho::cfunc_InternalCreateGroupL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject parentObject(LuaPlus::LuaStackObject(state, 2));
   CMauiControl* const parentControl = SCR_FromLua_CMauiControl(parentObject, state);
 
-  class CMauiGroupControl final : public CMauiControl
-  {
-  public:
-    CMauiGroupControl(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
-      : CMauiControl(luaObject, parent, "group")
-    {
-    }
-  };
-
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  CMauiGroupControl* const group = new CMauiGroupControl(&luaObject, parentControl);
+  CMauiGroup* const group = new CMauiGroup(&luaObject, parentControl);
   group->DoInit();
   CMauiControlScriptObjectRuntimeView::FromControl(group)->mLuaObj.PushStack(state);
   return 1;
+}
+
+/**
+ * Address context: constructor path in `cfunc_InternalCreateGroupL`
+ * (`FUN_00797390`) allocates one `CMauiGroup` and initializes it through
+ * `CMauiControl(luaObject, parent, "group")`.
+ *
+ * What it does:
+ * Constructs one group control from Lua object + parent lanes.
+ */
+moho::CMauiGroup::CMauiGroup(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
+  : CMauiControl(luaObject, parent, "group")
+{
+}
+
+/**
+ * Address: 0x00797300 (FUN_00797300, Moho::CMauiGroup::Draw)
+ *
+ * What it does:
+ * No-op draw lane used by the group control vtable.
+ */
+void moho::CMauiGroup::Draw(CD3DPrimBatcher* const /*primBatcher*/, const std::int32_t /*drawMask*/)
+{
 }
 
 /**
@@ -9270,6 +9916,16 @@ void moho::CMauiHistogram::Dump()
 }
 
 /**
+ * Address: 0x007978F0 (FUN_007978F0, Moho::CMauiHistogram::Draw)
+ *
+ * What it does:
+ * No-op draw lane used by the histogram vtable.
+ */
+void moho::CMauiHistogram::Draw(CD3DPrimBatcher* const /*primBatcher*/, const std::int32_t /*drawMask*/)
+{
+}
+
+/**
  * Address: 0x0079E590 (FUN_0079E590, cfunc_InternalCreateMesh)
  *
  * What it does:
@@ -9341,6 +9997,16 @@ moho::CMauiMesh::CMauiMesh(LuaPlus::LuaObject* const luaObject, CMauiControl* co
   meshView->mOrientation = Wm3::Quaternionf::Identity();
   meshView->mUnknown13C = -1;
   CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
+}
+
+/**
+ * Address: 0x0079E580 (FUN_0079E580, Moho::CMauiMesh::Dump)
+ *
+ * What it does:
+ * No-op dump lane used by the mesh control vtable.
+ */
+void moho::CMauiMesh::Dump()
+{
 }
 
 /**
@@ -10472,6 +11138,35 @@ void moho::CMauiItemList::AddItem(msvc8::string text)
 }
 
 /**
+ * Address: 0x0079A0B0 (FUN_0079A0B0, Moho::CMauiItemList::GetItem)
+ *
+ * What it does:
+ * Converts one Y-coordinate lane to an item index lane using top/scroll/font
+ * metrics and returns `-1` when no item row is hit.
+ */
+std::int32_t moho::CMauiItemList::GetItem(const float yCoordinate)
+{
+  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  const CD3DFont* const font = itemListView->mFont;
+
+  const float localY = yCoordinate - CScriptLazyVar_float::GetValue(&itemListView->mTopLV);
+  const float rowHeight = font->mExternalLeading + font->mHeight;
+
+  const auto* const itemBase = itemListView->mItems.data();
+  const std::int32_t rowIndex = itemListView->mScrollPosition + static_cast<std::int32_t>(localY / rowHeight);
+  if (
+    itemBase != nullptr
+    && rowIndex >= 0
+    && static_cast<std::size_t>(rowIndex) < itemListView->mItems.size()
+    && font->mHeight > std::fmod(localY, rowHeight)
+  ) {
+    return rowIndex;
+  }
+
+  return -1;
+}
+
+/**
  * Address: 0x00799560 (FUN_00799560, Moho::CMauiItemList::Dump)
  *
  * What it does:
@@ -10502,6 +11197,104 @@ void moho::CMauiItemList::Dump()
   const msvc8::string* const itemStorage = itemListView->mItems.data();
   const msvc8::string& selectedItem = itemStorage[curSelection];
   gpg::Logf("Current Selection = %d Text = %s", curSelection, selectedItem.c_str());
+}
+
+/**
+ * Address: 0x0079A560 (FUN_0079A560, Moho::CMauiItemList::GetScrollValues)
+ *
+ * What it does:
+ * Computes current item-list scroll extents and visible-range window.
+ */
+moho::SMauiScrollValues moho::CMauiItemList::GetScrollValues(const EMauiScrollAxis /*axis*/)
+{
+  const int visibleLineCount = LinesVisible();
+  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+
+  SMauiScrollValues scrollValues{};
+  scrollValues.mMinRange = 0.0f;
+  scrollValues.mMaxRange = static_cast<float>(GetItemListEntryCount(*itemListView));
+  scrollValues.mMinVisible = static_cast<float>(itemListView->mScrollPosition);
+  scrollValues.mMaxVisible = static_cast<float>(itemListView->mScrollPosition + visibleLineCount);
+  return scrollValues;
+}
+
+/**
+ * Address: 0x0079A5F0 (FUN_0079A5F0, Moho::CMauiItemList::ScrollLines)
+ *
+ * What it does:
+ * Applies line-scroll delta and clamps top-scroll lane to valid item-list
+ * bounds.
+ */
+void moho::CMauiItemList::ScrollLines(const EMauiScrollAxis /*axis*/, const float amount)
+{
+  const int visibleLineCount = LinesVisible();
+  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  int clampedTop = GetItemListEntryCount(*itemListView) - visibleLineCount;
+
+  const int lineDelta = static_cast<int>(std::nearbyintf(amount));
+  const int candidateTop = itemListView->mScrollPosition + lineDelta;
+  if (candidateTop < clampedTop) {
+    clampedTop = candidateTop;
+  }
+
+  if (clampedTop < 0) {
+    clampedTop = 0;
+  }
+
+  itemListView->mScrollPosition = clampedTop;
+}
+
+/**
+ * Address: 0x0079A6D0 (FUN_0079A6D0, Moho::CMauiItemList::ScrollSetTop)
+ *
+ * What it does:
+ * Sets top-scroll lane from one absolute row index and clamps it to valid
+ * item-list bounds.
+ */
+void moho::CMauiItemList::ScrollSetTop(const EMauiScrollAxis /*axis*/, const float amount)
+{
+  const int visibleLineCount = LinesVisible();
+  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  int clampedTop = GetItemListEntryCount(*itemListView) - visibleLineCount;
+
+  const int requestedTop = static_cast<int>(std::nearbyintf(amount));
+  if (requestedTop < clampedTop) {
+    clampedTop = requestedTop;
+  }
+
+  if (clampedTop < 0) {
+    clampedTop = 0;
+  }
+
+  itemListView->mScrollPosition = clampedTop;
+}
+
+/**
+ * Address: 0x0079A650 (FUN_0079A650, Moho::CMauiItemList::ScrollLines2)
+ *
+ * What it does:
+ * Applies page-scroll delta (`amount * visible-row-count`) and clamps
+ * top-scroll lane to `[0, itemCount - visibleLineCount]`.
+ */
+void moho::CMauiItemList::ScrollPages(const EMauiScrollAxis /*axis*/, const float amount)
+{
+  const int visibleLineCount = LinesVisible();
+  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
+  int clampedTop = GetItemListEntryCount(*itemListView) - visibleLineCount;
+
+  const auto visibleLineCountUnsigned = static_cast<std::uint32_t>(visibleLineCount);
+  const float scaledDelta = static_cast<float>(visibleLineCountUnsigned) * amount;
+  const int pageDelta = static_cast<int>(std::nearbyintf(scaledDelta));
+  const int candidateTop = itemListView->mScrollPosition + pageDelta;
+  if (candidateTop < clampedTop) {
+    clampedTop = candidateTop;
+  }
+
+  if (clampedTop < 0) {
+    clampedTop = 0;
+  }
+
+  itemListView->mScrollPosition = clampedTop;
 }
 
 /**
@@ -11268,6 +12061,35 @@ void moho::CMauiMovie::DoRender(CD3DPrimBatcher* const primBatcher, const std::i
 }
 
 /**
+ * Address: 0x0079F490 (FUN_0079F490, Moho::CMauiMovie::OnMinimized)
+ *
+ * What it does:
+ * Stops active movie playback while minimized and resumes playback when the
+ * control is restored from minimized state.
+ */
+void moho::CMauiMovie::OnMinimized(const bool minimized)
+{
+  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
+
+  if (minimized) {
+    if (movieView->mIsPlaying && !movieView->mIsStopped) {
+      CMoviePlaybackInterface* const moviePlayback = movieView->mMovie;
+      if (moviePlayback != nullptr) {
+        moviePlayback->StopMovie();
+        movieView->mIsMinimized = true;
+        CMauiControl::OnMinimized(minimized);
+        return;
+      }
+    }
+  } else if (movieView->mIsMinimized) {
+    movieView->mMovie->PlayMovie();
+    movieView->mIsMinimized = false;
+  }
+
+  CMauiControl::OnMinimized(minimized);
+}
+
+/**
  * Address: 0x0079F8F0 (FUN_0079F8F0, cfunc_CMauiMovieLoopL)
  *
  * What it does:
@@ -11786,6 +12608,135 @@ void moho::CMauiScrollbar::SetTextures(
   if (thumbBottom.get() != nullptr) {
     scrollbarView->mThumbBottom = thumbBottom;
   }
+}
+
+/**
+ * Address: 0x007A11C0 (FUN_007A11C0, Moho::CMauiScrollbar::HandleEvent)
+ *
+ * What it does:
+ * Handles click/wheel scrollbar interaction lanes by translating mouse
+ * position to page-step or drag-capture behavior on the bound scroll target.
+ */
+bool moho::CMauiScrollbar::HandleEvent(const SMauiEventData& eventData)
+{
+  const EMauiEventType eventType = eventData.mEventType;
+  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
+  CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl();
+
+  if ((eventType == MET_ButtonPress || eventType == MET_ButtonDClick) && eventData.mKeyCode == kPostDraggerLeftButton) {
+    if (scrollableControl != nullptr) {
+      const EMauiScrollAxis axis = scrollbarView->mAxis;
+      const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+
+      const CScriptLazyVar_float* topLane = &controlView->mTopLV;
+      const CScriptLazyVar_float* bottomLane = &controlView->mBottomLV;
+      if (axis != MSA_Vert) {
+        topLane = &controlView->mRightLV;
+        bottomLane = &controlView->mLeftLV;
+      }
+
+      const float topEdge = CScriptLazyVar_float::GetValue(topLane);
+      const float bottomEdge = CScriptLazyVar_float::GetValue(bottomLane);
+      const float mousePosition = axis == MSA_Vert ? eventData.mMousePos.y : eventData.mMousePos.x;
+
+      const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(axis);
+      const float minRange = scrollValues.mMinRange;
+      const float maxRange = scrollValues.mMaxRange;
+      const float minVisible = scrollValues.mMinVisible;
+
+      float thumbStart = topEdge;
+      float thumbEnd = bottomEdge;
+      if (maxRange > minRange) {
+        const float trackSpan = bottomEdge - topEdge;
+        const float rangeSpan = maxRange - minRange;
+        thumbStart = (((scrollValues.mMinVisible - minRange) / rangeSpan) * trackSpan) + topEdge;
+        thumbEnd = (((scrollValues.mMaxVisible - minRange) / rangeSpan) * trackSpan) + topEdge;
+      }
+
+      if (topEdge <= mousePosition) {
+        if (thumbStart > mousePosition) {
+          scrollableControl->ScrollPages(axis, -1.0f);
+          return true;
+        }
+
+        if (thumbEnd > mousePosition) {
+          scrollbarView->mDragStart = mousePosition;
+          scrollbarView->mTopAtDragStart = minVisible;
+          SMauiEventData mutableEventData = eventData;
+          func_PostDragger(GetRootFrame(), static_cast<moho::IMauiDragger*>(this), &mutableEventData);
+          return true;
+        }
+
+        if (bottomEdge > mousePosition) {
+          scrollableControl->ScrollPages(axis, 1.0f);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  if (eventType != MET_WheelRotation) {
+    return false;
+  }
+
+  if (scrollableControl != nullptr && scrollbarView->mAxis == MSA_Vert) {
+    const float lineDelta = eventData.mWheelRotation <= 0 ? 1.0f : -1.0f;
+    scrollableControl->ScrollLines(MSA_Vert, lineDelta);
+  }
+
+  return true;
+}
+
+/**
+ * Address: 0x007A1410 (FUN_007A1410, Moho::CMauiScrollbar::DragMove)
+ *
+ * What it does:
+ * Converts mouse drag delta into scroll-range displacement and updates
+ * `ScrollSetTop` on the attached scrollable control.
+ */
+void moho::CMauiScrollbar::DragMove(const SMauiEventData* const eventData)
+{
+  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
+  CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl();
+  if (scrollableControl == nullptr) {
+    return;
+  }
+
+  const EMauiScrollAxis axis = scrollbarView->mAxis;
+  const float mousePosition = axis == MSA_Vert ? eventData->mMousePos.y : eventData->mMousePos.x;
+  const float delta = mousePosition - scrollbarView->mDragStart;
+
+  const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(axis);
+  const float minRange = scrollValues.mMinRange;
+  const float maxRange = scrollValues.mMaxRange;
+
+  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  const float rangePerPixel = (maxRange - minRange) / (bottom - top);
+
+  scrollableControl->ScrollSetTop(axis, (rangePerPixel * delta) + scrollbarView->mTopAtDragStart);
+}
+
+/**
+ * Address: 0x007A1500 (FUN_007A1500, Moho::CMauiScrollbar::DragRelease)
+ *
+ * What it does:
+ * No-op drag release hook for the scrollbar dragger lane.
+ */
+void moho::CMauiScrollbar::DragRelease(const SMauiEventData* const)
+{
+}
+
+/**
+ * Address: 0x007A1510 (FUN_007A1510, Moho::CMauiScrollbar::DragCancel)
+ *
+ * What it does:
+ * No-op replacement/cancel hook for the scrollbar dragger lane.
+ */
+void moho::CMauiScrollbar::OnCurrentDraggerReplaced()
+{
 }
 
 /**
@@ -12961,6 +13912,38 @@ moho::CUIMapPreview::CUIMapPreview(LuaPlus::LuaObject* const luaObject, CMauiCon
 }
 
 /**
+ * Address: 0x008507F0 (FUN_008507F0, Moho::CUIMapPreview::~CUIMapPreview)
+ *
+ * What it does:
+ * Releases the preview texture lane before the inherited control teardown
+ * continues through `CMauiControl`.
+ */
+moho::CUIMapPreview::~CUIMapPreview()
+{
+  CUIMapPreviewRuntimeView::FromMapPreview(this)->mTexture = {};
+}
+
+/**
+ * Address: 0x008507D0 (FUN_008507D0, Moho::CUIMapPreview::Delete)
+ *
+ * What it does:
+ * Mirrors the deleting-destructor thunk lane for map-preview controls and
+ * optionally frees the storage block.
+ */
+moho::CUIMapPreview* moho::CUIMapPreview::DeleteWithFlag(
+  CUIMapPreview* const object,
+  const std::uint8_t deleteFlags
+) noexcept
+{
+  object->~CUIMapPreview();
+  if ((deleteFlags & 1u) != 0u) {
+    operator delete(object);
+  }
+
+  return object;
+}
+
+/**
  * Address: 0x00850870 (FUN_00850870, Moho::CUIMapPreview::SetTexture)
  *
  * What it does:
@@ -14121,6 +15104,100 @@ int moho::cfunc_CUIWorldViewSetHighlightEnabledL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0086A650 (FUN_0086A650, Moho::CLuaWldUIProvider::StartLoadingDialog)
+ *
+ * What it does:
+ * Dispatches the `StartLoadingDialog` Lua callback on the embedded script
+ * object base lane.
+ */
+void moho::CLuaWldUIProvider::StartLoadingDialog()
+{
+  (void)static_cast<CScriptObject*>(this)->RunScript("StartLoadingDialog");
+}
+
+/**
+ * Address: 0x0086A660 (FUN_0086A660, Moho::CLuaWldUIProvider::UpdateLoadingDialog)
+ *
+ * What it does:
+ * Dispatches the `UpdateLoadingDialog` Lua callback with one float argument.
+ */
+void moho::CLuaWldUIProvider::UpdateLoadingDialog(const float deltaSeconds)
+{
+  static_cast<CScriptObject*>(this)->RunScriptNum("UpdateLoadingDialog", deltaSeconds);
+}
+
+/**
+ * Address: 0x0086A680 (FUN_0086A680, Moho::CLuaWldUIProvider::StopLoadingDialog)
+ *
+ * What it does:
+ * Dispatches the `StopLoadingDialog` Lua callback on the embedded script
+ * object base lane.
+ */
+void moho::CLuaWldUIProvider::StopLoadingDialog()
+{
+  (void)static_cast<CScriptObject*>(this)->RunScript("StopLoadingDialog");
+}
+
+/**
+ * Address: 0x0086A690 (FUN_0086A690, Moho::CLuaWldUIProvider::StartWaitingDialog)
+ *
+ * What it does:
+ * Dispatches the `StartWaitingDialog` Lua callback on the embedded script
+ * object base lane.
+ */
+void moho::CLuaWldUIProvider::StartWaitingDialog()
+{
+  (void)static_cast<CScriptObject*>(this)->RunScript("StartWaitingDialog");
+}
+
+/**
+ * Address: 0x0086A6A0 (FUN_0086A6A0, Moho::CLuaWldUIProvider::UpdateWaitingDialog)
+ *
+ * What it does:
+ * Dispatches the `UpdateWaitingDialog` Lua callback with one float argument.
+ */
+void moho::CLuaWldUIProvider::UpdateWaitingDialog(const float deltaSeconds)
+{
+  static_cast<CScriptObject*>(this)->RunScriptNum("UpdateWaitingDialog", deltaSeconds);
+}
+
+/**
+ * Address: 0x0086A6C0 (FUN_0086A6C0, Moho::CLuaWldUIProvider::StopWaitingDialog)
+ *
+ * What it does:
+ * Dispatches the `StopWaitingDialog` Lua callback on the embedded script
+ * object base lane.
+ */
+void moho::CLuaWldUIProvider::StopWaitingDialog()
+{
+  (void)static_cast<CScriptObject*>(this)->RunScript("StopWaitingDialog");
+}
+
+/**
+ * Address: 0x0086A6D0 (FUN_0086A6D0, Moho::CLuaWldUIProvider::OnStart)
+ *
+ * What it does:
+ * Dispatches the `OnStart` Lua callback on the embedded script object base
+ * lane.
+ */
+void moho::CLuaWldUIProvider::OnStart()
+{
+  (void)static_cast<CScriptObject*>(this)->RunScript("OnStart");
+}
+
+/**
+ * Address: 0x0086A8C0 (FUN_0086A8C0, Moho::CLuaWldUIProvider::DestroyGameInterface)
+ *
+ * What it does:
+ * Dispatches the `DestroyGameInterface` Lua callback on the embedded script
+ * object base lane.
+ */
+void moho::CLuaWldUIProvider::DestroyGameInterface()
+{
+  (void)static_cast<CScriptObject*>(this)->RunScript("DestroyGameInterface");
+}
+
+/**
  * Address: 0x0086AA50 (FUN_0086AA50, cfunc_CLuaWldUIProviderDestroy)
  *
  * What it does:
@@ -15157,6 +16234,54 @@ int moho::cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* const stat
   LuaPlus::LuaObject interpolatedScrollObject = SCR_ToLua<Wm3::Vector2f>(state, interpolatedScroll);
   interpolatedScrollObject.PushStack(state);
   return 1;
+}
+
+/**
+ * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::Draw)
+ *
+ * What it does:
+ * Refreshes world-view viewport lazy-var bounds when drawing world content,
+ * otherwise dispatches optional overlay draw callback state.
+ *
+ * Notes:
+ * Recovered as a free function while `CUIWorldView` remains forward-declared.
+ */
+void moho::UIWorldViewDraw(
+  CUIWorldView* const worldView,
+  CD3DPrimBatcher* const primBatcher,
+  const std::int32_t drawMask
+)
+{
+  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
+  if (drawMask == 1) {
+    const float left = CScriptLazyVar_float::GetValue(&worldViewView->mViewLeft);
+    const float top = CScriptLazyVar_float::GetValue(&worldViewView->mViewTop);
+    const float right = CScriptLazyVar_float::GetValue(&worldViewView->mViewRight);
+    const float bottom = CScriptLazyVar_float::GetValue(&worldViewView->mViewBottom);
+
+    if (worldViewView->mCachedViewLeft != left || worldViewView->mCachedViewTop != top ||
+        worldViewView->mCachedViewRight != right || worldViewView->mCachedViewBottom != bottom) {
+      worldViewView->mCachedViewLeft = left;
+      worldViewView->mCachedViewTop = top;
+      worldViewView->mCachedViewRight = right;
+      worldViewView->mCachedViewBottom = bottom;
+
+      CRenderWorldViewViewportRuntimeView* const viewport = worldViewView->mViewportCallback;
+      if (viewport != nullptr) {
+        const Wm3::Vector2f minPoint{left, top};
+        const Wm3::Vector2f maxPoint{right, bottom};
+        viewport->SetViewRect(minPoint, maxPoint);
+      }
+    }
+    return;
+  }
+
+  const std::uint32_t overlayToken = worldViewView->mOverlayDrawToken;
+  if (overlayToken != 0u && overlayToken != 4u) {
+    auto* const overlay =
+      reinterpret_cast<CUIWorldViewOverlayRuntimeView*>(static_cast<std::uintptr_t>(overlayToken) - 4u);
+    overlay->Draw(primBatcher);
+  }
 }
 
 /**
@@ -16251,6 +17376,51 @@ moho::CMauiBitmap::~CMauiBitmap()
 }
 
 /**
+ * Address: 0x0077FF70 (FUN_0077FF70, Moho::CMauiBitmap::HitTest)
+ *
+ * What it does:
+ * Applies base bounds hit-testing first, then uses packed hit-mask lanes when
+ * present; otherwise optionally checks texture alpha at the local pixel.
+ */
+bool moho::CMauiBitmap::HitTest(const float x, const float y)
+{
+  const bool baseHit = CMauiControl::HitTest(x, y);
+  if (!baseHit) {
+    return false;
+  }
+
+  const CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
+  const float localX = x - CScriptLazyVar_float::GetValue(&bitmapView->mLeftLV);
+  const float localY = y - CScriptLazyVar_float::GetValue(&bitmapView->mTopLV);
+
+  const auto* const hitMask = static_cast<const gpg::BitArray2D*>(bitmapView->mHitMask);
+  if (hitMask != nullptr) {
+    const int sampleX = static_cast<int>(localX);
+    const int sampleY = static_cast<int>(localY);
+    const std::uint32_t bitMask = 1u << (static_cast<std::uint32_t>(sampleY) & 0x1Fu);
+    const int wordRow = static_cast<int>(static_cast<std::uint32_t>(sampleY) >> 5u);
+    const int wordIndex = sampleX + (hitMask->width * wordRow);
+    return (hitMask->ptr[wordIndex] & static_cast<std::int32_t>(bitMask)) != 0;
+  }
+
+  if (!bitmapView->mUseAlphaHitTest) {
+    return baseHit;
+  }
+
+  const std::int32_t* const frameStart = bitmapView->mFrames.begin();
+  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = bitmapView->mTextureBatches.begin();
+  const std::int32_t frameTextureIndex = frameStart[bitmapView->mCurrentFrame];
+  const boost::shared_ptr<CD3DBatchTexture>& texture = textureStart[frameTextureIndex];
+  if (!texture) {
+    return baseHit;
+  }
+
+  const std::int32_t pixelX = static_cast<std::int32_t>(localX);
+  const std::int32_t pixelY = static_cast<std::int32_t>(localY);
+  return texture->GetAlphaAt(static_cast<std::uint32_t>(pixelX), static_cast<std::uint32_t>(pixelY)) != 0u;
+}
+
+/**
  * Address: 0x0077FCF0 (FUN_0077FCF0, Moho::CMauiBitmap::ShareTextures)
  *
  * What it does:
@@ -16590,6 +17760,43 @@ void moho::CMauiEdit::Frame(const float deltaSeconds)
 }
 
 /**
+ * Address: 0x00790470 (FUN_00790470, Moho::CMauiEdit::HandleEvent)
+ *
+ * What it does:
+ * Routes button press/double-click lanes to click handling and dispatches
+ * character events into edit-key processing.
+ */
+bool moho::CMauiEdit::HandleEvent(const SMauiEventData& eventData)
+{
+  if (eventData.mEventType < MET_ButtonPress) {
+    return false;
+  }
+
+  if (eventData.mEventType <= MET_ButtonDClick) {
+    HandleClickEvent(const_cast<SMauiEventData*>(&eventData));
+  } else if (eventData.mEventType == MET_Char) {
+    HandleKeyEvent(const_cast<SMauiEventData*>(&eventData));
+  }
+
+  return false;
+}
+
+/**
+ * Address: 0x0078F330 (FUN_0078F330, Moho::CMauiEdit::AbandonKeyboardFocus)
+ *
+ * What it does:
+ * Hides caret rendering and clears keyboard focus when this edit currently
+ * owns the global focus lane.
+ */
+void moho::CMauiEdit::AbandonKeyboardFocus()
+{
+  CMauiEditRuntimeView::FromEdit(this)->mCaretVisible = false;
+  if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
+    MAUI_SetKeyboardFocus(nullptr, true);
+  }
+}
+
+/**
  * Address: 0x007906F0 (FUN_007906F0, Moho::CMauiEdit::GetSelection)
  *
  * What it does:
@@ -16631,6 +17838,74 @@ bool moho::CMauiEdit::EscPressed()
 {
   const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
   return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool("OnEscPressed", std::string(editView->mText.c_str()));
+}
+
+/**
+ * Address: 0x007907B0 (FUN_007907B0, Moho::CMauiEdit::ClearSelection)
+ *
+ * What it does:
+ * Replaces the active selection with one empty UTF-8 string lane.
+ */
+void moho::CMauiEdit::ClearSelection()
+{
+  ReplaceSelection(gpg::STR_WideToUtf8(L""));
+}
+
+/**
+ * Address: 0x00790830 (FUN_00790830, Moho::CMauiEdit::ReplaceSelection)
+ *
+ * What it does:
+ * Deletes current selection and inserts replacement UTF-8 text (clamped to
+ * max-char lane), then emits `OnTextChanged` when callback guard allows.
+ */
+void moho::CMauiEdit::ReplaceSelection(const msvc8::string& replacementText)
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+
+  msvc8::string insertText{};
+  const int replacementLength = gpg::STR_Utf8Len(replacementText.c_str());
+  const int currentLength = gpg::STR_Utf8Len(editView->mText.c_str());
+  if ((currentLength + replacementLength) <= editView->mMaxChars) {
+    insertText = replacementText;
+  } else {
+    if (currentLength >= editView->mMaxChars) {
+      return;
+    }
+
+    const int maxInsertChars = editView->mMaxChars - currentLength;
+    insertText = gpg::STR_Utf8SubString(replacementText.c_str(), 0, maxInsertChars);
+  }
+
+  DeleteSelection(false);
+  const msvc8::string oldText = editView->mText;
+
+  if (insertText.size() != 0u) {
+    const int caretPosition = editView->mCaretPosition;
+    if (caretPosition == gpg::STR_Utf8Len(editView->mText.c_str())) {
+      editView->mText += insertText;
+      const int insertedLength = gpg::STR_Utf8Len(insertText.c_str());
+      editView->mCaretPosition += insertedLength;
+      editView->mClipLength += insertedLength;
+      SetEditClipOffsetRight(editView, 0);
+    } else {
+      const int caretByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), caretPosition);
+      (void)editView->mText.replace(static_cast<std::size_t>(caretByteOffset), 0u, insertText.view());
+
+      editView->mCaretPosition += gpg::STR_Utf8Len(insertText.c_str());
+      if (editView->mCaretPosition >= (editView->mClipOffset + editView->mClipLength)) {
+        const int nextTextLength = gpg::STR_Utf8Len(editView->mText.c_str());
+        SetEditClipOffsetRight(editView, nextTextLength - editView->mCaretPosition);
+      } else {
+        SetEditClipOffsetLeft(editView, editView->mClipOffset);
+      }
+    }
+  }
+
+  if (!editView->mTextChangeCallbackInProgress) {
+    editView->mTextChangeCallbackInProgress = true;
+    TextChanged(editView->mText, oldText);
+    editView->mTextChangeCallbackInProgress = false;
+  }
 }
 
 /**
@@ -16786,6 +18061,99 @@ void moho::CMauiEdit::SetCaretPosition(int position)
 }
 
 /**
+ * Address: 0x00791250 (FUN_00791250, Moho::CMauiEdit::MoveCaretLeft)
+ *
+ * What it does:
+ * Moves caret left by `amount` characters, clamped to the start-of-text lane.
+ */
+void moho::CMauiEdit::MoveCaretLeft(int amount)
+{
+  const int caretPosition = CMauiEditRuntimeView::FromEdit(this)->mCaretPosition;
+  if (caretPosition == 0) {
+    return;
+  }
+
+  if (amount >= caretPosition) {
+    amount = caretPosition;
+  }
+
+  SetCaretPosition(caretPosition - amount);
+}
+
+/**
+ * Address: 0x00791290 (FUN_00791290, Moho::CMauiEdit::MoveSelectionLeft)
+ *
+ * What it does:
+ * Extends/contracts current selection toward the left by `amount` while
+ * preserving anchor semantics used by keyboard-shift navigation.
+ */
+void moho::CMauiEdit::MoveSelectionLeft(int amount)
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  if (editView->mSelectionStart == editView->mSelectionEnd) {
+    const int caretPosition = editView->mCaretPosition;
+    editView->mSelectionStart = caretPosition;
+    editView->mSelectionEnd = caretPosition;
+  }
+
+  const int oldCaretPosition = editView->mCaretPosition;
+  if (oldCaretPosition != 0) {
+    if (amount >= oldCaretPosition) {
+      amount = oldCaretPosition;
+    }
+    SetCaretPosition(oldCaretPosition - amount);
+  }
+
+  const int newCaretPosition = editView->mCaretPosition;
+  if (oldCaretPosition == newCaretPosition) {
+    return;
+  }
+
+  if (editView->mSelectionStart == newCaretPosition) {
+    editView->mSelectionStart = 0;
+    editView->mSelectionEnd = 0;
+  } else if (editView->mSelectionStart >= newCaretPosition) {
+    editView->mSelectionStart = newCaretPosition;
+  } else {
+    editView->mSelectionEnd = newCaretPosition;
+  }
+}
+
+/**
+ * Address: 0x00791310 (FUN_00791310, Moho::CMauiEdit::MoveSelectionRight)
+ *
+ * What it does:
+ * Extends/contracts current selection toward the right by `amount` while
+ * preserving anchor semantics used by keyboard-shift navigation.
+ */
+void moho::CMauiEdit::MoveSelectionRight(const int amount)
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  if (editView->mSelectionStart == editView->mSelectionEnd) {
+    const int caretPosition = editView->mCaretPosition;
+    editView->mSelectionStart = caretPosition;
+    editView->mSelectionEnd = caretPosition;
+  }
+
+  const int oldCaretPosition = editView->mCaretPosition;
+  SetCaretPosition(oldCaretPosition + amount);
+
+  const int newCaretPosition = editView->mCaretPosition;
+  if (oldCaretPosition == newCaretPosition) {
+    return;
+  }
+
+  if (editView->mSelectionEnd == newCaretPosition) {
+    editView->mSelectionStart = 0;
+    editView->mSelectionEnd = 0;
+  } else if (editView->mSelectionEnd <= newCaretPosition) {
+    editView->mSelectionEnd = newCaretPosition;
+  } else {
+    editView->mSelectionStart = newCaretPosition;
+  }
+}
+
+/**
  * Address: 0x007915C0 (FUN_007915C0, Moho::CMauiEdit::HandleClickEvent)
  *
  * What it does:
@@ -16825,6 +18193,215 @@ void moho::CMauiEdit::HandleClickEvent(SMauiEventData* const eventData)
   editView->mSelectionStart = selectionStart;
   editView->mSelectionEnd = selectionEnd;
   SetCaretPosition(selectionEnd);
+}
+
+/**
+ * Address: 0x00791780 (FUN_00791780, Moho::CMauiEdit::HandleKeyEvent)
+ *
+ * What it does:
+ * Processes edit keyboard lanes: caret/selection movement, delete/backspace,
+ * clipboard shortcuts, and text/non-text callback dispatch.
+ */
+void moho::CMauiEdit::HandleKeyEvent(SMauiEventData* const eventData)
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  const int keyCode = eventData->mKeyCode;
+
+  auto processDefaultKeyPath = [&]() {
+    if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+      constexpr int kCtrlCChar = 3;
+      constexpr int kCtrlVChar = 22;
+      constexpr int kCtrlXChar = 24;
+
+      switch (keyCode) {
+      case kCtrlCChar:
+        CopyEditSelectionToClipboard(this);
+        break;
+      case kCtrlVChar:
+        ReplaceSelection(moho::WIN_GetClipboardText());
+        break;
+      case kCtrlXChar:
+        CopyEditSelectionToClipboard(this);
+        DeleteSelection(true);
+        break;
+      default:
+        break;
+      }
+      return;
+    }
+
+    if (keyCode <= MKEY_START) {
+      if (!reinterpret_cast<CScriptObject*>(this)->RunScriptOnCharPressed(keyCode)) {
+        ClearSelection();
+      }
+      return;
+    }
+
+    [[maybe_unused]] bool isSpecial = false;
+    const int translatedKeyCode = wxCharCodeWXToMSW(keyCode, &isSpecial);
+    NonTextKeyPressed(translatedKeyCode, eventData);
+  };
+
+  if (keyCode > MKEY_END) {
+    switch (static_cast<EMauiKeyCode>(keyCode)) {
+    case MKEY_HOME:
+      if ((eventData->mModifiers & MEM_Shift) != 0u) {
+        const int moveAmount = editView->mCaretPosition;
+        if (moveAmount != 0) {
+          MoveSelectionLeft(moveAmount);
+        }
+      } else {
+        editView->mCaretPosition = 0;
+        editView->mSelectionStart = 0;
+        editView->mSelectionEnd = 0;
+        SetEditClipOffsetLeft(editView, 0);
+      }
+      break;
+
+    case MKEY_LEFT:
+      if ((eventData->mModifiers & MEM_Shift) != 0u) {
+        if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+          const int moveAmount = editView->mCaretPosition - gpg::STR_GetWordStartIndex(editView->mText, editView->mCaretPosition);
+          if (moveAmount != 0) {
+            MoveSelectionLeft(moveAmount);
+          }
+        } else {
+          MoveSelectionLeft(1);
+        }
+      } else {
+        if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+          const int wordStart = gpg::STR_GetWordStartIndex(editView->mText, editView->mCaretPosition);
+          SetCaretPosition(wordStart);
+        } else {
+          MoveCaretLeft(1);
+        }
+        editView->mSelectionStart = 0;
+        editView->mSelectionEnd = 0;
+      }
+      break;
+
+    case MKEY_RIGHT:
+      if ((eventData->mModifiers & MEM_Shift) != 0u) {
+        if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+          const int nextWordStart = gpg::STR_GetNextWordStartIndex(editView->mText, editView->mCaretPosition);
+          const int moveAmount = nextWordStart - editView->mCaretPosition;
+          if (moveAmount != 0) {
+            MoveSelectionRight(moveAmount);
+          }
+        } else {
+          MoveSelectionRight(1);
+        }
+      } else {
+        int nextCaretPosition = editView->mCaretPosition + 1;
+        if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+          nextCaretPosition = gpg::STR_GetNextWordStartIndex(editView->mText, editView->mCaretPosition);
+        }
+
+        SetCaretPosition(nextCaretPosition);
+        editView->mSelectionStart = 0;
+        editView->mSelectionEnd = 0;
+      }
+      break;
+
+    case MKEY_INSERT:
+      if ((eventData->mModifiers & MEM_Shift) != 0u) {
+        ReplaceSelection(moho::WIN_GetClipboardText());
+      } else if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+        CopyEditSelectionToClipboard(this);
+      }
+      break;
+
+    default:
+      processDefaultKeyPath();
+      break;
+    }
+
+    return;
+  }
+
+  if (keyCode == MKEY_END) {
+    if ((eventData->mModifiers & MEM_Shift) != 0u) {
+      const int textLength = gpg::STR_Utf8Len(editView->mText.c_str());
+      const int moveAmount = textLength - editView->mCaretPosition;
+      if (moveAmount != 0) {
+        MoveSelectionRight(moveAmount);
+      }
+    } else {
+      editView->mCaretPosition = gpg::STR_Utf8Len(editView->mText.c_str());
+      editView->mSelectionStart = 0;
+      editView->mSelectionEnd = 0;
+      SetEditClipOffsetRight(editView, 0);
+    }
+    return;
+  }
+
+  switch (static_cast<EMauiKeyCode>(keyCode)) {
+  case MKEY_BACK:
+    if ((eventData->mModifiers & MEM_Alt) != 0u) {
+      return;
+    }
+
+    if ((eventData->mModifiers & MEM_Ctrl) == 0u) {
+      DeleteCharAtCaret(false);
+      DeleteSelection(true);
+      return;
+    }
+
+    {
+      const int moveAmount = editView->mCaretPosition - gpg::STR_GetWordStartIndex(editView->mText, editView->mCaretPosition);
+      if (moveAmount != 0) {
+        MoveSelectionLeft(moveAmount);
+      }
+    }
+    DeleteSelection(true);
+    return;
+
+  case MKEY_RETURN:
+    if (!EnterPressed()) {
+      if (editView->mText.size() != 0u) {
+        ClearText();
+      } else {
+        AbandonKeyboardFocus();
+      }
+    }
+    return;
+
+  case MKEY_ESCAPE:
+    if (EscPressed()) {
+      return;
+    }
+
+    if (editView->mText.size() != 0u) {
+      ClearText();
+    } else {
+      AbandonKeyboardFocus();
+    }
+    return;
+
+  case MKEY_DELETE:
+    if ((eventData->mModifiers & MEM_Shift) != 0u) {
+      CopyEditSelectionToClipboard(this);
+      DeleteSelection(true);
+      return;
+    }
+
+    if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
+      const int moveAmount = gpg::STR_GetNextWordStartIndex(editView->mText, editView->mCaretPosition) - editView->mCaretPosition;
+      if (moveAmount != 0) {
+        MoveSelectionRight(moveAmount);
+      }
+      DeleteSelection(true);
+      return;
+    }
+
+    DeleteCharAtCaret(true);
+    DeleteSelection(true);
+    return;
+
+  default:
+    processDefaultKeyPath();
+    return;
+  }
 }
 
 /**
@@ -17171,6 +18748,22 @@ void moho::CMauiFrame::Dump()
 }
 
 /**
+ * Address: 0x00796550 (FUN_00796550, Moho::CMauiFrame::SetBounds)
+ *
+ * What it does:
+ * Resets frame origin to `(0,0)` and stores integer client-size bounds into
+ * width/height lazy-var lanes.
+ */
+void moho::CMauiFrame::SetBounds(const int width, const int height)
+{
+  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
+  CScriptLazyVar_float::SetValue(&frameView->mLeftLV, 0.0f);
+  CScriptLazyVar_float::SetValue(&frameView->mTopLV, 0.0f);
+  CScriptLazyVar_float::SetValue(&frameView->mWidthLV, static_cast<float>(width));
+  CScriptLazyVar_float::SetValue(&frameView->mHeightLV, static_cast<float>(height));
+}
+
+/**
  * Address: 0x007961B0 (FUN_007961B0, Moho::CMauiFrame::Create)
  *
  * What it does:
@@ -17216,11 +18809,20 @@ boost::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(LuaPlus::LuaState* 
   return outFrame;
 }
 
+/**
+ * Address: 0x00796740 (FUN_00796740, Moho::CMauiFrame::DumpControlsUnder)
+ *
+ * What it does:
+ * Walks one frame subtree depth-first, hit-tests each control at `(x, y)`,
+ * and calls `Dump()` on every control that matches.
+ */
 void moho::CMauiFrame::DumpControlsUnder(CMauiFrame* const frame, const float x, const float y)
 {
-  (void)frame;
-  (void)x;
-  (void)y;
+  for (CMauiControl* control = frame; control != nullptr; control = control->DepthFirstSuccessor(frame)) {
+    if (control->HitTest(x, y)) {
+      control->Dump();
+    }
+  }
 }
 
 /**
@@ -17527,6 +19129,42 @@ void moho::UI_NoteGameSpeedChanged(const std::int32_t slotZeroBased, const std::
       callbackFunction(slotZeroBased + 1, gameSpeed);
     }
   );
+}
+
+/**
+ * Address: 0x0088BA50 (FUN_0088BA50, func_DriverNoteGameSpeedChanged)
+ *
+ * What it does:
+ * Forwards game-speed UI callback only while one active simulation driver
+ * instance exists.
+ */
+void moho::UI_DriverNoteGameSpeedChanged(const std::int32_t slotZeroBased, const std::int32_t gameSpeed)
+{
+  if (SIM_GetActiveDriver() != nullptr) {
+    UI_NoteGameSpeedChanged(slotZeroBased, gameSpeed);
+  }
+}
+
+/**
+ * Address: 0x0088B9B0 (FUN_0088B9B0, Moho::CWldUiInterface::ReportBottleneck)
+ *
+ * What it does:
+ * Forwards one client-bottleneck snapshot to the GPGNet reporting lane.
+ */
+void moho::UI_ReportBottleneck(const SClientBottleneckInfo& info)
+{
+  GPGNET_ReportBottleneck(info);
+}
+
+/**
+ * Address: 0x0088B9C0 (FUN_0088B9C0, Moho::CWldUiInterface::ReportBottleneckCleared)
+ *
+ * What it does:
+ * Forwards one bottleneck-cleared notification to the GPGNet reporting lane.
+ */
+void moho::UI_ReportBottleneckCleared()
+{
+  GPGNET_ReportBottleneckCleared();
 }
 
 /**
@@ -17994,18 +19632,40 @@ namespace
 {
   struct FactoryCommandQueueItemRuntimeView
   {
-    msvc8::string blueprintId; // +0x00
-    std::int32_t count;        // +0x1C
-    std::int32_t commandType;  // +0x20
-    void* commandDataBegin;    // +0x24
-    void* commandDataEnd;      // +0x28
-    void* commandDataCapacity; // +0x2C
+    msvc8::string blueprintId;    // +0x00
+    std::int32_t count;           // +0x1C
+    msvc8::vector<void*> commandData; // +0x20
   };
   static_assert(
-    offsetof(FactoryCommandQueueItemRuntimeView, commandDataBegin) == 0x24,
-    "FactoryCommandQueueItemRuntimeView::commandDataBegin offset must be 0x24"
+    offsetof(FactoryCommandQueueItemRuntimeView, commandData) == 0x20,
+    "FactoryCommandQueueItemRuntimeView::commandData offset must be 0x20"
   );
   static_assert(sizeof(FactoryCommandQueueItemRuntimeView) == 0x30, "FactoryCommandQueueItemRuntimeView size must be 0x30");
+
+  /**
+   * Address: 0x00837AA0 (FUN_00837AA0, func_CpyBuildQueueItems)
+   *
+   * What it does:
+   * Copies one half-open range of factory build-queue items using `msvc8`
+   * string assignment and command-data vector copy semantics.
+   */
+  [[maybe_unused]] FactoryCommandQueueItemRuntimeView* CopyBuildQueueItems(
+    FactoryCommandQueueItemRuntimeView* destination,
+    FactoryCommandQueueItemRuntimeView* source,
+    FactoryCommandQueueItemRuntimeView* end
+  )
+  {
+    auto* sourceCursor = source;
+    auto* destinationCursor = destination;
+    while (sourceCursor != end) {
+      destinationCursor->blueprintId.assign(sourceCursor->blueprintId, 0u, msvc8::string::npos);
+      destinationCursor->count = sourceCursor->count;
+      destinationCursor->commandData = sourceCursor->commandData;
+      ++sourceCursor;
+      ++destinationCursor;
+    }
+    return destinationCursor;
+  }
 
   /**
    * Address: 0x00837B00 (FUN_00837B00, func_DeleteRangeBuildQueueItems)
@@ -18021,12 +19681,13 @@ namespace
   )
   {
     while (begin != end) {
-      if (begin->commandDataBegin != nullptr) {
-        ::operator delete(begin->commandDataBegin);
+      auto& commandDataView = msvc8::AsVectorRuntimeView(begin->commandData);
+      if (commandDataView.begin != nullptr) {
+        ::operator delete(commandDataView.begin);
       }
-      begin->commandDataBegin = nullptr;
-      begin->commandDataEnd = nullptr;
-      begin->commandDataCapacity = nullptr;
+      commandDataView.begin = nullptr;
+      commandDataView.end = nullptr;
+      commandDataView.capacityEnd = nullptr;
 
       if (begin->blueprintId.myRes >= 0x10u) {
         ::operator delete(begin->blueprintId.bx.ptr);
@@ -18077,9 +19738,85 @@ void moho::UI_StopCursorText()
   );
 }
 
+namespace
+{
+  struct CommandFeedbackBlipRuntimeView final
+  {
+    moho::Mesh* mMesh; // +0x00
+    float mDuration;   // +0x04
+    float mCurTime;    // +0x08
+  };
+
+  static_assert(
+    offsetof(CommandFeedbackBlipRuntimeView, mDuration) == 0x04,
+    "CommandFeedbackBlipRuntimeView::mDuration offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CommandFeedbackBlipRuntimeView, mCurTime) == 0x08,
+    "CommandFeedbackBlipRuntimeView::mCurTime offset must be 0x08"
+  );
+  static_assert(sizeof(CommandFeedbackBlipRuntimeView) == 0x0C, "CommandFeedbackBlipRuntimeView size must be 0x0C");
+
+  msvc8::list<CommandFeedbackBlipRuntimeView> sCommandFeedbackBlips;
+
+  void DestroyCommandFeedbackBlipMesh(moho::Mesh*& mesh) noexcept
+  {
+    if (mesh == nullptr) {
+      return;
+    }
+
+    delete mesh;
+    mesh = nullptr;
+  }
+} // namespace
+
+/**
+ * Address: 0x008586C0 (FUN_008586C0, Moho::RemoveCommandFeedbackBlips)
+ *
+ * What it does:
+ * Removes every command-feedback blip whose `mCurTime >= mDuration`.
+ *
+ * Notes:
+ * The binary uses one unused stdcall argument lane (`push 0`).
+ */
+void moho::RemoveCommandFeedbackBlips(const std::int32_t unused)
+{
+  (void)unused;
+
+  for (msvc8::list<CommandFeedbackBlipRuntimeView>::iterator it = sCommandFeedbackBlips.begin();
+       it != sCommandFeedbackBlips.end();) {
+    if (it->mCurTime < it->mDuration) {
+      ++it;
+      continue;
+    }
+
+    it = sCommandFeedbackBlips.erase(it);
+  }
+}
+
+/**
+ * Address: 0x00857B00 (FUN_00857B00, Moho::UpdateCommandFeedbackBlips)
+ *
+ * What it does:
+ * Advances command-feedback blip timers, destroys expired meshes, then
+ * compacts expired blip nodes from the global blip list.
+ */
 void moho::UI_UpdateCommandFeedbackBlips(const float deltaSeconds)
 {
-  (void)deltaSeconds;
+  (void)moho::MeshRenderer::GetInstance();
+
+  for (msvc8::list<CommandFeedbackBlipRuntimeView>::iterator it = sCommandFeedbackBlips.begin();
+       it != sCommandFeedbackBlips.end();
+       ++it) {
+    CommandFeedbackBlipRuntimeView& blip = *it;
+    const float updatedTime = blip.mCurTime + deltaSeconds;
+    blip.mCurTime = updatedTime;
+    if (updatedTime >= blip.mDuration) {
+      DestroyCommandFeedbackBlipMesh(blip.mMesh);
+    }
+  }
+
+  RemoveCommandFeedbackBlips(0);
 }
 
 void moho::UI_DumpCurrentInputCapture()

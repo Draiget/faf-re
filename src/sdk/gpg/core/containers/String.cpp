@@ -6,7 +6,13 @@ using namespace gpg;
 
 msvc8::string gpg::sWhitespaceChars{" \n\t\r"};
 
-// 0x009380A0
+/**
+ * Address: 0x009380A0 (FUN_009380A0, gpg::STR_Utf8ByteOffset)
+ *
+ * What it does:
+ * Advances `pos` UTF-8 codepoints (or to end-of-string) and returns the
+ * resulting byte offset from the original string start.
+ */
 int gpg::STR_Utf8ByteOffset(
   const StrArg str,
   const int pos
@@ -49,7 +55,13 @@ const char* gpg::STR_NextUtf8Char(
   return str;
 }
 
-// 0x00938020
+/**
+ * Address: 0x00938020 (FUN_00938020, gpg::STR_PreviousUtf8Char)
+ *
+ * What it does:
+ * Walks backward to the previous UTF-8 codepoint boundary, bounded by
+ * `start` when non-null.
+ */
 const char* gpg::STR_PreviousUtf8Char(
   const char* str,
   const char* start
@@ -100,7 +112,13 @@ msvc8::string gpg::STR_Utf8SubString(
   return msvc8::string{start, static_cast<std::size_t>(str - start)};
 }
 
-// 0x00937F90
+/**
+ * Address: 0x00937F90 (FUN_00937F90, gpg::STR_EncodeUtf8Char)
+ *
+ * What it does:
+ * Encodes one wide character to UTF-8 (1-3 bytes) when `limit` permits and
+ * returns the next write position; otherwise returns the original `dest`.
+ */
 char* gpg::STR_EncodeUtf8Char(
   char* dest,
   const wchar_t chr,
@@ -127,55 +145,65 @@ char* gpg::STR_EncodeUtf8Char(
   return dest;
 }
 
-// 0x00937EF0
+/**
+ * Address: 0x00937EF0 (FUN_00937EF0, gpg::STR_DecodeUtf8Char)
+ *
+ * What it does:
+ * Decodes one UTF-8 sequence and returns the pointer advanced past consumed
+ * bytes, preserving binary continuation-byte validation behavior.
+ */
 const char* gpg::STR_DecodeUtf8Char(
   const char* str,
   wchar_t& dest
 )
 {
-  const char c1 = *str;
-  ++str;
-  wchar_t chr = c1;
-  if (c1 >= 0) {
-    dest = chr;
-    return str;
-  }
-  if ((c1 & 0xE0) == 0xC0) {
-    chr = (c1 & 0x1F) << 6;
-    const char c2 = *str;
-    if ((c2 & 0xC0) == 0x80) {
-      chr |= c2 & 0x3F;
-      ++str;
-    }
-  } else {
-    if ((c1 & 0xF0) == 0xE0) {
-      chr = c1 << 12;
-    } else if ((c1 & 0xF8) == 0xF0) {
-      const char c2 = *str;
-      if ((c2 & 0xC0) == 0x80) {
-        chr = c2 << 12;
-        ++str;
-      } else {
-        dest = 0;
-        return str;
-      }
+  const char* cursor = str + 1;
+  const signed char leadSigned = static_cast<signed char>(*str);
+  const unsigned char lead = static_cast<unsigned char>(*str);
+
+  wchar_t codepoint = static_cast<wchar_t>(leadSigned);
+  if ((lead & 0x80u) != 0u) {
+    if ((lead & 0xE0u) == 0xC0u) {
+      codepoint = static_cast<wchar_t>((lead & 0x1Fu) << 6);
     } else {
-      dest = chr;
-      return str;
-    }
-    char nextC = *str;
-    if ((nextC & 0xC0) == 0x80) {
-      chr |= (nextC & 0x3F) << 6;
-      ++str;
-      nextC = *str;
-      if ((nextC & 0xC0) == 0x80) {
-        chr |= nextC & 0x3F;
-        ++str;
+      if ((lead & 0xF0u) == 0xE0u) {
+        codepoint = static_cast<wchar_t>((lead & 0x0Fu) << 12);
+      } else {
+        if ((lead & 0xF8u) != 0xF0u) {
+          dest = codepoint;
+          return cursor;
+        }
+
+        codepoint = 0;
+        const unsigned char c2 = static_cast<unsigned char>(*cursor);
+        if ((c2 & 0xC0u) != 0x80u) {
+          dest = codepoint;
+          return cursor;
+        }
+
+        codepoint = static_cast<wchar_t>((c2 & 0x3Fu) << 12);
+        cursor = str + 2;
       }
+
+      const unsigned char c3 = static_cast<unsigned char>(*cursor);
+      if ((c3 & 0xC0u) != 0x80u) {
+        dest = codepoint;
+        return cursor;
+      }
+
+      codepoint = static_cast<wchar_t>(codepoint | ((c3 & 0x3Fu) << 6));
+      ++cursor;
+    }
+
+    const unsigned char c4 = static_cast<unsigned char>(*cursor);
+    if ((c4 & 0xC0u) == 0x80u) {
+      codepoint = static_cast<wchar_t>(codepoint | (c4 & 0x3Fu));
+      ++cursor;
     }
   }
-  dest = chr;
-  return str;
+
+  dest = codepoint;
+  return cursor;
 }
 
 // 0x00938680
@@ -260,51 +288,90 @@ void gpg::STR_GetTokens(
   }
 }
 
-// 0x009384A0
+/**
+ * Address: 0x009384A0 (FUN_009384A0, gpg::STR_GetWordStartIndex)
+ *
+ * What it does:
+ * Walks backward across UTF-8 codepoint boundaries from `pos` and returns the
+ * start index of the current/previous word boundary.
+ */
 int gpg::STR_GetWordStartIndex(
   msvc8::string& str,
-  int pos
+  const int pos
 )
 {
   if (STR_Utf8Len(str.data()) <= 1) {
     return 0;
   }
+
+  const char* const begin = str.data();
+  const char* cursor = begin + STR_Utf8ByteOffset(begin, pos);
+  int index = pos;
   bool boundary = false;
-  for (const char* i = &str[STR_Utf8ByteOffset(str.data(), pos)]; *i; i = STR_NextUtf8Char(i)) {
-    char c = *i;
-    const auto res = sWhitespaceChars.find(&c, 0, 1);
-    if (!boundary) {
-      boundary = res == msvc8::string::npos;
-    } else if (res != msvc8::string::npos) {
-      return pos;
+
+  while (cursor > begin) {
+    cursor = STR_PreviousUtf8Char(cursor, begin);
+    const char c = *cursor;
+    const auto whitespacePos = sWhitespaceChars.find(&c, 0, 1);
+
+    if (boundary) {
+      if (whitespacePos != msvc8::string::npos) {
+        return index;
+      }
+    } else {
+      boundary = whitespacePos == msvc8::string::npos;
     }
-    --pos;
+
+    --index;
   }
-  return pos;
+
+  return index;
 }
 
-// 0x00938570
+/**
+ * Address: 0x00938570 (FUN_00938570, gpg::STR_GetNextWordStartIndex)
+ *
+ * msvc8::string &, int
+ *
+ * IDA signature:
+ * int __cdecl gpg::STR_GetNextWordStartIndex(std::string *str, int pos);
+ *
+ * What it does:
+ * Scans forward from `pos` and returns the first non-whitespace codepoint
+ * after the next whitespace separator; returns UTF-8 length when none exists.
+ */
 int gpg::STR_GetNextWordStartIndex(
   msvc8::string& str,
   int pos
 )
 {
-  const int len = STR_Utf8Len(str.data());
-  if (len == 0 || len <= pos) {
+  const char* const begin = str.data();
+  const int len = STR_Utf8Len(begin);
+  if (len == 0 || pos >= len) {
     return len;
   }
-  bool boundary = false;
-  for (const char* i = &str[STR_Utf8ByteOffset(str.data(), pos)]; *i; i = STR_NextUtf8Char(i)) {
-    char c = *i;
-    const auto res = sWhitespaceChars.find(&c, 0, 1);
-    if (!boundary) {
-      boundary = res == msvc8::string::npos;
-    } else if (res == msvc8::string::npos) {
-      return pos;
+
+  const char* cursor = begin + STR_Utf8ByteOffset(begin, pos);
+  int index = pos;
+  bool seenWhitespace = false;
+
+  while (*cursor != '\0') {
+    const char c = *cursor;
+    const bool isWhitespace = (sWhitespaceChars.find(&c, 0, 1) != msvc8::string::npos);
+
+    if (seenWhitespace) {
+      if (!isWhitespace) {
+        return index;
+      }
+    } else {
+      seenWhitespace = isWhitespace;
     }
-    ++pos;
+
+    ++index;
+    cursor = STR_NextUtf8Char(cursor);
   }
-  return pos;
+
+  return index;
 }
 
 // 0x00938190
@@ -332,7 +399,13 @@ bool gpg::STR_StartsWith(
   return strncmp(str, start, strlen(start)) == 0;
 }
 
-// 0x00938250
+/**
+ * Address: 0x00938250 (FUN_00938250, gpg::STR_EndsWithNoCase)
+ *
+ * What it does:
+ * Returns whether `str` ends with `end` using ASCII case-insensitive
+ * comparison.
+ */
 bool gpg::STR_EndsWithNoCase(
   const StrArg str,
   const StrArg end
@@ -343,7 +416,13 @@ bool gpg::STR_EndsWithNoCase(
   return strLen > endLen && !_stricmp(&str[strLen - endLen], end);
 }
 
-// 0x009382B0
+/**
+ * Address: 0x009382B0 (FUN_009382B0, gpg::STR_StartsWithNoCase)
+ *
+ * What it does:
+ * Returns whether `str` begins with `start` using ASCII case-insensitive
+ * comparison.
+ */
 bool gpg::STR_StartsWithNoCase(
   const StrArg str,
   const StrArg start
@@ -431,7 +510,13 @@ bool gpg::STR_EqualsNoCase(
   return _stricmp(lhs, rhs) == 0;
 }
 
-// 0x009382F0
+/**
+ * Address: 0x009382F0 (FUN_009382F0, gpg::STR_IsIdent)
+ *
+ * What it does:
+ * Validates one identifier token using ASCII `[A-Za-z_]` start and
+ * `[A-Za-z0-9_]*` tail rules.
+ */
 bool gpg::STR_IsIdent(
   StrArg str
 )
@@ -550,6 +635,12 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x00938450 (FUN_00938450, gpg::STR_MatchWildcard)
+ *
+ * What it does:
+ * Calls the wildcard matcher in default case-sensitive mode.
+ */
 bool gpg::STR_MatchWildcard(
   StrArg text,
   StrArg pattern
@@ -601,6 +692,12 @@ bool gpg::STR_MatchWildcard(
   return *pattern == '\0';
 }
 
+/**
+ * Address: 0x00938470 (FUN_00938470, gpg::STR_WildcardValidPrefix)
+ *
+ * What it does:
+ * Calls wildcard-prefix validation in default case-sensitive mode.
+ */
 bool gpg::STR_WildcardValidPrefix(
   StrArg prefix,
   StrArg pattern
@@ -654,7 +751,13 @@ msvc8::string gpg::STR_GetWhitespaceCharacters()
   return msvc8::string{sWhitespaceChars};
 }
 
-// 0x00938BF0
+/**
+ * Address: 0x00938BF0 (FUN_00938BF0, gpg::STR_Chop)
+ *
+ * What it does:
+ * Returns `str` without its trailing `chr` delimiter (or without the last
+ * character when `chr==0`).
+ */
 msvc8::string gpg::STR_Chop(
   const StrArg str,
   const char chr
@@ -687,7 +790,12 @@ msvc8::string gpg::STR_ToLower(
   return builder;
 }
 
-// 0x009389C0
+/**
+ * Address: 0x009389C0 (FUN_009389C0, gpg::STR_ToUpper)
+ *
+ * What it does:
+ * Produces one uppercase ASCII copy of the input string.
+ */
 msvc8::string gpg::STR_ToUpper(
   StrArg str
 )

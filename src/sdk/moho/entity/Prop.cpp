@@ -176,6 +176,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x0067F140 (FUN_0067F140, func_GetPropFactory)
+   *
+   * What it does:
+   * Returns cached `Prop` metatable object from Lua object-factory storage.
+   */
+  LuaPlus::LuaObject* func_GetPropFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<Prop>::Instance().Get(state);
+    return object;
+  }
+
+  /**
    * Address: 0x00BD50F0 (FUN_00BD50F0, register_CScrLuaMetatableFactory_Prop_Index)
    *
    * What it does:

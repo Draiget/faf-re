@@ -86,11 +86,19 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x007B9040 (FUN_007B9040, func_UnknownCommand)
+   *
+   * What it does:
+   * Emits a `gpg::Warnf` warning naming the unrecognized GPGNET command and
+   * returns; the original engine quietly drops unknown commands rather than
+   * propagating an exception.
+   */
   void LogUnknownCommand(
     const msvc8::string& commandName
   )
   {
-    throw std::runtime_error(gpg::STR_Printf("Unknown GPGNET command \"%s\".", commandName.c_str()).c_str());
+    gpg::Warnf("GPGNET: Ignoring unknown gpg.net command \"%s\".", commandName.c_str());
   }
 } // namespace
 
@@ -695,6 +703,36 @@ void CGpgNetInterface::Connect(
   mConnectThreadWorker = thread;
   if (oldThread) {
     oldThread->join();
+    delete oldThread;
+  }
+}
+
+/**
+ * Address: 0x007B6BA0 (FUN_007B6BA0, func_NET_connect)
+ *
+ * What it does:
+ * Starts async GPGNet-launch connect worker from one command-line template
+ * (for example containing `%s` endpoint substitution).
+ */
+void CGpgNetInterface::Connect(
+  const msvc8::string& launchCommandTemplate
+)
+{
+  boost::mutex::scoped_lock lock(mLock);
+
+  if (mConnectionState != kNetStatePending) {
+    throw std::runtime_error("Already connected.");
+  }
+
+  mConnectionState = kNetStateConnecting;
+
+  boost::thread* const thread = new boost::thread([this, launchCommandTemplate] {
+    ConnectThread(launchCommandTemplate);
+  });
+
+  boost::thread* const oldThread = mConnectThreadWorker;
+  mConnectThreadWorker = thread;
+  if (oldThread != nullptr) {
     delete oldThread;
   }
 }
@@ -1379,6 +1417,92 @@ void CGpgNetInterface::ConnectThread(
   } else {
     EnqueueCommand0("ConnectFailed", kNetStateTimedOut);
   }
+}
+
+/**
+ * Address: 0x007BA640 (FUN_007BA640, func_NET_ConnectThread)
+ *
+ * What it does:
+ * Creates a local loopback TCP listener, launches external GPGNet process
+ * using one command-line template, accepts the incoming socket, and starts
+ * command read loop.
+ */
+void CGpgNetInterface::ConnectThread(
+  const msvc8::string& launchCommandTemplate
+)
+{
+  const msvc8::string loopbackAddress("127.0.0.1");
+  INetTCPServer* const createdServer = NET_CreateTCPServer(
+    NET_GetUInt32FromDottedOcted(loopbackAddress),
+    0
+  );
+
+  INetTCPServer* const oldServer = mTcpServer;
+  mTcpServer = createdServer;
+  if (oldServer != nullptr) {
+    delete oldServer;
+  }
+
+  if (mTcpServer == nullptr) {
+    EnqueueCommand0("LaunchFailed", kNetStateTimedOut);
+    return;
+  }
+
+  STARTUPINFOA startupInfo{};
+  startupInfo.cb = sizeof(startupInfo);
+  PROCESS_INFORMATION processInformation{};
+
+  const u_short localPort = mTcpServer->GetLocalPort();
+  const msvc8::string listenerAddress = gpg::STR_Printf("127.0.0.1:%d", static_cast<int>(localPort));
+  const msvc8::string launchCommand = gpg::STR_Printf(launchCommandTemplate.c_str(), listenerAddress.c_str());
+
+  std::vector<char> launchCommandBuffer(launchCommand.size() + 1u, '\0');
+  if (!launchCommand.empty()) {
+    std::memcpy(launchCommandBuffer.data(), launchCommand.data(), launchCommand.size());
+  }
+
+  const BOOL launchOk = ::CreateProcessA(
+    nullptr,
+    launchCommandBuffer.data(),
+    nullptr,
+    nullptr,
+    FALSE,
+    0,
+    nullptr,
+    nullptr,
+    &startupInfo,
+    &processInformation
+  );
+
+  if (!launchOk) {
+    const msvc8::string lastError = WIN_GetLastError();
+    gpg::Logf("CreateProcess() failed: %s", lastError.c_str());
+    EnqueueCommand0("LaunchFailed", kNetStateTimedOut);
+    return;
+  }
+
+  ::CloseHandle(processInformation.hProcess);
+  ::CloseHandle(processInformation.hThread);
+
+  INetTCPSocket* const acceptedSocket = mTcpServer->Accept();
+  INetTCPSocket* const oldSocket = mTcpSocket;
+  mTcpSocket = acceptedSocket;
+  if (oldSocket != nullptr) {
+    delete oldSocket;
+  }
+
+  INetTCPServer* const serverToDestroy = mTcpServer;
+  mTcpServer = nullptr;
+  if (serverToDestroy != nullptr) {
+    delete serverToDestroy;
+  }
+
+  if (mTcpSocket == nullptr) {
+    EnqueueCommand0("LaunchFailed", kNetStateTimedOut);
+    return;
+  }
+
+  ReadFromSocket();
 }
 
 /**

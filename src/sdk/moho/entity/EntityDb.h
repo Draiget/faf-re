@@ -19,6 +19,7 @@ namespace moho
   struct SEntitySetTemplateUnit;
   struct BVIntSetAddResult;
   class Prop;
+  class CArmyImpl;
   class Sim;
   class Unit;
   struct CEntityDbIdPoolNode;
@@ -84,6 +85,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006B69D0 (FUN_006B69D0, Moho::CUnitIterAllArmies::CUnitIterAllArmies)
+     *
+     * What it does:
+     * Initializes one all-armies iterator lane for a specific army source id
+     * by taking `[source, source + 1)` bounds inside `CEntityDb::mAllUnits`.
+     */
+    explicit CUnitIterAllArmies(CArmyImpl* army);
+
+    /**
      * Address: 0x006B6AA0 (FUN_006B6AA0, Moho::CUnitIterAllArmies::CUnitIterAllArmies)
      *
      * What it does:
@@ -124,6 +134,17 @@ namespace moho
      * DB-owned runtime tracking maps.
      */
     ~CEntityDb();
+
+    /**
+     * Address: 0x00684560 (FUN_00684560)
+     * Mangled: ?Purge@EntityDB@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Compacts registered entity-set payloads to remove destroy-dispatched
+     * entities, destroys every tracked entity, and advances the DB id-pool
+     * lanes.
+     */
+    void Purge();
 
     /**
      * Address: 0x00684C30 (FUN_00684C30, Moho::EntityDB::AddBoundedProp)

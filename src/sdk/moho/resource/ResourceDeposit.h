@@ -33,6 +33,16 @@ namespace moho
     static void MemberDeserialize(ResourceDeposit* object, gpg::ReadArchive* archive);
 
     /**
+     * Address: 0x00548760 (FUN_00548760, Moho::ResourceDeposit::MemberSerialize)
+     *
+     * What it does:
+     * Writes one reflected `ResourceDeposit` payload into an archive by
+     * serializing the footprint rectangle first and the resource-type lane
+     * second.
+     */
+    static void MemberSerialize(ResourceDeposit* object, gpg::WriteArchive* archive);
+
+    /**
      * Address: 0x00546170 (Moho::ResourceDeposit::Intersects)
      *
      * Moho::CGeomSolid3 const&, Moho::CHeightField const&

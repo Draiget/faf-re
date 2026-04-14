@@ -1,9 +1,11 @@
 #include "CEconomy.h"
 
+#include <cstdint>
 #include <typeinfo>
 #include <new>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/sim/CEconStorage.h"
@@ -105,10 +107,10 @@ namespace moho
    * Writes economy-request intrusive-list pointers in reverse link order and
    * appends one null pointer terminator.
    */
-  void CEconomy::SerializeRequests(gpg::WriteArchive* const archive)
-  {
-    if (archive == nullptr) {
-      return;
+void CEconomy::SerializeRequests(gpg::WriteArchive* const archive)
+{
+  if (archive == nullptr) {
+    return;
     }
 
     const gpg::RRef nullOwner{};
@@ -119,14 +121,37 @@ namespace moho
       gpg::WriteRawPointer(archive, requestRef, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-    gpg::RRef endRef{};
-    gpg::RRef_CEconRequest(&endRef, nullptr);
-    gpg::WriteRawPointer(archive, endRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  gpg::RRef endRef{};
+  gpg::RRef_CEconRequest(&endRef, nullptr);
+  gpg::WriteRawPointer(archive, endRef, gpg::TrackedPointerState::Unowned, nullOwner);
+}
+
+/**
+ * Address: 0x00773130 (FUN_00773130, Moho::CEconomy::DeserializeRequests)
+ *
+ * What it does:
+ * Reads CEconRequest intrusive nodes from archive and links each request into
+ * `mConsumptionData` until one null terminator is encountered.
+ */
+void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
+{
+  if (archive == nullptr) {
+    return;
   }
 
-  /**
-   * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
-   *
+  gpg::RRef ownerRef{};
+  CEconRequest* request = nullptr;
+  (void)archive->ReadPointer_CEconRequest(&request, &ownerRef);
+  while (request != nullptr) {
+    request->mNode.ListLinkAfter(&mConsumptionData);
+    ownerRef = gpg::RRef{};
+    (void)archive->ReadPointer_CEconRequest(&request, &ownerRef);
+  }
+}
+
+/**
+ * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
+ *
    * What it does:
    * Serializes Sim owner, index/value lanes, totals, storage pointer ownership,
    * sharing flag, then emits the intrusive CEconRequest chain terminator.
@@ -187,5 +212,17 @@ namespace moho
 
     archive->WriteUInt64(mMaxStorage.ENERGY);
     archive->WriteUInt64(mMaxStorage.MASS);
+  }
+
+  /**
+   * Address: 0x00585920 (FUN_00585920, Moho::SEconTotals::MaxStorageOf)
+   *
+   * What it does:
+   * Returns selected max-storage resource lane as a floating-point scalar.
+   */
+  double SEconTotals::MaxStorageOf(const EEconResource resource) const noexcept
+  {
+    const std::uint64_t* const maxStorageLanes = &mMaxStorage.ENERGY;
+    return static_cast<double>(maxStorageLanes[static_cast<std::uint32_t>(resource)]);
   }
 } // namespace moho

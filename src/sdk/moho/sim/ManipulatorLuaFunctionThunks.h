@@ -1,5 +1,11 @@
 #pragma once
 
+namespace LuaPlus
+{
+  class LuaObject;
+  class LuaState;
+} // namespace LuaPlus
+
 namespace moho
 {
   class CScrLuaInitForm;
@@ -15,6 +21,15 @@ namespace moho
   CScrLuaInitForm* func_CAimManipulatorSetAimHeadingOffset_LuaFuncDef();
   CScrLuaInitForm* func_CreateFootPlantController_LuaFuncDef();
   CScrLuaInitForm* func_CreateBuilderArmController_LuaFuncDef();
+
+  /**
+   * Address: 0x006371B0 (FUN_006371B0, func_CreateLuaBuilderArmObject)
+   *
+   * What it does:
+   * Builds the cached `CBuilderArmManipulator` Lua metatable object into the
+   * caller-provided destination.
+   */
+  LuaPlus::LuaObject* func_CreateLuaBuilderArmObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00634C90 (FUN_00634C90, func_CBoneEntityManipulatorSetPivot_LuaFuncDef)
@@ -89,6 +104,14 @@ namespace moho
    */
   CScrLuaInitForm* func_CRotateManipulatorClearGoal_LuaFuncDef();
   CScrLuaInitForm* func_CreateRotator_LuaFuncDef();
+  /**
+   * Address: 0x00645540 (FUN_00645540, func_CreateCRotateManipulatorObject)
+   *
+   * What it does:
+   * Builds the cached `CRotateManipulator` Lua metatable object into the
+   * caller-provided destination.
+   */
+  LuaPlus::LuaObject* func_CreateCRotateManipulatorObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x006442A0 (FUN_006442A0, func_CRotateManipulatorSetSpinDown_LuaFuncDef)
@@ -172,6 +195,21 @@ namespace moho
   CScrLuaInitForm* func_CSlideManipulatorBeenDestroyed_LuaFuncDef();
   CScrLuaInitForm* func_CreateStorageManip_LuaFuncDef();
   CScrLuaInitForm* func_CreateThrustController_LuaFuncDef();
+  /**
+   * Address: 0x0064B380 (FUN_0064B380, func_CreateLuaCThrustManipulator)
+   *
+   * What it does:
+   * Builds the cached `CThrustManipulator` Lua metatable object into the
+   * caller-provided destination.
+   */
+  LuaPlus::LuaObject* func_CreateLuaCThrustManipulator(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
+
+  /**
+   * What it does:
+   * Returns the cached metatable object used for `CRotateManipulator` Lua
+   * userdata construction paths.
+   */
+  LuaPlus::LuaObject CreateRotateManipulatorLuaMetatable(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x0064AD30 (FUN_0064AD30, func_CThrustManipulatorSetThrustingParam_LuaFuncDef)

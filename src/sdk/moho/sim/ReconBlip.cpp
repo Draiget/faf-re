@@ -972,6 +972,20 @@ void ReconBlip::MemberConstruct(
 }
 
 /**
+ * Address: 0x005BDE70 (FUN_005BDE70, Moho::ReconBlip::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Returns one typed reflection reference for this recon blip instance.
+ */
+gpg::RRef ReconBlip::GetDerivedObjectRef()
+{
+  gpg::RRef objectRef{};
+  objectRef.mObj = this;
+  objectRef.mType = GetClass();
+  return objectRef;
+}
+
+/**
  * Address: 0x005BDE90 (FUN_005BDE90)
  */
 ReconBlip* ReconBlip::IsReconBlip()
@@ -1300,4 +1314,19 @@ void ReconBlip::CreateInterface(SSyncData* const syncData)
   syncData->mNewUnits.push_back(createParams);
   mInterfaceCreated = 1u;
 }
- 
+
+/**
+ * Address: 0x005BEE40 (FUN_005BEE40, Moho::ReconBlip::UpdateVisibility)
+ *
+ * What it does:
+ * Recomputes base entity visibility lanes, then applies focused-army recon
+ * flush gating to the blip visibility state.
+ */
+void ReconBlip::UpdateVisibility()
+{
+  Entity::UpdateVisibility();
+  const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
+  mVisibilityState = static_cast<std::uint8_t>(
+    focusArmy != -1 && mReconDat[static_cast<std::size_t>(focusArmy)].mNeedsFlush != 0u
+  );
+}

@@ -1,3 +1,6 @@
+#if defined(_MSC_VER)
+#pragma warning(disable : 4799)
+#endif
 
   /**
    * Address: 0x00ACCAE0 (FUN_00ACCAE0, _MWSFSVM_EntryVint)
@@ -550,6 +553,16 @@
     CFT_Ycc420plnToRgb555Init();
   }
 
+  /**
+   * Address: 0x00AEE950 (FUN_00AEE950, _CFT_Ycc420plnToArgb8888PrgInit)
+   *
+   * What it does:
+   * No-op progressive CFT init hook retained for binary parity.
+   */
+  void CFT_Ycc420plnToArgb8888PrgInit()
+  {
+  }
+
   namespace
   {
     [[nodiscard]] inline std::int16_t TruncateToI16(const double value) noexcept
@@ -594,6 +607,82 @@
       }
     }
   } // namespace
+
+  /**
+   * Address: 0x00AED990 (FUN_00AED990, _CFT_MakeArgb8888AlpLumiTbl)
+   *
+   * What it does:
+   * Builds one ARGB8888 alpha/luminance table with a configurable luminance
+   * ramp window and shared chroma side tables.
+   */
+  std::int32_t CFT_MakeArgb8888AlpLumiTbl(
+    const std::int32_t luminancePivot,
+    const std::int32_t luminanceMin,
+    const std::int32_t luminanceMax,
+    const std::int32_t tableAddress
+  )
+  {
+    auto* const tableWords = reinterpret_cast<std::int16_t*>(SjAddressToPointer(tableAddress));
+    if (tableWords == nullptr) {
+      return 0;
+    }
+
+    for (std::int32_t lane = -128; lane < 128; ++lane) {
+      const std::size_t laneIndex = static_cast<std::size_t>(lane + 128);
+      std::int16_t* const baseLane = tableWords + (laneIndex * 4u);
+      const std::int32_t baseValue =
+        TruncateToI32(((static_cast<double>(lane) + 112.0) * 74.496) + 0.5);
+      const auto packed = static_cast<std::int16_t>(baseValue);
+      baseLane[0] = packed;
+      baseLane[1] = packed;
+      baseLane[2] = packed;
+    }
+
+    BuildArgb8888AlphaChromaTables(tableWords);
+
+    const double rangeScale = 255.0 / static_cast<double>(luminanceMax - luminanceMin);
+    const std::int16_t alphaLow = 0;
+    const std::int16_t alphaHigh = 16320;
+
+    std::int32_t result = tableAddress;
+    if (luminancePivot == 1) {
+      result = luminanceMax;
+      std::int32_t descending = luminanceMax;
+      for (std::int32_t sample = 0; sample < 256; ++sample) {
+        std::int16_t* const baseLane = tableWords + (static_cast<std::size_t>(sample) * 4u);
+        if (sample >= luminanceMin) {
+          if (sample <= luminanceMax) {
+            result = TruncateToI32((static_cast<double>(descending) * rangeScale)) << 6;
+            baseLane[3] = static_cast<std::int16_t>(result);
+          } else {
+            baseLane[3] = alphaLow;
+          }
+        } else {
+          baseLane[3] = alphaHigh;
+        }
+        --descending;
+      }
+      return result;
+    }
+
+    std::int32_t ascending = -luminanceMin;
+    for (std::int32_t sample = 0; sample < 256; ++sample) {
+      std::int16_t* const baseLane = tableWords + (static_cast<std::size_t>(sample) * 4u);
+      if (sample >= luminanceMin) {
+        if (sample <= luminanceMax) {
+          result = TruncateToI32((static_cast<double>(ascending) * rangeScale)) << 6;
+          baseLane[3] = static_cast<std::int16_t>(result);
+        } else {
+          baseLane[3] = alphaHigh;
+        }
+      } else {
+        baseLane[3] = alphaLow;
+      }
+      ++ascending;
+    }
+
+    return result;
+  }
 
   /**
    * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)
@@ -843,6 +932,65 @@
     return 0;
   }
 
+  extern std::int64_t gUtyTimerUnit;
+
+  /**
+   * Address: 0x00AE6F90 (FUN_00AE6F90, _set_unit)
+   *
+   * What it does:
+   * Stores one global timer-unit lane and returns the low 32-bit lane.
+   */
+  extern "C" std::int32_t set_unit(const std::int64_t frequencyTicks)
+  {
+    gUtyTimerUnit = frequencyTicks;
+    return static_cast<std::int32_t>(frequencyTicks);
+  }
+
+  /**
+   * Address: 0x00AE6E20 (FUN_00AE6E20, _UTY_GetTmr)
+   *
+   * What it does:
+   * Returns high-resolution counter ticks when timer lanes are initialized and
+   * configured; otherwise returns zero.
+   */
+  extern "C" std::int64_t UTY_GetTmr()
+  {
+    if (gUtyTimerInitCount <= 0) {
+      return 0;
+    }
+    if (gUtyTimerChannel == -1) {
+      return 0;
+    }
+
+    LARGE_INTEGER performanceCount{};
+    if (QueryPerformanceCounter(&performanceCount) == FALSE || performanceCount.QuadPart == 0) {
+      return 0;
+    }
+    return performanceCount.QuadPart;
+  }
+
+  /**
+   * Address: 0x00AE6E60 (FUN_00AE6E60, _UTY_IsTmrVoid)
+   *
+   * What it does:
+   * Returns `1` when timer-unit lane is `0` or `1`; otherwise returns `0`.
+   */
+  extern "C" std::int32_t UTY_IsTmrVoid()
+  {
+    return (static_cast<std::uint64_t>(gUtyTimerUnit) < 2ull) ? 1 : 0;
+  }
+
+  /**
+   * Address: 0x00AE6EB0 (FUN_00AE6EB0, _UTY_GetTmrUnit)
+   *
+   * What it does:
+   * Returns the global timer-unit lane.
+   */
+  extern "C" std::int64_t UTY_GetTmrUnit()
+  {
+    return gUtyTimerUnit;
+  }
+
   /**
    * Address: 0x00AE6D70 (FUN_00AE6D70, _UTY_InitTmr)
    *
@@ -871,6 +1019,39 @@
     }
 
     return set_unit(1);
+  }
+
+  /**
+   * Address: 0x00AE6E00 (FUN_00AE6E00, _UTY_FinishTmr)
+   *
+   * What it does:
+   * Decrements timer init-reference count and clamps global count lane at zero.
+   */
+  std::int32_t UTY_FinishTmr()
+  {
+    const std::int32_t result = --gUtyTimerInitCount;
+    if (gUtyTimerInitCount < 0) {
+      gUtyTimerInitCount = 0;
+    }
+    return result;
+  }
+
+  /**
+   * Address: 0x00AE6FB0 (FUN_00AE6FB0, _UTY_InitTsum)
+   *
+   * What it does:
+   * Initializes one timer-summary lane to neutral sum/min/max/count defaults.
+   */
+  moho::SfplyTimerSummary* UTY_InitTsum(moho::SfplyTimerSummary* const timerSummary)
+  {
+    timerSummary->accumulatedTicksLow = 0;
+    timerSummary->accumulatedTicksHigh = 0;
+    timerSummary->minTicksLow = -1;
+    timerSummary->minTicksHigh = 0x7FFFFFFF;
+    timerSummary->maxTicksLow = 0;
+    timerSummary->maxTicksHigh = 0;
+    timerSummary->sampleCount = 0;
+    return timerSummary;
   }
 
   /**
@@ -1149,6 +1330,302 @@
     }
 
     return cft_sse_Ycc420plnToArgb8888Prg1smp(inputLanes, outputSurface, colorTable);
+  }
+
+  struct CftYcc420PlanarPackedWords;
+  struct CftRgb16OutputPackedWords;
+
+  namespace
+  {
+    struct CftYcc420PlanarPackedWordsView
+    {
+      std::int32_t reserved00 = 0; // +0x00
+      std::uint32_t* yPlaneWords = nullptr; // +0x04
+      std::int32_t reserved08 = 0; // +0x08
+      std::int32_t reserved0C = 0; // +0x0C
+      std::int32_t yStrideBytes = 0; // +0x10
+      std::uint32_t* cbPlaneWords = nullptr; // +0x14
+      std::int32_t reserved18 = 0; // +0x18
+      std::int32_t reserved1C = 0; // +0x1C
+      std::int32_t cbStrideBytes = 0; // +0x20
+      std::uint32_t* crPlaneWords = nullptr; // +0x24
+      std::int32_t reserved28 = 0; // +0x28
+      std::int32_t reserved2C = 0; // +0x2C
+      std::int32_t crStrideBytes = 0; // +0x30
+    };
+    static_assert(
+      offsetof(CftYcc420PlanarPackedWordsView, yPlaneWords) == 0x04,
+      "CftYcc420PlanarPackedWordsView::yPlaneWords offset must be 0x04"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarPackedWordsView, yStrideBytes) == 0x10,
+      "CftYcc420PlanarPackedWordsView::yStrideBytes offset must be 0x10"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarPackedWordsView, cbPlaneWords) == 0x14,
+      "CftYcc420PlanarPackedWordsView::cbPlaneWords offset must be 0x14"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarPackedWordsView, cbStrideBytes) == 0x20,
+      "CftYcc420PlanarPackedWordsView::cbStrideBytes offset must be 0x20"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarPackedWordsView, crPlaneWords) == 0x24,
+      "CftYcc420PlanarPackedWordsView::crPlaneWords offset must be 0x24"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarPackedWordsView, crStrideBytes) == 0x30,
+      "CftYcc420PlanarPackedWordsView::crStrideBytes offset must be 0x30"
+    );
+    static_assert(sizeof(CftYcc420PlanarPackedWordsView) == 0x34, "CftYcc420PlanarPackedWordsView size must be 0x34");
+
+    struct CftRgb16OutputPackedWordsView
+    {
+      std::int32_t reserved00 = 0; // +0x00
+      std::uint8_t* pixelBase = nullptr; // +0x04
+      std::int32_t widthPixels = 0; // +0x08
+      std::int32_t heightPixels = 0; // +0x0C
+      std::int32_t strideBytes = 0; // +0x10
+    };
+    static_assert(
+      offsetof(CftRgb16OutputPackedWordsView, pixelBase) == 0x04,
+      "CftRgb16OutputPackedWordsView::pixelBase offset must be 0x04"
+    );
+    static_assert(
+      offsetof(CftRgb16OutputPackedWordsView, widthPixels) == 0x08,
+      "CftRgb16OutputPackedWordsView::widthPixels offset must be 0x08"
+    );
+    static_assert(
+      offsetof(CftRgb16OutputPackedWordsView, heightPixels) == 0x0C,
+      "CftRgb16OutputPackedWordsView::heightPixels offset must be 0x0C"
+    );
+    static_assert(
+      offsetof(CftRgb16OutputPackedWordsView, strideBytes) == 0x10,
+      "CftRgb16OutputPackedWordsView::strideBytes offset must be 0x10"
+    );
+    static_assert(sizeof(CftRgb16OutputPackedWordsView) == 0x14, "CftRgb16OutputPackedWordsView size must be 0x14");
+
+    struct CftYcc420PlanarInputLanesView
+    {
+      std::uint8_t* yPlane = nullptr; // +0x00
+      std::uint8_t* cbPlane = nullptr; // +0x04
+      std::uint8_t* crPlane = nullptr; // +0x08
+      std::int32_t yStrideBytes = 0; // +0x0C
+      std::int32_t cbStrideBytes = 0; // +0x10
+      std::int32_t crStrideBytes = 0; // +0x14
+    };
+    static_assert(
+      offsetof(CftYcc420PlanarInputLanesView, yPlane) == 0x00,
+      "CftYcc420PlanarInputLanesView::yPlane offset must be 0x00"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarInputLanesView, cbPlane) == 0x04,
+      "CftYcc420PlanarInputLanesView::cbPlane offset must be 0x04"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarInputLanesView, crPlane) == 0x08,
+      "CftYcc420PlanarInputLanesView::crPlane offset must be 0x08"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarInputLanesView, yStrideBytes) == 0x0C,
+      "CftYcc420PlanarInputLanesView::yStrideBytes offset must be 0x0C"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarInputLanesView, cbStrideBytes) == 0x10,
+      "CftYcc420PlanarInputLanesView::cbStrideBytes offset must be 0x10"
+    );
+    static_assert(
+      offsetof(CftYcc420PlanarInputLanesView, crStrideBytes) == 0x14,
+      "CftYcc420PlanarInputLanesView::crStrideBytes offset must be 0x14"
+    );
+    static_assert(sizeof(CftYcc420PlanarInputLanesView) == 0x18, "CftYcc420PlanarInputLanesView size must be 0x18");
+
+    struct CftPixelSurfaceLanesView
+    {
+      std::uint8_t* pixelBase = nullptr; // +0x00
+      std::int32_t widthPixels = 0; // +0x04
+      std::int32_t heightPixels = 0; // +0x08
+      std::int32_t strideBytes = 0; // +0x0C
+      std::int32_t reserved = 0; // +0x10
+    };
+    static_assert(
+      offsetof(CftPixelSurfaceLanesView, pixelBase) == 0x00,
+      "CftPixelSurfaceLanesView::pixelBase offset must be 0x00"
+    );
+    static_assert(
+      offsetof(CftPixelSurfaceLanesView, widthPixels) == 0x04,
+      "CftPixelSurfaceLanesView::widthPixels offset must be 0x04"
+    );
+    static_assert(
+      offsetof(CftPixelSurfaceLanesView, heightPixels) == 0x08,
+      "CftPixelSurfaceLanesView::heightPixels offset must be 0x08"
+    );
+    static_assert(
+      offsetof(CftPixelSurfaceLanesView, strideBytes) == 0x0C,
+      "CftPixelSurfaceLanesView::strideBytes offset must be 0x0C"
+    );
+    static_assert(
+      offsetof(CftPixelSurfaceLanesView, reserved) == 0x10,
+      "CftPixelSurfaceLanesView::reserved offset must be 0x10"
+    );
+    static_assert(sizeof(CftPixelSurfaceLanesView) == 0x14, "CftPixelSurfaceLanesView size must be 0x14");
+
+    alignas(8) std::array<std::uint64_t, 0x300> cftbgra256x3{};
+
+    [[nodiscard]] const void* ResolveArgb8888UserTable(const std::int32_t* const userTableAddress) noexcept
+    {
+      if (userTableAddress != nullptr && *userTableAddress != 0) {
+        return reinterpret_cast<const void*>(
+          static_cast<std::uintptr_t>(static_cast<std::uint32_t>(*userTableAddress))
+        );
+      }
+
+      return cftbgra256x3.data();
+    }
+  } // namespace
+
+  std::int32_t cft_Ycc420plnToArgb8888UserTable(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const void* const colorTable
+  );
+
+  /**
+   * Address: 0x00AF2A00 (FUN_00AF2A00, _CFT_Ycc420plnToArgb8888)
+   *
+   * What it does:
+   * Repackages packed YCC420/input-surface lanes into the user-table converter
+   * views and dispatches conversion through either the caller-provided table
+   * pointer or the default ARGB table.
+   */
+  std::int32_t CFT_Ycc420plnToArgb8888(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords,
+    const std::int32_t* const userTableAddress
+  )
+  {
+    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
+    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
+
+    CftYcc420PlanarInputLanesView inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
+    inputLanes.yStrideBytes = inputView->yStrideBytes;
+    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
+    inputLanes.crStrideBytes = inputView->crStrideBytes;
+
+    CftPixelSurfaceLanesView outputSurface{};
+    outputSurface.pixelBase = outputView->pixelBase;
+    outputSurface.widthPixels = outputView->widthPixels;
+    outputSurface.heightPixels = outputView->heightPixels;
+    outputSurface.strideBytes = outputView->strideBytes;
+    outputSurface.reserved = 0;
+
+    return cft_Ycc420plnToArgb8888UserTable(
+      reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes),
+      reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface),
+      ResolveArgb8888UserTable(userTableAddress)
+    );
+  }
+
+  std::int32_t cft_sse_Ycc420plnToArgb8888UserTable(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const void* const colorTable,
+    const std::int32_t outputStrideBytes,
+    const std::int32_t outputStrideBytes2
+  );
+
+  std::int32_t cft_mmx_Ycc420plnToArgb8888UserTable(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const void* const colorTable,
+    const std::int32_t outputStrideBytes,
+    const std::int32_t outputStrideBytes2
+  );
+
+  /**
+   * Address: 0x00AF35E0 (FUN_00AF35E0, cft_Ycc420plnToArgb8888UserTable)
+   *
+   * What it does:
+   * Dispatches YCC420 planar -> ARGB8888 user-table conversion to the SSE or
+   * MMX lane using the surface stride and returns support-state fallback when
+   * neither SIMD path is available.
+   */
+  std::int32_t cft_Ycc420plnToArgb8888UserTable(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const void* const colorTable
+  )
+  {
+    const std::int32_t outputStrideBytes = outputSurface->strideBytes;
+    const std::int32_t outputStrideBytes2 = outputStrideBytes * 2;
+
+    if (UTY_SupportSse() != 0) {
+      return cft_sse_Ycc420plnToArgb8888UserTable(
+        inputLanes,
+        outputSurface,
+        colorTable,
+        outputStrideBytes,
+        outputStrideBytes2
+      );
+    }
+
+    const std::int32_t mmxSupported = UTY_SupportMmx();
+    if (mmxSupported != 0) {
+      return cft_mmx_Ycc420plnToArgb8888UserTable(
+        inputLanes,
+        outputSurface,
+        colorTable,
+        outputStrideBytes,
+        outputStrideBytes2
+      );
+    }
+
+    return mmxSupported;
+  }
+
+  /**
+   * Address: 0x00AF3640 (FUN_00AF3640, cft_Ycc420plnToArgb8888SplitUserTable)
+   *
+   * What it does:
+   * Dispatches split YCC420 planar -> ARGB8888 user-table conversion using a
+   * half-height chroma stride and returns support-state fallback when neither
+   * SIMD path is available.
+   */
+  std::int32_t cft_Ycc420plnToArgb8888SplitUserTable(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const void* const colorTable
+  )
+  {
+    const std::int32_t halfHeight = outputSurface->heightPixels / 2;
+    const std::int32_t splitStrideBytes = outputSurface->strideBytes * halfHeight;
+    const std::int32_t outputStrideBytes = outputSurface->strideBytes;
+
+    if (UTY_SupportSse() != 0) {
+      return cft_sse_Ycc420plnToArgb8888UserTable(
+        inputLanes,
+        outputSurface,
+        colorTable,
+        splitStrideBytes,
+        outputStrideBytes
+      );
+    }
+
+    const std::int32_t mmxSupported = UTY_SupportMmx();
+    if (mmxSupported != 0) {
+      return cft_mmx_Ycc420plnToArgb8888UserTable(
+        inputLanes,
+        outputSurface,
+        colorTable,
+        splitStrideBytes,
+        outputStrideBytes
+      );
+    }
+
+    return mmxSupported;
   }
 
   /**
@@ -1641,6 +2118,16 @@
   }
 
   /**
+   * Address: 0x00AF2140 (FUN_00AF2140, _CFT_Ycc420plnToArgb8888Init)
+   *
+   * What it does:
+   * No-op CFT init hook retained for binary parity.
+   */
+  void CFT_Ycc420plnToArgb8888Init()
+  {
+  }
+
+  /**
    * Address: 0x00AEE730 (FUN_00AEE730, _CFT_Ycc420plnToArgb8888IntInit)
    *
    * What it does:
@@ -1745,6 +2232,351 @@
     for (std::size_t index = 0; index < 0x100u; ++index) {
       table[0x200u + index] = clippedMaxPacked;
     }
+  }
+
+  struct CftYcc420PlanarPackedWords
+  {
+    std::int32_t reserved00 = 0; // +0x00
+    std::uint32_t* yPlaneWords = nullptr; // +0x04
+    std::int32_t reserved08 = 0; // +0x08
+    std::int32_t reserved0C = 0; // +0x0C
+    std::int32_t yStrideBytes = 0; // +0x10
+    std::uint32_t* cbPlaneWords = nullptr; // +0x14
+    std::int32_t reserved18 = 0; // +0x18
+    std::int32_t reserved1C = 0; // +0x1C
+    std::int32_t cbStrideBytes = 0; // +0x20
+    std::uint32_t* crPlaneWords = nullptr; // +0x24
+    std::int32_t reserved28 = 0; // +0x28
+    std::int32_t reserved2C = 0; // +0x2C
+    std::int32_t crStrideBytes = 0; // +0x30
+  };
+  static_assert(offsetof(CftYcc420PlanarPackedWords, yPlaneWords) == 0x04, "CftYcc420PlanarPackedWords::yPlaneWords offset must be 0x04");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, yStrideBytes) == 0x10, "CftYcc420PlanarPackedWords::yStrideBytes offset must be 0x10");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, cbPlaneWords) == 0x14, "CftYcc420PlanarPackedWords::cbPlaneWords offset must be 0x14");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, cbStrideBytes) == 0x20, "CftYcc420PlanarPackedWords::cbStrideBytes offset must be 0x20");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, crPlaneWords) == 0x24, "CftYcc420PlanarPackedWords::crPlaneWords offset must be 0x24");
+  static_assert(offsetof(CftYcc420PlanarPackedWords, crStrideBytes) == 0x30, "CftYcc420PlanarPackedWords::crStrideBytes offset must be 0x30");
+  static_assert(sizeof(CftYcc420PlanarPackedWords) == 0x34, "CftYcc420PlanarPackedWords size must be 0x34");
+
+  struct CftRgb16OutputPackedWords
+  {
+    std::int32_t reserved00 = 0; // +0x00
+    std::uint8_t* pixelBase = nullptr; // +0x04
+    std::int32_t widthPixels = 0; // +0x08
+    std::int32_t heightPixels = 0; // +0x0C
+    std::int32_t strideBytes = 0; // +0x10
+  };
+  static_assert(offsetof(CftRgb16OutputPackedWords, pixelBase) == 0x04, "CftRgb16OutputPackedWords::pixelBase offset must be 0x04");
+  static_assert(offsetof(CftRgb16OutputPackedWords, widthPixels) == 0x08, "CftRgb16OutputPackedWords::widthPixels offset must be 0x08");
+  static_assert(offsetof(CftRgb16OutputPackedWords, heightPixels) == 0x0C, "CftRgb16OutputPackedWords::heightPixels offset must be 0x0C");
+  static_assert(offsetof(CftRgb16OutputPackedWords, strideBytes) == 0x10, "CftRgb16OutputPackedWords::strideBytes offset must be 0x10");
+  static_assert(sizeof(CftRgb16OutputPackedWords) == 0x14, "CftRgb16OutputPackedWords size must be 0x14");
+
+  [[nodiscard]] inline std::uint8_t PackedByte(const std::uint32_t word, const std::uint32_t byteIndex) noexcept
+  {
+    return static_cast<std::uint8_t>(word >> (byteIndex * 8u));
+  }
+
+  [[nodiscard]] inline std::uint16_t ComposeRgb16Pixel(
+    const std::int32_t yLane,
+    const std::int32_t redLane,
+    const std::int32_t blueLane,
+    const std::int32_t greenChromaMix,
+    const std::int32_t* const rTable,
+    const std::int32_t* const gTable,
+    const std::int32_t* const bTable,
+    const std::uint32_t phaseOffset
+  ) noexcept
+  {
+    const std::size_t rIndex =
+      static_cast<std::size_t>(phaseOffset + ((static_cast<std::uint32_t>(redLane + yLane) >> 20) * 2u));
+    const std::size_t bIndex =
+      static_cast<std::size_t>(phaseOffset + ((static_cast<std::uint32_t>(blueLane + yLane) >> 20) * 2u));
+    const std::size_t gIndex =
+      static_cast<std::size_t>(phaseOffset + ((static_cast<std::uint32_t>(yLane - greenChromaMix) >> 20) * 2u));
+    return static_cast<std::uint16_t>(rTable[rIndex] | bTable[bIndex] | gTable[gIndex]);
+  }
+
+  std::int32_t CftYcc420plnToRgb16Core(
+    const char* const functionName,
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords,
+    const std::int32_t* const yToY2,
+    const std::int32_t* const crToR,
+    const std::int32_t* const cbToG,
+    const std::int32_t* const crToG,
+    const std::int32_t* const cbToB,
+    const std::int32_t* const rToPixel,
+    const std::int32_t* const gToPixel,
+    const std::int32_t* const bToPixel,
+    const bool useDitherPhases
+  )
+  {
+    CFTCOM_SetCftFunctionName(functionName);
+
+    auto* yTop = inputWords->yPlaneWords;
+    auto* yBottom =
+      reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uint8_t*>(yTop) + inputWords->yStrideBytes);
+    auto* cbWords = inputWords->cbPlaneWords;
+    auto* crWords = inputWords->crPlaneWords;
+
+    std::uint16_t* topOut = reinterpret_cast<std::uint16_t*>(outputWords->pixelBase);
+    const std::int32_t outputStrideEvenBytes = 2 * (outputWords->strideBytes >> 1);
+    std::uint16_t* bottomOut = reinterpret_cast<std::uint16_t*>(outputWords->pixelBase + outputStrideEvenBytes);
+
+    const std::uint32_t yRowTailWords =
+      static_cast<std::uint32_t>((2 * inputWords->yStrideBytes) - outputWords->widthPixels) >> 2;
+    const std::uint32_t cbRowTailWords =
+      static_cast<std::uint32_t>(inputWords->cbStrideBytes - (outputWords->widthPixels / 2)) >> 2;
+    const std::uint32_t crRowTailWords =
+      static_cast<std::uint32_t>(inputWords->crStrideBytes - (outputWords->widthPixels / 2)) >> 2;
+
+    const std::int32_t rowTailBytes = outputStrideEvenBytes - outputWords->widthPixels;
+    const std::int32_t rowPairAdvanceBytes = 2 * rowTailBytes;
+
+    std::int32_t result = rowTailBytes;
+    std::int32_t remainingRowPairs = outputWords->heightPixels / 2;
+    if (remainingRowPairs <= 0) {
+      return result;
+    }
+
+    const std::array<std::uint32_t, 4> phaseOffsets = useDitherPhases
+      ? std::array<std::uint32_t, 4>{0u, 1536u, 3072u, 4608u}
+      : std::array<std::uint32_t, 4>{0u, 0u, 0u, 0u};
+
+    do {
+      std::int32_t blocks = outputWords->widthPixels / 8;
+      while (blocks-- > 0) {
+        const std::uint32_t cbPacked = *cbWords++;
+        const std::uint32_t crPacked = *crWords++;
+
+        const std::uint32_t yTopWord0 = *yTop++;
+        const std::uint32_t yBottomWord0 = *yBottom++;
+        const std::uint32_t yTopWord1 = *yTop;
+        const std::uint32_t yBottomWord1 = *yBottom;
+
+        const auto emitPixelQuad =
+          [&](const std::uint8_t cbByte,
+              const std::uint8_t crByte,
+              const std::uint8_t yTop0,
+              const std::uint8_t yTop1,
+              const std::uint8_t yBottom0,
+              const std::uint8_t yBottom1) -> void
+        {
+          const std::int32_t redLane = crToR[crByte];
+          const std::int32_t blueLane = cbToB[cbByte];
+          const std::int32_t greenChromaMix = crToG[crByte] + cbToG[cbByte];
+
+          const std::int32_t yLaneTop0 = yToY2[yTop0];
+          const std::int32_t yLaneTop1 = yToY2[yTop1];
+          const std::int32_t yLaneBottom0 = yToY2[yBottom0];
+          const std::int32_t yLaneBottom1 = yToY2[yBottom1];
+
+          topOut[0] = ComposeRgb16Pixel(
+            yLaneTop0,
+            redLane,
+            blueLane,
+            greenChromaMix,
+            rToPixel,
+            gToPixel,
+            bToPixel,
+            phaseOffsets[0]
+          );
+          topOut[1] = ComposeRgb16Pixel(
+            yLaneTop1,
+            redLane,
+            blueLane,
+            greenChromaMix,
+            rToPixel,
+            gToPixel,
+            bToPixel,
+            phaseOffsets[1]
+          );
+          bottomOut[0] = ComposeRgb16Pixel(
+            yLaneBottom0,
+            redLane,
+            blueLane,
+            greenChromaMix,
+            rToPixel,
+            gToPixel,
+            bToPixel,
+            phaseOffsets[2]
+          );
+          bottomOut[1] = ComposeRgb16Pixel(
+            yLaneBottom1,
+            redLane,
+            blueLane,
+            greenChromaMix,
+            rToPixel,
+            gToPixel,
+            bToPixel,
+            phaseOffsets[3]
+          );
+
+          topOut += 2;
+          bottomOut += 2;
+        };
+
+        emitPixelQuad(
+          PackedByte(cbPacked, 0u),
+          PackedByte(crPacked, 0u),
+          PackedByte(yTopWord0, 0u),
+          PackedByte(yTopWord0, 1u),
+          PackedByte(yBottomWord0, 0u),
+          PackedByte(yBottomWord0, 1u)
+        );
+        emitPixelQuad(
+          PackedByte(cbPacked, 1u),
+          PackedByte(crPacked, 1u),
+          PackedByte(yTopWord0, 2u),
+          PackedByte(yTopWord0, 3u),
+          PackedByte(yBottomWord0, 2u),
+          PackedByte(yBottomWord0, 3u)
+        );
+        emitPixelQuad(
+          PackedByte(cbPacked, 2u),
+          PackedByte(crPacked, 2u),
+          PackedByte(yTopWord1, 0u),
+          PackedByte(yTopWord1, 1u),
+          PackedByte(yBottomWord1, 0u),
+          PackedByte(yBottomWord1, 1u)
+        );
+        emitPixelQuad(
+          PackedByte(cbPacked, 3u),
+          PackedByte(crPacked, 3u),
+          PackedByte(yTopWord1, 2u),
+          PackedByte(yTopWord1, 3u),
+          PackedByte(yBottomWord1, 2u),
+          PackedByte(yBottomWord1, 3u)
+        );
+
+        ++yTop;
+        ++yBottom;
+      }
+
+      yTop = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uint8_t*>(yTop) + (4 * yRowTailWords));
+      yBottom = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uint8_t*>(yBottom) + (4 * yRowTailWords));
+      cbWords += cbRowTailWords;
+      crWords += crRowTailWords;
+      topOut = reinterpret_cast<std::uint16_t*>(reinterpret_cast<std::uint8_t*>(topOut) + rowPairAdvanceBytes);
+      bottomOut =
+        reinterpret_cast<std::uint16_t*>(reinterpret_cast<std::uint8_t*>(bottomOut) + rowPairAdvanceBytes);
+      result = --remainingRowPairs;
+    } while (remainingRowPairs != 0);
+
+    return result;
+  }
+
+  /**
+   * Address: 0x00AF37F0 (FUN_00AF37F0, _CFT_Ycc420plnToRgb555)
+   *
+   * What it does:
+   * Converts one packed YCC420 planar source lane into RGB555 output using
+   * prebuilt fixed-point lookup tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb555(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords
+  )
+  {
+    return CftYcc420plnToRgb16Core(
+      "CFT_Ycc420plnToRgb555",
+      inputWords,
+      outputWords,
+      y_to_y2_555.data(),
+      cr_to_r_555.data(),
+      cb_to_g_555.data(),
+      cr_to_g_555.data(),
+      cb_to_b_555.data(),
+      r_to_pix_555.data(),
+      g_to_pix_555.data(),
+      b_to_pix_555.data(),
+      false
+    );
+  }
+
+  /**
+   * Address: 0x00AF3EF0 (FUN_00AF3EF0, _CFT_Ycc420plnToRgb555WithDither)
+   *
+   * What it does:
+   * Converts one packed YCC420 planar source lane into RGB555 output using
+   * 4-phase dither clip tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb555WithDither(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords
+  )
+  {
+    return CftYcc420plnToRgb16Core(
+      "CFT_Ycc420plnToRgb555WithDither",
+      inputWords,
+      outputWords,
+      y_to_y2_555.data(),
+      cr_to_r_555.data(),
+      cb_to_g_555.data(),
+      cr_to_g_555.data(),
+      cb_to_b_555.data(),
+      r_to_pix32_dither_555.data(),
+      g_to_pix32_dither_555.data(),
+      b_to_pix32_dither_555.data(),
+      true
+    );
+  }
+
+  /**
+   * Address: 0x00AF48A0 (FUN_00AF48A0, _CFT_Ycc420plnToRgb565)
+   *
+   * What it does:
+   * Converts one packed YCC420 planar source lane into RGB565 output using
+   * prebuilt fixed-point lookup tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb565(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords
+  )
+  {
+    return CftYcc420plnToRgb16Core(
+      "CFT_Ycc420plnToRgb565",
+      inputWords,
+      outputWords,
+      y_to_y2_565.data(),
+      cr_to_r_565.data(),
+      cb_to_g_565.data(),
+      cr_to_g_565.data(),
+      cb_to_b_565.data(),
+      r_to_pix_565.data(),
+      g_to_pix_565.data(),
+      b_to_pix_565.data(),
+      false
+    );
+  }
+
+  /**
+   * Address: 0x00AF4FA0 (FUN_00AF4FA0, _CFT_Ycc420plnToRgb565WithDither)
+   *
+   * What it does:
+   * Converts one packed YCC420 planar source lane into RGB565 output using
+   * 4-phase dither clip tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb565WithDither(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords
+  )
+  {
+    return CftYcc420plnToRgb16Core(
+      "CFT_Ycc420plnToRgb565WithDither",
+      inputWords,
+      outputWords,
+      y_to_y2_565.data(),
+      cr_to_r_565.data(),
+      cb_to_g_565.data(),
+      cr_to_g_565.data(),
+      cb_to_b_565.data(),
+      r_to_pix32_dither_565.data(),
+      g_to_pix32_dither_565.data(),
+      b_to_pix32_dither_565.data(),
+      true
+    );
   }
 
   /**

@@ -13,9 +13,13 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00885660 tail (??1IWldSessionLoader@Moho@@QAE@@Z)
+     * Address: 0x00885450 (FUN_00885450, ??1IWldSessionLoader@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Restores the base `IWldSessionLoader` vtable lane during base
+     * destruction.
      */
-    virtual ~IWldSessionLoader() = default;
+    virtual ~IWldSessionLoader();
 
     /**
      * Address: 0x00885890 (FUN_00885890, ?SetCreated@CWldSessionLoaderImpl@Moho@@UAEXXZ)

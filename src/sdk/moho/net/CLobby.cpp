@@ -2926,8 +2926,8 @@ uint32_t CLobby::AssignCommandSource(
       const uint32_t newId = static_cast<uint32_t>(commandSources.size());
       sourceId = newId;
 
-      const SSTICommandSource entry{static_cast<std::uint32_t>(sourceId), playerName, timeouts};
-      commandSources.push_back(entry);
+      const SSTICommandSource entry{static_cast<std::uint32_t>(sourceId), playerName.c_str(), timeouts};
+      AppendSSTICommandSource(commandSources, entry);
     }
 
     return sourceId;
@@ -2944,8 +2944,8 @@ uint32_t CLobby::AssignCommandSource(
   if (peer->mCmdSource == kInvalidCommandSourceId) {
     peer->mCmdSource = static_cast<uint32_t>(commandSources.size());
 
-    const SSTICommandSource entry{static_cast<std::uint32_t>(peer->mCmdSource), peer->playerName, timeouts};
-    commandSources.push_back(entry);
+    const SSTICommandSource entry{static_cast<std::uint32_t>(peer->mCmdSource), peer->playerName.c_str(), timeouts};
+    AppendSSTICommandSource(commandSources, entry);
   }
 
   return peer->mCmdSource;

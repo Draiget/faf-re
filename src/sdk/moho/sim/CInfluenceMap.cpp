@@ -895,6 +895,54 @@ namespace moho
   }
 
   /**
+   * Address: 0x0071E760 (FUN_0071E760, func_VectorCpy_SThreat)
+   *
+   * What it does:
+   * Copies one `SThreat` source value into `count` consecutive destination
+   * slots while preserving the original helper's per-iteration null check on
+   * the destination address.
+   */
+  void CopySThreatValueRange(SThreat* destination, std::uint32_t count, const SThreat* const source) noexcept
+  {
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+    while (count != 0u) {
+      if (destinationAddress != 0u) {
+        *reinterpret_cast<SThreat*>(destinationAddress) = *source;
+      }
+      --count;
+      destinationAddress += sizeof(SThreat);
+    }
+  }
+
+  /**
+   * Address: 0x0071F6A0 (FUN_0071F6A0, func_VectorMemCpy_SThreat)
+   *
+   * What it does:
+   * Copies one contiguous `SThreat` source range `[sourceBegin, sourceEnd)`
+   * into destination storage and returns one-past the last destination slot,
+   * preserving the helper's original per-iteration null-destination guard.
+   */
+  SThreat* CopySThreatRangeNullable(
+    SThreat* destination,
+    const SThreat* const sourceBegin,
+    const SThreat* const sourceEnd
+  ) noexcept
+  {
+    const SThreat* source = sourceBegin;
+    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
+    while (source != sourceEnd) {
+      if (destinationAddress != 0u) {
+        *reinterpret_cast<SThreat*>(destinationAddress) = *source;
+      }
+
+      ++source;
+      destinationAddress += sizeof(SThreat);
+    }
+
+    return reinterpret_cast<SThreat*>(destinationAddress);
+  }
+
+  /**
    * Address: 0x00715030 (FUN_00715030, ??0InfluenceGrid@Moho@@QAE@@Z)
    */
   InfluenceGrid::InfluenceGrid()
@@ -929,6 +977,35 @@ namespace moho
       cursor->threats.clear();
       cursor->entries.clear();
     }
+  }
+
+  /**
+   * Address: 0x0071E7B0 (FUN_0071E7B0, Moho::InfluenceGrid::ThreatDeconstruct)
+   *
+   * What it does:
+   * Copies one contiguous `InfluenceGrid` range into destination storage for
+   * vector relocation/copy lanes, preserving per-grid entry map, threat vector,
+   * aggregate threat, and decay state.
+   */
+  [[maybe_unused]] static InfluenceGrid*
+  CopyInfluenceGridRange(const InfluenceGrid* start, const InfluenceGrid* end, InfluenceGrid* dest)
+  {
+    for (const InfluenceGrid* source = start; source != end; ++source, ++dest) {
+      if (dest != source) {
+        new (&dest->entries) decltype(dest->entries)();
+        for (auto it = source->entries.begin(); it != source->entries.end(); ++it) {
+          (void)dest->entries.insert(*it);
+        }
+
+        new (&dest->threats) decltype(dest->threats)();
+        for (const SThreat* it = source->threats.begin(); it != source->threats.end(); ++it) {
+          dest->threats.push_back(*it);
+        }
+      }
+      dest->threat = source->threat;
+      dest->decay = source->decay;
+    }
+    return dest;
   }
 
   /**

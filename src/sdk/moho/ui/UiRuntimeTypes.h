@@ -66,7 +66,10 @@ namespace moho
   class CD3DFont;
   class CD3DPrimBatcher;
   class CD3DBatchTexture;
+  class CameraImpl;
+  class CWldSession;
   struct RMeshBlueprint;
+  struct SClientBottleneckInfo;
 
   class IWldUIProvider
   {
@@ -369,6 +372,87 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mRawKeyCode) == 0x18, "SMauiEventData::mRawKeyCode offset must be 0x18");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mModifiers) == 0x1C, "SMauiEventData::mModifiers offset must be 0x1C");
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mSource) == 0x20, "SMauiEventData::mSource offset must be 0x20");
+
+  class IMauiDragger
+  {
+  public:
+    virtual ~IMauiDragger() = default;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * What it does:
+     * Receives one pointer-drag move event while this dragger is active.
+     */
+    virtual void DragMove(const SMauiEventData* eventData) = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * What it does:
+     * Receives one pointer release event for the active drag operation.
+     */
+    virtual void DragRelease(const SMauiEventData* eventData) = 0;
+
+    /**
+     * Address: 0x00A82547 (_purecall slot)
+     *
+     * What it does:
+     * Notifies this dragger when a different current dragger replaces it.
+     */
+    virtual void OnCurrentDraggerReplaced() = 0;
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(IMauiDragger) == 0x4, "moho::IMauiDragger size must be 0x4");
+
+  struct CUIWorldViewBuildDragRuntimeView
+  {
+    std::uint8_t mUnknown00To43[0x44]{};
+    Wm3::Vector3f mStart{}; // +0x44
+    Wm3::Vector3f mEnd{};   // +0x50
+  };
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mStart) == 0x44,
+    "moho::CUIWorldViewBuildDragRuntimeView::mStart offset must be 0x44"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(CUIWorldViewBuildDragRuntimeView, mEnd) == 0x50,
+    "moho::CUIWorldViewBuildDragRuntimeView::mEnd offset must be 0x50"
+  );
+
+  class UIBuildDragger : public IMauiDragger
+  {
+  public:
+    /**
+     * Address: 0x00822FA0 (FUN_00822FA0, ??0UIBuildDragger@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Seeds build-drag start/end world positions from the current session
+     * cursor world position and mirrors those lanes into the world-view state.
+     */
+    UIBuildDragger(CWldSession* session, CUIWorldViewBuildDragRuntimeView* worldView, CameraImpl* camera);
+
+  public:
+    TDatListItem<IMauiDragger, void>* mList = nullptr;      // +0x04
+    CWldSession* mWldSession = nullptr;                     // +0x08
+    CUIWorldViewBuildDragRuntimeView* mWldView = nullptr;   // +0x0C
+    CameraImpl* mCam = nullptr;                             // +0x10
+    Wm3::Vector3f mStart{};                                 // +0x14
+    Wm3::Vector3f mEnd{};                                   // +0x20
+  };
+
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mList) == 0x4, "moho::UIBuildDragger::mList offset must be 0x4");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(UIBuildDragger, mWldSession) == 0x8, "moho::UIBuildDragger::mWldSession offset must be 0x8"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(UIBuildDragger, mWldView) == 0xC, "moho::UIBuildDragger::mWldView offset must be 0xC"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mCam) == 0x10, "moho::UIBuildDragger::mCam offset must be 0x10");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(UIBuildDragger, mStart) == 0x14, "moho::UIBuildDragger::mStart offset must be 0x14"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mEnd) == 0x20, "moho::UIBuildDragger::mEnd offset must be 0x20");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(UIBuildDragger) == 0x2C, "moho::UIBuildDragger size must be 0x2C");
 
   struct wxEvtHandlerRuntime
   {
@@ -1016,6 +1100,24 @@ namespace moho
     void Frame(float deltaSeconds) override;
 
     /**
+     * Address: 0x00790470 (FUN_00790470, Moho::CMauiEdit::HandleEvent)
+     *
+     * What it does:
+     * Routes mouse-button press/double-click lanes to click handling and
+     * dispatches character events to edit-key processing.
+     */
+    [[nodiscard]] bool HandleEvent(const SMauiEventData& eventData) override;
+
+    /**
+     * Address: 0x0078F330 (FUN_0078F330, Moho::CMauiEdit::AbandonKeyboardFocus)
+     *
+     * What it does:
+     * Hides caret rendering and clears global keyboard focus when this edit
+     * control currently owns it.
+     */
+    void AbandonKeyboardFocus() override;
+
+    /**
      * Address: 0x0078EDD0 (FUN_0078EDD0, Moho::CMauiEdit::GetText)
      *
      * What it does:
@@ -1112,6 +1214,23 @@ namespace moho
     [[nodiscard]] bool EscPressed();
 
     /**
+     * Address: 0x007907B0 (FUN_007907B0, Moho::CMauiEdit::ClearSelection)
+     *
+     * What it does:
+     * Replaces the current selection lane with an empty UTF-8 string.
+     */
+    void ClearSelection();
+
+    /**
+     * Address: 0x00790830 (FUN_00790830, Moho::CMauiEdit::ReplaceSelection)
+     *
+     * What it does:
+     * Deletes the current selection lane and inserts replacement UTF-8 text
+     * (clamped against max-char limit) at the caret.
+     */
+    void ReplaceSelection(const msvc8::string& replacementText);
+
+    /**
      * Address: 0x00790590 (FUN_00790590, Moho::CMauiEdit::DeleteSelection)
      *
      * What it does:
@@ -1130,6 +1249,32 @@ namespace moho
     void DeleteCharAtCaret(bool deleteToRight);
 
     /**
+     * Address: 0x00791250 (FUN_00791250, Moho::CMauiEdit::MoveCaretLeft)
+     *
+     * What it does:
+     * Moves caret left by `amount` UTF-8 characters, clamped to start of text.
+     */
+    void MoveCaretLeft(int amount);
+
+    /**
+     * Address: 0x00791290 (FUN_00791290, Moho::CMauiEdit::MoveSelectionLeft)
+     *
+     * What it does:
+     * Extends or contracts current selection toward the left by `amount`
+     * characters and updates caret/selection anchors accordingly.
+     */
+    void MoveSelectionLeft(int amount);
+
+    /**
+     * Address: 0x00791310 (FUN_00791310, Moho::CMauiEdit::MoveSelectionRight)
+     *
+     * What it does:
+     * Extends or contracts current selection toward the right by `amount`
+     * characters and updates caret/selection anchors accordingly.
+     */
+    void MoveSelectionRight(int amount);
+
+    /**
      * Address: 0x007915C0 (FUN_007915C0, Moho::CMauiEdit::HandleClickEvent)
      *
      * What it does:
@@ -1137,6 +1282,15 @@ namespace moho
      * posting dragger capture, and updating caret/word-selection lanes.
      */
     void HandleClickEvent(SMauiEventData* eventData);
+
+    /**
+     * Address: 0x00791780 (FUN_00791780, Moho::CMauiEdit::HandleKeyEvent)
+     *
+     * What it does:
+     * Processes keyboard edit operations (caret movement, selection growth,
+     * delete/backspace, clipboard shortcuts, and text/non-text key dispatch).
+     */
+    void HandleKeyEvent(SMauiEventData* eventData);
 
     /**
      * Address: 0x007914C0 (FUN_007914C0, Moho::CMauiEdit::DragRelease)
@@ -1214,6 +1368,15 @@ namespace moho
     [[nodiscard]] float GetTopmostDepth();
 
     /**
+     * Address: 0x00796550 (FUN_00796550, Moho::CMauiFrame::SetBounds)
+     *
+     * What it does:
+     * Resets frame origin to `(0, 0)` and stores new width/height lazy-var
+     * lanes from integer pixel bounds.
+     */
+    void SetBounds(int width, int height);
+
+    /**
      * Address: 0x00796720 (FUN_00796720, Moho::CMauiFrame::Dump)
      *
      * What it does:
@@ -1230,6 +1393,13 @@ namespace moho
      */
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
 
+    /**
+     * Address: 0x00796740 (FUN_00796740, Moho::CMauiFrame::DumpControlsUnder)
+     *
+     * What it does:
+     * Walks this frame subtree depth-first, hit-tests each control at `(x,y)`,
+     * and dumps every control that is under the cursor.
+     */
     static void DumpControlsUnder(CMauiFrame* frame, float x, float y);
   };
 
@@ -1254,6 +1424,15 @@ namespace moho
      * duration elapses.
      */
     void Frame(float deltaSeconds) override;
+
+    /**
+     * Address: 0x0077FF70 (FUN_0077FF70, Moho::CMauiBitmap::HitTest)
+     *
+     * What it does:
+     * Runs base control bounds hit-test, then applies bitmap hit-mask or
+     * per-pixel alpha hit-testing lanes when configured.
+     */
+    [[nodiscard]] bool HitTest(float x, float y) override;
 
     /**
      * Address: 0x0077FCF0 (FUN_0077FCF0, Moho::CMauiBitmap::ShareTextures)
@@ -1353,6 +1532,28 @@ namespace moho
     void Dump() override;
   };
 
+  class CMauiGroup : public CMauiControl
+  {
+  public:
+    /**
+     * Address context: constructor path in `cfunc_InternalCreateGroupL`
+     * (`FUN_00797390`) allocates one `CMauiGroup` and initializes it through
+     * `CMauiControl(luaObject, parent, "group")`.
+     *
+     * What it does:
+     * Constructs one group control from Lua object + parent lanes.
+     */
+    CMauiGroup(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x00797300 (FUN_00797300, Moho::CMauiGroup::Draw)
+     *
+     * What it does:
+     * No-op draw lane used by the group control vtable.
+     */
+    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+  };
+
   class CMauiHistogram : public CMauiControl
   {
   public:
@@ -1368,12 +1569,21 @@ namespace moho
     virtual ~CMauiHistogram() = default;
 
     /**
+     * Address: 0x007978F0 (FUN_007978F0, Moho::CMauiHistogram::Draw)
+     *
+     * What it does:
+     * No-op histogram draw lane retained for vtable/override compatibility.
+     */
+    void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+
+    /**
      * Address: 0x00797900 (FUN_00797900, Moho::CMauiHistogram::Dump)
      *
      * What it does:
      * Logs base control debug state plus one histogram class banner line.
      */
     void Dump() override;
+
   };
 
   class CMauiItemList : public CMauiControl
@@ -1424,6 +1634,42 @@ namespace moho
     [[nodiscard]] bool NeedsScrollBar();
 
     /**
+     * Address: 0x0079A560 (FUN_0079A560, Moho::CMauiItemList::GetScrollValues)
+     *
+     * What it does:
+     * Returns item-list scroll extents and visible range for current
+     * top-scroll lane.
+     */
+    [[nodiscard]] SMauiScrollValues GetScrollValues(EMauiScrollAxis axis) override;
+
+    /**
+     * Address: 0x0079A650 (FUN_0079A650, Moho::CMauiItemList::ScrollLines2)
+     *
+     * What it does:
+     * Applies page-scroll delta from visible-row count and clamps top-scroll
+     * lane to valid item-list bounds.
+     */
+    void ScrollPages(EMauiScrollAxis axis, float amount) override;
+
+    /**
+     * Address: 0x0079A5F0 (FUN_0079A5F0, Moho::CMauiItemList::ScrollLines)
+     *
+     * What it does:
+     * Applies line-scroll delta and clamps top-scroll lane to valid
+     * item-list bounds.
+     */
+    void ScrollLines(EMauiScrollAxis axis, float amount) override;
+
+    /**
+     * Address: 0x0079A6D0 (FUN_0079A6D0, Moho::CMauiItemList::ScrollSetTop)
+     *
+     * What it does:
+     * Sets top-scroll lane from one absolute row index and clamps it to valid
+     * item-list bounds.
+     */
+    void ScrollSetTop(EMauiScrollAxis axis, float amount) override;
+
+    /**
      * Address: 0x00799870 (FUN_00799870, Moho::CMauiItemList::AddItem)
      *
      * What it does:
@@ -1448,6 +1694,15 @@ namespace moho
      * post-delete selection semantics.
      */
     void DeleteItem(std::int32_t index);
+
+    /**
+     * Address: 0x0079A0B0 (FUN_0079A0B0, Moho::CMauiItemList::GetItem)
+     *
+     * What it does:
+     * Converts one Y-coordinate lane to an item index lane using current
+     * top/scroll/font metrics and returns `-1` when no row is hit.
+     */
+    [[nodiscard]] std::int32_t GetItem(float yCoordinate);
 
     /**
      * Address: 0x00799560 (FUN_00799560, Moho::CMauiItemList::Dump)
@@ -1500,6 +1755,14 @@ namespace moho
     void Draw(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
 
     /**
+     * Address: 0x0079E580 (FUN_0079E580, Moho::CMauiMesh::Dump)
+     *
+     * What it does:
+     * No-op dump lane retained for vtable/override compatibility.
+     */
+    void Dump() override;
+
+    /**
      * Address: 0x0079E930 (FUN_0079E930, cfunc_CMauiMeshSetOrientationL)
      *
      * What it does:
@@ -1507,6 +1770,7 @@ namespace moho
      * rotated for frame updates.
      */
     void SetOrientation(const Wm3::Quaternionf& orientation);
+
     virtual ~CMauiMesh() = default;
   };
 
@@ -1546,6 +1810,15 @@ namespace moho
      * Draws current movie texture over control bounds while playback is active.
      */
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+    /**
+     * Address: 0x0079F490 (FUN_0079F490, Moho::CMauiMovie::OnMinimized)
+     *
+     * What it does:
+     * Stops active movie playback while minimized and resumes playback when the
+     * control is restored from minimized state.
+     */
+    void OnMinimized(bool minimized) override;
 
     /**
      * Address: 0x0079F8F0 (FUN_0079F8F0, cfunc_CMauiMovieLoopL)
@@ -1605,7 +1878,7 @@ namespace moho
     virtual ~CMauiMovie() = default;
   };
 
-  class CMauiScrollbar : public CMauiControl
+  class CMauiScrollbar : public CMauiControl, public IMauiDragger
   {
   public:
     /**
@@ -1630,6 +1903,40 @@ namespace moho
       const boost::shared_ptr<CD3DBatchTexture>& thumbTop,
       const boost::shared_ptr<CD3DBatchTexture>& thumbBottom
     );
+
+    /**
+     * Address: 0x007A11C0 (FUN_007A11C0, Moho::CMauiScrollbar::HandleEvent)
+     *
+     * What it does:
+     * Handles mouse press/wheel lanes for page-scroll and drag-capture against
+     * the bound scrollable control.
+     */
+    [[nodiscard]] bool HandleEvent(const SMauiEventData& eventData) override;
+
+    /**
+     * Address: 0x007A1410 (FUN_007A1410, Moho::CMauiScrollbar::DragMove)
+     *
+     * What it does:
+     * Converts drag delta in screen space into scroll-range movement and
+     * updates the scrollable top value.
+     */
+    void DragMove(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x007A1500 (FUN_007A1500, Moho::CMauiScrollbar::DragRelease)
+     *
+     * What it does:
+     * No-op release hook for scrollbar dragger lane.
+     */
+    void DragRelease(const SMauiEventData* eventData) override;
+
+    /**
+     * Address: 0x007A1510 (FUN_007A1510, Moho::CMauiScrollbar::DragCancel)
+     *
+     * What it does:
+     * No-op cancel/replace hook for scrollbar dragger lane.
+     */
+    void OnCurrentDraggerReplaced() override;
 
     virtual ~CMauiScrollbar() = default;
   };
@@ -1765,6 +2072,24 @@ namespace moho
      * initializes preview texture state.
      */
     CUIMapPreview(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x008507F0 (FUN_008507F0, Moho::CUIMapPreview::~CUIMapPreview)
+     *
+     * What it does:
+     * Releases the preview texture lane before the inherited control teardown
+     * continues through `CMauiControl`.
+     */
+    ~CUIMapPreview() override;
+
+    /**
+     * Address: 0x008507D0 (FUN_008507D0, Moho::CUIMapPreview::Delete)
+     *
+     * What it does:
+     * Mirrors the deleting-destructor thunk lane for map-preview controls and
+     * optionally frees the storage block.
+     */
+    static CUIMapPreview* DeleteWithFlag(CUIMapPreview* object, std::uint8_t deleteFlags) noexcept;
 
     /**
      * Address: 0x00850870 (FUN_00850870, Moho::CUIMapPreview::SetTexture)
@@ -2496,6 +2821,31 @@ namespace moho
    * against the active UI Lua state.
    */
   void UI_NoteGameSpeedChanged(std::int32_t slotZeroBased, std::int32_t gameSpeed);
+
+  /**
+   * Address: 0x0088BA50 (FUN_0088BA50, func_DriverNoteGameSpeedChanged)
+   *
+   * What it does:
+   * Forwards game-speed UI notification only when a simulation driver is
+   * active.
+   */
+  void UI_DriverNoteGameSpeedChanged(std::int32_t slotZeroBased, std::int32_t gameSpeed);
+
+  /**
+   * Address: 0x0088B9B0 (FUN_0088B9B0, Moho::CWldUiInterface::ReportBottleneck)
+   *
+   * What it does:
+   * Forwards one assembled bottleneck snapshot into the GPGNet reporting lane.
+   */
+  void UI_ReportBottleneck(const SClientBottleneckInfo& info);
+
+  /**
+   * Address: 0x0088B9C0 (FUN_0088B9C0, Moho::CWldUiInterface::ReportBottleneckCleared)
+   *
+   * What it does:
+   * Reports that the current client bottleneck condition has been cleared.
+   */
+  void UI_ReportBottleneckCleared();
 
   /**
    * Address: 0x0083D740 (FUN_0083D740, ?UI_NoteGameOver@Moho@@YAXXZ)
@@ -6990,6 +7340,19 @@ namespace moho
   int cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::Draw)
+   *
+   * What it does:
+   * Refreshes world-view viewport lazy-var bounds when drawing world content,
+   * otherwise dispatches optional overlay draw callback state.
+   *
+   * Notes:
+   * Exposed as a free function while `CUIWorldView` remains a forward-declared
+   * runtime-owned class in this translation unit.
+   */
+  void UIWorldViewDraw(CUIWorldView* worldView, CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+
+  /**
    * Address: 0x00872830 (FUN_00872830, cfunc_CUIWorldViewGetScreenPos)
    *
    * What it does:
@@ -7209,6 +7572,24 @@ namespace moho
    */
   void UI_StopCursorText();
 
+  /**
+   * Address: 0x008586C0 (FUN_008586C0, Moho::RemoveCommandFeedbackBlips)
+   *
+   * What it does:
+   * Removes expired command-feedback blip nodes from the global blip list.
+   *
+   * Notes:
+   * Binary callsites pass an unused `0` dword lane.
+   */
+  void RemoveCommandFeedbackBlips(std::int32_t unused);
+
+  /**
+   * Address: 0x00857B00 (FUN_00857B00, Moho::UpdateCommandFeedbackBlips)
+   *
+   * What it does:
+   * Advances command-feedback blip timers, destroys expired blip meshes, then
+   * compacts expired nodes from the global list.
+   */
   void UI_UpdateCommandFeedbackBlips(float deltaSeconds);
   void UI_DumpCurrentInputCapture();
 

@@ -7,6 +7,8 @@
 
 namespace gpg
 {
+  template <class T>
+  class RVectorType;
   class ReadArchive;
   class WriteArchive;
   struct SerHelperBase;
@@ -142,4 +144,111 @@ namespace moho
    * process-exit cleanup.
    */
   int register_SPointVectorTypeInfo();
+
+  /**
+   * Address: 0x005825A0 (FUN_005825A0, register_SPointVectorVectorType)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI for `msvc8::vector<moho::SPointVector>`.
+   */
+  [[nodiscard]] gpg::RType* register_SPointVectorVectorType();
+
+  /**
+   * Address: 0x00BCB470 (FUN_00BCB470, register_SPointVectorVectorType_AtExit)
+   *
+   * What it does:
+   * Registers `vector<SPointVector>` reflection and installs process-exit
+   * cleanup via `atexit`.
+   */
+  int register_SPointVectorVectorType_AtExit();
 } // namespace moho
+
+namespace gpg
+{
+  /**
+   * Reflection/indexing adapter for `msvc8::vector<moho::SPointVector>`.
+   */
+  template <>
+  class RVectorType<moho::SPointVector> final : public gpg::RType, public gpg::RIndexed
+  {
+  public:
+    /**
+     * Address: 0x0057DF60 (FUN_0057DF60, gpg::RVectorType_SPointVector::GetName)
+     *
+     * What it does:
+     * Lazily builds and caches the reflected type label
+     * `vector<SPointVector>`.
+     */
+    [[nodiscard]] const char* GetName() const override;
+
+    /**
+     * Address: 0x0057E020 (FUN_0057E020, gpg::RVectorType_SPointVector::GetLexical)
+     *
+     * What it does:
+     * Returns the base lexical text plus `size=<count>` for one reflected
+     * `vector<SPointVector>` payload.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+
+    /**
+     * Address: 0x0057E0B0 (FUN_0057E0B0, gpg::RVectorType_SPointVector::IsIndexed)
+     *
+     * What it does:
+     * Exposes the `RIndexed` subobject for `vector<SPointVector>`.
+     */
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
+
+    /**
+     * Address: 0x0057E000 (FUN_0057E000, gpg::RVectorType_SPointVector::Init)
+     *
+     * What it does:
+     * Initializes `vector<SPointVector>` reflection metadata and serializer
+     * callback lanes.
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x0057F2D0 (FUN_0057F2D0, gpg::RVectorType_SPointVector::SerLoad)
+     *
+     * What it does:
+     * Loads one `vector<SPointVector>` payload from archive and replaces the
+     * destination storage.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0057F400 (FUN_0057F400, gpg::RVectorType_SPointVector::SerSave)
+     *
+     * What it does:
+     * Saves one `vector<SPointVector>` payload to archive element-by-element.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x0057E160 (FUN_0057E160, gpg::RVectorType_SPointVector::SubscriptIndex)
+     *
+     * What it does:
+     * Returns one reflected element reference at index `ind`.
+     */
+    gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+
+    /**
+     * Address: 0x0057E0C0 (FUN_0057E0C0, gpg::RVectorType_SPointVector::GetCount)
+     *
+     * What it does:
+     * Returns element count for one reflected `vector<SPointVector>` payload.
+     */
+    size_t GetCount(void* obj) const override;
+
+    /**
+     * Address: 0x0057E0F0 (FUN_0057E0F0, gpg::RVectorType_SPointVector::SetCount)
+     *
+     * What it does:
+     * Resizes one reflected `vector<SPointVector>` payload using zero
+     * `SPointVector` fill for growth lanes.
+     */
+    void SetCount(void* obj, int count) const override;
+  };
+
+  static_assert(sizeof(RVectorType<moho::SPointVector>) == 0x68, "RVectorType<SPointVector> size must be 0x68");
+} // namespace gpg

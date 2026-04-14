@@ -1,0 +1,28 @@
+{
+  "ok_toks": [
+    [
+      "FUN_008E7A00",
+      "already-annotated"
+    ],
+    [
+      "FUN_0093EFE0",
+      "already-annotated"
+    ],
+    [
+      "FUN_00952E40",
+      "matched defaulted dtor in ReadArchive.cpp:1421"
+    ],
+    [
+      "FUN_00953150",
+      "matched defaulted dtor in WriteArchive.cpp:495"
+    ]
+  ],
+  "annotations": {
+    "G:\\projects\\faf-main\\src\\sdk\\gpg\\core\\containers\\ReadArchive.cpp:1421": [
+      "FUN_00952E40 ReadArchive"
+    ],
+    "G:\\projects\\faf-main\\src\\sdk\\gpg\\core\\containers\\WriteArchive.cpp:495": [
+      "FUN_00953150 WriteArchive"
+    ]
+  }
+}

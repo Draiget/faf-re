@@ -11,6 +11,14 @@
 
 namespace moho
 {
+  /**
+   * Address: 0x00885450 (FUN_00885450, ??1IWldSessionLoader@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Base virtual destructor lane for world-session loader ownership.
+   */
+  IWldSessionLoader::~IWldSessionLoader() = default;
+
   namespace
   {
     bool IsInterlockedLoadingEnabled()

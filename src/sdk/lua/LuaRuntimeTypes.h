@@ -57,6 +57,24 @@ struct Table
 	Node* firstfree;         // First free hash node.
 	GCObject* gclist;        // GC gray list link.
 	int sizearray;           // Dense array slot count.
+
+	/**
+	 * Address: 0x00920530 (FUN_00920530, Table::MemberSerialize)
+	 *
+	 * What it does:
+	 * Serializes one table metatable pointer lane, dense array payload lanes,
+	 * and non-empty hash key/value lanes using the archive owner context.
+	 */
+	static void MemberSerialize(gpg::WriteArchive* archive, Table* object, int version, const gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x00922950 (FUN_00922950, Table::MemberDeserialize)
+	 *
+	 * What it does:
+	 * Deserializes one Lua table metatable pointer lane, dense array payload
+	 * lanes, and hashed key/value lanes under owner GC traversal lock.
+	 */
+	static void MemberDeserialize(gpg::ReadArchive* archive, Table* object, int version, const gpg::RRef& ownerRef);
 };
 
 struct Udata
@@ -144,6 +162,15 @@ struct Proto
 	int32_t reserved6;
 	int32_t reserved7;
 	int64_t reserved8;
+
+	/**
+	 * Address: 0x00920E40 (FUN_00920E40, Proto::MemberSerialize)
+	 *
+	 * What it does:
+	 * Serializes proto scalar metadata, constants/code/nested-proto lanes, and
+	 * debug name/source pointer lanes under the owning thread archive context.
+	 */
+	static void MemberSerialize(gpg::WriteArchive* archive, Proto* object, int version, gpg::RRef* ownerRef);
 };
 
 struct UpVal
@@ -167,6 +194,15 @@ struct LClosure
 	LuaPlus::TObject g; // Closure environment/global table.
 	Proto* p;
 	UpVal* upvals[3];
+
+	/**
+	 * Address: 0x00920DA0 (FUN_00920DA0, LClosure::MemberSerialize)
+	 *
+	 * What it does:
+	 * Serializes one closure's proto pointer, global-object lane, and upvalue
+	 * pointer array lanes under the owning thread archive context.
+	 */
+	static void MemberSerialize(gpg::WriteArchive* archive, LClosure* object, int version, const gpg::RRef* ownerRef);
 
 	/**
 	 * Address: 0x00922AB0 (FUN_00922AB0, LClosure::MemberDeserialize)

@@ -124,6 +124,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
+   *
+   * What it does:
+   * Forwards one vertex-buffer creation request through the active GAL device
+   * singleton and returns `outBuffer`.
+   */
+  CD3DVertexStream::BufferHandle* CD3DVertexStream::CreateVertexBufferOnActiveDevice(
+    BufferHandle* const outBuffer,
+    gpg::gal::VertexBufferContext* const context
+  )
+  {
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    auto* const deviceD3D9 = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
+    deviceD3D9->CreateVertexBuffer(outBuffer, context);
+    return outBuffer;
+  }
+
+  /**
    * Address: 0x0043FC20 (FUN_0043FC20)
    *
    * What it does:
@@ -136,9 +154,7 @@ namespace moho
         return false;
       }
 
-      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-      auto* const deviceD3D9 = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
-      deviceD3D9->CreateVertexBuffer(&mBuffer, &mContext);
+      (void)CreateVertexBufferOnActiveDevice(&mBuffer, &mContext);
     }
 
     return true;

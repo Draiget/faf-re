@@ -195,6 +195,49 @@ namespace moho
     void ViewInitPerspective(float fovXRadians, float fovYRadians, float nearDepth, float farDepth);
   };
 
+  /**
+   * Address: 0x00741850 (FUN_00741850, func_CpyGeomCameras)
+   *
+   * What it does:
+   * Copies one half-open `GeomCamera3` range into destination storage using
+   * `GeomCamera3::operator=` for each element and returns destination end.
+   */
+  [[nodiscard]] GeomCamera3* CopyGeomCameraRangeAndReturnEnd(
+    const GeomCamera3* sourceBegin,
+    GeomCamera3* destinationBegin,
+    const GeomCamera3* sourceEnd
+  );
+
+  /**
+   * Address: 0x004EFDD0 (FUN_004EFDD0, Moho::VEC_D3DProjectionMatrixFOV)
+   *
+   * What it does:
+   * Builds one D3D-style perspective projection matrix from FOV, depth, and
+   * aspect lanes and returns it by value.
+   */
+  [[nodiscard]]
+  VMatrix4 VEC_D3DProjectionMatrixFOV(
+    float fovXRadians,
+    float fovYRadians,
+    float nearDepth,
+    float farDepth,
+    float aspectRatio
+  );
+
+  /**
+   * Address: 0x004EF6E0 (FUN_004EF6E0, ?VEC_LookAtMatrix@Moho@@YA?AUVMatrix4@1@ABV?$Vector3@M@Wm3@@00@Z)
+   *
+   * What it does:
+   * Writes a right-handed view matrix built from `eye`/`target`/`up` vectors
+   * into `dest` and returns `dest` for chaining callsites.
+   */
+  VMatrix4* VEC_LookAtMatrix(
+    const Wm3::Vector3f& eye,
+    const Wm3::Vector3f& target,
+    VMatrix4* dest,
+    const Wm3::Vector3f& up
+  );
+
   static_assert(offsetof(GeomCamera3, solid1) == 0x1A0, "GeomCamera3::solid1 offset must be 0x1A0");
   static_assert(offsetof(GeomCamera3, solid2) == 0x210, "GeomCamera3::solid2 offset must be 0x210");
   static_assert(offsetof(GeomCamera3, lodScale) == 0x280, "GeomCamera3::lodScale offset must be 0x280");

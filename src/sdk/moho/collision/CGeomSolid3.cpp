@@ -30,6 +30,13 @@ namespace
     return rejectDistance < 0.0f;
   }
 
+  /**
+   * Address: 0x00472430 (FUN_00472430)
+   *
+   * What it does:
+   * Tests whether an AABB is fully on the negative (inside) side of a plane by
+   * checking the support corner against the plane equation.
+   */
   [[nodiscard]] bool IsAabbFullyInsidePlane(const Wm3::Plane3f& plane, const Wm3::AxisAlignedBox3f& bounds) noexcept
   {
     const float supportX = SelectSupportCoordinate(plane.Normal.x, bounds.Min.x, bounds.Max.x);

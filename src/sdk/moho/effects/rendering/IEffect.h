@@ -92,4 +92,12 @@ namespace moho
   static_assert(offsetof(IEffect, mUnknown3C) == 0x3C, "IEffect::mUnknown3C offset must be 0x3C");
   static_assert(offsetof(IEffect, mUnknown40) == 0x40, "IEffect::mUnknown40 offset must be 0x40");
   static_assert(sizeof(IEffect) == 0x44, "IEffect size must be 0x44");
+
+  /**
+   * Address: 0x0065A730 (FUN_0065A730, func_CreateLuaIEffect)
+   *
+   * What it does:
+   * Returns cached `IEffect` metatable object from Lua object-factory storage.
+   */
+  LuaPlus::LuaObject* func_CreateLuaIEffect(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 } // namespace moho

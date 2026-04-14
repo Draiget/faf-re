@@ -4,13 +4,16 @@
 #include "moho/ai/IAiAttackerSerializer.h"
 #include "moho/ai/IAiAttackerTypeInfo.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/Vector.h"
@@ -27,11 +30,32 @@ namespace moho
   class RBroadcasterRType_EAiAttackerEvent final : public gpg::RType
   {
   public:
+    /**
+     * Address: 0x005DC400 (FUN_005DC400, Moho::RBroadcasterRType_EAiAttackerEvent::SerLoad)
+     *
+     * What it does:
+     * Deserializes one intrusive `Broadcaster<EAiAttackerEvent>` lane by
+     * reading listener pointers until a null sentinel and relinking each
+     * listener node into the broadcaster ring.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005DC470 (FUN_005DC470, Moho::RBroadcasterRType_EAiAttackerEvent::SerSave)
+     *
+     * What it does:
+     * Serializes one intrusive `Broadcaster<EAiAttackerEvent>` lane by writing
+     * each listener pointer as `UNOWNED`, terminated by one null pointer.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     [[nodiscard]] const char* GetName() const override;
 
     void Init() override
     {
       size_ = sizeof(Broadcaster);
+      serLoadFunc_ = &RBroadcasterRType_EAiAttackerEvent::SerLoad;
+      serSaveFunc_ = &RBroadcasterRType_EAiAttackerEvent::SerSave;
       Finish();
     }
   };
@@ -103,6 +127,15 @@ namespace gpg
      * archive count + pointer lanes.
      */
     static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
+    /**
+     * Address: 0x005DC770 (FUN_005DC770, gpg::RVectorType_CAcquireTargetTask_P::SerSave)
+     *
+     * What it does:
+     * Serializes one `msvc8::vector<moho::CAcquireTargetTask*>` payload as
+     * count + unowned reflected pointer lanes.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
@@ -375,6 +408,81 @@ const char* moho::RListenerRType_EAiAttackerEvent::GetName() const
 }
 
 /**
+ * Address: 0x005DC400 (FUN_005DC400, Moho::RBroadcasterRType_EAiAttackerEvent::SerLoad)
+ *
+ * What it does:
+ * Reads listener pointers until a null sentinel and relinks each listener's
+ * intrusive broadcaster node before the destination broadcaster sentinel.
+ */
+void moho::RBroadcasterRType_EAiAttackerEvent::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(broadcaster != nullptr);
+  if (!archive || !broadcaster) {
+    return;
+  }
+
+  moho::Listener<moho::EAiAttackerEvent>* listener = nullptr;
+  archive->ReadPointer_Listener_EAiAttackerEvent(&listener, ownerRef);
+  while (listener != nullptr) {
+    listener->mListenerLink.ListLinkBefore(broadcaster);
+    archive->ReadPointer_Listener_EAiAttackerEvent(&listener, ownerRef);
+  }
+}
+
+/**
+ * Address: 0x005DC470 (FUN_005DC470, Moho::RBroadcasterRType_EAiAttackerEvent::SerSave)
+ *
+ * What it does:
+ * Serializes one intrusive `Broadcaster<EAiAttackerEvent>` lane by writing
+ * each linked listener as an unowned pointer and terminating with one null
+ * pointer record.
+ */
+void moho::RBroadcasterRType_EAiAttackerEvent::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const
+)
+{
+  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster_EAiAttackerEvent>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(broadcaster != nullptr);
+  if (!archive || !broadcaster) {
+    return;
+  }
+
+  const gpg::RRef nullOwner{};
+  gpg::RRef pointerRef{};
+
+  for (
+    moho::Broadcaster* node = static_cast<moho::Broadcaster*>(broadcaster->mNext);
+    node != broadcaster;
+    node = static_cast<moho::Broadcaster*>(node->mNext)
+  ) {
+    moho::Listener<moho::EAiAttackerEvent>* listener = nullptr;
+    if (node != nullptr) {
+      auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
+      listener = reinterpret_cast<moho::Listener<moho::EAiAttackerEvent>*>(
+        bytePtr - offsetof(moho::Listener<moho::EAiAttackerEvent>, mListenerLink)
+      );
+    }
+
+    (void)gpg::RRef_Listener_EAiAttackerEvent(&pointerRef, listener);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  }
+
+  (void)gpg::RRef_Listener_EAiAttackerEvent(&pointerRef, nullptr);
+  gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+}
+
+/**
  * Address: 0x005DB900 (FUN_005DB900, gpg::RVectorType_UnitWeapon_P::GetName)
  *
  * What it does:
@@ -491,6 +599,7 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::Init()
   size_ = sizeof(CAcquireTargetTaskPtrVector);
   version_ = 1;
   serLoadFunc_ = &RVectorType_CAcquireTargetTaskPtr::SerLoad;
+  serSaveFunc_ = &RVectorType_CAcquireTargetTaskPtr::SerSave;
 }
 
 /**
@@ -526,6 +635,38 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SerLoad(
   }
 
   *storage = loaded;
+}
+
+/**
+ * Address: 0x005DC770 (FUN_005DC770, gpg::RVectorType_CAcquireTargetTask_P::SerSave)
+ *
+ * What it does:
+ * Serializes one `vector<CAcquireTargetTask*>` payload as count + unowned
+ * reflected pointer entries.
+ */
+void gpg::RVectorType_CAcquireTargetTaskPtr::SerSave(
+  gpg::WriteArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const
+)
+{
+  const auto* const storage = PointerFromArchiveInt<const CAcquireTargetTaskPtrVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  const unsigned int count = static_cast<unsigned int>(storage->size());
+  archive->WriteUInt(count);
+
+  const gpg::RRef nullOwner{};
+  gpg::RRef pointerRef{};
+  for (unsigned int i = 0; i < count; ++i) {
+    (void)gpg::RRef_CAcquireTargetTask(&pointerRef, (*storage)[static_cast<std::size_t>(i)]);
+    gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  }
 }
 
 gpg::RRef gpg::RVectorType_CAcquireTargetTaskPtr::SubscriptIndex(void* const obj, const int ind) const

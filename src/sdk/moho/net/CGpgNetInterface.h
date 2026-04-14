@@ -173,6 +173,15 @@ namespace moho
     void EnqueueCommand0(const char* str, int val);
 
     /**
+     * Address: 0x007B6BA0 (FUN_007B6BA0, func_NET_connect)
+     *
+     * What it does:
+     * Starts async GPGNet-launch connect worker from one command-line template
+     * (for example containing `%s` endpoint substitution).
+     */
+    void Connect(const msvc8::string& launchCommandTemplate);
+
+    /**
      * Address: 0x007B6A30
      *
      * @param address
@@ -352,6 +361,16 @@ namespace moho
      * @param args
      */
     void EjectPlayer(msvc8::vector<SNetCommandArg>& args);
+
+    /**
+     * Address: 0x007BA640 (FUN_007BA640, func_NET_ConnectThread)
+     *
+     * What it does:
+     * Creates a local loopback TCP listener, launches external GPGNet process
+     * using one command-line template, accepts the incoming socket, and starts
+     * command read loop.
+     */
+    void ConnectThread(const msvc8::string& launchCommandTemplate);
 
     /**
      * Address: 0x007BA5E0

@@ -8,6 +8,11 @@
 #include "gpg/core/time/Timer.h"
 #include "Wm3Vector3.h"
 
+namespace boost
+{
+  struct SharedCountPair;
+}
+
 namespace moho
 {
   class AudioEngine;
@@ -15,6 +20,20 @@ namespace moho
   class IXACTCue;
   class IXACTWaveBank;
   struct AudioEngineImpl;
+
+  /**
+   * Address: 0x004DE650 (FUN_004DE650, ??0WeakPtr_AudioEngine@Moho@@QAE@@Z)
+   * Mangled: ??0WeakPtr_AudioEngine@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Rebinds one audio-engine weak/shared pair from a source shared pair by
+   * copying the pointee lane, retaining the incoming control lane, and
+   * weak-releasing any previously bound control lane.
+   */
+  boost::SharedCountPair* AssignWeakAudioEnginePairFromShared(
+    boost::SharedCountPair* outWeakPair,
+    const boost::SharedCountPair* sourceSharedPair
+  ) noexcept;
 
   class IXACTSoundBank
   {
@@ -486,6 +505,28 @@ namespace moho
      * category tracking map on success.
      */
     void SetPaused(gpg::StrArg category, bool paused);
+
+    /**
+     * Address: 0x004D9EC0 (FUN_004D9EC0, ?GetPaused@AudioEngine@Moho@@QAE_NVStrArg@gpg@@@Z)
+     *
+     * gpg::StrArg category
+     *
+     * What it does:
+     * Returns whether one category name is currently tracked in the paused
+     * category map.
+     */
+    [[nodiscard]] bool GetPaused(gpg::StrArg category);
+
+    /**
+     * Address: 0x004D9F50 (FUN_004D9F50, ?StopAllSounds@AudioEngine@Moho@@QAEXVStrArg@gpg@@@Z)
+     *
+     * gpg::StrArg category
+     *
+     * What it does:
+     * Stops all sounds in one named category when the category resolves in
+     * the XACT engine.
+     */
+    void StopAllSounds(gpg::StrArg category);
 
     /**
      * Address: 0x004D9DB0 (FUN_004D9DB0)

@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #include "moho/containers/TDatList.h"
+#include "moho/ai/CAiAttackerImpl.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -120,6 +122,108 @@ namespace moho
   }
 
   /**
+   * Address: 0x00724220 (FUN_00724220, Moho::CSquad::CountUnitsWithBP)
+   *
+   * What it does:
+   * Counts every live squad unit whose blueprint id matches `blueprintId`
+   * case-insensitively.
+   */
+  int CSquad::CountUnitsWithBP(const char* const blueprintId) const
+  {
+    int count = 0;
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
+        continue;
+      }
+
+      const msvc8::string& bpId = unit->GetBlueprint()->mBlueprintId;
+      const char* const bpIdData = (bpId.myRes < 0x10u) ? &bpId.bx.buf[0] : bpId.bx.ptr;
+      if (MOHO_STRICMP(bpIdData, blueprintId) == 0) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Address: 0x007242B0 (FUN_007242B0, Moho::CSquad::CountUnitsInCategory)
+   *
+   * What it does:
+   * Counts every live squad unit whose blueprint category bit belongs to
+   * `categorySet`.
+   */
+  int CSquad::CountUnitsInCategory(const EntityCategorySet* const categorySet) const
+  {
+    int count = 0;
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
+        continue;
+      }
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      if (categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Address: 0x007244E0 (FUN_007244E0, Moho::CSquad::CanAttackTarget)
+   *
+   * IDA signature:
+   * char __userpurge Moho::CSquad::CanAttackTarget@<al>(Moho::CSquad *this@<ebx>, Moho::Unit *target);
+   *
+   * What it does:
+   * Walks the squad's live unit list and returns true as soon as one unit's
+   * attacker controller reports that it can pick the supplied target entity.
+   * Dead units and units without attacker controllers are skipped.
+   */
+  bool CSquad::CanAttackTarget(Unit* const target)
+  {
+    Entity* const targetEntity = target != nullptr ? static_cast<Entity*>(target) : nullptr;
+
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead()) {
+        continue;
+      }
+
+      CAiAttackerImpl* const attacker = unit->AiAttacker;
+      if (attacker != nullptr && attacker->PickTarget(targetEntity)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Address: 0x00724750 (FUN_00724750, Moho::CSquad::HasUnitWithState)
+   *
+   * What it does:
+   * Iterates squad unit slots and returns true as soon as one live unit
+   * reports the requested unit-state lane.
+   */
+  bool CSquad::HasUnitWithState(const EUnitState state) const
+  {
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead()) {
+        continue;
+      }
+
+      if (unit->IsUnitState(state)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Address: 0x00724350 (FUN_00724350, Moho::CSquad::AppendUnitsWithBP)
    *
    * IDA signature:
@@ -153,6 +257,44 @@ namespace moho
       (void)outUnits.AddUnit(unit);
       if (++matchCount >= maxCount) {
         break;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00724400 (FUN_00724400, Moho::CSquad::AppendUnitsInCategory)
+   *
+   * IDA signature:
+   * void __userpurge Moho::CSquad::AppendUnitsInCategory(
+   *   Moho::EntityCategory *category@<edi>,
+   *   Moho::CSquad *this,
+   *   int upto,
+   *   std::map_uint_Entity *outUnits);
+   *
+   * What it does:
+   * Iterates this squad's unit list, filters out dead/destroying/under-build
+   * units, then appends each unit whose blueprint category bit is set in
+   * `categorySet` until `maxCount` accepted units have been added.
+   */
+  void CSquad::AppendUnitsInCategory(
+    const EntityCategorySet* const categorySet, const int maxCount, SEntitySetTemplateUnit& outUnits
+  )
+  {
+    int matchCount = 0;
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() || unit->IsBeingBuilt()) {
+        continue;
+      }
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      if (!categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+        continue;
+      }
+
+      (void)outUnits.AddUnit(unit);
+      if (++matchCount >= maxCount) {
+        return;
       }
     }
   }
@@ -232,5 +374,53 @@ namespace moho
     }
 
     return true;
+  }
+
+  /**
+   * Address: 0x00724020 (FUN_00724020, Moho::CSquad::GetCenter)
+   *
+   * IDA signature:
+   * Wm3::Vector3f *__usercall Moho::CSquad::GetCenter@<eax>(
+   *   Moho::CSquad *this@<ebx>,
+   *   Wm3::Vector3f *outPos@<esi>);
+   *
+   * What it does:
+   * Zeros the destination vector, sums every unit position in the squad, and
+   * divides by the live slot count. Empty squads return the zero vector
+   * immediately; the fallback max-float lane only appears if the slot count
+   * collapses to zero after traversal.
+   */
+  Wm3::Vector3f* CSquad::GetCenter(Wm3::Vector3f* const outPos) const
+  {
+    const std::ptrdiff_t slotCount = mUnits.mVec.end() - mUnits.mVec.begin();
+    outPos->x = 0.0f;
+    outPos->y = 0.0f;
+    outPos->z = 0.0f;
+    if (slotCount == 0) {
+      return outPos;
+    }
+
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      const Wm3::Vec3f& unitPosition = unit->GetPosition();
+      outPos->x += unitPosition.x;
+      outPos->y += unitPosition.y;
+      outPos->z += unitPosition.z;
+    }
+
+    const std::ptrdiff_t finalSlotCount = mUnits.mVec.end() - mUnits.mVec.begin();
+    if (finalSlotCount == 0) {
+      constexpr float kFloatMax = std::numeric_limits<float>::max();
+      outPos->x = kFloatMax;
+      outPos->y = kFloatMax;
+      outPos->z = kFloatMax;
+      return outPos;
+    }
+
+    const float inverseCount = 1.0f / static_cast<float>(finalSlotCount);
+    outPos->x *= inverseCount;
+    outPos->y *= inverseCount;
+    outPos->z *= inverseCount;
+    return outPos;
   }
 } // namespace moho

@@ -1,5 +1,6 @@
 #include "CLuaTask.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <new>
 #include <string>
@@ -40,7 +41,21 @@ namespace
   constexpr const char* kResumeThreadKilledTraceback = "Attempted to resume a thread that was already killed";
   constexpr const char* kResumeThreadTypeError = "thread";
   constexpr const char* kResumeThreadForkOnlyError = "Can't resume a thread that wasn't created with ForkThread.";
+  alignas(moho::CLuaTaskTypeInfo) std::byte gCLuaTaskTypeInfoStorage[sizeof(moho::CLuaTaskTypeInfo)]{};
+  bool gCLuaTaskTypeInfoConstructed = false;
+  alignas(moho::CLuaTaskConstruct) std::byte gCLuaTaskConstructStorage[sizeof(moho::CLuaTaskConstruct)]{};
+  bool gCLuaTaskConstructInitialized = false;
   moho::CLuaTaskSerializer gCLuaTaskSerializer{};
+
+  [[nodiscard]] moho::CLuaTaskTypeInfo& CLuaTaskTypeInfoSlot()
+  {
+    return *reinterpret_cast<moho::CLuaTaskTypeInfo*>(gCLuaTaskTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::CLuaTaskConstruct& CLuaTaskConstructSlot()
+  {
+    return *reinterpret_cast<moho::CLuaTaskConstruct*>(gCLuaTaskConstructStorage);
+  }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
   {
@@ -115,6 +130,148 @@ namespace
 #endif
   }
 
+  /**
+   * Address: 0x004C99D0 (FUN_004C99D0, CLuaTask startup type-info pre-registration)
+   *
+   * What it does:
+   * Materializes one startup `CLuaTaskTypeInfo` storage lane and pre-registers
+   * the type descriptor for `typeid(CLuaTask)`.
+   */
+  [[nodiscard]] gpg::RType* PreRegisterCLuaTaskTypeInfo()
+  {
+    if (!gCLuaTaskTypeInfoConstructed) {
+      ::new (static_cast<void*>(&CLuaTaskTypeInfoSlot())) moho::CLuaTaskTypeInfo();
+      gCLuaTaskTypeInfoConstructed = true;
+    }
+
+    gpg::PreRegisterRType(typeid(CLuaTask), &CLuaTaskTypeInfoSlot());
+    return &CLuaTaskTypeInfoSlot();
+  }
+
+  /**
+   * Address: 0x00BF0A60 (FUN_00BF0A60, CLuaTask type-info cleanup at exit)
+   *
+   * What it does:
+   * Releases dynamic field/base arrays from startup CLuaTask type-info storage
+   * and tears down the placement-constructed type descriptor.
+   */
+  void CleanupCLuaTaskTypeInfoAtExit()
+  {
+    if (!gCLuaTaskTypeInfoConstructed) {
+      return;
+    }
+
+    CLuaTaskTypeInfoSlot().fields_ = msvc8::vector<gpg::RField>{};
+    CLuaTaskTypeInfoSlot().bases_ = msvc8::vector<gpg::RField>{};
+    CLuaTaskTypeInfoSlot().~CLuaTaskTypeInfo();
+    gCLuaTaskTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x004C9910 (FUN_004C9910, CLuaTask construct storage initializer)
+   *
+   * What it does:
+   * Builds one raw `CLuaTask` object for serializer-construct paths with null
+   * owner thread and null LuaState lane.
+   */
+  [[nodiscard]] CLuaTask* InitializeRawCLuaTaskConstructStorage(void* const storage)
+  {
+    if (!storage) {
+      return nullptr;
+    }
+    return ::new (storage) CLuaTask(nullptr, nullptr);
+  }
+
+  /**
+   * Address: 0x004C9BB0 (FUN_004C9BB0, CLuaTask construct callback body)
+   *
+   * What it does:
+   * Placement-constructs one CLuaTask object in caller-provided storage for
+   * reflection construct-function registration.
+   */
+  void ConstructCLuaTaskInPlace(void* const objectStorage)
+  {
+    (void)InitializeRawCLuaTaskConstructStorage(objectStorage);
+  }
+
+  /**
+   * Address: 0x004CB6E0 (FUN_004CB6E0, CLuaTask construct delete callback)
+   *
+   * What it does:
+   * Deletes one construct-path CLuaTask object through its virtual deleting
+   * destructor.
+   */
+  void DeleteConstructedCLuaTask(void* const objectStorage)
+  {
+    auto* const task = static_cast<CLuaTask*>(objectStorage);
+    if (!task) {
+      return;
+    }
+    delete task;
+  }
+
+  /**
+   * Address: 0x00BF0AC0 (FUN_00BF0AC0, CLuaTask construct cleanup primary)
+   *
+   * What it does:
+   * Unlinks startup CLuaTask construct helper node from the intrusive helper
+   * chain and restores self-links.
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskConstructVariantPrimary()
+  {
+    return UnlinkSerializerNode(CLuaTaskConstructSlot());
+  }
+
+  /**
+   * Address: 0x004C9B40 (FUN_004C9B40, CLuaTask construct cleanup alias A)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskConstructVariantAliasA()
+  {
+    return CleanupCLuaTaskConstructVariantPrimary();
+  }
+
+  /**
+   * Address: 0x004C9B70 (FUN_004C9B70, CLuaTask construct cleanup alias B)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskConstructVariantAliasB()
+  {
+    return CleanupCLuaTaskConstructVariantPrimary();
+  }
+
+  /**
+   * Address: 0x004C9CA0 (FUN_004C9CA0, CLuaTask serializer cleanup alias A)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskSerializerVariantAliasA()
+  {
+    return UnlinkSerializerNode(gCLuaTaskSerializer);
+  }
+
+  /**
+   * Address: 0x004C9CD0 (FUN_004C9CD0, CLuaTask serializer cleanup alias B)
+   */
+  [[nodiscard]] gpg::SerHelperBase* CleanupCLuaTaskSerializerVariantAliasB()
+  {
+    return UnlinkSerializerNode(gCLuaTaskSerializer);
+  }
+
+  void InitializeCLuaTaskConstructHelper()
+  {
+    if (!gCLuaTaskConstructInitialized) {
+      ::new (static_cast<void*>(&CLuaTaskConstructSlot())) moho::CLuaTaskConstruct();
+      gCLuaTaskConstructInitialized = true;
+    }
+
+    auto& constructHelper = CLuaTaskConstructSlot();
+    ResetSerializerNode(constructHelper);
+    constructHelper.mSerConstructFunc = &ConstructCLuaTaskInPlace;
+    constructHelper.mDeleteFunc = &DeleteConstructedCLuaTask;
+  }
+
+  void CleanupCLuaTaskConstructAtExit()
+  {
+    (void)CleanupCLuaTaskConstructVariantPrimary();
+  }
+
   gpg::RType* CachedCLuaTaskType()
   {
     static gpg::RType* cached = nullptr;
@@ -156,14 +313,92 @@ namespace
   }
 
   /**
+   * Address: 0x004CB710 (FUN_004CB710, CLuaTask reflected ref store helper)
+   *
+   * What it does:
+   * Writes one `gpg::RRef` lane for a CLuaTask pointer into caller-provided
+   * output storage.
+   */
+  [[maybe_unused]] gpg::RRef* StoreCLuaTaskRef(gpg::RRef* const outRef, CLuaTask* const task)
+  {
+    return gpg::RRef_CLuaTask(outRef, task);
+  }
+
+  /**
+   * Address: 0x004CB740 (FUN_004CB740, CLuaTask member-deserialize thunk)
+   *
+   * What it does:
+   * Thin wrapper that forwards archive + object lanes into
+   * `CLuaTask::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeCLuaTaskThunk(gpg::ReadArchive* const archive, CLuaTask* const task)
+  {
+    GPG_ASSERT(task != nullptr);
+    task->MemberDeserialize(archive);
+  }
+
+  /**
+   * Address: 0x004CBD10 (FUN_004CBD10, CLuaTask member-deserialize thunk alias)
+   *
+   * What it does:
+   * Secondary wrapper lane forwarding archive + object pointers into
+   * `CLuaTask::MemberDeserialize`.
+   */
+  [[maybe_unused]] void DeserializeCLuaTaskThunkAlias(gpg::ReadArchive* const archive, CLuaTask* const task)
+  {
+    DeserializeCLuaTaskThunk(archive, task);
+  }
+
+  /**
+   * Address: 0x004CB750 (FUN_004CB750, CLuaTask member-serialize thunk)
+   *
+   * What it does:
+   * Thin wrapper that forwards archive + object lanes into
+   * `CLuaTask::MemberSerialize`.
+   */
+  [[maybe_unused]] void SerializeCLuaTaskThunk(gpg::WriteArchive* const archive, CLuaTask* const task)
+  {
+    GPG_ASSERT(task != nullptr);
+    task->MemberSerialize(archive);
+  }
+
+  /**
+   * Address: 0x004CC6A0 (FUN_004CC6A0)
+   *
+   * What it does:
+   * Saves one owned `LuaState*` tracked-pointer lane.
+   */
+  gpg::WriteArchive* WriteOwnedLuaStatePointer(
+    gpg::WriteArchive* const archive, LuaPlus::LuaState* const state, const gpg::RRef& ownerRef
+  )
+  {
+    gpg::RRef stateRef{};
+    (void)gpg::RRef_LuaState(&stateRef, state);
+    gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Owned, ownerRef);
+    return archive;
+  }
+
+  /**
+   * Address: 0x004C96A0 (FUN_004C96A0, ForkThread argument push helper)
+   *
+   * What it does:
+   * Pushes one Lua argument object onto a spawned thread-state stack and
+   * increments the pending resume-argument counter for that task.
+   */
+  void PushForkThreadArgumentAndIncrementResumeCount(CLuaTask* const task, const LuaPlus::LuaObject& argumentObject)
+  {
+    argumentObject.PushStack(task->mLuaState->m_state);
+    ++task->mResumeArgCount;
+  }
+
+  /**
    * Address: 0x004C9C40 (FUN_004C9C40, CLuaTaskSerializer::Deserialize callback)
    * Chain:   0x004CC2B0 (FUN_004CC2B0)
    */
   void DeserializeCLuaTask(gpg::ReadArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
   {
     auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
-    GPG_ASSERT(task != nullptr);
-    task->MemberDeserialize(archive);
+    DeserializeCLuaTaskThunk(archive, task);
   }
 
   /**
@@ -173,8 +408,7 @@ namespace
   void SerializeCLuaTask(gpg::WriteArchive* archive, int objectPtr, int /*version*/, gpg::RRef* /*ownerRef*/)
   {
     auto* const task = reinterpret_cast<CLuaTask*>(objectPtr);
-    GPG_ASSERT(task != nullptr);
-    task->MemberSerialize(archive);
+    SerializeCLuaTaskThunk(archive, task);
   }
 
   void InitializeCLuaTaskSerializer()
@@ -461,8 +695,7 @@ int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
   const int argumentCount = lua_gettop(curState->m_state);
   for (int stackIndex = 2; stackIndex <= argumentCount; ++stackIndex) {
     const LuaPlus::LuaObject argumentObject(LuaPlus::LuaStackObject(curState, stackIndex));
-    argumentObject.PushStack(task->mLuaState->m_state);
-    ++task->mResumeArgCount;
+    PushForkThreadArgumentAndIncrementResumeCount(task, argumentObject);
   }
 
   const LuaPlus::LuaObject threadObject(threadState->m_threadObj);
@@ -815,14 +1048,8 @@ moho::CScrLuaInitForm* moho::register_CurrentThread_LuaFuncDef()
  */
 void CLuaTask::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  gpg::RType* taskType = CTask::sType;
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CTask));
-    CTask::sType = taskType;
-  }
-
   gpg::RRef ownerRef{};
-  archive->Read(taskType, this, ownerRef);
+  moho::ReadCTaskBase(archive, this, ownerRef);
   (void)archive->ReadPointer_LuaState(&mLuaState, &ownerRef);
   archive->ReadInt(&mResumeArgCount);
 
@@ -836,17 +1063,9 @@ void CLuaTask::MemberDeserialize(gpg::ReadArchive* const archive)
  */
 void CLuaTask::MemberSerialize(gpg::WriteArchive* const archive)
 {
-  gpg::RType* taskType = CTask::sType;
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CTask));
-    CTask::sType = taskType;
-  }
-
   gpg::RRef ownerRef{};
-  archive->Write(taskType, this, ownerRef);
-  gpg::RRef stateRef{};
-  (void)gpg::RRef_LuaState(&stateRef, mLuaState);
-  gpg::WriteRawPointer(archive, stateRef, gpg::TrackedPointerState::Owned, ownerRef);
+  moho::WriteCTaskBase(archive, this, ownerRef);
+  (void)WriteOwnedLuaStatePointer(archive, mLuaState, ownerRef);
   archive->WriteInt(mResumeArgCount);
 
   if (mLuaState) {
@@ -877,9 +1096,52 @@ void CLuaTaskSerializer::RegisterSerializeFunctions()
   type->serSaveFunc_ = &SerializeCLuaTask;
 }
 
+/**
+ * Address: 0x00BC6160 (FUN_00BC6160, CLuaTask startup type-info registration)
+ *
+ * What it does:
+ * Pre-registers `CLuaTask` reflected type descriptor and schedules teardown
+ * of startup type-info storage at process exit.
+ */
+void moho::register_CLuaTaskTypeInfo()
+{
+  static const bool kRegistered = []() {
+    (void)PreRegisterCLuaTaskTypeInfo();
+    (void)std::atexit(&CleanupCLuaTaskTypeInfoAtExit);
+    return true;
+  }();
+  (void)kRegistered;
+}
+
+/**
+ * Address: 0x00BC6180 (FUN_00BC6180, CLuaTask startup construct registration)
+ *
+ * What it does:
+ * Initializes construct helper callbacks for CLuaTask reflected serializer
+ * construction and schedules intrusive helper cleanup at process exit.
+ */
+void moho::register_CLuaTaskConstruct()
+{
+  static const bool kRegistered = []() {
+    InitializeCLuaTaskConstructHelper();
+    CLuaTaskConstructSlot().RegisterConstructFunction();
+    (void)std::atexit(&CleanupCLuaTaskConstructAtExit);
+    return true;
+  }();
+  (void)kRegistered;
+}
+
+/**
+ * Address: 0x004C9CA0 (FUN_004C9CA0, serializer cleanup alias A)
+ * Address: 0x004C9CD0 (FUN_004C9CD0, serializer cleanup alias B)
+ *
+ * What it does:
+ * Unlinks static CLuaTask serializer helper node from the intrusive helper
+ * list and restores self-links.
+ */
 gpg::SerHelperBase* moho::cleanup_CLuaTaskSerializer()
 {
-  return UnlinkSerializerNode(gCLuaTaskSerializer);
+  return CleanupCLuaTaskSerializerVariantAliasA();
 }
 
 /**

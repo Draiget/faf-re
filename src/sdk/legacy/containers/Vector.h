@@ -1048,9 +1048,9 @@ namespace msvc8
             const int bitDelta
         ) noexcept
         {
-            SetCursorFromWordSlotAndClearBit(cursor, sourceSlot);
+            (void)SetCursorFromWordSlotAndClearBit(cursor, sourceSlot);
             if (bitDelta != 0) {
-                AdvanceCursorBits(cursor, bitDelta);
+                (void)AdvanceCursorBits(cursor, bitDelta);
             }
             return cursor;
         }
@@ -1068,7 +1068,7 @@ namespace msvc8
         ) noexcept
         {
             *destination = source;
-            AdvanceCursorBits(destination, bitDelta);
+            (void)AdvanceCursorBits(destination, bitDelta);
             return destination;
         }
 

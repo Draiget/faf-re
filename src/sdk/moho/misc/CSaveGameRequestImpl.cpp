@@ -141,6 +141,73 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00883430 (FUN_00883430, boost::shared_ptr_SFileStarCloser::operator=)
+   *
+   * What it does:
+   * Rebinds one `shared_ptr<SFileStarCloser>` from a raw pointer and releases
+   * prior ownership.
+   */
+  boost::shared_ptr<SFileStarCloser>* AssignSharedFileCloserFromRaw(
+    boost::shared_ptr<SFileStarCloser>* const outCloser,
+    SFileStarCloser* const closer
+  )
+  {
+    outCloser->reset(closer);
+    return outCloser;
+  }
+
+  /**
+   * Address: 0x008823B0 (FUN_008823B0, Moho::WeakPtr_FILE::Release)
+   *
+   * What it does:
+   * Clears one `boost::shared_ptr<std::FILE>` lane and releases the control
+   * block ownership counts.
+   */
+  void ReleaseSharedFileHandle(boost::shared_ptr<std::FILE>* const fileHandle)
+  {
+    if (fileHandle == nullptr) {
+      return;
+    }
+    fileHandle->reset();
+  }
+
+  /**
+   * Address: 0x0087FDC0 (FUN_0087FDC0, Moho::SaveLoadError::SaveLoadError)
+   *
+   * What it does:
+   * Formats the inherited `runtime_error` message as `Save/Load error %s` and
+   * stores the raw message lane separately for UI/reporting paths.
+   */
+  SaveLoadError::SaveLoadError(const char* const message)
+    : std::runtime_error(gpg::STR_Printf("Save/Load error %s", message != nullptr ? message : "").c_str())
+    , mRawMessage(message != nullptr ? message : "")
+  {}
+
+  /**
+   * Address: 0x00880700 (FUN_00880700, Moho::SaveLoadError::SaveLoadError copy-ctor)
+   *
+   * What it does:
+   * Copies inherited runtime-error payload and the raw save/load message lane.
+   */
+  SaveLoadError::SaveLoadError(const SaveLoadError& other)
+    : std::runtime_error(other)
+    , mRawMessage(other.mRawMessage)
+  {}
+
+  /**
+   * Address: 0x0087FE90 (FUN_0087FE90, Moho::SaveLoadError::~SaveLoadError)
+   *
+   * What it does:
+   * Releases raw-message string storage before base exception teardown.
+   */
+  SaveLoadError::~SaveLoadError() noexcept = default;
+
+  const msvc8::string& SaveLoadError::GetRawMessage() const noexcept
+  {
+    return mRawMessage;
+  }
+
   void SFileStarCloser::operator()(std::FILE* const file) const noexcept
   {
     if (file) {
@@ -202,7 +269,7 @@ namespace moho
   {
     delete mArchive;
     mArchive = nullptr;
-    mFile.reset();
+    ReleaseSharedFileHandle(&mFile);
   }
 
   /**
@@ -258,7 +325,7 @@ namespace moho
         completionText = gpg::STR_Printf("IO error writing header");
       }
 
-      mFile.reset();
+      ReleaseSharedFileHandle(&mFile);
       if (completedSuccessfully && !MoveTempFileIntoSavePath(tempPath, mSavePath)) {
         completedSuccessfully = false;
         gpg::Logf(
@@ -268,7 +335,7 @@ namespace moho
     }
 
     if (!completedSuccessfully) {
-      mFile.reset();
+      ReleaseSharedFileHandle(&mFile);
       if (!DeleteTempFile(tempPath)) {
         gpg::Logf("SAVE: DeleteFile(\"%s\") failed.", tempPath.c_str());
       }

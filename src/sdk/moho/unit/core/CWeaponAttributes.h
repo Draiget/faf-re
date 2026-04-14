@@ -53,6 +53,15 @@ namespace moho
      * Replaces the stored type string with the provided value.
      */
     void SetType(msvc8::string type);
+
+    /**
+     * Address: 0x006D3430 (FUN_006D3430, Moho::CWeaponAttributes::GetName)
+     *
+     * What it does:
+     * Returns the explicit local type string when present; otherwise returns
+     * the backing blueprint damage-type string.
+     */
+    [[nodiscard]] msvc8::string GetName() const;
   };
 
   static_assert(

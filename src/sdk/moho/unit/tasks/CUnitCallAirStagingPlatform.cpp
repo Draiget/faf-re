@@ -9,6 +9,7 @@
 #include "moho/ai/IAiTransport.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/sim/SFootprint.h"
+#include "moho/math/Vector3f.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
@@ -48,11 +49,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
     }
     return cached;
-  }
-
-  [[nodiscard]] bool IsValidVector3f(const Wm3::Vector3f& value) noexcept
-  {
-    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
   }
 
   [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept

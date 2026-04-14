@@ -217,6 +217,35 @@ namespace moho
   template <>
   int TSimConVarInstance<float>::HandleConsoleCommand(void* commandArgs);
 
+  /**
+   * Address: 0x005D41E0 (FUN_005D41E0, Moho::TSimConVarInstance_float::GetPtr)
+   *
+   * What it does:
+   * Returns pointer to the float value lane stored at offset +0x08.
+   */
+  template <>
+  void* TSimConVarInstance<float>::GetValueStorage();
+
+  /**
+   * Address: 0x0057FC80 (FUN_0057FC80, Moho::TSimConVarInstance_bool::GetRRef)
+   *
+   * What it does:
+   * Builds one reflected bool reference for this convar value and copies it
+   * into `outRef`.
+   */
+  template <>
+  gpg::RRef* TSimConVarInstance<bool>::GetValueRef(gpg::RRef* outRef);
+
+  /**
+   * Address: 0x005D41F0 (FUN_005D41F0, Moho::TSimConVarInstance_float::GetRRef)
+   *
+   * What it does:
+   * Builds one reflected float reference for this convar value and copies it
+   * into `outRef`.
+   */
+  template <>
+  gpg::RRef* TSimConVarInstance<float>::GetValueRef(gpg::RRef* outRef);
+
   static_assert(
     offsetof(TSimConVarInstance<bool>, mValue) == 0x08, "TSimConVarInstance<bool>::mValue offset must be 0x08"
   );

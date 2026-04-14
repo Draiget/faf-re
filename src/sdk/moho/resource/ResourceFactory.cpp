@@ -68,6 +68,31 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
+   *
+   * What it does:
+   * Resolves cached `RScmResource` RTTI and updates the prefetch/resource
+   * type lanes used by factory virtual dispatch.
+   */
+  void CScmResourceFactory::Init()
+  {
+    gpg::RType* firstResolvedType = RScmResource::sType;
+    if (firstResolvedType == nullptr) {
+      firstResolvedType = gpg::LookupRType(typeid(RScmResource));
+      RScmResource::sType = firstResolvedType;
+    }
+
+    gpg::RType* resolvedType = firstResolvedType;
+    if (resolvedType == nullptr) {
+      resolvedType = gpg::LookupRType(typeid(RScmResource));
+      RScmResource::sType = resolvedType;
+    }
+
+    mPrefetchType = firstResolvedType;
+    mResourceType = resolvedType;
+  }
+
+  /**
    * Address: 0x00539290 (FUN_00539290, Moho::CScmResourceFactory::Load)
    *
    * What it does:
@@ -106,6 +131,23 @@ namespace moho
     }
 
     outResource.reset(rawResource);
+    return outResource;
+  }
+
+  /**
+   * Address: 0x00539950 (FUN_00539950, Moho::ResourceFactory_RScmResource::LoadFrom)
+   *
+   * What it does:
+   * Clones prefetch handle lane, forwards into `LoadFromImpl`, and copies the
+   * resulting resource handle into `outResource`.
+   */
+  CScmResourceFactory::ResourceHandle&
+  CScmResourceFactory::LoadFrom(ResourceHandle& outResource, const char* const path, ResourceHandle prefetchData)
+  {
+    ResourceHandle prefetchCopy = prefetchData;
+    ResourceHandle loadedResource{};
+    (void)LoadFromImpl(loadedResource, path, prefetchCopy);
+    outResource = loadedResource;
     return outResource;
   }
 

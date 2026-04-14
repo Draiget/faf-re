@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/String.h"
 #include "moho/misc/WeakPtr.h"
 
@@ -14,8 +15,23 @@ namespace gpg
 
 namespace moho
 {
+  struct RUnitBlueprint;
+  class CBuildTaskHelper;
   class Sim;
   class Unit;
+
+  /**
+   * Address: 0x005F5670 (FUN_005F5670, func_CheckBuildRestriction)
+   *
+   * What it does:
+   * Applies blueprint build-restriction gating for one target area using the
+   * owning sim-resource deposit map.
+   */
+  [[nodiscard]] bool CheckBuildRestriction(
+    const RUnitBlueprint* blueprint,
+    gpg::Rect2i* buildArea,
+    CBuildTaskHelper* buildTaskHelper
+  );
 
   /**
    * Shared build/assist progress helper used by multiple unit command tasks.

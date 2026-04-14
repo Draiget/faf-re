@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "boost/shared_ptr.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -21,6 +22,8 @@
 
 namespace moho
 {
+  class CGeomSolid3;
+  class UserEntity;
   class CAniPose;
   class CD3DPrimBatcher;
   class CDebugCanvas;
@@ -31,6 +34,8 @@ namespace moho
   class ID3DRenderTarget;
   class ID3DDepthStencil;
   class Shadow;
+  enum EEntityType : std::uint32_t;
+  struct Vector4f;
   struct RMeshBlueprint;
   struct RMeshBlueprintLOD;
   class RScmResource;
@@ -40,6 +45,30 @@ namespace moho
   {
     void* db;           // +0x00
     std::int32_t entry; // +0x04
+
+    /**
+     * Address: 0x00501D80 (FUN_00501D80, Moho::SpatialDB_MeshInstance::SpatialDB_MeshInstance)
+     *
+     * What it does:
+     * Initializes one embedded spatial-db mesh-storage view in-place.
+     */
+    void InitializeStorage();
+
+    /**
+     * Address: 0x00501F50 (FUN_00501F50, Moho::SpatialDB_MeshInstance::SpatialDB_MeshInstance)
+     *
+     * What it does:
+     * Rebuilds embedded top-level shard lanes for one map-size update.
+     */
+    void ResizeStorageForMap(std::int32_t width, std::int32_t height);
+
+    /**
+     * Address: 0x00501E50 (FUN_00501E50, Moho::SpatialDB_MeshInstance::~SpatialDB_MeshInstance)
+     *
+     * What it does:
+     * Tears down one embedded spatial-db mesh-storage view in-place.
+     */
+    void DestroyStorage();
 
     /**
      * Address: 0x00501A80 (FUN_00501A80, sub_501A80)
@@ -64,6 +93,56 @@ namespace moho
      * Updates cached entry AABB payload lanes for this mesh-instance in spatial DB.
      */
     void UpdateBounds(const Wm3::AxisAlignedBox3f& bounds);
+
+    /**
+     * Address: 0x00503F80 (FUN_00503F80, Moho::SpatialDB_MeshInstance::Collect)
+     *
+     * What it does:
+     * Collects requested entity lanes from shard hierarchy, inline root data,
+     * and map-backed overflow lane, then returns destination count.
+     */
+    std::int32_t Collect(gpg::fastvector<UserEntity*>& dest, EEntityType type);
+
+    /**
+     * Address: 0x00504040 (FUN_00504040, Moho::SpatialDB_MeshInstance::CollectInBox)
+     *
+     * What it does:
+     * Collects unit entities intersecting one AABB query from shard lanes and
+     * inline root data, then returns destination count.
+     */
+    std::int32_t CollectInBox(gpg::fastvector<UserEntity*>& dest, const Wm3::AxisAlignedBox3f& bounds);
+
+    /**
+     * Address: 0x00504130 (FUN_00504130, Moho::SpatialDB_MeshInstance::CollectInVolume)
+     *
+     * What it does:
+     * Collects matching entities from all shard lanes and inline root data that
+     * intersect the query volume, then returns destination count.
+     */
+    std::int32_t CollectInVolume(gpg::fastvector<UserEntity*>& dest, EEntityType type, CGeomSolid3* volume);
+
+    /**
+     * Address: 0x00504180 (FUN_00504180, Moho::SpatialDB_MeshInstance::CollectAllInVolume)
+     *
+     * What it does:
+     * Collects unit/prop/projectile/entity lanes intersecting one query volume
+     * with fade-threshold culling inputs, then returns destination count.
+     */
+    std::int32_t CollectAllInVolume(
+      gpg::fastvector<UserEntity*>& dest,
+      CGeomSolid3* volume,
+      const Wm3::Vector3f& supportSelector,
+      const Vector4f& fadePlane
+    );
+
+    /**
+     * Address: 0x005041E0 (FUN_005041E0, Moho::SpatialDB_MeshInstance::CollectInView)
+     *
+     * What it does:
+     * Collects entities intersecting current camera frustum/fade lanes from
+     * shard hierarchy and inline root data, then returns destination count.
+     */
+    std::int32_t CollectInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& dest, EEntityType type);
 
     /**
      * What it does:
@@ -271,6 +350,16 @@ namespace moho
     void ResetBatches();
 
     /**
+     * Address: 0x007DDA50 (FUN_007DDA50,
+     * ?ComputeLOD@Mesh@Moho@@QBEPBVMeshLOD@2@M@Z)
+     *
+     * What it does:
+     * Selects the first matching LOD for the supplied distance and dissolve
+     * range settings.
+     */
+    [[nodiscard]] const MeshLOD* ComputeLOD(float distance) const;
+
+    /**
      * Address: 0x007DDC50 (FUN_007DDC50,
      * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@ABVRMeshBlueprintLOD@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
@@ -368,6 +457,14 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<Mesh> GetMesh() const;
 
     /**
+     * Address: 0x007DE890 (FUN_007DE890, ?SetDissolve@MeshInstance@Moho@@QAEXM@Z)
+     *
+     * What it does:
+     * Clamps and stores one dissolve factor in `[0.0, 1.0]`.
+     */
+    void SetDissolve(float dissolveValue);
+
+    /**
      * Address: 0x007DE930 (FUN_007DE930, ?SetStance@MeshInstance@Moho@@QAEXABVVTransform@2@0@Z)
      *
      * What it does:
@@ -401,6 +498,32 @@ namespace moho
      * interpolant and refreshes fallback runtime bounds.
      */
     void UpdateInterpolatedFields();
+
+    /**
+     * Address: 0x007DAE20 (FUN_007DAE20, Moho::MeshInstance::GetInterpolatedPos)
+     *
+     * What it does:
+     * Refreshes interpolation state and returns current interpolated position.
+     */
+    [[nodiscard]] Wm3::Vec3f GetInterpolatedPos() const;
+
+    /**
+     * Address: 0x007DE730 (FUN_007DE730, ?GetDebugBoneCount@MeshInstance@Moho@@QBEHXZ)
+     *
+     * What it does:
+     * Returns debug skeleton bone count for static-pose meshes.
+     */
+    [[nodiscard]] std::int32_t GetDebugBoneCount() const;
+
+    /**
+     * Address: 0x007DEFC0 (FUN_007DEFC0,
+     * ?GetSweptAlignedBox@MeshInstance@Moho@@QBE?AV?$AxisAlignedBox3@M@Wm3@@XZ)
+     *
+     * What it does:
+     * Returns cached swept AABB lanes; when stale, rebuilds from start/end
+     * stance transforms using scaled mesh-resource bounds.
+     */
+    [[nodiscard]] Wm3::AxisAlignedBox3f GetSweptAlignedBox() const;
 
   public:
     using ListLink = TDatListItem<void, void>;
@@ -499,6 +622,14 @@ namespace moho
      * Address: 0x007DF330 (FUN_007DF330, ??1MeshRenderer@Moho@@QAE@XZ)
      */
     virtual ~MeshRenderer();
+
+    /**
+     * Address: 0x007DF260 (FUN_007DF260, Moho::MeshRenderer::operator delete)
+     *
+     * What it does:
+     * Implements deleting-dtor thunk semantics for mesh-renderer runtime lanes.
+     */
+    static MeshRenderer* DeleteWithFlag(MeshRenderer* object, std::uint8_t deleteFlags) noexcept;
 
     /**
      * Address: 0x007E16C0 (FUN_007E16C0, ?GetInstance@MeshRenderer@Moho@@SAPAV12@XZ)

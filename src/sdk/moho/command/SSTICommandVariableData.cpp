@@ -95,6 +95,37 @@ namespace moho
   gpg::RType* SSTICommandVariableData::sType = nullptr;
 
   /**
+   * Address: 0x00552A00 (FUN_00552A00, Moho::SSTICommandVariableData::SSTICommandVariableData)
+   *
+   * What it does:
+   * Initializes variable-command payload lanes to an empty/default state
+   * (`UNITCOMMAND_None`, no targets, empty vectors, and unset count limits).
+   */
+  SSTICommandVariableData::SSTICommandVariableData()
+    : mEntIds{}
+    , v1(0)
+    , v2(0)
+    , mCmdType(EUnitCommandType::UNITCOMMAND_None)
+    , mTarget1{}
+    , mTarget2{}
+    , v14(0)
+    , mCells{}
+    , v19(0)
+    , v20(0)
+    , mMaxCount(-1)
+    , mCount(-1)
+    , v23(0)
+  {
+    mTarget1.mType = EAiTargetType::AITARGET_None;
+    mTarget1.mEnt = static_cast<EntId>(0xF0000000u);
+    mTarget1.mPos = Wm3::Vec3f::Zero();
+
+    mTarget2.mType = EAiTargetType::AITARGET_None;
+    mTarget2.mEnt = static_cast<EntId>(0xF0000000u);
+    mTarget2.mPos = Wm3::Vec3f::Zero();
+  }
+
+  /**
    * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)
    *
    * What it does:

@@ -27,6 +27,14 @@
 
 moho::SoundConfiguration* moho::sSoundConfiguration = nullptr;
 
+extern "C" __declspec(dllimport) void __stdcall X3DAudioCalculate(
+  const void* instance,
+  const moho::Audio3DListener* listener,
+  const moho::Audio3DEmitter* emitter,
+  std::uint32_t flags,
+  moho::Audio3DDspSettings* dspSettings
+);
+
 namespace moho
 {
   const char* func_SoundErrorCodeToMsg(int errorCode);
@@ -63,6 +71,23 @@ int moho::register_SoundConfigurationCleanupAtExit()
   return std::atexit(&cleanup_SoundConfigurationSingleton);
 }
 
+/**
+ * Address: 0x004DE650 (FUN_004DE650, ??0WeakPtr_AudioEngine@Moho@@QAE@@Z)
+ * Mangled: ??0WeakPtr_AudioEngine@Moho@@QAE@@Z
+ *
+ * What it does:
+ * Rebinds one audio-engine weak/shared pair from a source shared pair by
+ * copying the pointee lane, retaining the incoming control lane, and
+ * weak-releasing any previously bound control lane.
+ */
+boost::SharedCountPair* moho::AssignWeakAudioEnginePairFromShared(
+  boost::SharedCountPair* const outWeakPair,
+  const boost::SharedCountPair* const sourceSharedPair
+) noexcept
+{
+  return boost::AssignWeakPairFromShared(outWeakPair, sourceSharedPair);
+}
+
 namespace
 {
   struct AudioStartupCleanupRegistrations
@@ -79,10 +104,55 @@ namespace
 namespace
 {
   constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
+  constexpr int kHresultPointer = static_cast<int>(0x80004003u);
+  constexpr int kHresultFail = static_cast<int>(0x80004005u);
+  constexpr std::uint32_t kX3dCalculateFlags = 0x61u;
   constexpr std::uint16_t kInvalidCategoryId = 0xFFFFu;
   constexpr std::uint16_t kInvalidVariableId = 0xFFFFu;
   constexpr float kDefaultCategoryVolume = 1.0f;
   constexpr const char* kGlobalCategoryName = "Global";
+
+  struct AudioDistanceCurvePoint
+  {
+    float mDistance;
+    float mDspSetting;
+  };
+
+  struct AudioDistanceCurve
+  {
+    const AudioDistanceCurvePoint* mPoints;
+    std::uint32_t mPointCount;
+  };
+
+  constexpr std::array<AudioDistanceCurvePoint, 2> kDefaultDistanceCurvePoints = {
+    AudioDistanceCurvePoint{0.0f, 1.0f},
+    AudioDistanceCurvePoint{1.0f, 1.0f},
+  };
+
+  constexpr AudioDistanceCurve kDefaultDistanceCurve = {kDefaultDistanceCurvePoints.data(), 2u};
+
+  constexpr std::array<float, 2> kDefaultAzimuths2 = {4.71238899f, 1.57079637f};
+  constexpr std::array<float, 3> kDefaultAzimuths3 = {4.71238899f, 1.57079637f, 6.28318548f};
+  constexpr std::array<float, 4> kDefaultAzimuths4 = {5.49778748f, 0.785398185f, 3.92699075f, 2.3561945f};
+  constexpr std::array<float, 5> kDefaultAzimuths5 = {5.49778748f, 0.785398185f, 6.28318548f, 3.92699075f, 2.3561945f};
+  constexpr std::array<float, 6> kDefaultAzimuths6 = {
+    5.49778748f,
+    0.785398185f,
+    0.0f,
+    6.28318548f,
+    3.92699075f,
+    2.3561945f,
+  };
+  constexpr std::array<float, 8> kDefaultAzimuths8 = {
+    5.49778748f,
+    0.785398185f,
+    0.0f,
+    6.28318548f,
+    3.92699075f,
+    2.3561945f,
+    4.71238899f,
+    1.57079637f,
+  };
 
   struct AudioSoundBankLoader
   {
@@ -757,8 +827,16 @@ namespace moho
    * Maps common HRESULT/XACT failure codes to stable diagnostic text.
    */
   const char* func_SoundErrorCodeToMsg(int errorCode);
+
+  /**
+   * Address: 0x004D81E0 (FUN_004D81E0, func_X3DAudioCalculate)
+   *
+   * What it does:
+   * Applies default channel azimuth/curve lanes for multi-channel emitters
+   * and forwards one 3D-audio solve call into `X3DAudioCalculate`.
+   */
   int func_X3DAudioCalculate(
-    const Audio3DEmitter* emitter,
+    Audio3DEmitter* emitter,
     const Audio3DListener* listener,
     Audio3DDspSettings* settings,
     const void* audioHandle
@@ -877,6 +955,62 @@ namespace moho
     default:
       return "Unknown XACT Error";
     }
+  }
+
+  /**
+   * Address: 0x004D81E0 (FUN_004D81E0, func_X3DAudioCalculate)
+   *
+   * What it does:
+   * Validates listener/emitter/settings pointers, injects default azimuth
+   * layouts for common channel counts when missing, applies default flat
+   * distance curves, and dispatches one `X3DAudioCalculate` solve.
+   */
+  int func_X3DAudioCalculate(
+    Audio3DEmitter* const emitter,
+    const Audio3DListener* const listener,
+    Audio3DDspSettings* const settings,
+    const void* const audioHandle
+  )
+  {
+    if (listener == nullptr || emitter == nullptr || settings == nullptr) {
+      return kHresultPointer;
+    }
+
+    if (emitter->mChannelCount > 1u && emitter->mChannelAzimuths == nullptr) {
+      emitter->mChannelRadius = 1.0f;
+      switch (emitter->mChannelCount) {
+      case 2u:
+        emitter->mChannelAzimuths = const_cast<float*>(kDefaultAzimuths2.data());
+        break;
+      case 3u:
+        emitter->mChannelAzimuths = const_cast<float*>(kDefaultAzimuths3.data());
+        break;
+      case 4u:
+        emitter->mChannelAzimuths = const_cast<float*>(kDefaultAzimuths4.data());
+        break;
+      case 5u:
+        emitter->mChannelAzimuths = const_cast<float*>(kDefaultAzimuths5.data());
+        break;
+      case 6u:
+        emitter->mChannelAzimuths = const_cast<float*>(kDefaultAzimuths6.data());
+        break;
+      case 8u:
+        emitter->mChannelAzimuths = const_cast<float*>(kDefaultAzimuths8.data());
+        break;
+      default:
+        return kHresultFail;
+      }
+    }
+
+    if (emitter->mVolumeCurve == nullptr) {
+      emitter->mVolumeCurve = const_cast<AudioDistanceCurve*>(&kDefaultDistanceCurve);
+    }
+    if (emitter->mLfeCurve == nullptr) {
+      emitter->mLfeCurve = const_cast<AudioDistanceCurve*>(&kDefaultDistanceCurve);
+    }
+
+    X3DAudioCalculate(audioHandle, listener, emitter, kX3dCalculateFlags, settings);
+    return 0;
   }
 
   namespace
@@ -1806,6 +1940,46 @@ namespace moho
     } else {
       (void)ErasePausedCategoryName(mImpl->mMap1, category);
     }
+  }
+
+  /**
+   * Address: 0x004D9EC0 (FUN_004D9EC0, ?GetPaused@AudioEngine@Moho@@QAE_NVStrArg@gpg@@@Z)
+   *
+   * gpg::StrArg category
+   *
+   * What it does:
+   * Returns true when one category name exists in the paused-category map.
+   */
+  bool AudioEngine::GetPaused(const gpg::StrArg category)
+  {
+    if (mImpl == nullptr || mImpl->mInstance == nullptr || !IsCategoryArgValid(category)) {
+      return false;
+    }
+
+    return FindMap1CategoryNode(mImpl->mMap1, category) != nullptr;
+  }
+
+  /**
+   * Address: 0x004D9F50 (FUN_004D9F50, ?StopAllSounds@AudioEngine@Moho@@QAEXVStrArg@gpg@@@Z)
+   *
+   * gpg::StrArg category
+   *
+   * What it does:
+   * Stops all playing cues in one resolved XACT category.
+   */
+  void AudioEngine::StopAllSounds(const gpg::StrArg category)
+  {
+    if (mImpl == nullptr || mImpl->mInstance == nullptr || !IsCategoryArgValid(category)) {
+      return;
+    }
+
+    const std::uint16_t categoryId = mImpl->mInstance->GetCategory(category);
+    if (categoryId == kInvalidCategoryId) {
+      gpg::Warnf("SND: StopAllSounds - Invalid Category [%s]", category);
+      return;
+    }
+
+    mImpl->mInstance->Stop(categoryId, 0);
   }
 
   /**

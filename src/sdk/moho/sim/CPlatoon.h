@@ -6,6 +6,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/ArmyUnitSet.h"
 
@@ -114,6 +115,24 @@ namespace moho
     CSquad* GetSquad(ESquadClass squadClass);
 
     /**
+     * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
+     *
+     * What it does:
+     * Finds this platoon's unassigned squad and returns how many live units in
+     * that lane match `blueprintId`.
+     */
+    [[nodiscard]] int CountUnassignedUnitsWithBP(const char* blueprintId);
+
+    /**
+     * Address: 0x007256A0 (FUN_007256A0, Moho::CPlatoon::CountUnassignedUnitsInCategory)
+     *
+     * What it does:
+     * Finds this platoon's unassigned squad and returns how many live units in
+     * that lane match `categorySet`.
+     */
+    [[nodiscard]] int CountUnassignedUnitsInCategory(const EntityCategorySet* categorySet);
+
+    /**
      * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
      *
      * What it does:
@@ -123,6 +142,16 @@ namespace moho
      * unassigned squad.
      */
     void GetUnassignedUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
+
+    /**
+     * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
+     *
+     * What it does:
+     * Locates this platoon's `SQUADCLASS_Unassigned` squad and forwards to
+     * `CSquad::AppendUnitsInCategory` to collect up to `maxCount` live units
+     * matching `categorySet` into `outUnits`.
+     */
+    void GetUnassignedUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, SEntitySetTemplateUnit& outUnits);
 
     /**
      * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)

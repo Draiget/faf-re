@@ -6,6 +6,12 @@ gpg::RType* IAiReconDB::sType = nullptr;
 
 /**
  * Address: 0x005BE010 (??1IAiReconDB@Moho@@UAE@XZ)
+ * Address: 0x005BE020 (FUN_005BE020, scalar deleting thunk)
+ *
+ * What it does:
+ * Executes the base interface destructor body; the associated deleting thunk
+ * (`0x005BE020`) resets the IAiReconDB vtable lane and frees `this` when
+ * requested by delete flags.
  */
 IAiReconDB::~IAiReconDB() = default;
 

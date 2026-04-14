@@ -363,6 +363,14 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0063B1E0 (FUN_0063B1E0)
+   *
+   * What it does:
+   * Reads owned IAniManipulator pointers from the archive until a null
+   * terminator is encountered, unlinking each from any prior list and
+   * appending it to the actor's manipulator-by-precedence list.
+   */
   void DeserializeManipulatorList(moho::CAniActor* const actor, gpg::ReadArchive* const archive)
   {
     const gpg::RRef owner{};
@@ -376,6 +384,13 @@ namespace
     }
   }
 
+  /**
+   * Address: 0x0063B160 (FUN_0063B160)
+   *
+   * What it does:
+   * Walks the actor's manipulator-by-precedence list and writes each
+   * IAniManipulator as an owned typed pointer, then writes a null terminator.
+   */
   void SerializeManipulatorList(const moho::CAniActor* const actor, gpg::WriteArchive* const archive)
   {
     const auto* const listHead =
@@ -526,7 +541,7 @@ namespace moho
   }
 
   /**
-   * Address: 0x0063B020 (FUN_0063B020, Moho::CAniActorConstruct::Construct)
+   * Address: 0x0063B030 (FUN_0063B030, Moho::CAniActor::MemberConstruct)
    */
   void CAniActor::MemberConstruct(gpg::SerConstructResult* const result)
   {
@@ -647,6 +662,28 @@ namespace moho
   boost::shared_ptr<const CAniSkel> CAniActor::GetSkeleton() const
   {
     return mPose.px->GetSkeleton();
+  }
+
+  /**
+   * Address: 0x005BDD50 (FUN_005BDD50, ?GetPoseShared@CAniActor@Moho@@QBE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+   *
+   * What it does:
+   * Returns one retained shared-ptr handle to this actor's current pose.
+   */
+  boost::shared_ptr<CAniPose> CAniActor::GetPoseShared() const
+  {
+    return boost::SharedPtrFromRawRetained(mPose);
+  }
+
+  /**
+   * Address: 0x005BDD70 (FUN_005BDD70, ?GetPriorPoseShared@CAniActor@Moho@@QBE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+   *
+   * What it does:
+   * Returns one retained shared-ptr handle to this actor's prior pose.
+   */
+  boost::shared_ptr<CAniPose> CAniActor::GetPriorPoseShared() const
+  {
+    return boost::SharedPtrFromRawRetained(mPriorPose);
   }
 
   /**

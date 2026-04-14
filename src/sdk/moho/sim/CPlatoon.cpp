@@ -213,22 +213,6 @@ namespace
     return false;
   }
 
-  [[nodiscard]] bool SquadHasUnitState(const CSquadRuntimeView* const squad, const EUnitState unitState) noexcept
-  {
-    if (!squad) {
-      return false;
-    }
-
-    for (void** unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
-      Unit* const unit = DecodeSquadUnit(*unitSlot);
-      if (unit && unit->IsUnitState(unitState)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   void BuildPlatoonUnitSet(const CPlatoonRuntimeView& platoonRuntime, SEntitySetTemplateUnit& outSet);
 
   [[nodiscard]] bool ComputeSquadCenter(const CSquadRuntimeView* const squad, Wm3::Vector3f& outCenter) noexcept
@@ -237,32 +221,7 @@ namespace
       return false;
     }
 
-    float sumX = 0.0f;
-    float sumY = 0.0f;
-    float sumZ = 0.0f;
-    std::uint32_t unitCount = 0u;
-
-    for (void** unitSlot = squad->mUnitSlotBegin; unitSlot != squad->mUnitSlotEnd; ++unitSlot) {
-      Unit* const unit = DecodeSquadUnit(*unitSlot);
-      if (!unit) {
-        continue;
-      }
-
-      const Wm3::Vec3f& unitPosition = unit->GetPosition();
-      sumX += unitPosition.x;
-      sumY += unitPosition.y;
-      sumZ += unitPosition.z;
-      ++unitCount;
-    }
-
-    if (unitCount == 0u) {
-      return false;
-    }
-
-    const float inverseCount = 1.0f / static_cast<float>(unitCount);
-    outCenter.x = sumX * inverseCount;
-    outCenter.y = sumY * inverseCount;
-    outCenter.z = sumZ * inverseCount;
+    reinterpret_cast<const moho::CSquad*>(squad)->GetCenter(&outCenter);
     return true;
   }
 
@@ -607,6 +566,14 @@ namespace moho
   int cfunc_CPlatoonFindClosestUnitL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonFindClosestUnitToBaseL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonFindFurthestUnitL(LuaPlus::LuaState* state);
+  /**
+   * Address: 0x0072F790 (FUN_0072F790, cfunc_CPlatoonCanAttackTargetL)
+   *
+   * What it does:
+   * Resolves `(platoon, squadClass, targetUnit)` from Lua, locates the
+   * matching squad lane, and returns whether that squad can attack the
+   * requested unit.
+   */
   int cfunc_CPlatoonCanAttackTargetL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonMoveToTargetL(LuaPlus::LuaState* state);
@@ -788,6 +755,65 @@ namespace moho
   }
 
   /**
+   * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
+   *
+   * What it does:
+   * Returns the count of live unassigned-squad units whose blueprint id
+   * matches `blueprintId`, or zero when no unassigned squad exists.
+   */
+  int CPlatoon::CountUnassignedUnitsWithBP(const char* const blueprintId)
+  {
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
+    if (squadView == nullptr) {
+      return 0;
+    }
+
+    return reinterpret_cast<CSquad*>(squadView)->CountUnitsWithBP(blueprintId);
+  }
+
+  /**
+   * Address: 0x007256A0 (FUN_007256A0, Moho::CPlatoon::CountUnassignedUnitsInCategory)
+   *
+   * What it does:
+   * Returns the count of live unassigned-squad units matching `categorySet`,
+   * or zero when no unassigned squad exists.
+   */
+  int CPlatoon::CountUnassignedUnitsInCategory(const EntityCategorySet* const categorySet)
+  {
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, ESquadClass::Unassigned);
+    if (squadView == nullptr) {
+      return 0;
+    }
+
+    return reinterpret_cast<CSquad*>(squadView)->CountUnitsInCategory(categorySet);
+  }
+
+  /**
+   * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
+   *
+   * What it does:
+   * Walks platoon squad lanes to find the first `SQUADCLASS_Unassigned` squad
+   * and forwards category-filtered appends into `outUnits`.
+   */
+  void CPlatoon::GetUnassignedUnitsInCategory(
+    const EntityCategorySet* const categorySet, const int maxCount, SEntitySetTemplateUnit& outUnits
+  )
+  {
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(this);
+    for (CSquadRuntimeView** squadLane = runtimeView.mSquadStart; squadLane != runtimeView.mSquadEnd; ++squadLane) {
+      CSquadRuntimeView* const squadView = *squadLane;
+      if (squadView == nullptr || squadView->mSquadClass != ESquadClass::Unassigned) {
+        continue;
+      }
+
+      reinterpret_cast<CSquad*>(squadView)->AppendUnitsInCategory(categorySet, maxCount, outUnits);
+      return;
+    }
+  }
+
+  /**
    * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
    *
    * What it does:
@@ -903,8 +929,7 @@ namespace moho
       // Preserve original call lane: this method always queries GetSquad using
       // the incoming squadClass token, even during SQUADCLASS_all scanning.
       CSquad* const squad = platoon->GetSquad(squadClass);
-      const auto* const squadView = reinterpret_cast<const CSquadRuntimeView*>(squad);
-      if (SquadHasUnitState(squadView, state)) {
+      if (squad != nullptr && squad->HasUnitWithState(state)) {
         return true;
       }
     }
@@ -2540,6 +2565,53 @@ namespace moho
       kFindHighestValueUnitHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x0072F790 (FUN_0072F790, cfunc_CPlatoonCanAttackTargetL)
+   *
+   * IDA signature:
+   * int __thiscall cfunc_CPlatoonCanAttackTargetL(LuaPlus::LuaState *state)
+   *
+   * What it does:
+   * Resolves `(platoon, squadClass, targetUnit)`, finds the first squad in
+   * the requested class, and forwards the target to `CSquad::CanAttackTarget`.
+   * When the class is absent the Lua callback returns no values.
+   */
+  int cfunc_CPlatoonCanAttackTargetL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 3) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCanAttackTargetHelpText, 3, argumentCount);
+    }
+
+    const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    ESquadClass squadClass = static_cast<ESquadClass>(0);
+    gpg::RRef enumRef{};
+    gpg::RRef_ESquadClass(&enumRef, &squadClass);
+
+    const char* const squadClassName = lua_tostring(state->m_state, 2);
+    if (squadClassName == nullptr) {
+      LuaPlus::LuaStackObject typeErrorArg(state, 2);
+      LuaPlus::LuaStackObject::TypeError(&typeErrorArg, "string");
+    }
+    SCR_GetEnum(state, squadClassName, enumRef);
+
+    auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
+    CSquadRuntimeView* const squadView = FindSquadByClass(runtimeView, squadClass);
+    if (squadView == nullptr) {
+      return 0;
+    }
+
+    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 3));
+    Unit* const targetUnit = SCR_FromLua_Unit(targetObject);
+    const bool canAttack = reinterpret_cast<CSquad*>(squadView)->CanAttackTarget(targetUnit);
+
+    lua_pushboolean(state->m_state, canAttack ? 1 : 0);
+    (void)lua_gettop(state->m_state);
+    return 1;
   }
 
   /**

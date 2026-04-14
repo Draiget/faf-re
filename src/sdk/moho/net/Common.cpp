@@ -17,6 +17,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "NetConVars.h"
 using namespace moho;
 
@@ -1275,6 +1276,62 @@ void moho::NET_BuildBandwidthUsageSeries(
     ) * (1.0f / 3.0f);
 
     previousOriginal = currentOriginal;
+  }
+}
+
+/**
+ * Address: 0x007F3F20 (FUN_007F3F20, func_ren_BandwidthUsage_Line)
+ *
+ * What it does:
+ * Draws outbound/inbound bandwidth samples as two connected line strips.
+ */
+void moho::REN_DrawBandwidthUsageLinePair(
+  CD3DPrimBatcher& primBatcher,
+  const SBandwidthUsageSeries& series,
+  const std::int32_t xOffset,
+  const std::int32_t yBase,
+  const float yScale,
+  const std::uint32_t inboundColor,
+  const std::uint32_t outboundColor
+)
+{
+  const std::uint32_t sampleCount = series.SampleCount();
+  if (sampleCount == 0u) {
+    return;
+  }
+
+  CD3DPrimBatcher::Vertex previousOutbound{};
+  CD3DPrimBatcher::Vertex previousInbound{};
+  bool hasPrevious = false;
+
+  for (std::uint32_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
+    const SBandwidthUsageSample& sample = series.samples[sampleIndex];
+    const float x = static_cast<float>(xOffset + static_cast<std::int32_t>(sampleIndex));
+
+    CD3DPrimBatcher::Vertex currentOutbound{};
+    currentOutbound.mX = x;
+    currentOutbound.mY = static_cast<float>(yBase) - (sample.outboundBytesPerSec * yScale);
+    currentOutbound.mZ = 0.0f;
+    currentOutbound.mColor = outboundColor;
+    currentOutbound.mU = 0.0f;
+    currentOutbound.mV = 0.0f;
+
+    CD3DPrimBatcher::Vertex currentInbound{};
+    currentInbound.mX = x;
+    currentInbound.mY = static_cast<float>(yBase) - (sample.inboundBytesPerSec * yScale);
+    currentInbound.mZ = 0.0f;
+    currentInbound.mColor = inboundColor;
+    currentInbound.mU = 0.0f;
+    currentInbound.mV = 0.0f;
+
+    if (hasPrevious) {
+      primBatcher.DrawLine(previousOutbound, currentOutbound);
+      primBatcher.DrawLine(previousInbound, currentInbound);
+    }
+
+    previousOutbound = currentOutbound;
+    previousInbound = currentInbound;
+    hasPrevious = true;
   }
 }
 

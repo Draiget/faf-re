@@ -50,6 +50,46 @@ CSimConVarBase* CSimConVarBase::Identity()
   return this;
 }
 
+/**
+ * Address: 0x0057DED0 (FUN_0057DED0, Moho::TSimConVar_bool::NewInstance)
+ *
+ * What it does:
+ * Allocates one bool sim-convar instance, copies convar name/default value,
+ * and returns it as `CSimConVarInstanceBase`.
+ */
+template <>
+CSimConVarInstanceBase* moho::TSimConVar<bool>::CreateInstance()
+{
+  auto* const instance = new TSimConVarInstance<bool>();
+  if (!instance) {
+    return nullptr;
+  }
+
+  instance->mName = mName;
+  instance->mValue = mDefaultValue;
+  return instance;
+}
+
+/**
+ * Address: 0x005D3CE0 (FUN_005D3CE0, Moho::TSimConVar_float::NewInstance)
+ *
+ * What it does:
+ * Allocates one float sim-convar instance, copies convar name/default value,
+ * and returns it as `CSimConVarInstanceBase`.
+ */
+template <>
+CSimConVarInstanceBase* moho::TSimConVar<float>::CreateInstance()
+{
+  auto* const instance = new TSimConVarInstance<float>();
+  if (!instance) {
+    return nullptr;
+  }
+
+  instance->mName = mName;
+  instance->mValue = mDefaultValue;
+  return instance;
+}
+
 std::uint32_t CSimConVarBase::AllocateSimConVarIndex() noexcept
 {
   return gSimConVarIndexCounter++;

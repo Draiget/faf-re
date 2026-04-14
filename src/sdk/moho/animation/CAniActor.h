@@ -48,7 +48,7 @@ namespace moho
     ~CAniActor();
 
     /**
-     * Address: 0x0063B020 (FUN_0063B020, Moho::CAniActorConstruct::Construct)
+     * Address: 0x0063B030 (FUN_0063B030, Moho::CAniActor::MemberConstruct)
      *
      * What it does:
      * Allocates one `CAniActor` and publishes it as an unowned serialization
@@ -80,6 +80,24 @@ namespace moho
      */
     [[nodiscard]]
     boost::shared_ptr<const CAniSkel> GetSkeleton() const;
+
+    /**
+     * Address: 0x005BDD50 (FUN_005BDD50, ?GetPoseShared@CAniActor@Moho@@QBE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+     *
+     * What it does:
+     * Returns one retained shared-ptr handle to this actor's current pose.
+     */
+    [[nodiscard]]
+    boost::shared_ptr<CAniPose> GetPoseShared() const;
+
+    /**
+     * Address: 0x005BDD70 (FUN_005BDD70, ?GetPriorPoseShared@CAniActor@Moho@@QBE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+     *
+     * What it does:
+     * Returns one retained shared-ptr handle to this actor's prior pose.
+     */
+    [[nodiscard]]
+    boost::shared_ptr<CAniPose> GetPriorPoseShared() const;
 
     /**
      * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)

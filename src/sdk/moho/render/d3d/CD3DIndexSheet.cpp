@@ -91,6 +91,24 @@ namespace moho
   }
 
   /**
+   * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
+   *
+   * What it does:
+   * Forwards one index-buffer creation request through the active GAL device
+   * singleton and returns `outBuffer`.
+   */
+  CD3DIndexSheet::BufferHandle* CD3DIndexSheet::CreateIndexBufferOnActiveDevice(
+    BufferHandle* const outBuffer,
+    gpg::gal::IndexBufferContext* const context
+  )
+  {
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    auto* const deviceD3D9 = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
+    deviceD3D9->CreateIndexBuffer(outBuffer, context);
+    return outBuffer;
+  }
+
+  /**
    * Address: 0x0043F890 (FUN_0043F890)
    *
    * What it does:
@@ -216,9 +234,7 @@ namespace moho
   bool CD3DIndexSheet::CreateBuffer()
   {
     if (mBuffer.get() == nullptr) {
-      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-      auto* const deviceD3D9 = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
-      deviceD3D9->CreateIndexBuffer(&mBuffer, &mContext);
+      (void)CreateIndexBufferOnActiveDevice(&mBuffer, &mContext);
     }
 
     return true;

@@ -433,10 +433,26 @@ namespace gpg
      * Returns indexed-view support for the bound type.
      */
     const RIndexed* IsIndexed() const;
-    const RIndexed* IsPointer() const;       // 0x004CC9E0
+
+    /**
+     * Address: 0x004CC9E0 (FUN_004CC9E0, gpg::RRef::IsPointer)
+     *
+     * What it does:
+     * Returns pointer-view support for the bound type.
+     */
+    const RIndexed* IsPointer() const;
+
     int GetNumBases() const;                 // gpgcore.dll
     RRef GetBase(int ind) const;             // gpgcore.dll
-    int GetNumFields() const;                // 0x004CC9B0
+
+    /**
+     * Address: 0x004CC9B0 (FUN_004CC9B0, gpg::RRef::GetNumFields)
+     *
+     * What it does:
+     * Returns reflected field count for the bound type.
+     */
+    int GetNumFields() const;
+
     RRef GetField(int ind) const;            // gpgcore.dll
     const char* GetFieldName(int ind) const; // gpgcore.dll
     void Delete();                           // 0x008D8800
@@ -685,6 +701,12 @@ namespace gpg
     return gVec;
   }
 
+  /**
+   * Address: 0x008DF7C0 (gpg::GetPreRTypeMap)
+   *
+   * What it does:
+   * Lazily constructs and returns the global preregistered RTTI map.
+   */
   inline TypeInfoMap& GetRTypePreregisteredMap()
   {
     static TypeInfoMap gMap;
@@ -733,6 +755,7 @@ namespace gpg
 
   /**
    * Address: 0x008DF8A0
+   * Address: 0x008DF910 (FUN_008DF910, gpg::REF_FindTypeNamed `_0` overload)
    *
    * char const *
    *
@@ -1277,6 +1300,15 @@ namespace gpg
    * value pointer.
    */
   RRef* RRef_shared_ptr_CAniPose(RRef* out, boost::shared_ptr<moho::CAniPose>* value);
+
+  /**
+   * Address: 0x004C9030 (FUN_004C9030, gpg::RRef_CScriptObject)
+   *
+   * What it does:
+   * Builds a reflected reference for one `moho::CScriptObject` pointer with
+   * derived-type normalization.
+   */
+  RRef* RRef_CScriptObject(RRef* out, moho::CScriptObject* value);
 
   /**
    * Address: 0x004C8C30 (FUN_004C8C30, gpg::RRef_CScriptObject_P)

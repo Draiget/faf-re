@@ -8,6 +8,7 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class RType;
   class WriteArchive;
 } // namespace gpg
@@ -49,6 +50,15 @@ namespace moho
      * appends one null pointer terminator.
      */
     void SerializeRequests(gpg::WriteArchive* archive);
+
+    /**
+     * Address: 0x00773130 (FUN_00773130, Moho::CEconomy::DeserializeRequests)
+     *
+     * What it does:
+     * Reads CEconRequest intrusive nodes from archive and relinks each request
+     * into `mConsumptionData` until a null pointer terminator is read.
+     */
+    void DeserializeRequests(gpg::ReadArchive* archive);
 
   public:
     static gpg::RType* sType;

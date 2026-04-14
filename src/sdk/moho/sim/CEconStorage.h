@@ -8,7 +8,7 @@
 namespace gpg
 {
   class ReadArchive;
-  struct RRef;
+  class RRef;
   class SerConstructResult;
   class WriteArchive;
 } // namespace gpg
@@ -20,6 +20,26 @@ namespace moho
   class CEconStorage
   {
   public:
+    CEconStorage() = default;
+
+    /**
+     * Address: 0x00773250 (FUN_00773250, Moho::CEconStorage::CEconStorage)
+     *
+     * What it does:
+     * Binds one economy owner pointer, copies amount lanes, and applies this
+     * storage lane into economy max-storage totals.
+     */
+    CEconStorage(const SEconValue& amount, CEconomy* economy);
+
+    /**
+     * Address: 0x00773280 (FUN_00773280, Moho::CEconStorage::ChangeAmt)
+     *
+     * What it does:
+     * Removes previous amount contribution, copies new amount lanes, then
+     * reapplies contribution to economy max-storage totals.
+     */
+    std::int64_t ChangeAmt(const SEconValue& amount);
+
     /**
      * Address: 0x00773500 (FUN_00773500, Moho::CEconStorage::MemberConstruct)
      *

@@ -25,6 +25,7 @@
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/resource/RResId.h"
 #include "moho/render/camera/CameraImpl.h"
+#include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DFont.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -37,11 +38,166 @@
 #include "moho/ui/IUIManager.h"
 #include "moho/unit/core/UserUnit.h"
 
+namespace
+{
+  static_assert(sizeof(moho::WeakObject::WeakLinkNodeView) == 0x8, "WeakLinkNodeView size must be 0x8");
+
+  void LinkCursorInfoWeakOwnerRef(moho::MouseInfo& info) noexcept
+  {
+    moho::WeakObject::WeakLinkNodeView* const self =
+      reinterpret_cast<moho::WeakObject::WeakLinkNodeView*>(&info.mUnitHover);
+    if (self->ownerLinkSlot == nullptr) {
+      self->nextInOwner = nullptr;
+      return;
+    }
+
+    auto** const ownerLinkSlot = reinterpret_cast<moho::WeakObject::WeakLinkNodeView**>(self->ownerLinkSlot);
+    self->nextInOwner = *ownerLinkSlot;
+    *ownerLinkSlot = self;
+  }
+
+  void UnlinkCursorInfoWeakOwnerRef(moho::MouseInfo& info) noexcept
+  {
+    moho::WeakObject::WeakLinkNodeView* const self =
+      reinterpret_cast<moho::WeakObject::WeakLinkNodeView*>(&info.mUnitHover);
+    moho::WeakObject::WeakLinkNodeView** cursor =
+      reinterpret_cast<moho::WeakObject::WeakLinkNodeView**>(self->ownerLinkSlot);
+    if (cursor == nullptr) {
+      return;
+    }
+
+    while (*cursor != nullptr && *cursor != self) {
+      cursor = &((*cursor)->nextInOwner);
+    }
+
+    if (*cursor == self) {
+      *cursor = self->nextInOwner;
+    }
+  }
+} // namespace
+
+namespace moho
+{
+  MouseInfo::MouseInfo()
+    : mHitValid(0u)
+    , pad_01{0u, 0u, 0u}
+    , mMouseWorldPos(0.0f, 0.0f, 0.0f)
+    , mUnitHover(nullptr)
+    , mPrevious(nullptr)
+    , mIsDragger(-1)
+    , mMouseScreenPos(0.0f, 0.0f)
+  {}
+
+  /**
+   * Address: 0x0081CF00 (FUN_0081CF00, ??0UICursorInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Copy-constructs cursor info and relinks weak hovered-unit ownership to this instance.
+   */
+  MouseInfo::MouseInfo(const MouseInfo& other)
+  {
+    mHitValid = other.mHitValid;
+    mMouseWorldPos = other.mMouseWorldPos;
+    mUnitHover = other.mUnitHover;
+    LinkCursorInfoWeakOwnerRef(*this);
+
+    mIsDragger = other.mIsDragger;
+    mMouseScreenPos = other.mMouseScreenPos;
+  }
+
+  /**
+   * Address: 0x00893140 (FUN_00893140, ??1UICursorInfo@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unlinks this cursor info from the hovered-unit weak-owner chain.
+   */
+  MouseInfo::~MouseInfo()
+  {
+    UnlinkCursorInfoWeakOwnerRef(*this);
+  }
+
+  /**
+   * Address: 0x0082B270 (FUN_0082B270, Moho::UICursorInfo::Copy)
+   *
+   * What it does:
+   * Assigns cursor info and updates hovered-unit weak-owner chain links.
+   */
+  MouseInfo& MouseInfo::operator=(const MouseInfo& other)
+  {
+    mHitValid = other.mHitValid;
+    mMouseWorldPos = other.mMouseWorldPos;
+
+    if (other.mUnitHover != mUnitHover) {
+      if (mUnitHover != nullptr) {
+        UnlinkCursorInfoWeakOwnerRef(*this);
+      }
+
+      mUnitHover = other.mUnitHover;
+      LinkCursorInfoWeakOwnerRef(*this);
+      if (mUnitHover != nullptr) {
+        mIsDragger = other.mIsDragger;
+        mMouseScreenPos = other.mMouseScreenPos;
+        return *this;
+      }
+    }
+
+    mIsDragger = other.mIsDragger;
+    mMouseScreenPos = other.mMouseScreenPos;
+    return *this;
+  }
+
+  /**
+   * Address: 0x0081F6C0 (FUN_0081F6C0, ??0SCommandModeData@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Copy-constructs command mode state, including both cursor snapshots.
+   */
+  CommandModeData::CommandModeData(const CommandModeData& other)
+    : mMode(other.mMode)
+    , mCommandCaps(other.mCommandCaps)
+    , mBlueprint(other.mBlueprint)
+    , mMouseDragStart(other.mMouseDragStart)
+    , mMouseDragEnd(other.mMouseDragEnd)
+    , mModifiers(other.mModifiers)
+    , mIsDragged(other.mIsDragged)
+    , mReserved5C(other.mReserved5C)
+  {}
+
+  /**
+   * Address: 0x0082B230 (FUN_0082B230, ??0SCommandModeData@Moho@@QAE@@Z_0)
+   *
+   * What it does:
+   * Assigns command mode state from another value and copies both cursor-info
+   * lanes via `MouseInfo::operator=`.
+   */
+  CommandModeData& CommandModeData::operator=(const CommandModeData& other)
+  {
+    mMode = other.mMode;
+    mCommandCaps = other.mCommandCaps;
+    mBlueprint = other.mBlueprint;
+    mMouseDragStart = other.mMouseDragStart;
+    mMouseDragEnd = other.mMouseDragEnd;
+    mModifiers = other.mModifiers;
+    mIsDragged = other.mIsDragged;
+    mReserved5C = other.mReserved5C;
+    return *this;
+  }
+} // namespace moho
+
 namespace gpg
 {
   class RMultiMapType_EntId_string : public RType
   {
   public:
+    /**
+     * Address: 0x00899120 (FUN_00899120, gpg::RMultiMapType_EntId_string::Init)
+     *
+     * What it does:
+     * Sets multimap size/version metadata and binds load/save serializers for
+     * `multimap<EntId,std::string>`.
+     */
+    void Init() override;
+
     /**
      * Address: 0x00899060 (FUN_00899060, gpg::RMultiMapType_EntId_string::GetName)
      *
@@ -67,6 +223,7 @@ namespace
   std::uint32_t gEntIdStringMultiMapTypeNameInitGuard = 0;
   gpg::RType* gEntIdStringMultiMapKeyType = nullptr;
   gpg::RType* gEntIdStringMultiMapValueType = nullptr;
+  using EntIdStringMultiMap = std::multimap<moho::EntId, msvc8::string>;
 
   [[nodiscard]] gpg::RType* ResolveEntIdTypeForMultiMapName()
   {
@@ -117,6 +274,85 @@ namespace
     return gEntIdStringMultiMapValueType;
   }
 
+  [[nodiscard]] gpg::RType* ResolveEntIdArchiveType()
+  {
+    gpg::RType* const resolved = ResolveEntIdTypeForMultiMapName();
+    if (resolved != nullptr) {
+      return resolved;
+    }
+    return gpg::LookupRType(typeid(moho::EntId));
+  }
+
+  /**
+   * Address: 0x008999A0 (FUN_008999A0)
+   *
+   * What it does:
+   * Clears destination multimap storage and then loads serialized
+   * `(EntId, string)` pairs in archive order.
+   */
+  void DeserializeEntIdStringMultiMap(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    auto* const destination = reinterpret_cast<EntIdStringMultiMap*>(static_cast<std::uintptr_t>(objectPtr));
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+
+    destination->clear();
+    gpg::RType* const entIdType = ResolveEntIdArchiveType();
+
+    for (unsigned int index = 0u; index < count; ++index) {
+      moho::EntId key = 0;
+      archive->Read(entIdType, &key, *ownerRef);
+
+      msvc8::string value{};
+      archive->ReadString(&value);
+
+      destination->insert(std::make_pair(key, value));
+    }
+  }
+
+  /**
+   * Address: 0x00899B20 (FUN_00899B20)
+   *
+   * What it does:
+   * Writes multimap element count and serializes each `(EntId, string)` pair
+   * in key-order.
+   */
+  void SerializeEntIdStringMultiMap(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const auto* const source = reinterpret_cast<const EntIdStringMultiMap*>(static_cast<std::uintptr_t>(objectPtr));
+    const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
+    archive->WriteUInt(count);
+    if (source == nullptr) {
+      return;
+    }
+
+    gpg::RType* const entIdType = ResolveEntIdArchiveType();
+
+    for (const auto& entry : *source) {
+      archive->Write(entIdType, &entry.first, *ownerRef);
+      msvc8::string value = entry.second;
+      archive->WriteString(&value);
+    }
+  }
+
   /**
    * Address: 0x00C082E0 (FUN_00C082E0, cleanup_RMultiMapType_EntId_string_Name)
    *
@@ -130,6 +366,21 @@ namespace
     gEntIdStringMultiMapTypeNameInitGuard = 0;
   }
 } // namespace
+
+/**
+ * Address: 0x00899120 (FUN_00899120, gpg::RMultiMapType_EntId_string::Init)
+ *
+ * What it does:
+ * Sets multimap size/version metadata and binds load/save serializers for
+ * `multimap<EntId,std::string>`.
+ */
+void gpg::RMultiMapType_EntId_string::Init()
+{
+  size_ = 0x0C;
+  version_ = 1;
+  serSaveFunc_ = &SerializeEntIdStringMultiMap;
+  serLoadFunc_ = &DeserializeEntIdStringMultiMap;
+}
 
 /**
  * Address: 0x00899060 (FUN_00899060, gpg::RMultiMapType_EntId_string::GetName)
@@ -185,9 +436,66 @@ namespace moho
   bool ui_DebugAltClick = false;
   bool UI_SelectAnything = false;
 
+  struct UICommandGraphNode
+  {
+    boost::SharedPtrRaw<void> mOrderlineTexture{}; // +0x00 (shared `(px,pi)` pair)
+    float mOrderlineAspectRatio = 0.0f;            // +0x08
+    float mOrderlineAnimRate = 0.0f;               // +0x0C
+    std::uint32_t mOrderlineColor = 0;             // +0x10
+    std::uint32_t mOrderlineSelectedColor = 0;     // +0x14
+    std::uint32_t mOrderlineHighlightColor = 0;    // +0x18
+    float mOrderlineGlow = 0.0f;                   // +0x1C
+    float mOrderlineSelectedGlow = 0.0f;           // +0x20
+    float mOrderlineHighlightGlow = 0.0f;          // +0x24
+    std::uint32_t mWaypointColor = 0;              // +0x28
+    std::uint32_t mWaypointSelectedColor = 0;      // +0x2C
+    std::uint32_t mWaypointHighlightColor = 0;     // +0x30
+    float mWaypointScale = 0.0f;                   // +0x34
+    float mWaypointSelectedScale = 0.0f;           // +0x38
+    float mWaypointHighlightScale = 0.0f;          // +0x3C
+    float mArrowheadCapOffset = 0.0f;              // +0x40
+    boost::SharedPtrRaw<void> mWaypointTexture{};  // +0x44 (shared `(px,pi)` pair)
+    boost::SharedPtrRaw<void> mArrowheadTexture{}; // +0x4C (shared `(px,pi)` pair)
+
+    /**
+     * Address: 0x008243F0 (FUN_008243F0, ??0UICommandGraphNode@Moho@@QAE@@Z)
+     * Mangled: ??0UICommandGraphNode@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Initializes one command-graph node style payload with default
+     * orderline/waypoint scales and cleared texture shared pointers.
+     */
+    UICommandGraphNode();
+
+    /**
+     * Address: 0x008249B0 (FUN_008249B0, ??1UICommandGraphNode@Moho@@QAE@@Z)
+     * Mangled: ??1UICommandGraphNode@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Releases command-graph texture shared-control lanes in arrowhead,
+     * waypoint, then orderline teardown order.
+     */
+    ~UICommandGraphNode();
+
+    /**
+     * Address: 0x00825060 (FUN_00825060, Moho::UICommandGraphNode::cpy)
+     *
+     * What it does:
+     * Copies one command-graph style node payload, including shared-texture
+     * control lanes for orderline/waypoint/arrowhead textures.
+     */
+    UICommandGraphNode* CopyFrom(const UICommandGraphNode& other);
+  };
+
+  static_assert(sizeof(UICommandGraphNode) == 0x54, "UICommandGraphNode size must be 0x54");
+  static_assert(offsetof(UICommandGraphNode, mWaypointTexture) == 0x44, "UICommandGraphNode::mWaypointTexture offset must be 0x44");
+  static_assert(offsetof(UICommandGraphNode, mArrowheadTexture) == 0x4C, "UICommandGraphNode::mArrowheadTexture offset must be 0x4C");
+
   class UICommandGraph
   {
   public:
+    friend class CWldSession;
+
     /**
      * Address: 0x00824810 (FUN_00824810, ??0UICommandGraph@Moho@@QAE@@Z)
      *
@@ -203,10 +511,7 @@ namespace moho
     ~UICommandGraph();
 
   public:
-    struct CommandGraphNode
-    {
-      std::uint8_t mRaw[0x54];
-    };
+    using CommandGraphNode = UICommandGraphNode;
 
     template <std::size_t kNodeSize>
     struct HashListNode
@@ -340,6 +645,11 @@ namespace moho
      */
     void CreateMeshes();
 
+    void MarkDirty() noexcept
+    {
+      mNeedsRebuild = 1u;
+    }
+
   private:
     std::uint8_t mNeedsRebuild; // +0x0000
     std::uint8_t pad_0001[3];
@@ -369,11 +679,132 @@ namespace moho
   static_assert(sizeof(UICommandGraph::CommandGraphTree) == 0x0C, "UICommandGraph::CommandGraphTree size must be 0x0C");
   static_assert(sizeof(UICommandGraph) == 0xDDC, "UICommandGraph size must be 0xDDC");
 
+  /**
+   * Address: 0x008243F0 (FUN_008243F0, ??0UICommandGraphNode@Moho@@QAE@@Z)
+   * Mangled: ??0UICommandGraphNode@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Seeds one command-graph style node with default animation/scaling lanes
+   * and clears orderline/waypoint/arrowhead texture shared pointers.
+   */
+  UICommandGraphNode::UICommandGraphNode()
+  {
+    mOrderlineTexture.px = nullptr;
+    mOrderlineTexture.pi = nullptr;
+    mOrderlineAnimRate = 0.1f;
+    mOrderlineAspectRatio = 1.0f;
+    mOrderlineColor = 0u;
+    mOrderlineSelectedColor = 0u;
+    mOrderlineHighlightColor = 0u;
+    mOrderlineGlow = 0.0f;
+    mOrderlineSelectedGlow = 0.0f;
+    mOrderlineHighlightGlow = 0.0f;
+    mWaypointColor = 0u;
+    mWaypointSelectedColor = 0u;
+    mWaypointHighlightColor = 0u;
+    mWaypointScale = 1.0f;
+    mWaypointSelectedScale = 1.0f;
+    mWaypointHighlightScale = 1.0f;
+    mWaypointTexture.px = nullptr;
+    mWaypointTexture.pi = nullptr;
+    mArrowheadTexture.px = nullptr;
+    mArrowheadTexture.pi = nullptr;
+  }
+
+  /**
+   * Address: 0x008249B0 (FUN_008249B0, ??1UICommandGraphNode@Moho@@QAE@@Z)
+   * Mangled: ??1UICommandGraphNode@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Releases command-graph texture shared-control lanes in arrowhead, waypoint,
+   * then orderline teardown order.
+   */
+  UICommandGraphNode::~UICommandGraphNode()
+  {
+    mArrowheadTexture.release();
+    mWaypointTexture.release();
+    mOrderlineTexture.release();
+  }
+
+  /**
+   * Address: 0x00825060 (FUN_00825060, Moho::UICommandGraphNode::cpy)
+   *
+   * What it does:
+   * Copies one command-graph style node payload, including shared-texture
+   * control lanes for orderline/waypoint/arrowhead textures.
+   */
+  UICommandGraphNode* UICommandGraphNode::CopyFrom(const UICommandGraphNode& other)
+  {
+    mOrderlineTexture.px = other.mOrderlineTexture.px;
+    boost::detail::sp_counted_base* incomingControl = other.mOrderlineTexture.pi;
+    if (incomingControl != mOrderlineTexture.pi) {
+      if (incomingControl != nullptr) {
+        incomingControl->add_ref_copy();
+      }
+      if (mOrderlineTexture.pi != nullptr) {
+        mOrderlineTexture.pi->weak_release();
+      }
+      mOrderlineTexture.pi = incomingControl;
+    }
+
+    mOrderlineAspectRatio = other.mOrderlineAspectRatio;
+    mOrderlineAnimRate = other.mOrderlineAnimRate;
+    mOrderlineColor = other.mOrderlineColor;
+    mOrderlineSelectedColor = other.mOrderlineSelectedColor;
+    mOrderlineHighlightColor = other.mOrderlineHighlightColor;
+    mOrderlineGlow = other.mOrderlineGlow;
+    mOrderlineSelectedGlow = other.mOrderlineSelectedGlow;
+    mOrderlineHighlightGlow = other.mOrderlineHighlightGlow;
+    mWaypointColor = other.mWaypointColor;
+    mWaypointSelectedColor = other.mWaypointSelectedColor;
+    mWaypointHighlightColor = other.mWaypointHighlightColor;
+    mWaypointScale = other.mWaypointScale;
+    mWaypointSelectedScale = other.mWaypointSelectedScale;
+    mWaypointHighlightScale = other.mWaypointHighlightScale;
+    mArrowheadCapOffset = other.mArrowheadCapOffset;
+
+    mWaypointTexture.px = other.mWaypointTexture.px;
+    incomingControl = other.mWaypointTexture.pi;
+    if (incomingControl != mWaypointTexture.pi) {
+      if (incomingControl != nullptr) {
+        incomingControl->add_ref_copy();
+      }
+      if (mWaypointTexture.pi != nullptr) {
+        mWaypointTexture.pi->weak_release();
+      }
+      mWaypointTexture.pi = incomingControl;
+    }
+
+    mArrowheadTexture.px = other.mArrowheadTexture.px;
+    incomingControl = other.mArrowheadTexture.pi;
+    if (incomingControl != mArrowheadTexture.pi) {
+      if (incomingControl != nullptr) {
+        incomingControl->add_ref_copy();
+      }
+      if (mArrowheadTexture.pi != nullptr) {
+        mArrowheadTexture.pi->weak_release();
+      }
+      mArrowheadTexture.pi = incomingControl;
+    }
+
+    return this;
+  }
+
   struct SBuildTemplateInfo
   {
+    SBuildTemplateInfo() = default;
+
     Wm3::Vector3f mPos;         // +0x00
     float mHeading;             // +0x0C
     msvc8::string mBlueprintId; // +0x10
+
+    /**
+     * Address: 0x00823B40 (FUN_00823B40, struct_BuildTemplate::struct_BuildTemplate)
+     *
+     * What it does:
+     * Copy-constructs one build-template entry (position, heading, blueprint id).
+     */
+    SBuildTemplateInfo(const SBuildTemplateInfo& other);
   };
 
   static_assert(sizeof(SBuildTemplateInfo) == 0x2C, "SBuildTemplateInfo size must be 0x2C");
@@ -381,8 +812,29 @@ namespace moho
     offsetof(SBuildTemplateInfo, mBlueprintId) == 0x10, "SBuildTemplateInfo::mBlueprintId offset must be 0x10"
   );
 
+  /**
+   * Address: 0x00823B40 (FUN_00823B40, struct_BuildTemplate::struct_BuildTemplate)
+   *
+   * What it does:
+   * Copy-constructs one build-template entry (position, heading, blueprint id).
+   */
+  SBuildTemplateInfo::SBuildTemplateInfo(const SBuildTemplateInfo& other)
+    : mPos(other.mPos)
+    , mHeading(other.mHeading)
+    , mBlueprintId(other.mBlueprintId)
+  {}
+
   namespace
   {
+    [[nodiscard]] IWldUIProvider* ResolveWldUIProvider() noexcept
+    {
+      if (sWldUIProvider == nullptr) {
+        return nullptr;
+      }
+
+      return dynamic_cast<IWldUIProvider*>(sWldUIProvider);
+    }
+
     CWldSession* gActiveWldSession = nullptr;
     SWldSessionInfo* gPendingWldSessionInfo = nullptr;
     EWldFrameAction gWldFrameAction = EWldFrameAction::Inactive;
@@ -393,6 +845,26 @@ namespace moho
     {
       gWldTeardownCallbacks.clear();
       gWldTeardownCallbacksInitMask &= ~1u;
+    }
+
+    /**
+     * Address: 0x008698B0 (FUN_008698B0, func_DoTeardownCallbacks)
+     *
+     * What it does:
+     * Invokes every registered world-session teardown callback with the current
+     * global active-session pointer.
+     */
+    void DoTeardownCallbacks(WldTeardownCallbackVector* const callbacks)
+    {
+      if (callbacks == nullptr) {
+        return;
+      }
+
+      const std::size_t callbackCount = callbacks->size();
+      for (std::size_t i = 0; i < callbackCount; ++i) {
+        IWldTeardownCallback* const callback = (*callbacks)[i];
+        (void)callback->OnWldSessionTeardown(gActiveWldSession);
+      }
     }
 
     [[nodiscard]] bool RunLuaScriptWithEnv(
@@ -633,10 +1105,18 @@ namespace moho
       return control;
     }
 
+    /**
+     * Address: 0x00898F70 (FUN_00898F70, ??0WeakPtr_UICommandGraph@Moho@@QAE@@Z_0)
+     *
+     * What it does:
+     * Performs one weak-lock operation for the session command-graph lane:
+     * if the control block still has live shared owners, returns one retained
+     * shared handle using the current payload pointer; otherwise returns empty.
+     */
     [[nodiscard]] boost::SharedPtrRaw<UICommandGraph>
     LockWeakCommandGraph(UICommandGraph* px, boost::detail::sp_counted_base* control)
     {
-      if (!px || !control) {
+      if (!control) {
         return {};
       }
 
@@ -660,20 +1140,33 @@ namespace moho
       out.pi = newControl;
     }
 
+    /**
+     * Address: 0x0086EDD0 (FUN_0086EDD0, ??0WeakPtr_UICommandGraph@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Copies one shared command-graph payload into one weak lane, rebinding
+     * control ownership only when the incoming control block changes.
+     */
     void CopySharedToWeakCommandGraph(
       const boost::SharedPtrRaw<UICommandGraph>& shared,
       UICommandGraph*& weakPx,
       boost::detail::sp_counted_base*& weakControl
     )
     {
-      shared.weak_add_ref();
-
-      if (weakControl) {
-        weakControl->weak_release();
-      }
-
       weakPx = shared.px;
-      weakControl = shared.pi;
+      boost::detail::sp_counted_base* const incomingControl = shared.pi;
+
+      if (incomingControl != weakControl) {
+        if (incomingControl != nullptr) {
+          incomingControl->weak_add_ref();
+        }
+
+        if (weakControl != nullptr) {
+          weakControl->weak_release();
+        }
+
+        weakControl = incomingControl;
+      }
     }
 
     void ReleaseWeakCommandGraph(UICommandGraph*& px, boost::detail::sp_counted_base*& control)
@@ -2662,6 +3155,35 @@ namespace moho
   }
 
   /**
+   * Address: 0x007FDD50 (FUN_007FDD50, Moho::WeakSet_UserEntity::Find)
+   *
+   * What it does:
+   * Resolves one weak-set tree node for `entity` and writes one `{set,node}`
+   * cursor pair to `outResult`.
+   */
+  SSelectionSetUserEntity::FindResult* SSelectionSetUserEntity::Find(
+    FindResult* const outResult,
+    SSelectionSetUserEntity* const set,
+    UserEntity* const entity
+  )
+  {
+    GPG_ASSERT(outResult != nullptr);
+    if (outResult == nullptr) {
+      return nullptr;
+    }
+
+    outResult->mSet = set;
+    outResult->mRes = (set != nullptr) ? set->mHead : nullptr;
+    if (set == nullptr) {
+      return outResult;
+    }
+
+    ScopedSelectionOwnerLinkGuard ownerLinkGuard(entity);
+    outResult->mRes = FindSelectionNodeByKey(*set, SelectionKeyFromEntity(entity));
+    return outResult;
+  }
+
+  /**
    * Address: 0x007B59B0 (FUN_007B59B0, Moho::WeakSet_UserEntity::size)
    *
    * What it does:
@@ -2769,6 +3291,36 @@ namespace moho
     }
     *outNode = node;
     return node;
+  }
+
+  /**
+   * Address: 0x0066A060 (FUN_0066A060, Moho::WeakSet_UserEntity::First)
+   *
+   * What it does:
+   * Starts weak-set iteration from the head-left node and stores one
+   * `{set,node}` cursor pair into `outResult`.
+   */
+  SSelectionSetUserEntity::FindResult* SSelectionSetUserEntity::First(FindResult* const outResult)
+  {
+    SSelectionNodeUserEntity* firstLiveNode = nullptr;
+    find(this, mHead->mLeft, &firstLiveNode);
+    outResult->mSet = this;
+    outResult->mRes = firstLiveNode;
+    return outResult;
+  }
+
+  /**
+   * Address: 0x007AE7E0 (FUN_007AE7E0, Moho::WeakSet_UserEntity::Iterator::Next)
+   *
+   * What it does:
+   * Advances one weak-set iterator cursor with `Iterator_inc`, then filters to
+   * the next live node via `find`, storing the resulting node back into `mNode`.
+   */
+  SSelectionSetUserEntity::Index* SSelectionSetUserEntity::Index::Next()
+  {
+    SSelectionSetUserEntity::Iterator_inc(&mNode);
+    mNode = SSelectionSetUserEntity::find(mOwnerSet, mNode, &mNode);
+    return this;
   }
 
   /**
@@ -2949,28 +3501,48 @@ namespace moho
   }
 
   /**
-   * Address: 0x008B9580 callsite (focus army lookup path).
+   * Address: 0x007A6360 (FUN_007A6360, ?GetFocusArmy@CWldSession@Moho@@QBEPAVUserArmy@2@XZ)
+   *
+   * What it does:
+   * Returns the focused army slot when focus is active, otherwise `nullptr`.
    */
-  UserArmy* CWldSession::GetFocusUserArmy()
+  UserArmy* CWldSession::GetFocusArmy() const
   {
-    return const_cast<UserArmy*>(static_cast<const CWldSession*>(this)->GetFocusUserArmy());
+    const int focusArmy = FocusArmy;
+    if (focusArmy < 0) {
+      return nullptr;
+    }
+
+    return userArmies[static_cast<std::size_t>(focusArmy)];
   }
 
   /**
-   * Address: 0x008B9580 callsite (focus army lookup path).
+   * Address: 0x00896590 (FUN_00896590, ?IsObserver@CWldSession@Moho@@QBE_NXZ)
+   *
+   * What it does:
+   * Returns true when focus army is disabled (`FocusArmy < 0`) or when the
+   * focused army lane has no live `UserArmy*` owner.
+   */
+  bool CWldSession::IsObserver() const
+  {
+    const int focusArmy = FocusArmy;
+    return focusArmy < 0 || userArmies[static_cast<std::size_t>(focusArmy)] == nullptr;
+  }
+
+  /**
+   * Address context: compatibility wrapper lane used by recovered callsites.
+   */
+  UserArmy* CWldSession::GetFocusUserArmy()
+  {
+    return GetFocusArmy();
+  }
+
+  /**
+   * Address context: compatibility wrapper lane used by recovered callsites.
    */
   const UserArmy* CWldSession::GetFocusUserArmy() const
   {
-    if (FocusArmy < 0) {
-      return nullptr;
-    }
-
-    const std::size_t focusIndex = static_cast<std::size_t>(FocusArmy);
-    if (focusIndex >= userArmies.size()) {
-      return nullptr;
-    }
-
-    return userArmies[focusIndex];
+    return GetFocusArmy();
   }
 
   /**
@@ -3168,6 +3740,37 @@ namespace moho
     head->mRight = head;
     extraSelection.mSize = 0u;
     UI_EndCommandMode();
+  }
+
+  /**
+   * Address: 0x0081DC70 (FUN_0081DC70, Moho::CWldSession::UnitFirstInSelection)
+   *
+   * What it does:
+   * Returns true when selection is empty or every live selected entity
+   * resolves to the supplied user-unit pointer.
+   */
+  bool CWldSession::UnitFirstInSelection(const UserUnit* const unit) const
+  {
+    SSelectionSetUserEntity& selection = const_cast<SSelectionSetUserEntity&>(mSelection);
+    SSelectionNodeUserEntity* const head = selection.mHead;
+    if (head == nullptr) {
+      return true;
+    }
+
+    SSelectionNodeUserEntity* node = head->mLeft;
+    SSelectionSetUserEntity::find(&selection, node, &node);
+    while (node != head) {
+      const UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      const UserUnit* const selectedUnit = selectedEntity ? selectedEntity->IsUserUnit() : nullptr;
+      if (selectedUnit != unit) {
+        return false;
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      SSelectionSetUserEntity::find(&selection, node, &node);
+    }
+
+    return true;
   }
 
   /**
@@ -3378,6 +3981,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x00895F70 (FUN_00895F70, ?DirtyCommandGraph@CWldSession@Moho@@QAEXXZ)
+   *
+   * What it does:
+   * Locks the cached UI command-graph weak handle, marks it dirty when
+   * present, and releases the temporary shared hold.
+   */
+  void CWldSession::DirtyCommandGraph()
+  {
+    boost::SharedPtrRaw<UICommandGraph> graph = GetCommandGraph(false);
+    if (graph.px != nullptr) {
+      graph.px->MarkDirty();
+    }
+    graph.release();
+  }
+
+  /**
    * Address: 0x00895B40 (FUN_00895B40, ?SessionFrame@CWldSession@Moho@@QAEXM@Z)
    */
   void CWldSession::SessionFrame(const float deltaSeconds)
@@ -3466,6 +4085,33 @@ namespace moho
         AppendUnitUnique(outUnits, userUnit);
       }
     }
+  }
+
+  /**
+   * Address: 0x00894280 (FUN_00894280, ?LookupEntityId@CWldSession@Moho@@QAEPAVUserEntity@2@VEntId@2@@Z)
+   *
+   * What it does:
+   * Performs one ordered entity-id lookup in the world-session entity map and
+   * returns the live `UserEntity*` when the key is present.
+   */
+  UserEntity* CWldSession::LookupEntityId(const EntId entityId)
+  {
+    SessionEntityMap& entityMap = GetSessionEntityMap(this);
+    SessionEntityMapNode* const head = entityMap.mHead;
+    SessionEntityMapNode* probe = head->mParent;
+    const std::uint32_t key = static_cast<std::uint32_t>(entityId);
+
+    while (probe != nullptr && probe != head && probe->mIsSentinel == 0u) {
+      if (key < probe->mEntityId) {
+        probe = probe->mLeft;
+      } else if (probe->mEntityId < key) {
+        probe = probe->mRight;
+      } else {
+        return probe->mEntity;
+      }
+    }
+
+    return nullptr;
   }
 
   void CWldSession::SetSelectionUnits(const msvc8::vector<UserUnit*>& units)
@@ -3777,6 +4423,18 @@ namespace moho
   }
 
   /**
+   * Address: 0x0087FC90 (FUN_0087FC90,
+   * ?GetScenarioInfo@CWldSession@Moho@@QBE?AVLuaObject@LuaPlus@@XZ)
+   *
+   * What it does:
+   * Returns one value-copy of the session scenario-info Lua object.
+   */
+  LuaPlus::LuaObject CWldSession::GetScenarioInfo() const
+  {
+    return LuaPlus::LuaObject(mScenarioInfo);
+  }
+
+  /**
    * Address: 0x0081F7B0 (FUN_0081F7B0,
    * ?GetLeftMouseButtonAction@CWldSession@Moho@@QAEAAUCommandModeData@2@PAU32@PBUstruct_MouseInfo@@H@Z)
    */
@@ -4018,6 +4676,13 @@ namespace moho
       }
     }
 
+    /**
+     * Address: 0x0088C6D0 (FUN_0088C6D0, func_DoPostInitializing)
+     *
+     * What it does:
+     * Dispatches post-init sim/network work, transitions to playing once every
+     * client is ready, and toggles waiting-dialog UI lanes during the handoff.
+     */
     void WLD_DoPostInitializing(bool* const outContinue)
     {
       if (outContinue != nullptr) {
@@ -4038,11 +4703,24 @@ namespace moho
         if (outContinue != nullptr) {
           *outContinue = true;
         }
+        if (IWldUIProvider* const wldUIProvider = ResolveWldUIProvider(); wldUIProvider != nullptr) {
+          wldUIProvider->OnStart();
+        }
       } else {
+        if (IWldUIProvider* const wldUIProvider = ResolveWldUIProvider(); wldUIProvider != nullptr) {
+          wldUIProvider->StartWaitingDialog();
+        }
         gWldFrameAction = EWldFrameAction::Waiting;
       }
     }
 
+    /**
+     * Address: 0x0088C750 (FUN_0088C750, func_DoWaiting)
+     *
+     * What it does:
+     * Dispatches waiting-state sim/network work, transitions to playing when
+     * all peers are ready, and fires waiting-dialog stop/start UI callbacks.
+     */
     void WLD_DoWaiting(bool* const outContinue)
     {
       if (outContinue != nullptr) {
@@ -4058,8 +4736,17 @@ namespace moho
       simDriver->Dispatch();
       CClientManagerImpl* const clientManager = simDriver->GetClientManager();
       if (clientManager != nullptr && clientManager->IsEveryoneReady()) {
+        if (IWldUIProvider* const wldUIProvider = ResolveWldUIProvider(); wldUIProvider != nullptr) {
+          wldUIProvider->StopWaitingDialog();
+        }
+
         simDriver->DecrementOutstandingRequestsAndSignal();
         gWldFrameAction = EWldFrameAction::Playing;
+
+        if (IWldUIProvider* const wldUIProvider = ResolveWldUIProvider(); wldUIProvider != nullptr) {
+          wldUIProvider->OnStart();
+        }
+
         if (outContinue != nullptr) {
           *outContinue = true;
         }
@@ -4068,10 +4755,23 @@ namespace moho
       }
     }
 
+    /**
+     * Address: 0x0088C7C0 (FUN_0088C7C0, func_DoPlayingAction)
+     *
+     * What it does:
+     * Dispatches one sim-driver tick, hands the current world camera set to
+     * the sim driver, runs one world-session frame, fires the trailing
+     * sim-driver post-frame slot, and pumps the disconnect dialog callback.
+     */
     void WLD_DoPlayingAction(const float deltaSeconds)
     {
       if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
         simDriver->Dispatch();
+
+        // Snapshot every active GeomCamera and forward to the sim driver so
+        // visibility/projection state matches the upcoming session frame.
+        const msvc8::vector<GeomCamera3> cameras = CAM_GetAllCameras();
+        simDriver->SetGeomCams(cameras);
       }
 
       if (CWldSession* const activeSession = WLD_GetActiveSession(); activeSession != nullptr) {
@@ -4079,6 +4779,8 @@ namespace moho
       }
 
       if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
+        // Trailing sim-driver post-frame slot (Func1 in IDA): currently
+        // a NoOp until full ISTIDriver vtable slot ownership is recovered.
         simDriver->NoOp();
       }
 
@@ -4189,13 +4891,9 @@ namespace moho
       userSound->StopAllSounds();
     }
 
-    CWldSession* const activeSession = WLD_GetActiveSession();
-    for (IWldTeardownCallback* const callback : *WLD_GetOnTeardownCallbacks()) {
-      if (callback != nullptr) {
-        (void)callback->OnWldSessionTeardown(activeSession);
-      }
-    }
+    DoTeardownCallbacks(WLD_GetOnTeardownCallbacks());
 
+    CWldSession* const activeSession = WLD_GetActiveSession();
     if (activeSession != nullptr) {
       delete activeSession;
     }
@@ -4301,6 +4999,98 @@ namespace moho
       static_cast<float>(std::pow(static_cast<double>(wld_SkewRateAdjustBase), -simDriver->GetSimSpeed()));
     const float clampedSkewRate = std::max(skewRateMin, std::min(wld_SkewRateAdjustMax, skewRateSample));
     return clampedSkewRate * requestedSimScale;
+  }
+
+  /**
+   * Address: 0x0088D1B0 (FUN_0088D1B0, ?WLD_IncreaseSimRate@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Raises requested sim rate by one step (up to +50) for authorized local
+   * session contexts.
+   */
+  void WLD_IncreaseSimRate()
+  {
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    CWldSession* const activeSession = WLD_GetActiveSession();
+    if (simDriver == nullptr || activeSession == nullptr) {
+      return;
+    }
+
+    const int focusArmy = activeSession->FocusArmy;
+    if (
+      !activeSession->IsReplay
+      && (focusArmy < 0 || activeSession->userArmies[static_cast<std::size_t>(focusArmy)] == nullptr)
+      && activeSession->IsMultiplayer
+    ) {
+      return;
+    }
+
+    CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+    const int requestedSimRate = clientManager->GetSimRateRequested();
+    if (requestedSimRate < 50) {
+      clientManager->SetSimRate(requestedSimRate + 1);
+    }
+  }
+
+  /**
+   * Address: 0x0088D220 (FUN_0088D220, ?WLD_ResetSimRate@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Resets requested sim rate back to neutral (`0`) for authorized local
+   * session contexts.
+   */
+  void WLD_ResetSimRate()
+  {
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    CWldSession* const activeSession = WLD_GetActiveSession();
+    if (simDriver == nullptr || activeSession == nullptr) {
+      return;
+    }
+
+    const int focusArmy = activeSession->FocusArmy;
+    if (
+      !activeSession->IsReplay
+      && (focusArmy < 0 || activeSession->userArmies[static_cast<std::size_t>(focusArmy)] == nullptr)
+      && activeSession->IsMultiplayer
+    ) {
+      return;
+    }
+
+    CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+    if (clientManager->GetSimRateRequested() != 0) {
+      clientManager->SetSimRate(0);
+    }
+  }
+
+  /**
+   * Address: 0x0088D280 (FUN_0088D280, ?WLD_DecreaseSimRate@Moho@@YAXXZ)
+   *
+   * What it does:
+   * Lowers requested sim rate by one step (down to `-10`) for authorized
+   * local session contexts.
+   */
+  void WLD_DecreaseSimRate()
+  {
+    ISTIDriver* const simDriver = SIM_GetActiveDriver();
+    CWldSession* const activeSession = WLD_GetActiveSession();
+    if (simDriver == nullptr || activeSession == nullptr) {
+      return;
+    }
+
+    const int focusArmy = activeSession->FocusArmy;
+    if (
+      !activeSession->IsReplay
+      && (focusArmy < 0 || activeSession->userArmies[static_cast<std::size_t>(focusArmy)] == nullptr)
+      && activeSession->IsMultiplayer
+    ) {
+      return;
+    }
+
+    CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+    const int requestedSimRate = clientManager->GetSimRateRequested();
+    if (requestedSimRate > -10) {
+      clientManager->SetSimRate(requestedSimRate - 1);
+    }
   }
 
   /**

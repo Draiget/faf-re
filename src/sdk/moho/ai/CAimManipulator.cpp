@@ -650,6 +650,51 @@ namespace
 } // namespace
 
 /**
+ * Address: 0x006300F0 (FUN_006300F0, ??0CAimManipulator@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes weak owner links, label/runtime defaults, tracking state, and
+ * identity quaternions for both watched aim bones.
+ */
+moho::CAimManipulator::CAimManipulator()
+{
+  auto* const runtimeView = AimManipulatorRuntimeView(this);
+  runtimeView->mUnit.ClearLinkState();
+  runtimeView->mWeapon.ClearLinkState();
+
+  runtimeView->mLabel.clear();
+  runtimeView->mUnitWepBlueprint = nullptr;
+  runtimeView->mProjPhysBlueprint = nullptr;
+  runtimeView->mEnabled = false;
+  runtimeView->mMuzzleBone = 0;
+  runtimeView->mIsTracking = false;
+  runtimeView->mOnTarget = false;
+  runtimeView->mUnknownBoolE1 = false;
+  runtimeView->mResetPoseTime = 0;
+  runtimeView->mResetTime = 0;
+  runtimeView->mHeading = 0.0f;
+  runtimeView->mPitch = 0.0f;
+  runtimeView->mMinHeading = 0.0f;
+  runtimeView->mMaxHeading = 0.0f;
+  runtimeView->mHeadingMaxSlew = 0.0f;
+  runtimeView->mMinPitch = 0.0f;
+  runtimeView->mMaxPitch = 0.0f;
+  runtimeView->mPitchMaxSlew = 0.0f;
+
+  runtimeView->mBone0Rot.x = 1.0f;
+  runtimeView->mBone0Rot.y = 0.0f;
+  runtimeView->mBone0Rot.z = 0.0f;
+  runtimeView->mBone0Rot.w = 0.0f;
+
+  runtimeView->mBone1Rot.x = 1.0f;
+  runtimeView->mBone1Rot.y = 0.0f;
+  runtimeView->mBone1Rot.z = 0.0f;
+  runtimeView->mBone1Rot.w = 0.0f;
+
+  runtimeView->mHeadingOffset = 0.0f;
+}
+
+/**
  * Address: 0x0062FDF0 (FUN_0062FDF0, Moho::CAimManipulator::StaticGetClass)
  *
  * What it does:
@@ -681,6 +726,29 @@ gpg::RType* moho::CAimManipulator::GetClass() const
 gpg::RRef moho::CAimManipulator::GetDerivedObjectRef()
 {
   return MakeDerivedRef(this, CachedCAimManipulatorType());
+}
+
+/**
+ * Address: 0x006306A0 (FUN_006306A0, Moho::CAniManipulator::~CAniManipulator)
+ *
+ * What it does:
+ * Clears weak owner links and label storage before running
+ * `IAniManipulator` base teardown.
+ */
+moho::CAimManipulator::~CAimManipulator()
+{
+  auto* const runtimeView = AimManipulatorRuntimeView(this);
+  if (UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr(); weapon != nullptr) {
+    weapon->mCanFire = 1u;
+  }
+
+  AimManipulatorBaseView(this)->mBaseEnabled = false;
+  runtimeView->mLabel.tidy(true, 0U);
+  runtimeView->mWeapon.UnlinkFromOwnerChain();
+  runtimeView->mUnit.UnlinkFromOwnerChain();
+
+  IAniManipulator* const baseManipulator = reinterpret_cast<IAniManipulator*>(this);
+  baseManipulator->IAniManipulator::~IAniManipulator();
 }
 
 /**

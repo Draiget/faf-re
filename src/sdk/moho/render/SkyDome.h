@@ -17,6 +17,7 @@ namespace gpg::gal
 {
   class Effect;
   class EffectTechnique;
+  class TextureD3D9;
   class IndexBufferD3D9;
   class VertexBufferD3D9;
 }
@@ -27,6 +28,21 @@ namespace moho
   class CD3DVertexFormat;
   class RD3DTextureResource;
   struct GeomCamera3;
+
+  struct SkyDomeDecalUploadNode
+  {
+    SkyDomeDecalUploadNode* mNext;     // +0x00
+    SkyDomeDecalUploadNode* mPrev;     // +0x04
+    std::uint8_t mVertexData[0x28];    // +0x08
+  };
+
+  static_assert(sizeof(SkyDomeDecalUploadNode) == 0x30, "SkyDomeDecalUploadNode size must be 0x30");
+  static_assert(offsetof(SkyDomeDecalUploadNode, mNext) == 0x00, "SkyDomeDecalUploadNode::mNext offset must be 0x00");
+  static_assert(offsetof(SkyDomeDecalUploadNode, mPrev) == 0x04, "SkyDomeDecalUploadNode::mPrev offset must be 0x04");
+  static_assert(
+    offsetof(SkyDomeDecalUploadNode, mVertexData) == 0x08,
+    "SkyDomeDecalUploadNode::mVertexData offset must be 0x08"
+  );
 
   /**
    * VFTABLE: 0x00E422A0
@@ -85,10 +101,11 @@ namespace moho
     void Reset();
 
     /**
-     * Address: 0x008158D0 (FUN_008158D0)
+     * Address: 0x008158D0 (FUN_008158D0, ?SetCirrusContext@SkyDome@Moho@@QAEXMABV?$Vector3@M@Wm3@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
      *
      * What it does:
-     * Updates cirrus cloud layer context.
+     * Restores cirrus scalar/vector context lanes, releases the previous
+     * cirrus texture handle, and stores the new texture path.
      */
     void SetCirrusContext(float speed, const Wm3::Vector3f& direction, const msvc8::string& texturePath);
 
@@ -170,6 +187,15 @@ namespace moho
      */
     void CreateDecalIndexBuffer();
 
+    /**
+     * Address: 0x0081A190 (FUN_0081A190, Moho::SkyDome::UpdateDecalBuffer)
+     *
+     * What it does:
+     * Uploads queued sky-decal vertex records to the dynamic decal vertex
+     * buffer and clears the pending rebuild latch.
+     */
+    void UpdateDecalBuffer();
+
   public:
     // --- Layout from constructor ASM evidence ---
     std::uint8_t mPad04[0x04];                                    // +0x04
@@ -186,8 +212,8 @@ namespace moho
     msvc8::string mAtmosphereTexPath;                              // +0x7C
     msvc8::string mAtmosphereTexPath2;                             // +0x98
     std::uint8_t mPadB4[0x04];                                    // +0xB4
-    std::int32_t mSkyboxEffect = 0;                                // +0xB8
-    std::int32_t mField_BC = 0;                                   // +0xBC
+    SkyDomeDecalUploadNode* mDecalUploadHead = nullptr;            // +0xB8
+    std::int32_t mDecalUploadCount = 0;                            // +0xBC
     msvc8::string mDecalTexPath1;                                  // +0xC0
     msvc8::string mDecalTexPath2;                                  // +0xDC
     msvc8::string mDecalTexPath3;                                  // +0xF8
@@ -217,8 +243,7 @@ namespace moho
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat2;             // +0x204
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf3;  // +0x20C
     boost::shared_ptr<RD3DTextureResource> mCirrusTex;             // +0x214
-    std::int32_t mField_21C = 0;                                   // +0x21C
-    std::int32_t mField_220 = 0;                                   // +0x220
+    boost::shared_ptr<gpg::gal::TextureD3D9> mCloudsTexture;       // +0x21C
   };
 
   static_assert(offsetof(SkyDome, mDomeOrigin) == 0x20, "SkyDome::mDomeOrigin offset must be 0x20");
@@ -235,5 +260,6 @@ namespace moho
   static_assert(offsetof(SkyDome, mDomeFormat) == 0x198, "SkyDome::mDomeFormat offset must be 0x198");
   static_assert(offsetof(SkyDome, mNeedsRebuild) == 0x1C8, "SkyDome::mNeedsRebuild offset must be 0x1C8");
   static_assert(offsetof(SkyDome, mCirrusTex) == 0x214, "SkyDome::mCirrusTex offset must be 0x214");
+  static_assert(offsetof(SkyDome, mCloudsTexture) == 0x21C, "SkyDome::mCloudsTexture offset must be 0x21C");
   static_assert(sizeof(SkyDome) == 0x224, "SkyDome size must be 0x224");
 } // namespace moho

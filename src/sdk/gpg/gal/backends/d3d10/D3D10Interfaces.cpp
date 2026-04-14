@@ -2670,6 +2670,26 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F7B30 (FUN_008F7B30, gpg::gal::AdapterD3D10 destructor body)
+     *
+     * What it does:
+     * Destroys per-entry mode vectors, frees the outer adapter-mode storage,
+     * and clears begin/end/capacity lanes.
+     */
+    void DestroyAdapterModeVectorStorage(msvc8::vector<AdapterModeD3D10>& modes) noexcept
+    {
+      auto& runtime = msvc8::AsVectorRuntimeView(modes);
+      if (runtime.begin != nullptr) {
+        DestroyAdapterModeRuntimeRange(runtime.begin, runtime.end);
+        ::operator delete(runtime.begin);
+      }
+
+      runtime.begin = nullptr;
+      runtime.end = nullptr;
+      runtime.capacityEnd = nullptr;
+    }
+
+    /**
      * Address: 0x009023F0 (FUN_009023F0)
      *
      * What it does:
@@ -2721,6 +2741,24 @@ namespace gpg::gal
       }
 
       return 20;
+    }
+
+    /**
+     * Address: 0x00902D90 (FUN_00902D90, func_Fmt_Gal_to_DXGI)
+     *
+     * What it does:
+     * Converts GAL render-target format token to DXGI format token through the
+     * recovered 10-entry render-target mapping table.
+     */
+    int MapGalRenderTargetFormatToDxgi(const int galFormat)
+    {
+      for (const DXGIFormatPair& pair : kRenderTargetDxgiGalPairs) {
+        if (pair.gal == galFormat) {
+          return pair.dxgi;
+        }
+      }
+
+      return 0;
     }
 
     /**
@@ -3063,6 +3101,36 @@ namespace gpg::gal
 
       ReleaseSharedCount(destination);
       destination = source;
+    }
+
+    /**
+     * Address: 0x008FA550 (FUN_008FA550, boost::shared_ptr_RenderTargetD3D10::operator=)
+     *
+     * What it does:
+     * Rebinds one `shared_ptr<RenderTargetD3D10>` from one raw render-target
+     * pointer and releases previous ownership.
+     */
+    boost::shared_ptr<RenderTargetD3D10>* AssignSharedRenderTargetD3D10FromRaw(
+      boost::shared_ptr<RenderTargetD3D10>* const outRenderTarget, RenderTargetD3D10* const renderTarget
+    )
+    {
+      outRenderTarget->reset(renderTarget);
+      return outRenderTarget;
+    }
+
+    /**
+     * Address: 0x008FA760 (FUN_008FA760, boost::shared_ptr_PipelineStateD3D10::operator=)
+     *
+     * What it does:
+     * Rebinds one `shared_ptr<PipelineStateD3D10>` from one raw pipeline-state
+     * pointer and releases previous ownership.
+     */
+    boost::shared_ptr<PipelineStateD3D10>* AssignSharedPipelineStateD3D10FromRaw(
+      boost::shared_ptr<PipelineStateD3D10>* const outPipelineState, PipelineStateD3D10* const pipelineState
+    )
+    {
+      outPipelineState->reset(pipelineState);
+      return outPipelineState;
     }
 
     std::size_t EffectMacroCount(const EffectContextLane54Runtime& runtime) noexcept
@@ -3679,8 +3747,7 @@ namespace gpg::gal
    */
   AdapterD3D10::~AdapterD3D10()
   {
-    DestroyAdapterModeRuntimeRange(modes_.begin(), modes_.end());
-    modes_.clear();
+    DestroyAdapterModeVectorStorage(modes_);
   }
 
   /**
@@ -3880,6 +3947,14 @@ namespace gpg::gal
   }
 
   /**
+   * Address: 0x0094D4F0 (FUN_0094D4F0, ??0HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes one D3D10 hardware-vertex formatter wrapper.
+   */
+  HardwareVertexFormatterD3D10::HardwareVertexFormatterD3D10() = default;
+
+  /**
    * Address: 0x0094D8F0 (FUN_0094D8F0)
    *
    * What it does:
@@ -3998,6 +4073,14 @@ namespace gpg::gal
     destination.lane3C = source.streamScalar9C;
     destination.lane40 = source.streamScalarA0;
   }
+
+  /**
+   * Address: 0x0094D770 (FUN_0094D770, ??0Float16HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
+   *
+   * What it does:
+   * Initializes one D3D10 float16 hardware-vertex formatter wrapper.
+   */
+  Float16HardwareVertexFormatterD3D10::Float16HardwareVertexFormatterD3D10() = default;
 
   /**
    * Address: 0x0094D910 (FUN_0094D910)
@@ -5485,7 +5568,7 @@ namespace gpg::gal
       head.validFormats1.clear();
       for (int formatToken = 1; formatToken < 8; ++formatToken) {
         UINT supportFlags = 0U;
-        const DXGI_FORMAT dxgiFormat = static_cast<DXGI_FORMAT>(MapGalTextureFormatToDxgi(formatToken));
+        const DXGI_FORMAT dxgiFormat = static_cast<DXGI_FORMAT>(MapGalRenderTargetFormatToDxgi(formatToken));
         if ((device->CheckFormatSupport(dxgiFormat, &supportFlags) >= 0) &&
             ((supportFlags & kD3D10FormatSupportRenderTarget) != 0U)) {
           head.validFormats1.push_back(formatToken);
@@ -5933,7 +6016,7 @@ namespace gpg::gal
     textureDesc.Height = context->height_;
     textureDesc.MipLevels = 1U;
     textureDesc.ArraySize = 1U;
-    textureDesc.Format = static_cast<DXGI_FORMAT>(MapGalTextureFormatToDxgi(static_cast<int>(context->format_)));
+    textureDesc.Format = static_cast<DXGI_FORMAT>(MapGalRenderTargetFormatToDxgi(static_cast<int>(context->format_)));
     textureDesc.SampleDesc.Count = 1U;
     textureDesc.SampleDesc.Quality = 0U;
     textureDesc.Usage = D3D10_USAGE_DEFAULT;

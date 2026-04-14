@@ -45,11 +45,65 @@ namespace moho
   static_assert(sizeof(RWeakPtrType<CUnitCommand>) == 0x68, "RWeakPtrType<CUnitCommand> size must be 0x68");
 
   /**
+   * Address: 0x005A2220 (FUN_005A2220, Moho::WeakPtr_CUnitCommand::move_range)
+   *
+   * What it does:
+   * Rebinds one half-open `WeakPtr<CUnitCommand>` range onto destination
+   * storage by unlinking destination nodes from old owner chains and relinking
+   * them to source owners.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* MoveWeakPtrCUnitCommandRangeAndReturnEnd(
+    WeakPtr<CUnitCommand>* destination,
+    WeakPtr<CUnitCommand>* sourceBegin,
+    WeakPtr<CUnitCommand>* sourceEnd
+  );
+
+  /**
+   * Address: 0x005A1D00 (FUN_005A1D00, Moho::WeakPtr_CUnitCommand::move_range_0)
+   *
+   * What it does:
+   * Adapter for the VC8 vector move lane that forwards end-first operand order
+   * into the canonical `move_range(destination, begin, end)` ordering.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* MoveWeakPtrCUnitCommandRangeAdapter(
+    WeakPtr<CUnitCommand>* sourceEnd,
+    WeakPtr<CUnitCommand>* sourceBegin,
+    WeakPtr<CUnitCommand>* destination
+  );
+
+  /**
+   * Address: 0x005FF400 (FUN_005FF400, Moho::WeakPtr_CUnitCommand::cpy_range)
+   *
+   * What it does:
+   * Copies one half-open `WeakPtr<CUnitCommand>` range into destination storage,
+   * rebinding each copied node to the source owner link and inserting live nodes
+   * at the owner-chain head.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* CopyWeakPtrCUnitCommandRangeAndReturnEnd(
+    WeakPtr<CUnitCommand>* destination,
+    const WeakPtr<CUnitCommand>* sourceBegin,
+    const WeakPtr<CUnitCommand>* sourceEnd
+  );
+
+  /**
+   * Address: 0x005FD580 (FUN_005FD580, Moho::WeakPtr_CUnitCommand::cpy_range_0)
+   *
+   * What it does:
+   * Adapts the source-first argument order used by one vector-copy lane and
+   * forwards to `cpy_range` with canonical destination-first ordering.
+   */
+  [[nodiscard]] WeakPtr<CUnitCommand>* CopyWeakPtrCUnitCommandRangeAdapter(
+    const WeakPtr<CUnitCommand>* sourceBegin,
+    const WeakPtr<CUnitCommand>* sourceEnd,
+    WeakPtr<CUnitCommand>* destination
+  );
+
+  /**
    * Address: 0x005DB610 (FUN_005DB610, std::vector_WeakPtr_CUnitCommand::cpy)
    *
    * What it does:
    * Copies one legacy `vector<WeakPtr<CUnitCommand>>` payload into destination
-   * storage using the VC8 vector copy semantics.
+   * storage using the VC8 vector copy semantics and explicit weak-link relinking.
    */
   [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>>* CopyWeakPtrCUnitCommandVector(
     const msvc8::vector<WeakPtr<CUnitCommand>>& source,

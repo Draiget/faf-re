@@ -33,9 +33,13 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    EAiTargetType mType;     // +0x00
-    std::uint32_t mEntityId; // +0x04 (serialized raw id for AITARGET_Entity)
-    Wm3::Vec3f mPos;         // +0x08
+    EAiTargetType mType; // +0x00
+    union
+    {
+      std::uint32_t mEntityId; // +0x04 (serialized raw id for AITARGET_Entity)
+      std::uint32_t mEnt;      // legacy alias used by recovered callsites
+    };
+    Wm3::Vec3f mPos; // +0x08
   };
 
   static_assert(offsetof(SSTITarget, mType) == 0x00, "SSTITarget::mType offset must be 0x00");

@@ -94,6 +94,8 @@ namespace LuaPlus
 
 		/**
 		 * Address: 0x009075D0 (FUN_009075D0, LuaPlus::LuaObject::~LuaObject)
+		 * Address: 0x005D0A90 (FUN_005D0A90, LuaObject::j_Dtr_6 thunk)
+		 * Address: 0x00624120 (FUN_00624120, LuaObject::j_Dtr_7 thunk)
 		 * Address: 0x00BA2E8B (FUN_00BA2E8B, LuaObject::j_Dtr_9 thunk)
 		 *
 		 * What it does:
@@ -143,6 +145,15 @@ namespace LuaPlus
 		 * copies one caller-provided raw `TObject` payload into `m_object`.
 		 */
 		void AddToUsedObjectList(LuaState* state, TObject* obj);
+
+		/**
+		 * Address: 0x009099B0 (FUN_009099B0, LuaPlus::LuaObject::AssignTObject)
+		 *
+		 * What it does:
+		 * Rebinds this object to `state`'s root used-object intrusive list only
+		 * when root ownership changes, then copies one raw `TObject` payload.
+		 */
+		void AssignTObject(LuaState* state, TObject* obj);
 
 		/**
 		 * Address: 0x00908890 (FUN_00908890, LuaPlus::LuaObject::AddToUsedList)
@@ -217,11 +228,24 @@ namespace LuaPlus
 		 * Lua payload lane (`LUA_TNUMBER`).
 		 */
 		void AssignNumber(LuaState* state, double number);
-		void AssignInteger(LuaState* state, int32_t value)
-		{
-			AssignNumber(state, static_cast<double>(value));
-		}
+
+		/**
+		 * Address: 0x00909650 (FUN_00909650, LuaPlus::LuaObject::AssignInteger)
+		 *
+		 * What it does:
+		 * Rebinds to `state` root ownership when needed, then stores one integer
+		 * payload converted to Lua number lane (`LUA_TNUMBER`).
+		 */
+		void AssignInteger(LuaState* state, int32_t value);
 		void AssignNil(LuaState* state);
+
+		/**
+		 * Address: 0x00909600 (FUN_00909600, LuaPlus::LuaObject::AssignBoolean)
+		 *
+		 * What it does:
+		 * Rebinds to `state` root ownership when needed, then stores one boolean
+		 * payload lane (`LUA_TBOOLEAN`).
+		 */
 		void AssignBoolean(LuaState* state, bool value);
 
 		/**
@@ -233,6 +257,15 @@ namespace LuaPlus
 		 */
 		void AssignString(LuaState* state, const char* value);
 		void AssignLightUserData(LuaState* state, void* value);
+
+		/**
+		 * Address: 0x009097D0 (FUN_009097D0, LuaPlus::LuaObject::AssignNewUserData)
+		 *
+		 * What it does:
+		 * Rebinds this object to `state` root ownership and stores one
+		 * default-constructed reflected userdata payload of `type`.
+		 */
+		gpg::RRef AssignNewUserData(LuaState* state, const gpg::RType* type);
 
 		/**
 		 * Address: 0x00909840 (FUN_00909840, LuaPlus::LuaObject::AssignNewUserData)
@@ -463,6 +496,14 @@ namespace LuaPlus
 		 */
 		[[nodiscard]] int32_t GetTableCount() const;
 
+		/**
+		 * Address: 0x009073E0 (FUN_009073E0, LuaPlus::LuaObject::ToString)
+		 *
+		 * What it does:
+		 * Returns the current interned string buffer when already string-typed;
+		 * otherwise runs Lua's in-place `luaV_tostring` coercion and returns
+		 * `nullptr` when conversion fails.
+		 */
 		[[nodiscard]] const char* ToString() const;
 
 		/**
@@ -716,6 +757,15 @@ namespace LuaPlus
 		 * Reads the current stack slot as a boolean, allowing nil as false.
 		 */
 		[[nodiscard]] bool GetBoolean() const;
+
+		/**
+		 * Address: 0x00528140 (FUN_00528140, LuaPlus::LuaStackObject::GetByName)
+		 *
+		 * What it does:
+		 * Pushes one string key and performs a raw table lookup against this
+		 * stack slot, returning a stack-object view for the fetched value.
+		 */
+		[[nodiscard]] LuaStackObject GetByName(const char* name) const;
 		[[nodiscard]] static bool GetBoolean(const LuaStackObject* self)
 		{
 			return self != nullptr ? self->GetBoolean() : false;

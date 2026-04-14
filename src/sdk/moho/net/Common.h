@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "boost/weak_ptr.h"
 #include "gpg/core/time/Timer.h"
@@ -19,6 +20,7 @@ namespace gpg
 
 namespace moho
 {
+  class CD3DPrimBatcher;
   class INetConnector;
   struct SNetCommandArg;
   struct CHostManager;
@@ -271,6 +273,23 @@ namespace moho
     uint64_t rangeStartUs,
     uint64_t rangeEndUs,
     uint64_t averagingWindowUs
+  );
+
+  /**
+   * Address: 0x007F3F20 (FUN_007F3F20, func_ren_BandwidthUsage_Line)
+   *
+   * What it does:
+   * Renders one outbound/inbound bandwidth series pair as two connected line
+   * strips in screen space.
+   */
+  void REN_DrawBandwidthUsageLinePair(
+    CD3DPrimBatcher& primBatcher,
+    const SBandwidthUsageSeries& series,
+    std::int32_t xOffset,
+    std::int32_t yBase,
+    float yScale,
+    std::uint32_t inboundColor,
+    std::uint32_t outboundColor
   );
 
   /**

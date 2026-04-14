@@ -117,6 +117,23 @@ namespace moho
   }
 
   /**
+   * Address: 0x00548760 (FUN_00548760, Moho::ResourceDeposit::MemberSerialize)
+   *
+   * What it does:
+   * Writes one reflected `ResourceDeposit` payload into an archive by writing
+   * the footprint rectangle lane first and the resource-type lane at +0x10
+   * second.
+   */
+  void ResourceDeposit::MemberSerialize(ResourceDeposit* const object, gpg::WriteArchive* const archive)
+  {
+    const gpg::RRef footprintOwnerRef{};
+    archive->Write(CachedRect2iType(), object, footprintOwnerRef);
+
+    const gpg::RRef depositTypeOwnerRef{};
+    archive->Write(CachedEResourceTypeType(), &object->depositType, depositTypeOwnerRef);
+  }
+
+  /**
    * Address: 0x00546170 (Moho::ResourceDeposit::Intersects)
    *
    * Moho::CGeomSolid3 const&, Moho::CHeightField const&

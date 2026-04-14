@@ -3,8 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 
+#include "gpg/core/streams/BinaryWriter.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/animation/CAnimTexture.h"
+#include "moho/resource/IResources.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
@@ -187,6 +191,20 @@ namespace moho
   extern float ren_DecalAlbedoLodCutoff;
   extern float ren_DecalNormalLodCutoff;
   extern float ren_DecalFlatTol;
+  extern float ren_DecalFadeFraction;
+
+  msvc8::string CWldTerrainDecal::sTypeDesc[10] = {
+    "Undefined",
+    "Albedo",
+    "Normals",
+    "Water Mask",
+    "Water Albedo",
+    "Water Normals",
+    "Glow",
+    "Alpha Normals",
+    "Glow Mask",
+    "AlbedoXP",
+  };
 
   /**
    * Address: 0x0089CA60 (FUN_0089CA60, Moho::CWldTerrainDecal::CWldTerrainDecal)
@@ -267,6 +285,61 @@ namespace moho
   void CWldTerrainDecal::EnableFlatOptimization(const bool enabled)
   {
     mFlatOptimizationEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
+  }
+
+  /**
+   * Address: 0x0089CF30 (FUN_0089CF30, ?DecalSave@CWldTerrainDecal@Moho@@QAEXAAVBinaryWriter@gpg@@@Z)
+   * Mangled: ?DecalSave@CWldTerrainDecal@Moho@@QAEXAAVBinaryWriter@gpg@@@Z
+   *
+   * What it does:
+   * Writes decal persistence payload in binary order:
+   * index, type, name-slot count + per-slot `(byteLen, bytes)`, then
+   * scale/position/orientation, cutoff lanes, and terminal runtime token.
+   */
+  void CWldTerrainDecal::DecalSave(gpg::BinaryWriter& writer)
+  {
+    writer.Write(mIndex);
+
+    const std::int32_t decalType = static_cast<std::int32_t>(mType);
+    writer.Write(decalType);
+
+    constexpr std::int32_t kNameSlotCount = 2;
+    writer.Write(kNameSlotCount);
+
+    for (std::int32_t slot = 0; slot < kNameSlotCount; ++slot) {
+      const msvc8::string& name = mNames[slot];
+      const std::int32_t nameByteLength = static_cast<std::int32_t>(name.size());
+      writer.Write(nameByteLength);
+      writer.Write(name.raw_data_unsafe(), static_cast<std::size_t>(nameByteLength));
+    }
+
+    writer.Write(reinterpret_cast<const char*>(&mScale), sizeof(mScale));
+    writer.Write(reinterpret_cast<const char*>(&mPosition), sizeof(mPosition));
+    writer.Write(reinterpret_cast<const char*>(&mOrientation), sizeof(mOrientation));
+    writer.Write(mCutoffLOD);
+    writer.Write(mNearCutoff);
+    writer.Write(mUnknown9C);
+  }
+
+  /**
+   * Address: 0x0089D190 (FUN_0089D190, ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   * Mangled: ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+   *
+   * What it does:
+   * Resolves one decal type enum from static descriptor text and warns when
+   * caller input does not match any known descriptor lane.
+   */
+  EWldTerrainDecalType CWldTerrainDecal::LookupDecalType(const msvc8::string& typeDescription)
+  {
+    msvc8::string* const begin = &sTypeDesc[0];
+    msvc8::string* const end = begin + 10;
+    msvc8::string* const found = SearchStringArrayFor(begin, end, &typeDescription);
+    if (found != end) {
+      return static_cast<EWldTerrainDecalType>(found - begin);
+    }
+
+    gpg::Warnf("unknown decal type: %s", typeDescription.c_str());
+    return WldTerrainDecalType_Undefined;
   }
 
   /**
@@ -442,6 +515,26 @@ namespace moho
     }
 
     return diagonal * ren_DecalNormalLodCutoff;
+  }
+
+  /**
+   * Address: 0x0089D400 (FUN_0089D400, Moho::CWldTerrainDecal::GetLODAlpha)
+   *
+   * What it does:
+   * Computes one normalized alpha in `[0,1]` from either near-cutoff or
+   * far-cutoff fade lanes.
+   */
+  float CWldTerrainDecal::GetLODAlpha(const float distance) const
+  {
+    if (mNearCutoff > 0.0f) {
+      const float fadeBegin = mNearCutoff * ren_DecalFadeFraction;
+      const float clampedDistance = std::clamp(distance, fadeBegin, mNearCutoff);
+      return (clampedDistance - fadeBegin) / (mNearCutoff - fadeBegin);
+    }
+
+    const float fadeBegin = mCutoffLOD * ren_DecalFadeFraction;
+    const float clampedDistance = std::clamp(distance, fadeBegin, mCutoffLOD);
+    return 1.0f - ((clampedDistance - fadeBegin) / (mCutoffLOD - fadeBegin));
   }
 
   /**

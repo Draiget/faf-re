@@ -40,6 +40,23 @@ namespace moho
   gpg::RType* RProjectileBlueprint::sType = nullptr;
 
   /**
+   * Address: 0x0051B740 (FUN_0051B740, Moho::RProjectileBlueprint::RProjectileBlueprint)
+   *
+   * What it does:
+   * Constructs projectile-blueprint lanes on top of `REntityBlueprint` and
+   * restores projectile collision-shape defaults.
+   */
+  RProjectileBlueprint::RProjectileBlueprint(RRuleGameRules* const owner, const RResId& resId)
+    : REntityBlueprint(owner, resId)
+    , DevStatus()
+    , Display()
+    , Economy()
+    , Physics()
+  {
+    mCollisionShape = COLSHAPE_None;
+  }
+
+  /**
    * Address: 0x0051B650 (FUN_0051B650)
    *
    * What it does:
@@ -167,5 +184,22 @@ namespace moho
     angularVelocity.y = randomAxis.y * angularSpeed;
     angularVelocity.z = randomAxis.z * angularSpeed;
     return angularVelocity;
+  }
+
+  /**
+   * Address: 0x0051C680 (?GetRandomInitialSpeed@RProjectileBlueprint@Moho@@QBEMPAVCRandomStream@2@@Z)
+   * Mangled: ?GetRandomInitialSpeed@RProjectileBlueprint@Moho@@QBEMPAVCRandomStream@2@@Z
+   *
+   * What it does:
+   * Samples a symmetric launch-speed offset around `Physics.InitialSpeed`
+   * using `Physics.InitialSpeedRange`.
+   */
+  float RProjectileBlueprint::GetRandomInitialSpeed(CRandomStream* const randomStream) const
+  {
+    const float range = Physics.InitialSpeedRange;
+    const float minSpeed = -range;
+    const float maxSpeed = range;
+    const float unit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
+    return minSpeed + ((maxSpeed - minSpeed) * unit) + Physics.InitialSpeed;
   }
 } // namespace moho

@@ -341,6 +341,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x005BE1C0 (FUN_005BE1C0, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z)
+   *
+   * Wm3::Vector3<float> const &
+   *
+   * IDA signature:
+   * bool __usercall Moho::CIntelGrid::IsVisible@<al>(
+   *   Moho::CIntelGrid *this@<edi>,
+   *   Wm3::Vector3f *position@<esi>)
+   *
+   * What it does:
+   * Converts world-space position into one grid cell and forwards to the
+   * integer-grid visibility lane.
+   */
+  bool CIntelGrid::IsVisible(const Wm3::Vec3f& position) const
+  {
+    const GridPos gridPosition(const_cast<Wm3::Vec3f*>(&position), static_cast<int>(mGridSize));
+    return IsVisible(gridPosition.x, gridPosition.z);
+  }
+
+  /**
    * Address: 0x005BE210 (FUN_005BE210, ?IsVisible@CIntelGrid@Moho@@QBE_NABV?$Rect2@H@gpg@@_N@Z)
    *
    * gpg::Rect2<int> const &, bool

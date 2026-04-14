@@ -165,60 +165,188 @@ namespace
   class RStringVectorTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
-    [[nodiscard]] const char* GetName() const override
-    {
-      return "vector<string>";
-    }
+    /**
+     * Address: 0x00512C30 (FUN_00512C30, gpg::RVectorType_string::GetName)
+     *
+     * What it does:
+     * Lazily builds/caches the reflected lexical type label for one
+     * `vector<string>` lane using the current reflected string element type
+     * name.
+     */
+    [[nodiscard]] const char* GetName() const override;
 
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
-    {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
-      return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
-    }
+    /**
+     * Address: 0x00512CF0 (FUN_00512CF0, gpg::RVectorType_string::GetLexical)
+     *
+     * What it does:
+     * Appends `size=` metadata to inherited lexical text for one reflected
+     * `vector<string>` value.
+     */
+    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
-    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override
-    {
-      return this;
-    }
+    [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
-    void Init() override
-    {
-      size_ = sizeof(msvc8::vector<msvc8::string>);
-      version_ = 1;
-    }
+    /**
+     * Address: 0x00512CD0 (FUN_00512CD0, gpg::RVectorType_string::Init)
+     *
+     * What it does:
+     * Sets reflected vector size/version and installs archive serializer lanes
+     * for one `vector<string>` descriptor.
+     */
+    void Init() override;
 
-    [[nodiscard]] gpg::RRef SubscriptIndex(void* const obj, const int ind) const override
-    {
-      gpg::RRef out{};
-      out.mType = CachedStringType();
+    /**
+     * Address: 0x00512E60 (FUN_00512E60, gpg::RVectorType_string::SerLoad)
+     *
+     * What it does:
+     * Reads one serialized string-vector lane (count + string elements) and
+     * replaces destination storage.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
-      auto* const storage = static_cast<msvc8::vector<msvc8::string>*>(obj);
-      if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
-        return out;
-      }
+    /**
+     * Address: 0x00512F60 (FUN_00512F60, gpg::RVectorType_string::SerSave)
+     *
+     * What it does:
+     * Writes one reflected string-vector lane as count + element payloads.
+     */
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
 
-      out.mObj = &(*storage)[static_cast<std::size_t>(ind)];
-      return out;
-    }
-
-    [[nodiscard]] size_t GetCount(void* const obj) const override
-    {
-      const auto* const storage = static_cast<const msvc8::vector<msvc8::string>*>(obj);
-      return storage ? storage->size() : 0U;
-    }
-
-    void SetCount(void* const obj, const int count) const override
-    {
-      auto* const storage = static_cast<msvc8::vector<msvc8::string>*>(obj);
-      if (!storage || count < 0) {
-        return;
-      }
-
-      storage->resize(static_cast<std::size_t>(count));
-    }
+    [[nodiscard]] gpg::RRef SubscriptIndex(void* obj, int ind) const override;
+    [[nodiscard]] size_t GetCount(void* obj) const override;
+    void SetCount(void* obj, int count) const override;
   };
 
   static_assert(sizeof(RStringVectorTypeInfo) == 0x68, "RStringVectorTypeInfo size must be 0x68");
+
+  msvc8::string gRStringVectorTypeName{};
+  std::uint32_t gRStringVectorTypeNameInitGuard = 0u;
+
+  /**
+   * Address: 0x00BF2760 (FUN_00BF2760, sub_BF2760)
+   *
+   * What it does:
+   * Clears cached lexical-name state used by `RStringVectorTypeInfo::GetName`.
+   */
+  void cleanup_RStringVectorTypeInfo_GetName()
+  {
+    gRStringVectorTypeName.clear();
+    gRStringVectorTypeNameInitGuard = 0u;
+  }
+
+  const char* RStringVectorTypeInfo::GetName() const
+  {
+    if ((gRStringVectorTypeNameInitGuard & 1u) == 0u) {
+      gRStringVectorTypeNameInitGuard |= 1u;
+
+      const gpg::RType* const elementType = CachedStringType();
+      const char* const elementName = elementType != nullptr ? elementType->GetName() : "std::string";
+      gRStringVectorTypeName = gpg::STR_Printf("vector<%s>", elementName);
+      (void)std::atexit(&cleanup_RStringVectorTypeInfo_GetName);
+    }
+
+    return gRStringVectorTypeName.c_str();
+  }
+
+  msvc8::string RStringVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
+  {
+    const msvc8::string base = gpg::RType::GetLexical(ref);
+    return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
+  }
+
+  const gpg::RIndexed* RStringVectorTypeInfo::IsIndexed() const
+  {
+    return this;
+  }
+
+  void RStringVectorTypeInfo::Init()
+  {
+    size_ = sizeof(msvc8::vector<msvc8::string>);
+    version_ = 1;
+    serLoadFunc_ = &RStringVectorTypeInfo::SerLoad;
+    serSaveFunc_ = &RStringVectorTypeInfo::SerSave;
+  }
+
+  void RStringVectorTypeInfo::SerLoad(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    if (archive == nullptr || objectPtr == 0) {
+      return;
+    }
+
+    auto* const storage = reinterpret_cast<msvc8::vector<msvc8::string>*>(objectPtr);
+    unsigned int count = 0u;
+    archive->ReadUInt(&count);
+
+    msvc8::vector<msvc8::string> loaded{};
+    loaded.reserve(static_cast<std::size_t>(count));
+
+    for (unsigned int index = 0; index < count; ++index) {
+      msvc8::string value{};
+      archive->ReadString(&value);
+      loaded.push_back(value);
+    }
+
+    *storage = loaded;
+  }
+
+  void RStringVectorTypeInfo::SerSave(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    auto* const storage = reinterpret_cast<msvc8::vector<msvc8::string>*>(objectPtr);
+    const unsigned int count = storage != nullptr ? static_cast<unsigned int>(storage->size()) : 0u;
+    archive->WriteUInt(count);
+
+    if (storage == nullptr) {
+      return;
+    }
+
+    for (msvc8::string& value : *storage) {
+      archive->WriteString(&value);
+    }
+  }
+
+  gpg::RRef RStringVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
+  {
+    gpg::RRef out{};
+    out.mType = CachedStringType();
+
+    auto* const storage = static_cast<msvc8::vector<msvc8::string>*>(obj);
+    if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
+      return out;
+    }
+
+    out.mObj = &(*storage)[static_cast<std::size_t>(ind)];
+    return out;
+  }
+
+  size_t RStringVectorTypeInfo::GetCount(void* const obj) const
+  {
+    const auto* const storage = static_cast<const msvc8::vector<msvc8::string>*>(obj);
+    return storage ? storage->size() : 0u;
+  }
+
+  void RStringVectorTypeInfo::SetCount(void* const obj, const int count) const
+  {
+    auto* const storage = static_cast<msvc8::vector<msvc8::string>*>(obj);
+    if (!storage || count < 0) {
+      return;
+    }
+
+    storage->resize(static_cast<std::size_t>(count));
+  }
 
   alignas(EFootprintFlagsTypeInfo) unsigned char gEFootprintFlagsTypeInfoStorage[sizeof(EFootprintFlagsTypeInfo)];
   bool gEFootprintFlagsTypeInfoConstructed = false;

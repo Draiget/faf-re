@@ -214,6 +214,30 @@ CDecalBuffer::~CDecalBuffer()
 }
 
 /**
+ * Address: 0x00779BB0 (FUN_00779BB0, Moho::CDecalBuffer::SwapVectors)
+ *
+ * What it does:
+ * Swaps runtime storage pointers for both decal publish vectors:
+ * visible decals and pending hide object-id lanes.
+ */
+void CDecalBuffer::SwapVectors(msvc8::vector<SDecalInfo>* const addDecals, msvc8::vector<std::uint32_t>* const removeDecals)
+{
+  auto& visibleView = msvc8::AsVectorRuntimeView(mVisibleDecals);
+  auto& addView = msvc8::AsVectorRuntimeView(*addDecals);
+
+  std::swap(visibleView.begin, addView.begin);
+  std::swap(visibleView.end, addView.end);
+  std::swap(visibleView.capacityEnd, addView.capacityEnd);
+
+  auto& pendingHideView = msvc8::AsVectorRuntimeView(mPendingHideObjectIds);
+  auto& removeView = msvc8::AsVectorRuntimeView(*removeDecals);
+
+  std::swap(pendingHideView.begin, removeView.begin);
+  std::swap(pendingHideView.end, removeView.end);
+  std::swap(pendingHideView.capacityEnd, removeView.capacityEnd);
+}
+
+/**
  * Address: 0x007793D0 (FUN_007793D0, Moho::CDecalBuffer::CreateHandle)
  *
  * What it does:

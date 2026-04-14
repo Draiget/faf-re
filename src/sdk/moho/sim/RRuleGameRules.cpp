@@ -98,14 +98,28 @@ namespace moho
       return CompareLex(lhs.view(), rhs.view());
     }
 
+    /**
+     * Address: 0x0052C420 (FUN_0052C420, std::map_string_RBeamBlueprint::operator[])
+     *
+     * What it does:
+     * Returns the matched blueprint-map node for one key lookup, or the tree
+     * sentinel head when no exact key match exists.
+     */
     [[nodiscard]] RRuleGameRulesBlueprintNode*
-    FindExactNode(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
+    FindBlueprintNodeByMapSubscript(const RRuleGameRulesBlueprintMap& map, const msvc8::string& lookupId) noexcept
     {
-      return msvc8::find_equal_or_head_node<RRuleGameRulesBlueprintNode, &RRuleGameRulesBlueprintNode::mIsSentinel>(
-        map.mHead, lookupId, [](const RRuleGameRulesBlueprintNode& node, const msvc8::string& query) {
-        return CompareBlueprintIds(node.mBlueprintId, query) < 0;
+      RRuleGameRulesBlueprintNode* const candidate =
+        msvc8::lower_bound_node<RRuleGameRulesBlueprintNode, &RRuleGameRulesBlueprintNode::mIsSentinel>(
+          map.mHead, lookupId, [](const RRuleGameRulesBlueprintNode& node, const msvc8::string& query) {
+          return CompareBlueprintIds(node.mBlueprintId, query) < 0;
+        }
+        );
+
+      if (candidate == nullptr || candidate == map.mHead) {
+        return map.mHead;
       }
-      );
+
+      return (CompareBlueprintIds(lookupId, candidate->mBlueprintId) < 0) ? map.mHead : candidate;
     }
 
     template <typename TBlueprint>
@@ -117,7 +131,7 @@ namespace moho
       }
 
       const msvc8::string lookupId(resId.name.view());
-      RRuleGameRulesBlueprintNode* const node = FindExactNode(map, lookupId);
+      RRuleGameRulesBlueprintNode* const node = FindBlueprintNodeByMapSubscript(map, lookupId);
       if (!node || node == map.mHead) {
         return nullptr;
       }

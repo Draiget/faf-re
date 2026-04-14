@@ -10,7 +10,12 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
+#include "moho/entity/Entity.h"
+#include "moho/entity/EntityTransformPayload.h"
+#include "moho/particles/CParticleTextureCountedPtr.h"
+#include "moho/render/EBeamParam.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/resource/CParticleTexture.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
 #include "Wm3Sphere3.h"
@@ -97,6 +102,55 @@ namespace
     }
 
     return armiesBegin[focusArmyIndex];
+  }
+
+  [[nodiscard]] moho::Entity* ResolveAttachEntity(const moho::SEntAttachInfo& attachInfo) noexcept
+  {
+    return attachInfo.GetAttachTargetEntity();
+  }
+
+  [[nodiscard]] bool IsAttachmentInvalid(const moho::Entity* const entity) noexcept
+  {
+    return entity == nullptr || entity->DestroyQueuedFlag != 0u;
+  }
+
+  [[nodiscard]] moho::VTransform ReadCurrentTransform(const moho::Entity& entity) noexcept
+  {
+    return moho::BuildVTransformFromEntityTransformPayload(
+      moho::ReadEntityTransformPayload(entity.Orientation, entity.Position)
+    );
+  }
+
+  [[nodiscard]] moho::VTransform ReadPreviousTransform(const moho::Entity& entity) noexcept
+  {
+    return moho::BuildVTransformFromEntityTransformPayload(
+      moho::ReadEntityTransformPayload(entity.PrevOrientation, entity.PrevPosition)
+    );
+  }
+
+  [[nodiscard]] Wm3::Vec3f FetchVectorParam(moho::CEfxBeam& beam, const std::int32_t paramIndex)
+  {
+    Wm3::Vec3f value{};
+    beam.GetVectorParam(&value, paramIndex);
+    return value;
+  }
+
+  [[nodiscard]] Wm3::Vec3f ApplyPoint(const moho::VTransform& transform, const Wm3::Vec3f& point)
+  {
+    Wm3::Vec3f out{};
+    transform.Apply(point, &out);
+    return out;
+  }
+
+  void SetIdentityTransform(moho::VTransform& transform) noexcept
+  {
+    transform.orient_.x = 1.0f;
+    transform.orient_.y = 0.0f;
+    transform.orient_.z = 0.0f;
+    transform.orient_.w = 0.0f;
+    transform.pos_.x = 0.0f;
+    transform.pos_.y = 0.0f;
+    transform.pos_.z = 0.0f;
   }
 } // namespace
 
@@ -236,6 +290,116 @@ namespace moho
     const bool startVisible = reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_LOSNow)) != RECON_None;
     mVisible = startVisible || reconDb->BeamIsVisible(mBeam);
     return mVisible;
+  }
+
+  /**
+   * Address: 0x00654D40 (FUN_00654D40, Moho::CEfxBeam::Reset)
+   *
+   * What it does:
+   * Rebuilds beam render parameters from effect params, rebinding beam
+   * textures and width/scroll/repeat lanes.
+   */
+  void CEfxBeam::Reset()
+  {
+    Vector4f quatValue{};
+    mBeam.mStartColor = *GetQuatParam(&quatValue, BEAM_STARTCOLOR);
+    mBeam.mEndColor = *GetQuatParam(&quatValue, BEAM_ENDCOLOR);
+
+    CParticleTexture* texture = nullptr;
+    (void)GetTextureParam(&texture, 0);
+    (void)AssignCountedParticleTexturePtr(&mBeam.mTexture1, texture);
+    if (texture != nullptr) {
+      (void)texture->ReleaseReferenceAtomic();
+    }
+
+    texture = nullptr;
+    (void)GetTextureParam(&texture, 1);
+    (void)AssignCountedParticleTexturePtr(&mBeam.mTexture2, texture);
+    if (texture != nullptr) {
+      (void)texture->ReleaseReferenceAtomic();
+    }
+
+    mBeam.mWidth = GetFloatParam(BEAM_THICKNESS);
+    mBeam.mBlendMode = static_cast<SWorldBeam::BlendMode>(mBlendMode);
+    mBeam.mRepeatRate = GetFloatParam(BEAM_REPEATRATE);
+    mBeam.mUShift = GetFloatParam(BEAM_USHIFT);
+    mBeam.mVShift = GetFloatParam(BEAM_VSHIFT);
+  }
+
+  /**
+   * Address: 0x00654F30 (FUN_00654F30, Moho::CEfxBeam::Update)
+   *
+   * What it does:
+   * Updates beam endpoint transforms from current attachment state and
+   * handles detach/destroy paths for invalid source attachments.
+   */
+  bool CEfxBeam::Update()
+  {
+    if (mNewAttachment) {
+      Entity* const sourceEntity = ResolveAttachEntity(mEntityInfo);
+      if (IsAttachmentInvalid(sourceEntity)) {
+        ResolveEffectManager(this)->DestroyEffect(this);
+        return false;
+      }
+
+      Entity* const endEntity = ResolveAttachEntity(mEnd);
+      if (endEntity == nullptr) {
+        mBeam.mFromStart = false;
+        mBeam.mCurStart = ReadCurrentTransform(*sourceEntity);
+        mBeam.mLastStart = ReadPreviousTransform(*sourceEntity);
+        mBeam.mStart = FetchVectorParam(*this, 0);
+
+        const float beamLength = GetFloatParam(6);
+        mBeam.mEnd.x = 0.0f;
+        mBeam.mEnd.y = 0.0f;
+        mBeam.mEnd.z = beamLength;
+        mBeam.mLastInterpolation = sourceEntity->mVelocityScale;
+
+        if (mEntityInfo.mParentBoneIndex != -1) {
+          const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
+          mBeam.mStart = ApplyPoint(sourceBoneTransform, mBeam.mStart);
+          mBeam.mEnd = ApplyPoint(sourceBoneTransform, mBeam.mEnd);
+        }
+
+        mBeam.mCurEnd.pos_ = ApplyPoint(mBeam.mCurStart, mBeam.mEnd);
+        mBeam.mLastEnd.pos_ = ApplyPoint(mBeam.mLastStart, mBeam.mEnd);
+      } else {
+        mBeam.mFromStart = true;
+        mBeam.mCurStart = ReadCurrentTransform(*sourceEntity);
+        mBeam.mLastStart = ReadPreviousTransform(*sourceEntity);
+        mBeam.mCurEnd = ReadCurrentTransform(*endEntity);
+        mBeam.mLastEnd = ReadPreviousTransform(*endEntity);
+
+        const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
+        const Wm3::Vec3f localStart = FetchVectorParam(*this, 0);
+        mBeam.mStart = ApplyPoint(sourceBoneTransform, localStart);
+
+        const VTransform endBoneTransform = endEntity->GetBoneLocalTransform(mEnd.mParentBoneIndex);
+        const Wm3::Vec3f localEnd = FetchVectorParam(*this, 3);
+        mBeam.mEnd = ApplyPoint(endBoneTransform, localEnd);
+
+        mBeam.mLastInterpolation = sourceEntity->mVelocityScale;
+      }
+
+      if (mIsNew) {
+        Entity* const classificationEntity = ResolveAttachEntity(mEntityInfo);
+        if (classificationEntity != nullptr && !classificationEntity->IsCollisionBeam() &&
+            !classificationEntity->IsProjectile() && !classificationEntity->IsUnit()) {
+          mIsNew = false;
+          return true;
+        }
+      }
+    } else {
+      mBeam.mFromStart = false;
+      SetIdentityTransform(mBeam.mCurStart);
+      SetIdentityTransform(mBeam.mLastStart);
+      mBeam.mLastInterpolation = 1.0f;
+      mBeam.mStart = FetchVectorParam(*this, 0);
+      mBeam.mEnd = FetchVectorParam(*this, 3);
+      mIsNew = false;
+    }
+
+    return true;
   }
 
   /**

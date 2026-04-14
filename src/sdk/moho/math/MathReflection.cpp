@@ -170,6 +170,24 @@ namespace
   {
     DestroySerializerStartupSlot<TSerializer>();
   }
+
+  /**
+   * Address: 0x004EE1B0 (FUN_004EE1B0, func_PointsAreSimilar)
+   *
+   * What it does:
+   * Compares two 3D points component-wise and returns true when all axis deltas
+   * are within one `0.001f` absolute threshold.
+   */
+  [[maybe_unused]] [[nodiscard]] bool PointsAreSimilarWithinEpsilon(
+    const Wm3::Vector3f& lhs,
+    const Wm3::Vector3f& rhs
+  ) noexcept
+  {
+    constexpr float kAxisTolerance = 0.001f;
+    return std::fabs(lhs.x - rhs.x) <= kAxisTolerance &&
+      std::fabs(lhs.y - rhs.y) <= kAxisTolerance &&
+      std::fabs(lhs.z - rhs.z) <= kAxisTolerance;
+  }
 } // namespace
 
 boost::mutex& moho::math_GlobalRandomMutex = *reinterpret_cast<boost::mutex*>(gMathGlobalRandomMutexStorage);
@@ -223,6 +241,33 @@ namespace moho
   }
 
   /**
+   * Address: 0x004EB590 (FUN_004EB590, func_EulerToQuaternion)
+   *
+   * What it does:
+   * Converts Euler roll/pitch/yaw lanes into one quaternion orientation.
+   */
+  Wm3::Quaternionf EulerToQuaternion(const VEulers3& orientation)
+  {
+    const float halfRoll = orientation.r * 0.5f;
+    const float halfPitch = orientation.p * 0.5f;
+    const float halfYaw = orientation.y * 0.5f;
+
+    const float rollCos = std::cos(halfRoll);
+    const float rollSin = std::sin(halfRoll);
+    const float pitchCos = std::cos(halfPitch);
+    const float pitchSin = std::sin(halfPitch);
+    const float yawCos = std::cos(halfYaw);
+    const float yawSin = std::sin(halfYaw);
+
+    Wm3::Quaternionf orientationOut{};
+    orientationOut.w = (yawCos * pitchCos * rollCos) + (yawSin * pitchSin * rollSin);
+    orientationOut.x = (yawCos * pitchCos * rollSin) - (yawSin * pitchSin * rollCos);
+    orientationOut.y = (pitchSin * yawCos * rollCos) + (yawSin * pitchCos * rollSin);
+    orientationOut.z = (yawSin * pitchCos * rollCos) - (pitchSin * yawCos * rollSin);
+    return orientationOut;
+  }
+
+  /**
    * Address: 0x004EC590 (FUN_004EC590, Moho::VAxes3::VAxes3)
    *
    * What it does:
@@ -256,6 +301,119 @@ namespace moho
     vZ.x = xz + wy;
     vZ.y = wx - xy;
     vZ.z = 1.0f - (zz + xx);
+  }
+
+  /**
+   * Address: 0x004EC6D0 (FUN_004EC6D0, ??0VAxes3@Moho@@QAE@ABVVEulers3@1@@Z)
+   *
+   * What it does:
+   * Converts roll/pitch/yaw Euler lanes to quaternion and then expands that
+   * quaternion into one orthonormal basis matrix.
+   */
+  VAxes3::VAxes3(const VEulers3& orientation)
+    : VAxes3(EulerToQuaternion(orientation))
+  {
+  }
+
+  /**
+   * Address: 0x004EC720 (FUN_004EC720, ?OrthoNormalize@VAxes3@Moho@@QAEXXZ)
+   * Mangled: ?OrthoNormalize@VAxes3@Moho@@QAEXXZ
+   *
+   * What it does:
+   * Rebuilds the basis from cross products so axes remain orthogonal and
+   * unit-length (`vX = normalize(vY x vZ)`, `vZ = normalize(vX x vY)`,
+   * `vY = vZ x vX`).
+   */
+  void VAxes3::OrthoNormalize()
+  {
+    vX.x = (vZ.z * vY.y) - (vZ.y * vY.z);
+    vX.y = (vZ.x * vY.z) - (vY.x * vZ.z);
+    vX.z = (vY.x * vZ.y) - (vZ.x * vY.y);
+    (void)Wm3::Vector3f::Normalize(&vX);
+
+    vZ.x = (vX.y * vY.z) - (vX.z * vY.y);
+    vZ.y = (vY.x * vX.z) - (vX.x * vY.z);
+    vZ.z = (vX.x * vY.y) - (vY.x * vX.y);
+    (void)Wm3::Vector3f::Normalize(&vZ);
+
+    vY.x = (vZ.y * vX.z) - (vZ.z * vX.y);
+    vY.y = (vZ.z * vX.x) - (vZ.x * vX.z);
+    vY.z = (vZ.x * vX.y) - (vZ.y * vX.x);
+  }
+
+  /**
+   * Address: 0x004EC850 (FUN_004EC850, ?IsNormal@VAxes3@Moho@@QBE_NXZ)
+   * Mangled: ?IsNormal@VAxes3@Moho@@QBE_NXZ
+   *
+   * What it does:
+   * Checks that all three basis lanes are unit-length and verifies `vX`
+   * matches the reconstructed `vZ x vY` lane within epsilon.
+   */
+  bool VAxes3::IsNormal() const
+  {
+    constexpr float kUnitLengthEpsilon = 0.001f;
+    const auto squaredLength = [](const Wm3::Vector3f& axis) {
+      return (axis.x * axis.x) + (axis.y * axis.y) + (axis.z * axis.z);
+    };
+
+    if (std::fabs(squaredLength(vX) - 1.0f) > kUnitLengthEpsilon) {
+      return false;
+    }
+    if (std::fabs(squaredLength(vY) - 1.0f) > kUnitLengthEpsilon) {
+      return false;
+    }
+    if (std::fabs(squaredLength(vZ) - 1.0f) > kUnitLengthEpsilon) {
+      return false;
+    }
+
+    const Wm3::Vector3f reconstructedVX{
+      (vZ.z * vY.y) - (vZ.y * vY.z),
+      (vZ.x * vY.z) - (vY.x * vZ.z),
+      (vY.x * vZ.y) - (vZ.x * vY.y),
+    };
+    return PointsAreSimilarWithinEpsilon(vX, reconstructedVX);
+  }
+
+  msvc8::string ToString(const Wm3::Vector3f& value);
+
+  /**
+   * Address: 0x004ED000 (FUN_004ED000, ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z)
+   * Mangled: ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z
+   *
+   * What it does:
+   * Formats one basis as `X=(...) Y=(...) Z=(...)` using the existing vector
+   * lane formatter.
+   */
+  msvc8::string ToString(const VAxes3& value)
+  {
+    const msvc8::string zText = ToString(value.vZ);
+    const msvc8::string yText = ToString(value.vY);
+    const msvc8::string xText = ToString(value.vX);
+    return gpg::STR_Printf("X=(%s) Y=(%s) Z=(%s)", xText.c_str(), yText.c_str(), zText.c_str());
+  }
+
+  /**
+   * Address: 0x004ECB60 (FUN_004ECB60, ??$Identity@VVAxes3@Moho@@@Moho@@YAABVVAxes3@0@XZ)
+   *
+   * What it does:
+   * Returns a reference to the lazy-initialized identity `VAxes3`. The matrix
+   * is latched on first call via a single-bit init guard so the constant is
+   * written only once regardless of call frequency.
+   */
+  template <>
+  const VAxes3& Identity<VAxes3>()
+  {
+    static bool sInitialized = false;
+    static VAxes3 sIdentity{};
+
+    if (!sInitialized) {
+      sInitialized = true;
+      sIdentity.vX = Wm3::Vector3f{1.0f, 0.0f, 0.0f};
+      sIdentity.vY = Wm3::Vector3f{0.0f, 1.0f, 0.0f};
+      sIdentity.vZ = Wm3::Vector3f{0.0f, 0.0f, 1.0f};
+    }
+
+    return sIdentity;
   }
 
   /**
@@ -971,6 +1129,66 @@ namespace moho
   }
 
   /**
+   * Address: 0x004ECBD0 (FUN_004ECBD0, Moho::VEC_LookAt)
+   *
+   * What it does:
+   * Builds one orthonormal basis from a reference up vector and a forward
+   * vector, normalizing forward first and falling back to the binary's
+   * alternate right-axis lane when the cross product collapses.
+   */
+  void VEC_LookAt(const Wm3::Vector3f& up, const Wm3::Vector3f& forwardInput, VAxes3* const axes)
+  {
+    const float forwardLengthSq =
+      (forwardInput.x * forwardInput.x) + (forwardInput.y * forwardInput.y) + (forwardInput.z * forwardInput.z);
+    if (!(forwardLengthSq > 0.0f)) {
+      return;
+    }
+
+    const float forwardLength = std::sqrtf(forwardLengthSq);
+    float forwardX = std::numeric_limits<float>::max();
+    float forwardY = std::numeric_limits<float>::max();
+    float forwardZ = std::numeric_limits<float>::max();
+    if (forwardLength != 0.0f) {
+      const float reciprocalForwardLength = 1.0f / forwardLength;
+      forwardX = forwardInput.x * reciprocalForwardLength;
+      forwardY = forwardInput.y * reciprocalForwardLength;
+      forwardZ = forwardInput.z * reciprocalForwardLength;
+    }
+
+    float rightX = (up.y * forwardZ) - (up.z * forwardY);
+    float rightY = (up.z * forwardX) - (up.x * forwardZ);
+    float rightZ = (up.x * forwardY) - (up.y * forwardX);
+    const float rightLengthSq = (rightX * rightX) + (rightY * rightY) + (rightZ * rightZ);
+    if (!(rightLengthSq > 0.0f)) {
+      // Match the binary fallback lane when the up vector is collinear with forward.
+      rightX = (forwardZ * forwardZ) - ((-0.0f - forwardX) * forwardY);
+      rightY = ((-0.0f - forwardX) * forwardX) - (forwardY * forwardZ);
+      rightZ = (forwardY * forwardY) - (forwardZ * forwardX);
+    }
+
+    const float rightLength = std::sqrtf((rightX * rightX) + (rightY * rightY) + (rightZ * rightZ));
+    float basisX = std::numeric_limits<float>::max();
+    float basisY = std::numeric_limits<float>::max();
+    float basisZ = std::numeric_limits<float>::max();
+    if (rightLength != 0.0f) {
+      const float reciprocalRightLength = 1.0f / rightLength;
+      basisX = rightX * reciprocalRightLength;
+      basisY = rightY * reciprocalRightLength;
+      basisZ = rightZ * reciprocalRightLength;
+    }
+
+    axes->vX.x = basisX;
+    axes->vX.y = basisY;
+    axes->vX.z = basisZ;
+    axes->vY.x = (basisZ * forwardY) - (basisY * forwardZ);
+    axes->vY.y = (forwardZ * basisX) - (basisZ * forwardX);
+    axes->vY.z = (basisY * forwardX) - (forwardY * basisX);
+    axes->vZ.x = forwardX;
+    axes->vZ.y = forwardY;
+    axes->vZ.z = forwardZ;
+  }
+
+  /**
    * Address: 0x004EC4E0 (FUN_004EC4E0, Moho::VAxes3Serializer::DeserializeThunk)
    */
   void DeserializeVAxes3SerializerThunk(
@@ -1497,6 +1715,21 @@ namespace
 } // namespace
 
 extern "C" int global_mode_sse2 = 1;
+extern "C" int global_compat_flag = 1;
+
+/**
+ * Address: 0x00A8ECD3 (FUN_00A8ECD3, func_SetSSE2)
+ *
+ * What it does:
+ * Enables/disables the SSE2 runtime lane by masking with the startup
+ * compatibility flag, then publishes and returns the resulting mode value.
+ */
+extern "C" int __cdecl RuntimeSetSse2Mode(const int enableSse2)
+{
+  const int mode = (enableSse2 != 0) ? global_compat_flag : 0;
+  global_mode_sse2 = mode;
+  return mode;
+}
 
 namespace
 {

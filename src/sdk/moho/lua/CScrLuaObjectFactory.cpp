@@ -82,16 +82,112 @@ namespace
     return convertible;
   }
 
-  template <typename TValue>
-  [[nodiscard]] const TValue* TryUpcastScalar(const gpg::RRef& source)
+  /**
+   * Address: 0x004D4C40 (FUN_004D4C40)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `float` and returns the typed pointee
+   * on success, otherwise null.
+   */
+  [[nodiscard]] const float* TryUpcastFloatScalar(const gpg::RRef& source)
   {
     static gpg::RType* sType = nullptr;
     if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(TValue));
+      sType = gpg::LookupRType(typeid(float));
     }
 
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, sType);
-    return upcast.mObj != nullptr ? static_cast<const TValue*>(upcast.mObj) : nullptr;
+    return upcast.mObj != nullptr ? static_cast<const float*>(upcast.mObj) : nullptr;
+  }
+
+  /**
+   * Address: 0x004D4C80 (FUN_004D4C80)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `int` and returns the typed pointee on
+   * success, otherwise null.
+   */
+  [[nodiscard]] const int* TryUpcastIntScalar(const gpg::RRef& source)
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(int));
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, sType);
+    return upcast.mObj != nullptr ? static_cast<const int*>(upcast.mObj) : nullptr;
+  }
+
+  /**
+   * Address: 0x004D4CC0 (FUN_004D4CC0, func_CastUint)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `unsigned int` and returns the typed
+   * pointee on success, otherwise null.
+   */
+  [[nodiscard]] const unsigned int* TryUpcastUnsignedIntScalar(const gpg::RRef& source)
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(unsigned int));
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, sType);
+    return upcast.mObj != nullptr ? static_cast<const unsigned int*>(upcast.mObj) : nullptr;
+  }
+
+  /**
+   * Address: 0x004D4D00 (FUN_004D4D00, func_CastChar)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `char` and returns the typed pointee on
+   * success, otherwise null.
+   */
+  [[nodiscard]] const char* TryUpcastCharScalar(const gpg::RRef& source)
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(char));
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, sType);
+    return upcast.mObj != nullptr ? static_cast<const char*>(upcast.mObj) : nullptr;
+  }
+
+  /**
+   * Address: 0x004D4D40 (FUN_004D4D40, func_CastUchar)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `unsigned char` and returns the typed
+   * pointee on success, otherwise null.
+   */
+  [[nodiscard]] const unsigned char* TryUpcastUnsignedCharScalar(const gpg::RRef& source)
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(unsigned char));
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, sType);
+    return upcast.mObj != nullptr ? static_cast<const unsigned char*>(upcast.mObj) : nullptr;
+  }
+
+  /**
+   * Address: 0x004D4D80 (FUN_004D4D80, func_CastBool)
+   *
+   * What it does:
+   * Upcasts one reflected reference to `bool` and returns the typed pointee on
+   * success, otherwise null.
+   */
+  [[nodiscard]] const bool* TryUpcastBoolScalar(const gpg::RRef& source)
+  {
+    static gpg::RType* sType = nullptr;
+    if (sType == nullptr) {
+      sType = gpg::LookupRType(typeid(bool));
+    }
+
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, sType);
+    return upcast.mObj != nullptr ? static_cast<const bool*>(upcast.mObj) : nullptr;
   }
 
   [[nodiscard]] LuaPlus::LuaObject MakeNilObject(LuaPlus::LuaState* const state)
@@ -351,6 +447,44 @@ namespace moho
   }
 
   /**
+   * Address: 0x004D2380 (FUN_004D2380, ?SCR_ExpectArgs@Moho@@YAXPAVLuaState@LuaPlus@@HHPBD@Z)
+   *
+   * What it does:
+   * Validates Lua argument count in `[minArgs, maxArgs]` (or `>= minArgs`
+   * when `maxArgs == -1`) and raises LuaState::Error with `helpText` on
+   * mismatch.
+   */
+  void SCR_ExpectArgs(
+    LuaPlus::LuaState* const state,
+    const int maxArgs,
+    const int minArgs,
+    const char* const helpText
+  )
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount < minArgs || (maxArgs != -1 && argumentCount > maxArgs)) {
+      if (maxArgs == -1) {
+        LuaPlus::LuaState::Error(
+          state,
+          "%s\n  expected at least %d args, but got %d",
+          helpText,
+          minArgs,
+          argumentCount
+        );
+      } else {
+        LuaPlus::LuaState::Error(
+          state,
+          "%s\n  expected between %d and %d args, but got %d",
+          helpText,
+          minArgs,
+          maxArgs,
+          argumentCount
+        );
+      }
+    }
+  }
+
+  /**
    * Address: 0x004D3250 (FUN_004D3250, ?SCR_Import@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@VStrArg@gpg@@@Z)
    *
    * What it does:
@@ -522,6 +656,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x004D31D0 (FUN_004D31D0, ?SCR_ToBool@Moho@@YA_NABVLuaObject@LuaPlus@@@Z)
+   *
+   * What it does:
+   * Converts one Lua object to bool using Moho script semantics:
+   * numeric non-zero is true; case-insensitive string `"true"`, `"on"`, or
+   * `"yes"` is true; every other value is false.
+   */
+  bool SCR_ToBool(const LuaPlus::LuaObject& object)
+  {
+    if (object.IsNumber()) {
+      return object.GetInteger() != 0;
+    }
+
+    if (object.IsString()) {
+      const char* const valueTrue = object.GetString();
+      if (_stricmp(valueTrue, "true") == 0) {
+        return true;
+      }
+
+      const char* const valueOn = object.GetString();
+      if (_stricmp(valueOn, "on") == 0) {
+        return true;
+      }
+
+      const char* const valueYes = object.GetString();
+      if (_stricmp(valueYes, "yes") == 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Address: 0x004CF0B0 (FUN_004CF0B0, ?SCR_RObjectToLuaMerge@Moho@@YAXABVRRef@gpg@@AAVLuaObject@LuaPlus@@@Z)
    *
    * What it does:
@@ -536,32 +704,32 @@ namespace moho
       return;
     }
 
-    if (const float* const value = TryUpcastScalar<float>(source); value != nullptr) {
+    if (const float* const value = TryUpcastFloatScalar(source); value != nullptr) {
       destination.AssignNumber(state, *value);
       return;
     }
 
-    if (const int* const value = TryUpcastScalar<int>(source); value != nullptr) {
+    if (const int* const value = TryUpcastIntScalar(source); value != nullptr) {
       destination.AssignNumber(state, static_cast<double>(*value));
       return;
     }
 
-    if (const unsigned int* const value = TryUpcastScalar<unsigned int>(source); value != nullptr) {
+    if (const unsigned int* const value = TryUpcastUnsignedIntScalar(source); value != nullptr) {
       destination.AssignNumber(state, static_cast<double>(*value));
       return;
     }
 
-    if (const signed char* const value = TryUpcastScalar<signed char>(source); value != nullptr) {
+    if (const char* const value = TryUpcastCharScalar(source); value != nullptr) {
       destination.AssignNumber(state, static_cast<double>(*value));
       return;
     }
 
-    if (const unsigned char* const value = TryUpcastScalar<unsigned char>(source); value != nullptr) {
+    if (const unsigned char* const value = TryUpcastUnsignedCharScalar(source); value != nullptr) {
       destination.AssignNumber(state, static_cast<double>(*value));
       return;
     }
 
-    if (const bool* const value = TryUpcastScalar<bool>(source); value != nullptr) {
+    if (const bool* const value = TryUpcastBoolScalar(source); value != nullptr) {
       destination.AssignBoolean(state, *value);
       return;
     }

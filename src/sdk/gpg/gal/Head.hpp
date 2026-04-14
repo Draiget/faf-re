@@ -63,10 +63,13 @@ namespace gpg::gal
         Head(const Head& other);
 
         /**
+         * Address: 0x008E6EA0 (FUN_008E6EA0, gpg::gal::Head::~Head)
          * Address: 0x00436990 (FUN_00436990)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk for gal::Head instances.
+         * Tears down `Head` vector/string payload lanes; `0x00436990` is the
+         * scalar-deleting thunk that dispatches here and conditionally frees
+         * `this`.
          */
         virtual ~Head();
 
@@ -80,7 +83,7 @@ namespace gpg::gal
         std::uint32_t framesPerSecond = 0;                   // +0x18
         std::uint32_t antialiasingHigh = 0;                  // +0x1C
         std::uint32_t antialiasingLow = 0;                   // +0x20
-        msvc8::string unknownString0x24_{};                  // +0x24
+        msvc8::string name{};                                // +0x24
         msvc8::vector<HeadSampleOption> mStrs{};             // +0x40
         msvc8::vector<HeadAdapterMode> adapterModes{};       // +0x50
         msvc8::vector<std::int32_t> validFormats2{};         // +0x60
@@ -95,7 +98,7 @@ namespace gpg::gal
     static_assert(offsetof(Head, framesPerSecond) == 0x18, "Head::framesPerSecond offset must be 0x18");
     static_assert(offsetof(Head, antialiasingHigh) == 0x1C, "Head::antialiasingHigh offset must be 0x1C");
     static_assert(offsetof(Head, antialiasingLow) == 0x20, "Head::antialiasingLow offset must be 0x20");
-    static_assert(offsetof(Head, unknownString0x24_) == 0x24, "Head::unknownString0x24_ offset must be 0x24");
+    static_assert(offsetof(Head, name) == 0x24, "Head::name offset must be 0x24");
     static_assert(offsetof(Head, mStrs) == 0x40, "Head::mStrs offset must be 0x40");
     static_assert(offsetof(Head, adapterModes) == 0x50, "Head::adapterModes offset must be 0x50");
     static_assert(offsetof(Head, validFormats2) == 0x60, "Head::validFormats2 offset must be 0x60");

@@ -38,6 +38,31 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00676BA0 (FUN_00676BA0, ??0CTextureScroller@Moho@@QAE@@Z)
+     *
+     * Moho::Entity *
+     *
+     * IDA signature:
+     * Moho::CTextureScroller * __usercall
+     *   Moho::CTextureScroller::CTextureScroller@<eax>(
+     *     Moho::CTextureScroller *this@<eax>, Moho::Entity *owner@<ecx>);
+     *
+     * What it does:
+     * Binds one owning entity pointer and seeds one default "none" scroller
+     * payload with zero direction/speed lanes.
+     */
+    explicit CTextureScroller(Entity* owner);
+
+    /**
+     * Address: 0x00777730 (FUN_00777730, Moho::CTextureScroller::Tick)
+     *
+     * What it does:
+     * Advances one texture-scroll lane according to configured mode:
+     * ping-pong stepping, manual UV drift, or motion-derived UV projection.
+     */
+    void Tick();
+
+    /**
      * Address: 0x00778470 (FUN_00778470, Moho::CTextureScroller::MemberDeserialize)
      *
      * What it does:

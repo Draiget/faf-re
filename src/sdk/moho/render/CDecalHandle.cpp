@@ -12,15 +12,6 @@ namespace moho
 {
   namespace
   {
-    [[nodiscard]] LuaPlus::LuaObject CreateCDecalHandleFactoryObject(LuaPlus::LuaState* const state)
-    {
-      if (state == nullptr) {
-        return LuaPlus::LuaObject{};
-      }
-
-      return CScrLuaMetatableFactory<CDecalHandle>::Instance().Get(state);
-    }
-
     [[nodiscard]] gpg::RType* CachedCScriptObjectType()
     {
       gpg::RType* type = CScriptObject::sType;
@@ -114,12 +105,7 @@ namespace moho
     const SDecalInfo& info,
     const std::uint32_t createdAtTick
   )
-    : CScriptObject(
-        CreateCDecalHandleFactoryObject(state),
-        LuaPlus::LuaObject{},
-        LuaPlus::LuaObject{},
-        LuaPlus::LuaObject{}
-      )
+    : CScriptObject()
     , mListNode()
     , mInfo(info)
     , mArmyVisibilityFlags(0)
@@ -127,6 +113,13 @@ namespace moho
     , mPadD1{0, 0, 0}
     , mCreatedAtTick(createdAtTick)
   {
+    LuaPlus::LuaObject arg3{};
+    LuaPlus::LuaObject arg2{};
+    LuaPlus::LuaObject arg1{};
+    LuaPlus::LuaObject scriptFactory{};
+    (void)func_CreateCDecalHandleObject(&scriptFactory, state);
+    CreateLuaObject(scriptFactory, arg1, arg2, arg3);
+
     ++InstanceCounter<CDecalHandle>::s_count;
     mInfo.mObj = objectId;
   }

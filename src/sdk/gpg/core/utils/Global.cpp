@@ -1112,7 +1112,14 @@ void gpg::HandleAssertFailure(const char* msg, int line, const char* file)
     InvokeDieHandler(STR_Printf("Failed assertion: %s\nFile: %s\nLine: %d", msg, file, line).c_str());
 }
 
-// 0x00938FE0
+/**
+ * Address: 0x00938FE0 (FUN_00938FE0, gpg::SetDieHandler)
+ * Mangled: ?SetDieHandler@gpg@@YAP6AXPBD@ZP6AX0@Z@Z
+ *
+ * What it does:
+ * Installs one process-global fatal-error callback and returns the previous
+ * callback pointer.
+ */
 gpg::die_handler_t gpg::SetDieHandler(gpg::die_handler_t handler)
 {
     const die_handler_t old = dieHandler;
@@ -1120,7 +1127,13 @@ gpg::die_handler_t gpg::SetDieHandler(gpg::die_handler_t handler)
     return old;
 }
 
-// 0x00938FF0
+/**
+ * Address: 0x00938FF0 (FUN_00938FF0, gpg::InvokeDieHandler)
+ * Mangled: ?InvokeDieHandler@gpg@@YAXPBD@Z
+ *
+ * What it does:
+ * Invokes the active die handler callback when one is currently installed.
+ */
 void gpg::InvokeDieHandler(const char* msg)
 {
     if (dieHandler != nullptr) {
@@ -1415,71 +1428,48 @@ void gpg::GetHeapInfo(HeapStats* const outStats)
 
 bool gpg::ParseNum(const char* start, const char* end, int* dest) noexcept
 {
-    if (!start || !end || start >= end || !dest) {
-        return false;
-    }
-
-    bool neg = false;
+    std::uint8_t isNegative = 0u;
     if (*start == '-') {
-        neg = true;
+        isNegative = 1u;
         ++start;
-        if (start >= end) {
-            return false;
-        }
-    }
-
-    int base = 10;
-    if (*start == '0') {
-        if ((start + 1) < end && (start[1] == 'x' || start[1] == 'X')) {
-            base = 16;
-            start += 2;
-            if (start >= end) {
-                return false;
-            }
-        } else {
-            base = 8;
-            ++start;
-            if (start > end) {
-                return false;
-            }
-            if (start == end) {
-                *dest = 0;
-                return true;
-            }
-            if (*start < '0' || *start > '7') {
-                return false;
-            }
-        }
     }
 
     int value = 0;
-    const char* p = start;
-
-    while (p < end && *p != '\0') {
-        const unsigned char c = static_cast<unsigned char>(*p);
-        int digit = 0;
-
-        if (c >= '0' && c <= '9') {
-            digit = c - '0';
+    int base = 10;
+    if (*start == '0') {
+        if (start[1] == 'x') {
+            base = 16;
+            start += 2;
         } else {
-            const unsigned char lc = static_cast<unsigned char>(c | 0x20);
-            if (lc < 'a' || lc > 'z') {
+            base = 8;
+        }
+    }
+
+    char current = *start;
+    do {
+        int digit = 0;
+        if (static_cast<unsigned char>(current - '0') <= 9u) {
+            digit = static_cast<int>(current) - '0';
+        } else {
+            if (static_cast<unsigned char>(current - 'a') > 0x19u
+                && static_cast<unsigned char>(current - 'A') != 0u) {
                 return false;
             }
-            digit = 10 + (lc - 'a');
+            digit = static_cast<int>(current) - 'W';
         }
 
         if (digit >= base) {
             return false;
         }
 
-        value = value * base + digit;
-        ++p;
-    }
+        value = (value * base) + digit;
+        current = *++start;
+    } while (current != '\0' && start != end);
 
-    if (neg) {
+    if (isNegative != 0u) {
         value = -value;
     }
+
     *dest = value;
     return true;
 }

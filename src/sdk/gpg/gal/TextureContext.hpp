@@ -25,6 +25,24 @@ namespace gpg::gal
     TextureContext();
 
     /**
+     * Address: 0x008E7A40 (FUN_008E7A40, gpg::gal::TextureContext::Copy)
+     *
+     * What it does:
+     * Copy-constructs one texture-context payload, cloning the location string
+     * lane and incrementing shared-data ownership.
+     */
+    TextureContext(const TextureContext& other);
+
+    /**
+     * Address: 0x008E7D60 (FUN_008E7D60, ??0TextureContext@gal@gpg@@QAE@PBDIHH@Z)
+     *
+     * What it does:
+     * Initializes archive-backed texture source metadata from one location
+     * string plus explicit format and dimensions.
+     */
+    TextureContext(const char* location, std::uint32_t format, std::uint32_t width, std::uint32_t height);
+
+    /**
      * Address: 0x00903B60 (FUN_00903B60)
      *
      * What it does:

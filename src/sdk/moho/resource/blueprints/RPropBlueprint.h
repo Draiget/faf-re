@@ -64,6 +64,16 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0051D250 (FUN_0051D250, ??0RPropBlueprint@Moho@@QAE@@Z)
+     * Mangled: ??0RPropBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Runs base entity-blueprint construction and seeds prop display/defense/
+     * economy defaults.
+     */
+    RPropBlueprint();
+
+    /**
      * Address: 0x0051D210 (FUN_0051D210)
      * Mangled: ?GetClass@RPropBlueprint@Moho@@UBEPAVRType@gpg@@XZ
      *

@@ -46,6 +46,7 @@ namespace
   constexpr const char* kRootStatName = "Root";
   constexpr const char* kBeginLoggingStatsLuaHelpText = "Begin logging stats";
   constexpr const char* kEndLoggingStatsLuaHelpText = "EndLoggingStats(bool exit) - End logging stats and optionally exit app";
+  char gCTimeStampStringBuffer[32]{};
 
   moho::EStatTypeTypeInfo gEStatTypeTypeInfo;
   moho::EPulseModeTypeInfo gEPulseModeTypeInfo;
@@ -872,28 +873,6 @@ namespace
   }
 
   /**
-   * Address: 0x004E9CF0 (FUN_004E9CF0, Moho::CTimeStamp::GetString)
-   *
-   * What it does:
-   * Builds one ctime-style timestamp string and strips trailing newline.
-   */
-  [[nodiscard]] msvc8::string BuildCurrentTimestampString()
-  {
-    const __time64_t now = _time64(nullptr);
-    char timestampBuffer[32]{};
-    if (_ctime64_s(timestampBuffer, sizeof(timestampBuffer), &now) != 0) {
-      return {};
-    }
-
-    msvc8::string timestamp(timestampBuffer);
-    const std::size_t newlinePos = timestamp.find('\n');
-    if (newlinePos != msvc8::string::npos) {
-      timestamp.erase(newlinePos, 1u);
-    }
-    return timestamp;
-  }
-
-  /**
    * Address: 0x00415A50..0x00415B98 (FUN_00415660 local formatting pass)
    *
    * What it does:
@@ -952,6 +931,77 @@ namespace moho
   static StatItem* sPrintStatsDeepStuff = nullptr;
   static StatItem* sPrintStatsBoogersSquirt = nullptr;
   static StatItem* sPrintStatsDouble = nullptr;
+
+  /**
+   * Address: 0x004E9C50 (FUN_004E9C50, ??0CTimeStamp@Moho@@QAE@XZ)
+   * Mangled: ??0CTimeStamp@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Captures one wall-clock timestamp via CRT `time64`/`ftime64` lanes and
+   * stores second + millisecond components.
+   */
+  CTimeStamp::CTimeStamp() noexcept
+  {
+    time = static_cast<std::int64_t>(_time64(nullptr));
+
+    __timeb64 currentTime{};
+    _ftime64(&currentTime);
+    millis = static_cast<std::uint16_t>(currentTime.millitm);
+    ftime = static_cast<std::int64_t>(currentTime.time);
+  }
+
+  /**
+   * Address: 0x004E9C90 (FUN_004E9C90, ?GetInfo@CTimeStamp@Moho@@QBE_NAAUSInfo@12@_N@Z)
+   * Mangled: ?GetInfo@CTimeStamp@Moho@@QBE_NAAUSInfo@12@_N@Z
+   *
+   * What it does:
+   * Converts this timestamp into one local-calendar field bundle for
+   * YYYY-MM-DD.HH-MM style formatting and weekday/yearday metadata.
+   */
+  bool CTimeStamp::GetInfo(
+    SInfo& outInfo,
+    const bool useFineTime
+  ) const noexcept
+  {
+    const __time64_t* const selectedTime =
+      useFineTime ? reinterpret_cast<const __time64_t*>(&ftime) : reinterpret_cast<const __time64_t*>(&time);
+    const std::tm* const localTime = _localtime64(selectedTime);
+    if (localTime == nullptr) {
+      return false;
+    }
+
+    outInfo.year = static_cast<std::uint16_t>(localTime->tm_year + 1900);
+    outInfo.month = static_cast<std::uint8_t>(localTime->tm_mon + 1);
+    outInfo.day = static_cast<std::uint8_t>(localTime->tm_mday);
+    outInfo.hour = static_cast<std::uint8_t>(localTime->tm_hour);
+    outInfo.minute = static_cast<std::uint8_t>(localTime->tm_min);
+    outInfo.second = static_cast<std::uint8_t>(localTime->tm_sec);
+    outInfo.weekDay = static_cast<std::uint8_t>(localTime->tm_wday);
+    outInfo.yearDay = static_cast<std::uint16_t>(localTime->tm_yday);
+    return true;
+  }
+
+  /**
+   * Address: 0x004E9CF0 (FUN_004E9CF0, ?GetString@CTimeStamp@Moho@@QBEPBDXZ)
+   * Mangled: ?GetString@CTimeStamp@Moho@@QBEPBDXZ
+   *
+   * What it does:
+   * Formats this timestamp with CRT `ctime64`, copies into one process-global
+   * text buffer, strips trailing newline, and returns buffer pointer.
+   */
+  const char* CTimeStamp::GetString() const noexcept
+  {
+    const char* const source = _ctime64(reinterpret_cast<const __time64_t*>(&time));
+    if (source == nullptr) {
+      return nullptr;
+    }
+
+    std::strcpy(gCTimeStampStringBuffer, source);
+    if (char* const newline = std::strchr(gCTimeStampStringBuffer, '\n'); newline != nullptr) {
+      *newline = '\0';
+    }
+    return gCTimeStampStringBuffer;
+  }
 
   /**
    * Address: 0x0040AB20 (FUN_0040AB20, sub_40AB20)
@@ -1224,27 +1274,23 @@ namespace moho
    */
   msvc8::string LOG_GenerateFilenamePrefix()
   {
-    const __time64_t now = _time64(nullptr);
+    CTimeStamp timestamp{};
+    timestamp.time = static_cast<std::int64_t>(_time64(nullptr));
 
-    __timeb64 currentTime{};
-    currentTime.time = now;
-    currentTime.millitm = 0;
-    (void)_ftime64_s(&currentTime);
+    __timeb64 coarseTime{};
+    _ftime64(&coarseTime);
+    timestamp.millis = static_cast<std::uint16_t>(coarseTime.millitm);
+    timestamp.ftime = static_cast<std::int64_t>(coarseTime.time);
 
-    std::tm localTime{};
-    __time64_t wallClockSeconds = currentTime.time;
-    if (_localtime64_s(&localTime, &wallClockSeconds) != 0) {
-      wallClockSeconds = now;
-      (void)_localtime64_s(&localTime, &wallClockSeconds);
-    }
-
+    CTimeStamp::SInfo timeInfo{};
+    (void)timestamp.GetInfo(timeInfo, false);
     return gpg::STR_Printf(
       "%4d-%02d-%02d.%02d-%02d",
-      localTime.tm_year + 1900,
-      localTime.tm_mon + 1,
-      localTime.tm_mday,
-      localTime.tm_hour,
-      localTime.tm_min
+      timeInfo.year,
+      timeInfo.month,
+      timeInfo.day,
+      timeInfo.hour,
+      timeInfo.minute
     );
   }
 
@@ -1270,8 +1316,9 @@ namespace moho
     writer.WriteCString("Stats Log Report \n\n");
     writer.Printf("Logged frames          : %d\n", mLogFrameCount);
 
-    const msvc8::string timestampText = BuildCurrentTimestampString();
-    writer.Printf("Timestamp              : %s\n\n", timestampText.c_str());
+    const CTimeStamp timestamp{};
+    const char* const timestampText = timestamp.GetString();
+    writer.Printf("Timestamp              : %s\n\n", timestampText != nullptr ? timestampText : "");
 
     StatItem* const simSyncItem = GetEngineStats()->GetItem("Sim_Sync", false);
     StatItem* const simDispatchItem = GetEngineStats()->GetItem("Sim_Dispatch", false);
@@ -2183,6 +2230,57 @@ namespace moho
   }
 
   /**
+   * Address: 0x00751370 (FUN_00751370, Moho::StatItem::SetInt)
+   *
+   * What it does:
+   * Atomically replaces the primary numeric lane with `*value` (or `0` when
+   * `value == nullptr`) and returns the previous integer bits.
+   */
+  std::int32_t StatItem::SetInt(const std::int32_t* const value)
+  {
+    return AtomicStoreSlotFromPtr(&mPrimaryValueBits, value);
+  }
+
+  /**
+   * Address: 0x00585870 (FUN_00585870, Moho::StatItem::AddFloat)
+   *
+   * What it does:
+   * Atomically adds one float delta to the primary numeric lane by repeatedly
+   * CAS-ing the stored float bit pattern until the exchange succeeds.
+   */
+  std::int32_t StatItem::AddFloat(float* const delta)
+  {
+    volatile std::int32_t* const pCounter = &mPrimaryValueBits;
+#if defined(_WIN32)
+    do {
+      const std::int32_t observedBits = ReadAtomicI32(pCounter);
+      const float currentValue = AsFloatBits(observedBits);
+      const float nextValue = currentValue + *delta;
+      std::int32_t nextBits = 0;
+      std::memcpy(&nextBits, &nextValue, sizeof(nextBits));
+      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
+        reinterpret_cast<volatile long*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
+      ));
+      if (exchanged == observedBits) {
+        return exchanged;
+      }
+    } while (true);
+#else
+    for (;;) {
+      const std::int32_t observedBits = *pCounter;
+      const float currentValue = AsFloatBits(observedBits);
+      const float nextValue = currentValue + *delta;
+      std::int32_t nextBits = 0;
+      std::memcpy(&nextBits, &nextValue, sizeof(nextBits));
+      if (*pCounter == observedBits) {
+        *pCounter = nextBits;
+        return observedBits;
+      }
+    }
+#endif
+  }
+
+  /**
    * Address: 0x00436650 (FUN_00436650, Moho::StatItem::Synchronize)
    *
    * What it does:
@@ -2606,4 +2704,3 @@ namespace
 
   StatItemSerializerBootstrap gStatItemSerializerBootstrap;
 } // namespace
-

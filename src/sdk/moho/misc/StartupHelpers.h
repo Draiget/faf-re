@@ -164,6 +164,16 @@ namespace moho
   [[nodiscard]] std::int32_t OPTIONS_GetInt(gpg::StrArg key);
 
   /**
+   * Address: 0x008C69A0 (FUN_008C69A0)
+   * Mangled: ?OPTIONS_GetFloat@Moho@@YAMVStrArg@gpg@@@Z
+   *
+   * What it does:
+   * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the value as one
+   * floating-point lane.
+   */
+  [[nodiscard]] float OPTIONS_GetFloat(gpg::StrArg key);
+
+  /**
    * Address: 0x008C6AB0
    * Mangled:
    * ?OPTIONS_GetString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z

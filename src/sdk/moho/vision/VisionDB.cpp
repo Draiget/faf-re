@@ -6,6 +6,14 @@ using namespace moho;
 
 namespace
 {
+  /**
+   * Address: 0x006610E0 (FUN_006610E0, nullsub_3)
+   *
+   * What it does:
+   * Preserves one legacy list-node callback lane used by VisionDB pool setup/teardown.
+   */
+  void VisionDbPoolNoOpListCallback(void* /*self*/) {}
+
   template <class Entry>
   void ClearRingAndDeleteHead(Entry*& head, std::uint32_t& count) noexcept
   {
@@ -135,6 +143,13 @@ namespace
     entry->mNext = nullptr;
   }
 
+  /**
+   * Address: 0x0081B310 (FUN_0081B310, Moho::VisionDB::Entry::PutInChain)
+   *
+   * What it does:
+   * Descends into the deepest containing child for `entry` and links it into
+   * that owner's contained-chain.
+   */
   void EntryPutInChain(VisionDB::Pool::PooledNode* entry, VisionDB::Pool::PooledNode* root) noexcept
   {
     if (entry == nullptr || root == nullptr) {
@@ -195,6 +210,7 @@ VisionDB::Pool::Pool()
  */
 void VisionDB::Pool::Clear()
 {
+  VisionDbPoolNoOpListCallback(this);
   FreeZoneBlocks(mEntriesHead);
 
   ClearRingAndDeleteHead(mEntryPoolHead, mEntryPoolSize);
@@ -223,6 +239,8 @@ VisionDB::Pool::~Pool()
 VisionDB::Pool::Entry*
 VisionDB::Pool::NewEntry(const EntryCircle& previousCircle, const EntryCircle& currentCircle, const bool isReal)
 {
+  VisionDbPoolNoOpListCallback(this);
+
   if (mEntryPoolSize == 0) {
     constexpr std::uint32_t kEntryBlockCount = 500;
     const std::size_t blockBytes = sizeof(std::uint32_t) + sizeof(Entry) * kEntryBlockCount;

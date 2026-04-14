@@ -73,6 +73,28 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008D1D00 (FUN_008D1D00, func_CpyDeviceContext)
+     *
+     * What it does:
+     * Copies one device-context payload and returns the destination context.
+     */
+    DeviceContext& DeviceContext::operator=(const DeviceContext& other)
+    {
+        mDeviceType = other.mDeviceType;
+        mValidate = other.mValidate;
+        mAdapter = other.mAdapter;
+        mVSync = other.mVSync;
+        mHWBasedInstancing = other.mHWBasedInstancing;
+        mSupportsFloat16 = other.mSupportsFloat16;
+        mVertexShaderProfile = other.mVertexShaderProfile;
+        mPixelShaderProfile = other.mPixelShaderProfile;
+        mMaxPrimitiveCount = other.mMaxPrimitiveCount;
+        mMaxVertexCount = other.mMaxVertexCount;
+        mHeads = other.mHeads;
+        return *this;
+    }
+
+    /**
      * Address: 0x008E6730 (FUN_008E6730)
      *
      * What it does:
@@ -104,6 +126,8 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008E6700 (FUN_008E6700, func_DeivceD3DDtr)
+     *
      * What it does:
      * Runs slot-0 destroy behavior for the active backend device and clears
      * the retained singleton pointer.

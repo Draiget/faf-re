@@ -27,6 +27,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/CUnitCommandWeakPtrReflection.h"
+#include "moho/unit/ECommandEvent.h"
 #include "moho/unit/core/UnitWeakPtrReflection.h"
 #include "moho/unit/core/Unit.h"
 
@@ -681,6 +682,20 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
 }
 
 /**
+ * Address: 0x006E7D10 (FUN_006E7D10, Moho::CUnitCommand::GetDerivedObjectRef)
+ *
+ * What it does:
+ * Packs `{this, GetClass()}` as a reflection reference handle.
+ */
+gpg::RRef CUnitCommand::GetDerivedObjectRef()
+{
+  gpg::RRef ref{};
+  ref.mObj = this;
+  ref.mType = StaticGetClass();
+  return ref;
+}
+
+/**
  * Address: 0x006E7D40 (FUN_006E7D40, ?GetCoordinateWith@CUnitCommand@Moho@@QBE?AV?$vector@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@V?$allocator@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@@std@@@std@@XZ)
  *
  * What it does:
@@ -991,6 +1006,44 @@ Unit* CUnitCommand::GetTarget(CUnitCommand* const command)
 }
 
 /**
+ * Address: 0x005F24E0 (FUN_005F24E0, Moho::CUnitCommand::IsCoordinating)
+ *
+ * What it does:
+ * Returns true when this command has at least one coordinating-order link.
+ */
+bool CUnitCommand::IsCoordinating() const
+{
+  return !mCoordinatingOrders.empty();
+}
+
+/**
+ * Address: 0x006E90A0 (FUN_006E90A0, Moho::CUnitCommand::IsDone)
+ *
+ * What it does:
+ * Returns true when this command's done flag is set and all resolved
+ * coordinating-order peers are done as well.
+ */
+bool CUnitCommand::IsDone() const
+{
+  if (mCoordinatingOrders.empty()) {
+    return true;
+  }
+
+  if (!mUnknownFlag154) {
+    return false;
+  }
+
+  for (const WeakPtr<CUnitCommand>& commandRef : mCoordinatingOrders) {
+    CUnitCommand* const command = commandRef.GetObjectPtr();
+    if (command != nullptr && !command->mUnknownFlag154) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Address: 0x006E8A00 (FUN_006E8A00, Moho::CUnitCommand::InFormation)
  *
  * What it does:
@@ -1144,11 +1197,18 @@ void CUnitCommand::DecreaseCount(const int amount)
   mNeedsUpdate = true;
 }
 
-// 0x006E8820
+/**
+ * Address: 0x006E8820 (FUN_006E8820, Moho::CUnitCommand::SetTarget)
+ *
+ * What it does:
+ * Replaces command target payload, republishes serialized target data, emits
+ * one command-event broadcast, and marks command state dirty.
+ */
 void CUnitCommand::SetTarget(const CAiTarget& target)
 {
   mTarget = target;
   mTarget.EncodeToSSTITarget(mVarDat.mTarget1);
+  BroadcastEvent(static_cast<ECommandEvent>(0));
   mNeedsUpdate = true;
 }
 

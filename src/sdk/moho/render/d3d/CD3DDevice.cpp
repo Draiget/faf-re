@@ -17,6 +17,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Head.hpp"
+#include "gpg/gal/MeshFormatter.h"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/backends/d3d9/CubeRenderTargetD3D9.hpp"
@@ -63,6 +64,7 @@ namespace
   float sDeltaFrame = 0.0f;
   float sWeightedFrameRate = 0.0f;
   std::int32_t sCurGameTick = 0;
+  gpg::gal::MeshFormatter* sCurHardwareVertexFormatter = nullptr;
 
   [[nodiscard]] std::int32_t FloatToBits(const float value) noexcept
   {
@@ -714,7 +716,7 @@ namespace
       ResetCursorContextAfterDeviceDestroy(runtime->mCursorContext);
 
       if (device != nullptr) {
-        device->DestroyBackendObject();
+        gpg::gal::Device::DestroyInstance();
       }
     }
 
@@ -1873,6 +1875,27 @@ namespace moho
   }
 
   /**
+   * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
+   *
+   * What it does:
+   * Pulls the active GAL device singleton and forwards one texture-create
+   * request into its virtual `CreateTexture` lane.
+   */
+  boost::shared_ptr<gpg::gal::TextureD3D9>& CreateTextureOnActiveDevice(
+    boost::shared_ptr<gpg::gal::TextureD3D9>& outTexture,
+    const gpg::gal::TextureContext& context
+  )
+  {
+    outTexture.reset();
+    if (gpg::gal::Device* const device = gpg::gal::Device::GetInstance(); device != nullptr) {
+      if (auto* const d3d9Device = dynamic_cast<gpg::gal::DeviceD3D9*>(device); d3d9Device != nullptr) {
+        (void)d3d9Device->CreateTexture(&outTexture, &context);
+      }
+    }
+    return outTexture;
+  }
+
+  /**
    * Address: 0x004305F0 (FUN_004305F0, ?REN_Init@Moho@@YAXXZ)
    *
    * What it does:
@@ -1989,5 +2012,26 @@ namespace moho
       }
     }
     PublishFloatStat(sEngineStatFrameFps, frameFps);
+  }
+
+  float REN_GetSimDeltaSeconds()
+  {
+    return sDeltaFrame;
+  }
+
+  int REN_GetGameTick()
+  {
+    return sCurGameTick;
+  }
+
+  /**
+   * Address: 0x008E7540 (FUN_008E7540, func_ResetHarwareVertexFormatter)
+   *
+   * What it does:
+   * Clears the current hardware-vertex formatter cache pointer.
+   */
+  void REN_ResetHardwareVertexFormatter() noexcept
+  {
+    sCurHardwareVertexFormatter = nullptr;
   }
 } // namespace moho

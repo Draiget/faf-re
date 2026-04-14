@@ -5,6 +5,7 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/math/Vector3f.h"
 #include "moho/resource/SScmFile.h"
 #include "moho/serialization/PrefetchHandleBase.h"
 
@@ -12,17 +13,6 @@
 
 namespace
 {
-  [[nodiscard]] std::size_t LargestAxisByAbsoluteComponent(const float values[3]) noexcept
-  {
-    const bool yDominatesX = std::fabs(values[1]) > std::fabs(values[0]);
-    const std::size_t dominantAxis = yDominatesX ? 1u : 0u;
-    if (std::fabs(values[2]) <= std::fabs(values[dominantAxis])) {
-      return dominantAxis;
-    }
-
-    return 2u;
-  }
-
   struct RScmResourcePrefetchBootstrap
   {
     RScmResourcePrefetchBootstrap()
@@ -80,13 +70,14 @@ namespace moho
       }
     }
 
-    float axisExtents[3]{};
-    axisExtents[0] = mBounds.Max.x - mBounds.Min.x;
-    axisExtents[1] = mBounds.Max.y - mBounds.Min.y;
-    axisExtents[2] = mBounds.Max.z - mBounds.Min.z;
+    Wm3::Vector3f axisExtents{};
+    axisExtents.x = mBounds.Max.x - mBounds.Min.x;
+    axisExtents.y = mBounds.Max.y - mBounds.Min.y;
+    axisExtents.z = mBounds.Max.z - mBounds.Min.z;
 
-    const std::size_t dominantAxis = LargestAxisByAbsoluteComponent(axisExtents);
-    mSize = axisExtents[dominantAxis] * 1.2f;
+    const int dominantAxis = VEC_LargestAxis(axisExtents);
+    const float* const extentLanes = &axisExtents.x;
+    mSize = extentLanes[dominantAxis] * 1.2f;
   }
 
   /**

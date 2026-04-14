@@ -6,6 +6,7 @@
 #include <exception>
 #include <new>
 
+#include "boost/function.hpp"
 #include "moho/app/WxAppRuntime.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -73,6 +74,47 @@ namespace
   bool IsZeroDigest(const gpg::MD5Digest& digest)
   {
     return digest.vals[0] == 0 && digest.vals[1] == 0 && digest.vals[2] == 0 && digest.vals[3] == 0;
+  }
+
+  [[nodiscard]] boost::function<void()> BuildCallLaterCallback(
+    void (*fn)(CSimDriver*),
+    CSimDriver* driver
+  );
+
+  /**
+   * Address: 0x00741810 (FUN_00741810, func_call_later)
+   *
+   * What it does:
+   * Builds one deferred driver callback object and seeds it by forwarding to
+   * `BuildCallLaterCallback`.
+   */
+  [[nodiscard]] boost::function<void()> BuildDeferredDriverCallback(
+    void (*fn)(CSimDriver*),
+    CSimDriver* const driver
+  )
+  {
+    boost::function<void()> callback{};
+    callback = BuildCallLaterCallback(fn, driver);
+    return callback;
+  }
+
+  /**
+   * Address: 0x00741D70 (FUN_00741D70, func_call_later_0)
+   *
+   * What it does:
+   * Builds one deferred callback lane that will invoke `fn(driver)` when the
+   * created `boost::thread` runs.
+   */
+  [[nodiscard]] boost::function<void()> BuildCallLaterCallback(
+    void (*fn)(CSimDriver*),
+    CSimDriver* const driver
+  )
+  {
+    if (fn == nullptr || driver == nullptr) {
+      return {};
+    }
+
+    return [fn, driver]() { fn(driver); };
   }
 } // namespace
 
@@ -231,17 +273,18 @@ CSimDriver::CSimDriver(
 
   // 0x0073D260 creates the simulation bootstrap thread. The full function
   // still depends on additional lifted classes; for now we preserve state flow.
-  mCreateSimThread = new boost::thread([this]() {
-    boost::mutex::scoped_lock lock(DriverMutexRef(mLock));
-    if (mStopCreateSimThread) {
-      mState = EDriverState::Stopped;
-      mStateChanged.notify_all();
+  const auto createSimBootstrapProc = [](CSimDriver* const driver) {
+    boost::mutex::scoped_lock lock(DriverMutexRef(driver->mLock));
+    if (driver->mStopCreateSimThread) {
+      driver->mState = EDriverState::Stopped;
+      driver->mStateChanged.notify_all();
       return;
     }
 
-    mState = EDriverState::Ready;
-    mStateChanged.notify_all();
-  });
+    driver->mState = EDriverState::Ready;
+    driver->mStateChanged.notify_all();
+  };
+  mCreateSimThread = new boost::thread(BuildDeferredDriverCallback(createSimBootstrapProc, this));
 }
 
 /**
@@ -612,6 +655,7 @@ void CSimDriver::ShutDown()
   if (mSim) {
     // The original shutdown path calls Sim::Shutdown() and then performs one
     // final sync transfer before deleting the object.
+    mSim->Shutdown();
     delete mSim;
     mSim = nullptr;
   }

@@ -2688,6 +2688,33 @@ namespace gpg::gal
       error->message_.tidy(true, 0U);
       error->runtimeMessage_.tidy(true, 0U);
     }
+
+    /**
+     * Address: 0x00437850 (FUN_00437850)
+     *
+     * What it does:
+     * Applies legacy `_Tidy(true, 0)` teardown to one contiguous
+     * `HeadSampleOption` label-string range.
+     */
+    void DestroyHeadSampleOptionRange(HeadSampleOption* begin, HeadSampleOption* const end) noexcept
+    {
+      for (; begin != end; ++begin) {
+        begin->label.tidy(true, 0U);
+      }
+    }
+
+    template <class T>
+    void ReleaseVectorStorage(msvc8::vector<T>& vector) noexcept
+    {
+      msvc8::vector_runtime_view<T>& runtime = msvc8::AsVectorRuntimeView(vector);
+      if (runtime.begin != nullptr) {
+        ::operator delete(static_cast<void*>(runtime.begin));
+      }
+
+      runtime.begin = nullptr;
+      runtime.end = nullptr;
+      runtime.capacityEnd = nullptr;
+    }
   } // namespace
 
   /**
@@ -2766,7 +2793,22 @@ namespace gpg::gal
   DrawIndexedContext::~DrawIndexedContext() = default;
 
   /**
-   * Address: 0x0093EEC0 (FUN_0093EEC0)
+   * Address: 0x0093EEA0 (FUN_0093EEA0, __imp_??0CursorContext@gal@gpg@@QAE@XZ)
+   *
+   * What it does:
+   * Initializes cursor hotspot/pixel-source/control lanes to zero/null.
+   */
+  CursorContext::CursorContext()
+    : hotspotX_(0)
+    , hotspotY_(0)
+    , pixelSource_(nullptr)
+    , cursorControl_(nullptr)
+  {
+  }
+
+  /**
+   * Address: 0x0093EE60 (FUN_0093EE60, __imp_??1CursorContext@gal@gpg@@UAE@XZ)
+   * Scalar-deleting wrapper: 0x0093EEC0 (FUN_0093EEC0)
    *
    * What it does:
    * Releases the retained cursor-control shared-count block before object teardown.
@@ -2893,10 +2935,30 @@ namespace gpg::gal
   Head::Head() = default;
 
   /**
+   * Address: 0x008E6EA0 (FUN_008E6EA0, gpg::gal::Head::~Head)
    * Address: 0x00436990 (FUN_00436990)
    *
    * What it does:
-   * Scalar-deleting destructor thunk owner for gal::Head instances.
+   * Tears down all retained `Head` vector/string payload lanes in-place;
+   * `0x00436990` is the scalar-deleting thunk that dispatches here and
+   * conditionally frees `this`.
    */
-  Head::~Head() = default;
+  Head::~Head()
+  {
+    ReleaseVectorStorage(validFormats1);
+    ReleaseVectorStorage(validFormats2);
+    ReleaseVectorStorage(adapterModes);
+
+    msvc8::vector_runtime_view<HeadSampleOption>& sampleOptionsRuntime = msvc8::AsVectorRuntimeView(mStrs);
+    if (sampleOptionsRuntime.begin != nullptr) {
+      DestroyHeadSampleOptionRange(sampleOptionsRuntime.begin, sampleOptionsRuntime.end);
+      ::operator delete(static_cast<void*>(sampleOptionsRuntime.begin));
+    }
+
+    sampleOptionsRuntime.begin = nullptr;
+    sampleOptionsRuntime.end = nullptr;
+    sampleOptionsRuntime.capacityEnd = nullptr;
+
+    name.tidy(true, 0U);
+  }
 } // namespace gpg::gal

@@ -841,7 +841,7 @@ namespace
     moho::BeamRenderVertexRuntime** const outInsertPosition,
     moho::BeamRenderVertexRuntime* const appendPosition,
     const moho::BeamRenderVertexRuntime* const sourceVertex
-  ) noexcept
+  )
   {
     constexpr std::size_t kBeamRenderVertexMaxCount = 71582788U;
 

@@ -190,6 +190,33 @@ namespace moho
     [[nodiscard]] CArmyStatItem* GetStat(const char* statPath);
 
     /**
+     * Address: 0x005945E0 (FUN_005945E0, Moho::CArmyStats::GetItem)
+     *
+     * What it does:
+     * Resolves one army-stat item by path from the name-index cache and
+     * creates/caches missing items through token-table traversal.
+     */
+    [[nodiscard]] CArmyStatItem* GetItem(const char* statPath);
+
+    /**
+     * Address: 0x00593260 (FUN_00593260, func_UpdateUnitStat)
+     *
+     * What it does:
+     * Resolves one stat item by path, coerces it to integer type, and applies
+     * one atomic add to the integer counter lane.
+     */
+    [[nodiscard]] std::int32_t UpdateUnitStat(const char* statPath, const std::int32_t* delta);
+
+    /**
+     * Address: 0x005932C0 (FUN_005932C0, sub_5932C0)
+     *
+     * What it does:
+     * Sets one integer stat counter to `*candidate` only when the candidate is
+     * greater than the current value, using an atomic compare-exchange loop.
+     */
+    [[nodiscard]] std::int32_t SetUnitStatGreaterOf(const char* statPath, const std::int32_t* candidate);
+
+    /**
      * Address: 0x0070BAB0 (FUN_0070BAB0, Moho::CArmyStats::GetTrigger)
      *
      * What it does:

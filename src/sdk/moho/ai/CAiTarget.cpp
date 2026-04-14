@@ -13,6 +13,7 @@
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/EImpactTypeTypeInfo.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
@@ -360,6 +361,44 @@ bool CAiTarget::HasTarget() const
 }
 
 /**
+ * Address: 0x005E2D40 (FUN_005E2D40, Moho::CAiTarget::HasSameTargetEntity)
+ *
+ * What it does:
+ * Returns true when this target and `other` both resolve to the same
+ * non-sentinel entity target lane.
+ */
+bool CAiTarget::HasSameTargetEntity(const CAiTarget& other) const
+{
+  Entity* const thisEntity = targetEntity.GetObjectPtr();
+  if (thisEntity == nullptr) {
+    return false;
+  }
+
+  if (!other.targetEntity.HasValue()) {
+    return false;
+  }
+
+  return other.targetEntity.GetObjectPtr() == thisEntity;
+}
+
+/**
+ * Address: 0x005E2DB0 (FUN_005E2DB0, Moho::CAiTarget::NoTarget)
+ *
+ * What it does:
+ * Returns true when this target has a non-sentinel weak-owner slot and either
+ * no resolved entity or a resolved dead entity.
+ */
+bool CAiTarget::NoTarget() const
+{
+  if (!targetEntity.HasValue()) {
+    return false;
+  }
+
+  Entity* const entity = GetEntity();
+  return entity == nullptr || entity->Dead != 0u;
+}
+
+/**
  * Address: 0x005E2A90 (FUN_005E2A90, Moho::CAiTarget::GetTargetPosGun)
  *
  * What it does:
@@ -420,6 +459,42 @@ Entity* CAiTarget::GetEntity() const
   }
 
   return entity;
+}
+
+/**
+ * Address: 0x0062A900 (FUN_0062A900, Moho::CAiTarget::ImpactDidHitEntity)
+ *
+ * What it does:
+ * Confirms one impact lane against this target:
+ * - entity targets only accept projectile-or-later impacts against either the
+ *   exact target entity or the impact entity's attached parent,
+ * - ground targets only accept terrain/water/air/underwater impacts with no
+ *   entity hit payload,
+ * - all other target types pass through unchanged.
+ */
+bool CAiTarget::ImpactDidHitEntity(Entity* const entity, const EImpactType impactType)
+{
+  if (targetType == EAiTargetType::AITARGET_Entity) {
+    if (entity == nullptr || impactType < EImpactType::IMPACT_Projectile) {
+      return false;
+    }
+
+    if (entity != GetEntity()) {
+      const Entity* const attachedParent = entity->mAttachInfo.GetAttachTargetEntity();
+      if (attachedParent != GetEntity()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (targetType != EAiTargetType::AITARGET_Ground) {
+    return true;
+  }
+
+  const std::int32_t impactOrdinal = static_cast<std::int32_t>(impactType);
+  return entity == nullptr && static_cast<std::uint32_t>(impactOrdinal - 1) <= 3u;
 }
 
 /**

@@ -306,6 +306,16 @@ namespace moho
     Wm3::AxisAlignedBox3f GetTierBox(std::int32_t x, std::int32_t z, std::int32_t tier) const;
 
     /**
+     * Address: 0x00577660 (FUN_00577660, Moho::CHeightField::GetBounds3D)
+     *
+     * What it does:
+     * Computes the current tier count from `mGrids` and returns
+     * `GetTierBox(0, 0, tierCount)`.
+     */
+    [[nodiscard]]
+    Wm3::AxisAlignedBox3f GetBounds3D() const;
+
+    /**
      * Address: 0x00478280 (FUN_00478280, Moho::CHeightField::ConvexIntersection)
      *
      * Moho::CGeomSolid3 const&
@@ -726,6 +736,15 @@ namespace moho
     float GetTerrainTypeOffset(float x, float z) const;
 
     /**
+     * Address: 0x0069A6F0 (FUN_0069A6F0, ?GetTerrainNormal@STIMap@Moho@@QBE?AV?$Vector3@M@Wm3@@MM@Z)
+     *
+     * What it does:
+     * Forwards terrain-normal sampling to the height-field normal helper.
+     */
+    [[nodiscard]]
+    Wm3::Vec3f GetTerrainNormal(float x, float z) const;
+
+    /**
      * Address: 0x00577B60 (FUN_00577B60)
      *
      * IDA signature:
@@ -754,6 +773,31 @@ namespace moho
     Wm3::Vec3f SurfaceIntersection(const GeomLine3& line, CColHitResult* res) const;
 
     /**
+     * Address: 0x005ADC20 (FUN_005ADC20)
+     *
+     * Wm3::Vector3<float> const &
+     *
+     * What it does:
+     * Returns whether terrain elevation at `position` is above the active
+     * water plane (or above `-10000.0f` when water is disabled).
+     */
+    [[nodiscard]]
+    bool AboveWater(const Wm3::Vec3f& position) const;
+
+    /**
+     * Address: 0x0086DA60 (FUN_0086DA60)
+     * Mangled: ?IsPlayable@STIMap@Moho@@QBE_NABV?$Vector3@M@Wm3@@@Z
+     *
+     * Wm3::Vector3<float> const &
+     *
+     * What it does:
+     * Truncates world-space `x/z` to ints and checks they lie inside
+     * `mPlayableRect` using `[min,max)` bounds.
+     */
+    [[nodiscard]]
+    bool IsPlayable(const Wm3::Vec3f& position) const;
+
+    /**
      * Address: 0x00541A30 (FUN_00541A30), 0x1012F3B0 (FUN_1012F3B0)
      *
      * Wm3::Vector3<float> const &
@@ -765,6 +809,16 @@ namespace moho
     float GetSurface(const Wm3::Vec3f& position) const;
 
     /**
+     * Address: 0x0062D620 (FUN_0062D620, Moho::STIMap::LookAheadForMaxTerrain)
+     *
+     * What it does:
+     * Samples terrain elevation ahead of air movement using tiered min/max
+     * bounds for long lookahead distances, then applies water-floor rules.
+     */
+    [[nodiscard]]
+    float LookAheadForMaxTerrain(const Wm3::Vec3f& position, bool flyInWater, float lookahead) const;
+
+    /**
      * Address: 0x0062CA60 (FUN_0062CA60, Moho::STIMap::IsWithin)
      *
      * What it does:
@@ -774,7 +828,25 @@ namespace moho
     [[nodiscard]]
     bool IsWithin(const Wm3::Vec3f& position, float border, bool wholeMap) const;
 
+    /**
+     * Address: 0x007F7B00 (FUN_007F7B00, Moho::STIMap::GetHeightField)
+     *
+     * What it does:
+     * Copies this map's shared height-field ownership lane into
+     * `outHeightField`.
+     */
+    void GetHeightField(boost::shared_ptr<CHeightField>& outHeightField) const;
+
     [[nodiscard]] CHeightField* GetHeightField() const noexcept;
+    /**
+     * Address: 0x006BC400 (FUN_006BC400, ?GetElevation@CHeightField@Moho@@QBEMHH@Z)
+     *
+     * What it does:
+     * Clamps one cell coordinate pair to the heightfield extents, returns
+     * scaled terrain elevation, and applies map water-floor clamping when
+     * water is enabled.
+     */
+    [[nodiscard]] float GetElevation(std::int32_t x, std::int32_t z) const;
     [[nodiscard]] bool IsWaterEnabled() const noexcept;
     [[nodiscard]] float GetWaterElevation() const noexcept;
 

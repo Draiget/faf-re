@@ -30,7 +30,72 @@ namespace lua
      */
     lua_Error(lua_State* lua_state, int errcode, const char* err);
 
+    /**
+     * Address: 0x009132A0 (FUN_009132A0, lua_RuntimeError::dtr)
+     *
+     * What it does:
+     * Destroys one Lua runtime-error payload by delegating to the
+     * `std::runtime_error` destruction lane.
+     */
+    ~lua_Error() override;
+
     lua_State* L;   // originating lua state
     int code;       // numeric lua error code (e.g. LUA_ERRMEM, LUA_ERRRUN)
   };
+
+  static_assert(sizeof(lua_Error) == 0x30, "lua::lua_Error size must be 0x30");
 } // namespace lua
+
+/**
+ * VFTABLE: `lua_MemError::`vftable''
+ *
+ * Specialized Lua memory-allocation exception lane used by `luaM_realloc`
+ * throw paths.
+ */
+class lua_MemError : public lua::lua_Error
+{
+public:
+  /**
+   * Address: 0x0091A1F0 (FUN_0091A1F0)
+   * Mangled: lua_MemError::dtr
+   *
+   * What it does:
+   * Destroys one `lua_MemError` object and releases exception storage through
+   * the usual C++ virtual-destruction path.
+  */
+  ~lua_MemError() override;
+};
+
+static_assert(sizeof(lua_MemError) == 0x30, "lua_MemError size must be 0x30");
+
+/**
+ * VFTABLE: `lua_SyntaxError::`vftable''
+ *
+ * Syntax-error exception lane used by Lua parser and compile-time error
+ * recovery paths.
+ */
+class lua_SyntaxError : public lua::lua_Error
+{
+public:
+  /**
+   * Address: 0x00919900 (FUN_00919900)
+   * Mangled: ??0lua_SyntaxError@@QAE@@Z
+   *
+   * What it does:
+   * Copies an existing Lua error payload into a syntax-error exception object
+   * and installs the derived vtable.
+   */
+  lua_SyntaxError(const lua::lua_Error& error);
+
+  /**
+   * Address: 0x009188A0 (FUN_009188A0)
+   * Mangled: lua_SyntaxError::dtr
+   *
+   * What it does:
+   * Destroys one `lua_SyntaxError` object and releases exception storage
+   * through the normal scalar-deleting destructor path.
+   */
+  ~lua_SyntaxError() override;
+};
+
+static_assert(sizeof(lua_SyntaxError) == 0x30, "lua_SyntaxError size must be 0x30");

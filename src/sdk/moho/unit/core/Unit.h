@@ -43,6 +43,7 @@ namespace moho
 {
   class CUnitCommand;
   class CUnitCommandQueue;
+  class CUnitAssistMoveTask;
   class CUnitMotion;
   class CAniActor;
   class CFormationInstance;
@@ -73,6 +74,14 @@ namespace moho
    * due to map bounds or occupancy-cap fit checks.
    */
   [[nodiscard]] bool UnitWontFitAt(const Wm3::Vec3f& worldPosition, const Unit* unit);
+
+  /**
+   * Address: 0x0067F080 (FUN_0067F080, func_GetUnitFactory)
+   *
+   * What it does:
+   * Returns cached `Unit` metatable object from Lua object-factory storage.
+   */
+  LuaPlus::LuaObject* func_GetUnitFactory(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
   struct SBeatResourceAccumulators
   {
@@ -369,6 +378,15 @@ namespace moho
   struct UnitWeaponInfo
   {
     /**
+     * Address: 0x0055B6E0 (FUN_0055B6E0, ??0UnitWeaponInfo@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes category-set lanes to inline empty state and seeds default
+     * layer/radius/UI range-id values.
+     */
+    UnitWeaponInfo();
+
+    /**
      * Address: 0x0055D170 (FUN_0055D170, ??1UnitWeaponInfo@Moho@@QAE@@Z)
      *
      * What it does:
@@ -532,6 +550,30 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x006A4920 (FUN_006A4920, Moho::Unit::StaticGetClass)
+     *
+     * What it does:
+     * Returns cached reflection descriptor for `Unit`.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x006A4940 (FUN_006A4940, Moho::Unit::GetClass)
+     *
+     * What it does:
+     * Returns cached reflection descriptor for `Unit`.
+     */
+    [[nodiscard]] gpg::RType* GetClass() const override;
+
+    /**
+     * Address: 0x006A4960 (FUN_006A4960, Moho::Unit::GetDerivedObjectRef)
+     *
+     * What it does:
+     * Packs `{this, GetClass()}` as a reflection reference handle.
+     */
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
+
+    /**
      * Address: 0x006AD3C0 (FUN_006AD3C0, Moho::Unit::MemberConstruct)
      *
      * What it does:
@@ -560,6 +602,24 @@ namespace moho
      * Serializes runtime `Unit` state lanes for the given archive version.
      */
     static void MemberSerialize(gpg::WriteArchive* archive, Unit* unit, int version);
+
+    /**
+     * Address: 0x006AD5D0 (FUN_006AD5D0, ?SerEconomyEvents@Unit@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Reads tracked owned economy-event pointers until a null terminator and
+     * re-links each loaded event node into this unit's economy-event list.
+     */
+    void SerEconomyEvents(gpg::ReadArchive& archive, int version);
+
+    /**
+     * Address: 0x006AD540 (FUN_006AD540, ?SerEconomyEvents@Unit@Moho@@ABEXAAVWriteArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Serializes unit-owned economy-event pointer lanes as tracked owned
+     * pointers, then writes a null terminator pointer lane.
+     */
+    void SerEconomyEvents(gpg::WriteArchive& archive, int version) const;
 
     /**
      * Address: 0x006A4BC0 (FUN_006A4BC0)
@@ -662,6 +722,71 @@ namespace moho
     virtual bool IsBeingBuilt() const;
 
     /**
+     * Address: 0x006A4BD0 (FUN_006A4BD0, Moho::Unit::GetUniformScale)
+     *
+     * What it does:
+     * Returns display uniform scale from the unit blueprint lane.
+     */
+    float GetUniformScale() const override;
+
+    /**
+     * Address: 0x006A9C90 (FUN_006A9C90, Moho::Unit::GetVelocity)
+     *
+     * What it does:
+     * Returns motion velocity when a unit-motion lane is active on non-air
+     * layers; otherwise computes per-tick position delta scaled by
+     * `mVelocityScale`.
+     */
+    Wm3::Vec3f GetVelocity() const override;
+
+    /**
+     * Address: 0x006A9350 (FUN_006A9350, Moho::Unit::AdjustHealth)
+     *
+     * What it does:
+     * Forwards unit health adjustments to the shared `Entity` health mutation
+     * path.
+     */
+    void AdjustHealth(Entity* instigator, float delta) override;
+
+    /**
+     * Address: 0x006A9A40 (FUN_006A9A40, Moho::Unit::HandleTerranEffects)
+     *
+     * What it does:
+     * Applies periodic terrain-driven health effects (`HealthEffectPerSecond`)
+     * from terrain-type Lua data and kills the unit when health drops to zero.
+     */
+    void HandleTerranEffects();
+
+    /**
+     * Address: 0x006ABC30 (FUN_006ABC30, Moho::Unit::UpdateVisibility)
+     *
+     * What it does:
+     * Recomputes base entity visibility lanes, then keeps unit visibility
+     * enabled only for the focused army or when no army is focused.
+     */
+    void UpdateVisibility() override;
+
+    /**
+     * Address: 0x006AB410 (FUN_006AB410, ?AttachTo@Unit@Moho@@UAE_NABUSEntAttachInfo@2@@Z)
+     *
+     * What it does:
+     * Forwards to `Entity::AttachTo`, then (for mobile units) notifies unit
+     * motion and sets the attached-state bit; finally invalidates transport
+     * load-factor cache.
+     */
+    bool AttachTo(const SEntAttachInfo& attachInfo) override;
+
+    /**
+     * Address: 0x006AB480 (FUN_006AB480, ?DetachFrom@Unit@Moho@@UAE_NPAVEntity@2@_N@Z)
+     *
+     * What it does:
+     * Forwards to `Entity::DetachFrom`, then (for mobile units) notifies unit
+     * motion and clears the attached-state bit; finally invalidates transport
+     * load-factor cache and unlinks the transport weak-pointer chain.
+     */
+    bool DetachFrom(Entity* parent, bool skipBallistic) override;
+
+    /**
      * Address: 0x0062CD40 (FUN_0062CD40, Moho::Unit::PredictAheadBomb)
      *
      * What it does:
@@ -669,6 +794,15 @@ namespace moho
      * velocity with impulse-derived roll and integrating over `precision*10`.
      */
     Wm3::Vec3f* PredictAheadBomb(Wm3::Vec3f* out, float precision) const;
+
+    /**
+     * Address: 0x006D3A40 (FUN_006D3A40, Moho::Unit::CalcBombDrop)
+     *
+     * What it does:
+     * Scales current velocity by ten ticks and solves one ballistic drop-point
+     * lane against the target position using sim gravity.
+     */
+    Wm3::Vec3f* CalcBombDrop(Wm3::Vec3f* out, const Wm3::Vec3f& targetPosition) const;
 
     /**
      * Address: 0x006A7B90 (FUN_006A7B90, ?InitializeArmor@Unit@Moho@@AAEXXZ)
@@ -703,6 +837,15 @@ namespace moho
      * reports busy.
      */
     [[nodiscard]] bool IsBusy() const;
+
+    /**
+     * Address: 0x005F0E80 (FUN_005F0E80, Moho::Unit::NeedsPickup)
+     *
+     * What it does:
+     * Estimates whether assisting `task->mUnit` should switch to pickup by
+     * comparing this unit's goal ETA against assisted-unit interception ETA.
+     */
+    [[nodiscard]] bool NeedsPickup(const CUnitAssistMoveTask* task) const;
 
     /**
      * Address: 0x006A7D60 (FUN_006A7D60, ?IsIdleState@Unit@Moho@@QBE_NXZ)
@@ -859,6 +1002,40 @@ namespace moho
     void GetExtraData(SExtraUnitData* out) const;
 
     /**
+     * Address: 0x00603F10 (FUN_00603F10, Moho::Unit::DecrementCapturers)
+     *
+     * What it does:
+     * Decrements the non-negative captor reference count at `CaptorCount`
+     * (+0x690), clamped at zero. Called by `CUnitCaptureTask::DoCallback`
+     * when one capture task releases its claim on this unit. Returns the
+     * post-decrement count (or unchanged zero).
+     */
+    std::int32_t DecrementCapturers();
+
+    /**
+     * Address: 0x006A7640 (FUN_006A7640, Moho::Unit::SetFocusEntity)
+     * Mangled: ?SetFocusEntity@Unit@Moho@@QAEXPAVEntity@2@@Z
+     *
+     * What it does:
+     * Rebinds this unit's focus-entity weak reference (+0x4D0), fires the
+     * `OnAssignedFocusEntity` Lua script when the new target is a live
+     * (non-sentinel) entity, and marks the unit dirty for sync replication.
+     * Called from `CUnitUpgradeTask::TaskTick`,
+     * `CUnitMeleeAttackTargetTask::TaskTick`, and
+     * `CUnitReclaimTask::TaskTick`.
+     */
+    void SetFocusEntity(Entity* focusEntity);
+
+    /**
+     * Address: 0x006A7680 (FUN_006A7680, ?SetTargetBlipEntity@Unit@Moho@@QAEXPAVEntity@2@@Z)
+     *
+     * What it does:
+     * Rebinds this unit's target-blip weak-reference lane and marks unit sync
+     * state dirty.
+     */
+    void SetTargetBlipEntity(Entity* blipEntity);
+
+    /**
      * Address: 0x006A73F0 (FUN_006A73F0)
      *
      * What it does:
@@ -885,6 +1062,23 @@ namespace moho
      * through the owning unit blueprint.
      */
     [[nodiscard]] gpg::Rect2f GetSkirtRect() const;
+
+    /**
+     * Address: 0x006A75C0 (FUN_006A75C0, ?GetMaxFootprintSize@Unit@Moho@@QBEHXZ)
+     *
+     * What it does:
+     * Returns `max(GetFootprint().mSizeX, GetFootprint().mSizeZ)`.
+     */
+    [[nodiscard]] int GetMaxFootprintSize() const;
+
+    /**
+     * Address: 0x0062CC40 (FUN_0062CC40, Moho::Unit::IsAtPosition)
+     *
+     * What it does:
+     * Compares this unit's footprint-aligned grid anchor against one candidate
+     * world position using the same half-footprint cell projection.
+     */
+    [[nodiscard]] bool IsAtPosition(const Wm3::Vec3f& position) const;
 
     /**
      * Address: 0x006AA900 (FUN_006AA900, ?SetConsumptionActive@Unit@Moho@@QAEX_N@Z)
@@ -985,6 +1179,33 @@ namespace moho
     [[nodiscard]] Wm3::Vec3f GetTargetPoint(std::int32_t targetPoint) const;
 
     /**
+     * Address: 0x006AA5C0 (FUN_006AA5C0, ?GetBoneWorldTransform@Unit@Moho@@UBE?AVVTransform@2@H@Z)
+     *
+     * What it does:
+     * Resolves one unit bone world transform from animation-pose composite
+     * lanes, with fallback to unit transform + center-height anchor for `-1`.
+     */
+    [[nodiscard]] VTransform GetBoneWorldTransform(int boneIndex) const override;
+
+    /**
+     * Address: 0x006AA440 (FUN_006AA440, ?GetBoneLocalTransform@Unit@Moho@@UBE?AVVTransform@2@H@Z)
+     *
+     * What it does:
+     * Resolves one unit bone local transform from animation pose composite
+     * lanes, with `-1` fallback to blueprint center-height anchor.
+     */
+    [[nodiscard]] VTransform GetBoneLocalTransform(int boneIndex) const override;
+
+    /**
+     * Address: 0x006ABB90 (FUN_006ABB90, ?SetPoses@Unit@Moho@@QAEXABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
+     *
+     * What it does:
+     * Copies prior/current shared animation poses into variable-data lanes and
+     * mirrors them into `AniActor::{mPose,mPriorPose}`.
+     */
+    void SetPoses(const boost::shared_ptr<CAniPose>& priorSharedPose, const boost::shared_ptr<CAniPose>& sharedPose);
+
+    /**
      * Address: 0x006A9E50 (FUN_006A9E50, ?CanBuild@Unit@Moho@@QBE_NPBVRUnitBlueprint@2@@Z)
      *
      * What it does:
@@ -993,6 +1214,16 @@ namespace moho
      */
     [[nodiscard]]
     bool CanBuild(const RUnitBlueprint* blueprint) const;
+
+    /**
+     * Address: 0x0062D780 (FUN_0062D780, Moho::Unit::CanStartBuilding)
+     *
+     * What it does:
+     * Checks whether this unit's army economy can start a build lane given
+     * requested energy/mass startup costs.
+     */
+    [[nodiscard]]
+    bool CanStartBuilding(float energyCost, float massCost) const;
 
     /**
      * Address: 0x0059A430 (FUN_0059A430, ?GetGuardedUnit@Unit@Moho@@QBEPAV12@XZ)
@@ -1042,6 +1273,16 @@ namespace moho
     Unit* GetTransportedBy() const;
 
     /**
+     * Address: 0x006A8890 (FUN_006A8890, Moho::Unit::GetTransportFerryBeacon)
+     *
+     * What it does:
+     * Returns ferry-beacon unit ownership from the current head command when
+     * the command lane carries a valid beacon weak reference.
+     */
+    [[nodiscard]]
+    Unit* GetTransportFerryBeacon() const;
+
+    /**
      * Address: 0x005F5540 (FUN_005F5540, Moho::Unit::GetCreator)
      *
      * What it does:
@@ -1049,6 +1290,45 @@ namespace moho
      */
     [[nodiscard]]
     Unit* GetCreator() const;
+
+    /**
+     * Address: 0x0062D2B0 (FUN_0062D2B0, Moho::Unit::OverlapsWith)
+     *
+     * What it does:
+     * Returns true when this unit skirt rectangle overlaps `other` using the
+     * original 1.0f edge-contact tolerance checks.
+     */
+    [[nodiscard]]
+    bool OverlapsWith(Unit* other) const;
+
+    /**
+     * Address: 0x006A9810 (FUN_006A9810, Moho::Unit::UpdateInfoCache)
+     *
+     * What it does:
+     * Refreshes formation-cache lanes and recomputes cached top speed for this
+     * mobile unit.
+     */
+    void UpdateInfoCache();
+
+    /**
+     * Address: 0x006A8C20 (FUN_006A8C20, Moho::Unit::GetFormationVector)
+     *
+     * What it does:
+     * Resolves one unit movement vector from formation runtime lanes, with
+     * air-leader fallback to leader forward heading when applicable.
+     */
+    [[nodiscard]]
+    Wm3::Vector3f GetFormationVector() const;
+
+    /**
+     * Address: 0x006A9720 (FUN_006A9720, Moho::Unit::GetFormation)
+     *
+     * What it does:
+     * Resolves active formation ownership either from guarded-unit formation
+     * lane or from the current command queue head command.
+     */
+    [[nodiscard]]
+    IFormationInstance* GetFormation() const;
 
     /**
      * Address: 0x006A8D40 (FUN_006A8D40, Moho::Unit::IsSameFormationLayerWith)
@@ -1129,6 +1409,15 @@ namespace moho
      */
     void ExecuteOccupyGround();
 
+    /**
+     * Address: 0x006A7AB0 (FUN_006A7AB0, Moho::Unit::ReleaseOccupyGround)
+     *
+     * What it does:
+     * Mirrors `ExecuteOccupyGround` by clearing the footprint occupancy lane
+     * from the O-grid and resetting the unit's occupied-ground flag.
+     */
+    void ReleaseOccupyGround();
+
   public:
     [[nodiscard]] bool NeedsKillCleanup() const noexcept;
     void ClearBeatResourceAccumulators() noexcept;
@@ -1203,7 +1492,8 @@ namespace moho
     CAiSiloBuildImpl* AiSiloBuild;                   // 0x0558
     IAiTransport* AiTransport;                       // 0x055C
     bool FootprintDown;                              // 0x0560
-    char pad_0561[0x07];                             // 0x0561
+    char pad_0561[0x03];                             // 0x0561
+    float TransportLoadFactor;                       // 0x0564
     SArmorMultiplierMap ArmorMultipliers;            // 0x0568
     TDatListItem<void, void> mEconomyEventListHead;  // 0x0574
     std::uint8_t CurrentTerrainType;                 // 0x057C
@@ -1260,6 +1550,9 @@ namespace moho
     offsetof(Unit, ReservedOgridRectMaxZ) == 0x05B4, "Unit::ReservedOgridRectMaxZ offset must be 0x05B4"
   );
   static_assert(offsetof(Unit, ArmorMultipliers) == 0x0568, "Unit::ArmorMultipliers offset must be 0x0568");
+  static_assert(
+    offsetof(Unit, TransportLoadFactor) == 0x0564, "Unit::TransportLoadFactor offset must be 0x0564"
+  );
   static_assert(offsetof(Unit, mEconomyEventListHead) == 0x0574, "Unit::mEconomyEventListHead offset must be 0x0574");
   static_assert(offsetof(Unit, mReconBlips) == 0x0670, "Unit::mReconBlips offset must be 0x0670");
   static_assert(offsetof(Unit, GuardFormation) == 0x0520, "Unit::GuardFormation offset must be 0x0520");

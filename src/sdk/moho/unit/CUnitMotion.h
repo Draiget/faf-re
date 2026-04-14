@@ -24,6 +24,7 @@ namespace moho
   class CAiTarget;
   class Entity;
   struct SEntAttachInfo;
+  struct SPhysBody;
   enum ELayer : std::int32_t;
   enum EUnitMotionVertEvent : std::int32_t
   {
@@ -51,6 +52,16 @@ namespace moho
   public:
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x006B78E0 (FUN_006B78E0, Moho::CUnitMotion::CUnitMotion)
+     * Mangled: ??0CUnitMotion@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Initializes default motion lanes, identity transforms, and raised-platform
+     * weak-pointer runtime vector storage.
+     */
+    CUnitMotion();
 
     /**
      * Address: 0x006B8320 (FUN_006B8320, Moho::CUnitMotion::~CUnitMotion)
@@ -403,6 +414,15 @@ namespace moho
       float& wingOri
     );
 
+    /**
+     * Address: 0x006BE480 (FUN_006BE480, ?CalcHoverOrientation@CUnitMotion@Moho@@AAEXABUSPhysBody@2@ABV?$Vector3@M@Wm3@@AAVVAxes3@2@@Z)
+     *
+     * What it does:
+     * Computes hover up/forward control axes from velocity delta, gravity,
+     * elevation ratio, and hover-bank blueprint lanes.
+     */
+    void CalcHoverOrientation(const SPhysBody& body, const Wm3::Vector3f& referenceVector, VAxes3& outAxes);
+
   public:
     Unit* mUnit;                    // +0x00
     CPathPoint* mNextWaypoint;      // +0x04
@@ -443,7 +463,7 @@ namespace moho
     std::int32_t mUnknownA8;              // +0xA8
     std::int32_t mPreparationTick;        // +0xAC
     std::int32_t mStateWordB0;            // +0xB0
-    Wm3::Vector3f mVectorB4;              // +0xB4
+    Wm3::Vector3f mPreviousVelocity;      // +0xB4
     Wm3::Vector3f mVectorC0;              // +0xC0
     Wm3::Vector3f mRecoilImpulse;         // +0xCC
     Wm3::Vector3f mVectorD8;              // +0xD8
@@ -501,6 +521,9 @@ namespace moho
     offsetof(CUnitMotion, mPreparationTick) == 0xAC, "CUnitMotion::mPreparationTick offset must be 0xAC"
   );
   static_assert(offsetof(CUnitMotion, mStateWordB0) == 0xB0, "CUnitMotion::mStateWordB0 offset must be 0xB0");
+  static_assert(
+    offsetof(CUnitMotion, mPreviousVelocity) == 0xB4, "CUnitMotion::mPreviousVelocity offset must be 0xB4"
+  );
   static_assert(
     offsetof(CUnitMotion, mRaisedPlatformUnit) == 0x114, "CUnitMotion::mRaisedPlatformUnit offset must be 0x114"
   );

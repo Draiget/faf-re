@@ -98,15 +98,6 @@ namespace
     delete static_cast<CAiSteeringImpl*>(object);
   }
 
-  [[nodiscard]] gpg::RRef ConstructAiSteeringImplRefInPlace(void* objectStorage)
-  {
-    auto* const steering = static_cast<CAiSteeringImpl*>(objectStorage);
-    if (steering) {
-      new (steering) CAiSteeringImpl();
-    }
-    return MakeTypedRef(steering, CachedCAiSteeringImplType());
-  }
-
   void DestroyAiSteeringImplInPlace(void* object)
   {
     auto* const steering = static_cast<CAiSteeringImpl*>(object);
@@ -198,13 +189,29 @@ void CAiSteeringImplTypeInfo::Init()
 {
   size_ = sizeof(CAiSteeringImpl);
   newRefFunc_ = &CreateAiSteeringImplRefOwned;
-  ctorRefFunc_ = &ConstructAiSteeringImplRefInPlace;
+  ctorRefFunc_ = &CAiSteeringImplTypeInfo::CtrRef;
   deleteFunc_ = &DeleteAiSteeringImplOwned;
   dtrFunc_ = &DestroyAiSteeringImplInPlace;
   gpg::RType::Init();
   AddIAiSteeringBase(this);
   AddCTaskBase(this);
   Finish();
+}
+
+/**
+ * Address: 0x005D4310 (FUN_005D4310, Moho::CAiSteeringImplTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Placement-constructs one `CAiSteeringImpl` in caller storage and returns a
+ * typed reflection reference.
+ */
+gpg::RRef CAiSteeringImplTypeInfo::CtrRef(void* const objectStorage)
+{
+  auto* const steering = static_cast<CAiSteeringImpl*>(objectStorage);
+  if (steering) {
+    new (steering) CAiSteeringImpl();
+  }
+  return MakeTypedRef(steering, CachedCAiSteeringImplType());
 }
 
 /**

@@ -5123,16 +5123,6 @@ namespace
     return tableObject;
   }
 
-  void SaveMapDataBestEffort(
-    gpg::WriteArchive* archive, gpg::Rect2i* playableRect1, gpg::Rect2i* playableRect2, const gpg::RRef& ownerRef
-  )
-  {
-    // 0x00745020 serializes map playable rectangles and cached tile rect list.
-    // Current reconstruction keeps the two known Rect2 slots.
-    SaveObjectByRType(archive, playableRect1, {"Rect2<int>", "gpg::Rect2<int>"}, ownerRef);
-    SaveObjectByRType(archive, playableRect2, {"Rect2<int>", "gpg::Rect2<int>"}, ownerRef);
-  }
-
   struct Rect2iVectorRuntimeView
   {
     void* allocatorProxy;
@@ -5658,6 +5648,44 @@ extern "C"
 gpg::Rect2i* Rect2CopyRange(const gpg::Rect2i* first, const gpg::Rect2i* last, gpg::Rect2i* destination);
 
 /**
+ * Address: 0x00745020 (FUN_00745020, ?SerMapData@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Serializes map playable-rect state by writing:
+ * - one `Rect2i` copied from `mMapData->mPlayableRect`;
+ * - loaded map-rect vector count (`+0x0A08` lane);
+ * - each loaded `Rect2i` element.
+ */
+void Sim::SerMapData(gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  auto* const runtime = reinterpret_cast<SimSerMapDataRuntimeView*>(this);
+
+  const gpg::Rect2i playableRect = runtime->mapData->mPlayableRect;
+  gpg::RRef nullOwnerRef{};
+  archive->Write(ResolveRect2iRType(), &playableRect, nullOwnerRef);
+
+  std::uint32_t rectCount = 0;
+  if (runtime->loadedMapRects.first != nullptr) {
+    rectCount = static_cast<std::uint32_t>(runtime->loadedMapRects.last - runtime->loadedMapRects.first);
+  }
+  WriteArchiveUIntCompat(archive, rectCount);
+
+  for (std::uint32_t index = 0; index < rectCount; ++index) {
+    gpg::Rect2i* const loadedRects = runtime->loadedMapRects.first;
+    if (loadedRects == nullptr) {
+      break;
+    }
+
+    gpg::RRef elementOwnerRef{};
+    archive->Write(ResolveRect2iRType(), &loadedRects[index], elementOwnerRef);
+  }
+}
+
+/**
  * Address: 0x00745120 (FUN_00745120, ?SerMapData@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
  *
  * What it does:
@@ -5704,6 +5732,104 @@ void Sim::SerMapData(gpg::ReadArchive* const archive)
 }
 
 /**
+ * Address: 0x007452B0 (FUN_007452B0, ?SerArmies@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Serializes owned army pointers from `mArmiesList` as count + owned
+ * `SimArmy` raw-pointer entries.
+ */
+void Sim::SerArmies(gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const std::uint32_t armyCount = static_cast<std::uint32_t>(mArmiesList.size());
+  WriteArchiveUIntCompat(archive, armyCount);
+
+  gpg::RRef ownerRef{};
+  for (CArmyImpl* const army : mArmiesList) {
+    gpg::RRef armyRef{};
+    gpg::RRef_SimArmy(&armyRef, army);
+    gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Owned, ownerRef);
+  }
+}
+
+/**
+ * Address: 0x00745330 (FUN_00745330, ?SerArmies@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Reads owned army pointers from archive into `mArmiesList` using
+ * archive-count resize + per-entry owned pointer load.
+ */
+void Sim::SerArmies(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  unsigned int armyCount = 0u;
+  archive->ReadUInt(&armyCount);
+
+  mArmiesList.resize(static_cast<std::size_t>(armyCount));
+
+  gpg::RRef nullOwner{};
+  for (std::size_t i = 0; i < static_cast<std::size_t>(armyCount); ++i) {
+    SimArmy* loadedArmy = nullptr;
+    archive->ReadPointerOwned_SimArmy(&loadedArmy, &nullOwner);
+    mArmiesList[i] = static_cast<CArmyImpl*>(loadedArmy);
+  }
+}
+
+/**
+ * Address: 0x007456D0 (FUN_007456D0, ?SerDirtyEnts@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Writes one unowned entity-pointer chain from `mCoordEntities` and
+ * terminates the stream with a null entity sentinel.
+ */
+void Sim::SerDirtyEnts(gpg::WriteArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  const gpg::RRef nullOwner{};
+  for (Entity* const entity : mCoordEntities.owners_member<Entity, &Entity::mCoordNode>()) {
+    gpg::RRef entityRef{};
+    gpg::RRef_Entity(&entityRef, entity);
+    gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, nullOwner);
+  }
+
+  gpg::RRef tailRef{};
+  gpg::RRef_Entity(&tailRef, nullptr);
+  gpg::WriteRawPointer(archive, tailRef, gpg::TrackedPointerState::Unowned, nullOwner);
+}
+
+/**
+ * Address: 0x00745760 (FUN_00745760, ?SerDirtyEnts@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Reads one unowned entity-pointer stream and relinks each loaded entity's
+ * coord-node into `mCoordEntities` until a null sentinel is encountered.
+ */
+void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  gpg::RRef ownerRef{};
+  Entity* entity = nullptr;
+  (void)archive->ReadPointer_Entity(&entity, &ownerRef);
+  while (entity != nullptr) {
+    entity->mCoordNode.ListLinkBefore(&mCoordEntities);
+    ownerRef = gpg::RRef{};
+    (void)archive->ReadPointer_Entity(&entity, &ownerRef);
+  }
+}
+
+/**
  * Address: 0x00754C60 (FUN_00754C60, sub_754C60)
  *
  * What it does:
@@ -5740,6 +5866,7 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
 
   LoadTaskStages(archive, &mTaskStageA, &mDiskWatcherTaskStage, &mTaskStageB, ownerRef);
   LoadObjectByRType(archive, &mShields, {"std::list<Moho::Shield *>", "list<Moho::Shield *>"}, ownerRef);
+  SerDirtyEnts(archive);
 
   bool bitFlag = false;
   archive->ReadBool(&bitFlag);
@@ -5799,7 +5926,7 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   const gpg::RRef ownerRef = MakeSimOwnerRef(this);
 
   // 0x007551C0 order recovered from IDA/decomp.
-  SaveMapDataBestEffort(archive, &mPlayableRect1, &mPlayableRect2, ownerRef);
+  SerMapData(archive);
   WriteArchiveUIntCompat(archive, mCurTick);
 
   SavePointerByRType(
@@ -5815,6 +5942,7 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   SavePointerByRType(
     archive, mEntityDB, {"EntityDB", "CEntityDB", "Moho::EntityDB"}, gpg::TrackedPointerState::Owned, ownerRef
   );
+  SerArmies(archive);
   WriteArchiveUIntCompat(archive, mReserved98C);
   SavePointerByRType(
     archive, mDecalBuffer, {"CDecalBuffer", "Moho::CDecalBuffer"}, gpg::TrackedPointerState::Owned, ownerRef
@@ -5829,6 +5957,7 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   SaveTaskStages(archive, &mTaskStageA, &mDiskWatcherTaskStage, &mTaskStageB, ownerRef);
   SerVars(archive);
   SaveObjectByRType(archive, &mShields, {"std::list<Moho::Shield *>", "list<Moho::Shield *>"}, ownerRef);
+  SerDirtyEnts(archive);
 
   archive->WriteBool(mCheatsEnabled);
   archive->WriteBool(mGameOver);
@@ -6268,10 +6397,15 @@ Wm3::Quaternionf* QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Ve
 }
 
 /**
- * Address: 0x0044F9B0 (FUN_0044F9B0, sub_44F9B0)
+ * Address: 0x00452D40 (FUN_00452D40, Moho::MultQuadVec)
  *
- * What it does:
- * Thin wrapper around quaternion-vector rotation helper.
+ * Shared quaternion-vector rotation helper with 67+ callsites. Binary body
+ * inlines `QuatToMatrix` + matrix-vector multiply; expressed here via
+ * `Wm3::MultiplyQuaternionVector` which matches the same semantics.
+ *
+ * The orphan thunk at 0x0044F9B0 (FUN_0044F9B0) forwards here with its
+ * argument order rotated; it has zero callers in the shipping binary and
+ * is therefore covered by the skip classification, not by a separate body.
  */
 Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat)
 {
@@ -6920,6 +7054,22 @@ void Sim::RegisterEntitySet(EntitySetBase* const set)
 }
 
 /**
+ * Address: 0x00751220 (FUN_00751220, boost::shared_ptr_SParticleBuffer::operator=)
+ *
+ * What it does:
+ * Rebinds one `shared_ptr<SParticleBuffer>` from a raw pointer and releases
+ * prior ownership.
+ */
+boost::shared_ptr<SParticleBuffer>* AssignSharedParticleBufferFromRaw(
+  boost::shared_ptr<SParticleBuffer>* const outBuffer,
+  SParticleBuffer* const buffer
+)
+{
+  outBuffer->reset(buffer);
+  return outBuffer;
+}
+
+/**
  * Address: 0x00746820 (FUN_00746820, ?GetParticleBuffer@Sim@Moho@@QAEPAUSParticleBuffer@2@XZ)
  *
  * What it does:
@@ -6929,7 +7079,7 @@ void Sim::RegisterEntitySet(EntitySetBase* const set)
 SParticleBuffer* Sim::GetParticleBuffer()
 {
   if (!mParticleBuffer) {
-    mParticleBuffer.reset(new SParticleBuffer());
+    (void)AssignSharedParticleBufferFromRaw(&mParticleBuffer, new SParticleBuffer());
   }
 
   return mParticleBuffer.get();
@@ -6965,6 +7115,24 @@ const char* Sim::GetCurrentCommandSourceName() const
   }
 
   return source->mName.c_str();
+}
+
+/**
+ * Address: 0x0062CBD0 (FUN_0062CBD0, ?CenterOfMap@Sim@Moho@@QBE?AV?$Vector3@M@Wm3@@XZ)
+ *
+ * What it does:
+ * Computes the center of the current map in terrain grid coordinates from
+ * the backing heightfield dimensions and returns a zero-elevation vector.
+ */
+Wm3::Vec3f Sim::CenterOfMap() const
+{
+  const CHeightField* const field = mMapData->GetHeightField();
+
+  Wm3::Vec3f center{};
+  center.x = static_cast<float>(field->width - 1) * 0.5f;
+  center.y = 0.0f;
+  center.z = static_cast<float>(field->height - 1) * 0.5f;
+  return center;
 }
 
 LuaPlus::LuaState* Sim::GetLuaState() const noexcept
@@ -7133,6 +7301,20 @@ void Sim::OnCommandSourceTerminated()
 }
 
 /**
+ * Address: 0x00743120 (FUN_00743120, Moho::SDesyncInfo::SDesyncInfo)
+ *
+ * What it does:
+ * Initializes one desync entry from beat/army metadata and both checksum
+ * digest payloads.
+ */
+SDesyncInfo::SDesyncInfo(const std::int32_t beatValue, const std::int32_t armyValue, const gpg::MD5Digest& expectedHash, const gpg::MD5Digest& remoteHash)
+  : beat(beatValue)
+  , army(armyValue)
+  , hash1(expectedHash)
+  , hash2(remoteHash)
+{}
+
+/**
  * Address: 0x007487C0 (FUN_007487C0, ?VerifyChecksum@Sim@Moho@@UAEXABVMD5Digest@gpg@@H@Z)
  *
  * What it does:
@@ -7166,11 +7348,7 @@ void Sim::VerifyChecksum(const gpg::MD5Digest& checksum, const CSeqNo beat)
     return;
   }
 
-  SDesyncInfo desync{};
-  desync.hash1 = *expected;
-  desync.hash2 = checksum;
-  desync.beat = beat;
-  desync.army = mCurCommandSource;
+  const SDesyncInfo desync(beat, mCurCommandSource, *expected, checksum);
   mDesyncs.push_back(desync);
 
   const msvc8::string incomingHash = checksum.ToString();
@@ -7364,14 +7542,17 @@ void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const 
     return;
   }
 
-  SUnitConstructionParams params{};
-  params.mArmy = army;
-  params.mBlueprint = blueprint;
-  params.mTransform = BuildUnitSpawnTransform(pos, heading);
+  SUnitConstructionParams params(
+    0,
+    BuildUnitSpawnTransform(pos, heading),
+    army,
+    blueprint,
+    nullptr,
+    true
+  );
   params.mUseLayerOverride = 0;
   params.mFixElevation = 0;
   params.mLayer = 0;
-  params.mLinkSourceUnit = nullptr;
   params.mComplete = 1;
 
   (void)CreateUnit(params, true);
@@ -9333,6 +9514,34 @@ void Sim::AdvanceBeat(const int amt)
 }
 
 /**
+ * Address: 0x007457F0 (FUN_007457F0, ?Shutdown@Sim@Moho@@QAEXXZ)
+ *
+ * What it does:
+ * Destroys live units, drains the deferred deletion queue, shuts down the
+ * sim sound manager, and latches `mDidProcess`.
+ */
+void Sim::Shutdown()
+{
+  ForEachAllArmyUnit(mEntityDB, [](Unit* const unit) {
+    if (unit != nullptr) {
+      static_cast<Entity&>(*unit).Destroy();
+    }
+  });
+
+  while (!mDeletionQueue.empty()) {
+    void* const queuedObject = mDeletionQueue.front();
+    mDeletionQueue.pop_front();
+    RunQueuedDestroy(queuedObject);
+  }
+
+  if (mSoundManager != nullptr) {
+    mSoundManager->Shutdown();
+  }
+
+  mDidProcess = true;
+}
+
+/**
  * Address: 0x0074AFB0 (FUN_0074AFB0, ?SaveState@Sim@Moho@@QAEXAAVWriteArchive@gpg@@@Z)
  *
  * What it does:
@@ -11203,6 +11412,106 @@ moho::CScrLuaInitForm* moho::func_GetUnitCommandFromCommandCap_LuaFuncDef()
 }
 
 /**
+ * Address: 0x00821F50 (FUN_00821F50, Moho::UnitCommandCapToCommandType)
+ *
+ * What it does:
+ * Converts one command-capability enum into the matching unit command enum.
+ */
+moho::EUnitCommandType moho::UnitCommandCapToCommandType(const ERuleBPUnitCommandCaps commandCap)
+{
+  if (commandCap > RULEUCC_Tactical) {
+    if (commandCap > RULEUCC_Pause) {
+      if (commandCap > RULEUCC_Reclaim) {
+        if (commandCap == RULEUCC_SpecialAction) {
+          return EUnitCommandType::UNITCOMMAND_SpecialAction;
+        }
+      } else {
+        switch (commandCap) {
+        case RULEUCC_Reclaim:
+          return EUnitCommandType::UNITCOMMAND_Reclaim;
+        case RULEUCC_Overcharge:
+          return EUnitCommandType::UNITCOMMAND_OverCharge;
+        case RULEUCC_Dive:
+          return EUnitCommandType::UNITCOMMAND_Dive;
+        default:
+          break;
+        }
+      }
+    } else {
+      if (commandCap == RULEUCC_Pause) {
+        return EUnitCommandType::UNITCOMMAND_Pause;
+      }
+
+      if (commandCap > RULEUCC_SiloBuildTactical) {
+        if (commandCap == RULEUCC_SiloBuildNuke) {
+          return EUnitCommandType::UNITCOMMAND_BuildSiloNuke;
+        }
+        if (commandCap == RULEUCC_Sacrifice) {
+          return EUnitCommandType::UNITCOMMAND_Sacrifice;
+        }
+      } else {
+        switch (commandCap) {
+        case RULEUCC_SiloBuildTactical:
+          return EUnitCommandType::UNITCOMMAND_BuildSiloTactical;
+        case RULEUCC_Teleport:
+          return EUnitCommandType::UNITCOMMAND_Teleport;
+        case RULEUCC_Ferry:
+          return EUnitCommandType::UNITCOMMAND_Ferry;
+        default:
+          break;
+        }
+      }
+    }
+
+    return EUnitCommandType::UNITCOMMAND_None;
+  }
+
+  if (commandCap == RULEUCC_Tactical) {
+    return EUnitCommandType::UNITCOMMAND_Tactical;
+  }
+
+  if (commandCap > RULEUCC_Repair) {
+    if (commandCap > RULEUCC_CallTransport) {
+      if (commandCap == RULEUCC_Nuke) {
+        return EUnitCommandType::UNITCOMMAND_Nuke;
+      }
+    } else {
+      switch (commandCap) {
+      case RULEUCC_CallTransport:
+        return EUnitCommandType::UNITCOMMAND_TransportLoadUnits;
+      case RULEUCC_Capture:
+        return EUnitCommandType::UNITCOMMAND_Capture;
+      case RULEUCC_Transport:
+        return EUnitCommandType::UNITCOMMAND_TransportUnloadUnits;
+      default:
+        break;
+      }
+    }
+
+    return EUnitCommandType::UNITCOMMAND_None;
+  }
+
+  if (commandCap == RULEUCC_Repair) {
+    return EUnitCommandType::UNITCOMMAND_Repair;
+  }
+
+  switch (commandCap) {
+  case RULEUCC_Move:
+    return EUnitCommandType::UNITCOMMAND_Move;
+  case RULEUCC_Stop:
+    return EUnitCommandType::UNITCOMMAND_Stop;
+  case RULEUCC_Attack:
+    return EUnitCommandType::UNITCOMMAND_Attack;
+  case RULEUCC_Guard:
+    return EUnitCommandType::UNITCOMMAND_Guard;
+  case RULEUCC_Patrol:
+    return EUnitCommandType::UNITCOMMAND_Patrol;
+  default:
+    return EUnitCommandType::UNITCOMMAND_None;
+  }
+}
+
+/**
  * Address: 0x008408C0 (FUN_008408C0, cfunc_GetUnitCommandFromCommandCapL)
  *
  * What it does:
@@ -11227,102 +11536,7 @@ int moho::cfunc_GetUnitCommandFromCommandCapL(LuaPlus::LuaState* const state)
   gpg::RRef commandCapRef(&commandCap, CachedERuleBPUnitCommandCapsType());
   (void)commandCapRef.SetLexical(commandCapLexical);
 
-  EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
-  if (commandCap > RULEUCC_Tactical) {
-    if (commandCap > RULEUCC_Pause) {
-      if (commandCap > RULEUCC_Reclaim) {
-        if (commandCap == RULEUCC_SpecialAction) {
-          commandType = EUnitCommandType::UNITCOMMAND_SpecialAction;
-        }
-      } else {
-        switch (commandCap) {
-        case RULEUCC_Reclaim:
-          commandType = EUnitCommandType::UNITCOMMAND_Reclaim;
-          break;
-        case RULEUCC_Overcharge:
-          commandType = EUnitCommandType::UNITCOMMAND_OverCharge;
-          break;
-        case RULEUCC_Dive:
-          commandType = EUnitCommandType::UNITCOMMAND_Dive;
-          break;
-        default:
-          commandType = EUnitCommandType::UNITCOMMAND_None;
-          break;
-        }
-      }
-    } else {
-      if (commandCap == RULEUCC_Pause) {
-        commandType = EUnitCommandType::UNITCOMMAND_Pause;
-      } else if (commandCap > RULEUCC_SiloBuildTactical) {
-        if (commandCap == RULEUCC_SiloBuildNuke) {
-          commandType = EUnitCommandType::UNITCOMMAND_BuildSiloNuke;
-        } else if (commandCap == RULEUCC_Sacrifice) {
-          commandType = EUnitCommandType::UNITCOMMAND_Sacrifice;
-        }
-      } else {
-        switch (commandCap) {
-        case RULEUCC_SiloBuildTactical:
-          commandType = EUnitCommandType::UNITCOMMAND_BuildSiloTactical;
-          break;
-        case RULEUCC_Teleport:
-          commandType = EUnitCommandType::UNITCOMMAND_Teleport;
-          break;
-        case RULEUCC_Ferry:
-          commandType = EUnitCommandType::UNITCOMMAND_Ferry;
-          break;
-        default:
-          commandType = EUnitCommandType::UNITCOMMAND_None;
-          break;
-        }
-      }
-    }
-  } else if (commandCap == RULEUCC_Tactical) {
-    commandType = EUnitCommandType::UNITCOMMAND_Tactical;
-  } else if (commandCap > RULEUCC_Repair) {
-    if (commandCap > RULEUCC_CallTransport) {
-      if (commandCap == RULEUCC_Nuke) {
-        commandType = EUnitCommandType::UNITCOMMAND_Nuke;
-      }
-    } else {
-      switch (commandCap) {
-      case RULEUCC_CallTransport:
-        commandType = EUnitCommandType::UNITCOMMAND_TransportLoadUnits;
-        break;
-      case RULEUCC_Capture:
-        commandType = EUnitCommandType::UNITCOMMAND_Capture;
-        break;
-      case RULEUCC_Transport:
-        commandType = EUnitCommandType::UNITCOMMAND_TransportUnloadUnits;
-        break;
-      default:
-        commandType = EUnitCommandType::UNITCOMMAND_None;
-        break;
-      }
-    }
-  } else if (commandCap == RULEUCC_Repair) {
-    commandType = EUnitCommandType::UNITCOMMAND_Repair;
-  } else {
-    switch (commandCap) {
-    case RULEUCC_Move:
-      commandType = EUnitCommandType::UNITCOMMAND_Move;
-      break;
-    case RULEUCC_Stop:
-      commandType = EUnitCommandType::UNITCOMMAND_Stop;
-      break;
-    case RULEUCC_Attack:
-      commandType = EUnitCommandType::UNITCOMMAND_Attack;
-      break;
-    case RULEUCC_Guard:
-      commandType = EUnitCommandType::UNITCOMMAND_Guard;
-      break;
-    case RULEUCC_Patrol:
-      commandType = EUnitCommandType::UNITCOMMAND_Patrol;
-      break;
-    default:
-      commandType = EUnitCommandType::UNITCOMMAND_None;
-      break;
-    }
-  }
+  EUnitCommandType commandType = moho::UnitCommandCapToCommandType(commandCap);
 
   gpg::RRef commandTypeRef(&commandType, CachedEUnitCommandTypeType());
   const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
@@ -12072,6 +12286,25 @@ int moho::cfunc_IsEnemyUserL(LuaPlus::LuaState* const state)
   return 1;
 }
 
+namespace
+{
+  /**
+   * Address: 0x00707BF0 (FUN_00707BF0, func_IsNeutral)
+   *
+   * What it does:
+   * Returns whether `targetArmyIndex` is in one neutral-relation bitset lane.
+   * Legacy behavior treats `0xFFFFFFFF` as neutral by default.
+   */
+  [[nodiscard]] bool IsArmyMarkedNeutral(const std::uint32_t targetArmyIndex, const moho::Set& neutralSet) noexcept
+  {
+    if (targetArmyIndex == std::numeric_limits<std::uint32_t>::max()) {
+      return true;
+    }
+
+    return neutralSet.Contains(targetArmyIndex);
+  }
+} // namespace
+
 /**
  * Address: 0x008BE710 (FUN_008BE710, cfunc_IsNeutral)
  *
@@ -12125,8 +12358,8 @@ int moho::cfunc_IsNeutralL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
   UserArmy* const secondArmy = USER_ResolveArmyFromLuaState(state, secondArmyObject);
 
-  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr &&
-    firstArmy->mVarDat.mNeutrals.Contains(secondArmy->mArmyIndex);
+  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr
+    && IsArmyMarkedNeutral(secondArmy->mArmyIndex, firstArmy->mVarDat.mNeutrals);
   lua_pushboolean(rawState, isNeutral ? 1 : 0);
   return 1;
 }
@@ -15153,7 +15386,8 @@ int moho::cfunc_SessionGetScenarioInfoL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kWrongLuaStateText);
   }
 
-  session->mScenarioInfo.PushStack(state);
+  const LuaPlus::LuaObject scenarioInfo = session->GetScenarioInfo();
+  scenarioInfo.PushStack(state);
   return 1;
 }
 
@@ -18187,6 +18421,61 @@ int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x0075F2D0 (FUN_0075F2D0, func_SetTerrainTypeRect)
+ *
+ * What it does:
+ * Writes one terrain-type rectangle into `grid` after clamping
+ * `(x, z, x + width, z + height)` against map bounds, preserving the original
+ * nested row/column fill order.
+ */
+static std::int32_t FillTerrainTypeRectClamped(
+  const std::int32_t x,
+  const std::int32_t z,
+  const std::uint8_t terrainType,
+  moho::TerrainTypeGrid* const grid,
+  const std::int32_t width,
+  const std::int32_t height
+) noexcept
+{
+  std::int32_t endX = x + width;
+  std::int32_t endZ = z + height;
+
+  std::int32_t startX = x;
+  if (startX < 0) {
+    startX = 0;
+  }
+
+  std::int32_t startZ = z;
+  if (startZ < 0) {
+    startZ = 0;
+  }
+
+  if (endX >= grid->width) {
+    endX = grid->width;
+  }
+  if (endZ >= grid->height) {
+    endZ = grid->height;
+  }
+
+  std::int32_t result = startX;
+  if (endX > startX && startZ < endZ) {
+    do {
+      if (result < endX) {
+        do {
+          ++result;
+          grid->data[static_cast<std::size_t>(startZ) * static_cast<std::size_t>(grid->width) + static_cast<std::size_t>(result - 1)] =
+            terrainType;
+        } while (result < endX);
+        result = startX;
+      }
+      ++startZ;
+    } while (startZ < endZ);
+  }
+
+  return result;
+}
+
+/**
  * Address: 0x0075C5F0 (FUN_0075C5F0, func_SetTerrainTypeRect_LuaFuncDef)
  *
  * What it does:
@@ -18260,23 +18549,15 @@ int moho::cfunc_SetTerrainTypeRectL(LuaPlus::LuaState* const state)
   }
   const std::uint8_t terrainType = static_cast<std::uint8_t>(static_cast<std::int32_t>(lua_tonumber(rawState, typeCodeIndex)));
 
-  TerrainTypeGrid& terrainTypeGrid = map->mTerrainType;
-  const std::int32_t minX = std::max(rect.x0, 0);
-  const std::int32_t minZ = std::max(rect.z0, 0);
-  const std::int32_t maxX = std::min(rect.x1, terrainTypeGrid.width);
-  const std::int32_t maxZ = std::min(rect.z1, terrainTypeGrid.height);
-
-  if (maxX <= minX || maxZ <= minZ) {
-    return 0;
-  }
-
-  for (std::int32_t z = minZ; z < maxZ; ++z) {
-    std::uint8_t* const row =
-      &terrainTypeGrid.data[static_cast<std::size_t>(z) * static_cast<std::size_t>(terrainTypeGrid.width)];
-    for (std::int32_t x = minX; x < maxX; ++x) {
-      row[x] = terrainType;
-    }
-  }
+  TerrainTypeGrid* const terrainTypeGrid = &map->mTerrainType;
+  (void)FillTerrainTypeRectClamped(
+    rect.x0,
+    rect.z0,
+    terrainType,
+    terrainTypeGrid,
+    rect.x1 - rect.x0,
+    rect.z1 - rect.z0
+  );
 
   return 0;
 }
@@ -20297,13 +20578,16 @@ int moho::cfunc_CreateResourceDepositL(LuaPlus::LuaState* const state)
   size.x = static_cast<int>(lua_tonumber(state->m_state, 5));
   size.y = sizeY;
 
-  int depositTypeIndex = 0;
-  const std::string_view typeView = depositTypeName.view();
-  if (typeView == "Mass") {
-    depositTypeIndex = 1;
-  } else if (typeView == "Hydrocarbon") {
-    depositTypeIndex = 2;
-  }
+  static msvc8::string resourceDepositTypeNames[3] = {
+    msvc8::string(""),
+    msvc8::string("Mass"),
+    msvc8::string("Hydrocarbon"),
+  };
+
+  msvc8::string* const match =
+    moho::SearchStringArrayFor(resourceDepositTypeNames, resourceDepositTypeNames + 3, &depositTypeName);
+  const int depositTypeIndex =
+    match != resourceDepositTypeNames + 3 ? static_cast<int>(match - resourceDepositTypeNames) : 0;
 
   if (depositTypeIndex == 0) {
     gpg::Logf(kUnknownResourceDepositTypeMessage, depositTypeName.c_str());
@@ -21161,8 +21445,8 @@ int moho::cfunc_IsNeutralSimL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
   CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
 
-  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr &&
-    firstArmy->Neutrals.Contains(static_cast<std::uint32_t>(secondArmy->ArmyId));
+  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr
+    && IsArmyMarkedNeutral(static_cast<std::uint32_t>(secondArmy->ArmyId), firstArmy->Neutrals);
   lua_pushboolean(rawState, isNeutral ? 1 : 0);
   return 1;
 }

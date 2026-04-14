@@ -30,6 +30,15 @@ namespace moho
     inline static gpg::RType* sType = nullptr;
     inline static gpg::RType* sBlendModeType = nullptr;
 
+    /**
+     * Address: 0x00655CC0 (FUN_00655CC0, Moho::SWorldBeam::SWorldBeam)
+     *
+     * What it does:
+     * Initializes the four endpoint transforms to identity rotation and zero
+     * translation, and constructs both counted texture-pointer lanes.
+     */
+    SWorldBeam();
+
     VTransform mCurStart;                    // +0x00
     VTransform mLastStart;                   // +0x1C
     bool mFromStart = false;                 // +0x38

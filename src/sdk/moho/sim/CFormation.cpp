@@ -1,12 +1,94 @@
 #include "moho/sim/CFormation.h"
 
+#include <cstddef>
 #include <cstring>
 #include <new>
 
+#include "moho/entity/UserEntity.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/ai/IFormationInstance.h"
+#include "moho/unit/core/Unit.h"
 
 namespace
 {
+  [[nodiscard]] moho::UserEntity* DecodeSelectionEntity(
+    const moho::SSelectionWeakRefUserEntity& weakEntityRef
+  ) noexcept
+  {
+    constexpr std::uintptr_t kWeakOwnerOffset = offsetof(moho::UserEntity, mIUnitChainHead);
+    const std::uintptr_t rawOwnerSlot = reinterpret_cast<std::uintptr_t>(weakEntityRef.mOwnerLinkSlot);
+    if (rawOwnerSlot == 0u || rawOwnerSlot < kWeakOwnerOffset) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::UserEntity*>(rawOwnerSlot - kWeakOwnerOffset);
+  }
+
+  [[nodiscard]] moho::Unit* ResolveSelectionUnit(moho::UserEntity* const entity) noexcept
+  {
+    if (entity == nullptr) {
+      return nullptr;
+    }
+
+    moho::UserUnit* const userUnitView = entity->IsUserUnit();
+    if (userUnitView == nullptr) {
+      return nullptr;
+    }
+
+    constexpr std::size_t kUserUnitSubobjectOffsetInUnit = 0x148;
+    auto* const rawUserUnitView = reinterpret_cast<std::uint8_t*>(userUnitView);
+    return reinterpret_cast<moho::Unit*>(rawUserUnitView - kUserUnitSubobjectOffsetInUnit);
+  }
+
+  /**
+   * Address: 0x008381E0 (FUN_008381E0, func_GetFormationType)
+   *
+   * What it does:
+   * Walks one weak-selection set, classifies live units by movement layer, and
+   * returns formation-type lane `0` (surface), `1` (air), or `2` (mixed).
+   */
+  [[maybe_unused]] std::int32_t DetermineSelectionFormationType(
+    moho::SSelectionSetUserEntity* const selection
+  ) noexcept
+  {
+    constexpr std::int32_t kFormationTypeSurface = 0;
+    constexpr std::int32_t kFormationTypeAir = 1;
+    constexpr std::int32_t kFormationTypeMixed = 2;
+
+    if (selection == nullptr || selection->mHead == nullptr) {
+      return kFormationTypeSurface;
+    }
+
+    moho::SSelectionSetUserEntity::FindResult cursor{};
+    selection->First(&cursor);
+    if (cursor.mRes == selection->mHead) {
+      return kFormationTypeSurface;
+    }
+
+    bool hasAirUnits = false;
+    bool hasSurfaceUnits = false;
+
+    moho::SSelectionSetUserEntity::Index iterator{};
+    iterator.mOwnerSet = selection;
+    iterator.mNode = cursor.mRes;
+    while (iterator.mNode != selection->mHead) {
+      moho::UserEntity* const entity = DecodeSelectionEntity(iterator.mNode->mEnt);
+      moho::Unit* const unit = ResolveSelectionUnit(entity);
+      if (unit != nullptr && unit->mCurrentLayer == moho::LAYER_Air) {
+        hasAirUnits = true;
+      } else {
+        hasSurfaceUnits = true;
+      }
+
+      iterator.Next();
+    }
+
+    if (!hasAirUnits) {
+      return kFormationTypeSurface;
+    }
+    return hasSurfaceUnits ? kFormationTypeMixed : kFormationTypeAir;
+  }
+
   [[nodiscard]] moho::CFormation::Node* AllocateFormationNode()
   {
     auto* const node = static_cast<moho::CFormation::Node*>(::operator new(sizeof(moho::CFormation::Node), std::nothrow));

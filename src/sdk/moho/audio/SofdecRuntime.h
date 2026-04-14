@@ -384,9 +384,48 @@ namespace moho
    */
   struct SfplyTimerSummary
   {
-    std::array<std::int32_t, 8> lanes{}; // +0x00
+    std::int32_t accumulatedTicksLow = 0;  // +0x00
+    std::int32_t accumulatedTicksHigh = 0; // +0x04
+    std::int32_t minTicksLow = -1;         // +0x08
+    std::int32_t minTicksHigh = 0x7FFFFFFF; // +0x0C
+    std::int32_t maxTicksLow = 0;          // +0x10
+    std::int32_t maxTicksHigh = 0;         // +0x14
+    std::int32_t sampleCount = 0;          // +0x18
+    std::int32_t mUnknown1C = 0;           // +0x1C
   };
 
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, accumulatedTicksLow) == 0x00,
+    "SfplyTimerSummary::accumulatedTicksLow offset must be 0x00"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, accumulatedTicksHigh) == 0x04,
+    "SfplyTimerSummary::accumulatedTicksHigh offset must be 0x04"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, minTicksLow) == 0x08,
+    "SfplyTimerSummary::minTicksLow offset must be 0x08"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, minTicksHigh) == 0x0C,
+    "SfplyTimerSummary::minTicksHigh offset must be 0x0C"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, maxTicksLow) == 0x10,
+    "SfplyTimerSummary::maxTicksLow offset must be 0x10"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, maxTicksHigh) == 0x14,
+    "SfplyTimerSummary::maxTicksHigh offset must be 0x14"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, sampleCount) == 0x18,
+    "SfplyTimerSummary::sampleCount offset must be 0x18"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SfplyTimerSummary, mUnknown1C) == 0x1C,
+    "SfplyTimerSummary::mUnknown1C offset must be 0x1C"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SfplyTimerSummary) == 0x20, "SfplyTimerSummary size must be 0x20");
 
   /**
@@ -2298,6 +2337,15 @@ void mwsflib_SetSvrFunc();
 void mwply_Destroy(moho::MwsfdPlaybackStateSubobj* ply);
 
 /**
+ * Address: 0x00AC8D00 (FUN_00AC8D00, _mwPlyDestroy)
+ *
+ * What it does:
+ * Public teardown wrapper that forwards one playback handle to
+ * `mwply_Destroy`.
+ */
+void mwPlyDestroy(moho::MwsfdPlaybackStateSubobj* ply);
+
+/**
  * Address: 0x00AC8F60 (FUN_00AC8F60, _MWSFD_Malloc)
  *
  * What it does:
@@ -2374,6 +2422,38 @@ std::int32_t MWSFD_GetPlyInf(moho::MwsfdPlaybackStateSubobj* ply, void* outPlyIn
 std::int32_t
 MWSFD_GetCond(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t conditionId, std::int32_t* outConditionValue);
 
+namespace moho
+{
+  /**
+   * Runtime ADXT parameter block mirrored into global `sfadxt_para`.
+   */
+  struct SofdecAdxtParams
+  {
+    std::int32_t value0 = 0; // +0x00
+    std::int32_t value1 = 0; // +0x04
+    std::int32_t adxWorkBytes = 0; // +0x08
+    std::int32_t value3 = 0; // +0x0C
+    std::int32_t value4 = 0; // +0x10
+    std::int32_t value5 = 0; // +0x14
+    std::int32_t adxInputBufferBytes = 0; // +0x18
+  };
+
+  static_assert(offsetof(SofdecAdxtParams, value0) == 0x00, "SofdecAdxtParams::value0 offset must be 0x00");
+  static_assert(offsetof(SofdecAdxtParams, value1) == 0x04, "SofdecAdxtParams::value1 offset must be 0x04");
+  static_assert(
+    offsetof(SofdecAdxtParams, adxWorkBytes) == 0x08,
+    "SofdecAdxtParams::adxWorkBytes offset must be 0x08"
+  );
+  static_assert(offsetof(SofdecAdxtParams, value3) == 0x0C, "SofdecAdxtParams::value3 offset must be 0x0C");
+  static_assert(offsetof(SofdecAdxtParams, value4) == 0x10, "SofdecAdxtParams::value4 offset must be 0x10");
+  static_assert(offsetof(SofdecAdxtParams, value5) == 0x14, "SofdecAdxtParams::value5 offset must be 0x14");
+  static_assert(
+    offsetof(SofdecAdxtParams, adxInputBufferBytes) == 0x18,
+    "SofdecAdxtParams::adxInputBufferBytes offset must be 0x18"
+  );
+  static_assert(sizeof(SofdecAdxtParams) == 0x1C, "SofdecAdxtParams size must be 0x1C");
+} // namespace moho
+
 /**
  * Address: 0x00AD88E0 (FUN_00AD88E0, _SFD_GetCond)
  *
@@ -2383,6 +2463,15 @@ MWSFD_GetCond(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t conditionId, std
  */
 std::int32_t
 SFD_GetCond(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t conditionId, std::int32_t* outConditionValue);
+
+/**
+ * Address: 0x00AD0270 (FUN_00AD0270, _SFD_SetAdxtPara)
+ *
+ * What it does:
+ * Copies one ADXT parameter block into global `sfadxt_para`, applying the
+ * binary alignment rules for ADXT work/input buffer lanes.
+ */
+std::int32_t SFD_SetAdxtPara(const moho::SofdecAdxtParams* params);
 
 /**
  * Address: 0x00AD1900 (FUN_00AD1900, _SFD_SetMpvCond)
@@ -2395,6 +2484,29 @@ std::int32_t SFD_SetMpvCond(
   moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
   std::int32_t conditionId,
   std::int32_t (*conditionCallback)()
+);
+
+/**
+ * Address: 0x00AD16A0 (FUN_00AD16A0, _SFD_SetMpvPara)
+ *
+ * What it does:
+ * Copies one MPV parameter snapshot into global runtime lanes and resets
+ * ring-buffer/tab tables.
+ */
+std::int32_t SFD_SetMpvPara(const void* parameterSnapshot);
+
+/**
+ * Address: 0x00AD1A50 (FUN_00AD1A50, _SFD_SetVideoUsrSj)
+ *
+ * What it does:
+ * Validates one SFD handle and forwards one video user-stream lane into MPV.
+ */
+std::int32_t SFD_SetVideoUsrSj(
+  moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
+  std::int32_t streamIndex,
+  std::int32_t streamObjectAddress,
+  std::int32_t streamCallbackAddress,
+  std::int32_t streamContextAddress
 );
 
   /**
@@ -2448,12 +2560,132 @@ void SFD_VbOut();
 std::int32_t SFD_IsHnSvrWait(std::int32_t sfdHandleAddress);
 
 /**
+ * Address: 0x00AD6EC0 (FUN_00AD6EC0, _SFD_ExecServer)
+ *
+ * What it does:
+ * Runs one decode-server tick for all valid SFD handles and returns aggregate
+ * server status.
+ */
+std::int32_t SFD_ExecServer();
+
+/**
  * Address: 0x00AD6E90 (FUN_00AD6E90, _SFD_ExecOne)
  *
  * What it does:
  * Executes one SFD per-handle server step after handle validation.
  */
 std::int32_t SFD_ExecOne(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+
+/**
+ * Address: 0x00AECEF0 (FUN_00AECEF0, _SFD_SetSeekPosTbl)
+ *
+ * What it does:
+ * Validates one SFD handle and writes one seek-position table lane value into
+ * attached SFSEE runtime state.
+ */
+std::int32_t SFD_SetSeekPosTbl(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t seekTableAddress);
+
+/**
+ * Address: 0x00AECF30 (FUN_00AECF30, _SFD_StartHeadAnaly)
+ *
+ * What it does:
+ * Validates one SFD handle, enables condition lane `47`, and transitions
+ * playback into standby for header analysis.
+ */
+std::int32_t SFD_StartHeadAnaly(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+
+/**
+ * Address: 0x00AECF70 (FUN_00AECF70, _SFD_IsHeadAnalyEnd)
+ *
+ * What it does:
+ * Validates one SFD handle and mirrors SFSEE header-analysis completion flag
+ * into caller output storage.
+ */
+std::int32_t SFD_IsHeadAnalyEnd(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outHeadAnalyzed);
+
+/**
+ * Address: 0x00ADBA60 (FUN_00ADBA60, _SFD_GetPlayFps)
+ *
+ * What it does:
+ * Returns effective playback FPS for one handle from timer frame-rate and
+ * time-base scale lanes.
+ */
+std::int32_t SFD_GetPlayFps(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outPlayFramesPerSecond);
+
+/**
+ * Address: 0x00AE60E0 (FUN_00AE60E0, _SFD_GetTimePerFile)
+ *
+ * What it does:
+ * Returns per-file adjusted playback time lanes and file-history ordinal from
+ * timer and queued sample-total history state.
+ */
+std::int32_t SFD_GetTimePerFile(
+  moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
+  std::int32_t* outTimeMajor,
+  std::int32_t* outTimeMinor,
+  std::int32_t* outFileHistoryOrdinal
+);
+
+/**
+ * Address: 0x00ADB350 (FUN_00ADB350, _SFD_OutUsrFrmSync)
+ *
+ * What it does:
+ * Validates one SFD handle, increments user-frame sync sequence lane, and
+ * marks output-sync state as dirty.
+ */
+std::int32_t SFD_OutUsrFrmSync(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+
+/**
+ * Address: 0x00ADBB30 (FUN_00ADBB30, _SFD_OutDispSync)
+ *
+ * What it does:
+ * Validates one SFD handle, stores display-sync time lanes, increments
+ * display-sync sequence lane, and marks output-sync state as dirty.
+ */
+std::int32_t
+SFD_OutDispSync(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t displayTimeMajor, std::int32_t displayTimeMinor);
+
+/**
+ * Address: 0x00ADBF60 (FUN_00ADBF60, _SFD_LockFrm)
+ *
+ * What it does:
+ * Locks one frame-object lane resolved from a frame-search slot and increments
+ * per-handle lock depth.
+ */
+std::int32_t SFD_LockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t frameSearchLaneAddress);
+
+/**
+ * Address: 0x00ADBFD0 (FUN_00ADBFD0, _SFD_UnlockFrm)
+ *
+ * What it does:
+ * Unlocks one frame-object lane resolved from a frame-search slot and
+ * decrements per-handle lock depth.
+ */
+std::int32_t SFD_UnlockFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t frameSearchLaneAddress);
+
+/**
+ * Address: 0x00AE0C70 (FUN_00AE0C70, _M2PES_GetVersionStr)
+ *
+ * What it does:
+ * Returns the static CRI M2PES runtime version banner string.
+ */
+extern "C" const char* M2PES_GetVersionStr();
+
+/**
+ * Address: 0x00AE3230 (FUN_00AE3230, _M2T_GetVersionStr)
+ *
+ * What it does:
+ * Returns the static CRI M2T runtime version banner string.
+ */
+extern "C" const char* M2T_GetVersionStr();
+
+/**
+ * Address: 0x00ADFD80 (FUN_00ADFD80, _M2TSD_GetVersionStr)
+ *
+ * What it does:
+ * Returns the static CRI M2TSD runtime version banner string.
+ */
+extern "C" const char* M2TSD_GetVersionStr();
 
 /**
  * Address: 0x00AD6FD0 (FUN_00AD6FD0, _sfply_ExecOneSub)
@@ -2654,6 +2886,15 @@ std::int32_t sfply_IsPlayTimeAutoStop(moho::SofdecSfdWorkctrlSubobj* workctrlSub
  * Stops transfer lanes and transitions one playback handle to FIN phase.
  */
 std::int32_t sfply_Fin(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+
+/**
+ * Address: 0x00AD7990 (FUN_00AD7990, _SFPLY_DecideSvrStat)
+ *
+ * What it does:
+ * Collapses all active SFD handle states into one global decode-server status
+ * lane (`0`: idle, `1`: running, `2`: fault/terminal).
+ */
+std::int32_t sfply_DecideSvrStat();
 
 /**
  * Address: 0x00AD7A30 (FUN_00AD7A30, _sfply_Create)
@@ -3167,6 +3408,159 @@ std::int32_t MWSTM_Start(std::int32_t streamHandleAddress);
 bool MWSTM_IsFsStatErr(std::int32_t streamHandleAddress);
 
 /**
+ * Address: 0x00AED7D0 (FUN_00AED7D0, _mwPlySwitchToIdle)
+ *
+ * What it does:
+ * Forwards to ADXM vertical-sync wait lane.
+ */
+extern "C" std::int32_t mwPlySwitchToIdle();
+
+/**
+ * Address: 0x00AED7E0 (FUN_00AED7E0, _mwPlySaveRsc)
+ *
+ * What it does:
+ * Dispatches playback-resource save hook lane.
+ */
+extern "C" void mwPlySaveRsc();
+
+/**
+ * Address: 0x00AED7F0 (FUN_00AED7F0, _mwPlyRestoreRsc)
+ *
+ * What it does:
+ * Dispatches playback-resource restore hook lane.
+ */
+extern "C" void mwPlyRestoreRsc();
+
+/**
+ * Address: 0x00AED220 (FUN_00AED220, _SFD_IsSeekAble)
+ *
+ * What it does:
+ * Validates one SFD handle and reports whether SFSEE seek conversion lanes
+ * are available.
+ */
+std::int32_t SFD_IsSeekAble(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outSeekable);
+
+/**
+ * Address: 0x00AED2C0 (FUN_00AED2C0, _SFD_CnvTimeToPos)
+ *
+ * What it does:
+ * Converts one playback time pair to seek position when the attached SFSEE
+ * runtime is seek-capable.
+ */
+std::int32_t
+SFD_CnvTimeToPos(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t timeMajor, std::int32_t timeMinor, std::int32_t* outSeekPosition);
+
+/**
+ * Address: 0x00AED380 (FUN_00AED380, _SFD_CnvPosToTime)
+ *
+ * What it does:
+ * Converts one seek position to playback time pair when the attached SFSEE
+ * runtime is seek-capable.
+ */
+std::int32_t
+SFD_CnvPosToTime(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t seekPosition, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
+
+/**
+ * Address: 0x00AED480 (FUN_00AED480, _SFD_Seek)
+ *
+ * What it does:
+ * Stops playback, stores seek request words, and dispatches transfer setup
+ * lane `13`.
+ */
+std::int32_t SFD_Seek(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, const std::int32_t* seekRequestWords);
+
+/**
+ * Address: 0x00AED620 (FUN_00AED620, _SFD_SetSeekPos)
+ *
+ * What it does:
+ * Stores SFSEE seek-base position lane for one SFD handle.
+ */
+std::int32_t SFD_SetSeekPos(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t seekPositionBytes);
+
+/**
+ * Address: 0x00AED530 (FUN_00AED530, _SFD_SetFileSize)
+ *
+ * What it does:
+ * Stores total file-size lane into active sfsee runtime handle and refreshes
+ * effective byte-rate tracking.
+ */
+std::int32_t SFD_SetFileSize(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t fileSizeBytes);
+
+/**
+ * Address: 0x00AED580 (FUN_00AED580, _SFD_SetTotTime)
+ *
+ * What it does:
+ * Stores configured total-time numerator/denominator lanes into active sfsee
+ * runtime state and refreshes effective byte-rate tracking.
+ */
+std::int32_t
+SFD_SetTotTime(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t totalTimeMajor, std::int32_t totalTimeMinor);
+
+/**
+ * Address: 0x00AED5D0 (FUN_00AED5D0, _SFD_SetByteRate)
+ *
+ * What it does:
+ * Stores configured byte-rate lane into active sfsee runtime state and
+ * refreshes effective byte-rate tracking.
+ */
+std::int32_t SFD_SetByteRate(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t byteRate);
+
+/**
+ * Address: 0x00AE5AB0 (FUN_00AE5AB0, _SFD_SetVideoPts)
+ *
+ * What it does:
+ * Seeds the SFD video PTS queue lane from caller-provided source buffer/count
+ * after handle validation.
+ */
+std::int32_t
+SFD_SetVideoPts(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t ptsQueueSourceAddress, std::int32_t ptsEntryCount);
+
+/**
+ * Address: 0x00AE5E90 (FUN_00AE5E90, _SFD_SetConcatPlay)
+ *
+ * What it does:
+ * Enables concat-play condition lane for one SFD handle after handle
+ * validation.
+ */
+std::int32_t SFD_SetConcatPlay(void* sfdHandle);
+
+/**
+ * Address: 0x00ACFB00 (FUN_00ACFB00, _SFD_SetOutVol)
+ *
+ * What it does:
+ * Updates one SFD handle output-volume lane when audio-output condition lane
+ * is enabled.
+ */
+std::int32_t SFD_SetOutVol(void* sfdHandle, std::int32_t volumeLevel);
+
+/**
+ * Address: 0x00ACFB50 (FUN_00ACFB50, _SFD_GetOutVol)
+ *
+ * What it does:
+ * Reads one SFD handle output-volume lane when audio-output condition lane is
+ * enabled.
+ */
+std::int32_t SFD_GetOutVol(void* sfdHandle);
+
+/**
+ * Address: 0x00ACFA60 (FUN_00ACFA60, _SFD_SetOutPan)
+ *
+ * What it does:
+ * Updates one SFD handle output-pan lane when audio-output condition lane is
+ * enabled.
+ */
+std::int32_t SFD_SetOutPan(void* sfdHandle, std::int32_t laneIndex, std::int32_t panLevel);
+
+/**
+ * Address: 0x00ACFAB0 (FUN_00ACFAB0, _SFD_GetOutPan)
+ *
+ * What it does:
+ * Reads one SFD handle output-pan lane when audio-output condition lane is
+ * enabled.
+ */
+std::int32_t SFD_GetOutPan(void* sfdHandle, std::int32_t laneIndex);
+
+/**
  * Address: 0x00ADE0D0 (_MWSFRNA_SetOutVol)
  *
  * What it does:
@@ -3231,6 +3625,26 @@ std::int32_t CFT_MakeYcc422ColAdjTbl(std::int32_t tableAddress);
  * conversion tables.
  */
 std::int32_t CFT_MakeArgb8888ColAdjTbl(std::int32_t tableAddress);
+
+/**
+ * Address: 0x00AED830 (FUN_00AED830, _CFT_Ycc420plnToA256V)
+ *
+ * What it does:
+ * Converts one YCC420 source lane into destination alpha-channel lane, with
+ * optional user remap table.
+ */
+std::uint8_t*
+CFT_Ycc420plnToA256V(std::uint8_t** sourcePlanes, const std::int32_t* conversionWords, const std::int32_t* userTableAddress);
+
+/**
+ * Address: 0x00AED990 (FUN_00AED990, _CFT_MakeArgb8888AlpLumiTbl)
+ *
+ * What it does:
+ * Builds one ARGB8888 alpha/luminance table pack with a luminance-window
+ * ramp and shared chroma side tables.
+ */
+std::int32_t
+CFT_MakeArgb8888AlpLumiTbl(std::int32_t luminancePivot, std::int32_t luminanceMin, std::int32_t luminanceMax, std::int32_t tableAddress);
 
 /**
  * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)

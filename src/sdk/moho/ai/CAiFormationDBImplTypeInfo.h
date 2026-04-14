@@ -33,6 +33,43 @@ namespace moho
      * Address: 0x0059C570 (FUN_0059C570, ?Init@CAiFormationDBImplTypeInfo@Moho@@UAEXXZ)
      */
     void Init() override;
+
+  private:
+    /**
+     * Address: 0x0059D390 (FUN_0059D390, Moho::CAiFormationDBImplTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates a reflected `CAiFormationDBImpl`, clears its owned AI-sim lane,
+     * and returns the object as a typed `gpg::RRef`.
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x0059D430 (FUN_0059D430, Moho::CAiFormationDBImplTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Placement-constructs one `CAiFormationDBImpl` in caller storage, resets
+     * its owned sim lane, and returns a typed `gpg::RRef`.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x0059D410 (FUN_0059D410, Moho::CAiFormationDBImplTypeInfo::Delete)
+     *
+     * What it does:
+     * Runs deleting-dtor behavior for one reflected `CAiFormationDBImpl`
+     * storage lane.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x0059D4B0 (FUN_0059D4B0, Moho::CAiFormationDBImplTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs in-place teardown for one reflected `CAiFormationDBImpl` storage
+     * lane without freeing the backing allocation.
+     */
+    static void Destruct(void* objectStorage);
   };
 
   static_assert(sizeof(CAiFormationDBImplTypeInfo) == 0x64, "CAiFormationDBImplTypeInfo size must be 0x64");

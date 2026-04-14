@@ -4,9 +4,13 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/math/Vector3f.h"
 
 namespace moho
 {
+  class Entity;
+  class Sim;
+
   /**
    * Owns the reflected enum descriptor for `EImpactType`.
    */
@@ -27,6 +31,15 @@ namespace moho
   };
 
   static_assert(sizeof(EImpactType) == 0x04, "EImpactType size must be 0x04");
+
+  /**
+   * Address: 0x0067B240 (FUN_0067B240, Moho::ENT_GetImpactType)
+   *
+   * What it does:
+   * Resolves impact classification from hit position vs waterline and optional
+   * collided-entity runtime type/layer lanes.
+   */
+  [[nodiscard]] EImpactType ENT_GetImpactType(Sim* sim, Entity* entity, const Wm3::Vector3f& hitPosition);
 
   /**
    * Address: 0x0067B320 (FUN_0067B320, Moho::ENT_GetImpactTypeString)

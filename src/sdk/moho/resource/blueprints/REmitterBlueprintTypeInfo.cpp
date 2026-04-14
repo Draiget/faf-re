@@ -156,16 +156,6 @@ namespace
     return MakeEmitterBlueprintRef(new moho::REmitterBlueprint());
   }
 
-  [[nodiscard]] gpg::RRef ConstructEmitterBlueprintRef(void* objectMemory)
-  {
-    if (!objectMemory) {
-      return MakeEmitterBlueprintRef(nullptr);
-    }
-
-    auto* const object = new (objectMemory) moho::REmitterBlueprint();
-    return MakeEmitterBlueprintRef(object);
-  }
-
   void DeleteEmitterBlueprintObject(void* objectMemory)
   {
     delete static_cast<moho::REmitterBlueprint*>(objectMemory);
@@ -223,7 +213,7 @@ namespace moho
     size_ = sizeof(REmitterBlueprint);
     newRefFunc_ = &NewEmitterBlueprintRef;
     deleteFunc_ = &DeleteEmitterBlueprintObject;
-    ctorRefFunc_ = &ConstructEmitterBlueprintRef;
+    ctorRefFunc_ = &REmitterBlueprintTypeInfo::CtrRef;
     dtrFunc_ = &DestroyEmitterBlueprintObject;
     AddEffectBase(this);
     gpg::RType::Init();
@@ -315,6 +305,23 @@ namespace moho
       typeInfo, "RampTextureName", CachedStringType(), 0x268, "Name of ramp texture we are using for this particle"
     );
     rampTextureNameField->mName = "RampTexture";
+  }
+
+  /**
+   * Address: 0x00510BB0 (FUN_00510BB0, Moho::REmitterBlueprintTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Placement-constructs one `REmitterBlueprint` in caller storage and
+   * returns a typed reflection ref.
+   */
+  gpg::RRef REmitterBlueprintTypeInfo::CtrRef(void* const objectMemory)
+  {
+    if (!objectMemory) {
+      return MakeEmitterBlueprintRef(nullptr);
+    }
+
+    auto* const object = new (objectMemory) REmitterBlueprint();
+    return MakeEmitterBlueprintRef(object);
   }
 
   /**

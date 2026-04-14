@@ -1076,6 +1076,56 @@
    */
   void CFT_Ycc420plnToArgb8888IntInit();
   void CFT_Ycc420plnToArgb8888PrgInit();
+  struct CftYcc420PlanarPackedWords;
+  struct CftRgb16OutputPackedWords;
+
+  /**
+   * Address: 0x00AF37F0 (FUN_00AF37F0, _CFT_Ycc420plnToRgb555)
+   *
+   * What it does:
+   * Converts one packed YCC420 source lane into RGB555 using fixed-point
+   * clip lookup tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb555(
+    const CftYcc420PlanarPackedWords* inputWords,
+    const CftRgb16OutputPackedWords* outputWords
+  );
+
+  /**
+   * Address: 0x00AF3EF0 (FUN_00AF3EF0, _CFT_Ycc420plnToRgb555WithDither)
+   *
+   * What it does:
+   * Converts one packed YCC420 source lane into RGB555 using 4-phase dither
+   * clip lookup tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb555WithDither(
+    const CftYcc420PlanarPackedWords* inputWords,
+    const CftRgb16OutputPackedWords* outputWords
+  );
+
+  /**
+   * Address: 0x00AF48A0 (FUN_00AF48A0, _CFT_Ycc420plnToRgb565)
+   *
+   * What it does:
+   * Converts one packed YCC420 source lane into RGB565 using fixed-point
+   * clip lookup tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb565(
+    const CftYcc420PlanarPackedWords* inputWords,
+    const CftRgb16OutputPackedWords* outputWords
+  );
+
+  /**
+   * Address: 0x00AF4FA0 (FUN_00AF4FA0, _CFT_Ycc420plnToRgb565WithDither)
+   *
+   * What it does:
+   * Converts one packed YCC420 source lane into RGB565 using 4-phase dither
+   * clip lookup tables.
+   */
+  std::int32_t CFT_Ycc420plnToRgb565WithDither(
+    const CftYcc420PlanarPackedWords* inputWords,
+    const CftRgb16OutputPackedWords* outputWords
+  );
   /**
    * Address: 0x00B031B0 (FUN_00B031B0, _cft_sse_Ycc420plnToRgb888Prg)
    *
@@ -3027,19 +3077,101 @@
   std::int32_t sfply_EnoughViData(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t sfply_EnoughAiData(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   void SFPLY_MeasureFps(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  /**
+   * Address: 0x00ADD950 (FUN_00ADD950, _SFPL2_Pause)
+   *
+   * What it does:
+   * Applies pause transition mode against per-handle pause-depth/state lanes.
+   */
   std::int32_t SFPL2_Pause(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t paused);
+  /**
+   * Address: 0x00ADDA40 (FUN_00ADDA40, _SFPL2_Standby)
+   *
+   * What it does:
+   * Switches one handle to standby phase lane.
+   */
   std::int32_t SFPL2_Standby(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
   std::int32_t SFHDS_FinishFhd(void* fileHeaderState);
   void SFBUF_DestroySj(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
-  std::int32_t SFTMR_InitTsum(void* timerSummary);
+  /**
+   * Address: 0x00AEADC0 (FUN_00AEADC0, _SFTMR_InitTsum)
+   *
+   * What it does:
+   * Initializes one timer-summary lane to neutral sum/min/max/count defaults.
+   */
+  moho::SfplyTimerSummary* SFTMR_InitTsum(moho::SfplyTimerSummary* timerSummary);
+  /**
+   * Address: 0x00AEADF0 (FUN_00AEADF0, _SFTMR_AddTsum)
+   *
+   * What it does:
+   * Adds one signed 64-bit sample into one timer-summary lane.
+   */
+  void* SFTMR_AddTsum(void* timerSummaryLane, std::int32_t deltaLowWord, std::int32_t deltaHighWord);
+  /**
+   * Address: 0x00AEACF0 (FUN_00AEACF0, _SFTMR_GetTmr)
+   *
+   * What it does:
+   * Returns current timer ticks while refreshing global timer-unit cache.
+   */
+  std::int64_t SFTMR_GetTmr();
+  /**
+   * Address: 0x00AEAD90 (FUN_00AEAD90, _SFTMR_GetTmrUnit)
+   *
+   * What it does:
+   * Returns cached timer-unit ticks, refreshing cache on first read.
+   */
+  std::int64_t SFTMR_GetTmrUnit();
   std::int32_t SFTIM_VbIn();
+  /**
+   * Address: 0x00ADAF30 (FUN_00ADAF30, _SFTIM_GetAudioStartSample)
+   *
+   * What it does:
+   * Converts ADXT start PTS (90 kHz) to sample index at requested sample rate.
+   */
+  std::int32_t SFTIM_GetAudioStartSample(void* adxtRuntime, std::int32_t audioSampleRate);
+  /**
+   * Address: 0x00ADAF90 (FUN_00ADAF90, _SFTIM_GetVideoStartSample)
+   *
+   * What it does:
+   * Converts ADXT video-start timing lanes to sample index and reports whether
+   * explicit video-start timing was used.
+   */
+  std::int32_t SFTIM_GetVideoStartSample(void* adxtRuntime, std::int32_t audioSampleRate, std::int32_t* outHasExplicitStartTime);
+  /**
+   * Address: 0x00ADAFF0 (FUN_00ADAFF0, _SFTIM_SetStartTime)
+   *
+   * What it does:
+   * Stores one per-handle playback start-time pair.
+   */
+  std::int32_t
+  SFTIM_SetStartTime(std::int32_t workctrlAddress, std::int32_t startTimeMajor, std::int32_t startTimeMinor);
   void SFTIM_GetTime(std::int32_t workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
+  /**
+   * Address: 0x00ADBEC0 (FUN_00ADBEC0, _SFTIM_SetSpeed)
+   *
+   * What it does:
+   * Stores one per-handle timer speed rational lane.
+   */
+  std::int32_t SFTIM_SetSpeed(std::int32_t workctrlAddress, std::int32_t speedRational);
+  /**
+   * Address: 0x00ADBED0 (FUN_00ADBED0, _SFTIM_GetSpeed)
+   *
+   * What it does:
+   * Returns one per-handle timer speed rational lane.
+   */
+  std::int32_t SFTIM_GetSpeed(std::int32_t workctrlAddress);
   std::int32_t SFTIM_GetTimeSub(
     moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
     std::int32_t* outTimeMajor,
     std::int32_t* outTimeMinor
   );
   std::int32_t SFTIM_IsStagnant(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj);
+  /**
+   * Address: 0x00ADB3D0 (FUN_00ADB3D0, _SFD_CmpTime)
+   *
+   * What it does:
+   * Thin thunk that forwards one time-pair compare to `UTY_CmpTime`.
+   */
   std::int32_t SFD_CmpTime(
     std::int32_t lhsIntegerPart,
     std::int32_t lhsFractionalPart,
@@ -3047,8 +3179,48 @@
     std::int32_t rhsFractionalPart
   );
   std::int32_t CRICFG_Read(const char* key, std::int32_t* outValue);
+  /**
+   * Address: 0x00AE6F90 (FUN_00AE6F90, _set_unit)
+   *
+   * What it does:
+   * Stores one global timer-unit lane and returns its low 32-bit value.
+   */
   std::int32_t set_unit(std::int64_t frequencyTicks);
+  /**
+   * Address: 0x00AE6E20 (FUN_00AE6E20, _UTY_GetTmr)
+   *
+   * What it does:
+   * Reads high-resolution counter ticks when timer init/channel state is valid.
+   */
+  std::int64_t UTY_GetTmr();
+  /**
+   * Address: 0x00AE6E00 (FUN_00AE6E00, _UTY_FinishTmr)
+   *
+   * What it does:
+   * Decrements timer init-reference count and clamps global count at zero.
+   */
+  std::int32_t UTY_FinishTmr();
+  /**
+   * Address: 0x00AE6EB0 (FUN_00AE6EB0, _UTY_GetTmrUnit)
+   *
+   * What it does:
+   * Returns the global timer-unit lane.
+   */
+  std::int64_t UTY_GetTmrUnit();
+  /**
+   * Address: 0x00AE6E60 (FUN_00AE6E60, _UTY_IsTmrVoid)
+   *
+   * What it does:
+   * Returns `1` when timer-unit lane is `0` or `1`; otherwise returns `0`.
+   */
   std::int32_t UTY_IsTmrVoid();
+  /**
+   * Address: 0x00AE6FB0 (FUN_00AE6FB0, _UTY_InitTsum)
+   *
+   * What it does:
+   * Initializes one timer-summary lane to neutral sum/min/max/count defaults.
+   */
+  moho::SfplyTimerSummary* UTY_InitTsum(moho::SfplyTimerSummary* timerSummary);
   std::int32_t UTY_MulDiv(std::int32_t lhs, std::int32_t rhs, std::int32_t divisor);
   void ADXCRS_Lock();
   void ADXCRS_Unlock();
@@ -3060,7 +3232,19 @@
   SflibErrorInfo*
   sflib_SetErrFnSub(SflibErrorInfo* errInfo, SflibErrorCallback callback, std::int32_t callbackObject);
   SflibLibWorkRuntime* sflib_InitResetPara(SflibLibWorkRuntime* libWork);
+  /**
+   * Address: 0x00ADA9C0 (FUN_00ADA9C0, _SFTIM_Init)
+   *
+   * What it does:
+   * Initializes global timer lanes and stores caller timer-version tag.
+   */
   void SFTIM_Init(void* timerState, std::int32_t versionTag);
+  /**
+   * Address: 0x00ADA9E0 (FUN_00ADA9E0, _SFTIM_Finish)
+   *
+   * What it does:
+   * Finalizes global timer runtime (no-op in this build).
+   */
   void SFTIM_Finish(void* timerState);
   void sflib_FinishCs();
   std::int32_t sflib_FinishSub();
@@ -3405,6 +3589,11 @@
   std::int32_t gUtyMmxSupportState = -1;
   std::int32_t gUtyTimerInitCount = 0;
   std::int32_t gUtyTimerChannel = 0;
+  std::int64_t gUtyTimerUnit = 0;
+  std::int64_t sftim_as_pts = 0;
+  std::int32_t sftim_a_sample = 0;
+  std::int32_t sftim_v_time = 0;
+  std::int32_t sftim_v_sample = 0;
 
   struct CriConfigEntry
   {

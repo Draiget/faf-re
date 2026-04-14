@@ -150,17 +150,11 @@ namespace
 
   [[nodiscard]] bool WeaponCheckSilo(const UnitWeapon* const weapon) noexcept
   {
-    if (!weapon || !weapon->mWeaponBlueprint || weapon->mWeaponBlueprint->CountedProjectile == 0u) {
+    if (!weapon) {
       return true;
     }
 
-    if (!weapon->mUnit || !weapon->mUnit->AiSiloBuild) {
-      return true;
-    }
-
-    const std::int32_t storageCount =
-      weapon->mUnit->AiSiloBuild->SiloGetStorageCount(static_cast<ESiloType>(weapon->mWeaponBlueprint->NukeWeapon));
-    return storageCount != 0;
+    return const_cast<UnitWeapon*>(weapon)->CheckSilo();
   }
 
   [[nodiscard]] bool WeaponTargetIsTooClose(const UnitWeapon* const weapon) noexcept

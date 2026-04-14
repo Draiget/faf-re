@@ -605,6 +605,20 @@ namespace
     return LoopList::owner_from_member_node<moho::HSound, &moho::HSound::mSimLoopLink>(node);
   }
 
+  /**
+   * Address: 0x00761CE0 (FUN_00761CE0, func_AppendSoundToList)
+   *
+   * What it does:
+   * Unlinks one `HSound` loop node from its current intrusive ring and inserts
+   * it before the supplied list-head sentinel.
+   */
+  [[nodiscard]] LoopNode* AppendSoundToList(moho::HSound* const sound, LoopNode* const listHead)
+  {
+    LoopNode* const loopNode = &sound->mSimLoopLink;
+    loopNode->ListLinkBefore(listHead);
+    return loopNode;
+  }
+
   bool IsSndVarReady(const moho::CSndVar& value)
   {
     if (value.mResolved != 0u) {
@@ -1602,7 +1616,7 @@ namespace moho
     }
 
     HSound* const sound = new HSound(params);
-    mActiveLoops.push_back(&sound->mSimLoopLink);
+    (void)AppendSoundToList(sound, reinterpret_cast<LoopNode*>(&mActiveLoops));
     sound->mLoopCue = cue;
     return sound;
   }

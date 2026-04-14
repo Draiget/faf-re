@@ -5,6 +5,7 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/math/Vector2f.h"
 #include "moho/math/Vector3f.h"
 
 namespace gpg
@@ -16,6 +17,7 @@ namespace gpg
 namespace moho
 {
   class Unit;
+  class VTransform;
 
   /**
    * Collision reaction category stored in steering collision state.
@@ -74,6 +76,108 @@ namespace moho
   static_assert(offsetof(CPathPoint, mPosition) == 0x00, "CPathPoint::mPosition offset must be 0x00");
   static_assert(offsetof(CPathPoint, mDirection) == 0x0C, "CPathPoint::mDirection offset must be 0x0C");
   static_assert(offsetof(CPathPoint, mState) == 0x18, "CPathPoint::mState offset must be 0x18");
+
+  struct SteeringParams
+  {
+    /**
+     * Address: 0x006990E0 (FUN_006990E0, ??0struct_SteeringParams@@QAE@@Z)
+     *
+     * What it does:
+     * Builds steering scalar/vector lanes from unit physics + attributes and a
+     * source/destination/forward snapshot.
+     */
+    SteeringParams(
+      Unit* unit,
+      const Wm3::Vector3f& sourcePosition,
+      const Wm3::Vector3f& destinationPosition,
+      const Wm3::Vector3f& forwardVector,
+      float speedLimit,
+      bool skipDynamicLimits
+    ) noexcept;
+
+    float mMaxSpeed;                 // +0x00
+    float mMaxReverseSpeed;          // +0x04
+    float mMaxAcceleration;          // +0x08
+    float mMaxBrake;                 // +0x0C
+    float mMaxSteer;                 // +0x10
+    float mInvTurnRadius;            // +0x14
+    float mTurnRate;                 // +0x18
+    float mTurnFacingRate;           // +0x1C
+    float mDeltaX;                   // +0x20
+    float mDeltaZ;                   // +0x24
+    Wm3::Vector2f mForwardXZ;        // +0x28
+    float mDistance;                 // +0x30
+    float mDistanceSq;               // +0x34
+    std::uint8_t mRotateOnSpot;      // +0x38
+    std::uint8_t pad_39_3B[0x03]{};  // +0x39
+    float mRotateOnSpotThreshold;    // +0x3C
+  };
+
+  static_assert(offsetof(SteeringParams, mMaxSpeed) == 0x00, "SteeringParams::mMaxSpeed offset must be 0x00");
+  static_assert(
+    offsetof(SteeringParams, mMaxReverseSpeed) == 0x04, "SteeringParams::mMaxReverseSpeed offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SteeringParams, mMaxAcceleration) == 0x08, "SteeringParams::mMaxAcceleration offset must be 0x08"
+  );
+  static_assert(offsetof(SteeringParams, mMaxBrake) == 0x0C, "SteeringParams::mMaxBrake offset must be 0x0C");
+  static_assert(offsetof(SteeringParams, mMaxSteer) == 0x10, "SteeringParams::mMaxSteer offset must be 0x10");
+  static_assert(
+    offsetof(SteeringParams, mInvTurnRadius) == 0x14, "SteeringParams::mInvTurnRadius offset must be 0x14"
+  );
+  static_assert(offsetof(SteeringParams, mTurnRate) == 0x18, "SteeringParams::mTurnRate offset must be 0x18");
+  static_assert(
+    offsetof(SteeringParams, mTurnFacingRate) == 0x1C, "SteeringParams::mTurnFacingRate offset must be 0x1C"
+  );
+  static_assert(offsetof(SteeringParams, mDeltaX) == 0x20, "SteeringParams::mDeltaX offset must be 0x20");
+  static_assert(offsetof(SteeringParams, mDeltaZ) == 0x24, "SteeringParams::mDeltaZ offset must be 0x24");
+  static_assert(offsetof(SteeringParams, mForwardXZ) == 0x28, "SteeringParams::mForwardXZ offset must be 0x28");
+  static_assert(offsetof(SteeringParams, mDistance) == 0x30, "SteeringParams::mDistance offset must be 0x30");
+  static_assert(offsetof(SteeringParams, mDistanceSq) == 0x34, "SteeringParams::mDistanceSq offset must be 0x34");
+  static_assert(
+    offsetof(SteeringParams, mRotateOnSpot) == 0x38, "SteeringParams::mRotateOnSpot offset must be 0x38"
+  );
+  static_assert(
+    offsetof(SteeringParams, mRotateOnSpotThreshold) == 0x3C,
+    "SteeringParams::mRotateOnSpotThreshold offset must be 0x3C"
+  );
+  static_assert(sizeof(SteeringParams) == 0x40, "SteeringParams size must be 0x40");
+
+  /**
+   * Address: 0x00698FF0 (FUN_00698FF0)
+   *
+   * What it does:
+   * Builds one temporary `SteeringParams` snapshot from a transform origin,
+   * destination vector, and transform-derived XZ forward lane.
+   */
+  [[nodiscard]]
+  SteeringParams
+  BuildSteeringParamsFromTransform(Unit* unit, const VTransform& transform, const Wm3::Vector3f& destination) noexcept;
+
+  /**
+   * Address: 0x006992C0 (FUN_006992C0)
+   *
+   * What it does:
+   * Rotates one XZ direction toward a target direction by at most the supplied
+   * max turn angle, preserving source length semantics.
+   */
+  Wm3::Vector2f* RotateDirectionTowardTargetLimited(
+    Wm3::Vector2f* outDirection,
+    float maxTurnRadians,
+    float sourceX,
+    float sourceZ,
+    float targetX,
+    float targetZ
+  ) noexcept;
+
+  /**
+   * Address: 0x00699940 (FUN_00699940)
+   *
+   * What it does:
+   * Converts one XZ direction lane into a yaw-only quaternion orientation.
+   */
+  Wm3::Quaternionf*
+  BuildHeadingQuaternionFromDirection2D(const Wm3::Vector2f* direction, Wm3::Quaternionf* outOrientation) noexcept;
 
   /**
    * Intrusive collision-link header paired with steering collision state.

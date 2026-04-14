@@ -15,6 +15,13 @@ namespace msvc8
     struct string;
 }
 
+struct lua_State;
+struct TString;
+struct Table;
+struct LClosure;
+struct Udata;
+struct CClosure;
+
 namespace gpg
 {
     class RRef;
@@ -211,6 +218,60 @@ namespace gpg
          * `WriteFloat`.
          */
         WriteArchive* WriteValue(const void* valueLane, int unusedTag);
+
+        /**
+         * Address: 0x0090B380 (FUN_0090B380, gpg::WriteArchive::WriteTThread)
+         *
+         * What it does:
+         * Wraps one Lua `lua_State*` as an `RRef` and emits it as an unowned
+         * tracked pointer lane using caller-provided owner context.
+         */
+        WriteArchive* WriteTThread(lua_State* threadState, const gpg::RRef& ownerRef);
+
+        /**
+         * Address: 0x00920870 (FUN_00920870, gpg::WriteArchive::WriteTString)
+         *
+         * What it does:
+         * Wraps one Lua `TString*` as an `RRef` and emits it as an unowned
+         * tracked pointer lane using caller-provided owner context.
+         */
+        WriteArchive* WriteTString(TString* value, const gpg::RRef& ownerRef);
+
+        /**
+         * Address: 0x009208B0 (FUN_009208B0, gpg::WriteArchive::WriteTTable)
+         *
+         * What it does:
+         * Wraps one Lua `Table*` as an `RRef` and emits it as an unowned
+         * tracked pointer lane using caller-provided owner context.
+         */
+        WriteArchive* WriteTTable(Table* table, const gpg::RRef& ownerRef);
+
+        /**
+         * Address: 0x009208F0 (FUN_009208F0, gpg::WriteArchive::WriteFunction)
+         *
+         * What it does:
+         * Wraps one Lua `LClosure*` as an `RRef` and emits it as an unowned
+         * tracked pointer lane using caller-provided owner context.
+         */
+        WriteArchive* WriteFunction(LClosure* closure, const gpg::RRef& ownerRef);
+
+        /**
+         * Address: 0x00920930 (FUN_00920930, gpg::WriteArchive::WriteUserdata)
+         *
+         * What it does:
+         * Wraps one Lua `Udata*` as an `RRef` and emits it as an unowned
+         * tracked pointer lane using caller-provided owner context.
+         */
+        WriteArchive* WriteUserdata(Udata* userdata, const gpg::RRef& ownerRef);
+
+        /**
+         * Address: 0x00921240 (FUN_00921240, gpg::WriteArchive::WriteCFunction)
+         *
+         * What it does:
+         * Wraps one Lua `CClosure*` as an `RRef` and emits it as an unowned
+         * tracked pointer lane using caller-provided owner context.
+         */
+        WriteArchive* WriteCFunction(CClosure* closure, const gpg::RRef& ownerRef);
 
     protected:
         std::map<const RType*, int> mRefCounts;

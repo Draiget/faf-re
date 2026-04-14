@@ -37,4 +37,22 @@ namespace moho
   {
     mType.assign(type, 0u, msvc8::string::npos);
   }
+
+  /**
+   * Address: 0x006D3430 (FUN_006D3430, Moho::CWeaponAttributes::GetName)
+   *
+   * What it does:
+   * Returns `mType` when non-empty; otherwise returns `mBlueprint->mDamageType`.
+   */
+  msvc8::string CWeaponAttributes::GetName() const
+  {
+    const msvc8::string* sourceName = &mType;
+    if (mType.empty()) {
+      sourceName = &mBlueprint->DamageType;
+    }
+
+    msvc8::string result;
+    result.assign(*sourceName, 0u, msvc8::string::npos);
+    return result;
+  }
 } // namespace moho

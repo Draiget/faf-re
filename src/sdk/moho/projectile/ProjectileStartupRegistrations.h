@@ -21,10 +21,32 @@ namespace moho
   class CScrLuaInitForm;
 
   template <class TEvent>
+  class ManyToOneListener;
+
+  template <class TEvent>
   class ManyToOneBroadcaster
   {
   public:
     inline static gpg::RType* sType = nullptr;
+  };
+
+  template <>
+  class ManyToOneBroadcaster<EProjectileImpactEvent>
+  {
+  public:
+    static gpg::RType* sType;
+
+    void* ownerLinkSlot; // +0x00
+    void* nextInOwner;   // +0x04
+
+    /**
+     * Address: 0x005DC230 (FUN_005DC230, Moho::ManyToOneBroadcaster_EProjectileImpactEvent::BroadcastEvent)
+     *
+     * What it does:
+     * Rebinds this projectile-impact broadcaster node to the supplied listener
+     * chain head while preserving intrusive owner-chain integrity.
+     */
+    void BroadcastEvent(ManyToOneListener<EProjectileImpactEvent>* listener);
   };
 
   template <class TEvent>
@@ -36,6 +58,19 @@ namespace moho
 
   using ManyToOneBroadcaster_EProjectileImpactEvent = ManyToOneBroadcaster<EProjectileImpactEvent>;
   using ManyToOneListener_EProjectileImpactEvent = ManyToOneListener<EProjectileImpactEvent>;
+
+  static_assert(
+    sizeof(ManyToOneBroadcaster_EProjectileImpactEvent) == 0x08,
+    "ManyToOneBroadcaster<EProjectileImpactEvent> size must be 0x08"
+  );
+  static_assert(
+    offsetof(ManyToOneBroadcaster_EProjectileImpactEvent, ownerLinkSlot) == 0x00,
+    "ManyToOneBroadcaster<EProjectileImpactEvent>::ownerLinkSlot offset must be 0x00"
+  );
+  static_assert(
+    offsetof(ManyToOneBroadcaster_EProjectileImpactEvent, nextInOwner) == 0x04,
+    "ManyToOneBroadcaster<EProjectileImpactEvent>::nextInOwner offset must be 0x04"
+  );
 
   class EProjectileImpactEventTypeInfo final : public gpg::REnumType
   {

@@ -7,6 +7,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/math/MathReflection.h"
 
 namespace
 {
@@ -159,7 +160,8 @@ int moho::cfunc_EulerToQuaternionL(LuaPlus::LuaState* const state)
   }
   const float yaw = static_cast<float>(lua_tonumber(state->m_state, 3));
 
-  const Wm3::Quatf orientation = Wm3::Quatf::FromEulerXYZ(roll, pitch, yaw);
+  const VEulers3 eulerAngles{roll, pitch, yaw};
+  const Wm3::Quatf orientation = moho::EulerToQuaternion(eulerAngles);
   LuaPlus::LuaObject luaOrientation = SCR_ToLua<Wm3::Quaternion<float>>(state, orientation);
   luaOrientation.PushStack(state);
   return 1;
