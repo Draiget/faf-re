@@ -133,6 +133,15 @@ namespace moho
     void Render(CWldSession* worldSession, Cartographic* cartographic, unsigned int viewportHeadIndex, float alpha);
 
     /**
+     * Address: 0x007EE950 (FUN_007EE950, Moho::RangeRenderer::MoveCategories)
+     *
+     * What it does:
+     * Rebuilds the visible-profile vector from category-name keys using the
+     * profile map tree.
+     */
+    void MoveCategories(const msvc8::vector<msvc8::string>& categories);
+
+    /**
      * Address: 0x007EE430 (FUN_007EE430, sub_7EE430)
      *
      * What it does:

@@ -1117,6 +1117,27 @@ namespace
   {
     return UnlinkSTriggerSerializerHelper();
   }
+
+  /**
+   * Address: 0x0070E8F0 (FUN_0070E8F0, gpg::fastvector_SCondition::push_back)
+   *
+   * What it does:
+   * Appends one `SCondition` to the legacy fastvector lane. When the lane is
+   * full it grows through the shared runtime insert helper; otherwise it copies
+   * into the current end slot and advances `end`.
+   */
+  void FastVectorSConditionPushBack(gpg::fastvector_runtime_view<moho::SCondition>& vector, const moho::SCondition& value)
+  {
+    if (vector.end == vector.capacityEnd) {
+      (void)gpg::FastVectorRuntimeInsertRange(vector, vector.end, &value, &value + 1);
+      return;
+    }
+
+    if (vector.end != nullptr) {
+      *vector.end = value;
+    }
+    ++vector.end;
+  }
 } // namespace
 
 namespace moho

@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/sim/Sim.h"
@@ -13,6 +14,16 @@
 namespace
 {
   constexpr std::uint64_t kUnitStateMaskCarrierLaunch = 0x0000000000000200ull;
+
+  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
+  {
+    gpg::RType* type = moho::CCommandTask::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::CCommandTask));
+      moho::CCommandTask::sType = type;
+    }
+    return type;
+  }
 
   [[nodiscard]] gpg::RType* CachedSNavGoalType()
   {
@@ -36,6 +47,21 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00606E10 (FUN_00606E10, Moho::CUnitCarrierLaunch::CUnitCarrierLaunch)
+   *
+   * What it does:
+   * Initializes one detached carrier-launch task with empty launch-goal state
+   * and an unregistered carried-unit set.
+   */
+  CUnitCarrierLaunch::CUnitCarrierLaunch()
+    : CCommandTask()
+    , mLaunchGoal()
+    , mHasCarrierTransportedUnit(false)
+    , mPad55{}
+    , mCarriedUnits()
+  {}
+
   /**
    * Address: 0x00606E60 (FUN_00606E60, Moho::CUnitCarrierLaunch::CUnitCarrierLaunch)
    *
@@ -109,6 +135,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x00608950 (FUN_00608950, Moho::CUnitCarrierLaunch::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes the `CCommandTask` base, launch goal, launch-state bool, and
+   * carried-unit set.
+   */
+  void CUnitCarrierLaunch::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedCCommandTaskType(), this, ownerRef);
+
+    const gpg::RRef launchGoalOwnerRef{};
+    archive->Read(CachedSNavGoalType(), &mLaunchGoal, launchGoalOwnerRef);
+    archive->ReadBool(&mHasCarrierTransportedUnit);
+
+    const gpg::RRef carriedUnitsOwnerRef{};
+    archive->Read(CachedEntitySetTemplateUnitType(), &mCarriedUnits, carriedUnitsOwnerRef);
+  }
+
+  /**
    * Address: 0x00608A10 (FUN_00608A10, Moho::CUnitCarrierLaunch::MemberSerialize)
    *
    * What it does:
@@ -121,14 +171,8 @@ namespace moho
       return;
     }
 
-    gpg::RType* commandTaskType = CCommandTask::sType;
-    if (!commandTaskType) {
-      commandTaskType = gpg::LookupRType(typeid(CCommandTask));
-      CCommandTask::sType = commandTaskType;
-    }
-
     const gpg::RRef ownerRef{};
-    archive->Write(commandTaskType, this, ownerRef);
+    archive->Write(CachedCCommandTaskType(), this, ownerRef);
 
     const gpg::RRef launchGoalOwnerRef{};
     archive->Write(CachedSNavGoalType(), &mLaunchGoal, launchGoalOwnerRef);

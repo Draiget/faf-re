@@ -7,9 +7,11 @@
 // Lives outside dependencies/WildMagic3p8/ because they're FAF SDK glue, not
 // Wild Magic library code. Used to live at src/sdk/wm3/Distance3.h.
 #include "Wm3Box3.h"
+#include "Wm3Box2.h"
 #include "Wm3Line3.h"
 #include "Wm3Segment3.h"
 #include "Wm3Sphere3.h"
+#include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
 namespace Wm3
@@ -159,6 +161,51 @@ namespace Wm3
     const Vector3<double>& vectorVelocity,
     const Vector3<double>& boxVelocity,
     Vector3<double>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A6CB50 (FUN_00A6CB50, Wm3::DistVector2Box2d::StaticGet)
+   *
+   * double, Wm3::Vector2<double> const&, Wm3::Box2<double> const&, Wm3::Vector2<double> const&,
+   * Wm3::Vector2<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector2Box2d::StaticGet(Wm3::DistVector2Box2d *this, double t,
+   * Wm3::Vector2d *velocity0, Wm3::Vector2d *velocity1);
+   *
+   * What it does:
+   * Moves point/box forward by time `t` and returns point-to-box distance.
+   */
+  double DistVector2Box2dStaticGet(
+    double t,
+    const Vector2<double>& vector,
+    const Box2<double>& box,
+    const Vector2<double>& vectorVelocity,
+    const Vector2<double>& boxVelocity,
+    Vector2<double>* closestPointOnBox = nullptr
+  ) noexcept;
+
+  /**
+   * Address: 0x00A6CC60 (FUN_00A6CC60, Wm3::DistVector2Box2d::StaticGetSquared)
+   *
+   * double, Wm3::Vector2<double> const&, Wm3::Box2<double> const&, Wm3::Vector2<double> const&,
+   * Wm3::Vector2<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector2Box2d::StaticGetSquared(Wm3::DistVector2Box2d *this, double t,
+   * Wm3::Vector2d *velocity0, Wm3::Vector2d *velocity1);
+   *
+   * What it does:
+   * Moves the point and box forward by time `t`, then returns the squared distance from the moved point to the moved
+   * oriented box.
+   */
+  double DistVector2Box2dStaticGetSquared(
+    double t,
+    const Vector2<double>& vector,
+    const Box2<double>& box,
+    const Vector2<double>& vectorVelocity,
+    const Vector2<double>& boxVelocity,
+    Vector2<double>* closestPointOnBox = nullptr
   ) noexcept;
 
   /**

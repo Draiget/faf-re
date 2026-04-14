@@ -38,6 +38,7 @@ static_assert(sizeof(wxSize) == 0x8, "wxSize size must be 0x8");
 struct wxStringRuntime;
 struct wxColourRuntime;
 class wxMoveEventRuntime;
+class wxCursor;
 
 /**
  * Address: 0x009ACE50 (FUN_009ACE50, wxENTER_CRIT_SECT)
@@ -113,6 +114,16 @@ int wxGetOsVersion(int* majorVsn, int* minorVsn);
  * Preserves the wx debug-log call lane as a deliberate no-op.
  */
 void wxLogDebug(...);
+
+/**
+ * Address: 0x009C7BB0 (FUN_009C7BB0, wxBeginBusyCursor)
+ *
+ * What it does:
+ * Increments busy-cursor nesting depth and, on first entry, swaps the active
+ * Win32 cursor to the provided wx cursor handle (or null cursor when refdata
+ * is absent), while saving the previous cursor lane.
+ */
+void wxBeginBusyCursor(wxCursor* cursor);
 
 namespace wx
 {
@@ -3057,6 +3068,16 @@ namespace moho
      * outline path (`RenderCameraOutline` at 0x007F98A0).
      */
     void ResetRenderState0C() noexcept;
+
+    /**
+     * Address: 0x007F8290 (FUN_007F8290, Moho::WRenViewport::RenderMeshes)
+     *
+     * What it does:
+     * Sets the render target, viewport, and color-write state for one viewport
+     * mesh pass, then dispatches either skeleton-debug rendering or the normal
+     * mesh batch renderer depending on `ren_ShowSkeletons`.
+     */
+    void RenderMeshes(int meshFlags, bool mirrored);
   };
 
   static_assert(offsetof(WRenViewport, mRenderState0C) == 0x0C, "moho::WRenViewport::mRenderState0C offset must be 0x0C");

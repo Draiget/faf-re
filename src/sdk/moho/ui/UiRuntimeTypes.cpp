@@ -8,6 +8,7 @@
 #include <exception>
 #include <limits>
 #include <new>
+#include <string>
 #include <stdexcept>
 #include <typeinfo>
 #include <vector>
@@ -2200,6 +2201,22 @@ namespace
     return reinterpret_cast<IMauiDragger*>(editView->mClickDraggerStorage);
   }
 
+  struct CMauiEditClickDraggerRuntimeView
+  {
+    std::uint32_t mVftable = 0;
+    DraggerLink* mListHead = nullptr;
+  };
+
+  static_assert(
+    sizeof(CMauiEditClickDraggerRuntimeView) == 0x08,
+    "CMauiEditClickDraggerRuntimeView size must be 0x08"
+  );
+
+  [[nodiscard]] CMauiEditClickDraggerRuntimeView* ResolveEditClickDraggerRuntime(CMauiEditRuntimeView* const editView) noexcept
+  {
+    return reinterpret_cast<CMauiEditClickDraggerRuntimeView*>(editView->mClickDraggerStorage);
+  }
+
   /**
    * Address: 0x0078F620 (FUN_0078F620, Moho::CMauiEdit::ApplyFontAndRefreshClip)
    *
@@ -2247,22 +2264,10 @@ namespace
 
   void ApplyCursorDefaultTexture(moho::CMauiCursor* const cursor, const char* const texturePath)
   {
-    moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    moho::ID3DDeviceResources* const resources = device->GetResources();
-    moho::ID3DDeviceResources::TextureResourceHandle loadedTexture{};
-    resources->GetTexture(loadedTexture, texturePath, 0, false);
-
-    auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
-    if (loadedTexture.get() == cursorView->mDefaultTexture.get()) {
+    if (!cursor) {
       return;
     }
-
-    if (cursorView->mTexture.get() == cursorView->mDefaultTexture.get()) {
-      cursorView->mTexture = loadedTexture;
-      cursorView->mIsDefaultTexture = true;
-    }
-
-    cursorView->mDefaultTexture = loadedTexture;
+    cursor->SetDefaultTexture(texturePath);
   }
 
   [[nodiscard]] std::uint32_t NarrowPointerToFocusField(const void* const pointer) noexcept
@@ -3027,6 +3032,31 @@ void moho::CMauiCursor::SetTexture(const char* const texturePath)
     cursorView->mTexture = loadedTexture;
     cursorView->mIsDefaultTexture = true;
   }
+}
+
+/**
+ * Address: 0x0078CD80 (FUN_0078CD80, Moho::CMauiCursor::SetDefaultTexture)
+ *
+ * What it does:
+ * Loads one default cursor texture and updates default/active texture lanes.
+ * If active texture still equals the old default, it is replaced as well.
+ */
+void moho::CMauiCursor::SetDefaultTexture(const char* const texturePath)
+{
+  ID3DDeviceResources::TextureResourceHandle loadedTexture{};
+  D3D_GetDevice()->GetResources()->GetTexture(loadedTexture, texturePath, 0, false);
+
+  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
+  if (loadedTexture.get() == cursorView->mDefaultTexture.get()) {
+    return;
+  }
+
+  if (cursorView->mTexture.get() == cursorView->mDefaultTexture.get()) {
+    cursorView->mTexture = loadedTexture;
+    cursorView->mIsDefaultTexture = true;
+  }
+
+  cursorView->mDefaultTexture = loadedTexture;
 }
 
 /**
@@ -9018,6 +9048,27 @@ moho::CMauiBorder::CMauiBorder(LuaPlus::LuaObject* const luaObject, CMauiControl
 }
 
 /**
+ * Address: 0x00784B40 (FUN_00784B40, Moho::CMauiBorder::~CMauiBorder)
+ *
+ * What it does:
+ * Releases border lazy-var/object texture lanes before base `CMauiControl`
+ * teardown.
+ */
+moho::CMauiBorder::~CMauiBorder()
+{
+  CMauiBorderRuntimeView* const borderView = CMauiBorderRuntimeView::FromBorder(this);
+  AsLazyVarObject(borderView->mBorderHeightLV).~LuaObject();
+  AsLazyVarObject(borderView->mBorderWidthLV).~LuaObject();
+
+  borderView->mTexLR.~shared_ptr();
+  borderView->mTexLL.~shared_ptr();
+  borderView->mTexUR.~shared_ptr();
+  borderView->mTexUL.~shared_ptr();
+  borderView->mTexHorz.~shared_ptr();
+  borderView->mTex1.~shared_ptr();
+}
+
+/**
  * Address: 0x00791FF0 (FUN_00791FF0, cfunc_InternalCreateEdit)
  *
  * What it does:
@@ -9204,6 +9255,18 @@ moho::CMauiHistogram::CMauiHistogram(LuaPlus::LuaObject* const luaObject, CMauiC
   histogramView->mUnknown128 = 0;
   histogramView->mUnknown12C = 0;
   histogramView->mUnknown130 = 0;
+}
+
+/**
+ * Address: 0x00797900 (FUN_00797900, Moho::CMauiHistogram::Dump)
+ *
+ * What it does:
+ * Logs base control debug state plus one histogram class banner line.
+ */
+void moho::CMauiHistogram::Dump()
+{
+  CMauiControl::Dump();
+  gpg::Logf("CMauiHistogram");
 }
 
 /**
@@ -16399,6 +16462,33 @@ std::int32_t moho::CMauiBitmap::SetFrame(const std::int32_t frameIndex)
 }
 
 /**
+ * Address: 0x00780270 (FUN_00780270, Moho::CMauiBitmap::Frame)
+ *
+ * What it does:
+ * Dispatches the bitmap `OnFrame` script callback, advances the frame timer
+ * when playback is active, and wraps back to frame-end handling once the
+ * current frame duration is exceeded.
+ */
+void moho::CMauiBitmap::Frame(const float deltaSeconds)
+{
+  reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+
+  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
+  if (!bitmapView->mIsPlaying) {
+    return;
+  }
+
+  const float nextFrameTime = deltaSeconds + bitmapView->mCurrentFrameTimeSeconds;
+  bitmapView->mCurrentFrameTimeSeconds = nextFrameTime;
+  if (nextFrameTime <= bitmapView->mFrameDurationSeconds) {
+    return;
+  }
+
+  bitmapView->mCurrentFrameTimeSeconds = 0.0f;
+  OnPatternEnd();
+}
+
+/**
  * Address: 0x00780160 (FUN_00780160, Moho::CMauiBitmap::OnPatternEnd)
  *
  * What it does:
@@ -16444,6 +16534,28 @@ void moho::CMauiBitmap::OnPatternEnd()
   }
 
   reinterpret_cast<CScriptObject*>(this)->CallbackInt("OnAnimationFrame", bitmapView->mCurrentFrame);
+}
+
+/**
+ * Address: 0x0078F1B0 (FUN_0078F1B0, Moho::CMauiEdit::~CMauiEdit)
+ * Mangled: ??1CMauiEdit@Moho@@QAE@XZ
+ *
+ * What it does:
+ * Releases edit text/font ownership lanes, clears click-dragger intrusive
+ * link nodes, and then tears down the `CMauiControl` base.
+ */
+moho::CMauiEdit::~CMauiEdit()
+{
+  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  editView->mText.tidy(true, 0U);
+  ReleaseIntrusiveFont(editView->mFont);
+
+  CMauiEditClickDraggerRuntimeView* const clickDragger = ResolveEditClickDraggerRuntime(editView);
+  for (DraggerLink* node = clickDragger->mListHead; node != nullptr; node = clickDragger->mListHead) {
+    clickDragger->mListHead = node->mNext;
+    node->mPrev = nullptr;
+    node->mNext = nullptr;
+  }
 }
 
 /**
@@ -16495,6 +16607,30 @@ msvc8::string moho::CMauiEdit::GetSelection()
   }
 
   return selectionText;
+}
+
+/**
+ * Address: 0x007904D0 (FUN_007904D0, Moho::CMauiEdit::EnterPressed)
+ *
+ * What it does:
+ * Invokes `OnEnterPressed(self, text)` and returns the script bool result.
+ */
+bool moho::CMauiEdit::EnterPressed()
+{
+  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool("OnEnterPressed", std::string(editView->mText.c_str()));
+}
+
+/**
+ * Address: 0x007904F0 (FUN_007904F0, Moho::CMauiEdit::EscPressed)
+ *
+ * What it does:
+ * Invokes `OnEscPressed(self, text)` and returns the script bool result.
+ */
+bool moho::CMauiEdit::EscPressed()
+{
+  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
+  return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool("OnEscPressed", std::string(editView->mText.c_str()));
 }
 
 /**
@@ -16960,6 +17096,49 @@ moho::CMauiFrame::CMauiFrame(LuaPlus::LuaObject* const luaObject, CMauiControl* 
 }
 
 /**
+ * Address: 0x00796460 (FUN_00796460, ??1CMauiFrame@Moho@@UAE@XZ)
+ * Deleting thunk: 0x00796440 (FUN_00796440, Moho::CMauiFrame::dtr)
+ *
+ * What it does:
+ * Purges pending deleted controls, releases one frame-owned wx event mapper,
+ * unlinks the deleted-control sentinel, and then tears down base control
+ * state.
+ */
+moho::CMauiFrame::~CMauiFrame()
+{
+  PurgeDeleted();
+
+  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
+  if (frameView->mEventHandler != nullptr) {
+    delete frameView->mEventHandler;
+    frameView->mEventHandler = nullptr;
+  }
+
+  static_cast<CMauiControlListNode*>(&frameView->mDeletedControlList)->ListUnlink();
+  frameView->mSelfWeak = boost::weak_ptr<CMauiFrame>{};
+}
+
+/**
+ * Address: 0x00796510 (FUN_00796510, Moho::CMauiFrame::PurgeDeleted)
+ *
+ * What it does:
+ * Deletes all controls queued in this frame's deleted-control intrusive list
+ * and restores the list to empty-sentinel state.
+ */
+void moho::CMauiFrame::PurgeDeleted()
+{
+  auto* const deletedListHead = static_cast<CMauiControlListNode*>(&CMauiFrameRuntimeView::FromFrame(this)->mDeletedControlList);
+  while (deletedListHead->mNext != deletedListHead) {
+    CMauiControlListNode* const deletedNode = deletedListHead->mPrev;
+    deletedNode->ListUnlink();
+
+    if (CMauiControl* const deletedControl = ControlFromParentListNode(deletedNode); deletedControl != nullptr) {
+      delete deletedControl;
+    }
+  }
+}
+
+/**
  * Address: 0x00796680 (FUN_00796680, Moho::CMauiFrame::GetTopmostDepth)
  *
  * What it does:
@@ -16976,6 +17155,19 @@ float moho::CMauiFrame::GetTopmostDepth()
     }
   }
   return topmostDepth;
+}
+
+/**
+ * Address: 0x00796720 (FUN_00796720, Moho::CMauiFrame::Dump)
+ *
+ * What it does:
+ * Logs base control debug state and this frame's event-handler lane id.
+ */
+void moho::CMauiFrame::Dump()
+{
+  CMauiControl::Dump();
+  const CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
+  gpg::Logf("Root Frame, head#d\n", static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(frameView->mEventHandler)));
 }
 
 /**
@@ -17797,6 +17989,56 @@ void moho::UI_ClearCurrentDragger()
   (void)func_ResetCurrentDraggerLink();
   sCurrentDraggerKeycode = 0;
 }
+
+namespace
+{
+  struct FactoryCommandQueueItemRuntimeView
+  {
+    msvc8::string blueprintId; // +0x00
+    std::int32_t count;        // +0x1C
+    std::int32_t commandType;  // +0x20
+    void* commandDataBegin;    // +0x24
+    void* commandDataEnd;      // +0x28
+    void* commandDataCapacity; // +0x2C
+  };
+  static_assert(
+    offsetof(FactoryCommandQueueItemRuntimeView, commandDataBegin) == 0x24,
+    "FactoryCommandQueueItemRuntimeView::commandDataBegin offset must be 0x24"
+  );
+  static_assert(sizeof(FactoryCommandQueueItemRuntimeView) == 0x30, "FactoryCommandQueueItemRuntimeView size must be 0x30");
+
+  /**
+   * Address: 0x00837B00 (FUN_00837B00, func_DeleteRangeBuildQueueItems)
+   *
+   * What it does:
+   * Destroys one half-open range of factory queue display items by releasing
+   * per-item command payload buffers and resetting embedded `msvc8::string`
+   * storage back to empty SSO state.
+   */
+  [[maybe_unused]] void DeleteRangeBuildQueueItems(
+    FactoryCommandQueueItemRuntimeView* begin,
+    FactoryCommandQueueItemRuntimeView* end
+  )
+  {
+    while (begin != end) {
+      if (begin->commandDataBegin != nullptr) {
+        ::operator delete(begin->commandDataBegin);
+      }
+      begin->commandDataBegin = nullptr;
+      begin->commandDataEnd = nullptr;
+      begin->commandDataCapacity = nullptr;
+
+      if (begin->blueprintId.myRes >= 0x10u) {
+        ::operator delete(begin->blueprintId.bx.ptr);
+      }
+      begin->blueprintId.myRes = 0x0Fu;
+      begin->blueprintId.mySize = 0u;
+      begin->blueprintId.bx.buf[0] = '\0';
+
+      ++begin;
+    }
+  }
+} // namespace
 
 void moho::UI_FactoryCommandQueueHandlerBeat()
 {

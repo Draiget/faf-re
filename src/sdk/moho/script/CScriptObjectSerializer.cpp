@@ -75,6 +75,17 @@ namespace
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
   }
 
+  /**
+   * Address: 0x004C7A30 (FUN_004C7A30)
+   * Address: 0x004C7A60 (FUN_004C7A60)
+   *
+   * What it does:
+   * Unlinks the CScriptObjectSerializer helper-node from its global
+   * intrusive list and points its own next/prev lanes at itself so the
+   * node becomes a self-loop sentinel. Emitted by the compiler twice for
+   * the two static-destruction lanes that unlink `gCScriptObjectSerializer`
+   * at process exit.
+   */
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
   {

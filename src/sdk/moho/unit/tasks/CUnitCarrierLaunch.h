@@ -9,6 +9,7 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class WriteArchive;
 }
 
@@ -22,7 +23,14 @@ namespace moho
   class CUnitCarrierLaunch : public CCommandTask
   {
   public:
-    CUnitCarrierLaunch() = default;
+    /**
+     * Address: 0x00606E10 (FUN_00606E10, Moho::CUnitCarrierLaunch::CUnitCarrierLaunch)
+     *
+     * What it does:
+     * Initializes one detached carrier-launch task with empty launch-goal state
+     * and an unregistered carried-unit set.
+     */
+    CUnitCarrierLaunch();
 
     /**
      * Address: 0x00606E60 (FUN_00606E60, Moho::CUnitCarrierLaunch::CUnitCarrierLaunch)
@@ -63,6 +71,15 @@ namespace moho
      * carried-unit set.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00608950 (FUN_00608950, Moho::CUnitCarrierLaunch::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes the `CCommandTask` base, launch goal, launch-state bool, and
+     * carried-unit set.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
   public:
     SNavGoal mLaunchGoal;                 // 0x30

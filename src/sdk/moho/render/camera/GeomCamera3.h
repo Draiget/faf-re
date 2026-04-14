@@ -61,6 +61,15 @@ namespace moho
     GeomCamera3(const VTransform& viewTransform, const gpg::gal::Matrix& projectionMatrix);
 
     /**
+     * Address: 0x007421C0 (FUN_007421C0, func_CpyCamera)
+     *
+     * What it does:
+     * Copies transform, projection/view matrices, frustum solids, LOD scale,
+     * and viewport matrix lanes from `rhs` while preserving local flag lanes.
+     */
+    GeomCamera3& operator=(const GeomCamera3& rhs);
+
+    /**
      * Address: 0x004700A0 (FUN_004700A0, Moho::GeomCamera3::Init)
      *
      * Moho::VTransform const&, Moho::VMatrix4 const&

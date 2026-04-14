@@ -4,6 +4,7 @@
 #include <new>
 #include <typeinfo>
 
+#include "moho/debug/RDebugOverlayReflectionHelpers.h"
 #include "moho/ui/CUIWorldMesh.h"
 
 using namespace moho;
@@ -49,6 +50,7 @@ const char* CUIWorldMeshTypeInfo::GetName() const { return "CUIWorldMesh"; }
 void CUIWorldMeshTypeInfo::Init()
 {
   size_ = 0x38;
+  debug_reflection::AddBaseCScriptObject(this);
   gpg::RType::Init();
   Finish();
 }

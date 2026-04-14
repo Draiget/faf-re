@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <new>
+#include <ostream>
 
 #include "String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -32,6 +34,224 @@ const char* SafeTypeName(const RType* const type)
 }
 
 constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
+
+class TextWriteArchive final : public gpg::WriteArchive
+{
+public:
+    explicit TextWriteArchive(const boost::shared_ptr<std::ostream>& stream)
+        : mStreamRef(stream)
+        , mStream(stream.get())
+    {
+    }
+
+    /**
+     * Address: 0x009391E0 (FUN_009391E0, ??1TextWriteArchive@@QAE@@Z)
+     * Address: 0x00939260 (FUN_00939260, scalar deleting destructor thunk)
+     *
+     * What it does:
+     * Releases stream shared-owner state and tears down `WriteArchive` base
+     * bookkeeping.
+     */
+    ~TextWriteArchive() override = default;
+
+    /**
+     * Address: 0x0093E8E0 (FUN_0093E8E0, TextWriteArchive::WriteBytes)
+     *
+     * What it does:
+     * Writes one byte span as grouped lowercase hex pairs (`32` bytes per line,
+     * extra separator after every fourth byte).
+     */
+    void WriteBytes(char* bytes, size_t byteCount) override
+    {
+        if (byteCount == 0u) {
+            return;
+        }
+
+        int lineColumn = 0;
+        for (size_t i = 0; i < byteCount; ++i) {
+            const unsigned char value = static_cast<unsigned char>(bytes[i]);
+            const msvc8::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
+            (*mStream) << encodedByte.c_str();
+
+            ++lineColumn;
+            if (lineColumn == 32) {
+                mStream->put('\n');
+                lineColumn = 0;
+                continue;
+            }
+
+            mStream->put(' ');
+            if ((lineColumn & 3) == 0) {
+                mStream->put(' ');
+            }
+        }
+
+        if (lineColumn != 0) {
+            mStream->put('\n');
+        }
+    }
+
+    /**
+     * Address: 0x0093EB60 (FUN_0093EB60, TextWriteArchive::WriteString)
+     *
+     * What it does:
+     * Writes one quoted, escaped text lane (`\\n`, `\\t`, `\\\"`, `\\\\`, octal
+     * escapes for non-printable bytes), then terminates the record with newline.
+     */
+    void WriteString(msvc8::string* const value) override
+    {
+        mStream->put('"');
+        const char* const data = value->c_str();
+        const size_t size = value->size();
+        for (size_t i = 0; i < size; ++i) {
+            const unsigned char c = static_cast<unsigned char>(data[i]);
+            switch (c) {
+            case '\n':
+                (*mStream) << "\\n";
+                break;
+            case '\t':
+                (*mStream) << "\\t";
+                break;
+            case '"':
+                (*mStream) << "\\\"";
+                break;
+            case '\\':
+                (*mStream) << "\\\\";
+                break;
+            default:
+                if (c < 0x20u || c > 0x7Eu) {
+                    const msvc8::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
+                    (*mStream) << "\\" << octalByte.c_str();
+                } else {
+                    mStream->put(static_cast<char>(c));
+                }
+                break;
+            }
+        }
+        mStream->put('"');
+        mStream->put('\n');
+    }
+
+    /**
+     * Address: 0x0093EB40 (FUN_0093EB40, TextWriteArchive::WriteFloat)
+     */
+    void WriteFloat(float value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EB20 (FUN_0093EB20, TextWriteArchive::WriteUInt64)
+     */
+    void WriteUInt64(uint64_t value) override
+    {
+        WriteScalarWithTrailingSpace(static_cast<unsigned long long>(value));
+    }
+
+    /**
+     * Address: 0x0093EB00 (FUN_0093EB00, TextWriteArchive::WriteInt64)
+     */
+    void WriteInt64(int64_t value) override
+    {
+        WriteScalarWithTrailingSpace(static_cast<long long>(value));
+    }
+
+    /**
+     * Address: 0x0093EAE0 (FUN_0093EAE0, TextWriteArchive::WriteULong)
+     */
+    void WriteULong(unsigned long value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EAC0 (FUN_0093EAC0, TextWriteArchive::WriteLong)
+     */
+    void WriteLong(long value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EAA0 (FUN_0093EAA0, TextWriteArchive::WriteUInt)
+     */
+    void WriteUInt(unsigned int value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EA80 (FUN_0093EA80, TextWriteArchive::WriteInt)
+     */
+    void WriteInt(int value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EA60 (FUN_0093EA60, TextWriteArchive::WriteUShort)
+     */
+    void WriteUShort(unsigned short value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EA40 (FUN_0093EA40, TextWriteArchive::WriteShort)
+     */
+    void WriteShort(short value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093EA20 (FUN_0093EA20, TextWriteArchive::WriteUByte)
+     */
+    void WriteUByte(unsigned __int8 value) override
+    {
+        WriteScalarWithTrailingSpace(static_cast<int>(value));
+    }
+
+    /**
+     * Address: 0x0093EA00 (FUN_0093EA00, TextWriteArchive::WriteByte)
+     */
+    void WriteByte(__int8 value) override
+    {
+        WriteScalarWithTrailingSpace(static_cast<int>(value));
+    }
+
+    /**
+     * Address: 0x0093E9E0 (FUN_0093E9E0, TextWriteArchive::WriteBool)
+     */
+    void WriteBool(bool value) override
+    {
+        WriteScalarWithTrailingSpace(value);
+    }
+
+    /**
+     * Address: 0x0093B960 (FUN_0093B960, TextWriteArchive::WriteToken)
+     *
+     * What it does:
+     * Writes one textual marker byte (`}N0*{`) and appends a separator space.
+     */
+    void WriteMarker(int marker) override
+    {
+        mStream->put(kArchiveTokenBytes[marker]);
+        mStream->put(' ');
+    }
+
+private:
+    template <typename T>
+    void WriteScalarWithTrailingSpace(const T& value)
+    {
+        (*mStream) << value;
+        mStream->put(' ');
+    }
+
+private:
+    boost::shared_ptr<std::ostream> mStreamRef;
+    std::ostream* mStream;
+};
 
 class BinaryWriteArchive final : public gpg::WriteArchive
 {
@@ -427,4 +647,15 @@ WriteArchive* gpg::CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& 
         ThrowSerializationError("Error while creating archive: invalid output stream.");
     }
     return new BinaryWriteArchive(file);
+}
+
+/**
+ * Address: 0x00939280 (FUN_00939280, ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)
+ *
+ * What it does:
+ * Creates one text-backed concrete `WriteArchive` bound to an output stream.
+ */
+WriteArchive* gpg::CreateTextWriteArchive(const boost::shared_ptr<std::ostream>& stream)
+{
+    return new (std::nothrow) TextWriteArchive(stream);
 }

@@ -486,6 +486,9 @@
     <ClCompile Include="moho\sim\CEconomy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\CFormation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\CArmyLuaFunctionRegistrations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1149,7 +1152,25 @@
     <ClCompile Include="moho\unit\tasks\CAcquireTargetTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitFireAtTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitFireAtTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCarrierRetrieve.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCarrierRetrieveTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCarrierLandTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCarrierLaunch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitCarrierLaunchTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCallAirStagingPlatform.cpp">
@@ -1170,6 +1191,12 @@
     <ClCompile Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitTeleportTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitWaitForFerryTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCallTransport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1179,10 +1206,16 @@
     <ClCompile Include="moho\unit\tasks\CBuildTaskHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CFactoryBuildTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitCaptureTaskTypeInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitGuardTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitFerryTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitMeleeAttackTargetTaskTypeInfo.cpp">
@@ -1197,10 +1230,19 @@
     <ClCompile Include="moho\unit\tasks\CUnitMoveTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitMoveTaskTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitPatrolTask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitPodAssist.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitPodAssistTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitUnloadUnits.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitUnloadUnitsTypeInfo.cpp">
@@ -1225,6 +1267,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CUnitRefuelTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\unit\tasks\CUnitSacrificeTask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\unit\tasks\CFireWeaponTask.cpp">
@@ -1428,7 +1473,19 @@
     <ClCompile Include="moho\terrain\water\LowFidelityWater.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\terrain\water\HighFidelityWater.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\terrain\water\WaveSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\terrain\water\Shoreline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\ui\CUIManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moho\ui\CUIWorldMesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ui\EUIStateTypeInfo.cpp">
@@ -1533,6 +1590,9 @@
     <ClCompile Include="lua\LuaObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lua\LuaParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="lua\LuaAssertion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1540,6 +1600,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="lua\LuaObjectTypeInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lua\LuaStateConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="lua\LuaStateSaveConstruct.cpp">
@@ -2661,6 +2724,9 @@
     <ClInclude Include="moho\sim\CDamageEMethodTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\CFormation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\ESpecialFileTypeTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3046,6 +3112,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaObjectTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaStateConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lua\LuaStateSaveConstruct.h">
@@ -3909,7 +3978,28 @@
     <ClInclude Include="moho\unit\tasks\CAcquireTargetTaskTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitFireAtTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitFireAtTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCarrierRetrieve.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCarrierRetrieveTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCarrierLand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCarrierLandTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCarrierLaunch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitCarrierLaunchTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCallAirStagingPlatform.h">
@@ -3930,6 +4020,15 @@
     <ClInclude Include="moho\unit\tasks\CUnitCallTeleportTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitTeleportTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitWaitForFerryTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitWaitForFerryTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCallTransport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3945,6 +4044,9 @@
     <ClInclude Include="moho\unit\tasks\CBuildTaskHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CFactoryBuildTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitCaptureTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3957,6 +4059,9 @@
     <ClInclude Include="moho\unit\tasks\CUnitGuardTaskTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitFerryTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitMeleeAttackTargetTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -3964,6 +4069,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitMoveTask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitMoveTaskTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitPatrolTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitPodAssist.h">
@@ -3991,6 +4102,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CUnitRefuelTypeInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\unit\tasks\CUnitSacrificeTask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\unit\tasks\CFireWeaponTask.h">
@@ -4150,6 +4264,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\terrain\water\LowFidelityWater.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\terrain\water\HighFidelityWater.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\terrain\water\WaveSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\terrain\water\Shoreline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\app\WinApp.h">

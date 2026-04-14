@@ -10,6 +10,8 @@
 
 namespace moho
 {
+  struct GeomCamera3;
+
   class CEfxBeam : public CEffectImpl
   {
   public:
@@ -46,6 +48,15 @@ namespace moho
      * Saves CEfxBeam state to archive in the recovered binary field order.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00655690 (FUN_00655690, Moho::CEfxBeam::CanSeeCam)
+     *
+     * What it does:
+     * Applies camera-frustum and focused-army recon visibility tests for this
+     * beam and updates cached `mVisible` state when re-evaluation is due.
+     */
+    [[nodiscard]] bool CanSeeCam(const GeomCamera3* camera);
 
     /**
      * What it does:

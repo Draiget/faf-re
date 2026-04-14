@@ -152,6 +152,15 @@ namespace moho
     void SwitchAIPlan(const char* planName);
 
     /**
+     * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
+     *
+     * What it does:
+     * Stores one Lua-visible formation override string (empty string clears
+     * the override lane).
+     */
+    void SetPlatoonFormationOverride(const msvc8::string& formationName);
+
+    /**
      * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
      *
      * What it does:
@@ -1065,6 +1074,15 @@ namespace moho
    * `cfunc_CPlatoonSetPlatoonFormationOverrideL`.
    */
   int cfunc_CPlatoonSetPlatoonFormationOverride(lua_State* luaContext);
+
+  /**
+   * Address: 0x00732140 (FUN_00732140, cfunc_CPlatoonSetPlatoonFormationOverrideL)
+   *
+   * What it does:
+   * Resolves `(platoon, formationName)`, normalizes `"None"` to empty text,
+   * and stores the formation override lane.
+   */
+  int cfunc_CPlatoonSetPlatoonFormationOverrideL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x007320E0 (FUN_007320E0, func_CPlatoonSetPlatoonFormationOverride_LuaFuncDef)

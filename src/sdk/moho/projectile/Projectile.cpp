@@ -250,6 +250,12 @@ namespace
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
   }
+
+  void UnlinkImpactBroadcaster(ProjectileImpactBroadcasterStorage& broadcaster) noexcept
+  {
+    auto& weakLink = reinterpret_cast<moho::WeakPtr<void>&>(broadcaster);
+    weakLink.UnlinkFromOwnerChain();
+  }
 } // namespace
 
 namespace moho
@@ -316,6 +322,24 @@ namespace moho
     view.mAttributes.mDetonateAboveHeight = kProjectileUnsetValue;
     view.mAttributes.mDetonateBelowHeight = kProjectileUnsetValue;
     view.mUnknownTailFlag = false;
+  }
+
+  /**
+   * Address: 0x0069AED0 (FUN_0069AED0, Moho::Projectile::~Projectile)
+   *
+   * What it does:
+   * Unlinks intrusive weak/broadcaster lanes owned by this projectile and
+   * decrements the projectile instance-counter stat before member/base
+   * destructors run.
+   */
+  Projectile::~Projectile()
+  {
+    auto& view = *reinterpret_cast<ProjectileDeserializeRuntimeView*>(this);
+    view.mTargetPosData.targetEntity.UnlinkFromOwnerChain();
+    view.mLauncherWeak.UnlinkFromOwnerChain();
+
+    AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), -1L);
+    UnlinkImpactBroadcaster(view.mImpactEventBroadcaster);
   }
 
   /**

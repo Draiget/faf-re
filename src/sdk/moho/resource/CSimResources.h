@@ -32,6 +32,7 @@ namespace moho
     CSimResources();
 
     /**
+     * Address: 0x00545E10 (FUN_00545E10, core dtor body)
      * Address: 0x00546A00 (Moho::CSimResources::dtr)
      *
      * What it does:

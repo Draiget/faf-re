@@ -1,10 +1,12 @@
 #include "CEconomy.h"
 
 #include <typeinfo>
+#include <new>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
 
@@ -69,6 +71,32 @@ namespace
 namespace moho
 {
   gpg::RType* CEconomy::sType = nullptr;
+
+  /**
+   * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
+   *
+   * What it does:
+   * Unlinks the consumption-request sentinel node, releases extra-storage
+   * ownership (with max-storage rollback), then frees this economy object.
+   */
+  CEconomy* CEconomy::Clear()
+  {
+    mConsumptionData.mNext->mPrev = mConsumptionData.mPrev;
+    mConsumptionData.mPrev->mNext = mConsumptionData.mNext;
+    mConsumptionData.mPrev = &mConsumptionData;
+    mConsumptionData.mNext = &mConsumptionData;
+
+    CEconStorage* const extraStorage = mExtraStorage;
+    if (extraStorage != nullptr) {
+      if (extraStorage->mEconomy != nullptr) {
+        (void)extraStorage->Chng(-1);
+      }
+      ::operator delete(extraStorage);
+    }
+
+    ::operator delete(this);
+    return this;
+  }
 
   /**
    * Address: 0x007731B0 (FUN_007731B0, Moho::CEconomy::SerializeRequests)

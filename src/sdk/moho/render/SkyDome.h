@@ -17,14 +17,14 @@ namespace gpg::gal
 {
   class Effect;
   class EffectTechnique;
+  class IndexBufferD3D9;
+  class VertexBufferD3D9;
 }
 
 namespace moho
 {
   class CD3DEffect;
-  class CD3DIndexSheet;
   class CD3DVertexFormat;
-  class CD3DVertexSheet;
   class RD3DTextureResource;
   struct GeomCamera3;
 
@@ -138,7 +138,13 @@ namespace moho
      * What it does:
      * Builds dome vertex buffer with the specified spherical parameters.
      */
-    void CreateDomeVertexBuffer(float radius, float startAngle, float endAngle, int widthSegments, int heightSegments);
+    void CreateDomeVertexBuffer(
+      float verticalOffset,
+      float domeRadius,
+      float startAngleRadians,
+      int widthSegments,
+      int heightSegments
+    );
 
     /**
      * Address: 0x00818410 (FUN_00818410, ?CreateDomeIndexBuffer@SkyDome@Moho@@AAEXHH@Z)
@@ -148,12 +154,28 @@ namespace moho
      */
     void CreateDomeIndexBuffer(int widthSegments, int heightSegments);
 
+    /**
+     * Address: 0x00818780 (FUN_00818780, ?CreateDecalVertexBuffers@SkyDome@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Creates and initializes all sky decal vertex-buffer lanes.
+     */
+    void CreateDecalVertexBuffers();
+
+    /**
+     * Address: 0x00818A10 (FUN_00818A10, ?CreateDecalIndexBuffer@SkyDome@Moho@@AAEXXZ)
+     *
+     * What it does:
+     * Creates and initializes the sky decal index buffer.
+     */
+    void CreateDecalIndexBuffer();
+
   public:
     // --- Layout from constructor ASM evidence ---
     std::uint8_t mPad04[0x04];                                    // +0x04
     std::uint8_t mInlineVectorStorage[0x18];                      // +0x08 (vector with inline buf)
-    std::uint8_t mPad20[0x0C];                                    // +0x20
-    Wm3::Vector3f mSkyParams{0.0f, 512.0f, 1.2566371f};          // +0x2C (origin? elevation? angle)
+    Wm3::Vector3f mDomeOrigin{0.0f, 0.0f, 0.0f};                 // +0x20
+    Wm3::Vector3f mDomeShapeParams{0.0f, 512.0f, 1.2566371f};    // +0x2C (height/radius/start-angle)
     std::int32_t mWidth = 16;                                     // +0x38
     std::int32_t mHeight = 6;                                     // +0x3C
     float mHorizonSize = 44.0f;                                   // +0x40
@@ -178,27 +200,29 @@ namespace moho
     std::int32_t mDomeVertexCount = 0;                             // +0x190
     std::int32_t mDomeIndexCount = 0;                              // +0x194
     boost::shared_ptr<CD3DVertexFormat> mDomeFormat;               // +0x198
-    boost::shared_ptr<CD3DVertexSheet> mDomeVertBuf;               // +0x1A0
-    boost::shared_ptr<CD3DIndexSheet> mDomeIndexBuf;               // +0x1A8
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDomeVertBuf;    // +0x1A0
+    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDomeIndexBuf;    // +0x1A8
     boost::shared_ptr<RD3DTextureResource> mHorizonLookupTex;      // +0x1B0
-    boost::shared_ptr<CD3DVertexSheet> mDecalVertBuf1;             // +0x1B8
-    boost::shared_ptr<CD3DIndexSheet> mDecalIndexBuf;              // +0x1C0
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf1;  // +0x1B8
+    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDecalIndexBuf;   // +0x1C0
     bool mNeedsRebuild = true;                                     // +0x1C8
     std::uint8_t mPad1C9[0x03];                                    // +0x1C9
     boost::shared_ptr<RD3DTextureResource> mAtmosphereTex;         // +0x1CC
     boost::shared_ptr<RD3DTextureResource> mAtmosphereTex2;        // +0x1D4
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat1;             // +0x1DC
-    boost::shared_ptr<CD3DVertexSheet> mDecalVertBuf2;             // +0x1E4
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf2;  // +0x1E4
     boost::shared_ptr<RD3DTextureResource> mDecalTex1;             // +0x1EC
     boost::shared_ptr<RD3DTextureResource> mDecalTex2;             // +0x1F4
     boost::shared_ptr<RD3DTextureResource> mDecalTex3;             // +0x1FC
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat2;             // +0x204
-    boost::shared_ptr<CD3DVertexSheet> mDecalVertBuf3;             // +0x20C
+    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf3;  // +0x20C
     boost::shared_ptr<RD3DTextureResource> mCirrusTex;             // +0x214
     std::int32_t mField_21C = 0;                                   // +0x21C
     std::int32_t mField_220 = 0;                                   // +0x220
   };
 
+  static_assert(offsetof(SkyDome, mDomeOrigin) == 0x20, "SkyDome::mDomeOrigin offset must be 0x20");
+  static_assert(offsetof(SkyDome, mDomeShapeParams) == 0x2C, "SkyDome::mDomeShapeParams offset must be 0x2C");
   static_assert(offsetof(SkyDome, mWidth) == 0x38, "SkyDome::mWidth offset must be 0x38");
   static_assert(offsetof(SkyDome, mHeight) == 0x3C, "SkyDome::mHeight offset must be 0x3C");
   static_assert(offsetof(SkyDome, mHorizonSize) == 0x40, "SkyDome::mHorizonSize offset must be 0x40");

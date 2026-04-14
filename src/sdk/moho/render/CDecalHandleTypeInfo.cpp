@@ -57,6 +57,15 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00779E40 (FUN_00779E40, Moho::CDecalHandleTypeInfo::CDecalHandleTypeInfo)
+   */
+  CDecalHandleTypeInfo::CDecalHandleTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CDecalHandle), this);
+  }
+
+  /**
    * Address: 0x00779EF0 (FUN_00779EF0, Moho::CDecalHandleTypeInfo::dtr)
    */
   CDecalHandleTypeInfo::~CDecalHandleTypeInfo() = default;

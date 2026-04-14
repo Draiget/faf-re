@@ -23,6 +23,7 @@ namespace moho
   struct CPathPoint;
   class CAiTarget;
   class Entity;
+  struct SEntAttachInfo;
   enum ELayer : std::int32_t;
   enum EUnitMotionVertEvent : std::int32_t
   {
@@ -50,6 +51,16 @@ namespace moho
   public:
     static gpg::RType* sType;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x006B8320 (FUN_006B8320, Moho::CUnitMotion::~CUnitMotion)
+     * Mangled: ??1CUnitMotion@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Releases owned economy-request registration and raised-platform weak
+     * pointer runtime storage.
+     */
+    ~CUnitMotion();
 
     /**
      * Address: 0x006BA280 (FUN_006BA280, Moho::CUnitMotion::MemberConstruct)
@@ -158,6 +169,16 @@ namespace moho
     void SetImmediateVelocity(const Wm3::Vector3f& velocity, const Wm3::Quaternionf& orientation);
 
     /**
+     * Address: 0x006B94A0 (FUN_006B94A0, ?NotifyAttached@CUnitMotion@Moho@@QAEXABUSEntAttachInfo@2@@Z)
+     * Mangled: ?NotifyAttached@CUnitMotion@Moho@@QAEXABUSEntAttachInfo@2@@Z
+     *
+     * What it does:
+     * Forces attached-motion state and canonical attached events
+     * (`Horz=Stopped`, `Vert=Top`) and emits the corresponding script callbacks.
+     */
+    void NotifyAttached(const SEntAttachInfo& attachInfo);
+
+    /**
      * Address: 0x006B9570 (FUN_006B9570, ?NotifyDetached@CUnitMotion@Moho@@QAEXPAVEntity@2@_N@Z)
      *
      * Moho::Entity *, bool
@@ -214,6 +235,24 @@ namespace moho
     void ProcessFuelLevels();
 
   private:
+    /**
+     * Address: 0x006C1350 (FUN_006C1350, ?CalcRollHack@CUnitMotion@Moho@@AAE?AV?$Vector3@M@Wm3@@XZ)
+     *
+     * What it does:
+     * Updates recoil/roll damping lanes and returns one normalized roll-hack
+     * tilt normal used by water-motion snapping.
+     */
+    [[nodiscard]] Wm3::Vector3f CalcRollHack();
+
+    /**
+     * Address: 0x006C1CB0 (FUN_006C1CB0, ?SnapToWater@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z)
+     *
+     * What it does:
+     * Snaps one transform to terrain/water elevation rules and applies
+     * roll-hack tilt while updating submerged-elevation carry state.
+     */
+    [[nodiscard]] VTransform SnapToWater(const VTransform& sourceTransform);
+
     /**
      * Address: 0x006B83F0 (FUN_006B83F0, ?ReCalcCurTargetElevation@CUnitMotion@Moho@@AAEXABV?$Vector3@M@Wm3@@@Z)
      *

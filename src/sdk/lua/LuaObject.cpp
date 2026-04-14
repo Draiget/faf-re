@@ -1,11 +1,13 @@
 #include "LuaObject.h"
 
 #include <cerrno>
+#include <cctype>
 #include <cstdio>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <io.h>
 #include <limits>
 #include <new>
@@ -129,6 +131,56 @@ namespace
 		offsetof(LuaFuncStateUpvalueRuntimeView, upvalues) == 0x38,
 		"LuaFuncStateUpvalueRuntimeView::upvalues offset must be 0x38"
 	);
+
+#if INTPTR_MAX == INT32_MAX
+	static_assert(offsetof(Table, lsizenode) == 0x0D, "Table::lsizenode offset must be 0x0D (x86)");
+	static_assert(offsetof(Table, array) == 0x14, "Table::array offset must be 0x14 (x86)");
+	static_assert(offsetof(Table, node) == 0x18, "Table::node offset must be 0x18 (x86)");
+	static_assert(offsetof(Table, sizearray) == 0x24, "Table::sizearray offset must be 0x24 (x86)");
+	static_assert(sizeof(Node) == 0x14, "Node size must be 0x14 (x86)");
+#endif
+
+	[[nodiscard]] constexpr std::uint32_t LuaHashMask(const Table* const table)
+	{
+		return (1u << table->lsizenode) - 1u;
+	}
+
+	[[nodiscard]] constexpr std::uint32_t LuaHashOddModulus(const Table* const table)
+	{
+		return LuaHashMask(table) | 1u;
+	}
+
+	[[nodiscard]] std::uint32_t LuaFloatBitPattern(const float value)
+	{
+		std::uint32_t bits = 0u;
+		std::memcpy(&bits, &value, sizeof(bits));
+		return bits;
+	}
+
+	[[nodiscard]] constexpr int LuaInstructionSignedOffset(const Instruction instruction)
+	{
+		return static_cast<int>((instruction >> 6) & 0x3FFFFu) - 0x1FFFF;
+	}
+
+	struct LuaGlobalStateTableAllocRuntimeView
+	{
+		std::uint8_t reserved00[0x100];
+		Table* defaultTableMetatable;
+		std::uint8_t reserved104To14F[0x4C];
+		std::uint8_t allocationTrackingEnabled;
+	};
+#if INTPTR_MAX == INT32_MAX
+	static_assert(
+		offsetof(LuaGlobalStateTableAllocRuntimeView, defaultTableMetatable) == 0x100,
+		"LuaGlobalStateTableAllocRuntimeView::defaultTableMetatable offset must be 0x100 (x86)"
+	);
+	static_assert(
+		offsetof(LuaGlobalStateTableAllocRuntimeView, allocationTrackingEnabled) == 0x150,
+		"LuaGlobalStateTableAllocRuntimeView::allocationTrackingEnabled offset must be 0x150 (x86)"
+	);
+#endif
+
+	[[maybe_unused]] Table* LuaDebugGetSizesTable(lua_State* const state);
 }
 
 struct FuncState;
@@ -137,15 +189,36 @@ struct expdesc;
 extern "C"
 {
 	void luaC_collectgarbage(lua_State* L);
+	void luaC_link(lua_State* L, GCObject* object, int typeTag);
 	Closure* luaF_newCclosure(lua_State* L, int nelems);
 	void luaD_growstack(lua_State* L, int n);
 	void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
 	void* luaM_growaux(lua_State* L, void* block, int* size, int sizeElem, int limit, const char* what);
+	const char* luaO_pushvfstring(lua_State* L, const char* fmt, va_list argp);
+	int _errorfb(lua_State* L, int level);
 	void luaG_runerror(lua_State* L, const char* format, ...);
+	void luaV_concat(lua_State* L, int total, int last);
+	int luaV_tostring(lua_State* L, TObject* obj);
 	void discharge2reg(expdesc* e, int reg, FuncState* fs);
+	int luaK_code(FuncState* fs, Instruction i, int line);
+	int luaK_codeABC(FuncState* fs, int o, int a, int b, int c);
+	void luaK_dischargevars(FuncState* fs, expdesc* e);
+	void luaK_nil(FuncState* fs, int from, int n);
 	void luaX_checklimit(void* ls, int v, int l, const char* what);
 	void luaX_syntaxerror(void* ls, const char* msg);
+	TString* luaS_newlstr(lua_State* L, const char* str, size_t len);
+	extern const TObject luaO_nilobject;
+	int luaO_rawequalObj(const TObject* t1, const TObject* t2);
+	Node* luaH_mainposition(const Table* t, const TObject* key);
+	const TObject* luaH_getany(const TObject* key, Table* t);
+	const TObject* luaH_get(Table* t, const TObject* key);
+	const TObject* luaH_getstr(Table* t, TString* key);
 	const TObject* luaH_getnum(Table* t, int key);
+	int luaO_log2(unsigned int x);
+	const TObject* luaT_gettm(Table* events, int event, TString* ename);
+	void luaD_reallocstack(lua_State* L, int newsize);
+	TObject* newkey(lua_State* L, Table* t, const TObject* key);
+	void luaK_fixjump(int to, int from, FuncState* fs);
 	TObject* luaH_set(lua_State* L, Table* t, const TObject* key);
 	TObject* luaH_setnum(lua_State* L, Table* t, int key);
 
@@ -184,6 +257,1300 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090D740 (FUN_0090D740, lua_concat)
+	 *
+	 * What it does:
+	 * Concatenates `n` values at stack top through VM concat, pushes empty
+	 * string when `n == 0`, and preserves Lua stack-growth guard behavior.
+	 */
+	void lua_concat(lua_State* const state, const int n)
+	{
+		auto* const globalStateRuntime = reinterpret_cast<LuaGlobalStateGcRuntimeView*>(state->l_G);
+		if (globalStateRuntime->allocatedBytes >= globalStateRuntime->gcThreshold
+			&& globalStateRuntime->panicFunction == nullptr) {
+			luaC_collectgarbage(state);
+		}
+
+		if (n >= 2) {
+			const int last = static_cast<int>(state->top - state->base) - 1;
+			luaV_concat(state, n, last);
+			state->top += 1 - n;
+			return;
+		}
+
+		if (n == 0) {
+			TObject* const top = state->top;
+			TString* const emptyString = luaS_newlstr(state, nullptr, 0u);
+			top->tt = static_cast<int>(emptyString->tt);
+			top->value.p = emptyString;
+
+			if (top >= state->ci->top && state->stack_last - top <= 1) {
+				luaD_growstack(state, 1);
+			}
+
+			state->top += 1;
+		}
+	}
+
+	/**
+	 * Address: 0x0090E330 (FUN_0090E330, luaL_pushresult)
+	 *
+	 * What it does:
+	 * Flushes pending buffer bytes as one Lua string lane, then concatenates
+	 * all buffered segments and resets buffer nesting level to one.
+	 */
+	void luaL_pushresult(luaL_Buffer* const buffer)
+	{
+		const auto bufferedLength = buffer->p - buffer->buffer;
+		if (bufferedLength != 0) {
+			lua_pushlstring(buffer->L, buffer->buffer, static_cast<size_t>(bufferedLength));
+			++buffer->lvl;
+			buffer->p = buffer->buffer;
+		}
+
+		lua_concat(buffer->L, buffer->lvl);
+		buffer->lvl = 1;
+	}
+
+	/**
+	 * Address: 0x0090CB10 (FUN_0090CB10, lua_strlen)
+	 *
+	 * What it does:
+	 * Resolves one stack lane by positive or negative index, converts it to a
+	 * string when needed, and returns the resulting byte length.
+	 */
+	[[nodiscard]] size_t lua_strlen(lua_State* const state, const int idx)
+	{
+		TObject* object = nullptr;
+		if (idx <= 0) {
+			object = state->top + idx;
+			if (object < state->base) {
+				return 0;
+			}
+		} else {
+			object = &state->base[idx - 1];
+			if (object >= state->top) {
+				return 0;
+			}
+		}
+
+		if (object == nullptr) {
+			return 0;
+		}
+
+		if (object->tt == LUA_TSTRING) {
+			return static_cast<TString*>(object->value.p)->len;
+		}
+
+		if (luaV_tostring(state, object) == 0) {
+			return 0;
+		}
+
+		return static_cast<TString*>(object->value.p)->len;
+	}
+
+	/**
+	 * Address: 0x00926170 (FUN_00926170, luaI_addquoted)
+	 *
+	 * What it does:
+	 * Writes one quoted Lua string literal into the buffer, escaping embedded
+	 * NUL, newline, quote, and backslash bytes with the legacy Lua escape lane.
+	 */
+	[[maybe_unused]] void luaI_addquoted(lua_State* const state, const int argumentIndex, luaL_Buffer* const buffer)
+	{
+		char* const bufferEnd = reinterpret_cast<char*>(&buffer[1]);
+		size_t remainingLength = 0;
+		const char* source = luaL_checklstring(state, argumentIndex, &remainingLength);
+
+		if (buffer->p >= bufferEnd) {
+			luaL_prepbuffer(buffer);
+		}
+
+		*buffer->p++ = '"';
+		for (; remainingLength != 0; ++source) {
+			--remainingLength;
+
+			switch (*source) {
+			case '\0':
+				luaL_addlstring(buffer, "\\000", 4u);
+				break;
+
+			case '\n':
+			case '"':
+			case '\\':
+				if (buffer->p >= bufferEnd) {
+					luaL_prepbuffer(buffer);
+				}
+
+				*buffer->p++ = '\\';
+				if (buffer->p >= bufferEnd) {
+					luaL_prepbuffer(buffer);
+				}
+
+				*buffer->p = *source;
+				++buffer->p;
+				break;
+
+			default:
+				if (buffer->p >= bufferEnd) {
+					luaL_prepbuffer(buffer);
+				}
+
+				*buffer->p = *source;
+				++buffer->p;
+				break;
+			}
+		}
+
+		--remainingLength;
+		if (buffer->p >= bufferEnd) {
+			luaL_prepbuffer(buffer);
+		}
+
+		*buffer->p++ = '"';
+	}
+
+	/**
+	 * Address: 0x0091A570 (FUN_0091A570, luaO_rawequalObj)
+	 *
+	 * What it does:
+	 * Compares two tagged Lua values with raw-equality semantics (no
+	 * metamethod dispatch), including exact-number and pointer-lane equality.
+	 */
+	int luaO_rawequalObj(const TObject* const t1, const TObject* const t2)
+	{
+		if (t1->tt != t2->tt) {
+			return 0;
+		}
+
+		switch (t1->tt) {
+		case LUA_TNIL:
+			return 1;
+		case LUA_TNUMBER:
+			return (t1->value.n == t2->value.n) ? 1 : 0;
+		default:
+			return (t1->value.p == t2->value.p) ? 1 : 0;
+		}
+	}
+
+	/**
+	 * Address: 0x0091A8D0 (FUN_0091A8D0, luaO_pushfstring)
+	 *
+	 * What it does:
+	 * Starts one varargs lane for `format`, forwards to `luaO_pushvfstring`,
+	 * then returns that pushed Lua string pointer.
+	 */
+	const char* luaO_pushfstring(lua_State* const state, const char* const format, ...)
+	{
+		va_list argp;
+		va_start(argp, format);
+		const char* const pushedString = luaO_pushvfstring(state, format, argp);
+		va_end(argp);
+		return pushedString;
+	}
+
+	/**
+	 * Address: 0x009247C0 (FUN_009247C0, luaS_resize)
+	 *
+	 * What it does:
+	 * Rebuilds the Lua interned-string hash table to `newsize`, rehashing all
+	 * existing `TString` nodes and releasing the previous bucket array.
+	 */
+	void luaS_resize(lua_State* const state, const int newsize)
+	{
+		GCObject** const newHash = static_cast<GCObject**>(
+			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(sizeof(GCObject*) * newsize))
+		);
+		global_State* const globalState = state->l_G;
+		if (newsize > 0) {
+			std::memset(newHash, 0, static_cast<std::size_t>(sizeof(GCObject*) * newsize));
+		}
+
+		for (int bucketIndex = 0; bucketIndex < globalState->strt.size; ++bucketIndex) {
+			GCObject* node = globalState->strt.hash[bucketIndex];
+			while (node != nullptr) {
+				GCObject* const next = node->gch.next;
+				const int newBucket = static_cast<int>(node->ts.hash & static_cast<lu_hash>(newsize - 1));
+				node->gch.next = newHash[newBucket];
+				newHash[newBucket] = node;
+				node = next;
+			}
+		}
+
+		luaM_realloc(
+			state,
+			globalState->strt.hash,
+			static_cast<lu_mem>(sizeof(GCObject*) * globalState->strt.size),
+			0u
+		);
+		globalState->strt.hash = newHash;
+		globalState->strt.size = newsize;
+	}
+
+	/**
+	 * Address: 0x00924860 (FUN_00924860, newlstr)
+	 *
+	 * What it does:
+	 * Allocates one `TString`, copies payload bytes plus terminating NUL, links
+	 * it into the string-table bucket chain, and triggers table growth when
+	 * string usage exceeds bucket count.
+	 */
+	[[nodiscard]] static TString* newlstr(
+		const lu_hash hashValue,
+		lua_State* const state,
+		const char* const source,
+		const std::size_t length
+	)
+	{
+		constexpr std::size_t kTStringHeaderWithTerminator = offsetof(TString, str) + 1u;
+		constexpr int kLuaStringTableMaxGrowth = 0x3FFFFFFE;
+
+		GCObject* const object = static_cast<GCObject*>(
+			luaM_realloc(state, nullptr, 0u, static_cast<lu_mem>(length + kTStringHeaderWithTerminator))
+		);
+		TString* const stringObject = &object->ts;
+		stringObject->len = length;
+		stringObject->hash = hashValue;
+		stringObject->marked = 0u;
+		stringObject->tt = LUA_TSTRING;
+		stringObject->reserved = 0;
+
+		if (length != 0 && source != nullptr) {
+			std::memcpy(stringObject->str, source, length);
+		}
+		stringObject->str[length] = '\0';
+
+		global_State* const globalState = state->l_G;
+		const int bucket = static_cast<int>(hashValue & static_cast<lu_hash>(globalState->strt.size - 1));
+		object->gch.next = globalState->strt.hash[bucket];
+		globalState->strt.hash[bucket] = object;
+
+		const int stringUseCount = ++globalState->strt.nuse;
+		const int bucketCount = globalState->strt.size;
+		if (stringUseCount > bucketCount && bucketCount <= kLuaStringTableMaxGrowth) {
+			luaS_resize(state, bucketCount * 2);
+		}
+
+		return stringObject;
+	}
+
+	/**
+	 * Address: 0x009248E0 (FUN_009248E0, luaS_newlstr)
+	 *
+	 * What it does:
+	 * Computes Lua string hash, probes interned-string bucket chain for an exact
+	 * byte match, and returns existing interned object or allocates a new one.
+	 */
+	TString* luaS_newlstr(lua_State* const state, const char* const source, const std::size_t length)
+	{
+		const std::size_t hashStep = (length >> 5u) + 1u;
+		lu_hash hashValue = static_cast<lu_hash>(length);
+		for (std::size_t probeIndex = length; probeIndex >= hashStep; probeIndex -= hashStep) {
+			const lu_hash byteValue = static_cast<unsigned char>(source[probeIndex - 1u]);
+			hashValue ^= (hashValue << 5u) + (hashValue >> 2u) + byteValue;
+		}
+
+		global_State* const globalState = state->l_G;
+		const int bucket = static_cast<int>(hashValue & static_cast<lu_hash>(globalState->strt.size - 1));
+		for (GCObject* object = globalState->strt.hash[bucket]; object != nullptr; object = object->gch.next) {
+			TString* const candidate = &object->ts;
+			if (candidate->tt == LUA_TSTRING && candidate->len == length) {
+				if (length == 0u || (source != nullptr && std::memcmp(source, candidate->str, length) == 0)) {
+					return candidate;
+				}
+			}
+		}
+
+		return newlstr(hashValue, state, source, length);
+	}
+
+	/**
+	 * Address: 0x00925A20 (FUN_00925A20, push_onecapture)
+	 *
+	 * What it does:
+	 * Pushes one pattern-capture result to Lua stack (error for unfinished
+	 * capture, numeric position for position captures, or captured substring).
+	 */
+	struct CaptureRuntimeView
+	{
+		const char* init;
+		int len;
+	};
+	struct MatchStateRuntimeView
+	{
+		const char* srcInit;
+		const char* srcEnd;
+		lua_State* state;
+		int level;
+		CaptureRuntimeView captures[32];
+	};
+	static_assert(offsetof(CaptureRuntimeView, init) == 0x0, "CaptureRuntimeView::init offset must be 0x0");
+	static_assert(offsetof(CaptureRuntimeView, len) == 0x4, "CaptureRuntimeView::len offset must be 0x4");
+	static_assert(sizeof(CaptureRuntimeView) == 0x8, "CaptureRuntimeView size must be 0x8");
+	static_assert(offsetof(MatchStateRuntimeView, srcInit) == 0x0, "MatchStateRuntimeView::srcInit offset must be 0x0");
+	static_assert(offsetof(MatchStateRuntimeView, srcEnd) == 0x4, "MatchStateRuntimeView::srcEnd offset must be 0x4");
+	static_assert(offsetof(MatchStateRuntimeView, state) == 0x8, "MatchStateRuntimeView::state offset must be 0x8");
+	static_assert(offsetof(MatchStateRuntimeView, level) == 0xC, "MatchStateRuntimeView::level offset must be 0xC");
+	static_assert(
+		offsetof(MatchStateRuntimeView, captures) == 0x10,
+		"MatchStateRuntimeView::captures offset must be 0x10"
+	);
+	static_assert(sizeof(MatchStateRuntimeView) == 0x110, "MatchStateRuntimeView size must be 0x110");
+
+	[[nodiscard]] const char* luaI_classend(const char* p, MatchStateRuntimeView* ms);
+	[[nodiscard]] int match_class(int c1, int cl1);
+	[[nodiscard]] int matchbracketclass(const char* p, int c, const char* ec);
+	[[nodiscard]] int luaI_singlematch(int c, const char* p, const char* ep);
+	[[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchStateRuntimeView* ms);
+	[[nodiscard]] const char* match_capture(int l, MatchStateRuntimeView* ms, const char* s);
+	[[nodiscard]] const char* max_expand(MatchStateRuntimeView* ms, const char* s, const char* p, const char* ep);
+	[[nodiscard]] const char* min_expand(const char* s, MatchStateRuntimeView* ms, const char* p, const char* ep);
+	[[nodiscard]] const char* start_capture(const char* s, MatchStateRuntimeView* ms, const char* p, int what);
+	[[nodiscard]] const char* end_capture(const char* s, MatchStateRuntimeView* ms, const char* p);
+	[[nodiscard]] const char* match(MatchStateRuntimeView* ms, const char* s, const char* p);
+
+	void push_onecapture(const int captureIndex, MatchStateRuntimeView* const matchState)
+	{
+		CaptureRuntimeView& capture = matchState->captures[captureIndex];
+		const int captureLength = capture.len;
+		if (captureLength == -1) {
+			luaL_error(matchState->state, "unfinished capture");
+			return;
+		}
+
+		if (captureLength == -2) {
+			const int capturePosition = static_cast<int>(capture.init - matchState->srcInit + 1);
+			lua_pushnumber(matchState->state, static_cast<float>(capturePosition));
+			return;
+		}
+
+		lua_pushlstring(matchState->state, capture.init, static_cast<size_t>(captureLength));
+	}
+
+	/**
+	 * Address: 0x009250B0 (FUN_009250B0, luaI_classend)
+	 *
+	 * What it does:
+	 * Advances a pattern pointer to the end of the current class/range token,
+	 * raising Lua pattern syntax errors for truncated `%` or `[...]` forms.
+	 */
+	[[nodiscard]] const char* luaI_classend(const char* p, MatchStateRuntimeView* const ms)
+	{
+		const char token = *p++;
+		if (token == '%') {
+			if (*p == '\0') {
+				luaL_error(ms->state, "malformed pattern (ends with `%%')");
+				return nullptr;
+			}
+			return p + 1;
+		}
+
+		if (token == '[') {
+			if (*p == '^') {
+				++p;
+			}
+
+			do {
+				if (*p == '\0') {
+					luaL_error(ms->state, "malformed pattern (missing `]')");
+					return nullptr;
+				}
+
+				const char next = *p++;
+				if (next == '%' && *p != '\0') {
+					++p;
+				}
+			} while (*p != ']');
+
+			return p + 1;
+		}
+
+		return p;
+	}
+
+	/**
+	 * Address: 0x00925120 (FUN_00925120, match_class)
+	 *
+	 * What it does:
+	 * Evaluates one Lua character class against `c1`, honoring the legacy
+	 * uppercase-negation convention for class letters.
+	 */
+	[[nodiscard]] int match_class(const int c1, const int cl1)
+	{
+		const unsigned char ch = static_cast<unsigned char>(c1);
+		const unsigned char classChar = static_cast<unsigned char>(cl1);
+		int result = 0;
+
+		switch (std::tolower(classChar)) {
+		case 'a':
+			result = std::isalpha(ch) != 0;
+			break;
+		case 'c':
+			result = std::iscntrl(ch) != 0;
+			break;
+		case 'd':
+			result = std::isdigit(ch) != 0;
+			break;
+		case 'l':
+			result = std::islower(ch) != 0;
+			break;
+		case 'p':
+			result = std::ispunct(ch) != 0;
+			break;
+		case 's':
+			result = std::isspace(ch) != 0;
+			break;
+		case 'u':
+			result = std::isupper(ch) != 0;
+			break;
+		case 'w':
+			result = std::isalnum(ch) != 0;
+			break;
+		case 'x':
+			result = std::isxdigit(ch) != 0;
+			break;
+		case 'z':
+			result = (ch == 0);
+			break;
+		default:
+			return c1 == cl1;
+		}
+
+		if (std::islower(classChar) == 0) {
+			result = (result == 0);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Address: 0x00925230 (FUN_00925230, matchbracketclass)
+	 *
+	 * What it does:
+	 * Evaluates a bracket class or range list against one character and honors
+	 * `^` negation, character ranges, and embedded `%` class escapes.
+	 */
+	[[nodiscard]] int matchbracketclass(const char* p, const int c, const char* ec)
+	{
+		int positive = 1;
+		if (p[1] == '^') {
+			positive = 0;
+			++p;
+		}
+
+		++p;
+		if (p < ec) {
+			const char* cursor = p + 2;
+			do {
+				if (*p == '%') {
+					const int classChar = static_cast<unsigned char>(*++p);
+					++cursor;
+					if (match_class(c, classChar)) {
+						return positive;
+					}
+				} else if (p[1] == '-' && cursor < ec) {
+					const int first = static_cast<unsigned char>(*p);
+					p += 2;
+					cursor += 2;
+					if (first <= c && c <= static_cast<unsigned char>(*p)) {
+						return positive;
+					}
+				} else if (static_cast<unsigned char>(*p) == c) {
+					return positive;
+				}
+
+				++p;
+				++cursor;
+			} while (p < ec);
+		}
+
+		return positive == 0;
+	}
+
+	/**
+	 * Address: 0x009252D0 (FUN_009252D0, luaI_singlematch)
+	 *
+	 * What it does:
+	 * Performs one pattern atom test at a single character position.
+	 */
+	[[nodiscard]] int luaI_singlematch(const int c, const char* const p, const char* const ep)
+	{
+		const unsigned char patternChar = static_cast<unsigned char>(*p);
+		if (patternChar == '%') {
+			return match_class(c, p[1]);
+		}
+
+		if (patternChar == '.') {
+			return 1;
+		}
+
+		if (patternChar == '[') {
+			return matchbracketclass(p, c, ep - 1);
+		}
+
+		return patternChar == c;
+	}
+
+	/**
+	 * Address: 0x00925320 (FUN_00925320, matchbalance)
+	 *
+	 * What it does:
+	 * Matches one balanced-pair pattern lane and advances to the matching
+	 * closing delimiter when nesting depth returns to zero.
+	 */
+	[[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchStateRuntimeView* const ms)
+	{
+		if (*p == '\0' || p[1] == '\0') {
+			luaL_error(ms->state, "unbalanced pattern");
+			return nullptr;
+		}
+
+		const char openChar = *p;
+		if (*s != openChar) {
+			return nullptr;
+		}
+
+		const char* const srcEnd = ms->srcEnd;
+		const char closeChar = p[1];
+		int depth = 1;
+		++s;
+		for (const int openValue = openChar; s < srcEnd; ++s) {
+			const int current = static_cast<unsigned char>(*s);
+			if (current == closeChar) {
+				if (--depth == 0) {
+					return s + 1;
+				}
+			} else if (current == openValue) {
+				++depth;
+			}
+		}
+
+		return nullptr;
+	}
+
+	/**
+	 * Address: 0x00925390 (FUN_00925390, max_expand)
+	 *
+	 * What it does:
+	 * Greedily consumes the largest possible prefix matching the current
+	 * pattern atom, then backtracks until the tail pattern succeeds.
+	 */
+	[[nodiscard]] const char* max_expand(
+		MatchStateRuntimeView* const ms,
+		const char* s,
+		const char* p,
+		const char* ep
+	)
+	{
+		const char* current = s;
+		int matchedCount = 0;
+
+		if (s < ms->srcEnd) {
+			while (true) {
+				const unsigned char patternChar = static_cast<unsigned char>(*p);
+				const unsigned char currentChar = static_cast<unsigned char>(*current);
+
+				bool matched = false;
+				if (patternChar == '%') {
+					matched = match_class(currentChar, p[1]) != 0;
+				} else if (patternChar == '.') {
+					matched = true;
+				} else if (patternChar == '[') {
+					matched = matchbracketclass(p, currentChar, ep - 1) != 0;
+				} else {
+					matched = patternChar == currentChar;
+				}
+
+				if (matched == false) {
+					break;
+				}
+
+				++current;
+				++matchedCount;
+				if (current >= ms->srcEnd) {
+					break;
+				}
+			}
+		}
+
+		while (true) {
+			const char* const result = match(ms, s + matchedCount, ep + 1);
+			if (result != nullptr) {
+				return result;
+			}
+
+			--matchedCount;
+			if (matchedCount < 0) {
+				return nullptr;
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x00925430 (FUN_00925430, min_expand)
+	 *
+	 * What it does:
+	 * Tries the tail pattern at the current source position first and only
+	 * advances while the current atom still matches.
+	 */
+	[[nodiscard]] const char* min_expand(
+		const char* s,
+		MatchStateRuntimeView* const ms,
+		const char* p,
+		const char* ep
+	)
+	{
+		const char* current = s;
+		while (true) {
+			const char* const result = match(ms, current, ep + 1);
+			if (result != nullptr) {
+				return result;
+			}
+
+			if (current >= ms->srcEnd) {
+				return nullptr;
+			}
+
+			const unsigned char patternChar = static_cast<unsigned char>(*p);
+			const unsigned char sourceChar = static_cast<unsigned char>(*current);
+			const bool matched =
+				(patternChar == '%')
+					? (match_class(sourceChar, p[1]) != 0)
+					: (patternChar == '.'
+						? true
+						: (patternChar == '[' ? (matchbracketclass(p, sourceChar, ep - 1) != 0)
+											   : (patternChar == sourceChar)));
+			if (matched == false) {
+				return nullptr;
+			}
+
+			++current;
+		}
+	}
+
+	/**
+	 * Address: 0x00925580 (FUN_00925580, match_capture)
+	 *
+	 * What it does:
+	 * Compares a captured substring lane against the current source lane and
+	 * advances when they match byte-for-byte.
+	 */
+	[[nodiscard]] const char* match_capture(const int l, MatchStateRuntimeView* const ms, const char* const s)
+	{
+		const int captureIndex = l - '1';
+		if (captureIndex < 0 || captureIndex >= ms->level || ms->captures[captureIndex].len == -1) {
+			luaL_error(ms->state, "invalid capture index");
+			return nullptr;
+		}
+
+		const int captureLength = ms->captures[captureIndex].len;
+		if (ms->srcEnd - s < captureLength) {
+			return nullptr;
+		}
+
+		if (std::memcmp(ms->captures[captureIndex].init, s, static_cast<size_t>(captureLength)) != 0) {
+			return nullptr;
+		}
+
+		return s + captureLength;
+	}
+
+	/**
+	 * Address: 0x009254D0 (FUN_009254D0, start_capture)
+	 *
+	 * What it does:
+	 * Starts one new capture lane, advances nested pattern matching, and rolls
+	 * back the capture depth when the tail pattern fails.
+	 */
+	[[nodiscard]] const char* start_capture(
+		const char* s,
+		MatchStateRuntimeView* const ms,
+		const char* p,
+		const int what
+	)
+	{
+		const int level = ms->level;
+		if (level >= 32) {
+			luaL_error(ms->state, "too many captures");
+			return nullptr;
+		}
+
+		ms->captures[level].init = s;
+		ms->captures[level].len = what;
+		ms->level = level + 1;
+		const char* const result = match(ms, s, p);
+		if (result == nullptr) {
+			--ms->level;
+		}
+		return result;
+	}
+
+	/**
+	 * Address: 0x00925520 (FUN_00925520, end_capture)
+	 *
+	 * What it does:
+	 * Completes the most recent open capture lane, then re-enters matching and
+	 * rolls the capture back open if the tail fails.
+	 */
+	[[nodiscard]] const char* end_capture(const char* s, MatchStateRuntimeView* const ms, const char* p)
+	{
+		int level = ms->level - 1;
+		if (level < 0) {
+			luaL_error(ms->state, "invalid pattern capture");
+			return nullptr;
+		}
+
+		while (ms->captures[level].len != -1) {
+			--level;
+			if (level < 0) {
+				luaL_error(ms->state, "invalid pattern capture");
+				return nullptr;
+			}
+		}
+
+		ms->captures[level].len = static_cast<int>(s - ms->captures[level].init);
+		const char* const result = match(ms, s, p);
+		if (result == nullptr) {
+			ms->captures[level].len = -1;
+		}
+		return result;
+	}
+
+	/**
+	 * Address: 0x00925650 (FUN_00925650, match)
+	 *
+	 * What it does:
+	 * Evaluates one Lua pattern atom against the current source lane, handling
+	 * anchors, captures, frontier checks, balanced pairs, and quantifiers.
+	 */
+	[[nodiscard]] const char* match(MatchStateRuntimeView* const ms, const char* s, const char* p)
+	{
+		while (true) {
+			switch (*p) {
+			case '\0':
+				return s;
+
+			case '$':
+				if (p[1] != '\0') {
+					goto default_case;
+				}
+				return s != ms->srcEnd ? nullptr : s;
+
+			case '%': {
+				const unsigned char p1 = static_cast<unsigned char>(p[1]);
+				if (p1 == 'b') {
+					s = matchbalance(p + 2, s, ms);
+					if (s == nullptr) {
+						return nullptr;
+					}
+					p += 4;
+					continue;
+				}
+				if (p1 != 'f') {
+					if (std::isdigit(p1) == 0) {
+						goto default_case;
+					}
+					s = match_capture(p1, ms, s);
+					if (s == nullptr) {
+						return nullptr;
+					}
+					p += 2;
+					continue;
+				}
+
+				p += 2;
+				if (*p != '[') {
+					luaL_error(ms->state, "missing `[' after `%%f' in pattern");
+					return nullptr;
+				}
+
+				const char* const classEnd = luaI_classend(p, ms);
+				const char* const classEndMinusOne = classEnd - 1;
+				const unsigned char previous = (s == ms->srcInit) ? 0 : static_cast<unsigned char>(*(s - 1));
+				if (!matchbracketclass(p, previous, classEndMinusOne)
+					&& matchbracketclass(p, static_cast<unsigned char>(*s), classEndMinusOne)) {
+					p = classEnd;
+					continue;
+				}
+				return nullptr;
+			}
+
+			case '(':
+				if (p[1] == ')') {
+					return start_capture(s, ms, p + 2, -2);
+				}
+				return start_capture(s, ms, p + 1, -1);
+
+			case ')':
+				return end_capture(s, ms, p + 1);
+
+			default:
+			default_case:
+				break;
+			}
+
+			const char* const ep = luaI_classend(p, ms);
+			int matched = 0;
+			if (s < ms->srcEnd) {
+				const unsigned char patternChar = static_cast<unsigned char>(*p);
+				const unsigned char sourceChar = static_cast<unsigned char>(*s);
+				if (patternChar == '%') {
+					matched = match_class(sourceChar, p[1]);
+				} else if (patternChar == '.') {
+					matched = 1;
+				} else if (patternChar == '[') {
+					matched = matchbracketclass(p, sourceChar, ep - 1);
+				} else {
+					matched = patternChar == sourceChar;
+				}
+			}
+
+			switch (*ep) {
+			case '*':
+				return max_expand(ms, s, p, ep);
+
+			case '+':
+				if (matched == 0) {
+					return nullptr;
+				}
+				return max_expand(ms, s + 1, p, ep);
+
+			case '-':
+				return min_expand(s, ms, p, ep);
+
+			case '?':
+				if (matched != 0) {
+					const char* const result = match(ms, s + 1, ep + 1);
+					if (result != nullptr) {
+						return result;
+					}
+				}
+				p = ep + 1;
+				continue;
+
+			default:
+				if (matched == 0) {
+					return nullptr;
+				}
+				++s;
+				p = ep;
+				continue;
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x00926F70 (FUN_00926F70, luaH_mainposition)
+	 *
+	 * What it does:
+	 * Computes the canonical main hash-bucket node for one table key by key
+	 * tag (boolean/lightuserdata/number/string/default pointer lane).
+	 */
+	Node* luaH_mainposition(const Table* const t, const TObject* const key)
+	{
+		const std::uint32_t hashMask = LuaHashMask(t);
+		const std::uint32_t oddModulus = LuaHashOddModulus(t);
+
+		switch (key->tt) {
+		case LUA_TBOOLEAN:
+			return &t->node[static_cast<std::uint32_t>(key->value.b) & hashMask];
+		case LUA_TLIGHTUSERDATA: {
+			const std::uint32_t raw = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(key->value.p));
+			return &t->node[raw % oddModulus];
+		}
+		case LUA_TNUMBER: {
+			const std::uint32_t hash = LuaFloatBitPattern(key->value.n + 1.0f);
+			return &t->node[hash % oddModulus];
+		}
+		case LUA_TSTRING: {
+			auto* const stringKey = static_cast<TString*>(key->value.p);
+			return &t->node[stringKey->hash & hashMask];
+		}
+		default: {
+			const std::uint32_t raw = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(key->value.p));
+			return &t->node[raw % oddModulus];
+		}
+		}
+	}
+
+	/**
+	 * Address: 0x00927400 (FUN_00927400, luaH_getany)
+	 *
+	 * What it does:
+	 * Performs hash-table lookup for arbitrary key tags and returns the slot
+	 * value lane or `luaO_nilobject` when the key is not present.
+	 */
+	const TObject* luaH_getany(const TObject* const key, Table* const t)
+	{
+		if (key->tt == LUA_TNIL) {
+			return &luaO_nilobject;
+		}
+
+		Node* node = luaH_mainposition(t, key);
+		while (luaO_rawequalObj(&node->i_key, key) == 0) {
+			node = node->next;
+			if (node == nullptr) {
+				return &luaO_nilobject;
+			}
+		}
+
+		return &node->i_val;
+	}
+
+	/**
+	 * Address: 0x00927450 (FUN_00927450, luaH_getnum)
+	 *
+	 * What it does:
+	 * Looks up one integer key in table array-part first, then in hash chains
+	 * using Lua's numeric-key hash lane and nilobject-on-miss semantics.
+	 */
+	const TObject* luaH_getnum(Table* const t, const int key)
+	{
+		if (key >= 1 && key <= t->sizearray) {
+			return &t->array[key - 1];
+		}
+
+		const float floatKey = static_cast<float>(key);
+		const std::uint32_t bucket = LuaFloatBitPattern(floatKey + 1.0f) % LuaHashOddModulus(t);
+		Node* node = &t->node[bucket];
+		while (node->i_key.tt != LUA_TNUMBER || node->i_key.value.n != floatKey) {
+			node = node->next;
+			if (node == nullptr) {
+				return &luaO_nilobject;
+			}
+		}
+
+		return &node->i_val;
+	}
+
+	/**
+	 * Address: 0x009274D0 (FUN_009274D0, luaH_getstr)
+	 *
+	 * What it does:
+	 * Looks up one interned string key in table hash chains and returns either
+	 * the value lane or the shared Lua nil object on miss.
+	 */
+	const TObject* luaH_getstr(Table* const t, TString* const key)
+	{
+		Node* node = &t->node[key->hash & LuaHashMask(t)];
+		while (node->i_key.tt != LUA_TSTRING || static_cast<TString*>(node->i_key.value.p) != key) {
+			node = node->next;
+			if (node == nullptr) {
+				return &luaO_nilobject;
+			}
+		}
+
+		return &node->i_val;
+	}
+
+	/**
+	 * Address: 0x00927510 (FUN_00927510, luaH_get)
+	 *
+	 * What it does:
+	 * Dispatches table get by key tag, including integer-fast-path for number
+	 * keys and string-fast-path for interned string keys.
+	 */
+	const TObject* luaH_get(Table* const t, const TObject* const key)
+	{
+		if (key->tt == LUA_TNUMBER) {
+			const float numericKey = key->value.n;
+			const int integerKey = static_cast<int>(numericKey);
+			if (static_cast<float>(integerKey) == numericKey) {
+				return luaH_getnum(t, integerKey);
+			}
+		} else if (key->tt == LUA_TSTRING) {
+			return luaH_getstr(t, static_cast<TString*>(key->value.p));
+		}
+
+		return luaH_getany(key, t);
+	}
+
+	/**
+	 * Address: 0x00927610 (FUN_00927610, luaH_index)
+	 *
+	 * What it does:
+	 * Resolves the linear iteration index used by `next`, validating incoming
+	 * key shape and mapping hash-node value-lane pointers back to node indices.
+	 */
+	int luaH_index(lua_State* const state, Table* const table, const TObject* const key)
+	{
+		if (key->tt == LUA_TNIL) {
+			return -1;
+		}
+
+		if (key->tt == LUA_TNUMBER) {
+			const float numericKey = key->value.n;
+			const int integerKey = static_cast<int>(numericKey);
+			if (static_cast<float>(integerKey) == numericKey && integerKey >= 1) {
+				const int zeroBased = integerKey - 1;
+				if ((zeroBased & 0xFF000000) == 0 && integerKey <= table->sizearray) {
+					return zeroBased;
+				}
+			}
+		}
+
+		const TObject* const slot = luaH_get(table, key);
+		if (slot == &luaO_nilobject) {
+			luaG_runerror(state, "invalid key for `next'");
+		}
+
+		const auto nodeBase = reinterpret_cast<std::uintptr_t>(table->node);
+		const auto slotAddress = reinterpret_cast<std::uintptr_t>(slot);
+		const std::uintptr_t valueLaneOffset = offsetof(Node, i_val);
+		const int nodeIndex =
+			static_cast<int>((slotAddress - nodeBase - valueLaneOffset) / static_cast<std::uintptr_t>(sizeof(Node)));
+		return table->sizearray + nodeIndex;
+	}
+
+	/**
+	 * Address: 0x009276A0 (FUN_009276A0, luaH_next)
+	 *
+	 * What it does:
+	 * Advances Lua table iteration from `key` to the next occupied array/hash
+	 * slot and writes both next-key and next-value lanes into caller storage.
+	 */
+	int luaH_next(lua_State* const state, Table* const table, TObject* const key)
+	{
+		int index = luaH_index(state, table, key) + 1;
+		const int sizearray = table->sizearray;
+		if (index < sizearray) {
+			TObject* arraySlot = &table->array[index];
+			while (arraySlot->tt == LUA_TNIL) {
+				++index;
+				++arraySlot;
+				if (index >= sizearray) {
+					break;
+				}
+			}
+
+			if (index < sizearray) {
+				key->tt = LUA_TNUMBER;
+				key->value.n = static_cast<float>(index + 1);
+				key[1] = table->array[index];
+				return 1;
+			}
+		}
+
+		int nodeIndex = index - sizearray;
+		const int nodeCount = 1 << table->lsizenode;
+		if (nodeIndex >= nodeCount) {
+			return 0;
+		}
+
+		Node* const nodeBase = table->node;
+		TObject* valueSlot = &nodeBase[nodeIndex].i_val;
+		while (valueSlot->tt == LUA_TNIL) {
+			++nodeIndex;
+			valueSlot = reinterpret_cast<TObject*>(reinterpret_cast<std::uint8_t*>(valueSlot) + sizeof(Node));
+			if (nodeIndex >= nodeCount) {
+				return 0;
+			}
+		}
+
+		key[0] = nodeBase[nodeIndex].i_key;
+		key[1] = nodeBase[nodeIndex].i_val;
+		return 1;
+	}
+
+	/**
+	 * Address: 0x0090A6B0 (FUN_0090A6B0, LuaPlusH_next)
+	 *
+	 * What it does:
+	 * Advances Lua table iteration using LuaPlus object wrappers, returning the
+	 * next key/value pair in `key` and `value` and `0` when exhausted.
+	 */
+	extern "C" int LuaPlusH_next(
+		LuaState* const state,
+		LuaObject* const table,
+		LuaObject* const key,
+		LuaObject* const value
+	)
+	{
+		if (state == nullptr || state->m_state == nullptr || table == nullptr || key == nullptr || value == nullptr) {
+			return 0;
+		}
+
+		auto* const tableObject = static_cast<Table*>(table->m_object.value.p);
+		if (tableObject == nullptr) {
+			return 0;
+		}
+
+		int nextIndex = luaH_index(state->m_state, tableObject, &key->m_object) + 1;
+		const int arraySize = tableObject->sizearray;
+
+		if (nextIndex < arraySize) {
+			TObject* arrayValue = &tableObject->array[nextIndex];
+			while (arrayValue->tt == LUA_TNIL) {
+				++nextIndex;
+				++arrayValue;
+				if (nextIndex >= arraySize) {
+					break;
+				}
+			}
+
+			if (nextIndex < arraySize) {
+				key->AssignInteger(state, nextIndex + 1);
+				value->AddToUsedObjectList(state, arrayValue);
+				return 1;
+			}
+		}
+
+		int nodeIndex = nextIndex - arraySize;
+		const int nodeCount = 1 << tableObject->lsizenode;
+		if (nodeIndex >= nodeCount) {
+			return 0;
+		}
+
+		Node* const nodeBase = tableObject->node;
+		TObject* valueSlot = &nodeBase[nodeIndex].i_val;
+		while (valueSlot->tt == LUA_TNIL) {
+			++nodeIndex;
+			if (nodeIndex >= nodeCount) {
+				return 0;
+			}
+			valueSlot = &nodeBase[nodeIndex].i_val;
+		}
+
+		key->AddToUsedObjectList(state, &nodeBase[nodeIndex].i_key);
+		value->AddToUsedObjectList(state, &nodeBase[nodeIndex].i_val);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x009102F0 (FUN_009102F0, luaK_concat)
+	 *
+	 * What it does:
+	 * Concatenates two jump lists for Lua codegen: appends `l2` to `*l1`,
+	 * walking terminal jump links in generated bytecode before patching.
+	 */
+	void luaK_concat(FuncState* const fs, int* const l1, const int l2)
+	{
+		if (l2 == LUA_MULTRET) {
+			return;
+		}
+
+		int list = *l1;
+		if (list == LUA_MULTRET) {
+			*l1 = l2;
+			return;
+		}
+
+		const auto* const fsRuntime = reinterpret_cast<const LuaFuncStateCodegenRuntimeView*>(fs);
+		const Instruction* const code = fsRuntime->functionProto->code;
+		while (true) {
+			const int signedOffset = LuaInstructionSignedOffset(code[list]);
+			if (signedOffset == LUA_MULTRET) {
+				break;
+			}
+
+			const int next = list + signedOffset + 1;
+			if (next == LUA_MULTRET) {
+				break;
+			}
+
+			list = next;
+		}
+
+		luaK_fixjump(l2, list, fs);
+	}
+
+	struct LuaDischargeExpdescRuntimeView
+	{
+		int k;
+		int info;
+		int aux;
+		int t;
+		int f;
+	};
+
+	struct LuaDischargeLexStateRuntimeView
+	{
+		int current;
+		int linenumber;
+		int lastline;
+	};
+
+	static_assert(offsetof(LuaDischargeExpdescRuntimeView, k) == 0x00, "LuaDischargeExpdescRuntimeView::k offset must be 0x00");
+	static_assert(offsetof(LuaDischargeExpdescRuntimeView, info) == 0x04, "LuaDischargeExpdescRuntimeView::info offset must be 0x04");
+	static_assert(offsetof(LuaDischargeExpdescRuntimeView, aux) == 0x08, "LuaDischargeExpdescRuntimeView::aux offset must be 0x08");
+	static_assert(offsetof(LuaDischargeExpdescRuntimeView, t) == 0x0C, "LuaDischargeExpdescRuntimeView::t offset must be 0x0C");
+	static_assert(offsetof(LuaDischargeExpdescRuntimeView, f) == 0x10, "LuaDischargeExpdescRuntimeView::f offset must be 0x10");
+	static_assert(sizeof(LuaDischargeExpdescRuntimeView) == 0x14, "LuaDischargeExpdescRuntimeView size must be 0x14");
+	static_assert(offsetof(LuaDischargeLexStateRuntimeView, current) == 0x00, "LuaDischargeLexStateRuntimeView::current offset must be 0x00");
+	static_assert(offsetof(LuaDischargeLexStateRuntimeView, linenumber) == 0x04, "LuaDischargeLexStateRuntimeView::linenumber offset must be 0x04");
+	static_assert(offsetof(LuaDischargeLexStateRuntimeView, lastline) == 0x08, "LuaDischargeLexStateRuntimeView::lastline offset must be 0x08");
+	static_assert(sizeof(LuaDischargeLexStateRuntimeView) == 0x0C, "LuaDischargeLexStateRuntimeView size must be 0x0C");
+
+	/**
+	 * Address: 0x00910970 (FUN_00910970, discharge2reg)
+	 *
+	 * What it does:
+	 * Forces one expression into a destination register, rewriting the
+	 * expression lane or emitting a move/load opcode as needed.
+	 */
+	extern "C" void discharge2reg(expdesc* const e, const int reg, FuncState* const fs)
+	{
+		constexpr int kExpKindNil = 1;
+		constexpr int kExpKindTrue = 2;
+		constexpr int kExpKindFalse = 3;
+		constexpr int kExpKindConstant = 4;
+		constexpr int kExpKindRelocatable = 10;
+		constexpr int kExpKindNonReloc = 11;
+		constexpr int kLuaOpMove = 0;
+		constexpr int kLuaOpLoadBool = 2;
+
+		auto* const expr = reinterpret_cast<LuaDischargeExpdescRuntimeView*>(e);
+		auto* const fsRuntime = reinterpret_cast<LuaFuncStateCodegenRuntimeView*>(fs);
+
+		luaK_dischargevars(fs, e);
+
+		switch (expr->k) {
+		case kExpKindNil:
+			luaK_nil(fs, reg, 1);
+			expr->info = reg;
+			expr->k = kExpKindNonReloc;
+			break;
+
+		case kExpKindTrue:
+		case kExpKindFalse:
+			luaK_codeABC(fs, kLuaOpLoadBool, reg, expr->k == kExpKindTrue ? 1 : 0, 0);
+			expr->info = reg;
+			expr->k = kExpKindNonReloc;
+			break;
+
+		case kExpKindConstant:
+			luaK_code(
+				fs,
+				static_cast<Instruction>(((expr->info | (reg << 18)) << 6) | 1),
+				static_cast<int>(reinterpret_cast<LuaDischargeLexStateRuntimeView*>(fsRuntime->lexState)->lastline)
+			);
+			expr->info = reg;
+			expr->k = kExpKindNonReloc;
+			break;
+
+		case kExpKindRelocatable:
+			fsRuntime->functionProto->code[expr->info] =
+				(reg << 24) | (static_cast<unsigned int>(fsRuntime->functionProto->code[expr->info]) & 0x00FFFFFFu);
+			expr->info = reg;
+			expr->k = kExpKindNonReloc;
+			break;
+
+		case kExpKindNonReloc: {
+			const int info = expr->info;
+			if (reg != info) {
+				luaK_codeABC(fs, kLuaOpMove, reg, info, 0);
+			}
+			expr->info = reg;
+			expr->k = kExpKindNonReloc;
+			break;
+		}
+
+		default:
+			return;
+		}
+	}
+
+	/**
 	 * Address: 0x0090DB80 (FUN_0090DB80, luaL_where)
 	 *
 	 * What it does:
@@ -201,7 +1568,31 @@ extern "C"
 			}
 		}
 
-		lua_pushlstring(state, "", 0u);
+	lua_pushlstring(state, "", 0u);
+	}
+
+	/**
+	 * Address: 0x0090DD40 (FUN_0090DD40, luaL_getmetafield)
+	 *
+	 * What it does:
+	 * Looks up one named metafield on the object's metatable, leaving the
+	 * metatable stack slot consumed on success and restoring the stack on miss.
+	 */
+	int luaL_getmetafield(lua_State* const state, const int obj, const char* const event)
+	{
+		if (lua_getmetatable(state, obj) == 0) {
+			return 0;
+		}
+
+		lua_pushstring(state, event);
+		lua_rawget(state, -2);
+		if (lua_type(state, -1) == LUA_TNIL) {
+			lua_settop(state, -3);
+			return 0;
+		}
+
+		lua_remove(state, -2);
+		return 1;
 	}
 
 	/**
@@ -255,6 +1646,117 @@ extern "C"
 		}
 
 		return defaultValue;
+	}
+
+	/**
+	 * Address: 0x00927090 (FUN_00927090, computesizes)
+	 *
+	 * What it does:
+	 * Chooses optimal array/hash split from bucketed integer-key usage counts
+	 * and writes resulting dense-array size plus hash-entry count.
+	 */
+	void computesizes(
+		const int totalUsedEntries,
+		int* const narray,
+		int* const nhash,
+		const int* const nums
+	)
+	{
+		int accumulatedArrayUse = nums[0];
+		int bestLog = (accumulatedArrayUse != 0) ? 0 : -1;
+		int bestArrayUse = accumulatedArrayUse;
+		if (accumulatedArrayUse < *narray) {
+			int log = 0;
+			const int* numsLane = nums + 1;
+			while (accumulatedArrayUse < *narray) {
+				const int bucketUpperBound = 1 << log;
+				if (*narray < bucketUpperBound) {
+					break;
+				}
+
+				if (*numsLane > 0) {
+					accumulatedArrayUse += *numsLane;
+					if (accumulatedArrayUse >= bucketUpperBound) {
+						bestLog = log + 1;
+						bestArrayUse = accumulatedArrayUse;
+					}
+				}
+
+				++numsLane;
+				++log;
+			}
+		}
+
+		*nhash = totalUsedEntries - bestArrayUse;
+		*narray = (bestLog == -1) ? 0 : (1 << bestLog);
+	}
+
+	/**
+	 * Address: 0x00927110 (FUN_00927110, numuse)
+	 *
+	 * What it does:
+	 * Counts live Lua table entries by dense-array power-of-two buckets and
+	 * hash-node lanes, then derives resize targets for array/hash partitions.
+	 */
+	void numuse(Table* const table, int* const narray, int* const nhash)
+	{
+		constexpr int kLuaTableMaxBits = 0x18;
+		constexpr int kLuaBucketCount = kLuaTableMaxBits + 1;
+
+		int totalUse = 0;
+		int nums[kLuaBucketCount]{};
+
+		int i = 0;
+		int lg = 0;
+		const int sizearray = table->sizearray;
+		while (lg <= kLuaTableMaxBits) {
+			int bucketEnd = 1 << lg;
+			if (bucketEnd > sizearray) {
+				bucketEnd = sizearray;
+				if (i >= sizearray) {
+					break;
+				}
+			}
+
+			nums[lg] = 0;
+			while (i < bucketEnd) {
+				if (table->array[i].tt != LUA_TNIL) {
+					++nums[lg];
+					++totalUse;
+				}
+				++i;
+			}
+
+			++lg;
+		}
+
+		for (; lg < kLuaBucketCount; ++lg) {
+			nums[lg] = 0;
+		}
+
+		*narray = totalUse;
+		const int nodeCount = 1 << table->lsizenode;
+		for (int index = nodeCount - 1; index >= 0; --index) {
+			const Node& node = table->node[index];
+			if (node.i_val.tt == LUA_TNIL) {
+				continue;
+			}
+
+			if (node.i_key.tt == LUA_TNUMBER) {
+				const float numericKey = node.i_key.value.n;
+				const int integerKey = static_cast<int>(numericKey);
+				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1
+					&& ((integerKey - 1) & 0xFF000000) == 0) {
+					const int logIndex = luaO_log2(static_cast<unsigned int>(integerKey - 1));
+					++nums[logIndex + 1];
+					++(*narray);
+				}
+			}
+
+			++totalUse;
+		}
+
+		computesizes(totalUse, narray, nhash, nums);
 	}
 
 	/**
@@ -313,6 +1815,86 @@ extern "C"
 		Node* const firstFree = &table->node[size - 1];
 		table->firstfree = firstFree;
 		return firstFree;
+	}
+
+	/**
+	 * Address: 0x009136F0 (FUN_009136F0, sub_9136F0)
+	 *
+	 * What it does:
+	 * Records one newly-created table type entry in Lua debug allocation-size
+	 * map while temporarily disabling recursive allocation tracking.
+	 */
+	void LuaDebugTrackNewTableAllocation(lua_State* const state, Table* const table)
+	{
+		global_State* const globalState = state->l_G;
+		++globalState->gcTraversalLockDepth;
+		globalState->unknown150 = 0;
+
+		TObject* const top = state->top;
+		top->tt = static_cast<int>(table->tt);
+		top->value.p = table;
+		state->top = top + 1;
+
+		Table* const sizesTable = LuaDebugGetSizesTable(state);
+		TObject* const destination = luaH_set(state, sizesTable, state->top - 1);
+
+		lua_pushstring(state, lua_typename(state, table->tt));
+		(void)_errorfb(state, 0);
+
+		*destination = *(state->top - 1);
+		state->top -= 2;
+
+		globalState->unknown150 = 1;
+		--globalState->gcTraversalLockDepth;
+	}
+
+	/**
+	 * Address: 0x00927320 (FUN_00927320, luaH_new)
+	 *
+	 * What it does:
+	 * Allocates and initializes one Lua table object, links it into GC lists,
+	 * allocates array/hash lanes, and applies debug allocation tracking hook.
+	 */
+	Table* luaH_new(lua_State* const state, const int narray, const int lnhash)
+	{
+		Table* const table = static_cast<Table*>(luaM_realloc(state, nullptr, 0u, sizeof(Table)));
+		luaC_link(state, reinterpret_cast<GCObject*>(table), LUA_TTABLE);
+
+		auto* const globalStateView = reinterpret_cast<LuaGlobalStateTableAllocRuntimeView*>(state->l_G);
+		table->metatable = globalStateView->defaultTableMetatable;
+		table->flags = static_cast<std::int8_t>(-1);
+		table->array = nullptr;
+		table->sizearray = 0;
+		table->lsizenode = 0;
+		table->node = nullptr;
+
+		(void)setarrayvector(narray, table, state);
+		(void)setnodevector(state, table, lnhash);
+
+		if (globalStateView->allocationTrackingEnabled != 0) {
+			LuaDebugTrackNewTableAllocation(state, table);
+		}
+
+		return table;
+	}
+
+	/**
+	 * Address: 0x009273A0 (FUN_009273A0, luaH_free)
+	 *
+	 * What it does:
+	 * Releases one Lua table's hash-node and array storage, then frees the
+	 * table object itself through Lua allocator callbacks.
+	 */
+	void luaH_free(lua_State* const state, Table* const table)
+	{
+		if (table->lsizenode != 0) {
+			const lu_mem nodeBytes = static_cast<lu_mem>(sizeof(Node)) * static_cast<lu_mem>(1u << table->lsizenode);
+			(void)luaM_realloc(state, table->node, nodeBytes, 0u);
+		}
+
+		const lu_mem arrayBytes = static_cast<lu_mem>(sizeof(TObject)) * static_cast<lu_mem>(table->sizearray);
+		(void)luaM_realloc(state, table->array, arrayBytes, 0u);
+		(void)luaM_realloc(state, table, static_cast<lu_mem>(sizeof(Table)), 0u);
 	}
 
 	/**
@@ -380,6 +1962,185 @@ extern "C"
 		}
 
 		return oldNodeCount;
+	}
+
+	/**
+	 * Address: 0x00927930 (FUN_00927930, sub_927930)
+	 *
+	 * What it does:
+	 * Recomputes Lua table array/hash resize targets from current occupancy and
+	 * applies one resize pass with the derived hash-bit count.
+	 */
+	int RehashTableFromUsage(Table* const table, lua_State* const state)
+	{
+		int narray = 0;
+		int nhash = 0;
+		numuse(table, &narray, &nhash);
+		const int hashBits = luaO_log2(static_cast<unsigned int>(nhash)) + 1;
+		return resize(table, narray, state, hashBits);
+	}
+
+	/**
+	 * Address: 0x00927970 (FUN_00927970, newkey)
+	 *
+	 * What it does:
+	 * Inserts one missing key into Lua table storage, relocating collided nodes
+	 * through `firstfree` chains and triggering table resize when hash lanes
+	 * are exhausted.
+	 */
+	TObject* newkey(lua_State* const state, Table* const table, const TObject* const key)
+	{
+		Node* mainPosition = luaH_mainposition(table, key);
+		if (mainPosition->i_val.tt != LUA_TNIL) {
+			Node* const collidingMainPosition = luaH_mainposition(table, &mainPosition->i_key);
+			Node* const firstFree = table->firstfree;
+			if (collidingMainPosition == mainPosition) {
+				firstFree->next = mainPosition->next;
+				mainPosition->next = firstFree;
+				mainPosition = firstFree;
+			} else {
+				Node* collisionPrev = collidingMainPosition;
+				while (collisionPrev->next != mainPosition) {
+					collisionPrev = collisionPrev->next;
+				}
+
+				collisionPrev->next = firstFree;
+				firstFree->i_key = mainPosition->i_key;
+				firstFree->i_val = mainPosition->i_val;
+				firstFree->next = mainPosition->next;
+				mainPosition->next = nullptr;
+				mainPosition->i_val.tt = LUA_TNIL;
+			}
+		}
+
+		mainPosition->i_key = *key;
+		if (table->firstfree->i_key.tt == LUA_TNIL) {
+			return &mainPosition->i_val;
+		}
+
+		const Node* const nodeStart = table->node;
+		for (;;) {
+			Node* const currentFirstFree = table->firstfree;
+			if (currentFirstFree == nodeStart) {
+				break;
+			}
+
+			Node* const previousNode = currentFirstFree - 1;
+			table->firstfree = previousNode;
+			if (previousNode->i_key.tt == LUA_TNIL) {
+				return &mainPosition->i_val;
+			}
+		}
+
+		mainPosition->i_val.tt = LUA_TBOOLEAN;
+		mainPosition->i_val.value.b = 0;
+		(void)RehashTableFromUsage(table, state);
+
+		TObject* valueSlot = nullptr;
+		if (key->tt == LUA_TNUMBER) {
+			const float numericKey = key->value.n;
+			const int integerKey = static_cast<int>(numericKey);
+			if (static_cast<float>(integerKey) == numericKey) {
+				valueSlot = const_cast<TObject*>(luaH_getnum(table, integerKey));
+			}
+		} else if (key->tt == LUA_TSTRING) {
+			valueSlot = const_cast<TObject*>(luaH_getstr(table, static_cast<TString*>(key->value.p)));
+		}
+
+		if (valueSlot == nullptr) {
+			valueSlot = const_cast<TObject*>(luaH_getany(key, table));
+		}
+
+		valueSlot->tt = LUA_TNIL;
+		return valueSlot;
+	}
+
+	/**
+	 * Address: 0x00927560 (FUN_00927560, luaH_set)
+	 *
+	 * What it does:
+	 * Resolves mutable slot for one table key (with integer/string fast-paths),
+	 * resets table metamethod-cache flags, and inserts missing keys via `newkey`.
+	 */
+	TObject* luaH_set(lua_State* const state, Table* const table, const TObject* const key)
+	{
+		const TObject* slot = nullptr;
+		if (key->tt == LUA_TNUMBER) {
+			const float numericKey = key->value.n;
+			const int integerKey = static_cast<int>(numericKey);
+			if (static_cast<float>(integerKey) == numericKey) {
+				slot = luaH_getnum(table, integerKey);
+			}
+		} else if (key->tt == LUA_TSTRING) {
+			slot = luaH_getstr(table, static_cast<TString*>(key->value.p));
+		}
+
+		if (slot == nullptr) {
+			slot = luaH_getany(key, table);
+		}
+
+		table->flags = 0;
+		if (slot == &luaO_nilobject) {
+			if (key->tt == LUA_TNIL) {
+				luaG_runerror(state, "table index is nil");
+			} else if (key->tt == LUA_TNUMBER) {
+				const float numericKey = key->value.n;
+				if (numericKey != numericKey) {
+					luaG_runerror(state, "table index is NaN");
+				}
+			}
+
+			return newkey(state, table, key);
+		}
+
+		return const_cast<TObject*>(slot);
+	}
+
+	/**
+	 * Address: 0x00927AC0 (FUN_00927AC0, luaH_setnum)
+	 *
+	 * What it does:
+	 * Resolves or inserts one integer-key table slot and returns the mutable
+	 * value lane for callers to assign payload data.
+	 */
+	TObject* luaH_setnum(lua_State* const state, Table* const table, const int key)
+	{
+		const TObject* slot = luaH_getnum(table, key);
+		if (slot == &luaO_nilobject) {
+			TObject numericKey{};
+			numericKey.tt = LUA_TNUMBER;
+			numericKey.value.n = static_cast<float>(key);
+			return newkey(state, table, &numericKey);
+		}
+
+		return const_cast<TObject*>(slot);
+	}
+
+	/**
+	 * Address: 0x00927EF0 (FUN_00927EF0, sub_927EF0)
+	 *
+	 * What it does:
+	 * Compares two stack lanes for table-sort partitioning, using custom
+	 * comparator at stack index 2 when present and falling back to
+	 * `lua_lessthan` when comparator is absent.
+	 */
+	[[nodiscard]] int LuaSortLessThanWithOptionalComparator(
+		const int leftStackIndex,
+		const int rightStackIndex,
+		lua_State* const state
+	)
+	{
+		if (lua_type(state, 2) == LUA_TNONE) {
+			return lua_lessthan(state, rightStackIndex, leftStackIndex);
+		}
+
+		lua_pushvalue(state, 2);
+		lua_pushvalue(state, rightStackIndex - 1);
+		lua_pushvalue(state, leftStackIndex - 2);
+		lua_call(state, 2, 1);
+		const int lessThan = lua_toboolean(state, -1);
+		lua_settop(state, -2);
+		return lessThan;
 	}
 
 	/**
@@ -493,12 +2254,12 @@ namespace
 		void luaA_pushobject(lua_State* L, const TObject* o);
 		int luaopen_serialize(lua_State* L);
 		void reallymarkobject(GCState* gcState, GCObject* object);
+		int luaD_call(lua_State* L, StkId func, int nResults);
 		void luaD_reallocCI(lua_State* L, int newsize);
 		void luaD_growstack(lua_State* L, int n);
 		void* luaM_realloc(lua_State* L, void* oldblock, lu_mem oldsize, lu_mem size);
 		void correctstack(lua_State* L, TObject* oldstack);
 		extern const char* luaT_typenames[];
-		extern const TObject luaO_nilobject;
 	}
 	constexpr std::uint16_t kLuaMaxCallInfoFrames = 0x1000u;
 
@@ -572,6 +2333,29 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00912F30 (FUN_00912F30, addinfo)
+	 *
+	 * What it does:
+	 * Prefixes one Lua error message with `chunk(line): ` when the active call
+	 * frame is a Lua function and returns the formatted string lane.
+	 */
+	[[maybe_unused]] const char* addinfo(lua_State* const state, const char* const msg)
+	{
+		char buff[60]{};
+		CallInfo* const ci = state->ci;
+		if (ci->state < 3) {
+			const auto* const closure = static_cast<const Closure*>(ci->base[-1].value.p);
+			const Proto* const proto = closure->l.p;
+			const int pc = static_cast<int>(ci->savedpc - proto->code);
+			const int line = (pc >= 0) ? (proto->lineinfo != nullptr ? proto->lineinfo[pc] : 0) : -1;
+			luaO_chunkid(buff, proto->source->str, sizeof(buff));
+			return luaO_pushfstring(state, "%s(%d): %s", buff, line, msg);
+		}
+
+		return msg;
+	}
+
+	/**
 	 * Address: 0x009133A0 (FUN_009133A0, luaG_typeerror)
 	 *
 	 * What it does:
@@ -601,6 +2385,28 @@ namespace
 		}
 
 		luaG_runerror(state, "%s expected but got %s", operation, valueType);
+	}
+
+	/**
+	 * Address: 0x00913420 (FUN_00913420, luaV_concat type-error helper)
+	 *
+	 * What it does:
+	 * Selects the non-string operand lane from two concat candidates and raises
+	 * `luaG_typeerror(..., "concatenate")`.
+	 */
+	[[maybe_unused]] [[noreturn]] void luaV_concat_raise_typeerror(
+		lua_State* const state,
+		TObject* const leftCandidate,
+		TObject* const rightCandidate
+	)
+	{
+		TObject* errorOperand = leftCandidate;
+		if (leftCandidate != nullptr && leftCandidate->tt == LUA_TSTRING) {
+			errorOperand = rightCandidate;
+		}
+
+		luaG_typeerror(state, errorOperand, "concatenate");
+		std::abort();
 	}
 
 	/**
@@ -647,6 +2453,35 @@ namespace
 		state->stacksize = newStackSize;
 		state->stack_last = &newStackBase[newStackSize - 6];
 		correctstack(state, oldStackBase);
+	}
+
+	/**
+	 * Address: 0x00929280 (FUN_00929280, callTMres)
+	 *
+	 * What it does:
+	 * Pushes one metamethod function + two operands, executes one Lua call with
+	 * a single expected result, then pops that result slot from the Lua stack.
+	 */
+	[[maybe_unused]] int callTMres(
+		const TObject* const metamethodFunction,
+		const TObject* const leftOperand,
+		const TObject* const rightOperand,
+		lua_State* const state
+	)
+	{
+		TObject* const top = state->top;
+		top[0] = *metamethodFunction;
+		top[1] = *leftOperand;
+		top[2] = *rightOperand;
+
+		if (reinterpret_cast<const char*>(state->stack_last) - reinterpret_cast<const char*>(state->top) <= 24) {
+			luaD_growstack(state, 3);
+		}
+
+		state->top += 3;
+		const int callResult = luaD_call(state, state->top - 3, 1);
+		--state->top;
+		return callResult;
 	}
 
 	/**
@@ -1430,6 +3265,21 @@ namespace
 	}
 
 	/**
+	 * Address: 0x00916C80 (FUN_00916C80, io_difftime)
+	 *
+	 * What it does:
+	 * Converts the first two numeric arguments to a time span and pushes the
+	 * `difftime` result as one Lua number.
+	 */
+	[[maybe_unused]] int io_difftime(lua_State* const state)
+	{
+		const std::time_t right = static_cast<std::time_t>(luaL_optnumber(state, 2, 0.0f));
+		const std::time_t left = static_cast<std::time_t>(luaL_checknumber(state, 1));
+		lua_pushnumber(state, static_cast<lua_Number>(std::difftime(left, right)));
+		return 1;
+	}
+
+	/**
 	 * Address: 0x00917350 (FUN_00917350, lua::io_tostring)
 	 *
 	 * What it does:
@@ -1735,6 +3585,308 @@ namespace
 				}
 			}
 			node = node->m_next;
+		}
+	}
+
+	/**
+	 * Address: 0x009151E0 (FUN_009151E0, reallymarkobject)
+	 *
+	 * What it does:
+	 * Marks one collectable GC object and links it into the appropriate gray
+	 * propagation lane.
+	 */
+	extern "C" void reallymarkobject(GCState* const st, GCObject* const object)
+	{
+		GCObject* current = object;
+		current->gch.marked |= 1u;
+
+		while (true) {
+			switch (static_cast<unsigned int>(current->gch.tt - LUA_TTABLE)) {
+			case 0:
+				current->h.gclist = st->tmark;
+				st->tmark = current;
+				return;
+
+			case 1:
+			case 2:
+				current->cl.c.gclist = st->tmark;
+				st->tmark = current;
+				return;
+
+			case 3:
+				current = reinterpret_cast<GCObject*>(current->u.metatable);
+				if (current != nullptr && (current->gch.marked & 0x11u) == 0u) {
+					current->gch.marked |= 1u;
+					if (static_cast<unsigned int>(current->gch.tt - LUA_TTABLE) <= 5u) {
+						continue;
+					}
+				}
+				return;
+
+			case 4:
+				current->th.gclist = st->tmark;
+				st->tmark = current;
+				return;
+
+			case 5:
+				current->p.gclist = st->tmark;
+				st->tmark = current;
+				return;
+
+			default:
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x00915320 (FUN_00915320, traversetable)
+	 *
+	 * What it does:
+	 * Marks the metatable, resolves weak-table mode, and traverses array/hash
+	 * lanes while preserving weak key/value semantics.
+	 */
+	extern "C" void traversetable(GCState* const st, Table* const h)
+	{
+		constexpr int kLuaTagMethodMode = 3;
+
+		auto markCollectable = [st](TObject& slot) {
+			if (slot.tt >= LUA_TSTRING) {
+				auto* const object = static_cast<GCObject*>(slot.value.p);
+				if (object != nullptr && (object->gch.marked & 0x11u) == 0u) {
+					reallymarkobject(st, object);
+				}
+			}
+		};
+
+		auto condMarkCollectable = [&markCollectable](TObject& slot, const bool shouldMark) {
+			if (shouldMark) {
+				markCollectable(slot);
+			}
+		};
+
+		Table* const metatable = h->metatable;
+		bool weakkey = false;
+		bool weakvalue = false;
+		if ((metatable->marked & 0x11u) == 0u) {
+			reallymarkobject(st, reinterpret_cast<GCObject*>(metatable));
+		}
+
+		if ((metatable->flags & 4) == 0) {
+			const TObject* const mode = luaT_gettm(metatable, kLuaTagMethodMode, st->g->tmname[kLuaTagMethodMode]);
+			if (mode != nullptr && mode->tt == LUA_TSTRING) {
+				const char* const modeText = static_cast<TString*>(mode->value.p)->str;
+				weakkey = std::strchr(modeText, 'k') != nullptr;
+				weakvalue = std::strchr(modeText, 'v') != nullptr;
+			}
+		}
+
+		if (weakkey || weakvalue) {
+			h->marked &= static_cast<lu_byte>(~0x6u);
+			if (weakkey) {
+				h->marked |= 0x2u;
+			}
+			if (weakvalue) {
+				h->marked |= 0x4u;
+			}
+
+			GCObject** const weaklist = weakkey ? (weakvalue ? &st->wkv : &st->wk) : &st->wv;
+			h->gclist = *weaklist;
+			*weaklist = reinterpret_cast<GCObject*>(h);
+		}
+
+		if (!weakvalue) {
+			for (int index = h->sizearray; index != 0; --index) {
+				markCollectable(h->array[index - 1]);
+			}
+		}
+
+		for (int index = 1 << h->lsizenode; index != 0; --index) {
+			Node* const node = &h->node[index - 1];
+			if (node->i_val.tt != LUA_TNIL) {
+				condMarkCollectable(node->i_key, !weakkey);
+				condMarkCollectable(node->i_val, !weakvalue);
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x009154A0 (FUN_009154A0, traverseproto)
+	 *
+	 * What it does:
+	 * Marks one prototype's strings, upvalue names, nested protos, and local
+	 * variable names.
+	 */
+	extern "C" void traverseproto(GCState* const st, Proto* const f)
+	{
+		f->source->marked |= 1u;
+		for (int index = 0; index < f->sizek; ++index) {
+			TObject& constant = f->k[index];
+			if (constant.tt == LUA_TSTRING) {
+				static_cast<TString*>(constant.value.p)->marked |= 1u;
+			}
+		}
+
+		for (int index = 0; index < f->sizeupvalues; ++index) {
+			f->upvalues[index]->marked |= 1u;
+		}
+
+		for (int index = 0; index < f->sizep; ++index) {
+			Proto* const nested = f->p[index];
+			if ((nested->marked & 0x11u) == 0u) {
+				reallymarkobject(st, reinterpret_cast<GCObject*>(nested));
+			}
+		}
+
+		for (int index = 0; index < f->sizelocvars; ++index) {
+			f->locvars[index].varname->marked |= 1u;
+		}
+	}
+
+	/**
+	 * Address: 0x00915540 (FUN_00915540, traversecclosure)
+	 *
+	 * What it does:
+	 * Marks one C closure's collectable upvalue lanes.
+	 */
+	extern "C" void traversecclosure(GCState* const st, CClosure* const cl)
+	{
+		for (int index = 0; index < cl->nupvalues; ++index) {
+			TObject& upvalue = cl->upvalue[index];
+			if (upvalue.tt >= LUA_TSTRING) {
+				auto* const object = static_cast<GCObject*>(upvalue.value.p);
+				if (object != nullptr && (object->gch.marked & 0x11u) == 0u) {
+					reallymarkobject(st, object);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x00915580 (FUN_00915580, traverselclosure)
+	 *
+	 * What it does:
+	 * Marks one Lua closure's environment, prototype, and nested upvalues.
+	 */
+	extern "C" void traverselclosure(GCState* const st, LClosure* const cl)
+	{
+		if (cl->g.tt >= LUA_TSTRING) {
+			auto* const object = static_cast<GCObject*>(cl->g.value.p);
+			if (object != nullptr && (object->gch.marked & 0x11u) == 0u) {
+				reallymarkobject(st, object);
+			}
+		}
+
+		if (cl->p != nullptr && (cl->p->marked & 0x11u) == 0u) {
+			reallymarkobject(st, reinterpret_cast<GCObject*>(cl->p));
+		}
+
+		for (int index = 0; index < cl->nupvalues; ++index) {
+			UpVal* const upvalue = cl->upvals[index];
+			if (upvalue != nullptr && upvalue->marked == 0) {
+				if (upvalue->value.tt >= LUA_TSTRING) {
+					auto* const object = static_cast<GCObject*>(upvalue->value.value.p);
+					if (object != nullptr && (object->gch.marked & 0x11u) == 0u) {
+						reallymarkobject(st, object);
+					}
+				}
+				upvalue->marked = 1u;
+			}
+		}
+	}
+
+	/**
+	 * Address: 0x00915670 (FUN_00915670, traversestack)
+	 *
+	 * What it does:
+	 * Marks the thread global table and live stack lanes, clears the unused tail
+	 * to nil, then trims overgrown stack and call-info allocations.
+	 */
+	extern "C" void traversestack(lua_State* const L1, GCState* const st)
+	{
+		if (L1->_gt.tt >= LUA_TSTRING) {
+			auto* const object = static_cast<GCObject*>(L1->_gt.value.p);
+			if (object != nullptr && (object->gch.marked & 0x11u) == 0u) {
+				reallymarkobject(st, object);
+			}
+		}
+
+		CallInfo* const baseCi = L1->base_ci;
+		CallInfo* const currentCi = L1->ci;
+		TObject* lim = L1->top;
+		for (CallInfo* ci = baseCi; ci <= currentCi; ++ci) {
+			if (lim < ci->top) {
+				lim = ci->top;
+			}
+		}
+
+		for (TObject* object = L1->stack; object < L1->top; ++object) {
+			if (object->tt >= LUA_TSTRING) {
+				auto* const gcObject = static_cast<GCObject*>(object->value.p);
+				if (gcObject != nullptr && (gcObject->gch.marked & 0x11u) == 0u) {
+					reallymarkobject(st, gcObject);
+				}
+			}
+		}
+
+		for (TObject* object = L1->top; object <= lim; ++object) {
+			object->tt = LUA_TNIL;
+			object->value.p = nullptr;
+		}
+
+		if ((4 * (L1->ci - L1->base_ci) < L1->size_ci) && L1->size_ci > 0x10u) {
+			luaD_reallocCI(L1, L1->size_ci >> 1);
+		}
+
+		if ((4 * (lim - L1->stack) < L1->stacksize) && L1->stacksize > 90) {
+			luaD_reallocstack(L1, L1->stacksize / 2);
+		}
+	}
+
+	/**
+	 * Address: 0x00915750 (FUN_00915750, propagatemarks)
+	 *
+	 * What it does:
+	 * Drains the gray list by dispatching tables, closures, threads, and proto
+	 * nodes through their specialized traversal lanes.
+	 */
+	extern "C" void propagatemarks(GCState* const st)
+	{
+		while (st->tmark != nullptr) {
+			GCObject* const current = st->tmark;
+			switch (current->gch.tt) {
+			case LUA_TTABLE:
+				st->tmark = current->h.gclist;
+				traversetable(st, &current->h);
+				break;
+
+			case LUA_CFUNCTION:
+				st->tmark = current->cl.c.gclist;
+				traversecclosure(st, &current->cl.c);
+				break;
+
+			case LUA_TFUNCTION:
+				st->tmark = current->cl.c.gclist;
+				traverselclosure(st, &current->cl.l);
+				break;
+
+			case LUA_TTHREAD:
+				st->tmark = current->th.gclist;
+				traversestack(&current->th, st);
+				if (current->th.l_G->userGCFunction != nullptr) {
+					st->L = &current->th;
+					current->th.l_G->userGCFunction(st);
+				}
+				break;
+
+			case LUA_TPROTO:
+				st->tmark = current->p.gclist;
+				traverseproto(st, &current->p);
+				break;
+
+			default:
+				break;
+			}
 		}
 	}
 
@@ -2666,9 +4818,145 @@ namespace
 			return;
 		}
 
-		const char* const alertText = lua_tostring(state, -2);
-		std::fprintf(stderr, "%s\n", alertText);
-		lua_settop(state, -3);
+	const char* const alertText = lua_tostring(state, -2);
+	std::fprintf(stderr, "%s\n", alertText);
+	lua_settop(state, -3);
+	}
+
+	/**
+	 * Address: 0x00924CE0 (FUN_00924CE0, str_lower)
+	 *
+	 * What it does:
+	 * Lowercases each byte from the first Lua string argument and pushes the
+	 * transformed buffer result.
+	 */
+	[[maybe_unused]] int str_lower(lua_State* const state)
+	{
+		size_t textLength = 0u;
+		const char* const text = luaL_checklstring(state, 1, &textLength);
+
+		luaL_Buffer buffer{};
+		luaL_buffinit(state, &buffer);
+		char* const bufferEnd = reinterpret_cast<char*>(&buffer) + sizeof(buffer);
+		for (size_t index = 0; index < textLength; ++index) {
+			if (buffer.p >= bufferEnd) {
+				luaL_prepbuffer(&buffer);
+			}
+			*buffer.p++ = static_cast<char>(std::tolower(static_cast<unsigned char>(text[index])));
+		}
+
+		luaL_pushresult(&buffer);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00924C30 (FUN_00924C30, str_sub)
+	 *
+	 * What it does:
+	 * Returns the substring slice selected by arg-2 and arg-3, honoring Lua's
+	 * 1-based negative-index conventions and empty-slice behavior.
+	 */
+	[[maybe_unused]] int str_sub(lua_State* const state)
+	{
+		size_t textLength = 0u;
+		const char* const text = luaL_checklstring(state, 1, &textLength);
+
+		int start = static_cast<int>(luaL_checknumber(state, 2));
+		if (start < 0) {
+			start += static_cast<int>(textLength) + 1;
+		}
+
+		int end = static_cast<int>(luaL_optnumber(state, 3, -1.0f));
+		if (end < 0) {
+			end += static_cast<int>(textLength) + 1;
+		}
+
+		if (start < 1) {
+			start = 1;
+		}
+		if (end > static_cast<int>(textLength)) {
+			end = static_cast<int>(textLength);
+		}
+
+		if (start > end) {
+			lua_pushlstring(state, "", 0u);
+		} else {
+			lua_pushlstring(state, text + (start - 1), static_cast<size_t>(end - start + 1));
+		}
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00924D80 (FUN_00924D80, str_upper)
+	 *
+	 * What it does:
+	 * Uppercases each byte from the first Lua string argument and pushes the
+	 * transformed buffer result.
+	 */
+	[[maybe_unused]] int str_upper(lua_State* const state)
+	{
+		size_t textLength = 0u;
+		const char* const text = luaL_checklstring(state, 1, &textLength);
+
+		luaL_Buffer buffer{};
+		luaL_buffinit(state, &buffer);
+		char* const bufferEnd = reinterpret_cast<char*>(&buffer) + sizeof(buffer);
+		for (size_t index = 0; index < textLength; ++index) {
+			if (buffer.p >= bufferEnd) {
+				luaL_prepbuffer(&buffer);
+			}
+			*buffer.p++ = static_cast<char>(std::toupper(static_cast<unsigned char>(text[index])));
+		}
+
+		luaL_pushresult(&buffer);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00924E20 (FUN_00924E20, str_rep)
+	 *
+	 * What it does:
+	 * Repeats arg-1 string arg-2 times and pushes the concatenated result.
+	 */
+	[[maybe_unused]] int str_rep(lua_State* const state)
+	{
+		size_t textLength = 0u;
+		const char* const text = luaL_checklstring(state, 1, &textLength);
+		const int repeatCount = static_cast<int>(luaL_checknumber(state, 2));
+
+		luaL_Buffer buffer{};
+		luaL_buffinit(state, &buffer);
+		for (int repeatIndex = 0; repeatIndex < repeatCount; ++repeatIndex) {
+			luaL_addlstring(&buffer, text, textLength);
+		}
+
+		luaL_pushresult(&buffer);
+		return 1;
+	}
+
+	/**
+	 * Address: 0x00924EA0 (FUN_00924EA0, str_byte)
+	 *
+	 * What it does:
+	 * Returns one byte value from arg-1 at optional arg-2 position, honoring
+	 * Lua's negative-index adjustment and out-of-range empty-result behavior.
+	 */
+	[[maybe_unused]] int str_byte(lua_State* const state)
+	{
+		size_t textLength = 0u;
+		const char* const text = luaL_checklstring(state, 1, &textLength);
+
+		int position = static_cast<int>(luaL_optnumber(state, 2, 1.0f));
+		if (position < 0) {
+			position += static_cast<int>(textLength) + 1;
+		}
+
+		if (position <= 0 || static_cast<size_t>(position) > textLength) {
+			return 0;
+		}
+
+		lua_pushnumber(state, static_cast<float>(static_cast<unsigned char>(text[position - 1])));
+		return 1;
 	}
 
 	/**
@@ -3725,6 +6013,27 @@ LuaObject& LuaObject::operator=(const LuaObject& other)
 }
 
 /**
+ * Address: 0x00908B00 (FUN_00908B00, LuaPlus::LuaObject::operator=)
+ *
+ * What it does:
+ * Unlinks current state-list ownership (when bound), resolves one stack slot
+ * TValue lane from `stackObject`, then re-links this object into that state's
+ * used-object list.
+ */
+LuaObject& LuaObject::operator=(const LuaStackObject& stackObject)
+{
+	if (m_state) {
+		*m_prev = m_next;
+		m_next->m_prev = m_prev;
+		m_object.tt = LUA_TNIL;
+	}
+
+	TObject* const stackValue = luaA_index(stackObject.m_state->m_state, stackObject.m_stackIndex);
+	AddToUsedObjectList(stackObject.m_state, stackValue);
+	return *this;
+}
+
+/**
  * Address: 0x009075D0 (FUN_009075D0, LuaPlus::LuaObject::~LuaObject)
  * Address: 0x00BA2E8B (FUN_00BA2E8B, LuaObject::j_Dtr_9 thunk)
  *
@@ -3914,6 +6223,117 @@ void LuaState::SetState(lua_State* const state)
  * Serializes raw lua_State stack/callframe/global/upvalue lanes for archive
  * persistence.
  */
+/**
+ * Address: 0x009207E0 (FUN_009207E0, Udata::MemberSerialize)
+ *
+ * What it does:
+ * Uses the owner Lua-thread lane as serialization context, writes userdata
+ * metatable pointer as unowned tracked reference, then serializes userdata
+ * payload through the stored runtime `RType`.
+ */
+void Udata::MemberSerialize(
+	gpg::WriteArchive* const archive,
+	Udata* const object,
+	const int,
+	gpg::RRef* const ownerRef
+)
+{
+	Ensure(archive != nullptr, "archive");
+	Ensure(object != nullptr, "object");
+	Ensure(ownerRef != nullptr, "ownerRef");
+
+	lua_State* const ownerState = ownerRef->TryUpcastLuaThreadState();
+	Ensure(ownerState != nullptr, "ownerState");
+	Ensure(ownerState->l_G != nullptr, "ownerState->l_G");
+
+	struct GlobalStateLockGuard
+	{
+		global_State* state;
+		explicit GlobalStateLockGuard(global_State* const inState) : state(inState)
+		{
+			++state->gcTraversalLockDepth;
+		}
+		~GlobalStateLockGuard()
+		{
+			--state->gcTraversalLockDepth;
+		}
+	} lockGuard(ownerState->l_G);
+
+	gpg::RRef metatableRef{};
+	(void)gpg::RRef_Table(&metatableRef, object->metatable);
+	gpg::WriteRawPointer(archive, metatableRef, gpg::TrackedPointerState::Unowned, *ownerRef);
+
+	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(object->len);
+	const void* const payload = reinterpret_cast<const std::uint8_t*>(object) + sizeof(Udata);
+	archive->Write(payloadType, payload, *ownerRef);
+}
+
+/**
+ * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
+ *
+ * What it does:
+ * Deserializes userdata metatable pointer lane and typed payload bytes using
+ * one owning Lua thread traversal lock lane from `ownerRef`.
+ */
+void Udata::MemberDeserialize(
+	gpg::ReadArchive* const archive,
+	Udata* const object,
+	const int,
+	const gpg::RRef& ownerRef
+)
+{
+	Ensure(archive != nullptr, "archive");
+	Ensure(object != nullptr, "object");
+
+	lua_State* const ownerState = ownerRef.TryUpcastLuaThreadState();
+	Ensure(ownerState != nullptr, "ownerState");
+	Ensure(ownerState->l_G != nullptr, "ownerState->l_G");
+
+	struct GlobalStateLockGuard
+	{
+		global_State* state;
+		explicit GlobalStateLockGuard(global_State* const inState) : state(inState)
+		{
+			++state->gcTraversalLockDepth;
+		}
+		~GlobalStateLockGuard()
+		{
+			--state->gcTraversalLockDepth;
+		}
+	} lockGuard(ownerState->l_G);
+
+	(void)archive->ReadPointer_Table(&object->metatable, &ownerRef);
+	gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(object->len);
+	void* const payload = reinterpret_cast<std::uint8_t*>(object) + sizeof(Udata);
+	archive->Read(payloadType, payload, ownerRef);
+}
+
+/**
+ * Address: 0x00922AB0 (FUN_00922AB0, LClosure::MemberDeserialize)
+ *
+ * What it does:
+ * Deserializes prototype/global-object/upvalue pointer lanes for one Lua
+ * closure object.
+ */
+void LClosure::MemberDeserialize(
+	gpg::ReadArchive* const archive,
+	LClosure* const object,
+	const int,
+	const gpg::RRef& ownerRef
+)
+{
+	Ensure(archive != nullptr, "archive");
+	Ensure(object != nullptr, "object");
+
+	archive->ReadPointer_Proto(&object->p, &ownerRef);
+	archive->Read(CachedType<TObject>(gLuaTObjectType), &object->g, ownerRef);
+
+	UpVal** upvalueLane = object->upvals;
+	for (std::uint8_t upvalueIndex = 0; upvalueIndex < object->nupvalues; ++upvalueIndex, ++upvalueLane) {
+		archive->ReadPointer_UpVal(upvalueLane, &ownerRef);
+	}
+}
+
 void lua_State::MemberSerialize(
 	gpg::WriteArchive* const archive,
 	lua_State* const state,
@@ -5423,23 +7843,37 @@ int32_t LuaObject::GetTableCount() const
 	return count;
 }
 
-void LuaObject::Register(const char* key, CFunction value, const int32_t tagMethod)
+/**
+ * Address: 0x00907630 (FUN_00907630, LuaPlus::LuaObject::Register)
+ *
+ * What it does:
+ * Creates one C closure with `tagMethod` upvalues from the Lua root-state
+ * stack, then assigns it into this table object under `key`.
+ */
+void LuaObject::Register(const char* const key, CFunction const value, const int32_t tagMethod)
 {
 	Ensure(m_state != nullptr, "m_state");
+	Ensure(m_state->m_state != nullptr, "lua state");
+	Ensure(m_state->m_state->l_G != nullptr, "lua global state");
 	Ensure(key != nullptr, "key");
 	Ensure(value != nullptr, "value");
 
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+	lua_State* const closureState = m_state->m_state->l_G->lstate;
+	Ensure(closureState != nullptr, "closure state");
 
-	const int oldTop = lua_gettop(lstate);
-	PushStack(lstate);
-	lua_pushstring(lstate, key);
-	lua_pushcfunction(lstate, value);
-	lua_settable(lstate, -3);
-	lua_settop(lstate, oldTop);
+	Closure* const closure = luaF_newCclosure(closureState, tagMethod);
+	closure->c.f = value;
+	closureState->top -= tagMethod;
 
-	(void)tagMethod;
+	for (int upvalueIndex = tagMethod - 1; upvalueIndex >= 0; --upvalueIndex) {
+		closure->c.upvalue[upvalueIndex] = closureState->top[upvalueIndex];
+		closureState->top[upvalueIndex].tt = 0;
+	}
+
+	TObject closureObject{};
+	closureObject.value.p = closure;
+	closureObject.tt = static_cast<int>(closure->c.tt);
+	SetTableHelper(key, &closureObject);
 }
 
 /**

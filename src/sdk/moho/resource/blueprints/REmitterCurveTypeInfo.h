@@ -38,6 +38,15 @@ namespace moho
      */
     void Init() override;
 
+    /**
+     * Address: 0x00516740 (FUN_00516740, Moho::REmitterBlueprintCurveTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `REmitterBlueprintCurve` in caller-provided storage and
+     * returns a typed reflection reference for that object.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
   private:
     /**
      * Address: 0x00516EC0 (FUN_00516EC0)
@@ -126,4 +135,3 @@ namespace moho
   static_assert(sizeof(REmitterBlueprintCurveTypeInfo) == 0x64, "REmitterBlueprintCurveTypeInfo size must be 0x64");
   static_assert(sizeof(REmitterCurveKeyTypeInfo) == 0x64, "REmitterCurveKeyTypeInfo size must be 0x64");
 } // namespace moho
-

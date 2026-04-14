@@ -295,6 +295,15 @@ namespace moho
   };
 
   /**
+   * Address: 0x005A5790 (FUN_005A5790, ?AI_CreatePathingNavigator@Moho@@YAPAVIAiNavigator@1@PAVUnit@1@@Z)
+   *
+   * What it does:
+   * Allocates one `CAiNavigatorLand` for `unit` and returns it through the
+   * `IAiNavigator` interface pointer. Returns null when allocation fails.
+   */
+  [[nodiscard]] IAiNavigator* AI_CreatePathingNavigator(Unit* unit);
+
+  /**
    * Address: 0x00BCC9A0 (FUN_00BCC9A0)
    *
    * What it does:

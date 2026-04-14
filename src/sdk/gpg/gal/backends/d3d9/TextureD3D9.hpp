@@ -35,6 +35,15 @@ namespace gpg::gal
         TextureD3D9();
 
         /**
+         * Address: 0x0094AB80 (FUN_0094AB80)
+         *
+         * What it does:
+         * Initializes one texture wrapper and binds caller context plus
+         * one native texture payload.
+         */
+        TextureD3D9(const TextureContext* context, void* texture);
+
+        /**
          * Address: 0x0094AB60 (FUN_0094AB60)
          *
          * What it does:
@@ -121,6 +130,15 @@ namespace gpg::gal
          * Resets texture resources and reinitializes context state.
          */
         void Reset();
+
+        /**
+         * Address: 0x0094AAF0 (FUN_0094AAF0)
+         *
+         * What it does:
+         * Resets prior texture state, copies caller context metadata, assigns a
+         * new native texture handle, and clears copied source-data lanes.
+         */
+        void SetTexture(const TextureContext* context, void* texture);
 
     public:
         TextureContext context_{}; // +0x04

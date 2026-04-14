@@ -1,6 +1,8 @@
 #include "moho/misc/ScrFileLine.h"
 
 #include <cstddef>
+#include <cstring>
+#include <exception>
 #include <new>
 #include <string>
 
@@ -22,6 +24,182 @@ namespace
       ::operator delete(static_cast<void*>(self));
     }
     return self;
+  }
+
+  /**
+   * Address: 0x004C6AB0 (FUN_004C6AB0)
+   *
+   * IDA signature:
+   * int __usercall sub_4C6AB0@<eax>(int a1@<eax>, int a2@<esi>);
+   *
+   * What it does:
+   * Copy-assigns one source ScrFileLine row into one already-constructed
+   * destination row by duplicating the marker state and owning-copying
+   * both embedded string lanes.
+   */
+  [[maybe_unused]] moho::ScrFileLine& CopyAssignScrFileLine(
+    moho::ScrFileLine& destination,
+    const moho::ScrFileLine& source
+  )
+  {
+    destination.mMarkerState = source.mMarkerState;
+    destination.mLineNumberText.assign(source.mLineNumberText, 0U, msvc8::string::npos);
+    destination.mSourceText.assign(source.mSourceText, 0U, msvc8::string::npos);
+    return destination;
+  }
+
+  /**
+   * Address: 0x004C6B90 (FUN_004C6B90)
+   *
+   * IDA signature:
+   * int __usercall sub_4C6B90@<eax>(int result@<eax>, int a2@<ecx>, int a3@<ebx>);
+   *
+   * What it does:
+   * Copy-assigns one half-open source row range `[sourceBegin, sourceEnd)`
+   * into destination rows ending at `destinationEnd`, walking the ranges
+   * backward one 64-byte row at a time so overlapping in-place shifts
+   * preserve semantics. Returns the destination begin pointer. Matches
+   * the legacy `std::copy_backward<ScrFileLine*, ScrFileLine*>`
+   * instantiation used by `msvc8::vector<ScrFileLine>` insert paths.
+   */
+  [[maybe_unused]] moho::ScrFileLine* CopyAssignScrFileLineRangeBackward(
+    moho::ScrFileLine* destinationEnd,
+    const moho::ScrFileLine* sourceBegin,
+    const moho::ScrFileLine* sourceEnd
+  )
+  {
+    while (sourceEnd != sourceBegin) {
+      --sourceEnd;
+      --destinationEnd;
+      CopyAssignScrFileLine(*destinationEnd, *sourceEnd);
+    }
+    return destinationEnd;
+  }
+
+  /**
+   * Address: 0x004C6850 (FUN_004C6850)
+   *
+   * IDA signature:
+   * int __usercall sub_4C6850@<eax>(int result@<eax>, int a2@<ecx>, int a3@<ebx>);
+   *
+   * What it does:
+   * Copy-assigns one half-open source row range `[sourceBegin, sourceEnd)`
+   * over the already-constructed destination rows starting at `destination`
+   * and returns one-past the last written destination row. Matches the
+   * legacy `std::copy<ScrFileLine*, ScrFileLine*>` instantiation emitted
+   * for `msvc8::vector<ScrFileLine>` reallocation and insertion paths.
+   */
+  [[maybe_unused]] moho::ScrFileLine* CopyAssignScrFileLineRange(
+    moho::ScrFileLine* destination,
+    const moho::ScrFileLine* sourceBegin,
+    const moho::ScrFileLine* const sourceEnd
+  )
+  {
+    for (; sourceBegin != sourceEnd; ++sourceBegin, ++destination) {
+      CopyAssignScrFileLine(*destination, *sourceBegin);
+    }
+    return destination;
+  }
+
+  /**
+   * Address: 0x004C69B0 (FUN_004C69B0)
+   *
+   * IDA signature:
+   * std::string *__usercall sub_4C69B0@<eax>(std::string *result@<eax>,
+   *                                          int a2@<edi>,
+   *                                          std::string *a3);
+   *
+   * What it does:
+   * Copy-assigns one source row into every already-constructed destination
+   * row in the half-open range `[destinationBegin, destinationEnd)` and
+   * returns the address of the last assignment's destination string lane,
+   * matching the legacy `std::fill<ScrFileLine*, ScrFileLine>` instantiation.
+   */
+  [[maybe_unused]] void FillScrFileLineRangeFromSource(
+    moho::ScrFileLine* destinationBegin,
+    moho::ScrFileLine* const destinationEnd,
+    const moho::ScrFileLine& source
+  )
+  {
+    for (; destinationBegin != destinationEnd; ++destinationBegin) {
+      CopyAssignScrFileLine(*destinationBegin, source);
+    }
+  }
+
+  /**
+   * Address: 0x004C6D30 (FUN_004C6D30)
+   *
+   * IDA signature:
+   * void __thiscall __noreturn sub_4C6D30(char *this, char *a1,
+   *                                       void (__thiscall ***a2)(_DWORD, _DWORD));
+   *
+   * What it does:
+   * Uninitialized-constructs one destination ScrFileLine range from a
+   * parallel source range by copy-constructing each slot through the
+   * ScrFileLine copy constructor. On any thrown exception, walks the
+   * already-constructed destination prefix and invokes each row's non-
+   * deleting destructor before rethrowing. Matches the legacy
+   * `std::_Uninitialized_copy<ScrFileLine*, ScrFileLine*>` instantiation
+   * used by `msvc8::vector<ScrFileLine>` grow/insert paths.
+   */
+  [[maybe_unused]] moho::ScrFileLine* UninitializedCopyScrFileLineRange(
+    const moho::ScrFileLine* sourceBegin,
+    const moho::ScrFileLine* const sourceEnd,
+    moho::ScrFileLine* const destinationBegin
+  )
+  {
+    moho::ScrFileLine* cursor = destinationBegin;
+    try {
+      while (sourceBegin != sourceEnd) {
+        ::new (static_cast<void*>(cursor)) moho::ScrFileLine(*sourceBegin);
+        ++cursor;
+        ++sourceBegin;
+      }
+      return cursor;
+    } catch (...) {
+      for (moho::ScrFileLine* unwind = destinationBegin; unwind != cursor; ++unwind) {
+        unwind->~ScrFileLine();
+      }
+      throw;
+    }
+  }
+
+  /**
+   * Address: 0x004C68A0 (FUN_004C68A0)
+   *
+   * IDA signature:
+   * void __fastcall __noreturn sub_4C68A0(int a1, int a2,
+   *                                       void (__thiscall ***a3)(_DWORD, _DWORD));
+   *
+   * What it does:
+   * Uninitialized-constructs `count` ScrFileLine rows starting at
+   * `destinationBegin` using the copy-constructor from `sourceRow`; on any
+   * thrown exception, invokes the non-deleting destructor for every already-
+   * constructed row and rethrows. Matches the legacy
+   * `std::_Uninitialized_copy_n<ScrFileLine*>` instantiation used by
+   * `msvc8::vector<ScrFileLine>` growth paths.
+   */
+  [[maybe_unused]] moho::ScrFileLine* UninitializedConstructScrFileLineRun(
+    moho::ScrFileLine* const destinationBegin,
+    const std::size_t count,
+    const moho::ScrFileLine& sourceRow
+  )
+  {
+    moho::ScrFileLine* cursor = destinationBegin;
+    std::size_t remaining = count;
+    try {
+      while (remaining != 0U) {
+        ::new (static_cast<void*>(cursor)) moho::ScrFileLine(sourceRow);
+        ++cursor;
+        --remaining;
+      }
+      return cursor;
+    } catch (...) {
+      for (moho::ScrFileLine* unwind = destinationBegin; unwind != cursor; ++unwind) {
+        unwind->~ScrFileLine();
+      }
+      throw;
+    }
   }
 
   void ExpandTabsToVisualColumns(msvc8::string& text)

@@ -1,9 +1,11 @@
 #include "moho/render/camera/CameraImpl.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #include "lua/LuaObject.h"
@@ -11,7 +13,9 @@
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/render/RCamManager.h"
+#include "moho/unit/Broadcaster.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
@@ -21,6 +25,7 @@ namespace moho
 {
   int cfunc_GetCameraL(LuaPlus::LuaState* state);
   extern float cam_NearZoom;
+  extern float cam_NearFOV;
   extern float cam_FarFOV;
   extern float cam_FarPitch;
   extern float cam_ShakeMult;
@@ -110,7 +115,9 @@ namespace
   constexpr const char* kCameraImplSpinHelpText = "Camera:Spin(headingRate[,zoomRate])";
   constexpr float kDegreesToRadians = 0.017453292f;
   constexpr float kPi = 3.1415927f;
+  constexpr float kTwoPi = 6.2831855f;
   constexpr std::int32_t kCameraTargetTypeLocation = 0;
+  constexpr std::int32_t kCameraTargetTypeBox = 1;
   constexpr std::int32_t kCameraTargetTypeEntity = 2;
   constexpr std::int32_t kCameraTargetTypeHermite = 4;
   constexpr std::int32_t kCameraTimeSourceSystem = 0;
@@ -157,45 +164,66 @@ namespace
   );
   static_assert(offsetof(CameraShakeParamsView, mScale) == 0x20, "CameraShakeParamsView::mScale offset must be 0x20");
 
+  class CameraTimeSourceRuntime
+  {
+  public:
+    virtual float Time() = 0;
+  };
+
   struct CameraImplRuntimeView
   {
     std::uint8_t mUnknown000To03B[0x3C]{};
-    LuaPlus::LuaObject mLuaObject{};        // +0x03C
-    msvc8::string mName{};                   // +0x050
-    moho::STIMap* mTerrainMap = nullptr;     // +0x06C
-    moho::GeomCamera3 mCam{};                // +0x070
-    float mVerticalZoomMetricScale = 0.0f;   // +0x338
-    std::uint8_t mUnknown33CTo33C[0x01]{};   // +0x33C
-    std::uint8_t mIsRotated = 0;             // +0x33D
-    std::uint8_t mRevertRotation = 0;        // +0x33E
-    std::uint8_t mUnknown33FTo33F[0x01]{};   // +0x33F
-    float mFarFov = 0.0f;                    // +0x340
-    float mHeading = 0.0f;                   // +0x344
-    float mUnknown348 = 0.0f;                // +0x348
-    float mFarPitch = 0.0f;                  // +0x34C
-    float mHeadingZoom = 0.0f;               // +0x350
-    float mTargetZoom = 0.0f;                // +0x354
-    float mNearZoom = 0.0f;                  // +0x358
-    std::uint8_t mUnknown35CTo35F[0x04]{};   // +0x35C
-    Wm3::Vec3f mOffset{};                    // +0x360
-    std::uint8_t mUnknown36CTo373[0x08]{};   // +0x36C
-    float mHeadingRate = 0.0f;               // +0x374
-    float mZoomRate = 0.0f;                  // +0x378
-    std::int32_t mTargetType = 0;            // +0x37C
-    Wm3::Vec3f mTargetLocation{};            // +0x380
-    std::uint8_t mUnknown38CTo3B3[0x28]{};   // +0x38C
-    float mTargetTimeLeft = 0.0f;            // +0x3B4
-    std::uint8_t mTargetTime = 0;            // +0x3B8
-    std::uint8_t mUnknown3B9To3BB[0x03]{};   // +0x3B9
-    std::int32_t mTimeSource = 0;            // +0x3BC
-    std::uint8_t mUnknown3C0To3CB[0x0C]{};   // +0x3C0
-    std::uint8_t mEnableEaseInOut = 0;       // +0x3CC
-    std::uint8_t mUnknown3CDTo3CF[0x03]{};   // +0x3CD
-    float mUnknown3D0 = 0.0f;                // +0x3D0
-    std::uint8_t mUnknown3D4To427[0x54]{};   // +0x3D4
-    CameraShakeParamsView mCamShakeParams{}; // +0x428
-    std::uint8_t mUnknown44CTo44F[0x04]{};   // +0x44C
-    std::int32_t mAccType = 0;               // +0x450
+    LuaPlus::LuaObject mLuaObject{};                      // +0x03C
+    msvc8::string mName{};                                // +0x050
+    moho::STIMap* mTerrainMap = nullptr;                  // +0x06C
+    moho::GeomCamera3 mCam{};                             // +0x070
+    float mVerticalZoomMetricScale = 0.0f;                // +0x338
+    std::uint8_t mUnknown33CTo33C[0x01]{};                // +0x33C
+    std::uint8_t mIsRotated = 0;                          // +0x33D
+    std::uint8_t mRevertRotation = 0;                     // +0x33E
+    std::uint8_t mUnknown33FTo33F[0x01]{};                // +0x33F
+    float mFarFov = 0.0f;                                 // +0x340
+    float mHeading = 0.0f;                                // +0x344
+    float mCurrentPitch = 0.0f;                           // +0x348
+    float mFarPitch = 0.0f;                               // +0x34C
+    float mHeadingZoom = 0.0f;                            // +0x350
+    float mTargetZoom = 0.0f;                             // +0x354
+    float mNearZoom = 0.0f;                               // +0x358
+    std::uint8_t mUnknown35CTo35F[0x04]{};                // +0x35C
+    Wm3::Vec3f mOffset{};                                 // +0x360
+    std::uint8_t mUnknown36CTo373[0x08]{};                // +0x36C
+    float mHeadingRate = 0.0f;                            // +0x374
+    float mZoomRate = 0.0f;                               // +0x378
+    std::int32_t mTargetType = 0;                         // +0x37C
+    Wm3::Vec3f mTargetLocation{};                         // +0x380
+    Wm3::AxisAlignedBox3f mTargetBox{};                   // +0x38C
+    std::uint8_t mUnknown3A4To3B3[0x10]{};                // +0x3A4
+    float mTargetTimeLeft = 0.0f;                         // +0x3B4
+    std::uint8_t mTargetTime = 0;                         // +0x3B8
+    std::uint8_t mUnknown3B9To3BB[0x03]{};                // +0x3B9
+    std::int32_t mTimeSource = 0;                         // +0x3BC
+    CameraTimeSourceRuntime* mTimeSources[3]{};           // +0x3C0
+    std::uint8_t mEnableEaseInOut = 0;                    // +0x3CC
+    std::uint8_t mUnknown3CDTo3CF[0x03]{};                // +0x3CD
+    float mUnknown3D0 = 0.0f;                             // +0x3D0
+    Wm3::Vec3f mTimedMoveOffset{};                        // +0x3D4
+    float mTimedMoveZoom = 0.0f;                          // +0x3E0
+    float mTimedMoveDuration = 0.0f;                      // +0x3E4
+    float mTimedMoveTransitionParam = 0.0f;               // +0x3E8
+    float mTimedMoveStartTime = 0.0f;                     // +0x3EC
+    float mTimedMovePitch = 0.0f;                         // +0x3F0
+    float mTimedMoveHeading = 0.0f;                       // +0x3F4
+    Wm3::Vec3f mHermiteOffsetStartDelta{};                // +0x3F8
+    Wm3::Vec3f mHermiteOffsetEndDelta{};                  // +0x404
+    float mHermiteHeadingStartDelta = 0.0f;               // +0x410
+    float mHermiteHeadingEndDelta = 0.0f;                 // +0x414
+    float mHermitePitchStartDelta = 0.0f;                 // +0x418
+    float mHermitePitchEndDelta = 0.0f;                   // +0x41C
+    float mHermiteZoomStartDelta = 0.0f;                  // +0x420
+    float mHermiteZoomEndDelta = 0.0f;                    // +0x424
+    CameraShakeParamsView mCamShakeParams{};              // +0x428
+    std::uint8_t mUnknown44CTo44F[0x04]{};                // +0x44C
+    std::int32_t mAccType = 0;                            // +0x450
   };
 
   static_assert(
@@ -260,6 +288,10 @@ namespace
     "CameraImplRuntimeView::mTargetLocation offset must be 0x380"
   );
   static_assert(
+    offsetof(CameraImplRuntimeView, mTargetBox) == 0x38C,
+    "CameraImplRuntimeView::mTargetBox offset must be 0x38C"
+  );
+  static_assert(
     offsetof(CameraImplRuntimeView, mTargetTimeLeft) == 0x3B4,
     "CameraImplRuntimeView::mTargetTimeLeft offset must be 0x3B4"
   );
@@ -276,6 +308,34 @@ namespace
     "CameraImplRuntimeView::mEnableEaseInOut offset must be 0x3CC"
   );
   static_assert(
+    offsetof(CameraImplRuntimeView, mTimedMoveOffset) == 0x3D4,
+    "CameraImplRuntimeView::mTimedMoveOffset offset must be 0x3D4"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTimedMoveZoom) == 0x3E0,
+    "CameraImplRuntimeView::mTimedMoveZoom offset must be 0x3E0"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTimedMoveStartTime) == 0x3EC,
+    "CameraImplRuntimeView::mTimedMoveStartTime offset must be 0x3EC"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mTimedMoveHeading) == 0x3F4,
+    "CameraImplRuntimeView::mTimedMoveHeading offset must be 0x3F4"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mHermiteOffsetStartDelta) == 0x3F8,
+    "CameraImplRuntimeView::mHermiteOffsetStartDelta offset must be 0x3F8"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mHermiteOffsetEndDelta) == 0x404,
+    "CameraImplRuntimeView::mHermiteOffsetEndDelta offset must be 0x404"
+  );
+  static_assert(
+    offsetof(CameraImplRuntimeView, mHermiteZoomEndDelta) == 0x424,
+    "CameraImplRuntimeView::mHermiteZoomEndDelta offset must be 0x424"
+  );
+  static_assert(
     offsetof(CameraImplRuntimeView, mCamShakeParams) == 0x428,
     "CameraImplRuntimeView::mCamShakeParams offset must be 0x428"
   );
@@ -283,6 +343,7 @@ namespace
     offsetof(CameraImplRuntimeView, mAccType) == 0x450,
     "CameraImplRuntimeView::mAccType offset must be 0x450"
   );
+  static_assert(sizeof(CameraImplRuntimeView) == 0x454, "CameraImplRuntimeView size must be 0x454");
 
   [[nodiscard]] CameraImplRuntimeView* AsRuntimeView(moho::CameraImpl* const camera) noexcept
   {
@@ -292,6 +353,156 @@ namespace
   [[nodiscard]] const CameraImplRuntimeView* AsRuntimeView(const moho::CameraImpl* const camera) noexcept
   {
     return reinterpret_cast<const CameraImplRuntimeView*>(camera);
+  }
+
+  struct CameraTransitionFlagView
+  {
+    std::uint8_t mUnknown000To00F[0x10]{};
+    std::uint8_t mTransitionPending = 0; // +0x10
+  };
+  static_assert(
+    offsetof(CameraTransitionFlagView, mTransitionPending) == 0x10,
+    "CameraTransitionFlagView::mTransitionPending offset must be 0x10"
+  );
+
+  [[nodiscard]] CameraTransitionFlagView* AsTransitionFlagView(moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<CameraTransitionFlagView*>(camera);
+  }
+
+  struct RuntimeCameraBaseView
+  {
+    void* mVftable = nullptr;          // +0x00
+    Broadcaster mBroadcaster{};        // +0x04
+  };
+
+  static_assert(sizeof(RuntimeCameraBaseView) == 0x0C, "RuntimeCameraBaseView size must be 0x0C");
+  static_assert(
+    offsetof(RuntimeCameraBaseView, mVftable) == 0x00, "RuntimeCameraBaseView::mVftable offset must be 0x00"
+  );
+  static_assert(
+    offsetof(RuntimeCameraBaseView, mBroadcaster) == 0x04,
+    "RuntimeCameraBaseView::mBroadcaster offset must be 0x04"
+  );
+
+  [[nodiscard]] RuntimeCameraBaseView* AsRuntimeCameraBaseView(moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<RuntimeCameraBaseView*>(camera);
+  }
+
+  struct CameraTrackingEvent
+  {
+    msvc8::string cameraName;
+    std::uint8_t transitionFlag = 0;
+  };
+
+  struct CameraTrackingBroadcasterLink
+  {
+    CameraTrackingBroadcasterLink* mListNext = nullptr; // +0x00
+    CameraTrackingBroadcasterLink* mListPrev = nullptr; // +0x04
+  };
+  static_assert(
+    offsetof(CameraTrackingBroadcasterLink, mListNext) == 0x00,
+    "CameraTrackingBroadcasterLink::mListNext offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CameraTrackingBroadcasterLink, mListPrev) == 0x04,
+    "CameraTrackingBroadcasterLink::mListPrev offset must be 0x04"
+  );
+  static_assert(sizeof(CameraTrackingBroadcasterLink) == 0x08, "CameraTrackingBroadcasterLink size must be 0x08");
+
+  struct CameraTrackingListenerLayout
+  {
+    void* vtable = nullptr;                      // +0x00
+    CameraTrackingBroadcasterLink mLink{};       // +0x04
+  };
+  static_assert(
+    offsetof(CameraTrackingListenerLayout, mLink) == 0x04,
+    "CameraTrackingListenerLayout::mLink offset must be 0x04"
+  );
+
+  class CameraTrackingListenerVf
+  {
+  public:
+    virtual void Receive(const CameraTrackingEvent& event) = 0;
+  };
+
+  [[nodiscard]] CameraTrackingBroadcasterLink* AsCameraTrackingBroadcaster(moho::CameraImpl* const camera) noexcept
+  {
+    return reinterpret_cast<CameraTrackingBroadcasterLink*>(reinterpret_cast<std::uint8_t*>(camera) + 0x04);
+  }
+
+  void CameraTrackingSelfLink(CameraTrackingBroadcasterLink* const node) noexcept
+  {
+    node->mListPrev = node;
+    node->mListNext = node;
+  }
+
+  void CameraTrackingDetach(CameraTrackingBroadcasterLink* const node) noexcept
+  {
+    node->mListNext->mListPrev = node->mListPrev;
+    node->mListPrev->mListNext = node->mListNext;
+    CameraTrackingSelfLink(node);
+  }
+
+  void CameraTrackingAttachAfter(
+    CameraTrackingBroadcasterLink* const node, CameraTrackingBroadcasterLink* const anchor
+  ) noexcept
+  {
+    CameraTrackingDetach(node);
+    node->mListNext = anchor->mListNext;
+    node->mListPrev = anchor;
+    anchor->mListNext = node;
+    node->mListNext->mListPrev = node;
+  }
+
+  [[nodiscard]] CameraTrackingListenerVf* CameraTrackingListenerFromLink(
+    CameraTrackingBroadcasterLink* const listenerLink
+  ) noexcept
+  {
+    auto* const layout = reinterpret_cast<CameraTrackingListenerLayout*>(
+      reinterpret_cast<std::uint8_t*>(listenerLink) - offsetof(CameraTrackingListenerLayout, mLink)
+    );
+    return reinterpret_cast<CameraTrackingListenerVf*>(layout);
+  }
+
+  /**
+   * Address: 0x007AE2B0 (FUN_007AE2B0, Moho::Broadcaster<Moho::SCameraTracking>::BroadcastEvent)
+   *
+   * What it does:
+   * Moves listeners into a snapshot ring, iterates safely while relinking each
+   * listener back to broadcaster head, and dispatches one camera-tracking event
+   * payload (`cameraName`, `transitionFlag`) per listener.
+   */
+  void BroadcastCameraTrackingEvent(
+    CameraTrackingBroadcasterLink* const broadcaster, const msvc8::string& cameraName, const std::uint8_t transitionFlag
+  )
+  {
+    CameraTrackingBroadcasterLink snapshot{};
+    CameraTrackingSelfLink(&snapshot);
+
+    if (broadcaster->mListPrev != broadcaster) {
+      snapshot.mListPrev = broadcaster->mListPrev;
+      snapshot.mListNext = broadcaster->mListNext;
+      snapshot.mListNext->mListPrev = &snapshot;
+      snapshot.mListPrev->mListNext = &snapshot;
+      CameraTrackingSelfLink(broadcaster);
+
+      while (snapshot.mListPrev != &snapshot) {
+        CameraTrackingBroadcasterLink* const listenerLink = snapshot.mListPrev;
+        CameraTrackingDetach(listenerLink);
+        CameraTrackingAttachAfter(listenerLink, broadcaster);
+
+        CameraTrackingEvent event{};
+        event.cameraName = cameraName;
+        event.transitionFlag = transitionFlag;
+        CameraTrackingListenerFromLink(listenerLink)->Receive(event);
+      }
+    }
+
+    snapshot.mListNext->mListPrev = snapshot.mListPrev;
+    snapshot.mListPrev->mListNext = snapshot.mListNext;
+    CameraTrackingSelfLink(&snapshot);
   }
 
   /**
@@ -431,6 +642,33 @@ namespace moho
 } // namespace moho
 
 /**
+ * Address: 0x007AAC60 (FUN_007AAC60, Moho::RCamCamera::~RCamCamera)
+ *
+ * What it does:
+ * Removes one runtime camera from manager ownership and restores the base
+ * broadcaster node to its self-linked idle state.
+ */
+[[nodiscard]] Broadcaster* moho::DetachRuntimeCameraBase(CameraImpl* const camera)
+{
+  RuntimeCameraBaseView* const base = AsRuntimeCameraBaseView(camera);
+
+  if (RCamManager* const manager = CAM_GetManager(); manager != nullptr) {
+    auto& cameras = manager->mCams;
+    const auto cameraIt = std::find(cameras.begin(), cameras.end(), camera);
+    if (cameraIt != cameras.end()) {
+      cameras.erase(cameraIt);
+    }
+  }
+
+  Broadcaster& broadcaster = base->mBroadcaster;
+  broadcaster.mNext->mPrev = broadcaster.mPrev;
+  broadcaster.mPrev->mNext = broadcaster.mNext;
+  broadcaster.mPrev = &broadcaster;
+  broadcaster.mNext = &broadcaster;
+  return &broadcaster;
+}
+
+/**
  * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
  *
  * What it does:
@@ -440,6 +678,7 @@ namespace moho
 void moho::CameraImpl::operator_delete(const std::int32_t deleteFlags)
 {
   this->~CameraImpl();
+  (void)DetachRuntimeCameraBase(this);
   if ((deleteFlags & 1) != 0) {
     ::operator delete(this);
   }
@@ -519,7 +758,7 @@ void moho::CameraImpl::CameraReset()
   runtime->mHeading = kPi;
   runtime->mIsRotated = 0u;
   runtime->mFarPitch = cam_FarPitch * kDegreesToRadians;
-  runtime->mUnknown348 = 0.0f;
+  runtime->mCurrentPitch = 0.0f;
   runtime->mUnknown3D0 = 0.0f;
   runtime->mHeadingZoom = runtime->mFarPitch;
   runtime->mEnableEaseInOut = 1u;
@@ -671,6 +910,345 @@ float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
 void moho::CameraImpl::SetMaxZoomMult(const float maxZoomMult)
 {
   AsZoomLimitView(this)->mMaxZoomMult = maxZoomMult;
+}
+
+/**
+ * Address: 0x007A74C0 (FUN_007A74C0, Moho::CameraImpl::TimedMoveInit)
+ * Mangled: ?TimedMoveInit@CameraImpl@Moho@@QAEXMM@Z
+ *
+ * What it does:
+ * Seeds timed-move state lanes for position/zoom/pitch/heading transition.
+ */
+void moho::CameraImpl::TimedMoveInit(const float seconds, const float transitionParam)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  runtime->mTimedMoveOffset = {0.0f, 0.0f, 0.0f};
+  runtime->mTimedMoveZoom = 0.0f;
+  runtime->mTimedMoveStartTime = 0.0f;
+  runtime->mTimedMovePitch = 0.0f;
+  runtime->mTimedMoveHeading = 0.0f;
+  runtime->mTimedMoveDuration = seconds;
+  runtime->mTimedMoveTransitionParam = transitionParam;
+
+  if (seconds > 0.0f) {
+    CameraTimeSourceRuntime* const timeSource = runtime->mTimeSources[runtime->mTimeSource];
+    runtime->mTimedMoveStartTime = timeSource != nullptr ? timeSource->Time() : 0.0f;
+    runtime->mTimedMoveOffset = runtime->mOffset;
+    runtime->mTimedMoveZoom = runtime->mTargetZoom;
+    runtime->mTimedMovePitch = runtime->mFarPitch;
+    runtime->mTimedMoveHeading = moho::NormalizeAngleSignedRadians(runtime->mHeading);
+    AsTransitionFlagView(this)->mTransitionPending = 0u;
+  }
+}
+
+/**
+ * Address: 0x007A88A0 (FUN_007A88A0, func_NormalizeQuadrant)
+ *
+ * What it does:
+ * Normalizes one angle to [-pi, pi] and unwraps by +/-2pi so it remains
+ * closest to a reference heading lane.
+ */
+[[nodiscard]] static float NormalizeQuadrantRelative(const float angleRadians, const float referenceRadians) noexcept
+{
+  float normalized = static_cast<float>(std::fmod(static_cast<double>(angleRadians), static_cast<double>(kTwoPi)));
+
+  if (normalized < -kPi) {
+    normalized += kTwoPi;
+  } else if (normalized > kPi) {
+    normalized -= kTwoPi;
+  }
+
+  if (std::fabs(normalized - referenceRadians) > kPi) {
+    if (normalized < referenceRadians) {
+      normalized += kTwoPi;
+    } else {
+      normalized -= kTwoPi;
+    }
+  }
+
+  return normalized;
+}
+
+/**
+ * Address: 0x007A8940 (FUN_007A8940, Moho::CameraImpl::SetupHermite)
+ * Mangled: ?SetupHermite@CameraImpl@Moho@@QAEXXZ
+ *
+ * What it does:
+ * Derives Hermite delta lanes for target offset/heading/pitch/zoom when
+ * ease-in/out mode is disabled.
+ */
+void moho::CameraImpl::SetupHermite()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mEnableEaseInOut != 0u) {
+    return;
+  }
+
+  runtime->mHermiteOffsetStartDelta.x = runtime->mTargetLocation.x - runtime->mTimedMoveOffset.x;
+  runtime->mHermiteOffsetStartDelta.y = runtime->mTargetLocation.y - runtime->mTimedMoveOffset.y;
+  runtime->mHermiteOffsetStartDelta.z = runtime->mTargetLocation.z - runtime->mTimedMoveOffset.z;
+  runtime->mHermiteOffsetEndDelta = runtime->mHermiteOffsetStartDelta;
+
+  const float headingDelta = runtime->mHeadingZoom - runtime->mTimedMoveHeading;
+  runtime->mHermiteHeadingStartDelta = headingDelta;
+  runtime->mHermiteHeadingEndDelta = headingDelta;
+
+  const float pitchDelta = runtime->mCurrentPitch - runtime->mTimedMovePitch;
+  runtime->mHermitePitchStartDelta = pitchDelta;
+  runtime->mHermitePitchEndDelta = pitchDelta;
+
+  const float zoomDelta = runtime->mNearZoom - runtime->mTimedMoveZoom;
+  runtime->mHermiteZoomStartDelta = zoomDelta;
+  runtime->mHermiteZoomEndDelta = zoomDelta;
+}
+
+/**
+ * Address: 0x007A9320 (FUN_007A9320, Moho::CameraImpl::ClampTargetPos)
+ * Mangled: ?ClampTargetPos@CameraImpl@Moho@@QAEXXZ
+ *
+ * What it does:
+ * Clamps target X/Z to map or playable-rect bounds using zoom-proportional
+ * extents.
+ */
+void moho::CameraImpl::ClampTargetPos()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  STIMap* const stiMap = runtime->mTerrainMap;
+  if (stiMap == nullptr) {
+    return;
+  }
+
+  int minX = 0;
+  int minZ = 0;
+  int maxX = 0;
+  int maxZ = 0;
+  if (const CHeightField* const field = stiMap->mHeightField.get(); field != nullptr) {
+    maxX = field->width - 1;
+    maxZ = field->height - 1;
+  }
+
+  if (const CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
+    const int focusArmyIndex = session->FocusArmy;
+    bool useWholeMap = false;
+    if (focusArmyIndex >= 0) {
+      const std::size_t vectorIndex = static_cast<std::size_t>(focusArmyIndex);
+      UserArmy* const focusArmy =
+        (vectorIndex < session->userArmies.size()) ? session->userArmies[vectorIndex] : nullptr;
+      useWholeMap = (focusArmy != nullptr && focusArmy->mVarDat.mUseWholeMap != 0u);
+    }
+
+    if (!useWholeMap) {
+      minX = stiMap->mPlayableRect.x0;
+      minZ = stiMap->mPlayableRect.z0;
+      maxX = stiMap->mPlayableRect.x1;
+      maxZ = stiMap->mPlayableRect.z1;
+    }
+  }
+
+  const float maxZoom = GetMaxZoom();
+  float clampedZoom = runtime->mTargetZoom;
+  if (maxZoom <= clampedZoom) {
+    clampedZoom = maxZoom;
+  }
+  if (clampedZoom < 0.0f) {
+    clampedZoom = 0.0f;
+  }
+
+  const float halfSpanX = (clampedZoom / maxZoom) * (static_cast<float>(maxX - minX) * 0.5f);
+  const float maxTargetX = static_cast<float>(maxX) - halfSpanX;
+  const float minTargetX = static_cast<float>(minX) + halfSpanX;
+
+  float targetX = runtime->mTargetLocation.x;
+  if (maxTargetX <= targetX) {
+    targetX = maxTargetX;
+  }
+  if (minTargetX > targetX) {
+    targetX = minTargetX;
+  }
+  runtime->mTargetLocation.x = targetX;
+
+  const float halfSpanZ = (clampedZoom / maxZoom) * (static_cast<float>(maxZ - minZ) * 0.5f);
+  const float maxTargetZ = static_cast<float>(maxZ) - halfSpanZ;
+  const float minTargetZ = static_cast<float>(minZ) + halfSpanZ;
+
+  float targetZ = runtime->mTargetLocation.z;
+  if (maxTargetZ <= targetZ) {
+    targetZ = maxTargetZ;
+  }
+  if (minTargetZ > targetZ) {
+    targetZ = minTargetZ;
+  }
+  runtime->mTargetLocation.z = targetZ;
+}
+
+/**
+ * Address: 0x007A9470 (FUN_007A9470, Moho::CameraImpl::ClampFocusPos)
+ * Mangled: ?ClampFocusPos@CameraImpl@Moho@@QAEXXZ
+ *
+ * What it does:
+ * Projects one heading/pitch ray from current offset and snaps focus to the
+ * terrain/water surface hit when valid.
+ */
+void moho::CameraImpl::ClampFocusPos()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  STIMap* const stiMap = runtime->mTerrainMap;
+  if (stiMap == nullptr) {
+    return;
+  }
+
+  moho::GeomLine3 line{};
+  line.pos = runtime->mOffset;
+  const float cosPitch = std::cos(runtime->mFarPitch);
+  line.closest = -std::numeric_limits<float>::infinity();
+  line.farthest = std::numeric_limits<float>::infinity();
+  line.dir.x = std::sin(runtime->mHeading) * cosPitch;
+  line.dir.y = -std::sin(runtime->mFarPitch);
+  line.dir.z = cosPitch * std::cos(runtime->mHeading);
+
+  moho::CColHitResult hit{};
+  const Wm3::Vec3f clampedFocus = stiMap->SurfaceIntersection(line, &hit);
+  if (std::isfinite(clampedFocus.x) && std::isfinite(clampedFocus.y) && std::isfinite(clampedFocus.z)) {
+    runtime->mOffset = clampedFocus;
+  }
+}
+
+/**
+ * Address: 0x007A9550 (FUN_007A9550, Moho::CameraImpl::CalculateFOV)
+ * Mangled: ?CalculateFOV@CameraImpl@Moho@@QAEXXZ
+ *
+ * What it does:
+ * Recomputes far-FOV from logarithmic zoom interpolation between near/far
+ * camera zoom envelopes.
+ */
+void moho::CameraImpl::CalculateFOV()
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  const float logMaxZoom = std::log(GetMaxZoom());
+  const float logTargetZoom = std::log(runtime->mTargetZoom);
+  const float logNearZoom = std::log(moho::cam_NearZoom);
+
+  float clampedLogZoom = (logMaxZoom <= logTargetZoom) ? logMaxZoom : logTargetZoom;
+  if (logNearZoom > clampedLogZoom) {
+    clampedLogZoom = logNearZoom;
+  }
+
+  runtime->mFarFov =
+    ((((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) * (moho::cam_FarFOV - moho::cam_NearFOV)) +
+      moho::cam_NearFOV) *
+    kDegreesToRadians;
+}
+
+/**
+ * Address: 0x007A82F0 (FUN_007A82F0, Moho::CameraImpl::TargetLocation)
+ * Mangled: ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z
+ *
+ * What it does:
+ * Targets one world-space location with optional timed transition and
+ * immediate focus/FOV update when `seconds == 0`.
+ */
+void moho::CameraImpl::TargetLocation(const Wm3::Vec3f& position, const float seconds)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mTargetType == kCameraTargetTypeEntity) {
+    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+  }
+
+  TimedMoveInit(seconds, 0.0f);
+
+  runtime->mTargetLocation = position;
+  runtime->mTargetType = kCameraTargetTypeLocation;
+
+  if (seconds == 0.0f) {
+    runtime->mTargetZoom = runtime->mNearZoom;
+    ClampTargetPos();
+    runtime->mOffset = runtime->mTargetLocation;
+    ClampFocusPos();
+    CalculateFOV();
+  } else {
+    SetupHermite();
+  }
+}
+
+/**
+ * Address: 0x007A83E0 (FUN_007A83E0, Moho::CameraImpl::TargetBox)
+ * Mangled: ?TargetBox@CameraImpl@Moho@@UAEXABV?$AxisAlignedBox3@M@Wm3@@M@Z
+ *
+ * What it does:
+ * Targets one world-space AABB, derives focus/near-zoom lanes from box bounds,
+ * and optionally applies immediate focus+FOV clamping.
+ */
+void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const float seconds)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mTargetType == kCameraTargetTypeEntity) {
+    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+  }
+
+  TimedMoveInit(seconds, 0.0f);
+
+  runtime->mTargetBox = targetBox;
+  runtime->mTargetLocation.x = (runtime->mTargetBox.Min.x + runtime->mTargetBox.Max.x) * 0.5f;
+  runtime->mTargetLocation.y = (runtime->mTargetBox.Min.y + runtime->mTargetBox.Max.y) * 0.5f;
+  runtime->mTargetLocation.z = (runtime->mTargetBox.Min.z + runtime->mTargetBox.Max.z) * 0.5f;
+
+  float nearZoom = runtime->mTargetBox.Max.x - runtime->mTargetBox.Min.x;
+  const float depthSpan = runtime->mTargetBox.Max.z - runtime->mTargetBox.Min.z;
+  if (depthSpan > nearZoom) {
+    nearZoom = depthSpan;
+  }
+
+  runtime->mNearZoom = nearZoom;
+  runtime->mTargetType = kCameraTargetTypeBox;
+
+  if (seconds == 0.0f) {
+    runtime->mTargetZoom = nearZoom;
+    ClampTargetPos();
+    runtime->mOffset = runtime->mTargetLocation;
+    ClampFocusPos();
+    CalculateFOV();
+  } else {
+    SetupHermite();
+  }
+}
+
+/**
+ * Address: 0x007A8D40 (FUN_007A8D40, Moho::CameraImpl::TargetManual)
+ * Mangled: ?TargetManual@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@MMMM@Z
+ *
+ * What it does:
+ * Targets one world-space location plus heading/pitch/zoom lanes and either
+ * applies the result immediately or seeds Hermite transition state.
+ */
+void moho::CameraImpl::TargetManual(
+  const Wm3::Vec3f& position, const float heading, const float pitch, const float zoom, const float seconds
+)
+{
+  CameraImplRuntimeView* const runtime = AsRuntimeView(this);
+  if (runtime->mTargetType == kCameraTargetTypeEntity) {
+    BroadcastCameraTrackingEvent(AsCameraTrackingBroadcaster(this), runtime->mName, 0u);
+  }
+
+  TimedMoveInit(seconds, 0.0f);
+
+  runtime->mCurrentPitch = pitch;
+  runtime->mHeadingZoom = NormalizeQuadrantRelative(heading, runtime->mHeading);
+  runtime->mNearZoom = zoom;
+  runtime->mTargetLocation = position;
+
+  if (seconds == 0.0f) {
+    runtime->mTargetType = kCameraTargetTypeLocation;
+    runtime->mHeading = runtime->mHeadingZoom;
+    runtime->mFarPitch = runtime->mCurrentPitch;
+    runtime->mTargetZoom = runtime->mNearZoom;
+    runtime->mOffset = runtime->mTargetLocation;
+    runtime->mIsRotated = 1u;
+    ClampFocusPos();
+    CalculateFOV();
+  } else {
+    runtime->mTargetType = kCameraTargetTypeHermite;
+    SetupHermite();
+  }
 }
 
 /**

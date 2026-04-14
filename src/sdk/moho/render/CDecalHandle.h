@@ -61,6 +61,15 @@ namespace moho
     void MemberDeserialize(gpg::ReadArchive* archive);
 
     /**
+     * Address: 0x0077F280 (FUN_0077F280, Moho::CDecalHandle::MemberSerialize)
+     *
+     * What it does:
+     * Serializes base script-object lanes, decal payload, army visibility, and
+     * creation tick into the archive.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
      * Address: 0x007788B0 (FUN_007788B0, Moho::CDecalHandle::GetClass)
      * Slot: 0
      */

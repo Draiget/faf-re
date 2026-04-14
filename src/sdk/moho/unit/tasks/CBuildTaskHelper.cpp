@@ -2,13 +2,18 @@
 
 #include <algorithm>
 #include <string>
+#include <typeinfo>
 
+#include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IAiSiloBuild.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/CEconomyEvent.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptObject.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 
@@ -25,6 +30,25 @@ namespace
   [[nodiscard]] moho::Unit* ResolveFocusUnit(const moho::WeakPtr<moho::Unit>& focusLink) noexcept
   {
     return focusLink.GetObjectPtr();
+  }
+
+  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
+  {
+    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
+      moho::WeakPtr<moho::Unit>::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* ResolveSimType()
+  {
+    static gpg::RType* cachedType = nullptr;
+    if (!cachedType) {
+      cachedType = gpg::LookupRType(typeid(moho::Sim));
+    }
+    return cachedType;
   }
 
   [[nodiscard]] bool DidCrossBuildProgressBand(const float previous, const float current) noexcept
@@ -338,5 +362,82 @@ namespace moho
     mFractionComplete = currentFraction;
     ownerUnit->WorkProgress = currentFraction;
     return currentFraction == 1.0f;
+  }
+
+  /**
+   * Address: 0x005FE540 (FUN_005FE540, Moho::CBuildTaskHelper::MemberDeserialize)
+   *
+   * What it does:
+   * Restores helper owner links, focus weak pointer, and runtime progress
+   * lanes from one archive payload.
+   */
+  void CBuildTaskHelper::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    gpg::RRef ownerRef{};
+    archive->ReadPointer_Unit(&mUnit, &ownerRef);
+
+    ownerRef = gpg::RRef{};
+    archive->ReadPointer_Sim(&mSim, &ownerRef);
+
+    gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+    GPG_ASSERT(weakUnitType != nullptr);
+    if (!weakUnitType) {
+      return;
+    }
+
+    ownerRef = gpg::RRef{};
+    archive->Read(weakUnitType, &mFocus, ownerRef);
+
+    archive->ReadBool(&mBeingBuilt);
+    archive->ReadFloat(&mUnknown14);
+    archive->ReadFloat(&mUnknown18);
+    archive->ReadFloat(&mDelta);
+    archive->ReadString(&mActionName);
+    archive->ReadFloat(&mFractionComplete);
+    archive->ReadBool(&mIsSilo);
+  }
+
+  /**
+   * Address: 0x005FE610 (FUN_005FE610, Moho::CBuildTaskHelper::MemberSerialize)
+   *
+   * What it does:
+   * Stores helper owner links, focus weak pointer, and runtime progress lanes
+   * into one archive payload.
+   */
+  void CBuildTaskHelper::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RRef unitRef{};
+    gpg::RRef_Unit(&unitRef, mUnit);
+    gpg::WriteRawPointer(archive, unitRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    gpg::RRef simRef{};
+    simRef.mObj = mSim;
+    simRef.mType = mSim ? ResolveSimType() : nullptr;
+    gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+    GPG_ASSERT(weakUnitType != nullptr);
+    if (!weakUnitType) {
+      return;
+    }
+
+    archive->Write(weakUnitType, &mFocus, ownerRef);
+    archive->WriteBool(mBeingBuilt);
+    archive->WriteFloat(mUnknown14);
+    archive->WriteFloat(mUnknown18);
+    archive->WriteFloat(mDelta);
+    archive->WriteString(const_cast<msvc8::string*>(&mActionName));
+    archive->WriteFloat(mFractionComplete);
+    archive->WriteBool(mIsSilo);
   }
 } // namespace moho

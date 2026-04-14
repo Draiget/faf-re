@@ -253,6 +253,267 @@ namespace moho
   int cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x005BA690 (FUN_005BA690, cfunc_CAiPersonalityGetPersonalityNameL)
+   *
+   * What it does:
+   * Returns one personality-name string for the current Lua-side personality
+   * object.
+   */
+  int cfunc_CAiPersonalityGetPersonalityNameL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BA7B0 (FUN_005BA7B0, cfunc_CAiPersonalityGetChatPersonalityL)
+   *
+   * What it does:
+   * Returns one chat-personality string for the current Lua-side personality
+   * object.
+   */
+  int cfunc_CAiPersonalityGetChatPersonalityL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BA8D0 (FUN_005BA8D0, cfunc_CAiPersonalityGetDifficultyL)
+   *
+   * What it does:
+   * Returns one difficulty scalar for the current Lua-side personality object.
+   */
+  int cfunc_CAiPersonalityGetDifficultyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BAB40 (FUN_005BAB40, cfunc_CAiPersonalityGetArmySize)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetArmySizeL`.
+   */
+  int cfunc_CAiPersonalityGetArmySize(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BAB60 (FUN_005BAB60, func_CAiPersonalityGetArmySize_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:GetArmySize()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityGetArmySize_LuaFuncDef();
+
+  /**
+   * Address: 0x005BABC0 (FUN_005BABC0, cfunc_CAiPersonalityGetArmySizeL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted army-size value.
+   */
+  int cfunc_CAiPersonalityGetArmySizeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BAC80 (FUN_005BAC80, cfunc_CAiPersonalityGetPlatoonSize)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetPlatoonSizeL`.
+   */
+  int cfunc_CAiPersonalityGetPlatoonSize(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BACA0 (FUN_005BACA0, func_CAiPersonalityGetPlatoonSize_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:GetPlatoonSize()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityGetPlatoonSize_LuaFuncDef();
+
+  /**
+   * Address: 0x005BAD00 (FUN_005BAD00, cfunc_CAiPersonalityGetPlatoonSizeL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted platoon-size value.
+   */
+  int cfunc_CAiPersonalityGetPlatoonSizeL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BADC0 (FUN_005BADC0, cfunc_CAiPersonalityGetAttackFrequency)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_CAiPersonalityGetAttackFrequencyL`.
+   */
+  int cfunc_CAiPersonalityGetAttackFrequency(lua_State* luaContext);
+
+  /**
+   * Address: 0x005BADE0 (FUN_005BADE0, func_CAiPersonalityGetAttackFrequency_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the `CAiPersonality:GetAttackFrequency()` Lua binder definition.
+   */
+  CScrLuaInitForm* func_CAiPersonalityGetAttackFrequency_LuaFuncDef();
+
+  /**
+   * Address: 0x005BAE40 (FUN_005BAE40, cfunc_CAiPersonalityGetAttackFrequencyL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted attack-frequency value.
+   */
+  int cfunc_CAiPersonalityGetAttackFrequencyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BAF80 (FUN_005BAF80, cfunc_CAiPersonalityGetRepeatAttackFrequencyL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted repeat-attack-frequency value.
+   */
+  int cfunc_CAiPersonalityGetRepeatAttackFrequencyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB0C0 (FUN_005BB0C0, cfunc_CAiPersonalityGetCounterForcesL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted counter-forces value.
+   */
+  int cfunc_CAiPersonalityGetCounterForcesL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB200 (FUN_005BB200, cfunc_CAiPersonalityGetIntelGatheringL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted intel-gathering value.
+   */
+  int cfunc_CAiPersonalityGetIntelGatheringL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB340 (FUN_005BB340, cfunc_CAiPersonalityGetCoordinatedAttacksL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted coordinated-attacks value.
+   */
+  int cfunc_CAiPersonalityGetCoordinatedAttacksL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB480 (FUN_005BB480, cfunc_CAiPersonalityGetExpansionDrivenL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted expansion-driven value.
+   */
+  int cfunc_CAiPersonalityGetExpansionDrivenL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB5C0 (FUN_005BB5C0, cfunc_CAiPersonalityGetTechAdvancementL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted tech-advancement value.
+   */
+  int cfunc_CAiPersonalityGetTechAdvancementL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB700 (FUN_005BB700, cfunc_CAiPersonalityGetUpgradesDrivenL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted upgrades-driven value.
+   */
+  int cfunc_CAiPersonalityGetUpgradesDrivenL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB840 (FUN_005BB840, cfunc_CAiPersonalityGetDefenseDrivenL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted defense-driven value.
+   */
+  int cfunc_CAiPersonalityGetDefenseDrivenL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BB980 (FUN_005BB980, cfunc_CAiPersonalityGetEconomyDrivenL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted economy-driven value.
+   */
+  int cfunc_CAiPersonalityGetEconomyDrivenL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BBAC0 (FUN_005BBAC0, cfunc_CAiPersonalityGetFactoryTycoonL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted factory-tycoon value.
+   */
+  int cfunc_CAiPersonalityGetFactoryTycoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BBC00 (FUN_005BBC00, cfunc_CAiPersonalityGetIntelBuildingTycoonL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted intel-building-tycoon value.
+   */
+  int cfunc_CAiPersonalityGetIntelBuildingTycoonL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BBD40 (FUN_005BBD40, cfunc_CAiPersonalityGetSuperWeaponTendencyL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted super-weapon-tendency value.
+   */
+  int cfunc_CAiPersonalityGetSuperWeaponTendencyL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC050 (FUN_005BC050, cfunc_CAiPersonalityGetAirUnitsEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted air-units-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetAirUnitsEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC190 (FUN_005BC190, cfunc_CAiPersonalityGetTankUnitsEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted tank-units-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetTankUnitsEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC2D0 (FUN_005BC2D0, cfunc_CAiPersonalityGetBotUnitsEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted bot-units-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetBotUnitsEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC410 (FUN_005BC410, cfunc_CAiPersonalityGetSeaUnitsEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted sea-units-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetSeaUnitsEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC550 (FUN_005BC550, cfunc_CAiPersonalityGetSpecialtyForcesEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted specialty-forces-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetSpecialtyForcesEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC690 (FUN_005BC690, cfunc_CAiPersonalityGetSupportUnitsEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted support-units-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetSupportUnitsEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC7D0 (FUN_005BC7D0, cfunc_CAiPersonalityGetDirectDamageEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted direct-damage-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetDirectDamageEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BC910 (FUN_005BC910, cfunc_CAiPersonalityGetInDirectDamageEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted indirect-damage-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetInDirectDamageEmphasisL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x005BBE00 (FUN_005BBE00, cfunc_CAiPersonalityGetFavouriteStructures)
    *
    * What it does:
@@ -285,6 +546,30 @@ namespace moho
    * Pushes `mFavouriteUnits` as one Lua array-table of strings.
    */
   int cfunc_CAiPersonalityGetFavouriteUnitsL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BCC20 (FUN_005BCC20, cfunc_CAiPersonalityGetSurvivalEmphasisL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted survival-emphasis value.
+   */
+  int cfunc_CAiPersonalityGetSurvivalEmphasisL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BCD60 (FUN_005BCD60, cfunc_CAiPersonalityGetTeamSupportL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted team-support value.
+   */
+  int cfunc_CAiPersonalityGetTeamSupportL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: 0x005BCEA0 (FUN_005BCEA0, cfunc_CAiPersonalityGetFormationUseL)
+   *
+   * What it does:
+   * Returns one difficulty-weighted formation-use value.
+   */
+  int cfunc_CAiPersonalityGetFormationUseL(LuaPlus::LuaState* state);
 
   /**
    * Address: 0x005BCF60 (FUN_005BCF60, cfunc_CAiPersonalityGetTargetSpread)

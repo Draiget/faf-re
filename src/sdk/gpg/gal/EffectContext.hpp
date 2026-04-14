@@ -30,7 +30,16 @@ namespace gpg::gal
         EffectContext();
 
         /**
-         * Address: 0x009428F0 (FUN_009428F0)
+         * Address: 0x008FE7E0 (FUN_008FE7E0, gpg::gal::EffectContext::EffectContext)
+         *
+         * What it does:
+         * Copies effect-context source/cache paths, source-buffer shared-count
+         * ownership, and macro-vector lanes from another context.
+         */
+        EffectContext(const EffectContext& other);
+
+        /**
+         * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
          *
          * bool,gpg::StrArg,gpg::StrArg,gpg::MemBuffer<char> const &,std::vector<gpg::gal::EffectMacro> const &
          *

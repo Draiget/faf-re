@@ -324,16 +324,6 @@ namespace
     return MakeEmitterCurveRef(new moho::REmitterBlueprintCurve());
   }
 
-  [[nodiscard]] gpg::RRef ConstructEmitterCurveRef(void* objectMemory)
-  {
-    if (!objectMemory) {
-      return MakeEmitterCurveRef(nullptr);
-    }
-
-    auto* const object = new (objectMemory) moho::REmitterBlueprintCurve();
-    return MakeEmitterCurveRef(object);
-  }
-
   void DeleteEmitterCurveObject(void* objectMemory)
   {
     delete static_cast<moho::REmitterBlueprintCurve*>(objectMemory);
@@ -468,13 +458,32 @@ namespace moho
   {
     size_ = sizeof(REmitterBlueprintCurve);
     newRefFunc_ = &NewEmitterCurveRef;
-    ctorRefFunc_ = &ConstructEmitterCurveRef;
+    ctorRefFunc_ = &REmitterBlueprintCurveTypeInfo::CtrRef;
     deleteFunc_ = &DeleteEmitterCurveObject;
     dtrFunc_ = &DestructEmitterCurveObject;
     AddBaseRObject(this);
     gpg::RType::Init();
     AddFields(this);
     Finish();
+  }
+
+  /**
+   * Address: 0x00516740 (FUN_00516740, Moho::REmitterBlueprintCurveTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Constructs one `REmitterBlueprintCurve` in caller-provided storage and
+   * returns a typed reflection reference for that object.
+   */
+  gpg::RRef REmitterBlueprintCurveTypeInfo::CtrRef(void* const objectStorage)
+  {
+    auto* const curve = static_cast<REmitterBlueprintCurve*>(objectStorage);
+    if (curve != nullptr) {
+      new (curve) REmitterBlueprintCurve();
+    }
+
+    gpg::RRef curveRef{};
+    gpg::RRef_REmitterBlueprintCurve(&curveRef, curve);
+    return curveRef;
   }
 
   /**

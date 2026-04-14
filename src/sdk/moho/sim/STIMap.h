@@ -147,6 +147,18 @@ namespace moho
     float GetElevation(float x, float z) const;
 
     /**
+     * Address: 0x0069A620 (FUN_0069A620, Moho::CHeightField::GetNormal)
+     *
+     * float x, float z
+     *
+     * What it does:
+     * Samples four neighboring elevations around `(x,z)`, builds one terrain
+     * gradient normal, and normalizes the output vector.
+     */
+    [[nodiscard]]
+    Wm3::Vec3f GetNormal(float x, float z) const;
+
+    /**
      * Address: 0x00476260 (FUN_00476260, Moho::CHeightField::UpdateError)
      *
      * gpg::Rect2<int>
@@ -825,6 +837,23 @@ namespace moho
   EOccupancyCaps OCCUPY_FootprintFits(
     const COGrid& grid,
     const SOCellPos& pos,
+    const SFootprint& footprint,
+    EOccupancyCaps occupancyCaps
+  );
+
+  /**
+   * Address: 0x00720B20 (FUN_00720B20, Moho::OCCUPY_HoverFootprintFits)
+   *
+   * Moho::SOCellPos const &, Moho::COGrid const &, Moho::SFootprint const &, Moho::EOccupancyCaps
+   *
+   * What it does:
+   * Computes mobile occupancy caps for hover/amphibious motion at one footprint
+   * origin and then resolves final fit caps through `OCCUPY_FootprintFits`.
+   */
+  [[nodiscard]]
+  EOccupancyCaps OCCUPY_HoverFootprintFits(
+    const SOCellPos& pos,
+    const COGrid& grid,
     const SFootprint& footprint,
     EOccupancyCaps occupancyCaps
   );

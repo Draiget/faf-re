@@ -22,6 +22,7 @@
 namespace moho
 {
   enum class EUnitCommandType : std::int32_t;
+  struct SSTICommandIssueData;
   using EntId = std::int32_t;
 
   struct SSTICommandVariableData
@@ -41,6 +42,26 @@ namespace moho
     std::int32_t mMaxCount;
     std::int32_t mCount;
     std::uint32_t v23;
+
+    SSTICommandVariableData() = default;
+
+    /**
+     * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)
+     *
+     * What it does:
+     * Copy-constructs the full command-variable payload including target lanes
+     * and variable cell vector storage.
+     */
+    SSTICommandVariableData(const SSTICommandVariableData& other);
+
+    /**
+     * Address: 0x00552A70 (FUN_00552A70, Moho::SSTICommandVariableData::SSTICommandVariableData)
+     *
+     * What it does:
+     * Initializes variable-payload lanes from one command-issue payload
+     * (`mCmdType`, both targets, cell list, and count limits).
+     */
+    explicit SSTICommandVariableData(const SSTICommandIssueData& issueData);
 
     /**
      * Address: 0x005603E0 (FUN_005603E0, Moho::SSTICommandVariableData::~SSTICommandVariableData)

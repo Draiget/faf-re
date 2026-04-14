@@ -22,6 +22,7 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiSteering.h"
 #include "moho/ai/IAiTransport.h"
+#include "moho/ai/IFormationInstance.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/containers/SCoordsVec2.h"
@@ -74,6 +75,41 @@ namespace moho
    * nearby collision occupants against movement/attachment/formation rules.
    */
   bool COORDS_CanMoveAt(SOCellPos* pos, COGrid* grid, Unit* moveUnit, bool disallowAttached, Unit* ignoreUnit);
+
+  /**
+   * Address: 0x0062AA90 (FUN_0062AA90, func_UnitWontFitAt)
+   *
+   * What it does:
+   * Returns true when `unit` cannot place its footprint at `worldPosition`
+   * due to map bounds or occupancy-cap fit checks.
+   */
+  bool UnitWontFitAt(const Wm3::Vec3f& worldPosition, const Unit* const unit)
+  {
+    const SFootprint& footprint = unit->GetFootprint();
+    const Sim& sim = *unit->SimulationRef;
+    const STIMap& mapData = *sim.mMapData;
+    const bool useWholeMap = (unit->ArmyRef != nullptr) ? unit->ArmyRef->UseWholeMap() : false;
+    if (!mapData.IsWithin(worldPosition, 0.0f, useWholeMap)) {
+      return true;
+    }
+
+    SOCellPos cellPos{};
+    cellPos.x = static_cast<std::int16_t>(
+      static_cast<int>(worldPosition.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+    );
+    cellPos.z = static_cast<std::int16_t>(
+      static_cast<int>(worldPosition.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+    );
+
+    EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, mapData, cellPos);
+    if (unit->mCurrentLayer == LAYER_Water) {
+      occupancyCaps = static_cast<EOccupancyCaps>(
+        static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
+      );
+    }
+
+    return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*sim.mOGrid, cellPos, footprint, occupancyCaps)) == 0u;
+  }
 } // namespace moho
 
 using namespace moho;
@@ -1043,19 +1079,100 @@ namespace
     return label;
   }
 
+  constexpr std::uintptr_t kGuardedByOwnerLinkOffset = 0x8u;
+
+  [[nodiscard]] std::uintptr_t GuardedByOwnerSlotWord(const SGuardedByWeakOwnerSlot& slot) noexcept
+  {
+    return reinterpret_cast<std::uintptr_t>(slot.ownerLinkSlot);
+  }
+
+  [[nodiscard]] SGuardedByWeakOwnerSlot EncodeGuardedByOwnerSlot(const Unit* const owner) noexcept
+  {
+    SGuardedByWeakOwnerSlot slot{};
+    if (owner == nullptr) {
+      slot.ownerLinkSlot = nullptr;
+      return slot;
+    }
+
+    slot.ownerLinkSlot = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(owner) + kGuardedByOwnerLinkOffset);
+    return slot;
+  }
+
   [[nodiscard]] Entity* DecodeGuardedByOwnerSlot(const SGuardedByWeakOwnerSlot slot) noexcept
   {
     if (slot.ownerLinkSlot == nullptr) {
       return nullptr;
     }
 
-    constexpr std::uintptr_t kGuardedByOwnerDecodeOffset = 0x8u;
     const std::uintptr_t encoded = reinterpret_cast<std::uintptr_t>(slot.ownerLinkSlot);
-    if (encoded <= kGuardedByOwnerDecodeOffset) {
+    if (encoded <= kGuardedByOwnerLinkOffset) {
       return nullptr;
     }
 
-    return reinterpret_cast<Entity*>(encoded - kGuardedByOwnerDecodeOffset);
+    return reinterpret_cast<Entity*>(encoded - kGuardedByOwnerLinkOffset);
+  }
+
+  [[nodiscard]] bool RemoveGuardedByOwner(SGuardedByRuntimeList& guardedByList, const Unit* const guardUnit) noexcept
+  {
+    if (guardUnit == nullptr || guardedByList.mSlots.begin == nullptr || guardedByList.mSlots.end == nullptr) {
+      return false;
+    }
+
+    const std::uintptr_t targetSlotWord = GuardedByOwnerSlotWord(EncodeGuardedByOwnerSlot(guardUnit));
+    SGuardedByWeakOwnerSlot* cursor = guardedByList.mSlots.begin;
+    while (cursor != guardedByList.mSlots.end && GuardedByOwnerSlotWord(*cursor) < targetSlotWord) {
+      ++cursor;
+    }
+
+    if (cursor == guardedByList.mSlots.end || GuardedByOwnerSlotWord(*cursor) != targetSlotWord) {
+      return false;
+    }
+
+    const std::size_t tailCount = static_cast<std::size_t>(guardedByList.mSlots.end - (cursor + 1));
+    if (tailCount != 0u) {
+      std::memmove(cursor, cursor + 1, tailCount * sizeof(SGuardedByWeakOwnerSlot));
+    }
+    --guardedByList.mSlots.end;
+    return true;
+  }
+
+  void AddGuardedByOwner(SGuardedByRuntimeList& guardedByList, const Unit* const guardUnit)
+  {
+    if (guardUnit == nullptr) {
+      return;
+    }
+
+    const SGuardedByWeakOwnerSlot targetSlot = EncodeGuardedByOwnerSlot(guardUnit);
+    const std::uintptr_t targetSlotWord = GuardedByOwnerSlotWord(targetSlot);
+
+    SGuardedByWeakOwnerSlot* insertPos = guardedByList.mSlots.begin;
+    while (insertPos != guardedByList.mSlots.end && GuardedByOwnerSlotWord(*insertPos) < targetSlotWord) {
+      ++insertPos;
+    }
+
+    if (insertPos != guardedByList.mSlots.end && GuardedByOwnerSlotWord(*insertPos) == targetSlotWord) {
+      return;
+    }
+
+    gpg::FastVectorRuntimeInsertRange(
+      guardedByList.mSlots,
+      insertPos,
+      &targetSlot,
+      &targetSlot + 1
+    );
+  }
+
+  void ClearGuardFormation(Unit* const unit)
+  {
+    if (unit == nullptr) {
+      return;
+    }
+
+    IFormationInstance* const guardFormation = unit->GuardFormation;
+    unit->GuardFormation = nullptr;
+    if (guardFormation != nullptr) {
+      guardFormation->operator_delete(1);
+    }
   }
 
   [[nodiscard]] CAniPoseBone* ResolveUnitPoseBone(Unit& unit, const int boneIndex) noexcept
@@ -11271,6 +11388,33 @@ bool Unit::IsUnitState(const EUnitState state) const
 Unit* Unit::GetGuardedUnit() const
 {
   return GuardedUnitRef.ResolveObjectPtr<Unit>();
+}
+
+/**
+ * Address: 0x006A76A0 (FUN_006A76A0, Moho::Unit::SetGuardedUnit)
+ *
+ * What it does:
+ * Rebinds guarded-unit weak-link ownership, updates guarded-by slot lanes on
+ * old/new guarded units, clears stale guard-formation lanes, and marks this
+ * unit sync-dirty.
+ */
+void Unit::SetGuardedUnit(Unit* const guarded)
+{
+  Unit* const oldGuardedUnit = GuardedUnitRef.ResolveObjectPtr<Unit>();
+  if (oldGuardedUnit != nullptr) {
+    (void)RemoveGuardedByOwner(oldGuardedUnit->GuardedByList, this);
+    ClearGuardFormation(oldGuardedUnit);
+  }
+
+  GuardedUnitRef.AsWeakPtr<Unit>().Set(guarded);
+
+  Unit* const newGuardedUnit = GuardedUnitRef.ResolveObjectPtr<Unit>();
+  if (newGuardedUnit != nullptr) {
+    AddGuardedByOwner(newGuardedUnit->GuardedByList, this);
+    ClearGuardFormation(newGuardedUnit);
+  }
+
+  NeedSyncGameData = true;
 }
 
 /**

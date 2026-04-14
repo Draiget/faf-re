@@ -396,6 +396,8 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x004C7CC0 (FUN_004C7CC0, gpg::fastvector_n<LuaPlus::LuaObject>::Reserve lane)
+     *
      * Reserve is overridden for FastVectorN to avoid Base::Reserve deleting inline storage.
      */
     void Reserve(size_t n)
@@ -457,6 +459,7 @@ namespace gpg::core
 
     /**
      * Address: 0x0047C590 (FUN_0047C590, gpg::fastvector_n64_char::InsertAt char lane)
+     * Address: 0x004C7EB0 (FUN_004C7EB0, gpg::fastvector_n<LuaPlus::LuaObject>::InsertAt lane)
      *
      * What it does:
      * Inserts one element range `[insStart, insEnd)` before `pos`, growing
@@ -656,6 +659,7 @@ namespace gpg::core
 
     /**
      * Address: 0x0047C910 (FUN_0047C910, gpg::fastvector_n64_char::GrowInsert)
+     * Address: 0x004C7FD0 (FUN_004C7FD0, gpg::fastvector_n<LuaPlus::LuaObject>::GrowInsert lane)
      *
      * What it does:
      * Allocates `newCapacity` elements and materializes

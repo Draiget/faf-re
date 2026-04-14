@@ -30,5 +30,21 @@ namespace moho
     auto* const task = new (std::nothrow) CUnitUnloadUnits();
     return gpg::RRef{task, CachedCUnitUnloadUnitsType()};
   }
-} // namespace moho
 
+  /**
+   * Address: 0x00627DE0 (FUN_00627DE0, Moho::CUnitUnloadUnitsTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Constructs one `CUnitUnloadUnits` in caller-provided storage and returns a
+   * typed reflection ref.
+   */
+  gpg::RRef CUnitUnloadUnitsTypeInfo::CtrRef(void* const objectStorage)
+  {
+    CUnitUnloadUnits* task = nullptr;
+    if (objectStorage != nullptr) {
+      task = new (objectStorage) CUnitUnloadUnits();
+    }
+
+    return gpg::RRef{task, CachedCUnitUnloadUnitsType()};
+  }
+} // namespace moho

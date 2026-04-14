@@ -140,6 +140,31 @@ namespace moho
 
 void* lua_getglobaluserdata(lua_State* state);
 
+/**
+ * Address: 0x0090DD40 (FUN_0090DD40, luaL_getmetafield)
+ *
+ * What it does:
+ * Looks up one named metafield on the object's metatable, leaving the
+ * metatable stack slot consumed on success and restoring the stack on miss.
+ */
+int luaL_getmetafield(lua_State* L, int obj, const char* event);
+
+/**
+ * Address: 0x0091A8D0 (FUN_0091A8D0, luaO_pushfstring)
+ *
+ * What it does:
+ * Starts one varargs lane for `format`, forwards to `luaO_pushvfstring`, and
+ * returns the pushed string pointer from that worker.
+ */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+const char* luaO_pushfstring(lua_State* L, const char* format, ...);
+#ifdef __cplusplus
+}
+#endif
+
 inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
 {
 	return static_cast<moho::Sim*>(::lua_getglobaluserdata(state));

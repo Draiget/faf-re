@@ -1909,27 +1909,12 @@ namespace moho
       }
     }
 
-    struct TerrainResMapBridge
-    {
-      void* mVftable; // +0x00
-      STIMap* mMap;   // +0x04
-    };
-
-    static_assert(sizeof(TerrainResMapBridge) == 0x08, "TerrainResMapBridge size must be 0x08");
-    static_assert(offsetof(TerrainResMapBridge, mMap) == 0x04, "TerrainResMapBridge::mMap offset must be 0x04");
-
     [[nodiscard]] bool ApplyTerrainPlayableRect(IWldTerrainRes* const terrainRes, const gpg::Rect2i& playableRect)
     {
       if (terrainRes == nullptr) {
         return false;
       }
-
-      auto* const terrainBridge = reinterpret_cast<TerrainResMapBridge*>(terrainRes);
-      if (terrainBridge->mMap == nullptr) {
-        return false;
-      }
-
-      return terrainBridge->mMap->SetPlayableMapRect(playableRect);
+      return terrainRes->SetPlayableMapRect(playableRect);
     }
 
     /**
@@ -4239,6 +4224,38 @@ namespace moho
     }
 
     return scenarioEnv["ScenarioInfo"];
+  }
+
+  /**
+   * Address: 0x00897220 (FUN_00897220, ?WLD_CreateSession@Moho@@YAPAVCWldSession@1@AAV?$auto_ptr@VLuaState@LuaPlus@@@std@@AAV?$auto_ptr@VRRuleGameRules@Moho@@@4@AAV?$auto_ptr@VCWldMap@Moho@@@4@AAUSWldSessionInfo@1@@Z)
+   *
+   * What it does:
+   * Allocates one world-session object, constructs it from transferred
+   * auto_ptr lanes, and updates the global active-session pointer.
+   */
+  CWldSession* WLD_CreateSession(
+    msvc8::auto_ptr<LuaPlus::LuaState>& state,
+    msvc8::auto_ptr<RRuleGameRules>& gameRules,
+    msvc8::auto_ptr<CWldMap>& wldMap,
+    SWldSessionInfo& sessionInfo
+  )
+  {
+    void* const sessionStorage = ::operator new(sizeof(CWldSession), std::nothrow);
+    if (sessionStorage == nullptr) {
+      gActiveWldSession = nullptr;
+      return nullptr;
+    }
+
+    CWldSession* session = nullptr;
+    try {
+      session = new (sessionStorage) CWldSession(state, gameRules, wldMap, sessionInfo);
+    } catch (...) {
+      ::operator delete(sessionStorage);
+      throw;
+    }
+
+    gActiveWldSession = session;
+    return session;
   }
 
   /**

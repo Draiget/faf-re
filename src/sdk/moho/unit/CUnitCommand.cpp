@@ -404,22 +404,7 @@ namespace
 
   void CopyIssueDataToVariablePayload(const SSTICommandIssueData& issueData, SSTICommandVariableData& variableData)
   {
-    variableData = SSTICommandVariableData{};
-    variableData.v1 = issueData.unk04;
-    variableData.v2 = issueData.mIndex;
-    variableData.mCmdType = issueData.mCommandType;
-    variableData.mTarget1 = issueData.mTarget;
-    variableData.mTarget2 = issueData.mTarget2;
-    variableData.v14 = issueData.unk38;
-
-    variableData.mCells.clear();
-    variableData.mCells.reserve(issueData.mCells.Size());
-    for (std::size_t i = 0; i < issueData.mCells.Size(); ++i) {
-      variableData.mCells.push_back(issueData.mCells[i]);
-    }
-
-    variableData.mCount = issueData.unk70;
-    variableData.v23 = issueData.unk74;
+    variableData = SSTICommandVariableData(issueData);
   }
 
 } // namespace

@@ -207,6 +207,15 @@ namespace moho
     unsigned int Append(const char* ptr, size_t size);
 
     /**
+     * Address: 0x0048BD30 (FUN_0048BD30, Moho::CMessage::AppendChar)
+     *
+     * What it does:
+     * Appends one raw byte to payload storage, growing vector capacity when
+     * the current end pointer is at capacity.
+     */
+    void AppendChar(const char* ptr);
+
+    /**
      * Address: 0x00483530 (FUN_00483530)
      *
      * What it does:

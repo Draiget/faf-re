@@ -5,6 +5,7 @@
 #include "gpg/core/containers/String.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector3.h"
 
 struct lua_State;
@@ -16,6 +17,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class Broadcaster;
   class CScrLuaInitForm;
   class STIMap;
 
@@ -148,17 +150,83 @@ namespace moho
     [[nodiscard]] CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
 
     /**
-     * Address context: called from `cfunc_CameraImplMoveToL` (`0x007AB760`)
-     * through vftable slot 14 (`+0x38`).
+     * Address: 0x007A82F0 (FUN_007A82F0, Moho::CameraImpl::TargetLocation)
+     * Mangled: ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z
      *
      * What it does:
-     * Starts manual camera movement toward `position` with heading/pitch lanes
-     * and transition controls.
+     * Targets one world-space location with optional timed transition and
+     * immediate focus/FOV update when `seconds == 0`.
      */
-    // Originally a regular virtual: `RCamManager::CreateCamera` constructs
-    // `CameraImpl` directly via placement-new, so the binary cannot have left
-    // this slot pure-virtual. The body is pending recovery.
+    virtual void TargetLocation(const Wm3::Vec3f& position, float seconds);
+
+    /**
+     * Address: 0x007A8D40 (FUN_007A8D40, Moho::CameraImpl::TargetManual)
+     * Mangled: ?TargetManual@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@MMMM@Z
+     *
+     * What it does:
+     * Targets one world-space location plus heading/pitch/zoom lanes and
+     * either applies the result immediately or seeds Hermite transition state.
+     */
     virtual void TargetManual(const Wm3::Vec3f& position, float heading, float pitch, float zoom, float seconds);
+
+    /**
+     * Address: 0x007A83E0 (FUN_007A83E0, Moho::CameraImpl::TargetBox)
+     * Mangled: ?TargetBox@CameraImpl@Moho@@UAEXABV?$AxisAlignedBox3@M@Wm3@@M@Z
+     *
+     * What it does:
+     * Targets one world-space AABB, derives focus/near-zoom lanes from box
+     * bounds, and optionally applies immediate focus+FOV clamping.
+     */
+    virtual void TargetBox(const Wm3::AxisAlignedBox3f& targetBox, float seconds);
+
+    /**
+     * Address: 0x007A74C0 (FUN_007A74C0, Moho::CameraImpl::TimedMoveInit)
+     * Mangled: ?TimedMoveInit@CameraImpl@Moho@@QAEXMM@Z
+     *
+     * What it does:
+     * Seeds timed-move state lanes for position/zoom/pitch/heading transition.
+     */
+    void TimedMoveInit(float seconds, float transitionParam);
+
+    /**
+     * Address: 0x007A8940 (FUN_007A8940, Moho::CameraImpl::SetupHermite)
+     * Mangled: ?SetupHermite@CameraImpl@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Derives Hermite delta lanes for target offset/heading/pitch/zoom when
+     * ease-in/out mode is disabled.
+     */
+    void SetupHermite();
+
+    /**
+     * Address: 0x007A9320 (FUN_007A9320, Moho::CameraImpl::ClampTargetPos)
+     * Mangled: ?ClampTargetPos@CameraImpl@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Clamps target X/Z to map or playable-rect bounds using zoom-proportional
+     * extents.
+     */
+    void ClampTargetPos();
+
+    /**
+     * Address: 0x007A9470 (FUN_007A9470, Moho::CameraImpl::ClampFocusPos)
+     * Mangled: ?ClampFocusPos@CameraImpl@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Projects one heading/pitch ray from current offset and snaps focus to the
+     * terrain/water surface hit when valid.
+     */
+    void ClampFocusPos();
+
+    /**
+     * Address: 0x007A9550 (FUN_007A9550, Moho::CameraImpl::CalculateFOV)
+     * Mangled: ?CalculateFOV@CameraImpl@Moho@@QAEXXZ
+     *
+     * What it does:
+     * Recomputes far-FOV from logarithmic zoom interpolation between near/far
+     * camera zoom envelopes.
+     */
+    void CalculateFOV();
 
     /**
      * Address: 0x007A6C80 (Moho::CameraImpl::CameraGetOffset)
@@ -196,6 +264,15 @@ namespace moho
      */
     [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
   };
+
+  /**
+   * Address: 0x007AAC60 (FUN_007AAC60, Moho::RCamCamera::~RCamCamera)
+   *
+   * What it does:
+   * Removes one runtime camera from manager ownership and restores the base
+   * broadcaster node to a self-linked idle state.
+   */
+  [[nodiscard]] Broadcaster* DetachRuntimeCameraBase(CameraImpl* camera);
 
   template <>
   class CScrLuaMetatableFactory<CameraImpl> final : public CScrLuaObjectFactory

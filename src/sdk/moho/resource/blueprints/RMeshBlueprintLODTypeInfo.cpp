@@ -1,6 +1,7 @@
 #include "RMeshBlueprintLODTypeInfo.h"
 
 #include <cstdlib>
+#include <limits>
 #include <new>
 #include <typeinfo>
 
@@ -76,6 +77,44 @@ namespace
       cached = gpg::LookupRType(typeid(moho::RMeshBlueprintLOD));
     }
     return cached;
+  }
+
+  /**
+   * Address: 0x0051A530 (FUN_0051A530)
+   *
+   * What it does:
+   * Allocates `count * 0xCC` bytes for contiguous `RMeshBlueprintLOD` lanes.
+   * Raises `std::bad_alloc` on 32-bit overflow.
+   */
+  [[nodiscard]] void* AllocateMeshBlueprintLodArrayOrThrow(const unsigned int count)
+  {
+    constexpr unsigned int kElementSize = static_cast<unsigned int>(sizeof(moho::RMeshBlueprintLOD));
+    GPG_ASSERT(count != 0u);
+    if (count != 0u && (std::numeric_limits<unsigned int>::max() / count) < kElementSize) {
+      throw std::bad_alloc{};
+    }
+    return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(kElementSize));
+  }
+
+  /**
+   * Address: 0x0051A400 (FUN_0051A400)
+   *
+   * What it does:
+   * Builds one `gpg::RRef` lane for an `RMeshBlueprintLOD*` and writes it
+   * into caller-provided storage.
+   */
+  [[nodiscard]] gpg::RRef* BuildMeshBlueprintLodRef(gpg::RRef* const out, moho::RMeshBlueprintLOD* const object)
+  {
+    GPG_ASSERT(out != nullptr);
+    if (!out) {
+      return nullptr;
+    }
+
+    gpg::RRef temp{};
+    (void)gpg::RRef_RMeshBlueprintLOD(&temp, object);
+    out->mObj = temp.mObj;
+    out->mType = temp.mType;
+    return out;
   }
 
   /**
@@ -210,7 +249,7 @@ namespace
       return out;
     }
 
-    out.mObj = &(*storage)[static_cast<std::size_t>(ind)];
+    (void)BuildMeshBlueprintLodRef(&out, &(*storage)[static_cast<std::size_t>(ind)]);
     return out;
   }
 

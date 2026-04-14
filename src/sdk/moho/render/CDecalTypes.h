@@ -9,6 +9,7 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class RType;
 }
 
@@ -52,6 +53,15 @@ namespace moho
       std::uint32_t armyIndex,
       std::uint32_t fidelity
     );
+
+    /**
+     * Address: 0x0077D470 (FUN_0077D470, Moho::SDecalInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Loads decal position/size/rotation vectors plus texture/type lanes and
+     * runtime metadata fields from archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
 
     Wm3::Vec3f mPos;         // +0x00
     Wm3::Vec3f mSize;        // +0x0C

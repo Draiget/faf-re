@@ -44,7 +44,14 @@ namespace gpg::gal
     class Head
     {
     public:
-        Head() = default;
+        /**
+         * Address: 0x008E6D80 (FUN_008E6D80, gpg::gal::Head::Head)
+         *
+         * What it does:
+         * Initializes one GAL head descriptor and zeroes scalar/runtime
+         * vector lanes.
+         */
+        Head();
 
         /**
          * Address: 0x004368B0 (FUN_004368B0)

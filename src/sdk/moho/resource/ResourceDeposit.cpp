@@ -6,7 +6,9 @@
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "moho/collision/CGeomSolid3.h"
+#include "moho/resource/EResourceTypeTypeInfo.h"
 #include "moho/sim/STIMap.h"
 
 namespace
@@ -42,6 +44,25 @@ namespace
     bounds.Max.x = std::max(bounds.Max.x, pointX);
     bounds.Max.y = std::max(bounds.Max.y, terrainY);
     bounds.Max.z = std::max(bounds.Max.z, pointZ);
+  }
+
+  [[nodiscard]] gpg::RType* CachedRect2iType()
+  {
+    gpg::RType* cached = gpg::Rect2i::sType;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(gpg::Rect2i));
+      gpg::Rect2i::sType = cached;
+    }
+    return cached;
+  }
+
+  [[nodiscard]] gpg::RType* CachedEResourceTypeType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (!cached) {
+      cached = gpg::LookupRType(typeid(moho::EResourceType));
+    }
+    return cached;
   }
 
   alignas(moho::ResourceDepositTypeInfo) unsigned char
@@ -81,6 +102,20 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x005486E0 (FUN_005486E0, Moho::ResourceDeposit::MemberDeserialize)
+   *
+   * What it does:
+   * Loads one reflected `ResourceDeposit` payload from an archive by reading
+   * the footprint rectangle first, then the resource-type lane at +0x10.
+   */
+  void ResourceDeposit::MemberDeserialize(ResourceDeposit* const object, gpg::ReadArchive* const archive)
+  {
+    const gpg::RRef ownerRef{};
+    archive->Read(CachedRect2iType(), object, ownerRef);
+    archive->Read(CachedEResourceTypeType(), &object->depositType, ownerRef);
+  }
+
   /**
    * Address: 0x00546170 (Moho::ResourceDeposit::Intersects)
    *

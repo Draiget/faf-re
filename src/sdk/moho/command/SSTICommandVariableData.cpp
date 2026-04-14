@@ -4,6 +4,7 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
+#include "moho/command/SSTICommandIssueData.h"
 
 namespace
 {
@@ -92,6 +93,58 @@ namespace
 namespace moho
 {
   gpg::RType* SSTICommandVariableData::sType = nullptr;
+
+  /**
+   * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)
+   *
+   * What it does:
+   * Copy-constructs the full command-variable payload including target lanes
+   * and variable cell vector storage.
+   */
+  SSTICommandVariableData::SSTICommandVariableData(const SSTICommandVariableData& other)
+    : mEntIds(other.mEntIds)
+    , v1(other.v1)
+    , v2(other.v2)
+    , mCmdType(other.mCmdType)
+    , mTarget1(other.mTarget1)
+    , mTarget2(other.mTarget2)
+    , v14(other.v14)
+    , mCells(other.mCells)
+    , v19(other.v19)
+    , v20(other.v20)
+    , mMaxCount(other.mMaxCount)
+    , mCount(other.mCount)
+    , v23(other.v23)
+  {
+  }
+
+  /**
+   * Address: 0x00552A70 (FUN_00552A70, Moho::SSTICommandVariableData::SSTICommandVariableData)
+   *
+   * What it does:
+   * Initializes variable command payload lanes from one issue payload lane.
+   */
+  SSTICommandVariableData::SSTICommandVariableData(const SSTICommandIssueData& issueData)
+    : mEntIds{}
+    , v1(0)
+    , v2(0)
+    , mCmdType(issueData.mCommandType)
+    , mTarget1(issueData.mTarget)
+    , mTarget2(issueData.mTarget2)
+    , v14(issueData.unk38)
+    , mCells{}
+    , v19(0)
+    , v20(0)
+    , mMaxCount(issueData.unk70)
+    , mCount(issueData.unk74)
+    , v23(0)
+  {
+    mCells.clear();
+    mCells.reserve(issueData.mCells.Size());
+    for (std::size_t i = 0; i < issueData.mCells.Size(); ++i) {
+      mCells.push_back(issueData.mCells[i]);
+    }
+  }
 
   /**
    * Address: 0x005603E0 (FUN_005603E0, Moho::SSTICommandVariableData::~SSTICommandVariableData)

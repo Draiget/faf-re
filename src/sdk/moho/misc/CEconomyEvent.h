@@ -13,6 +13,7 @@
 namespace gpg
 {
   class ReadArchive;
+  class SerConstructResult;
   class WriteArchive;
 } // namespace gpg
 
@@ -47,6 +48,15 @@ namespace moho
    */
   struct CEconRequest
   {
+    /**
+     * Address: 0x00773990 (FUN_00773990, Moho::CEconRequest::MemberConstruct)
+     *
+     * What it does:
+     * Allocates one `CEconRequest`, resets intrusive links/economy values, and
+     * publishes the object as an unowned construct result.
+     */
+    static void MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
+
     /**
      * Address: 0x00774A60 (FUN_00774A60, Moho::CEconRequest::MemberDeserialize)
      *

@@ -679,6 +679,25 @@ namespace
     ::GetWindowRect(windowHandle, windowRect);
     (void)::UnmapViewOfFile(windowRect);
   }
+
+  /**
+   * Address: 0x008D42E0 (FUN_008D42E0, func_AppendMenuLuaDebugger)
+   *
+   * What it does:
+   * Appends one Lua debugger lane to the main window system menu:
+   * separator, one placeholder entry, and one `Open Lua Debugger` command.
+   */
+  [[nodiscard]] BOOL AppendLuaDebuggerSystemMenu(HWND const windowHandle)
+  {
+    HMENU const systemMenu = ::GetSystemMenu(windowHandle, FALSE);
+    if (systemMenu == nullptr) {
+      return FALSE;
+    }
+
+    (void)::AppendMenuW(systemMenu, MF_SEPARATOR, 0u, nullptr);
+    (void)::AppendMenuW(systemMenu, MF_STRING, 1u, L"New Item");
+    return ::AppendMenuW(systemMenu, MF_STRING, 2u, L"Open Lua Debugger");
+  }
 } // namespace
 
 /**
@@ -813,6 +832,8 @@ bool CScApp::Init()
     const gpg::gal::Head& primaryHead = context->GetHead(0);
     if (primaryHead.mWindowed && primaryHead.mHandle != nullptr) {
       PublishWindowedPresentationBounds(reinterpret_cast<HWND>(primaryHead.mHandle));
+    } else if (!primaryHead.mWindowed && primaryHead.mHandle != nullptr && moho::USER_DebugFacilitiesEnabled()) {
+      (void)AppendLuaDebuggerSystemMenu(reinterpret_cast<HWND>(primaryHead.mHandle));
     }
   }
 

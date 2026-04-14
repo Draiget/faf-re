@@ -1841,7 +1841,8 @@ extern "C"
   std::int32_t SFD_GetErrInf(std::int32_t errorObjectAddress, void* outErrInfo);
   std::int32_t SFD_Stop(void* sfdHandle);
   std::int32_t SFD_IsSvrWait();
-  void SFD_GetFrm(std::int32_t sfdHandleAddress, void** outFrame);
+  std::int32_t SFD_GetIdFrm(moho::SofdecSfdWorkctrlSubobj* workctrlSubobj, std::int32_t* outFrameId, void** outFrame);
+  std::int32_t SFD_GetFrm(std::int32_t sfdHandleAddress, void** outFrame);
   void SFD_RelFrm(std::int32_t sfdHandleAddress, void* frameAddress);
   std::int32_t SFD_IsNextFrmReady(std::int32_t sfdHandleAddress);
   std::int32_t mwPlyGetSfdHn(moho::MwsfdPlaybackStateSubobj* ply);

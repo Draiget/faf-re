@@ -17,7 +17,9 @@ namespace moho
   class Entity;
   class EntitySetBase;
   struct SEntitySetTemplateUnit;
+  struct BVIntSetAddResult;
   class Prop;
+  class Sim;
   class Unit;
   struct CEntityDbIdPoolNode;
 
@@ -75,6 +77,33 @@ namespace moho
     sizeof(CEntityDbBoundedPropQueueRuntime) == 0x24, "CEntityDbBoundedPropQueueRuntime size must be 0x24"
   );
 
+  /**
+   * Iterator payload used by all-army unit scans against `CEntityDb::mAllUnits`.
+   */
+  class CUnitIterAllArmies
+  {
+  public:
+    /**
+     * Address: 0x006B6AA0 (FUN_006B6AA0, Moho::CUnitIterAllArmies::CUnitIterAllArmies)
+     *
+     * What it does:
+     * Initializes one all-armies unit iterator from `sim->mEntityDB` by
+     * capturing the leftmost all-units tree node, iterator end sentinel, and
+     * current decoded unit payload.
+     */
+    explicit CUnitIterAllArmies(Sim* sim);
+
+  public:
+    CEntityDbAllUnitsNode* mItr; // +0x00
+    CEntityDbAllUnitsNode* mEnd; // +0x04
+    Unit* mCur;                  // +0x08
+  };
+
+  static_assert(sizeof(CUnitIterAllArmies) == 0x0C, "CUnitIterAllArmies size must be 0x0C");
+  static_assert(offsetof(CUnitIterAllArmies, mItr) == 0x00, "CUnitIterAllArmies::mItr offset must be 0x00");
+  static_assert(offsetof(CUnitIterAllArmies, mEnd) == 0x04, "CUnitIterAllArmies::mEnd offset must be 0x04");
+  static_assert(offsetof(CUnitIterAllArmies, mCur) == 0x08, "CUnitIterAllArmies::mCur offset must be 0x08");
+
   class CEntityDb
   {
   public:
@@ -113,6 +142,17 @@ namespace moho
      * (`[31..28]=family`, `[27..20]=source`).
      */
     [[nodiscard]] std::uint32_t DoReserveId(std::uint32_t requestedFamilySourceBits);
+
+    /**
+     * Address: 0x00684690 (FUN_00684690, Moho::EntityDB::ReleaseId)
+     * Mangled: ?ReleaseId@EntityDB@Moho@@QAEXVEntId@2@@Z
+     *
+     * What it does:
+     * Releases one packed entity id, updates entity-count stats, removes
+     * matching runtime entity tracking entries, and queues the serial lane for
+     * reuse in this family/source id pool.
+     */
+    [[nodiscard]] BVIntSetAddResult ReleaseId(std::uint32_t releasedId);
 
     /**
      * Address: 0x00683C90 (FUN_00683C90,

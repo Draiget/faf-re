@@ -200,6 +200,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x00654010 (?Intersects@CGeomSolid3@Moho@@QBE_NABV?$Sphere3@M@Wm3@@@Z)
+   *
+   * Wm3::Sphere3<float> const&
+   *
+   * What it does:
+   * Returns true when the sphere is not fully outside any clipping plane.
+   */
+  bool CGeomSolid3::Intersects(const Wm3::Sphere3f& sphere) const
+  {
+    for (const Wm3::Plane3f& plane : planes_) {
+      const float signedDistance = (plane.Normal.x * sphere.Center.x) + (plane.Normal.y * sphere.Center.y)
+        + (plane.Normal.z * sphere.Center.z) - plane.Constant;
+      if (signedDistance > sphere.Radius) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Address: 0x00473660 (?Intersects@CGeomSolid3@Moho@@QBE_NABV?$AxisAlignedBox3@M@Wm3@@PAI@Z)
    *
    * Wm3::AxisAlignedBox3<float> const&, unsigned int*

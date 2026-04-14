@@ -17,6 +17,15 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 namespace
 {
   constexpr const char* kCreateEconomyEventHelp = "CreateEconomyEvent";
@@ -550,6 +559,26 @@ namespace moho
   gpg::RType* CEconRequest::sType = nullptr;
   gpg::RType* CEconomyEvent::sType = nullptr;
   CScrLuaMetatableFactory<CEconomyEvent> CScrLuaMetatableFactory<CEconomyEvent>::sInstance{};
+
+  /**
+   * Address: 0x00773990 (FUN_00773990, Moho::CEconRequest::MemberConstruct)
+   *
+   * What it does:
+   * Allocates one `CEconRequest`, resets intrusive links/economy values, and
+   * publishes the object as an unowned construct result.
+   */
+  void CEconRequest::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
+  {
+    auto* const request = new (std::nothrow) CEconRequest{};
+    gpg::RRef requestRef{};
+    gpg::RRef_CEconRequest(&requestRef, request);
+    result.SetUnowned(requestRef, 0u);
+  }
 
   /**
    * Address: 0x00774A60 (FUN_00774A60, Moho::CEconRequest::MemberDeserialize)

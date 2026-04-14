@@ -3,8 +3,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <new>
 #include <typeinfo>
 
 #include "lua/LuaObject.h"
@@ -114,6 +116,82 @@ namespace
       decelRate <= 0.0f ? 0.0f : ((manipulator.mCurrentSpeed * 10.0f) * (manipulator.mCurrentSpeed * 10.0f)) / (decelRate * 2.0f);
     return brakingDistance > remainingDistance;
   }
+
+  alignas(moho::CSlideManipulatorTypeInfo)
+  unsigned char gCSlideManipulatorTypeInfoStorage[sizeof(moho::CSlideManipulatorTypeInfo)] = {};
+  bool gCSlideManipulatorTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CSlideManipulatorTypeInfo* AcquireCSlideManipulatorTypeInfo()
+  {
+    if (!gCSlideManipulatorTypeInfoConstructed) {
+      new (gCSlideManipulatorTypeInfoStorage) moho::CSlideManipulatorTypeInfo();
+      gCSlideManipulatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CSlideManipulatorTypeInfo*>(gCSlideManipulatorTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::CSlideManipulatorTypeInfo* PeekCSlideManipulatorTypeInfo() noexcept
+  {
+    if (!gCSlideManipulatorTypeInfoConstructed) {
+      return nullptr;
+    }
+    return reinterpret_cast<moho::CSlideManipulatorTypeInfo*>(gCSlideManipulatorTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00646E00 (FUN_00646E00)
+   *
+   * What it does:
+   * Constructs and preregisters startup reflection metadata for
+   * `CSlideManipulator`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CSlideManipulatorTypeInfo()
+  {
+    moho::CSlideManipulatorTypeInfo* const typeInfo = AcquireCSlideManipulatorTypeInfo();
+    gpg::PreRegisterRType(typeid(moho::CSlideManipulator), typeInfo);
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x00BFB260 (FUN_00BFB260)
+   *
+   * What it does:
+   * Tears down startup-owned `CSlideManipulator` type-info storage.
+   */
+  void cleanup_CSlideManipulatorTypeInfo()
+  {
+    moho::CSlideManipulatorTypeInfo* const typeInfo = PeekCSlideManipulatorTypeInfo();
+    if (!typeInfo) {
+      return;
+    }
+
+    typeInfo->~CSlideManipulatorTypeInfo();
+    gCSlideManipulatorTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BD34A0 (FUN_00BD34A0)
+   *
+   * What it does:
+   * Registers startup `CSlideManipulator` type-info preregistration and
+   * process-exit teardown.
+   */
+  int register_CSlideManipulatorTypeInfoStartup()
+  {
+    (void)preregister_CSlideManipulatorTypeInfo();
+    return std::atexit(&cleanup_CSlideManipulatorTypeInfo);
+  }
+
+  struct CSlideManipulatorTypeInfoStartupBootstrap
+  {
+    CSlideManipulatorTypeInfoStartupBootstrap()
+    {
+      (void)register_CSlideManipulatorTypeInfoStartup();
+    }
+  };
+
+  CSlideManipulatorTypeInfoStartupBootstrap gCSlideManipulatorTypeInfoStartupBootstrap;
 
   /**
    * Address: 0x00648450 (FUN_00648450, sub_648450)
@@ -266,6 +344,25 @@ moho::CScrLuaMetatableFactory<moho::CSlideManipulator>::Instance()
 LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CSlideManipulator>::Create(LuaPlus::LuaState* const state)
 {
   return SCR_CreateSimpleMetatable(state);
+}
+
+/**
+ * Address: 0x00647020 (FUN_00647020, ??0CSlideManipulator@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Builds detached/default slide-manipulator state used by reflection allocator
+ * lanes.
+ */
+moho::CSlideManipulator::CSlideManipulator()
+  : IAniManipulator()
+{
+  mCurrentPosition = {};
+  mGoal = {};
+  mSpeed = kSlideInitialSpeed;
+  mCurrentSpeed = 0.0f;
+  mAcceleration = 0.0f;
+  mDeceleration = 0.0f;
+  mWorldUnits = 0u;
 }
 
 /**
@@ -859,6 +956,159 @@ int moho::cfunc_CSlideManipulatorBeenDestroyedL(LuaPlus::LuaState* const state)
   lua_pushboolean(rawState, manipulator == nullptr);
   (void)lua_gettop(rawState);
   return 1;
+}
+
+/**
+ * Address: 0x00648550 (FUN_00648550, Moho::CSlideManipulatorTypeInfo::NewRef)
+ *
+ * What it does:
+ * Allocates one `CSlideManipulator`, runs detached default construction, and
+ * returns the typed reflection reference.
+ */
+gpg::RRef moho::CSlideManipulatorTypeInfo::NewRef()
+{
+  auto* const storage = static_cast<CSlideManipulator*>(::operator new(sizeof(CSlideManipulator), std::nothrow));
+  CSlideManipulator* object = nullptr;
+  if (storage) {
+    object = new (storage) CSlideManipulator();
+  }
+
+  gpg::RRef out{};
+  gpg::RRef_CSlideManipulator(&out, object);
+  return out;
+}
+
+/**
+ * Address: 0x006485F0 (FUN_006485F0, Moho::CSlideManipulatorTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Constructs one detached `CSlideManipulator` in caller-owned storage and
+ * returns its typed reflection reference.
+ */
+gpg::RRef moho::CSlideManipulatorTypeInfo::CtrRef(void* const objectStorage)
+{
+  CSlideManipulator* object = nullptr;
+  if (objectStorage) {
+    object = new (objectStorage) CSlideManipulator();
+  }
+
+  gpg::RRef out{};
+  gpg::RRef_CSlideManipulator(&out, object);
+  return out;
+}
+
+/**
+ * Address: 0x006485D0 (FUN_006485D0, Moho::CSlideManipulatorTypeInfo::Delete)
+ *
+ * What it does:
+ * Deletes one heap-owned `CSlideManipulator`.
+ */
+void moho::CSlideManipulatorTypeInfo::Delete(void* const objectStorage)
+{
+  delete static_cast<CSlideManipulator*>(objectStorage);
+}
+
+/**
+ * Address: 0x00648660 (FUN_00648660, Moho::CSlideManipulatorTypeInfo::Destruct)
+ *
+ * What it does:
+ * Runs non-deleting in-place destructor logic for `CSlideManipulator`.
+ */
+void moho::CSlideManipulatorTypeInfo::Destruct(void* const objectStorage)
+{
+  if (!objectStorage) {
+    return;
+  }
+
+  static_cast<CSlideManipulator*>(objectStorage)->~CSlideManipulator();
+}
+
+/**
+ * Address: 0x00648670 (FUN_00648670, Moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator)
+ *
+ * What it does:
+ * Registers `IAniManipulator` as reflected base at offset `0`.
+ */
+void moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+{
+  if (!typeInfo) {
+    return;
+  }
+
+  gpg::RType* baseType = IAniManipulator::sType;
+  if (!baseType) {
+    baseType = gpg::LookupRType(typeid(IAniManipulator));
+    IAniManipulator::sType = baseType;
+  }
+  if (!baseType) {
+    return;
+  }
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
+ * Address: 0x00648530 (FUN_00648530)
+ *
+ * What it does:
+ * Installs allocation and placement-construction callback lanes.
+ */
+moho::CSlideManipulatorTypeInfo*
+moho::CSlideManipulatorTypeInfo::ConfigureCtorCallbacks(CSlideManipulatorTypeInfo* const typeInfo)
+{
+  typeInfo->newRefFunc_ = &CSlideManipulatorTypeInfo::NewRef;
+  typeInfo->ctorRefFunc_ = &CSlideManipulatorTypeInfo::CtrRef;
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00648540 (FUN_00648540)
+ *
+ * What it does:
+ * Installs deletion and in-place destruction callback lanes.
+ */
+moho::CSlideManipulatorTypeInfo*
+moho::CSlideManipulatorTypeInfo::ConfigureDtorCallbacks(CSlideManipulatorTypeInfo* const typeInfo)
+{
+  typeInfo->deleteFunc_ = &CSlideManipulatorTypeInfo::Delete;
+  typeInfo->dtrFunc_ = &CSlideManipulatorTypeInfo::Destruct;
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00648470 (FUN_00648470)
+ *
+ * What it does:
+ * Installs all reflection lifecycle callbacks on one type-info instance.
+ */
+moho::CSlideManipulatorTypeInfo*
+moho::CSlideManipulatorTypeInfo::ConfigureLifecycleCallbacks(CSlideManipulatorTypeInfo* const typeInfo)
+{
+  ConfigureCtorCallbacks(typeInfo);
+  ConfigureDtorCallbacks(typeInfo);
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00646E60 (FUN_00646E60, Moho::CSlideManipulatorTypeInfo::Init)
+ *
+ * What it does:
+ * Sets reflected size/callback lanes for `CSlideManipulator`, registers
+ * `IAniManipulator` base metadata, then finalizes type initialization.
+ */
+void moho::CSlideManipulatorTypeInfo::Init()
+{
+  size_ = sizeof(CSlideManipulator);
+  ConfigureLifecycleCallbacks(this);
+  AddBase_IAniManipulator(this);
+  gpg::RType::Init();
+  Finish();
 }
 
 namespace gpg

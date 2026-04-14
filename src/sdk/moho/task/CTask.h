@@ -138,6 +138,13 @@ namespace moho
   class MOHO_EMPTY_BASES CPushTask : public CTask
   {
   public:
+    /**
+     * Address: 0x007C8650 (FUN_007C8650, ??0CPushTask_CDiscoveryService@Moho@@QAE@@Z)
+     * Address: 0x007C8B50 (FUN_007C8B50, ??0?$CPushTask@VCLobby@Moho@@@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Recovered constructor path shared by `CPushTask<T>` instantiations.
+     */
     CPushTask();
 
   private:
@@ -146,6 +153,14 @@ namespace moho
   static_assert(sizeof(CPushTask<void>) == 0x1C, "size of CPushTask must be 0x1C");
 
   template <class T>
+  /**
+   * Address: 0x007C8650 (FUN_007C8650, CPushTask<CDiscoveryService> specialization)
+   * Address: 0x007C8B50 (FUN_007C8B50, CPushTask<CLobby> specialization)
+   *
+   * What it does:
+   * Builds a `CTaskThread` on the before-wait stage and links this task as the
+   * thread top, preserving existing subtask chaining.
+   */
   CPushTask<T>::CPushTask()
     : CTask(new CTaskThread(WIN_GetBeforeWaitStage()), false)
   {}
@@ -154,11 +169,28 @@ namespace moho
   class MOHO_EMPTY_BASES CPullTask : public CTask
   {
   public:
+    /**
+     * Address: 0x007BB1B0 (FUN_007BB1B0, ??0CPullTask_CGpgNetInterface@Moho@@QAE@@Z)
+     * Address: 0x007C8590 (FUN_007C8590, ??0CPullTask_CDiscoveryService@Moho@@QAE@@Z)
+     * Address: 0x007C8C10 (FUN_007C8C10, ??0?$CPullTask@VCLobby@Moho@@@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Recovered constructor path shared by `CPullTask<T>` instantiations.
+     */
     CPullTask();
   };
   static_assert(sizeof(CPullTask<void>) == 0x18, "size of CPullTask must be 0x18");
 
   template <class T>
+  /**
+   * Address: 0x007BB1B0 (FUN_007BB1B0, CPullTask<CGpgNetInterface> specialization)
+   * Address: 0x007C8590 (FUN_007C8590, CPullTask<CDiscoveryService> specialization)
+   * Address: 0x007C8C10 (FUN_007C8C10, CPullTask<CLobby> specialization)
+   *
+   * What it does:
+   * Builds a `CTaskThread` on the before-events stage and links this task as the
+   * thread top, preserving existing subtask chaining.
+   */
   CPullTask<T>::CPullTask()
     : CTask(new CTaskThread(WIN_GetBeforeEventsStage()), false)
   {}

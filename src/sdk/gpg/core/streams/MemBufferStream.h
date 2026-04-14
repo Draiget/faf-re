@@ -96,7 +96,12 @@ namespace gpg
             return result;
         }
 
-        /** Create a sub-buffer view [start, start+len). */
+        /**
+         * Address: 0x0088E780 (FUN_0088E780, gpg::MemBuffer<char const>::SubBuffer)
+         *
+         * What it does:
+         * Creates one range-checked shared sub-view `[start, start + len)`.
+         */
         MemBuffer SubBuffer(std::size_t start, std::size_t len) const
         {
             type* b = GetPtr(start, 0);

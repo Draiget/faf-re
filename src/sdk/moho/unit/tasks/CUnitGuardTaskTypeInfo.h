@@ -21,8 +21,16 @@ namespace moho
      * Allocates one `CUnitGuardTask` and returns a typed reflection ref.
      */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x006149F0 (FUN_006149F0, Moho::CUnitGuardTaskTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CUnitGuardTask` in caller-provided storage and returns a
+     * typed reflection ref.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
   };
 
   static_assert(sizeof(CUnitGuardTaskTypeInfo) == 0x64, "CUnitGuardTaskTypeInfo size must be 0x64");
 } // namespace moho
-

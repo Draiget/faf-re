@@ -15,6 +15,16 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00779E40 (FUN_00779E40, Moho::CDecalHandleTypeInfo::CDecalHandleTypeInfo)
+     *
+     * What it does:
+     * Initializes the base `gpg::RType` lane, installs the
+     * `CDecalHandleTypeInfo` vtable, and pre-registers this type against
+     * `typeid(CDecalHandle)` into the gpg pre-RType map.
+     */
+    CDecalHandleTypeInfo();
+
+    /**
      * Address: 0x00779EF0 (FUN_00779EF0, Moho::CDecalHandleTypeInfo::dtr)
      * Slot: 2
      */

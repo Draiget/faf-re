@@ -31,6 +31,26 @@ namespace moho
     std::uint8_t mPadCB{0};       // +0xCB
 
     /**
+     * Address: 0x005183D0 (FUN_005183D0)
+     * Mangled: ??0RMeshBlueprintLOD@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Default-initializes one mesh LOD descriptor with empty string lanes,
+     * default cutoff, and disabled bool flags.
+     */
+    RMeshBlueprintLOD();
+
+    /**
+     * Address: 0x0051A0F0 (FUN_0051A0F0, Moho::RMeshBlueprintLOD::RMeshBlueprintLOD)
+     * Mangled: ??0RMeshBlueprintLOD@Moho@@QAE@ABV01@@Z
+     *
+     * What it does:
+     * Copy-constructs one mesh LOD descriptor including all path string lanes
+     * and scalar flags.
+     */
+    RMeshBlueprintLOD(const RMeshBlueprintLOD& other);
+
+    /**
      * Address: 0x00518870 (FUN_00518870)
      * Mangled: ?Init@RMeshBlueprintLOD@Moho@@QAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z
      *

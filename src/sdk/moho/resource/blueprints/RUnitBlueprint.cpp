@@ -108,6 +108,61 @@ namespace moho
   }
 
   /**
+   * Address: 0x0051F090 (FUN_0051F090, Moho::RUnitBlueprintPhysics::RUnitBlueprintPhysics)
+   *
+   * What it does:
+   * Seeds movement/skirt defaults, clears runtime footprint pointers, and
+   * starts occupancy/raised-platform vectors empty.
+   */
+  RUnitBlueprintPhysics::RUnitBlueprintPhysics()
+    : FlattenSkirt(0)
+    , pad_0001_0004{0, 0, 0}
+    , SkirtOffsetX(0.0f)
+    , SkirtOffsetZ(0.0f)
+    , SkirtSizeX(0.0f)
+    , SkirtSizeZ(0.0f)
+    , MaxGroundVariation(1.0f)
+    , MotionType(RULEUMT_None)
+    , AltMotionType(RULEUMT_None)
+    , StandUpright(0)
+    , SinkLower(0)
+    , RotateBodyWhileMoving(0)
+    , pad_0023_0024{0}
+    , DiveSurfaceSpeed(1.0f)
+    , MaxSpeed(0.0f)
+    , MaxSpeedReverse(-1.0f)
+    , MaxAcceleration(0.0f)
+    , MaxBrake(0.0f)
+    , MaxSteerForce(0.0f)
+    , BankingSlope(0.0f)
+    , RollStability(0.2f)
+    , RollDamping(0.5f)
+    , WobbleFactor(0.0f)
+    , WobbleSpeed(0.0f)
+    , TurnRadius(5.0f)
+    , TurnRate(0.0f)
+    , TurnFacingRate(0.0f)
+    , RotateOnSpot(0)
+    , pad_005D_0060{0, 0, 0}
+    , RotateOnSpotThreshold(0.5f)
+    , Elevation(0.0f)
+    , AttackElevation(0.0f)
+    , CatchUpAcc(0.0f)
+    , BackUpDistance(-1.0f)
+    , LayerChangeOffsetHeight(-0.1f)
+    , LayerTransitionDuration(0.0f)
+    , BuildOnLayerCapsMask(static_cast<std::int32_t>(LAYER_Land))
+    , BuildRestriction(RULEUBR_None)
+    , ResolvedFootprint(nullptr)
+    , ResolvedAltFootprint(nullptr)
+    , FuelUseTime(0.0f)
+    , FuelRechargeRate(0.0f)
+    , GroundCollisionOffset(0.0f)
+    , OccupyRects()
+    , RaisedPlatforms()
+  {}
+
+  /**
    * Address: 0x0051F7D0 (FUN_0051F7D0, ??0RUnitBlueprintAI@Moho@@QAE@@Z)
    *
    * What it does:
@@ -131,6 +186,45 @@ namespace moho
     , AutoSurfaceToAttack(1)
     , AttackAngle(0.0f)
   {}
+
+  /**
+   * Address: 0x0051F990 (FUN_0051F990, Moho::RUnitBlueprintEconomy::RUnitBlueprintEconomy)
+   * Mangled: ??0RUnitBlueprintEconomy@Moho@@QAE@PAVRRuleGameRules@1@@Z
+   *
+   * What it does:
+   * Seeds economy defaults, clears category-string vectors, and initializes
+   * runtime category-cache inline storage using one rules-owner lane.
+   */
+  RUnitBlueprintEconomy::RUnitBlueprintEconomy(RRuleGameRules* const rules)
+    : BuildCostEnergy(0.0f)
+    , BuildCostMass(0.0f)
+    , BuildRate(1.0f)
+    , BuildTime(0.0f)
+    , StorageEnergy(0.0f)
+    , StorageMass(0.0f)
+    , NaturalProducer(0)
+    , pad_0019_001C{0, 0, 0}
+    , BuildableCategories()
+    , RebuildBonusIds()
+    , UnresolvedWord3C(0)
+    , CategoryCache{}
+    , InitialRallyX(0.0f)
+    , InitialRallyZ(5.0f)
+    , NeedToFaceTargetToBuild(0)
+    , pad_0071_0074{0, 0, 0}
+    , SacrificeMassMult(0.0f)
+    , SacrificeEnergyMult(0.0f)
+    , MaxBuildDistance(5.0f)
+  {
+    CategoryCache.RuleGameRules = rules;
+    CategoryCache.UnresolvedWord04 = 0;
+    CategoryCache.RuntimeWord08 = 0;
+    CategoryCache.RuntimeVectorProxy = nullptr;
+    CategoryCache.First = CategoryCache.InlineStorage;
+    CategoryCache.Last = CategoryCache.InlineStorage;
+    CategoryCache.End = reinterpret_cast<std::uint32_t*>(&InitialRallyX);
+    CategoryCache.InlineStoragePtr = CategoryCache.InlineStorage;
+  }
 
   /**
    * Address: 0x0051F260 (FUN_0051F260)

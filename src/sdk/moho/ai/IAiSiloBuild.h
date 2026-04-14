@@ -10,6 +10,7 @@ namespace gpg
 namespace moho
 {
   struct SEconValue;
+  class Unit;
 
   enum ESiloType : std::int32_t
   {
@@ -115,4 +116,13 @@ namespace moho
   };
 
   static_assert(sizeof(IAiSiloBuild) == 0x04, "IAiSiloBuild size must be 0x04");
+
+  /**
+   * Address: 0x005CF980 (FUN_005CF980, ?AI_CreateSiloBuilder@Moho@@YAPAVIAiSiloBuild@1@PAVUnit@1@@Z)
+   *
+   * What it does:
+   * Allocates one `CAiSiloBuildImpl` bound to `unit` and returns it as
+   * `IAiSiloBuild`.
+   */
+  [[nodiscard]] IAiSiloBuild* AI_CreateSiloBuilder(Unit* unit);
 } // namespace moho

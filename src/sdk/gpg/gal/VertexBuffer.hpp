@@ -14,6 +14,15 @@ namespace gpg
     {
     public:
       /**
+       * Address: 0x008F56A0 (FUN_008F56A0, gpg::gal::VertexBuffer::VertexBuffer)
+       *
+       * What it does:
+       * Initializes one abstract vertex-buffer base object and applies the
+       * base vftable lane used by derived constructors/unwind paths.
+       */
+      VertexBuffer();
+
+      /**
        * Address: 0x00A82547
        * Slot: 0
        * Demangled: _purecall

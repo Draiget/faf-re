@@ -46,7 +46,7 @@ namespace
    * What it does:
    * Deserializes one reflected `EntId` value lane using lazy type lookup.
    */
-  [[maybe_unused]] void DeserializeEntIdField(void* const valueStorage, gpg::ReadArchive* const archive)
+  void DeserializeEntIdField(void* const valueStorage, gpg::ReadArchive* const archive)
   {
     if (archive == nullptr || valueStorage == nullptr) {
       return;
@@ -79,6 +79,25 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00559990 (FUN_00559990, Moho::SSTIEntityConstantData::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes entity id, unowned entity-blueprint pointer, and creation tick.
+   */
+  void SSTIEntityConstantData::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    const gpg::RRef nullOwner{};
+
+    DeserializeEntIdField(&mEntityId, archive);
+    archive->ReadPointer_REntityBlueprint(&mBlueprint, &nullOwner);
+    archive->ReadUInt(&mTickCreated);
+  }
+
   /**
    * Address: 0x00559A00 (FUN_00559A00, Moho::SSTIEntityConstantData::MemberSerialize)
    *

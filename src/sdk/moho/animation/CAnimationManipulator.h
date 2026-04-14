@@ -573,6 +573,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x0063F040 (FUN_0063F040, Moho::CAnimationManipulatorTypeInfo::CAnimationManipulatorTypeInfo)
+     *
+     * What it does:
+     * Initializes the base `gpg::RType` lane and pre-registers this type
+     * against `typeid(CAnimationManipulator)` into the gpg pre-RType map.
+     */
+    CAnimationManipulatorTypeInfo();
+
+    /**
      * Address: 0x0063F0E0 (FUN_0063F0E0, scalar deleting destructor thunk)
      * Slot: 2
      */

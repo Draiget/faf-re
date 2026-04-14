@@ -11,6 +11,7 @@
 
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/RScmResource.h"
 #include "gpg/core/utils/Logging.h"
@@ -1493,9 +1494,9 @@ namespace moho
     interpolatedPosition.y = endPos.y + (startPos.y - endPos.y) * interpolation;
     interpolatedPosition.z = endPos.z + (startPos.z - endPos.z) * interpolation;
 
-    // Binary path uses QuatLERP helper with start/end transforms; using normalized
-    // lerp keeps the same intent while avoiding low-level helper dispatch.
-    curOrientation = Wm3::Quatf::Nlerp(startTransform.orient_, endTransform.orient_, 1.0f - interpolation);
+    Wm3::Quatf blendedOrientation{};
+    QuatLERP(&startTransform.orient_, &endTransform.orient_, &blendedOrientation, interpolation);
+    curOrientation = blendedOrientation;
 
     if (hasStanceUpdatePending == 0) {
       return;

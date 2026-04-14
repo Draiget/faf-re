@@ -25,6 +25,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00647020 (FUN_00647020, ??0CSlideManipulator@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Builds detached/default slide-manipulator state for reflection
+     * construction paths.
+     */
+    CSlideManipulator();
+
+    /**
      * Address: 0x006470D0 (FUN_006470D0, ??0CSlideManipulator@Moho@@QAE@@Z)
      *
      * What it does:
@@ -62,6 +71,87 @@ namespace moho
   static_assert(offsetof(CSlideManipulator, mDeceleration) == 0xA4, "CSlideManipulator::mDeceleration offset must be 0xA4");
   static_assert(offsetof(CSlideManipulator, mWorldUnits) == 0xA8, "CSlideManipulator::mWorldUnits offset must be 0xA8");
   static_assert(sizeof(CSlideManipulator) == 0xB0, "CSlideManipulator size must be 0xB0");
+
+  class CSlideManipulatorTypeInfo : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00646E60 (FUN_00646E60, Moho::CSlideManipulatorTypeInfo::Init)
+     *
+     * What it does:
+     * Sets reflected size/callback lanes for `CSlideManipulator`, registers
+     * `IAniManipulator` base metadata, then finalizes type initialization.
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x00648550 (FUN_00648550, Moho::CSlideManipulatorTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates one `CSlideManipulator`, runs detached default construction,
+     * and returns its typed reflection reference.
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x006485F0 (FUN_006485F0, Moho::CSlideManipulatorTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one detached `CSlideManipulator` in caller-owned storage and
+     * returns its typed reflection reference.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x006485D0 (FUN_006485D0, Moho::CSlideManipulatorTypeInfo::Delete)
+     *
+     * What it does:
+     * Deletes one heap-owned `CSlideManipulator`.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x00648660 (FUN_00648660, Moho::CSlideManipulatorTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs non-deleting in-place destructor logic for `CSlideManipulator`.
+     */
+    static void Destruct(void* objectStorage);
+
+    /**
+     * Address: 0x00648670 (FUN_00648670, Moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator)
+     *
+     * What it does:
+     * Registers `IAniManipulator` as reflected base at offset `0`.
+     */
+    static void AddBase_IAniManipulator(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00648470 (FUN_00648470)
+     *
+     * What it does:
+     * Installs all reflection lifecycle callbacks on one type-info instance.
+     */
+    static CSlideManipulatorTypeInfo* ConfigureLifecycleCallbacks(CSlideManipulatorTypeInfo* typeInfo);
+
+    /**
+     * Address: 0x00648530 (FUN_00648530)
+     *
+     * What it does:
+     * Installs allocation and placement-construction callback lanes.
+     */
+    static CSlideManipulatorTypeInfo* ConfigureCtorCallbacks(CSlideManipulatorTypeInfo* typeInfo);
+
+    /**
+     * Address: 0x00648540 (FUN_00648540)
+     *
+     * What it does:
+     * Installs deletion and in-place destruction callback lanes.
+     */
+    static CSlideManipulatorTypeInfo* ConfigureDtorCallbacks(CSlideManipulatorTypeInfo* typeInfo);
+  };
+
+  static_assert(sizeof(CSlideManipulatorTypeInfo) == 0x64, "CSlideManipulatorTypeInfo size must be 0x64");
 
   /**
    * VFTABLE: 0x00E217A8

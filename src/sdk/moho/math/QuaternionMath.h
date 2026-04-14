@@ -54,6 +54,60 @@ namespace moho
   void NormalizeQuatInPlace(Wm3::Quaternionf* quat) noexcept;
 
   /**
+   * Address: 0x004EB3F0 (FUN_004EB3F0, func_MatrixToQuat)
+   *
+   * IDA signature:
+   * Wm3::Quaternionf *callcnv_F3 func_MatrixToQuat@<eax>(
+   *   Moho::VMatrix3 *a1@<eax>, Wm3::Quaternionf *dest@<esi>);
+   *
+   * What it does:
+   * Converts one 3x3 basis matrix (three row vectors) into a quaternion using
+   * the binary trace/max-diagonal branch logic.
+   */
+  Wm3::Quaternionf* MatrixToQuat(const Wm3::Vector3f* matrixRows, Wm3::Quaternionf* out) noexcept;
+
+  /**
+   * Address: 0x004F0CB0 (FUN_004F0CB0, sub_4F0CB0)
+   *
+   * What it does:
+   * Converts one 3x3 basis matrix (row lanes) into quaternion output using the
+   * canonical trace/dominant-axis branch with scalar lane sign matching Lua
+   * HPR/prop creation paths.
+   */
+  Wm3::Quaternionf* MatrixRowsToQuatCanonical(const Wm3::Vector3f* matrixRows, Wm3::Quaternionf* out) noexcept;
+
+  /**
+   * Address: 0x004F0AE0 (FUN_004F0AE0, func_MatrixToQuat_0)
+   *
+   * What it does:
+   * Transposes one 3x3 matrix from column lanes into row lanes, then forwards
+   * to `MatrixRowsToQuatCanonical`.
+   */
+  Wm3::Quaternionf* MatrixColumnsToQuatCanonical(const Wm3::Vector3f* matrixColumns, Wm3::Quaternionf* out) noexcept;
+
+  /**
+   * Address: 0x004EBA80 (FUN_004EBA80, func_QuatLERP)
+   *
+   * IDA signature:
+   * Wm3::Quaternionf *__usercall func_QuatLERP@<eax>(
+   *   Wm3::Quaternionf *q1@<eax>,
+   *   Wm3::Quaternionf *q2@<ecx>,
+   *   Wm3::Quaternionf *dest@<ebx>,
+   *   float amt);
+   *
+   * What it does:
+   * Clamps `amount` to `[0,1]`, flips one endpoint when needed for shortest
+   * hemisphere, performs normalized linear interpolation, and writes into
+   * `out`.
+   */
+  Wm3::Quaternionf* QuatLERP(
+    const Wm3::Quaternionf* q1,
+    const Wm3::Quaternionf* q2,
+    Wm3::Quaternionf* out,
+    float amount
+  ) noexcept;
+
+  /**
    * Address: 0x004EBC00 (FUN_004EBC00, Moho::SLERP)
    *
    * IDA signature:
@@ -91,5 +145,15 @@ namespace moho
    * Used by Moho::Projectile::MotionTick and UpdateTracking.
    */
   void QuatFromVecRot(Wm3::Quaternionf* quat, const Wm3::Vector3f* refAxis, float rads);
+
+  /**
+   * Address: 0x00697360 (FUN_00697360, func_VecToQuatB)
+   *
+   * What it does:
+   * Converts one axis-angle vector into a quaternion by normalizing the vector,
+   * treating its length as the angle, and writing `sin(angle/2)` into the xyz
+   * lanes with `cos(angle/2)` in w.
+   */
+  Wm3::Quaternionf* QuatFromAxisAngleVector(Wm3::Quaternionf* quat, Wm3::Vector3f axisAngle) noexcept;
 
 } // namespace moho

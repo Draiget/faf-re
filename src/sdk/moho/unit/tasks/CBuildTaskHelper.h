@@ -6,6 +6,12 @@
 #include "legacy/containers/String.h"
 #include "moho/misc/WeakPtr.h"
 
+namespace gpg
+{
+  class ReadArchive;
+  class WriteArchive;
+}
+
 namespace moho
 {
   class Sim;
@@ -62,6 +68,24 @@ namespace moho
      * this helper's current work item has finished.
      */
     [[nodiscard]] bool UpdateWorkProgress();
+
+    /**
+     * Address: 0x005FE540 (FUN_005FE540, Moho::CBuildTaskHelper::MemberDeserialize)
+     *
+     * What it does:
+     * Restores helper owner links, focus weak pointer, and runtime progress
+     * lanes from one archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005FE610 (FUN_005FE610, Moho::CBuildTaskHelper::MemberSerialize)
+     *
+     * What it does:
+     * Stores helper owner links, focus weak pointer, and runtime progress
+     * lanes into one archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
     Unit* mUnit;                 // 0x00

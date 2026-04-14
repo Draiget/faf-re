@@ -1,47 +1,31 @@
 ﻿# FAF-RE
 
-Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries.
+Reconstruction/disassembly project for the old **Supreme Commander: Forged Alliance** engine and game binaries. Inspired by [Forged Alliance Forever](https://faforever.com) team-work.
 
-## Recovery Coverage (2026-04-13, `fa_full_2026_03_26`)
+## Recovery Coverage (`14/04/2026`, `fa_full_2026_03_26`)
 
 Progress snapshot:
 
-- Total FAF functions (IDA index): `67,153`
-- Recovered so far (source annotations, in-scope families): `7,326`
-- **Coverage (moho + gpg + external): `55.41%`**
+- Total FAF functions: `67,168`
+  - *IDA index, exported*
+- Progress coverage:  **`50.20%`**
+  - *Consists of `recovered` + `skip` + `external_dependency` ÷ exported*
+  - *Total amount of recovered functions: `35,916`*
 
-Namespace families:
+Progress DB status breakdown: 
 
-- `moho`: `5,520/8,717 (63.32%)`
-- `gpg`: `1,417/2,172 (65.24%)`
-- `external`: `375/2,328 (16.11%)`
+- `recovered`: `25,269` (70.36%)
+- `skip`: `4,798` (13.36%) — CRT-internal / compiler-generated
+- `external_dependency`: `3,654` (10.17%) — third-party libs 
+  - *libpng, zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, CRI Sofdec/ADX, undname, bugsplat, CRT helpers*
+- `needs_evidence`: `1,753` (4.88%)
+- **`blocked`: `440` (1.23%)** 
+  - *strict circular/dep-blocked*
+  - *Consists of `needs_evidence`, combined with `needs_evidence`;
+  - *"not-yet-recovered non-external" bucket: `2,193`* 
+    *— functions previously attempted that depend on an unrecovered subsystem, a not-yet-typed owner class, or a non-trivial call-tree not yet walked bottom-up.*
 
-External dependency status (progress):
-
-- `wxWidgets`: `125/1,359 (9.20%)`
-- `MSVC STL/CRT`: `51/398 (12.81%)`
-- `WildMagic`: `42/387 (10.85%)` — consolidated as upstream `external_dependency` (see [`dependencies/patches/wildmagic3p8_faf_required.md`](dependencies/patches/wildmagic3p8_faf_required.md))
-- `LuaPlus/Lua`: `157/184 (85.33%)`
-
-Progress DB status breakdown (`decomp/recovery/recovered_progress.json`, `fa_full_2026_03_26`):
-
-- `recovered`: `24,780` (70.14%)
-- `skip`: `4,738` (13.41%) — CRT-internal / compiler-generated
-- `external_dependency`: `2,855` (8.08%) — third-party libs (libpng,
-  zlib, wxWidgets, LuaPlus/Lua, boost, MSVC STL, CRI Sofdec/ADX, undname,
-  bugsplat) and CRT helpers
-- `needs_evidence`: `2,048` (5.80%)
-- **`blocked`: `908` (2.57%)** — functions previously attempted that
-  depend on an unrecovered subsystem, a not-yet-typed owner class, or
-  a non-trivial call-tree not yet walked bottom-up. The remaining
-  blocked bucket is dominated by large single-function engine work
-  (UI dialogs, Sim bootstrap, large Unit/command state machines,
-  shader/material caches) plus a few Moho typed-owner bundles
-  (CFormationInstance layout, CUnitAssistMoveTask Execute path) that
-  each need a dedicated recovery pass.
-- **Total tracked in progress DB: `35,328`**
-
-## Patch + Build Quickstart
+## Build Quickstart + Paches
 
 Use a Visual Studio developer shell before `msbuild`:
 
@@ -72,9 +56,10 @@ powershell -ExecutionPolicy Bypass -File scripts\build_sdk_with_timeout.ps1 -Tim
 
 Patch/build details:
 
-- `dependencies/patches/boost_1_34_1_faf_required.md`
-- `dependencies/patches/wxwindows_2_4_2_faf_required.md`
-- `scripts/build_sdk_with_timeout.md`
+- [boost_1_34_1_faf_required.md](dependencies/patches/boost_1_34_1_faf_required.md)
+- [luaplus_build1081_faf_required.md](dependencies/patches/luaplus_build1081_faf_required.md)
+- [wildmagic3p8_faf_required.md](dependencies/patches/wildmagic3p8_faf_required.md)
+- [wxwindows_2_4_2_faf_required.md](dependencies/patches/wxwindows_2_4_2_faf_required.md)
 
 ## Known Dependencies in FAF
 
@@ -97,3 +82,10 @@ Patch/build details:
 ## Notes
 
 - `USE_X87_COMPATIBILITY`: keeps x87-compatible floating-point behavior where needed.
+
+## Credits
+
+Big thanks to all active maintainers and contributors of the FAF project. This work builds on many years of engine inspection and disassembly effort by the FAF community, with special recognition to:
+
+- [Hdt80bro](https://github.com/Hdt80bro)
+- [4z0t](https://github.com/4z0t)

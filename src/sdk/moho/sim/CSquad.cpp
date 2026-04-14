@@ -11,6 +11,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/STIMap.h"
 #include "moho/unit/core/Unit.h"
 
 #ifdef _MSC_VER
@@ -24,6 +25,20 @@
 namespace moho
 {
   gpg::RType* CSquad::sType = nullptr;
+
+  namespace
+  {
+    [[nodiscard]] EOccupancyCaps ClearSubCapsForWaterLayer(EOccupancyCaps caps, const ELayer layer) noexcept
+    {
+      if (layer != LAYER_Water) {
+        return caps;
+      }
+
+      return static_cast<EOccupancyCaps>(
+        static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
+      );
+    }
+  } // namespace
 
   /**
    * Address: 0x00723E70 (FUN_00723E70, Moho::CSquad::CSquad)
@@ -139,5 +154,82 @@ namespace moho
         break;
       }
     }
+  }
+
+  /**
+   * Address: 0x00724550 (FUN_00724550, Moho::CSquad::FitsAt)
+   *
+   * IDA signature:
+   * char __stdcall Moho::CSquad::FitsAt(Moho::CSquad *this, Wm3::Vector3f *pos);
+   *
+   * What it does:
+   * Iterates all live squad units, computes each unit footprint's origin cell
+   * for `position`, and returns false as soon as one unit cannot satisfy its
+   * motion-type occupancy-cap requirement.
+   */
+  bool CSquad::FitsAt(const Wm3::Vec3f& position) const
+  {
+    COGrid* const occupancyGrid = mSim->mOGrid;
+
+    for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
+      Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*slot);
+      if (unit == nullptr || unit->IsDead()) {
+        continue;
+      }
+
+      const SFootprint& footprint = unit->GetFootprint();
+      SOCellPos cellPos{};
+      cellPos.x = static_cast<std::int16_t>(
+        static_cast<int>(position.x - static_cast<float>(footprint.mSizeX) * 0.5f)
+      );
+      cellPos.z = static_cast<std::int16_t>(
+        static_cast<int>(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f)
+      );
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      switch (blueprint->Physics.MotionType) {
+      case RULEUMT_Land:
+      case RULEUMT_Biped: {
+        EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *occupancyGrid->sim->mMapData, cellPos);
+        occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mCurrentLayer);
+        const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*occupancyGrid, cellPos, footprint, occupancyCaps);
+        if ((static_cast<std::uint8_t>(fitCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)) == 0u) {
+          return false;
+        }
+        break;
+      }
+
+      case RULEUMT_Water:
+      case RULEUMT_SurfacingSub: {
+        EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *occupancyGrid->sim->mMapData, cellPos);
+        occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mCurrentLayer);
+        const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*occupancyGrid, cellPos, footprint, occupancyCaps);
+        if ((static_cast<std::uint8_t>(fitCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) == 0u) {
+          return false;
+        }
+        break;
+      }
+
+      case RULEUMT_Amphibious:
+      case RULEUMT_Hover:
+      case RULEUMT_AmphibiousFloating: {
+        const EOccupancyCaps fitCaps = OCCUPY_HoverFootprintFits(
+          cellPos,
+          *occupancyGrid,
+          footprint,
+          static_cast<EOccupancyCaps>(static_cast<std::uint8_t>(unit->mCurrentLayer))
+        );
+        if (static_cast<std::uint8_t>(fitCaps) == 0u) {
+          return false;
+        }
+        break;
+      }
+
+      default:
+        break;
+      }
+    }
+
+    return true;
   }
 } // namespace moho

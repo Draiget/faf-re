@@ -15,6 +15,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/intel/CIntel.h"
+#include "moho/particles/SWorldBeam.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/CInfluenceMap.h"
@@ -2011,6 +2012,26 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
 
   const bool belowWater = ent->mCurrentLayer == LAYER_Seabed || ent->mCurrentLayer == LAYER_Sub;
   return GetReconFlags(ent, pos, oldFlags, belowWater);
+}
+
+/**
+ * Address: 0x00655610 (FUN_00655610, Moho::CAiReconDBImpl::BeamIsVisible)
+ *
+ * What it does:
+ * Probes LOS at the far beam endpoint selected by `mFromStart`.
+ */
+bool CAiReconDBImpl::BeamIsVisible(const SWorldBeam& beam) const
+{
+  if (beam.mFromStart) {
+    return ReconCanDetect(beam.mCurEnd.pos_, RECON_LOSNow) != RECON_None;
+  }
+
+  Wm3::Vec3f beamEndProbe{
+    beam.mCurStart.pos_.x + beam.mEnd.x,
+    beam.mCurStart.pos_.y + beam.mEnd.y,
+    beam.mCurStart.pos_.z + beam.mEnd.z,
+  };
+  return ReconCanDetect(beamEndProbe, RECON_LOSNow) != RECON_None;
 }
 
 /**

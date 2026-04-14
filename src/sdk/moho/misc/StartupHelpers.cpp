@@ -205,9 +205,76 @@ namespace
   extern "C" void SFD_AnalyCreInf(const char* buffer, std::int32_t size, SofdecCreateInfoRuntimeView* outInfo);
   extern "C" std::int32_t mwsfcre_DecideFtypeByHdrInf(const SofdecCreateInfoRuntimeView* headerInfo);
   extern "C" std::int32_t mwsfdcre_IsPlayableByHdrInf(const SofdecHeaderInfoRuntimeView* headerInfo);
+  /**
+   * Address: 0x00ACA8E0 (FUN_00ACA8E0, _MWSFFRM_AnalyzeSofdecHeader)
+   *
+   * What it does:
+   * Scans Sofdec header chunks starting at the second 2 KiB block and fills the runtime header lanes when a valid
+   * Sofdec stream marker is found.
+   */
   extern "C" void
     MWSFFRM_AnalyzeSofdecHeader(const char* buffer, std::int32_t size, SofdecHeaderInfoRuntimeView* headerInfo);
   extern "C" void MWSFSVM_Error(const char* message);
+
+  struct SofdecHeaderAnalyzerRuntimeView;
+
+  extern "C" SofdecHeaderAnalyzerRuntimeView* SFH_Create(int bufferAddress, int remainingBytes);
+  extern "C" int SFH_Destroy(SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" int SFH_IsSfdHeader(SofdecHeaderAnalyzerRuntimeView* handle, unsigned int* success);
+  extern "C" int mwsffrm_AnalyTotalFrm(SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" int mwsffrm_AnalyFxType(SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" int mwsffrm_GetNumVideoCh(SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" int mwsffrm_GetNumAudioCh(SofdecHeaderAnalyzerRuntimeView* handle);
+
+  /**
+   * Address: 0x00ACA8E0 (FUN_00ACA8E0, _MWSFFRM_AnalyzeSofdecHeader)
+   *
+   * What it does:
+   * Scans Sofdec header chunks starting at the second 2 KiB block, validates the header marker, and populates the
+   * runtime Sofdec header lanes with frame count, composition mode, and audio/video channel counts.
+   */
+  extern "C" void MWSFFRM_AnalyzeSofdecHeader(
+    const char* const buffer,
+    const std::int32_t size,
+    SofdecHeaderInfoRuntimeView* const headerInfo
+  )
+  {
+    headerInfo->frameCount = -1;
+
+    if (size < 2048 || buffer == nullptr) {
+      return;
+    }
+
+    std::int32_t chunkIndex = 2;
+    const char* chunkCursor = buffer + 2048;
+    std::int32_t remainingSize = size - 2048;
+
+    do {
+      SofdecHeaderAnalyzerRuntimeView* const handle = SFH_Create(
+        static_cast<int>(reinterpret_cast<std::uintptr_t>(chunkCursor)),
+        remainingSize
+      );
+      if (handle != nullptr) {
+        unsigned int headerKind = 0;
+        if (SFH_IsSfdHeader(handle, &headerKind) == 1 && headerKind == 1) {
+          headerInfo->frameCount = mwsffrm_AnalyTotalFrm(handle);
+          headerInfo->reserved18 = mwsffrm_AnalyFxType(handle);
+          headerInfo->reserved1C = mwsffrm_GetNumVideoCh(handle);
+          headerInfo->reserved20 = mwsffrm_GetNumAudioCh(handle);
+          SFH_Destroy(handle);
+          return;
+        }
+
+        headerInfo->frameCount = -1;
+        headerInfo->reserved18 = -1;
+        SFH_Destroy(handle);
+      }
+
+      ++chunkIndex;
+      remainingSize -= 2048;
+      chunkCursor += 2048;
+    } while (chunkIndex <= 3);
+  }
 
   /**
    * Address: 0x00AC8DF0 (FUN_00AC8DF0, mwPlyGetHdrInf)
@@ -1383,7 +1450,15 @@ namespace
       mRoot.AssignNewTable(&mState, 0, 0);
     }
 
-    ~CUserPrefsRuntime() = default;
+    /**
+     * Address: 0x008C74A0 (FUN_008C74A0, Moho::IUserPrefs::~IUserPrefs)
+     * Mangled: ??1IUserPrefs@Moho@@UAE@XZ
+     *
+     * What it does:
+     * Tears down user-preferences runtime storage (Lua root/state and profile
+     * string lanes) before restoring base interface vftable ownership.
+     */
+    ~CUserPrefsRuntime();
 
     msvc8::string* GetStr1() override
     {
@@ -1447,7 +1522,7 @@ namespace
      */
     std::uint32_t GetHex(const msvc8::string& key, const std::uint32_t fallback) override
     {
-      const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
+      const LuaPlus::LuaObject value = LookupKeyObject(key);
       if (!value.IsConvertibleToString()) {
         return fallback;
       }
@@ -1464,42 +1539,50 @@ namespace
       return static_cast<std::uint32_t>(gpg::STR_Xtoi(hexText));
     }
 
+    /**
+     * Address: 0x008C7880 (FUN_008C7880, Moho::CUserPrefs::GetString)
+     *
+     * What it does:
+     * Reads one preference value from the local root table and returns either
+     * the resolved string value or the provided fallback when key lookup is nil.
+     */
     msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) override
     {
-      msvc8::string valueAsString;
-      valueAsString = fallback;
-
-      const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
-      if (TryGetStringFromLuaValue(value, &valueAsString)) {
-        return valueAsString;
+      const LuaPlus::LuaObject value = LookupKeyObject(key);
+      if (value.IsNil()) {
+        return fallback;
       }
 
-      return fallback;
+      msvc8::string outValue;
+      outValue.assign_owned(value.GetString());
+      return outValue;
     }
 
+    /**
+     * Address: 0x008C7980 (FUN_008C7980, Moho::CUserPrefs::GetStringArr)
+     *
+     * What it does:
+     * Starts from one fallback string-array copy, then appends each string from
+     * the local root table value when the resolved key is a Lua array-table.
+     */
     msvc8::vector<msvc8::string>
     GetStringArr(const msvc8::string& key, const msvc8::vector<msvc8::string>& fallback) override
     {
-      const LuaPlus::LuaObject value = QueryOptionValueWithLocalOverride(&mRoot, key);
+      msvc8::vector<msvc8::string> outValues = fallback;
+
+      const LuaPlus::LuaObject value = LookupKeyObject(key);
       if (value.IsNil() || !value.IsTable()) {
-        return fallback;
+        return outValues;
       }
 
-      msvc8::vector<msvc8::string> outValues;
       const int count = value.GetN();
-      if (count <= 0) {
-        return fallback;
-      }
-
       for (int index = 1; index <= count; ++index) {
         msvc8::string itemValue;
-        if (!TryGetStringFromLuaValue(value.GetByIndex(index), &itemValue)) {
-          continue;
-        }
+        itemValue.assign_owned(value.GetByIndex(index).GetString());
         outValues.push_back(itemValue);
       }
 
-      return outValues.empty() ? fallback : outValues;
+      return outValues;
     }
 
     void SetBoolean(const msvc8::string& key, const bool value) override
@@ -1517,6 +1600,13 @@ namespace
       SetPreferenceNumberRecursive(&mState, &mRoot, key, value);
     }
 
+    /**
+     * Address: 0x008C7DD0 (FUN_008C7DD0, Moho::CUserPrefs::SetHex)
+     *
+     * What it does:
+     * Formats one unsigned integer as `0x%08x` and writes it through the
+     * recursive string preference setter.
+     */
     void SetHex(const msvc8::string& key, const std::uint32_t value) override
     {
       const msvc8::string valueText = gpg::STR_Printf("0x%08x", static_cast<unsigned int>(value));
@@ -1627,6 +1717,16 @@ namespace
     LuaPlus::LuaState mState;
     LuaPlus::LuaObject mRoot;
   };
+
+  /**
+   * Address: 0x008C74A0 (FUN_008C74A0, Moho::IUserPrefs::~IUserPrefs)
+   * Mangled: ??1IUserPrefs@Moho@@UAE@XZ
+   *
+   * What it does:
+   * Tears down user-preferences runtime storage (Lua root/state and profile
+   * string lanes) before restoring base interface vftable ownership.
+   */
+  CUserPrefsRuntime::~CUserPrefsRuntime() = default;
 
   static_assert(sizeof(CUserPrefsRuntime) == 0x84, "CUserPrefsRuntime size must be 0x84");
 } // namespace
@@ -5695,4 +5795,3 @@ void moho::CreateDeviceD3D(gpg::gal::DeviceContext* const context)
     gpg::Warnf("CreateDeviceD3D: backend device instance is unavailable for type %d.", context->mDeviceType);
   }
 }
-

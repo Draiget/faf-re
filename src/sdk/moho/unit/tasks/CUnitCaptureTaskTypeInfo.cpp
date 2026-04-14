@@ -30,5 +30,21 @@ namespace moho
     auto* const task = new (std::nothrow) CUnitCaptureTask();
     return gpg::RRef{task, CachedCUnitCaptureTaskType()};
   }
-} // namespace moho
 
+  /**
+   * Address: 0x006054A0 (FUN_006054A0, Moho::CUnitCaptureTaskTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Constructs one `CUnitCaptureTask` in caller-provided storage and returns a
+   * typed reflection ref.
+   */
+  gpg::RRef CUnitCaptureTaskTypeInfo::CtrRef(void* const objectStorage)
+  {
+    CUnitCaptureTask* task = nullptr;
+    if (objectStorage != nullptr) {
+      task = new (objectStorage) CUnitCaptureTask();
+    }
+
+    return gpg::RRef{task, CachedCUnitCaptureTaskType()};
+  }
+} // namespace moho

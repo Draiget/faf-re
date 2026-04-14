@@ -1,5 +1,6 @@
 #include "moho/sim/CEconStorage.h"
 
+#include <new>
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
@@ -8,8 +9,26 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/sim/CEconomy.h"
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 namespace
 {
+  [[nodiscard]] gpg::RType* CachedCEconStorageType()
+  {
+    static gpg::RType* cached = nullptr;
+    if (cached == nullptr) {
+      cached = gpg::LookupRType(typeid(moho::CEconStorage));
+    }
+    return cached;
+  }
+
   [[nodiscard]] gpg::RType* CachedSEconValueType()
   {
     if (moho::SEconValue::sType == nullptr) {
@@ -55,6 +74,53 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00773500 (FUN_00773500, Moho::CEconStorage::MemberConstruct)
+   *
+   * What it does:
+   * Allocates one `CEconStorage`, zero-initializes owner/value lanes, and
+   * publishes the object as an unowned construct result.
+   */
+  void CEconStorage::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
+  {
+    auto* const storage = new (std::nothrow) CEconStorage{};
+
+    gpg::RRef storageRef{};
+    storageRef.mObj = storage;
+    storageRef.mType = CachedCEconStorageType();
+    result.SetUnowned(storageRef, 0u);
+  }
+
+  /**
+   * Address: 0x007732C0 (FUN_007732C0, Moho::CEconStorage::Chng)
+   *
+   * What it does:
+   * Applies this storage lane as a signed delta (`direction` is typically
+   * `+1` or `-1`) into owning economy max-storage counters.
+   */
+  std::int64_t CEconStorage::Chng(const std::int32_t direction)
+  {
+    if (mEconomy == nullptr) {
+      return 0;
+    }
+
+    const std::int64_t signedDirection = static_cast<std::int64_t>(direction);
+    const float amounts[2] = {mAmt.energy, mAmt.mass};
+    std::uint64_t* const totals[2] = {&mEconomy->mTotals.mMaxStorage.ENERGY, &mEconomy->mTotals.mMaxStorage.MASS};
+
+    std::int64_t result = 0;
+    for (int lane = 0; lane < 2; ++lane) {
+      result = static_cast<std::int64_t>(amounts[lane]) * signedDirection;
+      *totals[lane] += static_cast<std::uint64_t>(result);
+    }
+    return result;
+  }
+
   /**
    * Address: 0x00774990 (FUN_00774990, Moho::CEconStorage::MemberDeserialize)
    *

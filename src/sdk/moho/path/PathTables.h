@@ -13,26 +13,33 @@ namespace moho
   struct PathTablesImpl;
 
   /**
-   * Recovered placeholder for `Moho::PathQueue` — used by
-   * `gpg::RRef_PathQueue` (FUN_005ACCA0) and as a forward-declared type
-   * referenced by `gpg::ReadArchive` and several path-finder lanes.
-   * The complete-object size and field layout have not yet been
-   * confirmed from binary evidence; the class is given a single
-   * `std::uintptr_t` body so it remains a complete C++ type for
-   * `typeid()` use.
+   * Runtime queue owner used by per-army pathfinder lanes.
    *
-   * Note: the binary's `PathQueue::DirtyClusters` method is currently
-   * recovered on the sibling `PathTables::DirtyClusters` slot — those
-   * may be the same class with two decompiler-pass names.
+   * Layout evidence currently confirms the outer pointer-sized owner and
+   * constructor behavior. Deeper `Impl` payload fields are reconstructed in
+   * `PathTables.cpp` from the `FUN_00765B20/FUN_00765B90/FUN_00766CE0`
+   * constructor chain.
    */
   class PathQueue
   {
   public:
     static gpg::RType* sType;
 
+    /**
+     * Address: 0x00765D30 (FUN_00765D30, ??0PathQueue@Moho@@QA@Z)
+     *
+     * What it does:
+     * Allocates one `PathQueue::Impl` payload and stores the caller-supplied
+     * queue-size lane in the impl header.
+     */
+    explicit PathQueue(int size);
+
+    struct Impl;
+
   private:
-    std::uintptr_t mPlaceholderState{};
+    Impl* mImpl{};
   };
+  static_assert(sizeof(PathQueue) == 0x04, "PathQueue size must be 0x04");
 
   class PathTables
   {

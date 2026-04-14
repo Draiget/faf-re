@@ -51,9 +51,78 @@ namespace moho
         destination.assign_owned(fallbackName);
       }
     }
+
+    /**
+     * Address: 0x0051A3D0 (FUN_0051A3D0)
+     *
+     * What it does:
+     * Builds one `gpg::RRef` lane for an `RMeshBlueprint*` and writes it into
+     * caller-provided storage.
+     */
+    [[nodiscard]] gpg::RRef* BuildMeshBlueprintRef(gpg::RRef* const out, RMeshBlueprint* const object)
+    {
+      GPG_ASSERT(out != nullptr);
+      if (!out) {
+        return nullptr;
+      }
+
+      gpg::RRef temp{};
+      (void)gpg::RRef_RMeshBlueprint(&temp, object);
+      out->mObj = temp.mObj;
+      out->mType = temp.mType;
+      return out;
+    }
   } // namespace
 
   gpg::RType* RMeshBlueprint::sType = nullptr;
+
+  /**
+   * Address: 0x005183D0 (FUN_005183D0)
+   * Mangled: ??0RMeshBlueprintLOD@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Default-initializes one mesh LOD descriptor with empty string lanes,
+   * default cutoff, and disabled bool flags.
+   */
+  RMeshBlueprintLOD::RMeshBlueprintLOD()
+    : mMeshName()
+    , mAlbedoName()
+    , mNormalsName()
+    , mSpecularName()
+    , mLookupName()
+    , mSecondaryName()
+    , mShaderName()
+    , mLodCutoff(1000.0f)
+    , mScrolling(0)
+    , mOcclude(0)
+    , mSilhouette(0)
+    , mPadCB(0)
+  {
+  }
+
+  /**
+   * Address: 0x0051A0F0 (FUN_0051A0F0, Moho::RMeshBlueprintLOD::RMeshBlueprintLOD)
+   * Mangled: ??0RMeshBlueprintLOD@Moho@@QAE@ABV01@@Z
+   *
+   * What it does:
+   * Copy-constructs one mesh LOD descriptor including all path string lanes
+   * and scalar flags.
+   */
+  RMeshBlueprintLOD::RMeshBlueprintLOD(const RMeshBlueprintLOD& other)
+    : mMeshName(other.mMeshName)
+    , mAlbedoName(other.mAlbedoName)
+    , mNormalsName(other.mNormalsName)
+    , mSpecularName(other.mSpecularName)
+    , mLookupName(other.mLookupName)
+    , mSecondaryName(other.mSecondaryName)
+    , mShaderName(other.mShaderName)
+    , mLodCutoff(other.mLodCutoff)
+    , mScrolling(other.mScrolling)
+    , mOcclude(other.mOcclude)
+    , mSilhouette(other.mSilhouette)
+    , mPadCB(other.mPadCB)
+  {
+  }
 
   /**
    * Address: 0x00518870 (FUN_00518870)
@@ -112,8 +181,7 @@ namespace moho
   gpg::RRef RMeshBlueprint::GetDerivedObjectRef()
   {
     gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
+    (void)BuildMeshBlueprintRef(&out, this);
     return out;
   }
 

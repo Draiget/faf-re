@@ -20,6 +20,7 @@ namespace moho
 {
   class INetTCPSocket;
   class INetTCPServer;
+  struct SClientBottleneckInfo;
 
   struct SNetCommandArg
   {
@@ -56,6 +57,24 @@ namespace moho
     msvc8::string mName;
     msvc8::vector<SNetCommandArg> mArgs;
     int mVal{0};
+
+    /**
+     * Address: 0x007B6720 (FUN_007B6720, ??0SNetCommand@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one queued command entry with copied name, argument vector,
+     * and value lanes.
+     */
+    SNetCommand(const char* name, const msvc8::vector<SNetCommandArg>& args, int val);
+
+    /**
+     * Address: 0x007BAEF0 (FUN_007BAEF0, ??1SNetCommand@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Destroys argument/vector storage and string payload lanes for one queued
+     * command entry.
+     */
+    ~SNetCommand();
   };
   static_assert(sizeof(SNetCommand) == 0x30, "SNetCommand size must be 0x30");
 
@@ -69,6 +88,15 @@ namespace moho
      * Address: 0x007B6800
      */
     CGpgNetInterface();
+
+    /**
+     * Address: 0x007BCA70 (FUN_007BCA70, Moho::CGpgNetInterface::CreatePtr)
+     *
+     * What it does:
+     * Creates one owning `boost::shared_ptr<CGpgNetInterface>` from a raw
+     * instance pointer and binds `enable_shared_from_this` ownership lanes.
+     */
+    [[nodiscard]] static boost::shared_ptr<CGpgNetInterface> CreatePtr(CGpgNetInterface* inter);
 
     /**
      * Address: 0x007B68C0 (FUN_007B68C0 deleting wrapper)
@@ -365,22 +393,36 @@ namespace moho
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
 
   /**
-   * Address context:
-   * - process-global GPGNet shared-pointer lane (`sGPGNet`).
+   * Address: 0x007B9470 (FUN_007B9470, Moho::GPGNET_SetPtr)
    *
    * What it does:
-   * Replaces the active process-global GPGNet interface pointer.
+   * Replaces the process-global GPGNet shared-pointer lane (`sGPGNet`).
    */
   void GPGNET_SetPtr(const boost::shared_ptr<CGpgNetInterface>& ptr);
 
   /**
-   * Address context:
-   * - process-global GPGNet shared-pointer lane (`sGPGNet`).
-   *
    * What it does:
    * Returns the active process-global GPGNet interface pointer.
    */
   [[nodiscard]] boost::shared_ptr<CGpgNetInterface> GPGNET_GetPtr();
+
+  /**
+   * Address: 0x007B94C0 (FUN_007B94C0, ?GPGNET_ReportBottleneck@Moho@@YAXABUSClientBottleneckInfo@1@@Z)
+   *
+   * What it does:
+   * Formats one bottleneck report payload and sends `"Bottleneck"` through
+   * the active process-global GPGNet interface.
+   */
+  void GPGNET_ReportBottleneck(const SClientBottleneckInfo& info);
+
+  /**
+   * Address: 0x007B9A20 (FUN_007B9A20, Moho::GPGNET_ReportBottleneckCleared)
+   *
+   * What it does:
+   * Sends one `"BottleneckCleared"` command through the active process-global
+   * GPGNet interface pointer (when available).
+   */
+  void GPGNET_ReportBottleneckCleared();
 
   /**
    * Address: 0x007B9AC0 (FUN_007B9AC0, Moho::GPGNET_ReportDesync)
@@ -409,10 +451,11 @@ namespace moho
   void GPGNET_Attach(u_long addr, u_short port);
 
   /**
-   * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ)
+   * Address: 0x007B9DD0 (FUN_007B9DD0, ?GPGNET_Shutdown@Moho@@YAXXZ thunk)
+   * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ body)
    *
    * What it does:
-   * Shuts down and clears the process-global GPGNet interface pointer.
+   * Clears the process-global GPGNet interface shared-pointer lane.
    */
   void GPGNET_Shutdown();
 

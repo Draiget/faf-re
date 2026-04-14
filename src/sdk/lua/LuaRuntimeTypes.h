@@ -66,6 +66,24 @@ struct Udata
 	lu_byte marked;
 	Table* metatable;
 	size_t len;
+
+	/**
+	 * Address: 0x009207E0 (FUN_009207E0, Udata::MemberSerialize)
+	 *
+	 * What it does:
+	 * Serializes userdata metatable pointer lane and typed payload bytes using
+	 * one owning Lua thread reference as archive owner context.
+	 */
+	static void MemberSerialize(gpg::WriteArchive* archive, Udata* object, int version, gpg::RRef* ownerRef);
+
+	/**
+	 * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
+	 *
+	 * What it does:
+	 * Deserializes userdata metatable pointer lane and payload bytes under one
+	 * owning Lua thread traversal lock context.
+	 */
+	static void MemberDeserialize(gpg::ReadArchive* archive, Udata* object, int version, const gpg::RRef& ownerRef);
 };
 
 struct CClosure
@@ -149,6 +167,15 @@ struct LClosure
 	LuaPlus::TObject g; // Closure environment/global table.
 	Proto* p;
 	UpVal* upvals[3];
+
+	/**
+	 * Address: 0x00922AB0 (FUN_00922AB0, LClosure::MemberDeserialize)
+	 *
+	 * What it does:
+	 * Deserializes prototype/global-object/upvalue pointer lanes for one
+	 * Lua closure object.
+	 */
+	static void MemberDeserialize(gpg::ReadArchive* archive, LClosure* object, int version, const gpg::RRef& ownerRef);
 };
 
 union Closure

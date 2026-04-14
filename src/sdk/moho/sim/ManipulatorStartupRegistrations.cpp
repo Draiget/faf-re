@@ -5,7 +5,9 @@
 #include <cstring>
 #include <vector>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAimManipulator.h"
 #include "moho/ai/CAimManipulatorSerializer.h"
@@ -126,12 +128,26 @@ namespace
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
   };
 
   using VectorBoolStorage = moho::SBitStorage32;
+
+  template <class TObject>
+  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
+
+  template <class TObject>
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<const TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
 
   alignas(RVectorTypeBool) unsigned char gRecoveredRVectorTypeBoolStorage[sizeof(RVectorTypeBool)] = {};
   bool gRecoveredRVectorTypeBoolConstructed = false;
@@ -248,6 +264,68 @@ namespace
   {
     size_ = sizeof(VectorBoolStorage);
     version_ = 1;
+    serLoadFunc_ = &RVectorTypeBool::SerLoad;
+    serSaveFunc_ = &RVectorTypeBool::SerSave;
+  }
+
+  /**
+   * Address: 0x00641F70 (FUN_00641F70, gpg::RVectorType_bool::SerLoad)
+   *
+   * What it does:
+   * Reads packed boolean bit-count/value lanes from archive payload and
+   * replaces destination `SBitStorage32` storage in one transfer.
+   */
+  void RVectorTypeBool::SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  {
+    auto* const storage = PointerFromArchiveInt<VectorBoolStorage>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    unsigned int bitCount = 0;
+    archive->ReadUInt(&bitCount);
+
+    VectorBoolStorage loaded{};
+    loaded.Resize(bitCount, false);
+    for (unsigned int bitIndex = 0; bitIndex < bitCount; ++bitIndex) {
+      bool value = false;
+      archive->ReadBool(&value);
+      loaded.SetBit(bitIndex, value);
+    }
+
+    std::uint32_t* const oldWords = storage->mWords;
+    storage->mBitCount = loaded.mBitCount;
+    storage->mWords = loaded.mWords;
+    storage->mWordsEnd = loaded.mWordsEnd;
+    storage->mWordsCapacityEnd = loaded.mWordsCapacityEnd;
+    if (oldWords != nullptr) {
+      ::operator delete(oldWords);
+    }
+  }
+
+  /**
+   * Address: 0x006420A0 (FUN_006420A0, gpg::RVectorType_bool::SerSave)
+   *
+   * What it does:
+   * Writes packed boolean bit-count/value lanes to archive payload in index
+   * order from one `SBitStorage32` source.
+   */
+  void RVectorTypeBool::SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const)
+  {
+    const auto* const storage = ConstPointerFromArchiveInt<VectorBoolStorage>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(storage != nullptr);
+    if (!archive || !storage) {
+      return;
+    }
+
+    const unsigned int bitCount = storage->mBitCount;
+    archive->WriteUInt(bitCount);
+    for (unsigned int bitIndex = 0; bitIndex < bitCount; ++bitIndex) {
+      archive->WriteBool(storage->TestBit(bitIndex));
+    }
   }
 
   gpg::RRef RVectorTypeBool::SubscriptIndex(void* const obj, const int ind) const

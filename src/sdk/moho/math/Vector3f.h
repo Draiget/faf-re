@@ -14,6 +14,15 @@ namespace moho
   [[nodiscard]] const T& Invalid();
 
   /**
+   * Address: 0x005B1C90 (FUN_005B1C90, func_VecSetLengthS)
+   *
+   * What it does:
+   * Scales a 3D vector in place so its length matches the requested target
+   * length.
+   */
+  [[nodiscard]] bool VecSetLength(Wm3::Vector3f* vector, float targetLength);
+
+  /**
    * Address: 0x00570750 (FUN_00570750, Moho::EulerRollToQuat)
    *
    * What it does:

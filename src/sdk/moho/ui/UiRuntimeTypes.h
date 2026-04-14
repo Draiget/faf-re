@@ -466,6 +466,15 @@ namespace moho
     void SetTexture(const char* texturePath);
 
     /**
+     * Address: 0x0078CD80 (FUN_0078CD80, Moho::CMauiCursor::SetDefaultTexture)
+     *
+     * What it does:
+     * Loads one default cursor texture and swaps both active/default lanes when
+     * the active lane still points at the previous default.
+     */
+    void SetDefaultTexture(const char* texturePath);
+
+    /**
      * Address: 0x0078CEA0 (FUN_0078CEA0, Moho::CMauiCursor::ResetToDefault)
      *
      * What it does:
@@ -1067,7 +1076,15 @@ namespace moho
      */
     void Dump() override;
 
-    virtual ~CMauiEdit() = default;
+    /**
+     * Address: 0x0078F1B0 (FUN_0078F1B0, Moho::CMauiEdit::~CMauiEdit)
+     * Mangled: ??1CMauiEdit@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Releases edit text/font ownership lanes, clears click-dragger intrusive
+     * link nodes, and then tears down the `CMauiControl` base.
+     */
+    ~CMauiEdit() override;
 
   private:
     /**
@@ -1077,6 +1094,22 @@ namespace moho
      * Builds one Lua event payload and invokes `OnNonTextKeyPressed(key,event)`.
      */
     void NonTextKeyPressed(int keyCode, SMauiEventData* eventData);
+
+    /**
+     * Address: 0x007904D0 (FUN_007904D0, Moho::CMauiEdit::EnterPressed)
+     *
+     * What it does:
+     * Invokes `OnEnterPressed(self, text)` and returns the script bool result.
+     */
+    [[nodiscard]] bool EnterPressed();
+
+    /**
+     * Address: 0x007904F0 (FUN_007904F0, Moho::CMauiEdit::EscPressed)
+     *
+     * What it does:
+     * Invokes `OnEscPressed(self, text)` and returns the script bool result.
+     */
+    [[nodiscard]] bool EscPressed();
 
     /**
      * Address: 0x00790590 (FUN_00790590, Moho::CMauiEdit::DeleteSelection)
@@ -1144,6 +1177,26 @@ namespace moho
     CMauiFrame(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     /**
+     * Address: 0x00796460 (FUN_00796460, ??1CMauiFrame@Moho@@UAE@XZ)
+     * Deleting thunk: 0x00796440 (FUN_00796440, Moho::CMauiFrame::dtr)
+     *
+     * What it does:
+     * Purges pending deleted controls, releases one frame-owned wx event mapper,
+     * unlinks the deleted-control sentinel, and then tears down base control
+     * state.
+     */
+    ~CMauiFrame() override;
+
+    /**
+     * Address: 0x00796510 (FUN_00796510, Moho::CMauiFrame::PurgeDeleted)
+     *
+     * What it does:
+     * Deletes all controls queued in this frame's deleted-control intrusive
+     * list and restores the list to empty-sentinel state.
+     */
+    void PurgeDeleted();
+
+    /**
      * Address: 0x007961B0 (FUN_007961B0, Moho::CMauiFrame::Create)
      *
      * What it does:
@@ -1159,6 +1212,14 @@ namespace moho
      * Scans descendants and returns maximum control depth lane.
      */
     [[nodiscard]] float GetTopmostDepth();
+
+    /**
+     * Address: 0x00796720 (FUN_00796720, Moho::CMauiFrame::Dump)
+     *
+     * What it does:
+     * Logs base control debug state and this frame's event-handler lane id.
+     */
+    void Dump() override;
 
     /**
      * Address: 0x007870F0 (FUN_007870F0, Moho::CMauiFrame::DoRender)
@@ -1183,6 +1244,16 @@ namespace moho
      * initializes bitmap lazy-var/render state.
      */
     CMauiBitmap(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x00780270 (FUN_00780270, Moho::CMauiBitmap::Frame)
+     *
+     * What it does:
+     * Dispatches the bitmap `OnFrame` script callback and advances the active
+     * animation timer, wrapping to `OnPatternEnd()` when the current frame
+     * duration elapses.
+     */
+    void Frame(float deltaSeconds) override;
 
     /**
      * Address: 0x0077FCF0 (FUN_0077FCF0, Moho::CMauiBitmap::ShareTextures)
@@ -1295,6 +1366,14 @@ namespace moho
     CMauiHistogram(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
 
     virtual ~CMauiHistogram() = default;
+
+    /**
+     * Address: 0x00797900 (FUN_00797900, Moho::CMauiHistogram::Dump)
+     *
+     * What it does:
+     * Logs base control debug state plus one histogram class banner line.
+     */
+    void Dump() override;
   };
 
   class CMauiItemList : public CMauiControl
@@ -1607,6 +1686,15 @@ namespace moho
      * initializes border texture/lazy-var state.
      */
     CMauiBorder(LuaPlus::LuaObject* luaObject, CMauiControl* parent);
+
+    /**
+     * Address: 0x00784B40 (FUN_00784B40, Moho::CMauiBorder::~CMauiBorder)
+     *
+     * What it does:
+     * Releases border lazy-var/object texture lanes before base
+     * `CMauiControl` teardown.
+     */
+    ~CMauiBorder() override;
 
     /**
      * Address: 0x00784840 (FUN_00784840, Moho::CMauiBorder::StaticGetClass)

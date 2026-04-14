@@ -32,6 +32,16 @@ namespace moho
     CUnitCallTeleport(CCommandTask* parentTask, Unit* targetUnit);
 
     /**
+     * Address: 0x00600EF0 (FUN_00600EF0, Moho::CUnitCallTeleport::~CUnitCallTeleport)
+     *
+     * What it does:
+     * Clears call-teleport state flags on the owner unit, removes transport
+     * waiting/pickup links when needed, publishes dispatch result, and unlinks
+     * the weak transport-unit lane.
+     */
+    ~CUnitCallTeleport() override;
+
+    /**
      * Address: 0x00603CD0 (FUN_00603CD0)
      *
      * What it does:

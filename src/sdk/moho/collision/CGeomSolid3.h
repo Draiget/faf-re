@@ -5,6 +5,7 @@
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Box3.h"
 #include "Wm3Plane3.h"
+#include "Wm3Sphere3.h"
 
 namespace moho
 {
@@ -81,6 +82,17 @@ namespace moho
      * axis-aligned box in that local space.
      */
     [[nodiscard]] bool Intersects(const Wm3::Box3f& box) const;
+
+    /**
+     * Address: 0x00654010 (?Intersects@CGeomSolid3@Moho@@QBE_NABV?$Sphere3@M@Wm3@@@Z)
+     *
+     * Wm3::Sphere3<float> const&
+     *
+     * What it does:
+     * Returns true when the sphere center stays within all clipping planes by
+     * at most its radius.
+     */
+    [[nodiscard]] bool Intersects(const Wm3::Sphere3f& sphere) const;
 
     /**
      * Address: 0x00473660 (?Intersects@CGeomSolid3@Moho@@QBE_NABV?$AxisAlignedBox3@M@Wm3@@PAI@Z)

@@ -9,6 +9,8 @@
 
 namespace moho
 {
+  class CRandomStream;
+
   /**
    * Address: 0x0051BA00 (FUN_0051BA00)
    *
@@ -146,6 +148,17 @@ namespace moho
      * to a completed, lowercase, slash-normalized resource path.
      */
     void OnInitBlueprint();
+
+    /**
+     * Address: 0x0051C8C0 (FUN_0051C8C0)
+     * Mangled: ?GetAngularVelocity@RProjectileBlueprint@Moho@@QBE?AV?$Vector3@M@Wm3@@PAVCRandomStream@2@@Z
+     *
+     * What it does:
+     * Samples one random normalized axis and returns launch angular velocity
+     * in radians-per-second, using `Physics.RotationalVelocity` and symmetric
+     * random spread from `Physics.RotationalVelocityRange`.
+     */
+    [[nodiscard]] Wm3::Vector3f GetAngularVelocity(CRandomStream* randomStream) const;
   };
 
   static_assert(sizeof(RProjectileBlueprintDisplay) == 0x38, "RProjectileBlueprintDisplay size must be 0x38");

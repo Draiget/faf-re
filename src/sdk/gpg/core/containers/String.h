@@ -39,15 +39,28 @@ namespace gpg
   int STR_GetWordStartIndex(msvc8::string& str, int pos);                               // 0x009384A0
   int STR_GetNextWordStartIndex(msvc8::string& str, int pos);                           // 0x00938570
   bool STR_EndsWith(StrArg str, StrArg end);                                            // 0x00938190
-  bool STR_StartsWith(StrArg str, StrArg start);                                        // 0x00938210
+  /**
+   * Address: 0x00938210 (FUN_00938210, gpg::STR_StartsWith)
+   *
+   * What it does:
+   * Returns whether `str` begins with `start`.
+   */
+  bool STR_StartsWith(StrArg str, StrArg start);
   bool STR_EndsWithNoCase(StrArg str, StrArg end);                                      // 0x00938250
   bool STR_StartsWithNoCase(StrArg str, StrArg start);                                  // 0x009382B0
   bool STR_EqualsNoCaseN(StrArg lhs, StrArg rhs, std::size_t count);
   int STR_CompareNoCase(StrArg lhs, StrArg rhs);
   bool STR_ContainsNoCase(StrArg str, StrArg needle);
   bool STR_EqualsNoCase(StrArg lhs, StrArg rhs);
-  bool STR_IsIdent(StrArg str);                                                    // 0x009382F0
-  int STR_Replace(msvc8::string& str, StrArg what, StrArg with, unsigned int unk); // 0x00938B40
+  bool STR_IsIdent(StrArg str); // 0x009382F0
+  /**
+   * Address: 0x00938B40 (FUN_00938B40, gpg::STR_Replace)
+   *
+   * What it does:
+   * Replaces every occurrence of `what` in `str` with `with` while `unk` is
+   * non-zero, returning the number of replacements performed.
+   */
+  int STR_Replace(msvc8::string& str, StrArg what, StrArg with, unsigned int unk);
   int STR_ParseUInt32(StrArg str);                                                 // 0x00938150
   int STR_Xtoi(StrArg str);                                                        // 0x009380F0
   bool STR_IsAsciiWhitespace(char ch);
@@ -88,7 +101,14 @@ namespace gpg
    * Lowercases one path and normalizes `/` separators to `\\`.
    */
   void STR_CanonizeFilename(msvc8::string* out, StrArg in);
-  msvc8::string STR_TrimWhitespace(StrArg str); // 0x009388C0
+  /**
+   * Address: 0x009388C0 (FUN_009388C0, gpg::STR_TrimWhitespace)
+   *
+   * What it does:
+   * Trims leading/trailing ASCII whitespace (`' '`, `'\t'`, `'\r'`, `'\n'`)
+   * from one input C-string and returns the trimmed copy.
+   */
+  msvc8::string STR_TrimWhitespace(StrArg str);
 
   /**
    * Address: 0x00938F10 (FUN_00938F10)

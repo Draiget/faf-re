@@ -4,10 +4,12 @@
 #include "moho/ai/IAiAttackerSerializer.h"
 #include "moho/ai/IAiAttackerTypeInfo.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
@@ -92,6 +94,16 @@ namespace gpg
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
+
+    /**
+     * Address: 0x005DC660 (FUN_005DC660, gpg::RVectorType_CAcquireTargetTask_P::SerLoad)
+     *
+     * What it does:
+     * Deserializes one `msvc8::vector<moho::CAcquireTargetTask*>` payload from
+     * archive count + pointer lanes.
+     */
+    static void SerLoad(gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
+
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
     void SetCount(void* obj, int count) const override;
@@ -113,6 +125,12 @@ namespace
 
   using UnitWeaponPtrVector = msvc8::vector<moho::UnitWeapon*>;
   using CAcquireTargetTaskPtrVector = msvc8::vector<moho::CAcquireTargetTask*>;
+
+  template <class TObject>
+  [[nodiscard]] TObject* PointerFromArchiveInt(const int objectPtr)
+  {
+    return reinterpret_cast<TObject*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr)));
+  }
 
   alignas(BroadcasterAttackerType) unsigned char gBroadcasterAttackerTypeStorage[sizeof(BroadcasterAttackerType)];
   bool gBroadcasterAttackerTypeConstructed = false;
@@ -472,6 +490,42 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::Init()
 {
   size_ = sizeof(CAcquireTargetTaskPtrVector);
   version_ = 1;
+  serLoadFunc_ = &RVectorType_CAcquireTargetTaskPtr::SerLoad;
+}
+
+/**
+ * Address: 0x005DC660 (FUN_005DC660, gpg::RVectorType_CAcquireTargetTask_P::SerLoad)
+ *
+ * What it does:
+ * Deserializes one `vector<CAcquireTargetTask*>` payload from archive count +
+ * pointer lanes and replaces destination storage in one assignment.
+ */
+void gpg::RVectorType_CAcquireTargetTaskPtr::SerLoad(
+  gpg::ReadArchive* const archive,
+  const int objectPtr,
+  const int,
+  gpg::RRef* const ownerRef
+)
+{
+  auto* const storage = PointerFromArchiveInt<CAcquireTargetTaskPtrVector>(objectPtr);
+  GPG_ASSERT(archive != nullptr);
+  GPG_ASSERT(storage != nullptr);
+  if (!archive || !storage) {
+    return;
+  }
+
+  unsigned int count = 0;
+  archive->ReadUInt(&count);
+
+  CAcquireTargetTaskPtrVector loaded{};
+  loaded.reserve(static_cast<std::size_t>(count));
+  for (unsigned int i = 0; i < count; ++i) {
+    moho::CAcquireTargetTask* value = nullptr;
+    archive->ReadPointer_CAcquireTargetTask(&value, ownerRef);
+    loaded.push_back(value);
+  }
+
+  *storage = loaded;
 }
 
 gpg::RRef gpg::RVectorType_CAcquireTargetTaskPtr::SubscriptIndex(void* const obj, const int ind) const

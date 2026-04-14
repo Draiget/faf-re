@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <ios>
 #include <mutex>
 #include <sstream>
@@ -50,6 +51,15 @@ public:
           mMaxMessages(maxMessages)
     {
     }
+
+    /**
+     * Address: 0x008E4960 (FUN_008E4960, HistoryLogTarget::~HistoryLogTarget)
+     *
+     * What it does:
+     * Destroys retained history storage, releases lock state, and runs
+     * `gpg::LogTarget` base teardown.
+     */
+    ~HistoryLogTarget() override = default;
 
     /**
      * Address: 0x008E49D0 (FUN_008E49D0, HistoryLogTarget::Enable)
@@ -334,7 +344,65 @@ void WriteIndent(std::ostream& stream, const int count)
         stream.put(' ');
     }
 }
+
+/**
+ * Address: 0x00936830 (FUN_00936830, func_LogContext_Push)
+ *
+ * What it does:
+ * Formats one vararg log message, ensures the log singleton is initialized,
+ * then forwards the message to `LogContext::Dispatch` with the supplied level.
+ */
+void LogContextPushFormatted(const int level, const char* const fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    const char* formatCursor = fmt;
+    const msvc8::string message = STR_Va(formatCursor, va);
+    va_end(va);
+
+    std::call_once(gpg::g_LogOnce, &gpg::InitLogSingleton);
+    if (gpg::g_LogCtx != nullptr) {
+        gpg::g_LogCtx->Dispatch(static_cast<gpg::LogSeverity>(level), message);
+    }
+}
 } // namespace
+
+/**
+ * Address: 0x00937AD0 (FUN_00937AD0, func_Init_LogContext)
+ *
+ * What it does:
+ * Allocates the global log-context singleton and registers one process-exit
+ * cleanup callback that deletes it.
+ */
+void gpg::InitLogContextSingleton()
+{
+    if (g_LogCtx != nullptr) {
+        return;
+    }
+
+    g_LogCtx = new LogContext();
+    std::atexit([] {
+        delete g_LogCtx;
+        g_LogCtx = nullptr;
+    });
+}
+
+/**
+ * Address: 0x00937A70 (FUN_00937A70, ??0LogContext@gpg@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes TSS/lock lanes, self-links the target sentinel ring, and
+ * clears the cached last-thread pointer used by dispatch.
+ */
+LogContext::LogContext()
+    : tss(),
+      rw(),
+      head(),
+      lastTls(nullptr)
+{
+    head.next = &head;
+    head.prev = &head;
+}
 
 /**
  * Address: 0x00937E50 (FUN_00937E50)
@@ -1039,6 +1107,7 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
 
     ThreadState* const tls = tss.get();
     msvc8::vector<msvc8::string> snapshot;
+    msvc8::vector<msvc8::string> deferredOnMessageErrors;
     int prevDepth = 0;
 
     if (tls) {
@@ -1072,7 +1141,15 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
         current->flushOnce = 0;
 
         if (current->obj) {
-            current->obj->OnMessage(level, msg, snapshot, sendPrev);
+            try {
+                current->obj->OnMessage(level, msg, snapshot, sendPrev);
+            } catch (const std::exception& ex) {
+                deferredOnMessageErrors.push_back(msvc8::string(ex.what() ? ex.what() : "<unknown>"));
+                current->pendingRemove = 1;
+            } catch (...) {
+                deferredOnMessageErrors.push_back(msvc8::string("<unknown>"));
+                current->pendingRemove = 1;
+            }
         }
 
         current->busy = 0;
@@ -1086,6 +1163,14 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
     }
 
     rw.unlock();
+
+    for (const msvc8::string& errorText : deferredOnMessageErrors) {
+        LogContextPushFormatted(
+            3,
+            "LogTarget::OnMessage() puked: %s.\nDeleted target.",
+            errorText.c_str()
+        );
+    }
 }
 
 ScopedLogContext::ScopedLogContext(const msvc8::string& text)

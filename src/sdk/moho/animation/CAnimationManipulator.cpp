@@ -1621,6 +1621,15 @@ namespace moho
   }
 
   /**
+   * Address: 0x0063F040 (FUN_0063F040, Moho::CAnimationManipulatorTypeInfo::CAnimationManipulatorTypeInfo)
+   */
+  CAnimationManipulatorTypeInfo::CAnimationManipulatorTypeInfo()
+    : gpg::RType()
+  {
+    gpg::PreRegisterRType(typeid(CAnimationManipulator), this);
+  }
+
+  /**
    * Address: 0x0063F0E0 (FUN_0063F0E0, scalar deleting destructor thunk)
    */
   CAnimationManipulatorTypeInfo::~CAnimationManipulatorTypeInfo() = default;

@@ -358,6 +358,36 @@ namespace moho
   }
 
   /**
+   * Address: 0x007421C0 (FUN_007421C0, func_CpyCamera)
+   *
+   * What it does:
+   * Copies transform, view/projection matrix lanes, frustum solids, LOD scale,
+   * and viewport matrix lanes from `rhs`.
+   */
+  GeomCamera3& GeomCamera3::operator=(const GeomCamera3& rhs)
+  {
+    tranform.orient_.x = rhs.tranform.orient_.x;
+    tranform.orient_.y = rhs.tranform.orient_.y;
+    tranform.orient_.z = rhs.tranform.orient_.z;
+    tranform.orient_.w = rhs.tranform.orient_.w;
+    tranform.pos_ = rhs.tranform.pos_;
+
+    projection = rhs.projection;
+    view = rhs.view;
+    viewProjection = rhs.viewProjection;
+    inverseProjection = rhs.inverseProjection;
+    inverseView = rhs.inverseView;
+    inverseViewProjection = rhs.inverseViewProjection;
+
+    solid1 = rhs.solid1;
+    solid2 = rhs.solid2;
+
+    lodScale = rhs.lodScale;
+    viewport = rhs.viewport;
+    return *this;
+  }
+
+  /**
    * Address: 0x00742970 (FUN_00742970, ??1GeomCamera3@Moho@@QAE@XZ)
    *
    * What it does:

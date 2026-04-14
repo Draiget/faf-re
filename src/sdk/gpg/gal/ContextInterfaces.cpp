@@ -8,8 +8,13 @@
 #include "OutputContext.hpp"
 #include "RenderTargetContext.hpp"
 #include "TextureContext.hpp"
+#include "VertexBuffer.hpp"
 #include "VertexBufferContext.hpp"
 
+#include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/core/utils/BoostWrappers.h"
+
+#include <cstring>
 #include <new>
 
 namespace gpg::gal
@@ -92,6 +97,15 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F56A0 (FUN_008F56A0, gpg::gal::VertexBuffer::VertexBuffer)
+     *
+     * What it does:
+     * Initializes one abstract vertex-buffer base object and applies the
+     * base vftable lane used by derived constructors/unwind paths.
+     */
+    VertexBuffer::VertexBuffer() = default;
+
+    /**
      * Address: 0x009405F0 (FUN_009405F0)
      *
      * What it does:
@@ -152,6 +166,21 @@ namespace gpg::gal
           width_(width),
           height_(height)
     {
+    }
+
+    /**
+     * Address: 0x008F5710 (FUN_008F5710)
+     *
+     * What it does:
+     * Copies vertex-buffer metadata payload lanes from another context.
+     */
+    VertexBufferContext& VertexBufferContext::AssignFrom(const VertexBufferContext& other)
+    {
+        type_ = other.type_;
+        usage_ = other.usage_;
+        width_ = other.width_;
+        height_ = other.height_;
+        return *this;
     }
 
     /**
@@ -363,6 +392,144 @@ namespace gpg::gal
         runtime->macros.first = nullptr;
         runtime->macros.last = nullptr;
         runtime->macros.end = nullptr;
+    }
+
+    /**
+     * Address: 0x008FE7E0 (FUN_008FE7E0, gpg::gal::EffectContext::EffectContext)
+     *
+     * What it does:
+     * Copies effect-context source/cache paths, source-buffer ownership lanes,
+     * and effect-macro vector storage from one source context.
+     */
+    EffectContext::EffectContext(const EffectContext& other)
+    {
+        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
+        const auto* const sourceRuntime = reinterpret_cast<const EffectContextRuntimeView*>(&other);
+
+        runtime->sourceType = sourceRuntime->sourceType;
+        runtime->useCache = sourceRuntime->useCache;
+
+        runtime->sourceBufferBytes = 0U;
+        runtime->sourceBufferCount = nullptr;
+        runtime->sourceBufferBegin = 0U;
+        runtime->sourceBufferEnd = 0U;
+        runtime->macros.proxy = nullptr;
+        runtime->macros.first = nullptr;
+        runtime->macros.last = nullptr;
+        runtime->macros.end = nullptr;
+
+        ::new (static_cast<void*>(&runtime->sourcePath)) msvc8::string();
+        try
+        {
+            runtime->sourcePath.assign(sourceRuntime->sourcePath, 0U, msvc8::string::npos);
+
+            ::new (static_cast<void*>(&runtime->cachePath)) msvc8::string();
+            try
+            {
+                runtime->cachePath.assign(sourceRuntime->cachePath, 0U, msvc8::string::npos);
+
+                runtime->sourceBufferBytes = sourceRuntime->sourceBufferBytes;
+                runtime->sourceBufferCount = sourceRuntime->sourceBufferCount;
+                if (runtime->sourceBufferCount != nullptr)
+                {
+                    runtime->sourceBufferCount->add_ref_copy();
+                }
+                runtime->sourceBufferBegin = sourceRuntime->sourceBufferBegin;
+                runtime->sourceBufferEnd = sourceRuntime->sourceBufferEnd;
+
+                auto* const destinationMacros = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime->macros);
+                const auto* const sourceMacros = reinterpret_cast<const msvc8::vector<EffectMacro>*>(&sourceRuntime->macros);
+                ::new (static_cast<void*>(destinationMacros)) msvc8::vector<EffectMacro>(*sourceMacros);
+            }
+            catch (...)
+            {
+                if (runtime->sourceBufferCount != nullptr)
+                {
+                    runtime->sourceBufferCount->release();
+                    runtime->sourceBufferCount = nullptr;
+                }
+
+                runtime->cachePath.tidy(true, 0U);
+                throw;
+            }
+        }
+        catch (...)
+        {
+            runtime->sourcePath.tidy(true, 0U);
+            throw;
+        }
+    }
+
+    /**
+     * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
+     *
+     * What it does:
+     * Initializes one effect context from explicit cache/path/source-buffer
+     * payload and copies the effect-macro vector lane.
+     */
+    EffectContext::EffectContext(
+        const bool useCachePayload,
+        const gpg::StrArg sourcePath,
+        const gpg::StrArg cachePath,
+        const gpg::MemBuffer<char>& sourceBuffer,
+        const msvc8::vector<EffectMacro>& macros
+    )
+    {
+        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
+
+        runtime->sourceType = 2U;
+        runtime->useCache = useCachePayload ? 1U : 0U;
+
+        runtime->sourceBufferBytes = 0U;
+        runtime->sourceBufferCount = nullptr;
+        runtime->sourceBufferBegin = 0U;
+        runtime->sourceBufferEnd = 0U;
+        runtime->macros.proxy = nullptr;
+        runtime->macros.first = nullptr;
+        runtime->macros.last = nullptr;
+        runtime->macros.end = nullptr;
+
+        const char* const sourcePathText = (sourcePath != nullptr) ? sourcePath : "";
+        const char* const cachePathText = (cachePath != nullptr) ? cachePath : "";
+
+        ::new (static_cast<void*>(&runtime->sourcePath))
+            msvc8::string(sourcePathText, static_cast<unsigned int>(std::strlen(sourcePathText)));
+        try
+        {
+            ::new (static_cast<void*>(&runtime->cachePath))
+                msvc8::string(cachePathText, static_cast<unsigned int>(std::strlen(cachePathText)));
+            try
+            {
+                const boost::SharedPtrRaw<char> retainedBufferOwner =
+                    boost::SharedPtrRawFromSharedRetained(sourceBuffer.mData);
+
+                runtime->sourceBufferBytes = static_cast<std::uint32_t>(
+                    reinterpret_cast<std::uintptr_t>(retainedBufferOwner.px)
+                );
+                runtime->sourceBufferCount = static_cast<boost::detail::sp_counted_base*>(retainedBufferOwner.pi);
+                runtime->sourceBufferBegin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mBegin));
+                runtime->sourceBufferEnd = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mEnd));
+
+                auto* const destinationMacros = reinterpret_cast<msvc8::vector<EffectMacro>*>(&runtime->macros);
+                ::new (static_cast<void*>(destinationMacros)) msvc8::vector<EffectMacro>(macros);
+            }
+            catch (...)
+            {
+                if (runtime->sourceBufferCount != nullptr)
+                {
+                    runtime->sourceBufferCount->release();
+                    runtime->sourceBufferCount = nullptr;
+                }
+
+                runtime->cachePath.tidy(true, 0U);
+                throw;
+            }
+        }
+        catch (...)
+        {
+            runtime->sourcePath.tidy(true, 0U);
+            throw;
+        }
     }
 
     /**

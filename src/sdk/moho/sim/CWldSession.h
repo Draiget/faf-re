@@ -816,6 +816,20 @@ namespace moho
   [[nodiscard]] LuaPlus::LuaObject WLD_LoadScenarioInfo(const msvc8::string& scenarioFile, LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00897220 (FUN_00897220, ?WLD_CreateSession@Moho@@YAPAVCWldSession@1@AAV?$auto_ptr@VLuaState@LuaPlus@@@std@@AAV?$auto_ptr@VRRuleGameRules@Moho@@@4@AAV?$auto_ptr@VCWldMap@Moho@@@4@AAUSWldSessionInfo@1@@Z)
+   *
+   * What it does:
+   * Allocates one world-session object, constructs it from transferred
+   * auto_ptr lanes, and updates the global active-session pointer.
+   */
+  [[nodiscard]] CWldSession* WLD_CreateSession(
+    msvc8::auto_ptr<LuaPlus::LuaState>& state,
+    msvc8::auto_ptr<RRuleGameRules>& gameRules,
+    msvc8::auto_ptr<CWldMap>& wldMap,
+    SWldSessionInfo& sessionInfo
+  );
+
+  /**
    * Address: 0x0088D060 (FUN_0088D060, ?WLD_BeginSession@Moho@@YAXV?$auto_ptr@USWldSessionInfo@Moho@@@std@@@Z)
    *
    * What it does:

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Vector3f.h"
 #include "Vector4f.h"
 
 namespace gpg
@@ -37,6 +38,15 @@ namespace moho
      * Stores matrix lanes to archive in row-major order.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x004EE980 (FUN_004EE980, Moho::VMatrix4::Set)
+     *
+     * What it does:
+     * Rebuilds the rotation rows from a quaternion payload and writes
+     * translation to row 3 (`x,y,z,1`) in row-vector matrix convention.
+     */
+    void Set(const Wm3::Quaternionf& quat, const Wm3::Vector3f& vec);
 
     /** Identity. */
     static VMatrix4 Identity()

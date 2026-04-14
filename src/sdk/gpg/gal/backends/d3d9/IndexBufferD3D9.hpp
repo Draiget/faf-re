@@ -18,6 +18,15 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x008F4DA0 (FUN_008F4DA0)
+         *
+         * What it does:
+         * Initializes one D3D9 index-buffer wrapper and binds the provided
+         * context/native buffer payload.
+         */
+        IndexBufferD3D9(const IndexBufferContext* context, void* d3dIndexBuffer);
+
+        /**
          * Address: 0x008F4D80 (FUN_008F4D80)
          *
          * What it does:
@@ -56,6 +65,15 @@ namespace gpg::gal
          * Returns the retained D3D9 index-buffer handle and throws when unset.
          */
         void* GetBuffer();
+
+        /**
+         * Address: 0x008F4D10 (FUN_008F4D10, gpg::gal::IndexBufferD3D9::SetBuffer)
+         *
+         * What it does:
+         * Releases any previous native index-buffer handle, resets context lanes,
+         * then assigns one new context + native buffer payload.
+         */
+        std::uint32_t SetBuffer(const IndexBufferContext* context, void* d3dIndexBuffer);
 
     public:
         IndexBufferContext context_{};        // +0x04

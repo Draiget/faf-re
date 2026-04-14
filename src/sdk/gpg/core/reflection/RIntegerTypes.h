@@ -49,14 +49,68 @@ using RIntType_ulong = RIntType<unsigned long>;
   };                                                                                         \
   void register_##NAME##Startup();
 
+/**
+ * Address: 0x008DFAD0 (FUN_008DFAD0, charTypeInfo::charTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `char`.
+ */
 DECLARE_INT_TYPE_INFO(charTypeInfo, char)
+/**
+ * Address: 0x008DFE50 (FUN_008DFE50, signedcharTypeInfo::signedcharTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `signed char`.
+ */
 DECLARE_INT_TYPE_INFO(signedcharTypeInfo, signed char)
+/**
+ * Address: 0x008DFF30 (FUN_008DFF30, unsignedcharTypeInfo::unsignedcharTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `unsigned char`.
+ */
 DECLARE_INT_TYPE_INFO(unsignedcharTypeInfo, unsigned char)
+/**
+ * Address: 0x008DFBB0 (FUN_008DFBB0, shortTypeInfo::shortTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `short`.
+ */
 DECLARE_INT_TYPE_INFO(shortTypeInfo, short)
+/**
+ * Address: 0x008E0010 (FUN_008E0010, unsignedshortTypeInfo::unsignedshortTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `unsigned short`.
+ */
 DECLARE_INT_TYPE_INFO(unsignedshortTypeInfo, unsigned short)
+/**
+ * Address: 0x008DFC90 (FUN_008DFC90, intTypeInfo::intTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `int`.
+ */
 DECLARE_INT_TYPE_INFO(intTypeInfo, int)
+/**
+ * Address: 0x008E00F0 (FUN_008E00F0, unsignedintTypeInfo::unsignedintTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `unsigned int`.
+ */
 DECLARE_INT_TYPE_INFO(unsignedintTypeInfo, unsigned int)
+/**
+ * Address: 0x008DFD70 (FUN_008DFD70, longTypeInfo::longTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `long`.
+ */
 DECLARE_INT_TYPE_INFO(longTypeInfo, long)
+/**
+ * Address: 0x008E01D0 (FUN_008E01D0, unsignedlongTypeInfo::unsignedlongTypeInfo)
+ *
+ * What it does:
+ * Registers reflection metadata type for `unsigned long`.
+ */
 DECLARE_INT_TYPE_INFO(unsignedlongTypeInfo, unsigned long)
 
 #undef DECLARE_INT_TYPE_INFO

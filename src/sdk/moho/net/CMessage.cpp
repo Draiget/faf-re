@@ -172,6 +172,27 @@ unsigned int CMessage::Append(const char* ptr, const size_t size)
 }
 
 /**
+ * Address: 0x0048BD30 (FUN_0048BD30, Moho::CMessage::AppendChar)
+ *
+ * What it does:
+ * Appends one payload byte in-place when capacity allows, otherwise routes
+ * through fastvector insert-grow for a single-byte range.
+ */
+void CMessage::AppendChar(const char* const ptr)
+{
+  char* const end = mBuff.end_;
+  if (end == mBuff.capacity_) {
+    mBuff.InsertAt(end, ptr, ptr + 1);
+    return;
+  }
+
+  if (end != nullptr) {
+    *end = *ptr;
+  }
+  ++mBuff.end_;
+}
+
+/**
  * Address: 0x00483530 (FUN_00483530)
  *
  * What it does:

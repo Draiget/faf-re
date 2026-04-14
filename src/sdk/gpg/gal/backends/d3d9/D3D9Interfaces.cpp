@@ -626,6 +626,64 @@ namespace gpg::gal
             d3dx_get_pixel_shader_profile_fn getPixelShaderProfile = nullptr;
         };
 
+        /**
+         * Address: 0x0094ABF0 (FUN_0094ABF0)
+         *
+         * What it does:
+         * Maps one D3D declaration type token to the element byte-width used
+         * when accumulating stream strides.
+         */
+        [[nodiscard]] std::uint32_t GetVertexElementTypeSizeBytes(const std::uint8_t elementType) noexcept
+        {
+            switch (elementType)
+            {
+            case 0U:
+            case 4U:
+            case 5U:
+            case 6U:
+            case 8U:
+            case 9U:
+            case 11U:
+            case 13U:
+            case 14U:
+            case 15U:
+                return 4U;
+            case 1U:
+            case 7U:
+            case 10U:
+            case 12U:
+            case 16U:
+                return 8U;
+            case 2U:
+                return 12U;
+            case 3U:
+                return 16U;
+            default:
+                return 0U;
+            }
+        }
+
+        /**
+         * Address: 0x0094AC70 (FUN_0094AC70)
+         *
+         * What it does:
+         * Releases one COM-like pointer lane when present and nulls the slot.
+         */
+        void ReleaseComPointerSlot(void** const slot) noexcept
+        {
+            if ((slot != nullptr) && (*slot != nullptr))
+            {
+                auto** const vtable = *reinterpret_cast<void***>(*slot);
+                auto* const release = reinterpret_cast<release_fn>(vtable[2]);
+                release(*slot);
+            }
+
+            if (slot != nullptr)
+            {
+                *slot = nullptr;
+            }
+        }
+
         void ReleaseComLike(void*& object) noexcept;
 
         class ComObjectScope final
@@ -670,15 +728,7 @@ namespace gpg::gal
 
         void ReleaseComLike(void*& object) noexcept
         {
-            if (object == nullptr)
-            {
-                return;
-            }
-
-            auto** const vtable = *reinterpret_cast<void***>(object);
-            auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-            release(object);
-            object = nullptr;
+            ReleaseComPointerSlot(&object);
         }
 
         HRESULT InvokeLock(
@@ -3142,18 +3192,8 @@ namespace gpg::gal
          */
         void DestroyVertexFormatD3D9Body(VertexFormatD3D9* const vertexFormat) noexcept
         {
-            ReleaseComLike(vertexFormat->vertexDeclaration_);
-            vertexFormat->formatCode_ = 0x17U;
-
-            if (vertexFormat->elementArrayBegin_ != nullptr)
-            {
-                ::operator delete(vertexFormat->elementArrayBegin_);
-            }
-
-            vertexFormat->elementArrayProxy_ = nullptr;
-            vertexFormat->elementArrayBegin_ = nullptr;
-            vertexFormat->elementArrayEnd_ = nullptr;
-            vertexFormat->elementArrayCapacityEnd_ = nullptr;
+            vertexFormat->ResetDeclarationState();
+            vertexFormat->elementStrideByStream_ = msvc8::vector<std::uint32_t>{};
         }
 
         /**
@@ -3165,13 +3205,7 @@ namespace gpg::gal
          */
         void DestroyVertexBufferD3D9Body(VertexBufferD3D9* const vertexBuffer) noexcept
         {
-            ReleaseComLike(vertexBuffer->d3dVertexBuffer_);
-
-            const VertexBufferContext resetContext{};
-            vertexBuffer->context_.type_ = resetContext.type_;
-            vertexBuffer->context_.usage_ = resetContext.usage_;
-            vertexBuffer->context_.width_ = resetContext.width_;
-            vertexBuffer->context_.height_ = resetContext.height_;
+            vertexBuffer->ResetBufferState();
         }
 
         /**
@@ -3979,11 +4013,11 @@ namespace gpg::gal
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1462, createDepthResult);
             }
 
-            RenderTargetD3D9* const renderTarget = new RenderTargetD3D9();
-            renderTarget->context_.width_ = surfaceDesc.width;
-            renderTarget->context_.height_ = surfaceDesc.height;
-            renderTarget->context_.format_ = FormatD3D9ToMoho(surfaceDesc.format);
-            renderTarget->renderTexture_ = nullptr;
+            RenderTargetContext renderTargetContext{};
+            renderTargetContext.width_ = surfaceDesc.width;
+            renderTargetContext.height_ = surfaceDesc.height;
+            renderTargetContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
+            RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(&renderTargetContext, nullptr);
             renderTarget->renderSurface_ = backBuffer.release();
             outputHeads[headIndex].renderTarget.reset(renderTarget);
 
@@ -4258,20 +4292,254 @@ namespace gpg::gal
             std::uint8_t usageIndex = 0U;
         };
 
-        // Fallback declaration lane while full `vertexFormats` table lifting is pending.
-        constexpr D3DVertexElementRuntime kFallbackVertexElements[2] = {
-            {0U, 0U, 2U, 0U, 0U, 0U},
-            {0xFFU, 0U, 17U, 0U, 0U, 0U},
+        static constexpr std::uint32_t kVertexFormatCount = 24U;
+
+        static constexpr D3DVertexElementRuntime kVertexElementEndSentinel = {
+            0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U
         };
 
+        static constexpr D3DVertexElementRuntime kVertexFormat_0[2] = {
+            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_1[2] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_2[3] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x02U, 0x00U, 0x03U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_3[3] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_4[4] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x14U, 0x01U, 0x00U, 0x05U, 0x01U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_5[4] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x02U, 0x00U, 0x03U, 0x00U},
+            {0x00U, 0x18U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_6[4] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x04U, 0x00U, 0x0AU, 0x00U},
+            {0x00U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_7[3] = {
+            {0x00U, 0x00U, 0x03U, 0x00U, 0x09U, 0x00U},
+            {0x00U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_8[4] = {
+            {0x00U, 0x00U, 0x03U, 0x00U, 0x09U, 0x00U},
+            {0x00U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x18U, 0x01U, 0x00U, 0x05U, 0x01U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_9[8] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x02U, 0x00U, 0x03U, 0x00U},
+            {0x00U, 0x18U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x01U, 0x00U, 0x03U, 0x00U, 0x05U, 0x01U},
+            {0x01U, 0x10U, 0x03U, 0x00U, 0x05U, 0x02U},
+            {0x01U, 0x20U, 0x03U, 0x00U, 0x05U, 0x03U},
+            {0x01U, 0x30U, 0x03U, 0x00U, 0x05U, 0x04U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_10[2] = {
+            {0x00U, 0x00U, 0x07U, 0x00U, 0x00U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_11[7] = {
+            {0x00U, 0x00U, 0x03U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x10U, 0x03U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x20U, 0x03U, 0x00U, 0x05U, 0x01U},
+            {0x00U, 0x30U, 0x02U, 0x00U, 0x05U, 0x02U},
+            {0x00U, 0x3CU, 0x03U, 0x00U, 0x05U, 0x03U},
+            {0x00U, 0x4CU, 0x02U, 0x00U, 0x05U, 0x04U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_12[5] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x18U, 0x02U, 0x00U, 0x05U, 0x01U},
+            {0x00U, 0x24U, 0x03U, 0x00U, 0x05U, 0x02U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_13[5] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x03U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x1CU, 0x03U, 0x00U, 0x05U, 0x01U},
+            {0x00U, 0x2CU, 0x03U, 0x00U, 0x05U, 0x02U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_14[15] = {
+            {0x00U, 0x00U, 0x03U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x10U, 0x02U, 0x00U, 0x03U, 0x00U},
+            {0x00U, 0x1CU, 0x02U, 0x00U, 0x06U, 0x00U},
+            {0x00U, 0x28U, 0x02U, 0x00U, 0x07U, 0x00U},
+            {0x00U, 0x34U, 0x03U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x44U, 0x05U, 0x00U, 0x02U, 0x00U},
+            {0x01U, 0x00U, 0x02U, 0x00U, 0x05U, 0x01U},
+            {0x01U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x02U},
+            {0x01U, 0x18U, 0x02U, 0x00U, 0x05U, 0x03U},
+            {0x01U, 0x24U, 0x02U, 0x00U, 0x05U, 0x04U},
+            {0x01U, 0x30U, 0x05U, 0x00U, 0x05U, 0x05U},
+            {0x01U, 0x34U, 0x03U, 0x00U, 0x05U, 0x06U},
+            {0x01U, 0x44U, 0x04U, 0x00U, 0x0AU, 0x00U},
+            {0x01U, 0x48U, 0x00U, 0x00U, 0x05U, 0x07U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_15[15] = {
+            {0x00U, 0x00U, 0x10U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x08U, 0x10U, 0x00U, 0x03U, 0x00U},
+            {0x00U, 0x10U, 0x10U, 0x00U, 0x06U, 0x00U},
+            {0x00U, 0x18U, 0x10U, 0x00U, 0x07U, 0x00U},
+            {0x00U, 0x20U, 0x10U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x28U, 0x05U, 0x00U, 0x02U, 0x00U},
+            {0x01U, 0x00U, 0x02U, 0x00U, 0x05U, 0x01U},
+            {0x01U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x02U},
+            {0x01U, 0x18U, 0x02U, 0x00U, 0x05U, 0x03U},
+            {0x01U, 0x24U, 0x02U, 0x00U, 0x05U, 0x04U},
+            {0x01U, 0x30U, 0x05U, 0x00U, 0x05U, 0x05U},
+            {0x01U, 0x34U, 0x10U, 0x00U, 0x05U, 0x06U},
+            {0x01U, 0x3CU, 0x04U, 0x00U, 0x0AU, 0x00U},
+            {0x01U, 0x40U, 0x00U, 0x00U, 0x05U, 0x07U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_16[16] = {
+            {0x00U, 0x00U, 0x10U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x08U, 0x10U, 0x00U, 0x03U, 0x00U},
+            {0x00U, 0x10U, 0x10U, 0x00U, 0x06U, 0x00U},
+            {0x00U, 0x18U, 0x10U, 0x00U, 0x07U, 0x00U},
+            {0x00U, 0x20U, 0x10U, 0x00U, 0x05U, 0x00U},
+            {0x00U, 0x28U, 0x05U, 0x00U, 0x02U, 0x00U},
+            {0x01U, 0x00U, 0x10U, 0x00U, 0x00U, 0x01U},
+            {0x02U, 0x00U, 0x02U, 0x00U, 0x05U, 0x01U},
+            {0x02U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x02U},
+            {0x02U, 0x18U, 0x02U, 0x00U, 0x05U, 0x03U},
+            {0x02U, 0x24U, 0x02U, 0x00U, 0x05U, 0x04U},
+            {0x02U, 0x30U, 0x05U, 0x00U, 0x05U, 0x05U},
+            {0x02U, 0x34U, 0x10U, 0x00U, 0x05U, 0x06U},
+            {0x02U, 0x3CU, 0x04U, 0x00U, 0x0AU, 0x00U},
+            {0x02U, 0x40U, 0x00U, 0x00U, 0x05U, 0x07U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_17[5] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x00U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x01U, 0x00U, 0x01U, 0x00U, 0x00U, 0x01U},
+            {0x01U, 0x08U, 0x01U, 0x00U, 0x05U, 0x01U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_18[4] = {
+            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
+            {0x01U, 0x00U, 0x01U, 0x00U, 0x00U, 0x01U},
+            {0x01U, 0x08U, 0x00U, 0x00U, 0x05U, 0x00U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_19[9] = {
+            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
+            {0x01U, 0x00U, 0x03U, 0x00U, 0x00U, 0x01U},
+            {0x01U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x01U, 0x18U, 0x03U, 0x00U, 0x05U, 0x01U},
+            {0x01U, 0x28U, 0x02U, 0x00U, 0x05U, 0x02U},
+            {0x01U, 0x34U, 0x03U, 0x00U, 0x05U, 0x03U},
+            {0x01U, 0x44U, 0x02U, 0x00U, 0x05U, 0x04U},
+            {0x01U, 0x50U, 0x02U, 0x00U, 0x05U, 0x05U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_20[5] = {
+            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
+            {0x01U, 0x00U, 0x03U, 0x00U, 0x00U, 0x01U},
+            {0x01U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x01U, 0x18U, 0x03U, 0x00U, 0x05U, 0x01U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_21[7] = {
+            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
+            {0x01U, 0x00U, 0x03U, 0x00U, 0x00U, 0x01U},
+            {0x01U, 0x10U, 0x02U, 0x00U, 0x05U, 0x00U},
+            {0x01U, 0x1CU, 0x01U, 0x00U, 0x05U, 0x01U},
+            {0x01U, 0x24U, 0x01U, 0x00U, 0x05U, 0x02U},
+            {0x01U, 0x2CU, 0x03U, 0x00U, 0x05U, 0x03U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_22[5] = {
+            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
+            {0x01U, 0x00U, 0x02U, 0x00U, 0x00U, 0x01U},
+            {0x01U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
+            {0x01U, 0x14U, 0x03U, 0x00U, 0x05U, 0x01U},
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr D3DVertexElementRuntime kVertexFormat_23[1] = {
+            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        };
+
+        static constexpr const D3DVertexElementRuntime* kVertexFormatsByCode[kVertexFormatCount] = {
+            kVertexFormat_0,  kVertexFormat_1,  kVertexFormat_2,  kVertexFormat_3,  kVertexFormat_4,  kVertexFormat_5,
+            kVertexFormat_6,  kVertexFormat_7,  kVertexFormat_8,  kVertexFormat_9,  kVertexFormat_10, kVertexFormat_11,
+            kVertexFormat_12, kVertexFormat_13, kVertexFormat_14, kVertexFormat_15, kVertexFormat_16, kVertexFormat_17,
+            kVertexFormat_18, kVertexFormat_19, kVertexFormat_20, kVertexFormat_21, kVertexFormat_22, kVertexFormat_23,
+        };
+
+        [[nodiscard]] bool IsVertexElementEndSentinel(const D3DVertexElementRuntime& element) noexcept
+        {
+            return (element.stream == kVertexElementEndSentinel.stream) &&
+                   (element.offset == kVertexElementEndSentinel.offset) &&
+                   (element.type == kVertexElementEndSentinel.type) &&
+                   (element.method == kVertexElementEndSentinel.method) &&
+                   (element.usage == kVertexElementEndSentinel.usage) &&
+                   (element.usageIndex == kVertexElementEndSentinel.usageIndex);
+        }
+
+        /**
+         * Address: 0x0094AE10 (FUN_0094AE10, func_GetVertexFormat)
+         *
+         * What it does:
+         * Validates one vertex-format code and returns the recovered D3D vertex
+         * element declaration table pointer for that format.
+         */
         const D3DVertexElementRuntime* GetVertexFormatElementsOrThrow(const std::uint32_t formatCode)
         {
-            if (formatCode >= 24U)
+            if (formatCode >= kVertexFormatCount)
             {
                 ThrowGalError("VertexFormatD3D9.cpp", 389, "invalid vertex format specified");
             }
 
-            return kFallbackVertexElements;
+            return kVertexFormatsByCode[formatCode];
         }
 
         void ClearTextureContextData(TextureContext& context) noexcept
@@ -4537,11 +4805,7 @@ namespace gpg::gal
             ThrowGalError("DeviceD3D9.cpp", 493, "invalid source specified for texture data");
         }
 
-        TextureD3D9* const texture = new TextureD3D9();
-        texture->context_.AssignFrom(textureContext);
-        texture->texture_ = nativeTexture;
-        texture->locking_ = false;
-        texture->level_ = 0;
+        TextureD3D9* const texture = new TextureD3D9(&textureContext, nativeTexture);
         outTexture->reset(texture);
         return outTexture;
     }
@@ -4577,10 +4841,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 508, createResult);
         }
 
-        RenderTargetD3D9* const renderTarget = new RenderTargetD3D9();
-        renderTarget->context_ = *context;
-        renderTarget->renderTexture_ = renderTexture;
-        renderTarget->renderSurface_ = GetSurfaceLevel0FromTexture(renderTexture);
+        RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(context, renderTexture);
         outRenderTarget->reset(renderTarget);
         return outRenderTarget;
     }
@@ -4683,13 +4944,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 546, createResult);
         }
 
-        VertexFormatD3D9* const vertexFormat = new VertexFormatD3D9();
-        vertexFormat->formatCode_ = formatCode;
-        vertexFormat->elementArrayProxy_ = nullptr;
-        vertexFormat->elementArrayBegin_ = nullptr;
-        vertexFormat->elementArrayEnd_ = nullptr;
-        vertexFormat->elementArrayCapacityEnd_ = nullptr;
-        vertexFormat->vertexDeclaration_ = vertexDeclaration;
+        VertexFormatD3D9* const vertexFormat = new VertexFormatD3D9(formatCode, vertexDeclaration);
         outVertexFormat->reset(vertexFormat);
         return outVertexFormat;
     }
@@ -4721,11 +4976,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 560, createResult);
         }
 
-        VertexBufferD3D9* const vertexBuffer = new VertexBufferD3D9();
-        vertexBuffer->context_ = *context;
-        vertexBuffer->d3dVertexBuffer_ = nativeVertexBuffer;
-        vertexBuffer->locked_ = false;
-        vertexBuffer->mappedData_ = nullptr;
+        VertexBufferD3D9* const vertexBuffer = new VertexBufferD3D9(context, nativeVertexBuffer);
         outVertexBuffer->reset(vertexBuffer);
         return outVertexBuffer;
     }
@@ -4765,11 +5016,7 @@ namespace gpg::gal
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 581, createResult);
         }
 
-        IndexBufferD3D9* const indexBuffer = new IndexBufferD3D9();
-        indexBuffer->context_ = *context;
-        indexBuffer->d3dIndexBuffer_ = nativeIndexBuffer;
-        indexBuffer->locked_ = false;
-        indexBuffer->indexData_ = nullptr;
+        IndexBufferD3D9* const indexBuffer = new IndexBufferD3D9(context, nativeIndexBuffer);
         outIndexBuffer->reset(indexBuffer);
         return outIndexBuffer;
     }
@@ -6738,6 +6985,52 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F4DA0 (FUN_008F4DA0, gpg::gal::IndexBufferD3D9::IndexBufferD3D9)
+     *
+     * What it does:
+     * Initializes one D3D9 index-buffer wrapper and binds the provided
+     * context/native buffer payload.
+     */
+    IndexBufferD3D9::IndexBufferD3D9(
+        const IndexBufferContext* const context,
+        void* const d3dIndexBuffer
+    )
+        : context_()
+        , d3dIndexBuffer_(nullptr)
+        , locked_(false)
+        , lockPadding_{}
+        , indexData_(nullptr)
+    {
+        static_cast<void>(SetBuffer(context, d3dIndexBuffer));
+    }
+
+    /**
+     * Address: 0x008F4D10 (FUN_008F4D10, gpg::gal::IndexBufferD3D9::SetBuffer)
+     *
+     * What it does:
+     * Releases any previous native index-buffer handle, resets context lanes,
+     * then assigns one new context + native buffer payload.
+     */
+    std::uint32_t IndexBufferD3D9::SetBuffer(
+        const IndexBufferContext* const context,
+        void* const d3dIndexBuffer
+    )
+    {
+        ReleaseComLike(d3dIndexBuffer_);
+
+        const IndexBufferContext resetContext{};
+        context_.format_ = resetContext.format_;
+        context_.size_ = resetContext.size_;
+        context_.type_ = resetContext.type_;
+
+        context_.format_ = context->format_;
+        context_.size_ = context->size_;
+        context_.type_ = context->type_;
+        d3dIndexBuffer_ = d3dIndexBuffer;
+        return context_.type_;
+    }
+
+    /**
      * Address: 0x008F4D80 (FUN_008F4D80)
      *
      * What it does:
@@ -6746,6 +7039,66 @@ namespace gpg::gal
     IndexBufferD3D9::~IndexBufferD3D9()
     {
         DestroyIndexBufferD3D9Body(this);
+    }
+
+    /**
+     * Address: 0x008F5620 (FUN_008F5620, gpg::gal::RenderTargetD3D9::RenderTargetD3D9)
+     *
+     * What it does:
+     * Initializes one render-target wrapper and binds caller context plus one
+     * native texture payload.
+     */
+    RenderTargetD3D9::RenderTargetD3D9(
+        const RenderTargetContext* const context,
+        void* const renderTexture
+    )
+        : context_()
+        , renderTexture_(nullptr)
+        , renderSurface_(nullptr)
+    {
+        static_cast<void>(SetRenderTexture(context, renderTexture));
+    }
+
+    /**
+     * Address: 0x008F5500 (FUN_008F5500)
+     *
+     * What it does:
+     * Resets prior render-target state, stores one context + texture payload,
+     * then acquires and caches level-0 render surface state.
+     */
+    void* RenderTargetD3D9::SetRenderTexture(
+        const RenderTargetContext* const context,
+        void* const renderTexture
+    )
+    {
+        ResetRenderTargetD3D9State(this);
+
+        context_.width_ = context->width_;
+        context_.height_ = context->height_;
+        context_.format_ = context->format_;
+        renderTexture_ = renderTexture;
+
+        if (renderTexture_ == nullptr)
+        {
+            renderSurface_ = nullptr;
+            return nullptr;
+        }
+
+        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(renderTexture_, 0U, &renderSurface_);
+        if (getSurfaceResult < 0)
+        {
+            ThrowGalErrorFromHresult("RenderTargetD3D9.cpp", 89, getSurfaceResult);
+        }
+
+        D3DSurfaceDescRuntime surfaceDesc{};
+        const HRESULT getDescResult = InvokeSurfaceGetDesc(renderSurface_, &surfaceDesc);
+        if (getDescResult >= 0)
+        {
+            context_.width_ = surfaceDesc.width;
+            context_.height_ = surfaceDesc.height;
+        }
+
+        return renderSurface_;
     }
 
     /**
@@ -7033,6 +7386,26 @@ namespace gpg::gal
     TextureD3D9::TextureD3D9() = default;
 
     /**
+     * Address: 0x0094AB80 (FUN_0094AB80, gpg::gal::TextureD3D9::TextureD3D9)
+     *
+     * What it does:
+     * Initializes one texture wrapper and binds caller context plus one native
+     * texture payload.
+     */
+    TextureD3D9::TextureD3D9(
+        const TextureContext* const context,
+        void* const texture
+    )
+        : context_()
+        , texture_(nullptr)
+        , locking_(false)
+        , lockPadding_{}
+        , level_(0)
+    {
+        SetTexture(context, texture);
+    }
+
+    /**
      * Address: 0x0094AB60 (FUN_0094AB60)
      *
      * What it does:
@@ -7111,6 +7484,24 @@ namespace gpg::gal
         }
 
         return nullptr;
+    }
+
+    /**
+     * Address: 0x0094AAF0 (FUN_0094AAF0)
+     *
+     * What it does:
+     * Resets prior texture state, copies caller context metadata, assigns a
+     * new native texture handle, and clears copied source-data lanes.
+     */
+    void TextureD3D9::SetTexture(
+        const TextureContext* const context,
+        void* const texture
+    )
+    {
+        Reset();
+        context_.AssignFrom(*context);
+        texture_ = texture;
+        context_.ClearDataBuffer();
     }
 
     /**
@@ -7560,6 +7951,70 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x008F56B0 (FUN_008F56B0)
+     *
+     * What it does:
+     * Initializes one empty D3D9 vertex-buffer wrapper with default
+     * context/resource lanes.
+     */
+    VertexBufferD3D9::VertexBufferD3D9()
+        : context_()
+        , d3dVertexBuffer_(nullptr)
+        , locked_(false)
+        , lockPadding_{}
+        , mappedData_(nullptr)
+    {
+    }
+
+    /**
+     * Address: 0x008F58E0 (FUN_008F58E0, gpg::gal::VertexBufferD3D9::VertexBufferD3D9)
+     *
+     * What it does:
+     * Initializes one D3D9 vertex-buffer wrapper and binds the provided
+     * context/native buffer payload.
+     */
+    VertexBufferD3D9::VertexBufferD3D9(
+        const VertexBufferContext* const context,
+        void* const d3dVertexBuffer
+    )
+        : VertexBufferD3D9()
+    {
+        SetBuffer(context, d3dVertexBuffer);
+    }
+
+    /**
+     * Address: 0x008F5760 (FUN_008F5760)
+     *
+     * What it does:
+     * Releases any retained native vertex-buffer handle and restores
+     * the embedded context lanes to default values.
+     */
+    void VertexBufferD3D9::ResetBufferState()
+    {
+        ReleaseComLike(d3dVertexBuffer_);
+
+        const VertexBufferContext resetContext{};
+        context_.AssignFrom(resetContext);
+    }
+
+    /**
+     * Address: 0x008F5850 (FUN_008F5850)
+     *
+     * What it does:
+     * Releases any previous native vertex-buffer handle, resets context lanes,
+     * then assigns one new context + native buffer payload.
+     */
+    void VertexBufferD3D9::SetBuffer(
+        const VertexBufferContext* const context,
+        void* const d3dVertexBuffer
+    )
+    {
+        ResetBufferState();
+        context_.AssignFrom(*context);
+        d3dVertexBuffer_ = d3dVertexBuffer;
+    }
+
+    /**
      * Address: 0x008F58C0 (FUN_008F58C0)
      *
      * What it does:
@@ -7662,6 +8117,61 @@ namespace gpg::gal
     }
 
     /**
+     * Address: 0x0094B0A0 (FUN_0094B0A0, gpg::gal::VertexFormatD3D9::VertexFormatD3D9)
+     *
+     * What it does:
+     * Initializes one D3D9 vertex-format wrapper and applies caller format
+     * code plus native declaration payload.
+     */
+    VertexFormatD3D9::VertexFormatD3D9(const std::uint32_t formatCode, void* const vertexDeclaration)
+        : formatCode_(0x17U)
+        , elementStrideByStream_()
+        , vertexDeclaration_(nullptr)
+    {
+        SetFormatDeclaration(formatCode, vertexDeclaration);
+    }
+
+    /**
+     * Address: 0x0094AEF0 (FUN_0094AEF0)
+     *
+     * What it does:
+     * Applies one format/declaration payload and rebuilds per-stream stride
+     * lanes from the recovered D3D vertex-element table.
+     */
+    void VertexFormatD3D9::SetFormatDeclaration(const std::uint32_t formatCode, void* const vertexDeclaration)
+    {
+        ReleaseComLike(vertexDeclaration_);
+        vertexDeclaration_ = vertexDeclaration;
+        formatCode_ = formatCode;
+
+        const D3DVertexElementRuntime* const elementTable = GetVertexFormatElementsOrThrow(formatCode);
+        std::size_t declarationElementCount = 0U;
+        while (!IsVertexElementEndSentinel(elementTable[declarationElementCount]))
+        {
+            ++declarationElementCount;
+        }
+
+        elementStrideByStream_.clear();
+        for (std::size_t elementIndex = 0U; elementIndex < declarationElementCount; ++elementIndex)
+        {
+            const D3DVertexElementRuntime& element = elementTable[elementIndex];
+            const std::size_t streamIndex = static_cast<std::size_t>(element.stream);
+            if (elementStrideByStream_.size() <= streamIndex)
+            {
+                elementStrideByStream_.resize(streamIndex + 1U, 0U);
+            }
+
+            const std::uint32_t elementEndOffset =
+                static_cast<std::uint32_t>(element.offset) + GetVertexElementTypeSizeBytes(element.type);
+            std::uint32_t& streamStride = elementStrideByStream_[streamIndex];
+            if (streamStride < elementEndOffset)
+            {
+                streamStride = elementEndOffset;
+            }
+        }
+    }
+
+    /**
      * Address: 0x0094AD40 (FUN_0094AD40)
      *
      * What it does:
@@ -7670,6 +8180,19 @@ namespace gpg::gal
     VertexFormatD3D9::~VertexFormatD3D9()
     {
         DestroyVertexFormatD3D9Body(this);
+    }
+
+    /**
+     * Address: 0x0094AC90 (FUN_0094AC90)
+     *
+     * What it does:
+     * Releases the retained vertex-declaration handle and restores the
+     * default format code lane (`0x17`).
+     */
+    void VertexFormatD3D9::ResetDeclarationState()
+    {
+        ReleaseComLike(vertexDeclaration_);
+        formatCode_ = 0x17U;
     }
 
     /**
