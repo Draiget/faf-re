@@ -645,7 +645,7 @@ namespace moho
      * Seeds economy defaults, clears category-string vectors, and initializes
      * runtime category-cache inline storage using one rules-owner lane.
      */
-    explicit RUnitBlueprintEconomy(RRuleGameRules* rules = nullptr);
+    RUnitBlueprintEconomy(RRuleGameRules* rules = nullptr);
 
     float BuildCostEnergy;                            // +0x00
     float BuildCostMass;                              // +0x04

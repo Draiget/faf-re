@@ -1071,7 +1071,7 @@
     SFLIB_LockCs();
 
     const auto* const workctrlStorage =
-      static_cast<const std::uint8_t*>(SjAddressToPointer(workctrlAddress));
+      reinterpret_cast<const std::uint8_t*>(SjAddressToPointer(workctrlAddress));
     const std::int32_t decodeState = *reinterpret_cast<const std::int32_t*>(workctrlStorage + 0x48);
     if (decodeState == 4) {
       sfmpvf_SearchStbyFrm(workctrlAddress, &searchState, &readyFrameAddress);
@@ -1386,7 +1386,7 @@
   std::int32_t SFBUF_RingGetRead(
     const std::int32_t sfbufHandleAddress,
     const std::int32_t ringIndex,
-    void* outReadDescriptor
+    std::int32_t* outCursor
   );
   std::int32_t SFBUF_RingAddRead(
     const std::int32_t sfbufHandleAddress,
@@ -2036,7 +2036,7 @@
     const std::int32_t result = SFBUF_RingGetRead(
       workctrlAddress,
       runtimeView->activeSupplyLaneIndex,
-      &readDescriptor
+      reinterpret_cast<std::int32_t*>(&readDescriptor)
     );
     if (result != 0) {
       return result;
@@ -4896,6 +4896,7 @@
   {
     std::uint8_t mUnknown00[0x2158]{}; // +0x00
     std::int32_t* uochDescriptorWords = nullptr; // +0x2158
+    std::uint8_t mPad215C[0x04]{}; // +0x215C — implicit 4-byte gap before sfbufLaneIndex
     std::int32_t sfbufLaneIndex = 0; // +0x2160
     std::uint8_t mUnknown2164[0x13B4]{}; // +0x2164
     std::int32_t uochInlineHeader = 0; // +0x3518

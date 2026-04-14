@@ -373,7 +373,7 @@ namespace
   struct RuntimeCameraBaseView
   {
     void* mVftable = nullptr;          // +0x00
-    Broadcaster mBroadcaster{};        // +0x04
+    moho::Broadcaster mBroadcaster{};  // +0x04
   };
 
   static_assert(sizeof(RuntimeCameraBaseView) == 0x0C, "RuntimeCameraBaseView size must be 0x0C");
@@ -648,7 +648,7 @@ namespace moho
  * Removes one runtime camera from manager ownership and restores the base
  * broadcaster node to its self-linked idle state.
  */
-[[nodiscard]] Broadcaster* moho::DetachRuntimeCameraBase(CameraImpl* const camera)
+[[nodiscard]] moho::Broadcaster* moho::DetachRuntimeCameraBase(moho::CameraImpl* const camera)
 {
   RuntimeCameraBaseView* const base = AsRuntimeCameraBaseView(camera);
 
@@ -660,7 +660,7 @@ namespace moho
     }
   }
 
-  Broadcaster& broadcaster = base->mBroadcaster;
+  moho::Broadcaster& broadcaster = base->mBroadcaster;
   broadcaster.mNext->mPrev = broadcaster.mPrev;
   broadcaster.mPrev->mNext = broadcaster.mNext;
   broadcaster.mPrev = &broadcaster;

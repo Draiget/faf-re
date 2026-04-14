@@ -99,4 +99,21 @@ namespace moho
       break;
     }
   }
+
+  /**
+   * Address: 0x0060B380 (FUN_0060B380, Moho::CUnitFireAtTask::TaskTick) — placeholder
+   *
+   * What it does (placeholder):
+   * Provides a non-pure CTask::Execute override so this class is
+   * instantiable from `Create`. The real body is the 373-instruction
+   * weapon/target acquisition state machine at `0x0060B380`; recovery
+   * of that body is tracked as `needs_evidence` for `FUN_0060B380` in
+   * `recovered_progress.json`. Returning -1 (engine-style "no result"
+   * sentinel) keeps any accidental dispatch inert until the real body
+   * lands.
+   */
+  int CUnitFireAtTask::Execute()
+  {
+    return -1;
+  }
 } // namespace moho

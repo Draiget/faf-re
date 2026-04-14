@@ -49,7 +49,9 @@ namespace moho
     std::uint32_t mReserved04;                            // +0x04
     SpatialDB_MeshInstance mSpatialMeshInstance;          // +0x08
     std::uint8_t mRuntimeBlock10[0x8C];                   // +0x10
-    msvc8::vector<WaveGenerator*> mWaveGenerators;        // +0x9C
+    // 12-byte gpg-style vector (no proxy lane); matches the binary triplet
+    // initialized in WaveSystem ctor at 0x00888CB0 (mVec._Myfirst/_Mylast/_Myend).
+    gpg::core::FastVector<WaveGenerator*> mWaveGenerators; // +0x9C
     gpg::fastvector_n<WaveGenerator*, 100> mGeneratorCache; // +0xA8
   };
 

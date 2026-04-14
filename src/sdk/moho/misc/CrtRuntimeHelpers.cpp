@@ -60,6 +60,35 @@ extern "C" char* _aenvptr;
 extern "C" char** _environ;
 extern "C" int __env_initialized;
 extern "C" __declspec(dllimport) LPCH WINAPI GetEnvironmentStringsA(void);
+
+// Modern UCRT exposes `_iobuf` as an opaque single-pointer struct, but the
+// FAF CRT helpers (and the binaries they wrap) treat `std::FILE` as the
+// classic 32-byte VC8 layout below. This view lets us reach the legacy
+// fields through reinterpret_cast without depending on the corecrt header
+// shape.
+struct LegacyFileView
+{
+  char* _ptr;
+  int   _cnt;
+  char* _base;
+  int   _flag;
+  int   _file;
+  int   _charbuf;
+  int   _bufsiz;
+  char* _tmpfname;
+};
+static_assert(sizeof(LegacyFileView) == 0x20, "LegacyFileView size must be 0x20");
+
+[[nodiscard]] inline LegacyFileView& legacy_file(std::FILE* const stream) noexcept
+{
+  return *reinterpret_cast<LegacyFileView*>(stream);
+}
+
+[[nodiscard]] inline LegacyFileView& legacy_file(std::FILE& stream) noexcept
+{
+  return *reinterpret_cast<LegacyFileView*>(&stream);
+}
+
 struct RuntimeIoInfo
 {
   std::intptr_t osfhnd;        // +0x00
@@ -607,13 +636,13 @@ extern "C" int __cdecl _vsnprintf_helper(
   }
 
   std::FILE outputFile{};
-  outputFile._cnt = 0x7FFFFFFF;
+  legacy_file(outputFile)._cnt = 0x7FFFFFFF;
   if (count <= 0x7FFFFFFFu) {
-    outputFile._cnt = static_cast<int>(count);
+    legacy_file(outputFile)._cnt = static_cast<int>(count);
   }
-  outputFile._flag = 0x42;
-  outputFile._base = string;
-  outputFile._ptr = string;
+  legacy_file(outputFile)._flag = 0x42;
+  legacy_file(outputFile)._base = string;
+  legacy_file(outputFile)._ptr = string;
 
   const int formatResult = outfn(&outputFile, format, localeInfo, arguments);
   if (string == nullptr) {
@@ -621,9 +650,9 @@ extern "C" int __cdecl _vsnprintf_helper(
   }
 
   if (formatResult >= 0) {
-    --outputFile._cnt;
-    if (outputFile._cnt >= 0) {
-      *outputFile._ptr = '\0';
+    --legacy_file(outputFile)._cnt;
+    if (legacy_file(outputFile)._cnt >= 0) {
+      *legacy_file(outputFile)._ptr = '\0';
       return formatResult;
     }
     if (_flsbuf(0, &outputFile) != -1) {
@@ -631,7 +660,7 @@ extern "C" int __cdecl _vsnprintf_helper(
     }
   }
 
-  const bool remainingIsNonNegative = outputFile._cnt >= 0;
+  const bool remainingIsNonNegative = legacy_file(outputFile)._cnt >= 0;
   string[count - 1u] = '\0';
   return remainingIsNonNegative ? -1 : -2;
 }
@@ -667,7 +696,10 @@ extern "C" int __cdecl __wtomb_environ()
       return -1;
     }
 
-    if (__crtsetenv(reinterpret_cast<const unsigned char**>(&convertedEntry), 0) < 0) {
+    // C-style cast: convertedEntry is char*, but __crtsetenv takes a
+    // pointer-to-const-pointer. Two-step cast: first reinterpret the
+    // address as const-aware, then cast to the unsigned variant.
+    if (__crtsetenv((const unsigned char**)&convertedEntry, 0) < 0) {
       if (convertedEntry != nullptr) {
         _free_crt(convertedEntry);
         convertedEntry = nullptr;
@@ -697,10 +729,10 @@ vwprintf_helper(const RuntimeWideOutputFn woutfn, const wchar_t* const format, _
   }
 
   std::FILE outputFile{};
-  outputFile._cnt = 0x7FFFFFFF;
-  outputFile._flag = 0x42;
-  outputFile._base = nullptr;
-  outputFile._ptr = nullptr;
+  legacy_file(outputFile)._cnt = 0x7FFFFFFF;
+  legacy_file(outputFile)._flag = 0x42;
+  legacy_file(outputFile)._base = nullptr;
+  legacy_file(outputFile)._ptr = nullptr;
   return woutfn(&outputFile, format, plocinfo, ap);
 }
 
@@ -5996,23 +6028,23 @@ namespace moho::runtime
     const int streamFlags = RuntimeGetFileFlags(stream);
     int flushStatus = 0;
     if ((streamFlags & 0x3) == 0x2 && (streamFlags & 0x108) != 0) {
-      char* const base = stream->_base;
-      const int pendingBytes = static_cast<int>(stream->_ptr - base);
+      char* const base = legacy_file(stream)._base;
+      const int pendingBytes = static_cast<int>(legacy_file(stream)._ptr - base);
       if (pendingBytes > 0) {
         const int fileDescriptor = ::_fileno(stream);
         if (::_write(fileDescriptor, base, static_cast<unsigned int>(pendingBytes)) == pendingBytes) {
-          if ((stream->_flag & 0x80) != 0) {
-            stream->_flag &= ~0x2;
+          if ((legacy_file(stream)._flag & 0x80) != 0) {
+            legacy_file(stream)._flag &= ~0x2;
           }
         } else {
-          stream->_flag |= 0x20;
+          legacy_file(stream)._flag |= 0x20;
           flushStatus = -1;
         }
       }
     }
 
-    stream->_cnt = 0;
-    stream->_ptr = stream->_base;
+    legacy_file(stream)._cnt = 0;
+    legacy_file(stream)._ptr = legacy_file(stream)._base;
     return flushStatus;
   }
 
@@ -6081,7 +6113,7 @@ namespace moho::runtime
       return -1;
     }
 
-    if ((stream->_flag & 0x4000) == 0) {
+    if ((legacy_file(stream)._flag & 0x4000) == 0) {
       return 0;
     }
 
@@ -6123,7 +6155,7 @@ namespace moho::runtime
     }
 
     ++_cflush;
-    if ((stream->_flag & 0x10C) != 0) {
+    if ((legacy_file(stream)._flag & 0x10C) != 0) {
       return 0;
     }
 
@@ -6132,19 +6164,36 @@ namespace moho::runtime
       bufferSlot = static_cast<char*>(std::malloc(4096u));
     }
 
+    // Modern MSVC <_iobuf> hides legacy fields (_cnt/_flag/_base/_ptr/
+    // _bufsiz/_charbuf/_tmpfname) behind opaque storage. Reach the same
+    // legacy slots through a struct view that mirrors the legacy 32-byte
+    // FILE layout (matches the binary's assumption that std::FILE is the
+    // legacy `_iobuf`).
+    struct LegacyFileView
+    {
+      char* _ptr;
+      int   _cnt;
+      char* _base;
+      int   _flag;
+      int   _file;
+      int   _charbuf;
+      int   _bufsiz;
+      char* _tmpfname;
+    };
+    auto* const legacyView = reinterpret_cast<LegacyFileView*>(stream);
     if (bufferSlot != nullptr) {
-      stream->_base = bufferSlot;
-      stream->_ptr = bufferSlot;
-      stream->_bufsiz = 4096;
-      stream->_cnt = 4096;
+      legacyView->_base = bufferSlot;
+      legacyView->_ptr = bufferSlot;
+      legacyView->_bufsiz = 4096;
+      legacyView->_cnt = 4096;
     } else {
-      stream->_base = reinterpret_cast<char*>(&stream->_charbuf);
-      stream->_ptr = reinterpret_cast<char*>(&stream->_charbuf);
-      stream->_bufsiz = 2;
-      stream->_cnt = 2;
+      legacyView->_base = reinterpret_cast<char*>(&legacyView->_charbuf);
+      legacyView->_ptr = reinterpret_cast<char*>(&legacyView->_charbuf);
+      legacyView->_bufsiz = 2;
+      legacyView->_cnt = 2;
     }
 
-    stream->_flag |= 0x1102u;
+    legacyView->_flag |= 0x1102;
     return 1;
   }
 

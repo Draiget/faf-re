@@ -1971,7 +1971,7 @@ extern "C"
     moho::SofdecSjRingBufferHandle* ringBufferHandle
   );
   void MWSFPLY_SetFlowLimit(moho::MwsfdPlaybackStateSubobj* ply);
-  void mwlSfdSleepDecSvr(moho::MwsfdPlaybackStateSubobj* ply);
+  std::int32_t mwlSfdSleepDecSvr(moho::MwsfdPlaybackStateSubobj* ply);
   void mwsfsvr_StartPlayback(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t mwsfsvr_StartStream(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t mwlSfdExecDecSvrPrep(moho::MwsfdPlaybackStateSubobj* ply);

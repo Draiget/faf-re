@@ -9,6 +9,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"

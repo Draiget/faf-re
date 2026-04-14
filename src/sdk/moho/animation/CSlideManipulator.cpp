@@ -1096,6 +1096,17 @@ moho::CSlideManipulatorTypeInfo::ConfigureLifecycleCallbacks(CSlideManipulatorTy
 }
 
 /**
+ * Address: 0x00646EA0 (FUN_00646EA0, Moho::CSlideManipulatorTypeInfo::GetName)
+ *
+ * What it does:
+ * Returns the literal type name "CSlideManipulator" for reflection.
+ */
+const char* moho::CSlideManipulatorTypeInfo::GetName() const
+{
+  return "CSlideManipulator";
+}
+
+/**
  * Address: 0x00646E60 (FUN_00646E60, Moho::CSlideManipulatorTypeInfo::Init)
  *
  * What it does:

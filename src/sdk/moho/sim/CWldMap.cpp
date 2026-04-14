@@ -500,7 +500,7 @@ namespace moho
       return false;
     }
 
-    const bool setOk = map->SetPlayableMapRect(rect);
+    const bool setOk = map->SetPlayableMapRect(rect.AsRect2i());
     if (!setOk) {
       gpg::Warnf("Attempting to set an invalid playable rect");
       return false;
