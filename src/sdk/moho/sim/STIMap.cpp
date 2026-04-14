@@ -2194,6 +2194,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x0069A620 (FUN_0069A620, Moho::CHeightField::GetNormal)
+   *
+   * float x, float z
+   *
+   * What it does:
+   * Samples four neighboring elevations around `(x,z)`, builds one terrain
+   * gradient normal, and normalizes the output vector.
+   */
+  Wm3::Vec3f CHeightField::GetNormal(const float x, const float z) const
+  {
+    const float top = GetElevation(x, z - 0.5f);
+    const float left = GetElevation(x - 0.5f, z);
+    const float right = GetElevation(x + 0.5f, z);
+    const float bottom = GetElevation(x, z + 0.5f);
+
+    Wm3::Vec3f out{};
+    out.x = left - right;
+    out.y = 1.0f;
+    out.z = top - bottom;
+    (void)out.Normalize();
+    return out;
+  }
+
+  /**
    * Address: 0x00475DA0 (FUN_00475DA0)
    *
    * int x, int z, int tier
@@ -3905,6 +3929,32 @@ namespace moho
     }
 
     return ToOccupancyCaps(capsMask);
+  }
+
+  /**
+   * Address: 0x00720B20 (FUN_00720B20, Moho::OCCUPY_HoverFootprintFits)
+   *
+   * Moho::SOCellPos const &, Moho::COGrid const &, Moho::SFootprint const &, Moho::EOccupancyCaps
+   *
+   * IDA signature:
+   * Moho::EOccupancyCaps __userpurge Moho::OCCUPY_HoverFootprintFits@<al>(
+   *   Moho::SOCellPos *a1@<eax>, Moho::COGrid *a2@<ebx>, const Moho::SFootprint *a3@<esi>, Moho::EOccupancyCaps a4);
+   *
+   * What it does:
+   * Computes mobile occupancy caps, clears `OC_SUB` for water-layer callers,
+   * then forwards the narrowed caps into `OCCUPY_FootprintFits`.
+   */
+  EOccupancyCaps OCCUPY_HoverFootprintFits(
+    const SOCellPos& pos, const COGrid& grid, const SFootprint& footprint, EOccupancyCaps occupancyCaps
+  )
+  {
+    EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *grid.sim->mMapData, pos);
+    if (occupancyCaps == EOccupancyCaps::OC_WATER) {
+      caps = static_cast<EOccupancyCaps>(
+        static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
+      );
+    }
+    return OCCUPY_FootprintFits(grid, pos, footprint, caps);
   }
 
   CHeightField* STIMap::GetHeightField() const noexcept

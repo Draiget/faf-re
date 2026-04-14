@@ -5,6 +5,7 @@
 
 namespace gpg
 {
+  class ReadArchive;
   class WriteArchive;
 } // namespace gpg
 
@@ -14,6 +15,14 @@ namespace moho
 
   struct SSTIEntityConstantData
   {
+    /**
+     * Address: 0x00559990 (FUN_00559990, Moho::SSTIEntityConstantData::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes entity id, unowned entity-blueprint pointer, and creation tick.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
     /**
      * Address: 0x00559A00 (FUN_00559A00, Moho::SSTIEntityConstantData::MemberSerialize)
      *

@@ -124,6 +124,15 @@ moho::IUIManager* moho::UI_GetManager()
 }
 
 /**
+ * Address: 0x00833C20 (FUN_00833C20, Moho::UICommandModeData::UICommandModeData)
+ * Mangled: ??0UICommandModeData@Moho@@QAE@XZ
+ *
+ * What it does:
+ * Default-constructs command-mode name and payload Lua-object lanes.
+ */
+moho::UICommandModeData::UICommandModeData() = default;
+
+/**
  * Address: 0x0083D140 (FUN_0083D140, ?UI_StartFrontEnd@Moho@@YA_NXZ)
  *
  * What it does:

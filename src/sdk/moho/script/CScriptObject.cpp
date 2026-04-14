@@ -453,6 +453,64 @@ namespace
   private:
     WeakObject::ScopedWeakLinkGuard m_guard;
   };
+
+  /**
+   * Address: 0x004C7C30 (FUN_004C7C30)
+   *
+   * IDA signature:
+   * _DWORD *__thiscall sub_4C7C30(_DWORD *this);
+   *
+   * What it does:
+   * Unlinks one `CScriptObject_base` node from the active-invocation
+   * singly-linked chain used by every `CScriptObject::RunScript*` /
+   * `Call` variant (54 call sites). During a script invocation the
+   * caller installs its local stack-cell address into the object's
+   * `mNextPtr` field and stores the previous chain pointer inside that
+   * stack cell; on exit this helper walks the chain starting at
+   * `this->mNextPtr`, locates the slot whose stored back-pointer equals
+   * `this`, and replaces it with the saved predecessor pointer held in
+   * the companion slot at `this[1]`. This is the compiler-outlined form
+   * of the inline unlink loop that appears in
+   * `CScriptObject::Call` (FUN_00581930) and its 53 siblings.
+   */
+  [[maybe_unused]] void** UnlinkActiveScriptInvocationChainNode(void** const chainNode) noexcept
+  {
+    void** cursor = static_cast<void**>(chainNode[0]);
+    if (chainNode[0] != nullptr) {
+      while (*cursor != static_cast<void*>(chainNode)) {
+        cursor = reinterpret_cast<void**>(reinterpret_cast<char*>(*cursor) + sizeof(void*));
+      }
+      *cursor = chainNode[1];
+    }
+    return cursor;
+  }
+
+  /**
+   * Address: 0x004C8360 (FUN_004C8360)
+   * Address: 0x004C8390 (FUN_004C8390)
+   *
+   * What it does:
+   * Copy-assigns one source `LuaObject` range `[sourceBegin, sourceEnd)`
+   * so the copied block ends at `destinationEnd`, walking both ranges
+   * backward one 20-byte element at a time and invoking
+   * `LuaPlus::LuaObject::operator=`. Emitted twice by the compiler for
+   * the two distinct inlining lanes inside
+   * `LuaObjectFastVector::InsertAt` / `GrowInsert`.
+   */
+  [[maybe_unused]] LuaPlus::LuaObject* CopyAssignLuaObjectRangeBackward(
+    LuaPlus::LuaObject* destinationEnd,
+    const LuaPlus::LuaObject* sourceBegin,
+    const LuaPlus::LuaObject* sourceEnd
+  )
+  {
+    while (sourceEnd != sourceBegin) {
+      --sourceEnd;
+      --destinationEnd;
+      *destinationEnd = *sourceEnd;
+    }
+    return destinationEnd;
+  }
+
 } // namespace
 
 /**

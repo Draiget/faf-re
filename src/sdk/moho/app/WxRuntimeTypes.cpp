@@ -25,6 +25,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/console/CConCommand.h"
+#include "moho/mesh/Mesh.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
 
@@ -227,6 +228,9 @@ namespace
   int gWxGetOsVersionCache = -1;
   int gWxGetOsVersionMajor = -1;
   int gWxGetOsVersionMinor = -1;
+  HCURSOR gs_wxBusyCursor = nullptr;
+  HCURSOR gs_wxBusyCursorOld = nullptr;
+  int gs_wxBusyCursorCount = 0;
 
   struct WxWindowHandleHashEntryRuntime
   {
@@ -359,6 +363,16 @@ namespace
     void* vtable = nullptr;
     void* refData = nullptr;
   };
+
+  struct WxCursorRefDataRuntimeView
+  {
+    std::uint8_t reserved00_13[0x14];
+    void* nativeCursorHandle = nullptr; // +0x14
+  };
+  static_assert(
+    offsetof(WxCursorRefDataRuntimeView, nativeCursorHandle) == 0x14,
+    "WxCursorRefDataRuntimeView::nativeCursorHandle offset must be 0x14"
+  );
 
   /**
    * Runtime view for wxImage::m_refData allocated by `FUN_009703B0`.
@@ -1846,6 +1860,32 @@ void wxLogDebug(
   ...
 )
 {}
+
+/**
+ * Address: 0x009C7BB0 (FUN_009C7BB0, wxBeginBusyCursor)
+ *
+ * What it does:
+ * Increments busy-cursor nesting depth and, on first entry, swaps the active
+ * Win32 cursor to the provided wx cursor handle (or null cursor when refdata
+ * is absent), while saving the previous cursor lane.
+ */
+void wxBeginBusyCursor(wxCursor* const cursor)
+{
+  if (gs_wxBusyCursorCount++ != 0) {
+    return;
+  }
+
+  const auto* const objectView = reinterpret_cast<const WxObjectRuntimeView*>(cursor);
+  const auto* const refDataView = reinterpret_cast<const WxCursorRefDataRuntimeView*>(objectView->refData);
+  if (refDataView != nullptr) {
+    gs_wxBusyCursor = reinterpret_cast<HCURSOR>(refDataView->nativeCursorHandle);
+    gs_wxBusyCursorOld = ::SetCursor(gs_wxBusyCursor);
+    return;
+  }
+
+  gs_wxBusyCursor = nullptr;
+  gs_wxBusyCursorOld = ::SetCursor(nullptr);
+}
 
 /**
  * Address: 0x009CD1D0 (FUN_009CD1D0, wx::copystring)
@@ -6259,7 +6299,88 @@ void moho::WWinManagedFrame::DestroyManagedOwners(
  * from the render-camera-outline path as the viewport begins a new
  * render pass.
  */
+namespace
+{
+  struct WRenViewportRenderView final
+  {
+    std::uint8_t mUnknown0000_215B[0x215C];
+    std::uint8_t mDebugCanvas[0x40];
+    moho::GeomCamera3* mCam; // +0x219C
+    std::uint8_t mUnknown21A0_2C7[0x128];
+    struct PrimBatcherView final
+    {
+      moho::CD3DPrimBatcher* batcher;
+    };
+    PrimBatcherView mPrimBatcher; // +0x2C8
+    std::uint8_t mUnknown2CC_307[0x3C];
+    Wm3::Vector2i mScreenPos; // +0x308
+    Wm3::Vector2i mScreenSize; // +0x310
+    std::uint8_t mUnknown318_31F[0x08];
+    std::int32_t mHead; // +0x320
+    std::uint8_t mUnknown324_4EF[0x1CC];
+    struct ShadowView final
+    {
+      std::uint8_t mUnknown00_07[0x08];
+      std::int32_t shadow_Fidelity; // +0x08
+    };
+    ShadowView mShadowRenderer; // +0x4F0
+  };
+
+  static_assert(
+    offsetof(WRenViewportRenderView, mDebugCanvas) == 0x215C,
+    "WRenViewportRenderView::mDebugCanvas offset must be 0x215C"
+  );
+  static_assert(
+    offsetof(WRenViewportRenderView, mCam) == 0x219C, "WRenViewportRenderView::mCam offset must be 0x219C"
+  );
+  [[nodiscard]] WRenViewportRenderView* AsRenderView(moho::WRenViewport* const viewport) noexcept
+  {
+    return reinterpret_cast<WRenViewportRenderView*>(viewport);
+  }
+} // namespace
+
+namespace moho
+{
+  extern bool ren_ShowSkeletons;
+} // namespace moho
+
 void moho::WRenViewport::ResetRenderState0C() noexcept
 {
   mRenderState0C = -1;
+}
+
+/**
+ * Address: 0x007F8290 (FUN_007F8290, Moho::WRenViewport::RenderMeshes)
+ *
+ * What it does:
+ * Sets the render target, viewport, and color-write state for one viewport
+ * mesh pass, then dispatches either skeleton-debug rendering or the normal
+ * mesh batch renderer depending on `ren_ShowSkeletons`.
+ */
+void moho::WRenViewport::RenderMeshes(const int meshFlags, const bool mirrored)
+{
+  WRenViewportRenderView* const runtime = AsRenderView(this);
+  moho::GeomCamera3* const cam = runtime->mCam;
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
+  moho::D3D_GetDevice()->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
+  device->SetColorWriteState(true, true);
+
+  moho::Shadow* const shadowRenderer = runtime->mShadowRenderer.shadow_Fidelity != 0
+    ? reinterpret_cast<moho::Shadow*>(&runtime->mShadowRenderer)
+    : nullptr;
+
+  moho::MeshRenderer* const instance = moho::MeshRenderer::GetInstance();
+  if (moho::ren_ShowSkeletons) {
+    instance->RenderSkeletons(
+      reinterpret_cast<moho::CD3DPrimBatcher*>(runtime->mPrimBatcher.batcher),
+      reinterpret_cast<moho::CDebugCanvas*>(runtime->mDebugCanvas),
+      *cam,
+      true
+    );
+    return;
+  }
+
+  instance->Render(meshFlags, *cam, shadowRenderer, instance->meshes);
+  (void)mirrored;
 }

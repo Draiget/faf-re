@@ -21,8 +21,16 @@ namespace moho
      * Allocates one `CUnitCaptureTask` and returns a typed reflection ref.
      */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x006054A0 (FUN_006054A0, Moho::CUnitCaptureTaskTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CUnitCaptureTask` in caller-provided storage and returns
+     * a typed reflection ref.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
   };
 
   static_assert(sizeof(CUnitCaptureTaskTypeInfo) == 0x64, "CUnitCaptureTaskTypeInfo size must be 0x64");
 } // namespace moho
-

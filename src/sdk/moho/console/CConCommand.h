@@ -73,6 +73,8 @@ namespace moho
   extern msvc8::string con_TestVarStr;
   extern bool snd_ExtraDoWorkCalls;
   extern int recon_debug;
+  extern int rule_Paranoid;
+  extern float rule_BlueprintReloadDelay;
 
   /**
    * Address: 0x0041E390 (FUN_0041E390)
@@ -788,6 +790,7 @@ namespace moho
   void TConVar<float>::Handle(void* commandArgs);
 
   /**
+   * Address: 0x007FDE00 (FUN_007FDE00, Moho::TConVar_uint::Process)
    * Address: 0x103C8880 (FUN_103C8880)
    *
    * What it does:

@@ -46,6 +46,7 @@ namespace moho
     CScrLuaBaseClassSpec(const CScrLuaBaseClassSpec& other);
 
     /**
+     * Address: 0x004CD5E0 (FUN_004CD5E0, ?Run@CScrLuaBaseClassSpec@Moho@@MAEXPAVLuaState@LuaPlus@@@Z)
      * Address: 0x100BF090 (FUN_100BF090)
      *
      * LuaState *

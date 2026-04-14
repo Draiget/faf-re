@@ -46,6 +46,8 @@ namespace moho
   class CUnitMotion;
   class CAniActor;
   class CFormationInstance;
+  class IFormationInstance;
+  class Unit;
   class IAiBuilder;
   class IAiNavigator;
   class IAiSteering;
@@ -63,6 +65,15 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Address: 0x0062AA90 (FUN_0062AA90, func_UnitWontFitAt)
+   *
+   * What it does:
+   * Returns true when `unit` cannot place its footprint at `worldPosition`
+   * due to map bounds or occupancy-cap fit checks.
+   */
+  [[nodiscard]] bool UnitWontFitAt(const Wm3::Vec3f& worldPosition, const Unit* unit);
+
   struct SBeatResourceAccumulators
   {
     float maintenanceEnergy;
@@ -993,6 +1004,16 @@ namespace moho
     Unit* GetGuardedUnit() const;
 
     /**
+     * Address: 0x006A76A0 (FUN_006A76A0, Moho::Unit::SetGuardedUnit)
+     *
+     * What it does:
+     * Rebinds guarded-unit weak-link ownership, updates guarded-by lane
+     * membership, clears stale guard-formation ownership, and marks sync-dirty
+     * runtime state.
+     */
+    void SetGuardedUnit(Unit* guarded);
+
+    /**
      * Address: 0x00585B10 (FUN_00585B10, Moho::Unit::GetFocusEntity)
      *
      * What it does:
@@ -1163,7 +1184,8 @@ namespace moho
     char pad_04F4[4];                                    // 0x04F4
     SGuardedByRuntimeList GuardedByList;                 // 0x04F8
     void* OccupyGroundToken;                             // 0x0510
-    char pad_0514[16];                                   // 0x0514
+    char pad_0514[12];                                   // 0x0514
+    IFormationInstance* GuardFormation;                  // 0x0520
     bool mNeedsKillCleanup;            // 0x0524: tested in Sim::AdvanceBeat, cleared by Unit::KillCleanup (0x006A8790)
     char pad_0525[0x0B];               // 0x0525
     std::int32_t PriorityBoost;        // 0x0530
@@ -1240,6 +1262,7 @@ namespace moho
   static_assert(offsetof(Unit, ArmorMultipliers) == 0x0568, "Unit::ArmorMultipliers offset must be 0x0568");
   static_assert(offsetof(Unit, mEconomyEventListHead) == 0x0574, "Unit::mEconomyEventListHead offset must be 0x0574");
   static_assert(offsetof(Unit, mReconBlips) == 0x0670, "Unit::mReconBlips offset must be 0x0670");
+  static_assert(offsetof(Unit, GuardFormation) == 0x0520, "Unit::GuardFormation offset must be 0x0520");
   static_assert(offsetof(Unit, OverchargePaused) == 0x04A9, "Unit::OverchargePaused offset must be 0x04A9");
   static_assert(offsetof(Unit, NeedSyncGameData) == 0x068E, "Unit::NeedSyncGameData offset must be 0x068E");
   static_assert(offsetof(Unit, CaptorCount) == 0x0690, "Unit::CaptorCount offset must be 0x0690");

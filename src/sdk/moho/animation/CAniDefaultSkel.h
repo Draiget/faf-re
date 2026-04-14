@@ -18,11 +18,13 @@ namespace moho
     CAniDefaultSkel();
 
     /**
-     * Address: 0x0054AD50 (FUN_0054AD50, scalar deleting destructor thunk)
-     * Mangled: ??_GCAniDefaultSkel@Moho@@UAEPAXI@Z
+     * Address: 0x0054A4C0 (FUN_0054A4C0, Moho::CAniDefaultSkel::~CAniDefaultSkel)
+     * Mangled: ??1CAniDefaultSkel@Moho@@QAE@XZ
+     * Deleting thunk: 0x0054AD50 (FUN_0054AD50, ??_GCAniDefaultSkel@Moho@@UAEPAXI@Z)
      *
      * What it does:
-     * Runs base skeleton teardown and conditionally deletes `this`.
+     * Resets vftable to `CAniSkel`, releases skeleton vectors/shared SCM file,
+     * then returns to scalar deleting destructor thunk for optional delete.
      */
     ~CAniDefaultSkel() override;
   };

@@ -65,7 +65,12 @@ namespace
     return x >= rect.minX && x < rect.maxX && z >= rect.minZ && z < rect.maxZ;
   }
 
-  // 0x0063CA40
+  /**
+   * Address: 0x0063CA40 (FUN_0063CA40, boost::shared_ptr<Moho::CAniPose> helper)
+   *
+   * What it does:
+   * Rebinds one `boost::shared_ptr<CAniPose>` to the supplied pose pointer.
+   */
   void CreateCAniPoseSharedPtr(moho::CAniPose* const pose, boost::shared_ptr<moho::CAniPose>& out)
   {
     out.reset(pose);

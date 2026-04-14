@@ -550,6 +550,171 @@
     CFT_Ycc420plnToRgb555Init();
   }
 
+  namespace
+  {
+    [[nodiscard]] inline std::int16_t TruncateToI16(const double value) noexcept
+    {
+      return static_cast<std::int16_t>(static_cast<std::int32_t>(value));
+    }
+
+    [[nodiscard]] inline std::int32_t TruncateToI32(const double value) noexcept
+    {
+      return static_cast<std::int32_t>(value);
+    }
+
+    [[nodiscard]] inline double ClampToByteRange(const double value) noexcept
+    {
+      if (value < 0.0) {
+        return 0.0;
+      }
+      if (value > 255.0) {
+        return 255.0;
+      }
+      return value;
+    }
+
+    void BuildArgb8888AlphaChromaTables(std::int16_t* const tableWords)
+    {
+      for (std::int32_t lane = -128; lane < 128; ++lane) {
+        const std::size_t laneIndex = static_cast<std::size_t>(lane + 128);
+
+        std::int16_t* const table0 = tableWords + 1024u + (laneIndex * 4u);
+        std::int16_t* const table1 = tableWords + 2048u + (laneIndex * 4u);
+        const double laneValue = static_cast<double>(lane);
+
+        table0[0] = TruncateToI16((129.088 * laneValue) + 0.5);
+        table0[1] = TruncateToI16(0.5 - (25.088 * laneValue));
+        table0[2] = 0;
+        table0[3] = 0;
+
+        table1[0] = 0;
+        table1[1] = TruncateToI16(0.5 - (52.032 * laneValue));
+        table1[2] = TruncateToI16((102.144 * laneValue) + 0.5);
+        table1[3] = 0;
+      }
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)
+   *
+   * What it does:
+   * Builds one ARGB8888 alpha ramp table for 3110 mode:
+   * base lane bands in [0x000..0x7FF] and paired chroma lookup lanes in
+   * [0x800..0x17FF].
+   */
+  std::int32_t CFT_MakeArgb8888Alp3110Tbl(
+    const std::int32_t tableAddress,
+    const std::int32_t alpha0,
+    const std::int32_t alpha1,
+    const std::int32_t alpha2
+  )
+  {
+    auto* const tableWords = reinterpret_cast<std::int16_t*>(SjAddressToPointer(tableAddress));
+    if (tableWords == nullptr) {
+      return 0;
+    }
+
+    BuildArgb8888AlphaChromaTables(tableWords);
+
+    const std::int16_t alphaLane0 = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha0));
+    const std::int16_t alphaLane1 = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha1) << 6);
+    const std::int16_t alphaLane2 = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha2) << 6);
+
+    for (std::int32_t index = 0; index < 9; ++index) {
+      std::int16_t* const entry = tableWords + (static_cast<std::size_t>(index) * 4u);
+      entry[0] = 0;
+      entry[1] = 0;
+      entry[2] = 0;
+      entry[3] = alphaLane0;
+    }
+
+    std::int32_t result = 0;
+    for (std::int32_t index = 9; index < 134; ++index) {
+      std::int16_t* const entry = tableWords + (static_cast<std::size_t>(index) * 4u);
+      const double clamped = ClampToByteRange(static_cast<double>(index) - 16.0);
+      result = TruncateToI32((clamped * 148.3636363636364) + 0.5);
+      const std::int16_t packed = static_cast<std::int16_t>(result);
+      entry[0] = packed;
+      entry[1] = packed;
+      entry[2] = packed;
+      entry[3] = alphaLane1;
+    }
+
+    for (std::int32_t index = 134; index < 256; ++index) {
+      std::int16_t* const entry = tableWords + (static_cast<std::size_t>(index) * 4u);
+      const double clamped = ClampToByteRange(251.0 - static_cast<double>(index));
+      result = TruncateToI32((clamped * 148.3636363636364) + 0.5);
+      const std::int16_t packed = static_cast<std::int16_t>(result);
+      entry[0] = packed;
+      entry[1] = packed;
+      entry[2] = packed;
+      entry[3] = alphaLane2;
+    }
+
+    return result;
+  }
+
+  /**
+   * Address: 0x00AEDD50 (FUN_00AEDD50, _CFT_MakeArgb8888Alp3211Tbl)
+   *
+   * What it does:
+   * Builds one ARGB8888 alpha ramp table for 3211 mode:
+   * base lane bands in [0x000..0x7FF] and paired chroma lookup lanes in
+   * [0x800..0x17FF].
+   */
+  std::int32_t CFT_MakeArgb8888Alp3211Tbl(
+    const std::int32_t tableAddress,
+    const std::int32_t alpha0,
+    const std::int32_t alpha1,
+    const std::int32_t alpha2
+  )
+  {
+    auto* const tableWords = reinterpret_cast<std::int16_t*>(SjAddressToPointer(tableAddress));
+    if (tableWords == nullptr) {
+      return 0;
+    }
+
+    BuildArgb8888AlphaChromaTables(tableWords);
+
+    const std::int16_t alphaLane0 = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha0));
+    const std::int16_t alphaLane1 = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha1) << 6);
+    const std::int16_t alphaLane2 = static_cast<std::int16_t>(static_cast<std::uint8_t>(alpha2) << 6);
+
+    for (std::int32_t index = 0; index < 48; ++index) {
+      std::int16_t* const entry = tableWords + (static_cast<std::size_t>(index) * 4u);
+      entry[0] = -1160;
+      entry[1] = -1160;
+      entry[2] = -1160;
+      entry[3] = alphaLane0;
+    }
+
+    std::int32_t result = 0;
+    for (std::int32_t index = 48; index < 130; ++index) {
+      std::int16_t* const entry = tableWords + (static_cast<std::size_t>(index) * 4u);
+      const double clamped = ClampToByteRange(static_cast<double>(index) - 68.0);
+      result = TruncateToI32((clamped * 296.7272727272727) + 0.5);
+      const std::int16_t packed = static_cast<std::int16_t>(result);
+      entry[0] = packed;
+      entry[1] = packed;
+      entry[2] = packed;
+      entry[3] = alphaLane1;
+    }
+
+    for (std::int32_t index = 130; index < 256; ++index) {
+      std::int16_t* const entry = tableWords + (static_cast<std::size_t>(index) * 4u);
+      const double clamped = ClampToByteRange(247.0 - static_cast<double>(index));
+      result = TruncateToI32((clamped * 147.027027027027) + 0.5);
+      const std::int16_t packed = static_cast<std::int16_t>(result);
+      entry[0] = packed;
+      entry[1] = packed;
+      entry[2] = packed;
+      entry[3] = alphaLane2;
+    }
+
+    return result;
+  }
+
   /**
    * Address: 0x00B10490 (FUN_00B10490, _CRICFG_Init)
    *

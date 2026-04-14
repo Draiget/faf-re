@@ -8,6 +8,7 @@
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/sim/ArmyUnitSet.h"
 #include "moho/sim/ESquadClass.h"
+#include "Wm3Vector3.h"
 
 namespace gpg
 {
@@ -82,6 +83,15 @@ namespace moho
      * `maxCount` matches have been added.
      */
     void AppendUnitsWithBP(const char* blueprintId, int maxCount, SEntitySetTemplateUnit& outUnits);
+
+    /**
+     * Address: 0x00724550 (FUN_00724550, Moho::CSquad::FitsAt)
+     *
+     * What it does:
+     * Tests whether every live squad unit can fit its footprint at `position`
+     * against terrain occupancy using per-motion-type layer checks.
+     */
+    [[nodiscard]] bool FitsAt(const Wm3::Vec3f& position) const;
 
   public:
     Sim* mSim;                                                // +0x00

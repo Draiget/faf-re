@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <vector>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
@@ -20,12 +22,15 @@
 namespace moho
 {
   class CAniPose;
+  class CD3DPrimBatcher;
+  class CDebugCanvas;
   class MeshBatch;
   class Mesh;
   class MeshMaterial;
   class CD3DDynamicTextureSheet;
   class ID3DRenderTarget;
   class ID3DDepthStencil;
+  class Shadow;
   struct RMeshBlueprint;
   struct RMeshBlueprintLOD;
   class RScmResource;
@@ -554,6 +559,47 @@ namespace moho
       MeshInstance* meshInstance,
       ID3DRenderTarget* renderTarget,
       ID3DDepthStencil* depthStencil
+    );
+
+    /**
+     * Address: 0x007E19D0 (FUN_007E19D0, Moho::MeshRenderer::ConfigureShader)
+     *
+     * What it does:
+     * Binds the terrain/sun/shadow shader-constant lane for one mesh render
+     * pass before batch iteration begins.
+     */
+    void ConfigureShader(const GeomCamera3& camera, Shadow* shadow, bool mirrored);
+
+    /**
+     * Address: 0x007DFDB0 (FUN_007DFDB0, Moho::MeshRenderer::RenderSkeletons)
+     *
+     * What it does:
+     * Renders every mesh instance in the cache with skeleton-debug overlays
+     * and a shared prim batcher state.
+     */
+    void RenderSkeletons(CD3DPrimBatcher* debugBatcher, CDebugCanvas* debugCanvas, const GeomCamera3& camera, bool showBoneNames);
+
+    /**
+     * Address: 0x007E2290 (FUN_007E2290, Moho::MeshRenderer::RenderSkeleton)
+     *
+     * What it does:
+     * Draws one mesh instance's skeleton debug pose, optional bone names, and
+     * wireframe bounds.
+     */
+    void RenderSkeleton(CD3DPrimBatcher* debugBatcher, CDebugCanvas* debugCanvas, MeshInstance* meshInstance, bool showBoneNames);
+
+    /**
+     * Address: 0x007E0C30 (FUN_007E0C30, Moho::MeshRenderer::Render)
+     *
+     * What it does:
+     * Draws one batch map of mesh instances with the active material shader
+     * state and optional shadow lane.
+     */
+    void Render(
+      std::int32_t meshFlags,
+      const GeomCamera3& camera,
+      Shadow* shadow,
+      MeshBatchBucketTree& meshMap
     );
 
   public:

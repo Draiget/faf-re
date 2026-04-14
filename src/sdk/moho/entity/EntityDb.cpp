@@ -22,6 +22,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/sim/IdPool.h"
+#include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
 
 namespace moho
@@ -401,6 +402,18 @@ namespace
     entities.push_back(entity);
   }
 
+  void RemoveTrackedEntityById(msvc8::list<moho::Entity*>& entities, const std::uint32_t releasedId) noexcept
+  {
+    for (auto it = entities.begin(); it != entities.end();) {
+      const moho::Entity* const entity = *it;
+      if (entity != nullptr && static_cast<std::uint32_t>(entity->id_) == releasedId) {
+        it = entities.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
   [[nodiscard]] gpg::RRef MakeObjectRef(void* const object, gpg::RType* const type) noexcept
   {
     gpg::RRef ref{};
@@ -552,6 +565,22 @@ namespace
       next = next->left;
     }
     return childOrParent;
+  }
+
+  [[nodiscard]] moho::Unit* DecodeAllUnitsIteratorPayload(
+    const moho::CEntityDbAllUnitsNode* const node
+  ) noexcept
+  {
+    if (node == nullptr || node->unitListNode == nullptr) {
+      return nullptr;
+    }
+
+    const auto encodedNode = reinterpret_cast<std::uintptr_t>(node->unitListNode);
+    if (encodedNode < 0x8u) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<moho::Unit*>(encodedNode - 0x8u);
   }
 
   template <typename TNode>
@@ -743,6 +772,15 @@ namespace
      */
     [[nodiscard]] static gpg::RRef NewRef();
 
+    /**
+     * Address: 0x006879B0 (FUN_006879B0, Moho::EntityDBTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CEntityDb` in caller-provided storage and wraps it in an
+     * `EntityDB` reflection reference.
+     */
+    [[nodiscard]] static gpg::RRef CtrRef(void* objectStorage);
+
     [[nodiscard]] const char* GetName() const override
     {
       return "EntityDB";
@@ -751,6 +789,7 @@ namespace
     void Init() override
     {
       newRefFunc_ = &EntityDbTypeInfo::NewRef;
+      ctorRefFunc_ = &EntityDbTypeInfo::CtrRef;
       size_ = sizeof(moho::CEntityDb);
       gpg::RType::Init();
       Finish();
@@ -770,6 +809,25 @@ namespace
     moho::CEntityDb* entityDb = nullptr;
     if (void* const storage = ::operator new(sizeof(moho::CEntityDb), std::nothrow); storage != nullptr) {
       entityDb = new (storage) moho::CEntityDb();
+    }
+
+    gpg::RRef out{};
+    (void)gpg::RRef_EntityDB(&out, entityDb);
+    return out;
+  }
+
+  /**
+   * Address: 0x006879B0 (FUN_006879B0, Moho::EntityDBTypeInfo::CtrRef)
+   *
+   * What it does:
+   * Constructs one `CEntityDb` in caller-provided storage and wraps it in an
+   * `EntityDB` reflection reference.
+   */
+  gpg::RRef EntityDbTypeInfo::CtrRef(void* const objectStorage)
+  {
+    moho::CEntityDb* entityDb = nullptr;
+    if (objectStorage != nullptr) {
+      entityDb = new (objectStorage) moho::CEntityDb();
     }
 
     gpg::RRef out{};
@@ -1022,6 +1080,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x006B6AA0 (FUN_006B6AA0, Moho::CUnitIterAllArmies::CUnitIterAllArmies)
+   *
+   * What it does:
+   * Initializes one all-armies unit iterator from `sim->mEntityDB` by
+   * capturing the leftmost all-units tree node, iterator end sentinel, and
+   * current decoded unit payload.
+   */
+  CUnitIterAllArmies::CUnitIterAllArmies(Sim* const sim)
+    : mItr(nullptr)
+    , mEnd(nullptr)
+    , mCur(nullptr)
+  {
+    if (sim == nullptr || sim->mEntityDB == nullptr) {
+      return;
+    }
+
+    CEntityDb* const entityDb = sim->mEntityDB;
+    CEntityDbAllUnitsNode* leftMost = entityDb->mAllUnits;
+    if (leftMost == nullptr) {
+      return;
+    }
+
+    for (CEntityDbAllUnitsNode* node = leftMost->parent; node != nullptr && node->isNil == 0u; node = node->left) {
+      leftMost = node;
+    }
+
+    mItr = leftMost;
+    mEnd = entityDb->AllUnitsEnd();
+    if (mItr != mEnd) {
+      mCur = DecodeAllUnitsIteratorPayload(mItr);
+    }
+  }
+
+  /**
    * Address: 0x00683C90 (FUN_00683C90,
    * ?AllUnitsEnd@EntityDB@Moho@@QAE?AV?$Iterator@VUnit@Moho@@@EntityDBIterators@2@XZ)
    *
@@ -1092,6 +1184,30 @@ namespace moho
     const std::uint32_t fallbackEntityId = familySourceBits | 1u;
     UpdateEntityCountStats(fallbackEntityId, 1u);
     return fallbackEntityId;
+  }
+
+  /**
+   * Address: 0x00684690 (FUN_00684690, Moho::EntityDB::ReleaseId)
+   * Mangled: ?ReleaseId@EntityDB@Moho@@QAEXVEntId@2@@Z
+   *
+   * What it does:
+   * Releases one packed entity id, updates entity-count stats, removes runtime
+   * entity tracking lanes for that id, and adds the serial lane back to the
+   * family/source reuse set.
+   */
+  BVIntSetAddResult CEntityDb::ReleaseId(const std::uint32_t releasedId)
+  {
+    UpdateEntityCountStats(releasedId, static_cast<std::uint32_t>(-1));
+
+    msvc8::list<Entity*>& entities = Entities();
+    RemoveTrackedEntityById(entities, releasedId);
+
+    const std::uint32_t familySourceBits = releasedId & kEntityIdFamilySourceMaskRaw;
+    IdPoolRuntime& pool = gRuntimePools[this][familySourceBits];
+    SeedFamilyPoolFromEntities(entities, familySourceBits, pool);
+
+    const std::uint32_t serial = releasedId & kEntityIdSerialMask;
+    return pool.mReleasedSerials.Add(serial);
   }
 
   /**

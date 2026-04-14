@@ -148,6 +148,15 @@ namespace moho
   {
     msvc8::string mMode;          // +0x00
     LuaPlus::LuaObject mPayload{}; // +0x1C
+
+    /**
+     * Address: 0x00833C20 (FUN_00833C20, Moho::UICommandModeData::UICommandModeData)
+     * Mangled: ??0UICommandModeData@Moho@@QAE@XZ
+     *
+     * What it does:
+     * Default-constructs command-mode name and payload Lua-object lanes.
+     */
+    UICommandModeData();
   };
 
   static_assert(sizeof(UICommandModeData) == 0x30, "moho::UICommandModeData size must be 0x30");

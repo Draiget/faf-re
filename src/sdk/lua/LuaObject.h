@@ -84,6 +84,15 @@ namespace LuaPlus
 		LuaObject& operator=(const LuaObject& other);
 
 		/**
+		 * Address: 0x00908B00 (FUN_00908B00, LuaPlus::LuaObject::operator=)
+		 *
+		 * What it does:
+		 * Rebinds this object to one `LuaStackObject` slot by unlinking current
+		 * list ownership and linking to the resolved stack TValue lane.
+		 */
+		LuaObject& operator=(const LuaStackObject& stackObject);
+
+		/**
 		 * Address: 0x009075D0 (FUN_009075D0, LuaPlus::LuaObject::~LuaObject)
 		 * Address: 0x00BA2E8B (FUN_00BA2E8B, LuaObject::j_Dtr_9 thunk)
 		 *
@@ -480,6 +489,13 @@ namespace LuaPlus
 		 */
 		[[nodiscard]] const char* TypeName() const;
 
+		/**
+		 * Address: 0x00907630 (FUN_00907630, LuaPlus::LuaObject::Register)
+		 *
+		 * What it does:
+		 * Creates one C closure using `tagMethod` stack upvalues and stores it in
+		 * this table object at `key`.
+		 */
 		void Register(const char* key, CFunction value, int32_t tagMethod);
 
 		/**
@@ -2682,6 +2698,20 @@ namespace LuaPlus
 	}
 #pragma pack(pop)
 }
+
+/**
+ * Address: 0x0090A6B0 (FUN_0090A6B0, LuaPlusH_next)
+ *
+ * What it does:
+ * Advances one Lua table iterator lane and returns non-zero while a next
+ * `(key, value)` pair exists.
+ */
+extern "C" int LuaPlusH_next(
+	LuaPlus::LuaState* state,
+	LuaPlus::LuaObject* table,
+	LuaPlus::LuaObject* key,
+	LuaPlus::LuaObject* value
+);
 
 namespace gpg::core
 {

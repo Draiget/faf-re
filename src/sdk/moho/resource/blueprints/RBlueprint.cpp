@@ -9,6 +9,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -101,6 +102,19 @@ namespace
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);
   }
+
+  struct RBlueprintVTableView
+  {
+    void* destroy;
+    void* deletingDestroy;
+    void* getClass;
+    void(__thiscall* onInitBlueprint)(moho::RBlueprint*);
+  };
+
+  [[nodiscard]] const RBlueprintVTableView* GetVTableView(const moho::RBlueprint* const blueprint) noexcept
+  {
+    return reinterpret_cast<const RBlueprintVTableView*>(blueprint ? blueprint->mVTable : nullptr);
+  }
 } // namespace
 
 namespace moho
@@ -167,6 +181,51 @@ namespace moho
     mBlueprintId.assign(sourceData, sourceLen);
 
     mBlueprintOrdinal = owner->AssignNextOrdinal();
+  }
+
+  /**
+   * Address: 0x0050DE60 (FUN_0050DE60)
+   * Mangled: ??1RBlueprint@Moho@@QAE@@Z
+   *
+   * What it does:
+   * Releases base blueprint string lanes, decrements the shared
+   * `RBlueprint` instance counter slot, and restores the base
+   * `gpg::RObject` vtable lane.
+   */
+  RBlueprint::~RBlueprint()
+  {
+    mSource.tidy(true, 0U);
+    mDescription.tidy(true, 0U);
+    mBlueprintId.tidy(true, 0U);
+
+    AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), -1L);
+    reinterpret_cast<gpg::RObject*>(this)->~RObject();
+  }
+
+  /**
+   * Address: 0x0050DF10 (FUN_0050DF10, Moho::RBlueprint::InitBlueprint)
+   *
+   * What it does:
+   * Builds reflected fields from one Lua blueprint table, runs polymorphic
+   * post-init, then merges resolved fields back into the same table.
+   */
+  void RBlueprint::InitBlueprint(LuaPlus::LuaObject& luaBlueprint)
+  {
+    gpg::RRef destination{};
+    (void)gpg::RRef_RBlueprint(&destination, this);
+
+    LuaPlus::LuaObject valueObject(luaBlueprint);
+    (void)SCR_LuaBuildObject(valueObject, destination, true);
+
+    if (const auto* const vtableView = GetVTableView(this); vtableView && vtableView->onInitBlueprint) {
+      vtableView->onInitBlueprint(this);
+    } else {
+      OnInitBlueprint();
+    }
+
+    gpg::RRef source{};
+    (void)gpg::RRef_RBlueprint(&source, this);
+    SCR_RObjectToLuaMerge(source, luaBlueprint);
   }
 
   /**

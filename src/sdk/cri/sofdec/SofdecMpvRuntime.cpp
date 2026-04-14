@@ -15,12 +15,18 @@
 
 extern "C" {
   std::int32_t SFLIB_SetErr(std::int32_t errorObjectAddress, std::int32_t errorCode);
+  std::int32_t sfmpv_ChkFatal();
+  std::int32_t MPV_Init(std::int32_t framePoolCount, std::int32_t workAddress);
   std::int32_t UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
   std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue);
   void SFTIM_UpdateItime(void* timerState, std::int32_t interpolationTime);
   std::int32_t SFTIM_GetNextItime(void* timerState, std::int32_t interpolationTime);
   void SFTIM_GetTime(std::int32_t workctrlAddress, std::int32_t* outTimeMajor, std::int32_t* outTimeMinor);
   std::int32_t SFTIM_GetSpeed(std::int32_t workctrlAddress);
+  std::int32_t SFSET_GetCond(std::int32_t workctrlAddress, std::int32_t conditionId);
+  std::int32_t sfmpv_CalcAudioTotTime(std::int32_t workctrlAddress);
+  std::int32_t sfmpv_CalcVideoTotTime(std::int32_t workctrlAddress);
+  void SFCON_UpdateConcatTime(std::int32_t workctrlAddress, std::int32_t totalTime);
   std::int32_t UTY_CmpTime(
     std::int32_t lhsMajor,
     std::int32_t lhsMinor,
@@ -42,6 +48,11 @@ extern "C" {
     std::int32_t consumedBytes,
     std::int32_t errorCode
   );
+  std::int32_t sfmpv_GetTermSrc(std::int32_t workctrlAddress);
+  std::int32_t MPV_GetBitRate(std::int32_t decoderHandle, std::int32_t* outBitRate);
+  std::int32_t SFBUF_GetWTot(std::int32_t workctrlAddress, std::int32_t laneIndex);
+  std::int32_t SFTRN_IsSetup(std::int32_t workctrlAddress, std::int32_t laneIndex);
+  std::int32_t SFBUF_RingGetDataSiz(std::int32_t workctrlAddress, std::int32_t laneIndex);
   std::int32_t sfmpv_AddRtotSj(std::int32_t workctrlAddress, std::int32_t consumedBytes);
   std::int32_t SFPLY_AddSkipPic(
     std::int32_t workctrlAddress,
@@ -133,7 +144,10 @@ struct SfmpvTimingLane
 
   std::uint8_t mUnknown00To17[0x18]{}; // +0x00
   IsLateCallback isLateCallback = nullptr; // +0x18
-  std::uint8_t mUnknown1CToE3[0xC8]{}; // +0x1C
+  std::uint8_t mUnknown1CTo3B[0x20]{}; // +0x1C
+  std::uint32_t concatVideoTimeUnit[11]{}; // +0x3C
+  std::uint32_t concatAudioTimeUnit[11]{}; // +0x68
+  std::uint8_t mUnknown94ToE3[0x50]{}; // +0x94
   std::int32_t baseInterpolationTime = 0; // +0xE4
   std::int32_t baseFraction = 0; // +0xE8
   std::uint8_t mUnknownECTo117[0x2C]{}; // +0xEC
@@ -145,6 +159,14 @@ struct SfmpvTimingLane
 };
 
 static_assert(offsetof(SfmpvTimingLane, isLateCallback) == 0x18, "SfmpvTimingLane::isLateCallback offset must be 0x18");
+static_assert(
+  offsetof(SfmpvTimingLane, concatVideoTimeUnit) == 0x3C,
+  "SfmpvTimingLane::concatVideoTimeUnit offset must be 0x3C"
+);
+static_assert(
+  offsetof(SfmpvTimingLane, concatAudioTimeUnit) == 0x68,
+  "SfmpvTimingLane::concatAudioTimeUnit offset must be 0x68"
+);
 static_assert(
   offsetof(SfmpvTimingLane, baseInterpolationTime) == 0xE4,
   "SfmpvTimingLane::baseInterpolationTime offset must be 0xE4"
@@ -171,13 +193,18 @@ struct SfmpvInfoRuntimeView
   std::int32_t decoderHandle = 0; // +0x00
   std::uint8_t mUnknown04To6F[0x6C]{}; // +0x04
   std::int32_t activeFrameObjectAddress = 0; // +0x70
-  std::uint8_t mUnknown74To83[0x10]{}; // +0x74
+  std::uint8_t mUnknown74To77[0x04]{}; // +0x74
+  std::int32_t concatControlFlags = 0; // +0x78
+  std::uint8_t mUnknown7CTo83[0x08]{}; // +0x7C
   std::int32_t lateFrameCounter = 0; // +0x84
-  std::uint8_t mUnknown88ToA3[0x1C]{}; // +0x88
+  std::int32_t concatAdvanceCount = 0; // +0x88
+  std::uint8_t mUnknown8CToA3[0x18]{}; // +0x8C
   std::int32_t skipPicCallbackContext = 0; // +0xA4
   std::uint8_t mUnknownA8ToE3[0x3C]{}; // +0xA8
   std::uint8_t disableSkipLatch = 0; // +0xE4
-  std::uint8_t mUnknownE5To16B[0x87]{}; // +0xE5
+  std::uint8_t mUnknownE5To113[0x2F]{}; // +0xE5
+  std::int32_t vbvWriteThreshold = 0; // +0x114
+  std::uint8_t mUnknown118To16B[0x54]{}; // +0x118
   std::int32_t skipIssuedFlag = 0; // +0x16C
 };
 
@@ -187,8 +214,16 @@ static_assert(
   "SfmpvInfoRuntimeView::activeFrameObjectAddress offset must be 0x70"
 );
 static_assert(
+  offsetof(SfmpvInfoRuntimeView, concatControlFlags) == 0x78,
+  "SfmpvInfoRuntimeView::concatControlFlags offset must be 0x78"
+);
+static_assert(
   offsetof(SfmpvInfoRuntimeView, lateFrameCounter) == 0x84,
   "SfmpvInfoRuntimeView::lateFrameCounter offset must be 0x84"
+);
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, concatAdvanceCount) == 0x88,
+  "SfmpvInfoRuntimeView::concatAdvanceCount offset must be 0x88"
 );
 static_assert(
   offsetof(SfmpvInfoRuntimeView, skipPicCallbackContext) == 0xA4,
@@ -197,6 +232,10 @@ static_assert(
 static_assert(
   offsetof(SfmpvInfoRuntimeView, disableSkipLatch) == 0xE4,
   "SfmpvInfoRuntimeView::disableSkipLatch offset must be 0xE4"
+);
+static_assert(
+  offsetof(SfmpvInfoRuntimeView, vbvWriteThreshold) == 0x114,
+  "SfmpvInfoRuntimeView::vbvWriteThreshold offset must be 0x114"
 );
 static_assert(
   offsetof(SfmpvInfoRuntimeView, skipIssuedFlag) == 0x16C,
@@ -210,7 +249,11 @@ struct SfmpvHandleRuntimeView
 {
   std::uint8_t mUnknown00To57[0x58]{}; // +0x00
   std::int32_t decodePathMode = 0; // +0x58
-  std::uint8_t mUnknown5CToAA3[0xA48]{}; // +0x5C
+  std::uint8_t mUnknown5CTo77[0x1C]{}; // +0x5C
+  std::int32_t frameHeaderHandle = 0; // +0x78
+  std::uint8_t mUnknown7CToF3[0x78]{}; // +0x7C
+  std::int32_t vbvBypassFlag = 0; // +0xF4
+  std::uint8_t mUnknownF8ToAA3[0x9AC]{}; // +0xF8
   std::int32_t lateFrameGateThreshold = 0; // +0xAA4
   std::uint8_t mUnknownAA8ToD2F[0x288]{}; // +0xAA8
   SfmpvTimingLane timingLane{}; // +0xD30
@@ -219,6 +262,14 @@ struct SfmpvHandleRuntimeView
 };
 
 static_assert(offsetof(SfmpvHandleRuntimeView, decodePathMode) == 0x58, "SfmpvHandleRuntimeView::decodePathMode offset must be 0x58");
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, frameHeaderHandle) == 0x78,
+  "SfmpvHandleRuntimeView::frameHeaderHandle offset must be 0x78"
+);
+static_assert(
+  offsetof(SfmpvHandleRuntimeView, vbvBypassFlag) == 0xF4,
+  "SfmpvHandleRuntimeView::vbvBypassFlag offset must be 0xF4"
+);
 static_assert(
   offsetof(SfmpvHandleRuntimeView, lateFrameGateThreshold) == 0xAA4,
   "SfmpvHandleRuntimeView::lateFrameGateThreshold offset must be 0xAA4"
@@ -241,6 +292,7 @@ extern "C" {
   extern SfmpvPara sfmpv_para;
   extern std::int32_t sfmpv_rfb_adr_tbl[2];
   extern std::int32_t sfmpv_work;
+  extern std::int32_t sfmpv_discard_wsiz;
   extern std::int32_t sSofDec_tabs[16];
 }
 
@@ -301,6 +353,48 @@ std::int32_t SFTIM_InitTtu(std::uint32_t* timerState, std::int32_t initialValue)
   timerState[9] = static_cast<std::uint32_t>(initialValue);
   timerState[10] = 1;
   return result;
+}
+
+/**
+ * Address: 0x00AE5E10 (FUN_00AE5E10, _UTY_MemsetDword)
+ *
+ * What it does:
+ * Fills one DWORD lane range with one 32-bit value using reverse-order tail
+ * handling and 16-DWORD unrolled blocks.
+ */
+std::int32_t UTY_MemsetDword(void* const destination, const std::uint32_t value, const unsigned int dwordCount)
+{
+  auto* cursor = static_cast<std::uint32_t*>(destination) + dwordCount;
+
+  unsigned int tailCount = dwordCount & 0x0Fu;
+  while (tailCount != 0u) {
+    *--cursor = value;
+    --tailCount;
+  }
+
+  unsigned int blockCount = dwordCount >> 4;
+  while (blockCount != 0u) {
+    cursor -= 16;
+    cursor[0] = value;
+    cursor[1] = value;
+    cursor[2] = value;
+    cursor[3] = value;
+    cursor[4] = value;
+    cursor[5] = value;
+    cursor[6] = value;
+    cursor[7] = value;
+    cursor[8] = value;
+    cursor[9] = value;
+    cursor[10] = value;
+    cursor[11] = value;
+    cursor[12] = value;
+    cursor[13] = value;
+    cursor[14] = value;
+    cursor[15] = value;
+    --blockCount;
+  }
+
+  return static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(destination));
 }
 
 /**
@@ -379,6 +473,37 @@ void SFMPVF_InitPicUsr(std::uint32_t* picUsrState)
     cursor[1] = 0;
     cursor += 2;
   }
+}
+
+/**
+ * Address: 0x00AD1B70 (FUN_00AD1B70, _SFMPV_Init)
+ *
+ * What it does:
+ * Checks fatal-startup state, initializes the MPV work lane, and clears the
+ * parameter/table globals on success. On failure, returns the recovered Sofdec
+ * error code path.
+ */
+std::int32_t SFMPV_Init()
+{
+  if (sfmpv_ChkFatal()) {
+    while (true) {
+    }
+  }
+
+  const std::int32_t initResult = MPV_Init(32, reinterpret_cast<std::int32_t>(&sfmpv_work));
+  if (initResult != 0) {
+    std::int32_t errorCode = -(initResult != -16515323);
+    errorCode &= 0xEE;
+    return SFLIB_SetErr(0, errorCode - 16773357);
+  }
+
+  // _SFMPVF_InitPool
+  std::memset(&sfmpv_para, 0, 0x24u);
+  sfmpv_rfb_adr_tbl[0] = 0;
+  sfmpv_rfb_adr_tbl[1] = 0;
+  std::memset(sSofDec_tabs, 0, sizeof(sSofDec_tabs));
+  sfmpv_discard_wsiz = 0;
+  return 0;
 }
 
 /**
@@ -491,6 +616,78 @@ std::int32_t sfmpv_InitInf(std::int32_t /*unused*/, std::uint32_t* infoBlock)
     slotPtr += 58;
   }
 
+  return 0;
+}
+
+/**
+ * Address: 0x00AD1E20 (FUN_00AD1E20, _sfmpv_IsVbvEnough)
+ *
+ * What it does:
+ * Evaluates whether the active MPV stream ring has enough VBV data available
+ * to continue decode without underflow.
+ */
+std::int32_t sfmpv_IsVbvEnough(const std::int32_t workctrlAddress)
+{
+  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+  const std::int32_t decoderHandle = mpvInfo->decoderHandle;
+
+  const std::int32_t termSourceState = sfmpv_GetTermSrc(workctrlAddress);
+  if (termSourceState == 1) {
+    return termSourceState;
+  }
+
+  if (workctrl->frameHeaderHandle != 0 && workctrl->vbvBypassFlag == 0) {
+    return 1;
+  }
+
+  std::int32_t bitRate = 0;
+  MPV_GetBitRate(decoderHandle, &bitRate);
+  if (bitRate == 0x3FFFF) {
+    return 1;
+  }
+
+  if (SFBUF_GetWTot(workctrlAddress, 1) >= mpvInfo->vbvWriteThreshold) {
+    return 1;
+  }
+
+  const std::int32_t streamLane = (SFTRN_IsSetup(workctrlAddress, 1) == 0) ? 1 : 0;
+  const std::int32_t totalWritableBytes = SFBUF_GetWTot(workctrlAddress, streamLane);
+  const std::int32_t bufferedBytes = SFBUF_RingGetDataSiz(workctrlAddress, streamLane);
+  return (totalWritableBytes >= bufferedBytes) ? 1 : 0;
+}
+
+/**
+ * Address: 0x00AD29D0 (FUN_00AD29D0, _sfmpv_ConcatSub)
+ *
+ * What it does:
+ * Computes concat total-time from audio/video path, updates concat timeline
+ * when a positive delta exists, resets concat timer lanes, and re-arms concat
+ * control flags.
+ */
+std::int32_t sfmpv_ConcatSub(const std::int32_t workctrlAddress)
+{
+  auto* const workctrl = AddressToPointer<SfmpvHandleRuntimeView>(workctrlAddress);
+  SfmpvInfoRuntimeView* const mpvInfo = workctrl->mpvInfo;
+
+  std::int32_t concatTotalTime = 0;
+  if (SFSET_GetCond(workctrlAddress, 6) != 0) {
+    concatTotalTime = sfmpv_CalcAudioTotTime(workctrlAddress);
+    if (concatTotalTime < 0) {
+      return -1;
+    }
+  } else {
+    concatTotalTime = sfmpv_CalcVideoTotTime(workctrlAddress);
+  }
+
+  if (concatTotalTime > 0) {
+    SFCON_UpdateConcatTime(workctrlAddress, concatTotalTime);
+    ++mpvInfo->concatAdvanceCount;
+  }
+
+  SFTIM_InitTtu(workctrl->timingLane.concatVideoTimeUnit, 0x7FFFFFFF);
+  SFTIM_InitTtu(workctrl->timingLane.concatAudioTimeUnit, -1);
+  mpvInfo->concatControlFlags = 0xC0;
   return 0;
 }
 

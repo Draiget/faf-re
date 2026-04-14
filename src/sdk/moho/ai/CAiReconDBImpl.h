@@ -21,6 +21,7 @@ namespace moho
   class CArmyImpl;
   class CInfluenceMap;
   class Sim;
+  struct SWorldBeam;
 
   /**
    * Raw map header used by CAiReconDBImpl for blip lookup tree ownership.
@@ -171,6 +172,15 @@ namespace moho
      * recon flags through the point recon helper chain.
      */
     [[nodiscard]] EReconFlags ReconCanDetect(Entity* ent, const Wm3::Vec3f& pos, EReconFlags oldFlags) const;
+
+    /**
+     * Address: 0x00655610 (FUN_00655610, Moho::CAiReconDBImpl::BeamIsVisible)
+     *
+     * What it does:
+     * Resolves LOS visibility for the far beam endpoint selected by beam
+     * direction state (`mFromStart`).
+     */
+    [[nodiscard]] bool BeamIsVisible(const SWorldBeam& beam) const;
 
     /**
      * Address: 0x005C1720

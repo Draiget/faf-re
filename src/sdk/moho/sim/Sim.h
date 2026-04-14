@@ -938,6 +938,15 @@ namespace moho
     void SerializeLoadBody(gpg::ReadArchive* archive);
 
     /**
+     * Address: 0x00745120 (FUN_00745120, ?SerMapData@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+     *
+     * What it does:
+     * Reads playable map rectangle data from archive, applies it to `mMapData`,
+     * and refreshes the two internal cached `Rect2i` vector lanes.
+     */
+    void SerMapData(gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x00745390 (FUN_00745390, ?SerVars@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
      *
      * What it does:

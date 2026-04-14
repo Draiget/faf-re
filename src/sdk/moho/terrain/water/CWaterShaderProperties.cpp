@@ -36,12 +36,12 @@ CWaterShaderProperties::~CWaterShaderProperties()
   releaseTextures();
 
   // After releaseTextures() all mTextures entries have pi=null and px=null.
-  // The remaining string members (mWaterRamp, mShaderName4, mShaderNames[])
+  // The remaining string members (mWaterRamp, mWaterCubemap, mShaderNames[])
   // require explicit tidy to release any heap-allocated buffers.  The binary
   // uses eh_vector_destructor_iterator and direct SSO teardown; we call tidy()
   // directly here to match the same observable side-effects.
   mWaterRamp.tidy();
-  mShaderName4.tidy();
+  mWaterCubemap.tidy();
   for (auto& s : mShaderNames) {
     s.tidy();
   }
@@ -102,6 +102,69 @@ boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetWaterRamp() const
   }
 
   return boost::SharedPtrFromRawRetained(mTextures[5]);
+}
+
+/**
+ * Address: 0x0089FC40 (FUN_0089FC40, ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
+ * Mangled: ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ
+ *
+ * What it does:
+ * Lazily resolves one water-cubemap texture and caches its shared-owner lane
+ * at `mTextures[4]`, then returns one retained shared texture-sheet handle to
+ * the caller.
+ */
+boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetCubeMap() const
+{
+  if (mTextures[4].px == nullptr) {
+    if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
+      if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
+        ID3DDeviceResources::TextureResourceHandle loadedTexture{};
+        resources->GetTexture(loadedTexture, mWaterCubemap.c_str(), 0, true);
+
+        const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw =
+          boost::SharedPtrRawFromSharedBorrow(loadedTexture);
+
+        boost::SharedPtrRaw<ID3DTextureSheet> resolvedTexture{};
+        resolvedTexture.px = static_cast<ID3DTextureSheet*>(loadedRaw.px);
+        resolvedTexture.pi = loadedRaw.pi;
+        mTextures[4].assign_retain(resolvedTexture);
+      }
+    }
+  }
+
+  return boost::SharedPtrFromRawRetained(mTextures[4]);
+}
+
+/**
+ * Address: 0x0089FB00 (FUN_0089FB00, ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z)
+ * Mangled: ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z
+ *
+ * What it does:
+ * Lazily resolves one indexed normal-map texture from `mShaderNames[index]`,
+ * caches it in `mTextures[index]`, and returns one retained shared texture
+ * sheet handle.
+ */
+boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetNormalMap(const int index) const
+{
+  boost::SharedPtrRaw<ID3DTextureSheet>& cachedTexture = mTextures[index];
+  if (cachedTexture.px == nullptr) {
+    if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
+      if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
+        ID3DDeviceResources::TextureResourceHandle loadedTexture{};
+        resources->GetTexture(loadedTexture, mShaderNames[index].c_str(), 0, true);
+
+        const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw =
+          boost::SharedPtrRawFromSharedBorrow(loadedTexture);
+
+        boost::SharedPtrRaw<ID3DTextureSheet> resolvedTexture{};
+        resolvedTexture.px = static_cast<ID3DTextureSheet*>(loadedRaw.px);
+        resolvedTexture.pi = loadedRaw.pi;
+        cachedTexture.assign_retain(resolvedTexture);
+      }
+    }
+  }
+
+  return boost::SharedPtrFromRawRetained(cachedTexture);
 }
 
 } // namespace moho

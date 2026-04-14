@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <new>
 #include <string>
 #include <vector>
@@ -9,11 +10,13 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/Stream.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/sim/CBackgroundTaskControl.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/WldSessionInfo.h"
 
 namespace
@@ -27,6 +30,37 @@ namespace
     float y;
     float z;
   };
+
+  struct TerrainVisualResourceRuntimeView
+  {
+    std::uint8_t mUnknown0000_095B[0x95C]{};
+    msvc8::string mBackgroundFile;                              // +0x95C
+    moho::ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
+    msvc8::string mSkycubeFile;                                 // +0x980
+    moho::ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
+  };
+
+  static_assert(
+    offsetof(TerrainVisualResourceRuntimeView, mBackgroundFile) == 0x95C,
+    "TerrainVisualResourceRuntimeView::mBackgroundFile offset must be 0x95C"
+  );
+  static_assert(
+    offsetof(TerrainVisualResourceRuntimeView, mBackgroundTexture) == 0x978,
+    "TerrainVisualResourceRuntimeView::mBackgroundTexture offset must be 0x978"
+  );
+  static_assert(
+    offsetof(TerrainVisualResourceRuntimeView, mSkycubeFile) == 0x980,
+    "TerrainVisualResourceRuntimeView::mSkycubeFile offset must be 0x980"
+  );
+  static_assert(
+    offsetof(TerrainVisualResourceRuntimeView, mSkycubeTexture) == 0x99C,
+    "TerrainVisualResourceRuntimeView::mSkycubeTexture offset must be 0x99C"
+  );
+
+  [[nodiscard]] TerrainVisualResourceRuntimeView* AsTerrainVisualResourceRuntimeView(moho::IWldTerrainRes* terrainRes) noexcept
+  {
+    return reinterpret_cast<TerrainVisualResourceRuntimeView*>(terrainRes);
+  }
 
   [[nodiscard]] QuaternionLanes QuaternionFromMatrixRows(const float matrix[3][3]) noexcept
   {
@@ -450,6 +484,89 @@ namespace moho
     const TerrainPlayableRectSource* const source = mPlayableRectSource;
     outRect = source->mPlayableRect;
     return &outRect;
+  }
+
+  /**
+   * Address: 0x008A6DA0 (FUN_008A6DA0, ?SetPlayableMapRect@CWldTerrainRes@Moho@@EAEXABV?$Rect2@H@gpg@@@Z)
+   *
+   * What it does:
+   * Writes one playable-map rectangle through the owned terrain map and emits
+   * warning text when bounds are invalid.
+   */
+  bool IWldTerrainRes::SetPlayableMapRect(const VisibilityRect& rect)
+  {
+    STIMap* const map = reinterpret_cast<STIMap*>(mPlayableRectSource);
+    if (map == nullptr) {
+      return false;
+    }
+
+    const bool setOk = map->SetPlayableMapRect(rect);
+    if (!setOk) {
+      gpg::Warnf("Attempting to set an invalid playable rect");
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Address: 0x008A1080 (FUN_008A1080, ?SetBackground@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   *
+   * What it does:
+   * Stores terrain background texture path and resolves the corresponding D3D
+   * texture resource handle.
+   */
+  void IWldTerrainRes::SetBackground(const msvc8::string& texturePath)
+  {
+    auto* const view = AsTerrainVisualResourceRuntimeView(this);
+    view->mBackgroundFile = texturePath;
+
+    ID3DDeviceResources::TextureResourceHandle texture{};
+    if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
+      if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
+        resources->GetTexture(texture, texturePath.c_str(), 0, true);
+      }
+    }
+
+    view->mBackgroundTexture = texture;
+  }
+
+  /**
+   * Address: 0x008A11C0 (FUN_008A11C0, ?SetSkycube@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   *
+   * What it does:
+   * Stores terrain skycube texture path and resolves the corresponding D3D
+   * texture resource handle.
+   */
+  void IWldTerrainRes::SetSkycube(const msvc8::string& texturePath)
+  {
+    auto* const view = AsTerrainVisualResourceRuntimeView(this);
+    view->mSkycubeFile = texturePath;
+
+    ID3DDeviceResources::TextureResourceHandle texture{};
+    if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
+      if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
+        resources->GetTexture(texture, texturePath.c_str(), 0, true);
+      }
+    }
+
+    view->mSkycubeTexture = texture;
+  }
+
+  /**
+   * Address: 0x008A0A20 (FUN_008A0A20, ??0struct_Env@@QAE@@Z)
+   *
+   * What it does:
+   * Captures one environment lookup key plus one terrain texture resource
+   * handle in one terrain environment entry object.
+   */
+  TerrainEnvironmentLookupEntry::TerrainEnvironmentLookupEntry(
+    const msvc8::string& environmentName,
+    boost::shared_ptr<RD3DTextureResource> texture
+  )
+  {
+    mEnvironmentName.assign(environmentName, 0u, 0xFFFFFFFFu);
+    mTexture = texture;
   }
 
   /**

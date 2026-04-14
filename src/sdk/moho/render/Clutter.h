@@ -195,7 +195,17 @@ namespace moho
     std::int32_t mZ; // +0x10
     std::uint8_t reserved14[0x18]; // +0x14
     ClutterRegionMapState mMap; // +0x2C
+
+    /**
+     * Address: 0x007D5F20 (FUN_007D5F20, ??1Region@Clutter@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Resets region runtime payload lanes, clears map-node list storage, then
+     * releases the map sentinel allocation.
+     */
+    ~ClutterRegion();
   };
+  static_assert(sizeof(ClutterRegion) == 0x38, "ClutterRegion size must be 0x38");
   static_assert(offsetof(ClutterRegion, mNext) == 0x04, "ClutterRegion::mNext offset must be 0x04");
   static_assert(offsetof(ClutterRegion, mPrev) == 0x08, "ClutterRegion::mPrev offset must be 0x08");
   static_assert(offsetof(ClutterRegion, mX) == 0x0C, "ClutterRegion::mX offset must be 0x0C");

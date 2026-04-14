@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <typeinfo>
 
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -41,6 +42,15 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(moho::SDecalInfo));
       moho::SDecalInfo::sType = type;
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
     }
     return type;
   }
@@ -167,4 +177,45 @@ namespace moho
     , mArmy(armyIndex)
     , mFidelity(fidelity)
   {}
+
+  /**
+   * Address: 0x0077D470 (FUN_0077D470, Moho::SDecalInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Loads decal position/size/rotation vectors plus texture/type lanes and
+   * runtime metadata fields from archive payload.
+   */
+  void SDecalInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    gpg::RType* const vector3fType = CachedVector3fType();
+    gpg::RRef ownerRef{};
+    archive->Read(vector3fType, &mPos, ownerRef);
+    archive->Read(vector3fType, &mSize, ownerRef);
+    archive->Read(vector3fType, &mRot, ownerRef);
+
+    archive->ReadString(&mTexName1);
+    archive->ReadString(&mTexName2);
+
+    bool isSplat = false;
+    archive->ReadBool(&isSplat);
+    mIsSplat = isSplat ? 1u : 0u;
+
+    archive->ReadFloat(&mLODParam);
+    archive->ReadUInt(&mStartTick);
+    archive->ReadString(&mType);
+
+    std::int32_t objectId = 0;
+    std::int32_t armyIndex = 0;
+    std::int32_t fidelity = 0;
+    archive->ReadInt(&objectId);
+    archive->ReadInt(&armyIndex);
+    archive->ReadInt(&fidelity);
+    mObj = static_cast<std::uint32_t>(objectId);
+    mArmy = static_cast<std::uint32_t>(armyIndex);
+    mFidelity = static_cast<std::uint32_t>(fidelity);
+  }
 } // namespace moho

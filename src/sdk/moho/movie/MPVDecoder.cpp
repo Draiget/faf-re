@@ -39,6 +39,9 @@ namespace
 
   static_assert(offsetof(MPVObjectSlotView, activeMarker) == 0x188, "MPVObjectSlotView::activeMarker offset must be 0x188");
 
+  extern std::uint8_t gMpvIntraScanPermutationRuntime[64];
+  extern std::uint8_t gMpvDefaultIntraQuantMatrix[64];
+
   extern "C" {
     extern MPVLibWorkState mpvlib_libwork;
     extern const std::uint32_t mpvlib_cond_dfl[16];
@@ -125,8 +128,9 @@ namespace
     int MPV_MoveChunk(moho::movie::MPVSjStream* stream, int lane, int byteCount);
     int UTY_MemsetDword(void* destination, std::uint32_t value, unsigned int dwordCount);
     std::int32_t* UTY_MemcpyDword(void* destination, const void* source, unsigned int dwordCount);
-    void DCT_FsriInit();
+    unsigned int DCT_FsriInit();
     int DCT_FsriInitScaleTbl(int scaleTableBaseAddress);
+    unsigned int seq2dctfsir(int sequenceIndex);
     int DCT_FsriTrans6Blk();
     int DCT_FsriTransCbp();
     int MPVM2V_Create(int handleAddress);
@@ -165,10 +169,10 @@ namespace
     void MPVCMC_InitMcOiRt(int handleAddress);
     void MPVCMC_SetCcnt(int handleAddress);
     void MPVBDEC_StartFrame(int handleAddress);
+    void MPVCONCEAL_StartFrame(int handleAddress);
+    int MPVSL_DecSliceOne(int handleAddress, moho::movie::MPVSjStream* stream);
     int MPVSL_DecPicture(int handleAddress, moho::movie::MPVSjStream* stream);
     void MPVUMC_EndOfFrame(int handleAddress);
-    extern const std::uint8_t byte_11081A0[64];
-    extern const std::int32_t mpvbdec_dfl_iqm[64];
     int MPVUMCT_Intra(moho::movie::MPVDecoderContextPrefix* context);
     int MPVUMCT_Forward(moho::movie::MPVDecoderContextPrefix* context);
     int MPVUMCT_Backward(moho::movie::MPVDecoderContextPrefix* context);
@@ -179,6 +183,14 @@ namespace
     void SJ_SplitChunk(
       moho::movie::MPVSjChunk* sourceChunk, int splitOffset, moho::movie::MPVSjChunk* leftChunk, moho::movie::MPVSjChunk* rightChunk
     );
+    /**
+     * Address: 0x00AE97F0 (FUN_00AE97F0, _MPV_GoNextDelimSj)
+     *
+     * What it does:
+     * Walks SJ stream chunks until the next MPEG delimiter appears, preserving
+     * the 3-byte overlap needed to detect delimiters split across chunk
+     * boundaries.
+     */
     int MPV_GoNextDelimSj(moho::movie::MPVSjStream* stream);
   }
 
@@ -657,7 +669,7 @@ namespace
   inline void LoadQuantizationMatrix(MPVBitstreamState& bitstreamState, std::uint8_t* matrixStorage)
   {
     for (int index = 0; index < 64; ++index) {
-      matrixStorage[byte_11081A0[index]] = static_cast<std::uint8_t>(ConsumeHeaderBits(bitstreamState, 8));
+      matrixStorage[gMpvIntraScanPermutationRuntime[index]] = static_cast<std::uint8_t>(ConsumeHeaderBits(bitstreamState, 8));
     }
   }
 
@@ -796,6 +808,10 @@ extern "C" int mpvlib_DefaultConditionNoOp();
 extern "C" int mpvlib_InitDctPa(int handleAddress);
 extern "C" int mpvlib_SetCondAll(int conditionIndex, int callbackAddress);
 
+const char* DCT_GetVerStr();
+char* DCT_AcInit();
+std::int32_t DCT_AcIdctDouble(const double* inputCoefficients, double* outputCoefficients);
+
 std::int32_t M2V_IsSetup();
 std::int32_t M2V_SetUsrSj(
   std::int32_t decoderHandle, std::int32_t userSlotIndex, std::int32_t lane0, std::int32_t lane1, std::int32_t lane2
@@ -836,6 +852,114 @@ namespace
   constexpr int kMpvErrInvalidGetErrInfoHandle = -16580092;
   constexpr int kMpvErrorInfoOffset = 0x250;
   constexpr const char kExpectedMpvDecoderVersion[] = "1.958";
+  constexpr std::size_t kMpvBlockEntryCount = 64;
+  constexpr std::size_t kFsriB0TableByteCount = 0x50;
+  constexpr std::size_t kMpvAbdecForwardMaskCount = 8;
+  constexpr std::size_t kMpvAbdecThresholdCount = 8;
+  constexpr std::size_t kMpvRunLevelLaneCount = 6;
+
+  constexpr double kFsriBasisScaleVector[8] = {
+    0.3535533905932738,
+    0.4903926402016152,
+    0.46193976625564337,
+    0.4157348061512726,
+    0.3535533905932738,
+    0.2777851165098011,
+    0.1913417161825449,
+    0.09754516100806414,
+  };
+
+  constexpr std::uint8_t kFsriB0TablePacked[kFsriB0TableByteCount] = {
+    243, 4, 181, 63, 243, 4, 181, 63, 243, 4, 181, 63, 243, 4, 181, 63,
+    117, 61, 39, 64, 117, 61, 39, 64, 117, 61, 39, 64, 117, 61, 39, 64,
+    243, 4, 181, 63, 243, 4, 181, 63, 243, 4, 181, 63, 243, 4, 181, 63,
+    212, 139, 138, 63, 212, 139, 138, 63, 212, 139, 138, 63, 212, 139, 138, 63,
+    21, 239, 67, 63, 21, 239, 67, 63, 21, 239, 67, 63, 21, 239, 67, 63,
+  };
+
+  constexpr std::uint8_t kMpvScanZigZagOrder[kMpvBlockEntryCount] = {
+    0, 1, 8, 16, 9, 2, 3, 10,
+    17, 24, 32, 25, 18, 11, 4, 5,
+    12, 19, 26, 33, 40, 48, 41, 34,
+    27, 20, 13, 6, 7, 14, 21, 28,
+    35, 42, 49, 56, 57, 50, 43, 36,
+    29, 22, 15, 23, 30, 37, 44, 51,
+    58, 59, 52, 45, 38, 31, 39, 46,
+    53, 60, 61, 54, 47, 55, 62, 63,
+  };
+
+  // One-based lookup lane loaded from the binary table at 0x00D7FE57.
+  constexpr std::uint8_t kMpvDefaultQuantizerByScan[kMpvBlockEntryCount + 1] = {
+    63, 8, 16, 19, 22, 26, 27, 29, 34,
+    16, 16, 22, 24, 27, 29, 34, 37,
+    19, 22, 26, 27, 29, 34, 34, 38,
+    22, 22, 26, 27, 29, 34, 37, 40,
+    22, 26, 27, 29, 32, 35, 40, 48,
+    26, 27, 29, 32, 35, 40, 48, 58,
+    26, 27, 29, 34, 38, 46, 56, 69,
+    27, 29, 35, 38, 46, 56, 69, 83,
+  };
+
+  constexpr std::uint32_t kMpvAbdecForwardMaskLut[kMpvAbdecForwardMaskCount] = {
+    0x7FFFFFFFu,
+    0x1FFF3FFFu,
+    0x07FF0FFFu,
+    0x01FF03FFu,
+    0x007F00FFu,
+    0x001F003Fu,
+    0x0007000Fu,
+    0x00010003u,
+  };
+
+  constexpr std::uint32_t kMpvAbdecThresholdLut[kMpvAbdecThresholdCount] = {
+    0x03030405u,
+    0x02020202u,
+    0x01010101u,
+    0x01010101u,
+    0x00000000u,
+    0x00000000u,
+    0x00000000u,
+    0x00000000u,
+  };
+
+  struct MPVAbdecRunLevelLane
+  {
+    int tableBaseMinusBias; // +0x00
+    int bitLength;          // +0x04
+  };
+
+  static_assert(sizeof(MPVAbdecRunLevelLane) == 0x08, "MPVAbdecRunLevelLane size must be 0x08");
+  static_assert(
+    offsetof(MPVAbdecRunLevelLane, tableBaseMinusBias) == 0x00,
+    "MPVAbdecRunLevelLane::tableBaseMinusBias offset must be 0x00"
+  );
+  static_assert(offsetof(MPVAbdecRunLevelLane, bitLength) == 0x04, "MPVAbdecRunLevelLane::bitLength offset must be 0x04");
+
+  struct MPVAbdecSetupView
+  {
+    std::uint8_t reserved_0000[0x1100];
+    std::uint32_t forwardMaskLut[kMpvAbdecForwardMaskCount]; // +0x1100
+    std::uint8_t intraScanPermutation[kMpvBlockEntryCount]; // +0x1120
+    std::uint8_t reserved_1160[0x1260 - 0x1160];
+    std::uint32_t thresholdLut[kMpvAbdecThresholdCount]; // +0x1260
+    MPVAbdecRunLevelLane runLevelLanes[kMpvRunLevelLaneCount]; // +0x1280
+  };
+
+  static_assert(offsetof(MPVAbdecSetupView, forwardMaskLut) == 0x1100, "MPVAbdecSetupView::forwardMaskLut offset must be 0x1100");
+  static_assert(
+    offsetof(MPVAbdecSetupView, intraScanPermutation) == 0x1120,
+    "MPVAbdecSetupView::intraScanPermutation offset must be 0x1120"
+  );
+  static_assert(offsetof(MPVAbdecSetupView, thresholdLut) == 0x1260, "MPVAbdecSetupView::thresholdLut offset must be 0x1260");
+  static_assert(offsetof(MPVAbdecSetupView, runLevelLanes) == 0x1280, "MPVAbdecSetupView::runLevelLanes offset must be 0x1280");
+
+  const char* gFsriVersionString = nullptr;
+  double gFsriScaleTable[kMpvBlockEntryCount]{};
+  float gFsriPrecomputedIdct[kMpvBlockEntryCount * kMpvBlockEntryCount]{};
+  alignas(16) std::uint8_t gFsriB0AlignedStorage[kFsriB0TableByteCount + 0x10]{};
+  std::uint32_t gFsriB0AlignedAddress = 0;
+  std::uint8_t gMpvIntraScanPermutationRuntime[64]{};
+  std::uint8_t gMpvDefaultIntraQuantMatrix[64]{};
 
   struct MPVErrorInfoRuntime
   {
@@ -1919,7 +2043,7 @@ extern "C" int mpvhdec_GetCodec(const int handleAddress, MPVSjChunk* const chunk
 extern "C" std::int32_t* mpvhdec_InitIqm(const int handleAddress)
 {
   auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(AsHandleView(handleAddress));
-  return UTY_MemcpyDword(decodeContext->decodeWorkScratchIntra, mpvbdec_dfl_iqm, 16u);
+  return UTY_MemcpyDword(decodeContext->decodeWorkScratchIntra, gMpvDefaultIntraQuantMatrix, 16u);
 }
 
 /**
@@ -2416,6 +2540,49 @@ extern "C" std::uint8_t* MPV_SearchDelim(const std::uint8_t* const bitstreamCurs
 }
 
 /**
+ * Address: 0x00AE97F0 (FUN_00AE97F0, _MPV_GoNextDelimSj)
+ *
+ * What it does:
+ * Requests SJ data chunks until an MPEG start-code delimiter is found,
+ * preserving a 3-byte suffix when no delimiter is present so split delimiters
+ * across chunk boundaries are still detected on the next request.
+ */
+extern "C" int MPV_GoNextDelimSj(MPVSjStream* const stream)
+{
+  MPVSjChunk activeChunk{};
+  SjRequestChunk(stream, activeChunk);
+  if (activeChunk.size < 4) {
+    SjSubmitTailChunk(stream, activeChunk);
+    return 0;
+  }
+
+  while (true) {
+    std::uint8_t* const delimiterCursor = MPV_SearchDelim(activeChunk.data, activeChunk.size, -1);
+    if (delimiterCursor != nullptr) {
+      const int delimiterMask = MPV_CheckDelim(delimiterCursor);
+      MPVSjChunk tailChunk{};
+      const int splitOffset = static_cast<int>(delimiterCursor - activeChunk.data);
+      SJ_SplitChunk(&activeChunk, splitOffset, &activeChunk, &tailChunk);
+      SjReleaseHeadChunk(stream, activeChunk);
+      SjSubmitTailChunk(stream, tailChunk);
+      return delimiterMask;
+    }
+
+    MPVSjChunk carryChunk{};
+    const int splitOffset = activeChunk.size - 3;
+    SJ_SplitChunk(&activeChunk, splitOffset, &activeChunk, &carryChunk);
+    SjReleaseHeadChunk(stream, activeChunk);
+    SjSubmitTailChunk(stream, carryChunk);
+
+    SjRequestChunk(stream, activeChunk);
+    if (activeChunk.size < 4) {
+      SjSubmitTailChunk(stream, activeChunk);
+      return 0;
+    }
+  }
+}
+
+/**
  * Address: 0x00AE9A10 (FUN_00AE9A10, _MPVHDEC_RecoverSj)
  *
  * What it does:
@@ -2471,6 +2638,67 @@ extern "C" int MPV_MoveChunk(MPVSjStream* const stream, const int lane, const in
 }
 
 /**
+ * Address: 0x00AE98F0 (FUN_00AE98F0, _MPVSL_DecPicture)
+ *
+ * What it does:
+ * Runs one picture decode pass from SJ slices, recovering stream delimiters as
+ * needed and fixing macroblock lane state when trailing data leaves a partial
+ * frame.
+ */
+extern "C" int MPVSL_DecPicture(const int handleAddress, MPVSjStream* const stream)
+{
+  MPVHandleInitView* const handle = AsHandleView(handleAddress);
+  auto* const decodeContext = reinterpret_cast<MPVDecoderScanContext*>(handle);
+
+  decodeContext->serviceCountdown = handle->serviceReloadInterval;
+  MPVCONCEAL_StartFrame(handleAddress);
+  decodeContext->motionClampCounter = 0;
+
+  int recoverStatus = MPVHDEC_RecoverSj(handleAddress, -1, stream);
+  if (recoverStatus != 0) {
+    return MPVERR_SetCode(handleAddress, recoverStatus);
+  }
+
+  MPVSjChunk currentChunk{};
+  while (true) {
+    AsSjStreamView(stream)->vtable->requestChunk(stream, 1, 0x7FFFFFFF, &currentChunk);
+    AsSjStreamView(stream)->vtable->submitChunk(stream, 1, &currentChunk);
+
+    if (currentChunk.size < 4) {
+      break;
+    }
+    if ((MPV_CheckDelim(currentChunk.data) & 1) == 0) {
+      break;
+    }
+
+    MPVSL_DecSliceOne(handleAddress, stream);
+    if (decodeContext->macroblockLinearIndex >= decodeContext->macroblockLinearLimit) {
+      break;
+    }
+
+    recoverStatus = MPVHDEC_RecoverSj(handleAddress, -1, stream);
+    if (recoverStatus != 0) {
+      return MPVERR_SetCode(handleAddress, recoverStatus);
+    }
+  }
+
+  if (decodeContext->macroblockLinearIndex != decodeContext->macroblockLinearLimit) {
+    ++handle->recoverEventCounter;
+    decodeContext->macroblockLinearIndex = decodeContext->macroblockLinearLimit + 1;
+    decodeContext->macroblockRow = decodeContext->macroblockRowsCount;
+    decodeContext->macroblockColumn = 0;
+    decodeContext->macroblockDiscontinuityHandler(decodeContext);
+  }
+
+  ++decodeContext->lastDecodedMacroblockIndex;
+  if (decodeContext->motionClampCounter != 0) {
+    handle->recoverEventCounter += decodeContext->motionClampCounter;
+  }
+
+  return 0;
+}
+
+/**
  * Address: 0x00AEAB20 (FUN_00AEAB20, _MPV_DecodeFrmSj)
  *
  * What it does:
@@ -2521,6 +2749,106 @@ extern "C" int MPV_DecodeFrmSj(const int handleAddress, MPVSjStream* const strea
   frameSession->recoverEventDelta = handle->recoverEventCounter - recoverEventCounterBefore;
   frameSession->recoverConditionDelta = handle->recoverConditionCounter - recoverConditionCounterBefore;
   return decodeResult;
+}
+
+/**
+ * Address: 0x00AF6260 (FUN_00AF6260, nullsub_50)
+ *
+ * What it does:
+ * Retained CRI hook slot; current build keeps this initializer lane as a
+ * no-op.
+ */
+extern "C" void nullsub_50()
+{
+}
+
+/**
+ * Address: 0x00AF7FA0 (FUN_00AF7FA0, _mpvbdec_SetupIxa)
+ *
+ * What it does:
+ * Builds the FSRI index remap table from one signed 8-bit sequence order
+ * source lane.
+ */
+extern "C" int mpvbdec_SetupIxa(const int sourceSequenceAddress, std::uint8_t* const outFsriOrder)
+{
+  const auto* const sourceSequence = reinterpret_cast<const std::int8_t*>(AddressToPointer(sourceSequenceAddress));
+  int result = 0;
+  for (int i = 0; i < static_cast<int>(kMpvBlockEntryCount); ++i) {
+    result = static_cast<int>(seq2dctfsir(static_cast<int>(sourceSequence[i])));
+    outFsriOrder[i] = static_cast<std::uint8_t>(result);
+  }
+  return result;
+}
+
+/**
+ * Address: 0x00AF62A0 (FUN_00AF62A0, _MPVABDEC_Init)
+ *
+ * What it does:
+ * Seeds ABDEC per-handle decode LUT lanes (scan permutation, mask LUTs, and
+ * run-level table descriptors).
+ */
+extern "C" int MPVABDEC_Init(const int handleAddress)
+{
+  auto* const setup = reinterpret_cast<MPVAbdecSetupView*>(AddressToMutablePointer(handleAddress));
+
+  if (handleAddress + static_cast<int>(offsetof(MPVAbdecSetupView, intraScanPermutation)) != 0) {
+    UTY_MemcpyDword(setup->intraScanPermutation, gMpvIntraScanPermutationRuntime, 0x10u);
+  }
+
+  if (handleAddress + static_cast<int>(offsetof(MPVAbdecSetupView, forwardMaskLut)) != 0) {
+    UTY_MemcpyDword(setup->forwardMaskLut, kMpvAbdecForwardMaskLut, 8u);
+  }
+
+  std::memcpy(setup->thresholdLut, kMpvAbdecThresholdLut, sizeof(setup->thresholdLut));
+
+  setup->runLevelLanes[0].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_4) - 0x10;
+  setup->runLevelLanes[0].bitLength = 0x15;
+  setup->runLevelLanes[1].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_2) - 0x20;
+  setup->runLevelLanes[1].bitLength = 0x13;
+  setup->runLevelLanes[2].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_1) - 0x20;
+  setup->runLevelLanes[2].bitLength = 0x12;
+
+  const int runLevel0aBaseMinusBias = PointerToAddress(mpvvlc_run_level_0a) - 0x20;
+  setup->runLevelLanes[3].tableBaseMinusBias = runLevel0aBaseMinusBias;
+  setup->runLevelLanes[3].bitLength = 0x11;
+  setup->runLevelLanes[4].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_0b) - 0x20;
+  setup->runLevelLanes[4].bitLength = 0x10;
+  setup->runLevelLanes[5].tableBaseMinusBias = PointerToAddress(mpvvlc_run_level_0c) - 0x20;
+  setup->runLevelLanes[5].bitLength = 0x0F;
+
+  return runLevel0aBaseMinusBias;
+}
+
+/**
+ * Address: 0x00AF61F0 (FUN_00AF61F0, _MPVBDEC_Init)
+ *
+ * What it does:
+ * Builds B-picture decoder scan remap/quant tables and then applies ABDEC
+ * per-handle setup.
+ */
+extern "C" int MPVBDEC_Init(const int handleAddress)
+{
+  nullsub_50();
+
+  std::uint8_t sourceSequence[kMpvBlockEntryCount]{};
+  std::uint8_t fsriOrder[kMpvBlockEntryCount]{};
+  for (int i = 0; i < static_cast<int>(kMpvBlockEntryCount); ++i) {
+    sourceSequence[i] = static_cast<std::uint8_t>(i);
+  }
+  mpvbdec_SetupIxa(PointerToAddress(sourceSequence), fsriOrder);
+
+  for (int scanIndex = 0; scanIndex < static_cast<int>(kMpvBlockEntryCount); ++scanIndex) {
+    const int oneBasedIndex = scanIndex + 1;
+    const int zigZagIndex = static_cast<int>(kMpvScanZigZagOrder[scanIndex]);
+    const std::uint8_t remappedIndex = fsriOrder[zigZagIndex];
+    gMpvIntraScanPermutationRuntime[scanIndex] = remappedIndex;
+
+    const std::uint8_t quantizerValue = kMpvDefaultQuantizerByScan[oneBasedIndex];
+    const std::uint8_t quantizerLane = fsriOrder[oneBasedIndex - 1];
+    gMpvDefaultIntraQuantMatrix[quantizerLane] = quantizerValue;
+  }
+
+  return MPVABDEC_Init(handleAddress);
 }
 
 /**
@@ -3290,6 +3618,122 @@ extern "C" int mpvvlc_SetupVlc(const int vlcContextBase)
   runLevelState = mpvvlc_SetVlcDcSiz(runLevelState);
   runLevelState = mpvvlc_SetVlcMotion(runLevelState);
   return mpvvlc_SetVlcMbType(runLevelState);
+}
+
+/**
+ * Address: 0x00AF7F50 (FUN_00AF7F50, _seq2dctfsir)
+ *
+ * What it does:
+ * Remaps one zig-zag sequence index into the FSRI pre-IDCT lane index.
+ */
+extern "C" unsigned int seq2dctfsir(const int sequenceIndex)
+{
+  const int blockRow = sequenceIndex / 8;
+  const int blockCol = sequenceIndex % 8;
+  const int rowGroup = blockRow / 4;
+  const int rowInGroup = blockRow % 4;
+  const int mappedIndex = rowInGroup + (4 * (blockCol + (8 * rowGroup)));
+  if (mappedIndex < 0 || mappedIndex >= 0x100) {
+    for (;;) {
+    }
+  }
+  return static_cast<unsigned int>(mappedIndex);
+}
+
+/**
+ * Address: 0x00AF7DE0 (FUN_00AF7DE0, _initScaleTbl)
+ *
+ * What it does:
+ * Builds the 8x8 FSRI scale-product table from the fixed basis-vector lane.
+ */
+extern "C" double* initScaleTbl()
+{
+  std::size_t writeIndex = 0;
+  for (std::size_t row = 0; row < 8; ++row) {
+    for (std::size_t col = 0; col < 8; ++col) {
+      gFsriScaleTable[writeIndex++] = kFsriBasisScaleVector[row] * kFsriBasisScaleVector[col];
+    }
+  }
+  return gFsriScaleTable + kMpvBlockEntryCount;
+}
+
+/**
+ * Address: 0x00AF7FD0 (FUN_00AF7FD0, _initB0Tbl)
+ *
+ * What it does:
+ * Aligns FSRI B0-table storage to 16 bytes and seeds it with packed binary
+ * constants used by FSRI transform lanes.
+ */
+extern "C" void initB0Tbl()
+{
+  const std::uintptr_t alignedAddress = (reinterpret_cast<std::uintptr_t>(gFsriB0AlignedStorage + 0x0F) & ~std::uintptr_t(0x0F));
+  gFsriB0AlignedAddress = static_cast<std::uint32_t>(alignedAddress);
+  std::memcpy(reinterpret_cast<void*>(alignedAddress), kFsriB0TablePacked, kFsriB0TableByteCount);
+}
+
+/**
+ * Address: 0x00AF7E10 (FUN_00AF7E10, _DCT_FsriInitScaleTbl)
+ *
+ * What it does:
+ * Publishes the FSRI scale table into caller-provided runtime memory in FSRI
+ * remap order.
+ */
+extern "C" int DCT_FsriInitScaleTbl(const int scaleTableBaseAddress)
+{
+  auto* const scaleTable = reinterpret_cast<float*>(AddressToMutablePointer(scaleTableBaseAddress));
+  unsigned int result = 0;
+  for (int i = 0; i < static_cast<int>(kMpvBlockEntryCount); ++i) {
+    result = seq2dctfsir(i);
+    scaleTable[result] = static_cast<float>(gFsriScaleTable[i]);
+  }
+  return static_cast<int>(result);
+}
+
+/**
+ * Address: 0x00AF7E50 (FUN_00AF7E50, _initSparseTbl)
+ *
+ * What it does:
+ * Builds the sparse pre-IDCT matrix bank used by FSRI transform paths.
+ */
+extern "C" unsigned int initSparseTbl()
+{
+  std::memset(gFsriPrecomputedIdct, 0, sizeof(gFsriPrecomputedIdct));
+  DCT_AcInit();
+
+  double basisVector[kMpvBlockEntryCount]{};
+  double transformed[kMpvBlockEntryCount]{};
+  unsigned int result = 0;
+
+  for (int basisIndex = 0; basisIndex < static_cast<int>(kMpvBlockEntryCount); ++basisIndex) {
+    for (int i = 0; i < static_cast<int>(kMpvBlockEntryCount); ++i) {
+      basisVector[i] = (i == basisIndex) ? (1.0 / gFsriScaleTable[i]) : 0.0;
+    }
+
+    DCT_AcIdctDouble(basisVector, transformed);
+
+    const unsigned int mappedRow = seq2dctfsir(basisIndex) << 6;
+    for (int coefficientIndex = 0; coefficientIndex < static_cast<int>(kMpvBlockEntryCount); ++coefficientIndex) {
+      result = mappedRow + static_cast<unsigned int>(coefficientIndex);
+      gFsriPrecomputedIdct[result] = static_cast<float>(transformed[coefficientIndex]);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Address: 0x00AF7DC0 (FUN_00AF7DC0, _DCT_FsriInit)
+ *
+ * What it does:
+ * Runs full FSRI runtime initialization: version publish, B0 lane seed, scale
+ * table build, and sparse pre-IDCT table build.
+ */
+extern "C" unsigned int DCT_FsriInit()
+{
+  gFsriVersionString = DCT_GetVerStr();
+  initB0Tbl();
+  initScaleTbl();
+  return initSparseTbl();
 }
 
 namespace moho::movie

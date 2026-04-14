@@ -25,6 +25,19 @@
 
 using namespace moho;
 
+/**
+ * Address: 0x005E87E0 (FUN_005E87E0, ?AI_CreateTransport@Moho@@YAPAVIAiTransport@1@PAVUnit@1@@Z)
+ *
+ * What it does:
+ * Allocates one `CAiTransportImpl` bound to `unit` and returns it through the
+ * `IAiTransport` interface lane.
+ */
+IAiTransport* moho::AI_CreateTransport(Unit* const unit)
+{
+  auto* const impl = new (std::nothrow) CAiTransportImpl(unit);
+  return impl ? static_cast<IAiTransport*>(impl) : nullptr;
+}
+
 namespace moho
 {
   class RBroadcasterRType_EAiTransportEvent final : public gpg::RType

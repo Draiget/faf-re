@@ -8,6 +8,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiNavigatorLand.h"
 #include "moho/misc/Listener.h"
 
 using namespace moho;
@@ -321,6 +322,19 @@ void SNavPath::EraseFrontCells(std::int32_t count) noexcept
 }
 
 gpg::RType* IAiNavigator::sType = nullptr;
+
+/**
+ * Address: 0x005A5790 (FUN_005A5790, ?AI_CreatePathingNavigator@Moho@@YAPAVIAiNavigator@1@PAVUnit@1@@Z)
+ *
+ * What it does:
+ * Allocates one `CAiNavigatorLand` instance bound to `unit` and returns it as
+ * the `IAiNavigator` interface pointer.
+ */
+IAiNavigator* moho::AI_CreatePathingNavigator(Unit* const unit)
+{
+  auto* const navigator = new (std::nothrow) CAiNavigatorLand(unit);
+  return navigator;
+}
 
 /**
  * Address: 0x005A2D30 (FUN_005A2D30, scalar deleting thunk)

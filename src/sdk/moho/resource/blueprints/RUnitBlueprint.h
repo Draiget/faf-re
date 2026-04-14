@@ -193,6 +193,15 @@ namespace moho
    */
   struct RUnitBlueprintPhysics
   {
+    /**
+     * Address: 0x0051F090 (FUN_0051F090, Moho::RUnitBlueprintPhysics::RUnitBlueprintPhysics)
+     *
+     * What it does:
+     * Initializes movement/skirt/footprint defaults and clears occupancy/
+     * raised-platform vector lanes.
+     */
+    RUnitBlueprintPhysics();
+
     std::uint8_t FlattenSkirt;                                   // +0x00
     std::uint8_t pad_0001_0004[0x03];                            // +0x01
     float SkirtOffsetX;                                          // +0x04
@@ -628,6 +637,16 @@ namespace moho
    */
   struct RUnitBlueprintEconomy
   {
+    /**
+     * Address: 0x0051F990 (FUN_0051F990, Moho::RUnitBlueprintEconomy::RUnitBlueprintEconomy)
+     * Mangled: ??0RUnitBlueprintEconomy@Moho@@QAE@PAVRRuleGameRules@1@@Z
+     *
+     * What it does:
+     * Seeds economy defaults, clears category-string vectors, and initializes
+     * runtime category-cache inline storage using one rules-owner lane.
+     */
+    explicit RUnitBlueprintEconomy(RRuleGameRules* rules = nullptr);
+
     float BuildCostEnergy;                            // +0x00
     float BuildCostMass;                              // +0x04
     float BuildRate;                                  // +0x08

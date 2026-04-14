@@ -317,7 +317,12 @@ bool gpg::STR_EndsWith(
   return strLen > endLen && !strcmp(&str[strLen - endLen], end);
 }
 
-// 0x00938210
+/**
+ * Address: 0x00938210 (FUN_00938210, gpg::STR_StartsWith)
+ *
+ * What it does:
+ * Returns whether `str` begins with `start`.
+ */
 bool gpg::STR_StartsWith(
   const StrArg str,
   const StrArg start
@@ -444,7 +449,13 @@ bool gpg::STR_IsIdent(
   return true;
 }
 
-// 0x00938B40
+/**
+ * Address: 0x00938B40 (FUN_00938B40, gpg::STR_Replace)
+ *
+ * What it does:
+ * Replaces every occurrence of `what` in `str` with `with` while `unk` is
+ * non-zero, returning the number of replacements performed.
+ */
 int gpg::STR_Replace(
   msvc8::string& str,
   const StrArg what,
@@ -452,17 +463,19 @@ int gpg::STR_Replace(
   const unsigned int unk
 )
 {
-  int n = 0;
-  if (unk) { // sometimes passed as `1`, sometimes `-1` - but never `0`
-    size_t searchPos = 0;
-    int pos;
-    while ((pos = str.find(what, searchPos, strlen(what))) != msvc8::string::npos) {
-      str.replace(pos, strlen(what), with);
-      searchPos = pos + strlen(with);
-      ++n;
+  const std::size_t whatLength = std::strlen(what);
+  const std::size_t withLength = std::strlen(with);
+
+  int replaceCount = 0;
+  if (unk != 0u) {
+    std::size_t searchPos = 0u;
+    while ((searchPos = str.find(what, searchPos, whatLength)) != msvc8::string::npos) {
+      str.replace(searchPos, whatLength, with, withLength);
+      searchPos += withLength;
+      ++replaceCount;
     }
   }
-  return n;
+  return replaceCount;
 }
 
 // 0x00938150
@@ -787,26 +800,34 @@ void gpg::STR_CanonizeFilename(
   }
 }
 
-// 0x009388C0
+/**
+ * Address: 0x009388C0 (FUN_009388C0, gpg::STR_TrimWhitespace)
+ *
+ * What it does:
+ * Skips leading ASCII whitespace bytes, copies the remaining text, then trims
+ * trailing ASCII whitespace bytes from the copied buffer.
+ */
 msvc8::string gpg::STR_TrimWhitespace(
   StrArg str
 )
 {
   msvc8::string builder{};
   if (str != nullptr) {
-    while (*str == ' ' || *str != '\t' || *str != '\r' && *str != '\n') {
-      ++str;
+    const char* cursor = str;
+    while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n') {
+      ++cursor;
     }
-    builder = str;
-    int size = builder.size();
-    while (size) {
-      const char c = builder[size - 1];
-      if (c != ' ' && c != '\t' && c != '\r' && c != '\t') {
+    builder = cursor;
+
+    std::size_t trimmedSize = builder.size();
+    while (trimmedSize != 0) {
+      const char c = builder[trimmedSize - 1];
+      if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
         break;
       }
-      --size;
+      --trimmedSize;
     }
-    builder.resize(size);
+    builder.resize(trimmedSize);
   }
   return builder;
 }

@@ -8,12 +8,14 @@
 #include "legacy/containers/String.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/containers/TDatList.h"
+#include "moho/misc/WeakPtr.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
 {
   class ReadArchive;
+  class RType;
   class WriteArchive;
 } // namespace gpg
 
@@ -25,6 +27,7 @@ namespace LuaPlus
 namespace moho
 {
   enum class EUnitCommandType : std::int32_t;
+  class IUnit;
   class RRuleGameRules;
   class Sim;
   struct SOCellPos;
@@ -81,6 +84,55 @@ namespace moho
   );
   static_assert(
     offsetof(SFormationLaneUnitMap, size) == 0x08, "SFormationLaneUnitMap::size offset must be 0x08"
+  );
+
+  struct SUnitOffsetInfo
+  {
+    inline static gpg::RType* sType = nullptr;
+
+    /**
+     * Address: 0x005707B0 (FUN_005707B0, Moho::SUnitOffsetInfo::MemberDeserialize)
+     *
+     * What it does:
+     * Loads unit weak-link lane plus formation offset/vector/speed metadata
+     * lanes from archive payload.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive);
+
+    /**
+     * Address: 0x005708A0 (FUN_005708A0, Moho::SUnitOffsetInfo::MemberSerialize)
+     *
+     * What it does:
+     * Saves unit weak-link lane plus formation offset/vector/speed metadata
+     * lanes into archive payload.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    WeakPtr<IUnit> mUnit;         // +0x00
+    std::int32_t mLeaderPriority; // +0x08
+    SCoordsVec2 mOffset;          // +0x0C
+    Wm3::Vec3f mDirection;        // +0x14
+    float mWeight;                // +0x20
+    float mSpeedBandLow;          // +0x24
+    float mSpeedBandMid;          // +0x28
+    float mSpeedBandHigh;         // +0x2C
+  };
+  static_assert(sizeof(SUnitOffsetInfo) == 0x30, "SUnitOffsetInfo size must be 0x30");
+  static_assert(
+    offsetof(SUnitOffsetInfo, mLeaderPriority) == 0x08,
+    "SUnitOffsetInfo::mLeaderPriority offset must be 0x08"
+  );
+  static_assert(offsetof(SUnitOffsetInfo, mOffset) == 0x0C, "SUnitOffsetInfo::mOffset offset must be 0x0C");
+  static_assert(offsetof(SUnitOffsetInfo, mDirection) == 0x14, "SUnitOffsetInfo::mDirection offset must be 0x14");
+  static_assert(offsetof(SUnitOffsetInfo, mWeight) == 0x20, "SUnitOffsetInfo::mWeight offset must be 0x20");
+  static_assert(
+    offsetof(SUnitOffsetInfo, mSpeedBandLow) == 0x24, "SUnitOffsetInfo::mSpeedBandLow offset must be 0x24"
+  );
+  static_assert(
+    offsetof(SUnitOffsetInfo, mSpeedBandMid) == 0x28, "SUnitOffsetInfo::mSpeedBandMid offset must be 0x28"
+  );
+  static_assert(
+    offsetof(SUnitOffsetInfo, mSpeedBandHigh) == 0x2C, "SUnitOffsetInfo::mSpeedBandHigh offset must be 0x2C"
   );
 
   struct SFormationLaneEntry

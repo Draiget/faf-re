@@ -58,6 +58,28 @@ namespace moho
      */
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetWaterRamp() const;
 
+    /**
+     * Address: 0x0089FC40 (FUN_0089FC40, ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
+     * Mangled: ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ
+     *
+     * What it does:
+     * Lazily resolves one water-cubemap texture from `mWaterCubemap`, caches
+     * it in `mTextures[4]`, and returns one retained shared texture-sheet
+     * handle.
+     */
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetCubeMap() const;
+
+    /**
+     * Address: 0x0089FB00 (FUN_0089FB00, ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z)
+     * Mangled: ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z
+     *
+     * What it does:
+     * Lazily resolves one indexed normal-map texture from `mShaderNames[index]`,
+     * caches it in `mTextures[index]`, and returns one retained shared texture
+     * sheet handle.
+     */
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetNormalMap(int index) const;
+
     // -------------------------------------------------------------------------
     // Layout — offsets confirmed from binary evidence (dtor + releaseTextures).
     // Fields at +0x04 through +0x83 are not yet recovered; placeholder used.
@@ -71,7 +93,7 @@ namespace moho
     msvc8::string mShaderNames[4]{};                 // +0x84  (4 × 0x1C = 0x70 bytes)
 
     // Two additional string fields following the array.
-    msvc8::string mShaderName4{};                    // +0xF4
+    msvc8::string mWaterCubemap{};                   // +0xF4
     msvc8::string mWaterRamp{};                      // +0x110
 
     // Six texture-sheet handles (boost::SharedPtrRaw<CD3DDynamicTextureSheet>).
@@ -83,8 +105,8 @@ namespace moho
   // Spot-check key field offsets derived from binary evidence.
   static_assert(offsetof(CWaterShaderProperties, mShaderNames) == 0x84,
                 "CWaterShaderProperties::mShaderNames offset must be 0x84");
-  static_assert(offsetof(CWaterShaderProperties, mShaderName4) == 0xF4,
-                "CWaterShaderProperties::mShaderName4 offset must be 0xF4");
+  static_assert(offsetof(CWaterShaderProperties, mWaterCubemap) == 0xF4,
+                "CWaterShaderProperties::mWaterCubemap offset must be 0xF4");
   static_assert(offsetof(CWaterShaderProperties, mWaterRamp) == 0x110,
                 "CWaterShaderProperties::mWaterRamp offset must be 0x110");
   static_assert(offsetof(CWaterShaderProperties, mTextures) == 0x12C,

@@ -18,6 +18,24 @@ namespace gpg::gal
     {
     public:
         /**
+         * Address: 0x008F56B0 (FUN_008F56B0)
+         *
+         * What it does:
+         * Initializes one empty D3D9 vertex-buffer wrapper with default
+         * context/resource lanes.
+         */
+        VertexBufferD3D9();
+
+        /**
+         * Address: 0x008F58E0 (FUN_008F58E0)
+         *
+         * What it does:
+         * Initializes one D3D9 vertex-buffer wrapper and binds the provided
+         * context/native buffer payload.
+         */
+        VertexBufferD3D9(const VertexBufferContext* context, void* d3dVertexBuffer);
+
+        /**
          * Address: 0x008F58C0 (FUN_008F58C0)
          *
          * What it does:
@@ -56,6 +74,24 @@ namespace gpg::gal
          * Returns the retained D3D9 vertex-buffer handle and throws when unset.
          */
         void* GetD3D();
+
+        /**
+         * Address: 0x008F5850 (FUN_008F5850)
+         *
+         * What it does:
+         * Releases any previous native vertex-buffer handle, resets context
+         * lanes, then assigns one new context + native buffer payload.
+         */
+        void SetBuffer(const VertexBufferContext* context, void* d3dVertexBuffer);
+
+        /**
+         * Address: 0x008F5760 (FUN_008F5760)
+         *
+         * What it does:
+         * Releases any retained native vertex-buffer handle and restores
+         * the embedded context lanes to default values.
+         */
+        void ResetBufferState();
 
     public:
         VertexBufferContext context_{}; // +0x04

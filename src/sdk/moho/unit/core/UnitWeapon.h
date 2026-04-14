@@ -115,6 +115,15 @@ namespace moho
     Projectile* CreateProjectile(std::int32_t muzzleBoneIndex);
 
     /**
+     * Address: 0x006D53C0 (FUN_006D53C0, Moho::UnitWeapon::ChangeProjectileBlueprint)
+     *
+     * What it does:
+     * Resolves one projectile blueprint id text into a projectile blueprint
+     * resource and updates this weapon's silo-dependent projectile lane.
+     */
+    void ChangeProjectileBlueprint(const msvc8::string& blueprint);
+
+    /**
      * Address: 0x006D5720 (FUN_006D5720, Moho::UnitWeapon::CanAttackTarget)
      *
      * What it does:

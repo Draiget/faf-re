@@ -36,6 +36,22 @@ constexpr std::size_t kPngStructIoPtrOffset = 0x54;
 }
 
 // --------------------------------------------------------------------------
+// png_struct::read_data_fn (stream read callback).
+//
+// Evidence: png_push_fill_buffer (0x009E753F)
+//   mov eax, [ecx+50h]
+// --------------------------------------------------------------------------
+using png_read_data_ptr = void (*)(png_structp, std::uint8_t*, std::uint32_t);
+
+constexpr std::size_t kPngStructReadDataFnOffset = 0x50;
+
+[[nodiscard]] inline png_read_data_ptr& GetReadDataFn(png_structp png_ptr) noexcept
+{
+  auto* base = reinterpret_cast<std::uint8_t*>(png_ptr);
+  return *reinterpret_cast<png_read_data_ptr*>(base + kPngStructReadDataFnOffset);
+}
+
+// --------------------------------------------------------------------------
 // png_struct::{num_chunk_list, chunk_list} — unknown-chunk keep table.
 //
 // libpng 1.2.x stores a user-supplied "keep" directive list as an array of

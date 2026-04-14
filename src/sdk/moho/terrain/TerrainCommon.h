@@ -26,7 +26,14 @@ namespace moho
      */
     TerrainCommon();
 
-    virtual ~TerrainCommon() = default;
+    /**
+     * Address: 0x007FF8D0 (FUN_007FF8D0, ??1IRenTerrain@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Releases the shared decal-mask texture handle and restores the terrain
+     * base vtable lane during teardown.
+     */
+    virtual ~TerrainCommon();
 
     boost::shared_ptr<RD3DTextureResource> mDecalMask{}; // +0x04
   };

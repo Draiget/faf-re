@@ -36,6 +36,23 @@ namespace
     return gpg::RRef(value, CachedStatsStatItemType());
   }
 
+  /**
+   * Address: 0x005CAD60 (FUN_005CAD60, func_InitStatItemParent)
+   *
+   * What it does:
+   * Initializes one boost shared-control lane for `Stats<StatItem>` ownership.
+   */
+  void InitializeStatsRootSharedControl(
+    boost::detail::sp_counted_base*& outControl,
+    moho::Stats<moho::StatItem>* const statsRoot
+  )
+  {
+    outControl = nullptr;
+    if (statsRoot != nullptr) {
+      outControl = new boost::detail::sp_counted_impl_p<moho::Stats<moho::StatItem>>(statsRoot);
+    }
+  }
+
   void ReadStatsRootShared(
     boost::shared_ptr<moho::Stats<moho::StatItem>>& outPointer,
     gpg::ReadArchive* const archive,
@@ -130,7 +147,18 @@ namespace moho
     if (allocation != nullptr) {
       statsRoot = new (allocation) moho::Stats<moho::StatItem>();
     }
-    mStatsRoot = boost::shared_ptr<moho::Stats<moho::StatItem>>(statsRoot);
+
+    boost::SharedPtrRaw<moho::Stats<moho::StatItem>> statsRootRaw{};
+    statsRootRaw.px = statsRoot;
+    try {
+      InitializeStatsRootSharedControl(statsRootRaw.pi, statsRoot);
+    } catch (...) {
+      delete statsRoot;
+      throw;
+    }
+
+    mStatsRoot = boost::SharedPtrFromRawRetained(statsRootRaw);
+    statsRootRaw.release();
   }
 
   /**

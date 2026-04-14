@@ -7,6 +7,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "gpg/core/containers/String.h"
@@ -538,6 +539,69 @@ namespace
     offsetof(UserCommandManagerRuntimeView, resolvedRangeDirty) == 0x60,
     "UserCommandManagerRuntimeView::resolvedRangeDirty offset must be 0x60"
   );
+
+  struct UserManagerHelperEntry
+  {
+    std::int32_t commandType;     // +0x00
+    std::int32_t isResetCommand;  // +0x04
+    void* subject;                // +0x08
+    std::int32_t sequenceOrCount; // +0x0C
+  };
+  static_assert(sizeof(UserManagerHelperEntry) == 0x10, "UserManagerHelperEntry size must be 0x10");
+
+  struct UserCommandQueueLinkVectorView
+  {
+    UserCommandQueueEntryView* begin;       // +0x00
+    UserCommandQueueEntryView* end;         // +0x04
+    UserCommandQueueEntryView* capacityEnd; // +0x08
+    UserCommandQueueEntryView** inlineBase; // +0x0C
+  };
+  static_assert(sizeof(UserCommandQueueLinkVectorView) == 0x10, "UserCommandQueueLinkVectorView size must be 0x10");
+
+  struct UserManagerIssueQueueRuntimeView
+  {
+    std::uint32_t pad_00;                // +0x00
+    UserManagerHelperEntry** blocks;     // +0x04
+    std::uint32_t blockCount;            // +0x08
+    std::uint32_t startOffset;           // +0x0C
+    std::uint32_t size;                  // +0x10
+    std::uint32_t pad_14;                // +0x14
+  };
+  static_assert(offsetof(UserManagerIssueQueueRuntimeView, blocks) == 0x04, "UserManagerIssueQueueRuntimeView::blocks offset must be 0x04");
+  static_assert(
+    offsetof(UserManagerIssueQueueRuntimeView, blockCount) == 0x08,
+    "UserManagerIssueQueueRuntimeView::blockCount offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserManagerIssueQueueRuntimeView, startOffset) == 0x0C,
+    "UserManagerIssueQueueRuntimeView::startOffset offset must be 0x0C"
+  );
+  static_assert(offsetof(UserManagerIssueQueueRuntimeView, size) == 0x10, "UserManagerIssueQueueRuntimeView::size offset must be 0x10");
+  static_assert(sizeof(UserManagerIssueQueueRuntimeView) == 0x18, "UserManagerIssueQueueRuntimeView size must be 0x18");
+
+  struct UserUnitManagerRuntimeView
+  {
+    UserUnit* ownerUnit;                          // +0x00
+    std::uint8_t pad_0004_0008[0x04];
+    UserCommandQueueLinkVectorView primaryLinks;  // +0x08
+    std::uint8_t pad_0018_0028[0x10];
+    UserManagerIssueQueueRuntimeView issueQueue;  // +0x28
+    UserCommandQueueLinkVectorView resolvedLinks; // +0x40
+    std::uint8_t pad_0050_0060[0x10];
+    std::uint8_t resolvedLinksDirty;              // +0x60
+    std::uint8_t pad_0061_0068[0x07];
+  };
+  static_assert(offsetof(UserUnitManagerRuntimeView, primaryLinks) == 0x08, "UserUnitManagerRuntimeView::primaryLinks offset must be 0x08");
+  static_assert(offsetof(UserUnitManagerRuntimeView, issueQueue) == 0x28, "UserUnitManagerRuntimeView::issueQueue offset must be 0x28");
+  static_assert(
+    offsetof(UserUnitManagerRuntimeView, resolvedLinks) == 0x40,
+    "UserUnitManagerRuntimeView::resolvedLinks offset must be 0x40"
+  );
+  static_assert(
+    offsetof(UserUnitManagerRuntimeView, resolvedLinksDirty) == 0x60,
+    "UserUnitManagerRuntimeView::resolvedLinksDirty offset must be 0x60"
+  );
+  static_assert(sizeof(UserUnitManagerRuntimeView) == 0x68, "UserUnitManagerRuntimeView size must be 0x68");
 
   struct UserUnitVisionRuntimeView
   {
@@ -1114,6 +1178,176 @@ namespace
         *ownerLink = reinterpret_cast<UserCommandQueueEntryView*>(cursor->link);
       }
     }
+  }
+
+  [[nodiscard]] UserManagerHelperEntry* AllocateUserManagerHelperSlots(const std::uint32_t count)
+  {
+    if (count > (std::numeric_limits<std::uint32_t>::max() / sizeof(UserManagerHelperEntry))) {
+      throw std::bad_alloc();
+    }
+
+    const std::size_t byteCount = static_cast<std::size_t>(count) * sizeof(UserManagerHelperEntry);
+    return static_cast<UserManagerHelperEntry*>(::operator new(byteCount));
+  }
+
+  void GrowUserManagerIssueQueueMap(UserManagerIssueQueueRuntimeView& queue)
+  {
+    constexpr std::uint32_t kMaxMapSlots = 0x0FFFFFFFu;
+
+    const std::uint32_t oldSlotCount = queue.blockCount;
+    if ((kMaxMapSlots - oldSlotCount) < 1u) {
+      throw std::length_error("User manager issue queue map overflow");
+    }
+
+    std::uint32_t growth = 1u;
+    std::uint32_t candidateGrowth = oldSlotCount >> 1u;
+    if (candidateGrowth < 8u) {
+      candidateGrowth = 8u;
+    }
+    if (candidateGrowth > 1u && oldSlotCount <= (kMaxMapSlots - candidateGrowth)) {
+      growth = candidateGrowth;
+    }
+
+    const std::uint32_t newSlotCount = oldSlotCount + growth;
+    auto** const newBlocks =
+      static_cast<UserManagerHelperEntry**>(::operator new(sizeof(UserManagerHelperEntry*) * newSlotCount));
+    std::memset(newBlocks, 0, sizeof(UserManagerHelperEntry*) * newSlotCount);
+
+    if (oldSlotCount != 0u && queue.blocks != nullptr) {
+      for (std::uint32_t ordinal = 0; ordinal < oldSlotCount; ++ordinal) {
+        std::uint32_t oldIndex = queue.startOffset + ordinal;
+        if (oldIndex >= oldSlotCount) {
+          oldIndex -= oldSlotCount;
+        }
+
+        std::uint32_t newIndex = queue.startOffset + ordinal;
+        if (newIndex >= newSlotCount) {
+          newIndex -= newSlotCount;
+        }
+
+        newBlocks[newIndex] = queue.blocks[oldIndex];
+      }
+
+      ::operator delete(queue.blocks);
+    }
+
+    queue.blockCount = newSlotCount;
+    queue.blocks = newBlocks;
+  }
+
+  void ClearUserManagerIssueQueue(UserManagerIssueQueueRuntimeView& queue) noexcept
+  {
+    while (queue.size != 0u) {
+      queue.size -= 1u;
+      if (queue.size == 0u) {
+        queue.startOffset = 0u;
+      }
+    }
+
+    for (std::uint32_t slot = queue.blockCount; slot != 0u; --slot) {
+      if (queue.blocks == nullptr) {
+        break;
+      }
+
+      if (UserManagerHelperEntry* const block = queue.blocks[slot - 1u]; block != nullptr) {
+        ::operator delete(block);
+      }
+    }
+
+    if (queue.blocks != nullptr) {
+      ::operator delete(queue.blocks);
+      queue.blocks = nullptr;
+    }
+    queue.blockCount = 0u;
+  }
+
+  void PushUserManagerIssue(UserManagerIssueQueueRuntimeView& queue, const UserManagerHelperEntry& entry)
+  {
+    if (queue.blockCount <= (queue.size + 1u)) {
+      GrowUserManagerIssueQueueMap(queue);
+    }
+
+    std::uint32_t slot = queue.startOffset + queue.size;
+    if (queue.blockCount <= slot) {
+      slot -= queue.blockCount;
+    }
+
+    if (queue.blocks[slot] == nullptr) {
+      queue.blocks[slot] = AllocateUserManagerHelperSlots(1u);
+    }
+    if (queue.blocks[slot] != nullptr) {
+      *queue.blocks[slot] = entry;
+    }
+
+    queue.size += 1u;
+  }
+
+  /**
+   * Address: 0x008B6BE0 (FUN_008B6BE0, struct_UserUnitManager::~struct_UserUnitManager)
+   *
+   * What it does:
+   * Releases owner-link lanes for resolved/primary vectors, clears pending
+   * issue queue blocks, and restores both vectors to inline storage.
+   */
+  void DestroyUserUnitManagerState(UserUnitManager* const managerPtr) noexcept
+  {
+    if (managerPtr == nullptr) {
+      return;
+    }
+
+    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+
+    UnlinkResolvedQueueOwnerLinks(manager.resolvedLinks.begin, manager.resolvedLinks.end);
+    if (manager.resolvedLinks.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase)) {
+      ::operator delete[](manager.resolvedLinks.begin);
+      manager.resolvedLinks.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase);
+      manager.resolvedLinks.capacityEnd = manager.resolvedLinks.inlineBase != nullptr ? *manager.resolvedLinks.inlineBase : nullptr;
+    }
+    manager.resolvedLinks.end = manager.resolvedLinks.begin;
+
+    ClearUserManagerIssueQueue(manager.issueQueue);
+
+    UnlinkResolvedQueueOwnerLinks(manager.primaryLinks.begin, manager.primaryLinks.end);
+    if (manager.primaryLinks.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager.primaryLinks.inlineBase)) {
+      ::operator delete[](manager.primaryLinks.begin);
+      manager.primaryLinks.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager.primaryLinks.inlineBase);
+      manager.primaryLinks.capacityEnd = manager.primaryLinks.inlineBase != nullptr ? *manager.primaryLinks.inlineBase : nullptr;
+    }
+    manager.primaryLinks.end = manager.primaryLinks.begin;
+  }
+
+  /**
+   * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
+   *
+   * What it does:
+   * Clears pending issue queue state, pushes one reset marker helper, marks the
+   * resolved range dirty, and restores resolved-link storage to inline mode.
+   */
+  [[maybe_unused]] void ResetUserUnitManagerState(UserUnitManager* const managerPtr, const std::int32_t commandType)
+  {
+    if (managerPtr == nullptr) {
+      return;
+    }
+
+    auto& manager = *reinterpret_cast<UserUnitManagerRuntimeView*>(managerPtr);
+    ClearUserManagerIssueQueue(manager.issueQueue);
+
+    UserManagerHelperEntry resetHelper{};
+    resetHelper.commandType = commandType;
+    resetHelper.isResetCommand = 1;
+    resetHelper.subject = nullptr;
+    resetHelper.sequenceOrCount = -1;
+    PushUserManagerIssue(manager.issueQueue, resetHelper);
+
+    manager.resolvedLinksDirty = 1u;
+
+    UnlinkResolvedQueueOwnerLinks(manager.resolvedLinks.begin, manager.resolvedLinks.end);
+    if (manager.resolvedLinks.begin != reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase)) {
+      ::operator delete[](manager.resolvedLinks.begin);
+      manager.resolvedLinks.begin = reinterpret_cast<UserCommandQueueEntryView*>(manager.resolvedLinks.inlineBase);
+      manager.resolvedLinks.capacityEnd = manager.resolvedLinks.inlineBase != nullptr ? *manager.resolvedLinks.inlineBase : nullptr;
+    }
+    manager.resolvedLinks.end = manager.resolvedLinks.begin;
   }
 
   void AdvanceUserCommandManagerBySeq(UserUnitManager* const managerPtr, const std::int32_t seqNo) noexcept
@@ -1741,12 +1975,12 @@ UserUnit* UserUnit::DestroyUserUnit(const std::uint8_t deleteFlags)
   mSelectionSets.clear();
 
   if (mFactoryManager != nullptr) {
-    AdvanceUserCommandManagerBySeq(mFactoryManager, std::numeric_limits<std::int32_t>::max());
+    DestroyUserUnitManagerState(mFactoryManager);
     ::operator delete(mFactoryManager);
     mFactoryManager = nullptr;
   }
   if (mManager != nullptr) {
-    AdvanceUserCommandManagerBySeq(mManager, std::numeric_limits<std::int32_t>::max());
+    DestroyUserUnitManagerState(mManager);
     ::operator delete(mManager);
     mManager = nullptr;
   }

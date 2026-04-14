@@ -65,6 +65,8 @@ msvc8::string moho::con_TestVarStr;
 bool moho::snd_ExtraDoWorkCalls = false;
 int moho::recon_debug = 0;
 bool moho::sPathDebuggerEnabled = false;
+int moho::rule_Paranoid = 0;
+float moho::rule_BlueprintReloadDelay = 0.0f;
 
 namespace
 {
@@ -2375,6 +2377,7 @@ void moho::TConVar<float>::Handle(void* commandArgs)
 }
 
 /**
+ * Address: 0x007FDE00 (FUN_007FDE00, Moho::TConVar_uint::Process)
  * Address: 0x103C8880 (FUN_103C8880)
  *
  * What it does:
@@ -2392,7 +2395,7 @@ void moho::TConVar<std::uint32_t>::Handle(void* commandArgs)
   if (args.Count() >= 2) {
     HandleUInt32ConVarCommand(args, value);
   } else {
-    gpg::Logf("uint32 %s == %u (%x)", mName ? mName : "", *value, *value);
+    CON_Printf("uint32 %s == %u (%x)", mName ? mName : "", *value, *value);
   }
 }
 
@@ -2456,6 +2459,10 @@ namespace
   constexpr const char* kConsoleStartupConWinShowLogDialogDescription = "Show the log dialog.";
   constexpr const char* kConsoleStartupConWxInputBoxDescription = "Open the wx input box.";
   constexpr const char* kConsoleStartupReconDebugDescription = "Army index for recon debug rendering output.";
+  constexpr const char* kConsoleStartupRuleParanoidDescription =
+    "Paranoid-mode flag controlling rule-driven defensive runtime checks.";
+  constexpr const char* kConsoleStartupRuleBlueprintReloadDelayDescription =
+    "Minimum delay in seconds between blueprint hot-reload probes.";
 
   CConFunc gCConFunc_CON_Echo{};
   CConFunc gCConFunc_CON_ListCommands{};
@@ -2503,6 +2510,16 @@ namespace
     &moho::con_TestVarStr
   );
   TConVar<int> gTConVar_recon_debug("recon_debug", kConsoleStartupReconDebugDescription, &moho::recon_debug);
+  TConVar<int> gTConVar_rule_Paranoid(
+    "rule_Paranoid",
+    kConsoleStartupRuleParanoidDescription,
+    &moho::rule_Paranoid
+  );
+  TConVar<float> gTConVar_rule_BlueprintReloadDelay(
+    "rule_BlueprintReloadDelay",
+    kConsoleStartupRuleBlueprintReloadDelayDescription,
+    &moho::rule_BlueprintReloadDelay
+  );
   TConVar<int> gTConVar_graphics_Fidelity(
     "graphics_Fidelity",
     kConsoleStartupGraphicsFidelityDescription,
@@ -3711,6 +3728,54 @@ namespace moho
   {
     RegisterStartupConVar(gTConVar_recon_debug, &cleanup_TConVar_recon_debug);
   }
+
+  /**
+   * Address: 0x00BF3910 (FUN_00BF3910, ??1TConVar_rule_Paranoid@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `rule_Paranoid`.
+   */
+  void cleanup_TConVar_rule_Paranoid()
+  {
+    CleanupStartupConCommand(gTConVar_rule_Paranoid);
+  }
+
+  /**
+   * Address: 0x00BC8DC0 (FUN_00BC8DC0, register_TConVar_rule_Paranoid)
+   *
+   * What it does:
+   * Registers startup convar for `rule_Paranoid`, inserting the typed int
+   * convar into the process-global console command map and scheduling the
+   * cleanup lane at exit.
+   */
+  void register_TConVar_rule_Paranoid()
+  {
+    RegisterStartupConVar(gTConVar_rule_Paranoid, &cleanup_TConVar_rule_Paranoid);
+  }
+
+  /**
+   * Address: 0x00BF3940 (FUN_00BF3940, ??1TConVar_rule_BlueprintReloadDelay@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Unregisters startup convar storage for `rule_BlueprintReloadDelay`.
+   */
+  void cleanup_TConVar_rule_BlueprintReloadDelay()
+  {
+    CleanupStartupConCommand(gTConVar_rule_BlueprintReloadDelay);
+  }
+
+  /**
+   * Address: 0x00BC8E00 (FUN_00BC8E00, register_TConVar_rule_BlueprintReloadDelay)
+   *
+   * What it does:
+   * Registers startup convar for `rule_BlueprintReloadDelay`, inserting the
+   * typed float convar into the process-global console command map and
+   * scheduling the cleanup lane at exit.
+   */
+  void register_TConVar_rule_BlueprintReloadDelay()
+  {
+    RegisterStartupConVar(gTConVar_rule_BlueprintReloadDelay, &cleanup_TConVar_rule_BlueprintReloadDelay);
+  }
 } // namespace moho
 
 namespace
@@ -3771,6 +3836,8 @@ namespace
       moho::register_CConFunc_Debug_Crash();
       moho::register_CConFunc_Debug_Throw();
       moho::register_TConVar_recon_debug();
+      moho::register_TConVar_rule_Paranoid();
+      moho::register_TConVar_rule_BlueprintReloadDelay();
     }
   };
 

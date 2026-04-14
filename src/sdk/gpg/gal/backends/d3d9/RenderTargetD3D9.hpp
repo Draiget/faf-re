@@ -13,6 +13,17 @@ namespace gpg::gal
     class RenderTargetD3D9
     {
     public:
+        RenderTargetD3D9() = default;
+
+        /**
+         * Address: 0x008F5620 (FUN_008F5620)
+         *
+         * What it does:
+         * Initializes one render-target wrapper and binds caller context plus
+         * one native texture payload.
+         */
+        RenderTargetD3D9(const RenderTargetContext* context, void* renderTexture);
+
         /**
          * Address: 0x008F5450 (FUN_008F5450)
          *
@@ -44,6 +55,15 @@ namespace gpg::gal
          * Returns surface level 0 from the retained render-target texture handle.
          */
         virtual void* GetSurfaceLevel0();
+
+        /**
+         * Address: 0x008F5500 (FUN_008F5500)
+         *
+         * What it does:
+         * Resets prior render-target state, stores one context + texture payload,
+         * then acquires and caches level-0 render surface state.
+         */
+        void* SetRenderTexture(const RenderTargetContext* context, void* renderTexture);
 
     public:
         RenderTargetContext context_{}; // +0x04

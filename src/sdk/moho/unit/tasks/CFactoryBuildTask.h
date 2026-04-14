@@ -27,6 +27,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x005F9EB0 (FUN_005F9EB0, Moho::CFactoryBuildTask::CFactoryBuildTask)
+     *
+     * What it does:
+     * Initializes one detached factory-build task with empty dispatch, blueprint,
+     * helper, rally-point, and command lanes.
+     */
+    CFactoryBuildTask();
+
+    /**
      * Address: 0x005F9F20 (FUN_005F9F20)
      * Mangled: ??0CFactoryBuildTask@Moho@@QAE@@Z_0
      *

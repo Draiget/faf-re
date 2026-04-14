@@ -1032,6 +1032,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
+   *
+   * What it does:
+   * Replaces the platoon formation override string lane.
+   */
+  void CPlatoon::SetPlatoonFormationOverride(const msvc8::string& formationName)
+  {
+    mFormation = formationName;
+  }
+
+  /**
    * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
    *
    * What it does:
@@ -3051,6 +3062,45 @@ namespace moho
       kUseTeleporterHelpText
     );
     return &binder;
+  }
+
+  /**
+   * Address: 0x00732140 (FUN_00732140, cfunc_CPlatoonSetPlatoonFormationOverrideL)
+   *
+   * What it does:
+   * Resolves `(platoon, formationName)` from Lua, maps `"None"` to empty text,
+   * and stores the formation override lane.
+   */
+  int cfunc_CPlatoonSetPlatoonFormationOverrideL(LuaPlus::LuaState* const state)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != 2) {
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected %d args, but got %d",
+        kSetPlatoonFormationOverrideHelpText,
+        2,
+        argumentCount
+      );
+    }
+
+    LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
+    CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
+
+    LuaPlus::LuaStackObject formationArg(state, 2);
+    const char* formationText = lua_tostring(state->m_state, 2);
+    if (formationText == nullptr) {
+      LuaPlus::LuaStackObject::TypeError(&formationArg, "string");
+      formationText = "";
+    }
+
+    msvc8::string formationOverride{};
+    if (_stricmp(formationText, "None") != 0) {
+      formationOverride.assign(formationText);
+    }
+
+    platoon->SetPlatoonFormationOverride(formationOverride);
+    return 0;
   }
 
   /**

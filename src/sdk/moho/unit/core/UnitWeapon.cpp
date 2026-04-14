@@ -18,6 +18,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/SCR_FromLua.h"
 #include "moho/lua/SCR_ToLua.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -172,18 +173,13 @@ namespace
     OutsideMaxRange = 3u,
   };
 
-  [[nodiscard]] float NormalizeAngleRadians(const float angleRadians) noexcept
-  {
-    constexpr float kPi = 3.14159265358979323846f;
-    constexpr float kTwoPi = 6.28318530717958647692f;
-
-    float normalized = std::fmod(angleRadians + kPi, kTwoPi);
-    if (normalized < 0.0f) {
-      normalized += kTwoPi;
-    }
-    return normalized - kPi;
-  }
-
+  /**
+   * Address: 0x006D5B40 (FUN_006D5B40, Moho::UnitWeapon::TargetSolutionStatusGun)
+   *
+   * What it does:
+   * Evaluates one target point against radius/height/heading constraints and
+   * returns one target-solution status lane for gun-style weapons.
+   */
   [[nodiscard]] UnitWeaponTargetSolutionStatus EvaluateTargetSolutionStatusGun(
     moho::UnitWeapon* const weapon,
     const Wm3::Vec3f& targetPosition,
@@ -242,7 +238,7 @@ namespace
       constexpr float kDegreesToRadians = 0.017453292f;
       const float headingArcCenter = weapon->mWeaponBlueprint->HeadingArcCenter * kDegreesToRadians;
       const float headingArcRange = weapon->mWeaponBlueprint->HeadingArcRange * kDegreesToRadians;
-      const float headingDelta = NormalizeAngleRadians(targetHeading - unitHeading - headingArcCenter);
+      const float headingDelta = moho::NormalizeAngleSignedRadians(targetHeading - unitHeading - headingArcCenter);
       if (std::fabs(headingDelta) > headingArcRange) {
         return UnitWeaponTargetSolutionStatus::NoSolution;
       }
@@ -1460,7 +1456,7 @@ namespace moho
       return 0;
     }
 
-    UpdateProjectileBlueprintFromText(weapon, blueprintText);
+    weapon->ChangeProjectileBlueprint(msvc8::string(blueprintText));
     return 0;
   }
 
@@ -2258,6 +2254,22 @@ namespace moho
   {
     *outLabel = mLabel;
     return outLabel;
+  }
+
+  /**
+   * Address: 0x006D53C0 (FUN_006D53C0, Moho::UnitWeapon::ChangeProjectileBlueprint)
+   *
+   * What it does:
+   * Resolves one projectile blueprint id text into a projectile blueprint
+   * resource and updates this weapon's silo-dependent projectile lane.
+   */
+  void UnitWeapon::ChangeProjectileBlueprint(const msvc8::string& blueprint)
+  {
+    if (blueprint.empty()) {
+      return;
+    }
+
+    UpdateProjectileBlueprintFromText(this, blueprint.c_str());
   }
 
   /**

@@ -8,9 +8,35 @@
 
 #include "gpg/core/containers/String.h"
 #include "moho/resource/RResId.h"
+#include "moho/sim/CRandomStream.h"
 
 namespace moho
 {
+  namespace
+  {
+    /**
+     * Address: 0x0051C510 (FUN_0051C510, func_RandomDirection)
+     *
+     * What it does:
+     * Builds one randomized launch direction from blueprint direction lanes
+     * (`DirectionX/Y/Z`) plus symmetric per-axis ranges.
+     */
+    [[nodiscard]] Wm3::Vector3f* BuildRandomDirectionVector(
+      CRandomStream* const randomStream, Wm3::Vector3f* const destination, const RProjectileBlueprint* const blueprint
+    )
+    {
+      const auto sampleSymmetricOffset = [randomStream](const float range) {
+        const float unit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
+        return (-range) + ((range - (-range)) * unit);
+      };
+
+      destination->x = sampleSymmetricOffset(blueprint->Physics.DirectionXRange) + blueprint->Physics.DirectionX;
+      destination->y = sampleSymmetricOffset(blueprint->Physics.DirectionYRange) + blueprint->Physics.DirectionY;
+      destination->z = sampleSymmetricOffset(blueprint->Physics.DirectionZRange) + blueprint->Physics.DirectionZ;
+      return destination;
+    }
+  } // namespace
+
   gpg::RType* RProjectileBlueprint::sType = nullptr;
 
   /**
@@ -111,5 +137,35 @@ namespace moho
     msvc8::string completedMeshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
     gpg::STR_NormalizeFilenameLowerSlash(completedMeshPath);
     Display.MeshBlueprint.name.assign_owned(completedMeshPath.view());
+  }
+
+  /**
+   * Address: 0x0051C8C0 (FUN_0051C8C0)
+   * Mangled: ?GetAngularVelocity@RProjectileBlueprint@Moho@@QBE?AV?$Vector3@M@Wm3@@PAVCRandomStream@2@@Z
+   *
+   * What it does:
+   * Samples one random unit axis and scales it by blueprint rotational speed
+   * plus symmetric random spread, then converts degrees/sec to radians/sec.
+   */
+  Wm3::Vector3f RProjectileBlueprint::GetAngularVelocity(CRandomStream* const randomStream) const
+  {
+    Wm3::Vector3f randomAxis{};
+    randomAxis.x = randomStream->FRandGaussian();
+    randomAxis.y = randomStream->FRandGaussian();
+    randomAxis.z = randomStream->FRandGaussian();
+    Wm3::Vector3f::Normalize(&randomAxis);
+
+    const float randomRange = Physics.RotationalVelocityRange;
+    const float randomUnit = CMersenneTwister::ToUnitFloat(randomStream->twister.NextUInt32());
+    const float randomOffset = (-randomRange) + ((randomRange - (-randomRange)) * randomUnit);
+
+    constexpr float kDegreesToRadians = 0.017453292f;
+    const float angularSpeed = (Physics.RotationalVelocity + randomOffset) * kDegreesToRadians;
+
+    Wm3::Vector3f angularVelocity{};
+    angularVelocity.x = randomAxis.x * angularSpeed;
+    angularVelocity.y = randomAxis.y * angularSpeed;
+    angularVelocity.z = randomAxis.z * angularSpeed;
+    return angularVelocity;
   }
 } // namespace moho

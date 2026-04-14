@@ -66,6 +66,15 @@ namespace moho
     );
 
     /**
+     * Address: 0x0069AED0 (FUN_0069AED0, Moho::Projectile::~Projectile)
+     *
+     * What it does:
+     * Unlinks intrusive weak/broadcaster lanes owned by this projectile and
+     * decrements the projectile instance-counter stat before base teardown.
+     */
+    ~Projectile() override;
+
+    /**
      * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
      */
     static void MemberConstruct(gpg::ReadArchive* archive, gpg::SerConstructResult* result);

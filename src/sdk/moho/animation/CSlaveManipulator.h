@@ -22,6 +22,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00645F80 (FUN_00645F80, ??0CSlaveManipulator@Moho@@QAE@XZ)
+     *
+     * What it does:
+     * Builds detached/default slave-manipulator state for reflection
+     * construction paths.
+     */
+    CSlaveManipulator();
+
+    /**
      * Address: 0x00646010 (FUN_00646010, ??0CSlaveManipulator@Moho@@QAE@@Z)
      *
      * What it does:
@@ -56,6 +65,87 @@ namespace moho
   );
   static_assert(offsetof(CSlaveManipulator, mMaxRate) == 0x94, "CSlaveManipulator::mMaxRate offset must be 0x94");
   static_assert(sizeof(CSlaveManipulator) == 0x98, "CSlaveManipulator size must be 0x98");
+
+  class CSlaveManipulatorTypeInfo : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x00645DC0 (FUN_00645DC0, Moho::CSlaveManipulatorTypeInfo::Init)
+     *
+     * What it does:
+     * Sets reflected size/callback lanes for `CSlaveManipulator`, registers
+     * `IAniManipulator` base metadata, then finalizes type initialization.
+     */
+    void Init() override;
+
+    /**
+     * Address: 0x00646740 (FUN_00646740, Moho::CSlaveManipulatorTypeInfo::NewRef)
+     *
+     * What it does:
+     * Allocates one `CSlaveManipulator`, runs detached default construction,
+     * and returns its typed reflection reference.
+     */
+    static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x006467E0 (FUN_006467E0, Moho::CSlaveManipulatorTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one detached `CSlaveManipulator` in caller-owned storage and
+     * returns its typed reflection reference.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
+
+    /**
+     * Address: 0x006467C0 (FUN_006467C0, Moho::CSlaveManipulatorTypeInfo::Delete)
+     *
+     * What it does:
+     * Deletes one heap-owned `CSlaveManipulator`.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x00646850 (FUN_00646850, Moho::CSlaveManipulatorTypeInfo::Destruct)
+     *
+     * What it does:
+     * Runs non-deleting in-place destructor logic for `CSlaveManipulator`.
+     */
+    static void Destruct(void* objectStorage);
+
+    /**
+     * Address: 0x00646860 (FUN_00646860, Moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator)
+     *
+     * What it does:
+     * Registers `IAniManipulator` as reflected base at offset `0`.
+     */
+    static void AddBase_IAniManipulator(gpg::RType* typeInfo);
+
+    /**
+     * Address: 0x00646660 (FUN_00646660)
+     *
+     * What it does:
+     * Installs all reflection lifecycle callbacks on one type-info instance.
+     */
+    static CSlaveManipulatorTypeInfo* ConfigureLifecycleCallbacks(CSlaveManipulatorTypeInfo* typeInfo);
+
+    /**
+     * Address: 0x00646720 (FUN_00646720)
+     *
+     * What it does:
+     * Installs allocation and placement-construction callback lanes.
+     */
+    static CSlaveManipulatorTypeInfo* ConfigureCtorCallbacks(CSlaveManipulatorTypeInfo* typeInfo);
+
+    /**
+     * Address: 0x00646730 (FUN_00646730)
+     *
+     * What it does:
+     * Installs deletion and in-place destruction callback lanes.
+     */
+    static CSlaveManipulatorTypeInfo* ConfigureDtorCallbacks(CSlaveManipulatorTypeInfo* typeInfo);
+  };
+
+  static_assert(sizeof(CSlaveManipulatorTypeInfo) == 0x64, "CSlaveManipulatorTypeInfo size must be 0x64");
 
   /**
    * VFTABLE: 0x00E22D60

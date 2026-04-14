@@ -206,6 +206,17 @@ namespace moho
     T mValue; // +0x08
   };
 
+  /**
+   * Address: 0x005D4180 (FUN_005D4180, Moho::TSimConVarInstance_float::OnCall)
+   *
+   * What it does:
+   * Handles float sim-convar command arguments using the float command parser
+   * semantics (`=`, `+=`, `-=`, `*=`, `/=`, direct value); prints current value
+   * when no RHS token is provided.
+   */
+  template <>
+  int TSimConVarInstance<float>::HandleConsoleCommand(void* commandArgs);
+
   static_assert(
     offsetof(TSimConVarInstance<bool>, mValue) == 0x08, "TSimConVarInstance<bool>::mValue offset must be 0x08"
   );

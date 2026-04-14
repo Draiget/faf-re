@@ -7,6 +7,26 @@
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
+namespace
+{
+  /**
+   * Address: 0x00552C90 (FUN_00552C90, gpg::fastvector_SOCellPos::cpy)
+   *
+   * What it does:
+   * Rebinds one `FastVectorN<SOCellPos, 2>` destination lane to inline storage,
+   * then copies source payload/storage into the destination using the legacy
+   * runtime-view copy helper path.
+   */
+  [[nodiscard]] gpg::fastvector_n<moho::SOCellPos, 2>& CopySOCellPosFastVectorN2(
+    gpg::fastvector_n<moho::SOCellPos, 2>& destination,
+    const gpg::fastvector_n<moho::SOCellPos, 2>& source
+  )
+  {
+    (void)gpg::FastVectorN2RebindAndCopy(&destination, &source);
+    return destination;
+  }
+} // namespace
+
 namespace moho
 {
   /**
@@ -48,6 +68,40 @@ namespace moho
     , mUnitCommand(nullptr)
     , mCommandQueue(nullptr)
   {
+  }
+
+  /**
+   * Address: 0x006E5400 (FUN_006E5400, ??0SSTICommandIssueData@Moho@@QAEABU01@@Z)
+   *
+   * IDA signature:
+   * Moho::SSTICommandIssueData *__thiscall Moho::SSTICommandIssueData::SSTICommandIssueData(
+   *   Moho::SSTICommandIssueData *src, Moho::SSTICommandIssueData *this);
+   *
+   * What it does:
+   * Copy-constructs every command-issue payload lane, including fastvector
+   * cell storage and embedded Lua object state.
+   */
+  SSTICommandIssueData::SSTICommandIssueData(const SSTICommandIssueData& other)
+    : nextCommandId(other.nextCommandId)
+    , unk04(other.unk04)
+    , mIndex(other.mIndex)
+    , mCommandType(other.mCommandType)
+    , mTarget(other.mTarget)
+    , mTarget2(other.mTarget2)
+    , unk38(other.unk38)
+    , mOri(other.mOri)
+    , unk4C(other.unk4C)
+    , mBlueprint(other.mBlueprint)
+    , unk54(other.unk54)
+    , mCells{}
+    , unk70(other.unk70)
+    , unk74(other.unk74)
+    , mObject(other.mObject)
+    , mLuaState(other.mLuaState)
+    , mUnitCommand(other.mUnitCommand)
+    , mCommandQueue(other.mCommandQueue)
+  {
+    (void)CopySOCellPosFastVectorN2(mCells, other.mCells);
   }
 
   /**

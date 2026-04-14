@@ -75,6 +75,30 @@ namespace
   moho::StatItem* gEngineStatSoundActiveEntityLoops = nullptr;
   moho::StatItem* gEngineStatSoundPendingDestroy = nullptr;
 
+  /**
+   * Address: 0x008AB400 (FUN_008AB400, IXACTCUE::GetState)
+   *
+   * What it does:
+   * Queries the loop cue state for one script sound handle and returns true
+   * when cue state does not carry the stopped bit; null cues are treated as
+   * prepared.
+   */
+  [[nodiscard]] bool SoundHandleCueIsPrepared(moho::HSound* const sound)
+  {
+    std::int32_t cueState = 0;
+    moho::IXACTCue* const cue = (sound != nullptr) ? sound->mLoopCue : nullptr;
+    if (cue == nullptr) {
+      return true;
+    }
+
+    if (cue->GetState(&cueState) >= 0) {
+      return (cueState & kCueStateStoppedBit) == 0;
+    }
+
+    gpg::Warnf(kCueStateQueryFailedWarning);
+    return false;
+  }
+
   void EnsureSoundCounterStat(moho::StatItem*& slot, const char* statPath);
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
@@ -2061,15 +2085,7 @@ namespace moho
       const LuaPlus::LuaObject soundObject(LuaPlus::LuaStackObject(state, 1));
       if (HSound* const sound = SCR_FromLua_HSoundOpt(soundObject, state); sound != nullptr) {
         (void)USER_GetSound();
-        if (sound->mLoopCue != nullptr) {
-          std::int32_t cueState = 0;
-          if (sound->mLoopCue->GetState(&cueState) >= 0) {
-            isPrepared = (cueState & kCueStateStoppedBit) == 0;
-          } else {
-            gpg::Warnf(kCueStateQueryFailedWarning);
-            isPrepared = false;
-          }
-        }
+        isPrepared = SoundHandleCueIsPrepared(sound);
       }
     }
 

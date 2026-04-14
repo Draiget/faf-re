@@ -73,7 +73,12 @@ namespace moho
     CAcquireTargetTask(UnitWeapon* weapon, CAiAttackerImpl* attacker);
 
     /**
-     * Address: 0x005D88D0 (FUN_005D88D0, Moho::CAcquireTargetTask::dtr)
+     * Address: 0x005D88D0 (FUN_005D88D0, scalar deleting thunk)
+     * Address: 0x005D8970 (FUN_005D8970, Moho::CAcquireTargetTask::~CAcquireTargetTask body)
+     *
+     * What it does:
+     * Decrements acquire-target instance stats, clears both listener weak-link
+     * chains, and runs base-task teardown.
      * Slot: 0
      */
     ~CAcquireTargetTask() override;

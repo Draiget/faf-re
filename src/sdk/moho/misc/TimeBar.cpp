@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <map>
@@ -115,9 +116,30 @@ namespace moho
       gTimeBarState = new TimeBarState{};
     }
 
+    void ShutdownTimeBarStateAtProcessExit()
+    {
+      delete gTimeBarState;
+      gTimeBarState = nullptr;
+    }
+
+    /**
+     * Address: 0x004E6D00 (FUN_004E6D00)
+     *
+     * What it does:
+     * Performs one-time time-bar runtime initialization and registers process
+     * exit teardown for the time-bar global state.
+     */
+    void EnsureTimeBarRuntimeInitialized()
+    {
+      std::call_once(gTimeBarStateInitOnce, []() {
+        InitializeTimeBarState();
+        std::atexit(ShutdownTimeBarStateAtProcessExit);
+      });
+    }
+
     [[nodiscard]] TimeBarState& GetTimeBarState()
     {
-      std::call_once(gTimeBarStateInitOnce, InitializeTimeBarState);
+      EnsureTimeBarRuntimeInitialized();
       return *gTimeBarState;
     }
 

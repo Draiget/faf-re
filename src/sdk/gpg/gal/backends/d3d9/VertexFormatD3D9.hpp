@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
+
 namespace gpg::gal
 {
     /**
@@ -12,6 +14,15 @@ namespace gpg::gal
     class VertexFormatD3D9
     {
     public:
+        /**
+         * Address: 0x0094B0A0 (FUN_0094B0A0, gpg::gal::VertexFormatD3D9::VertexFormatD3D9)
+         *
+         * What it does:
+         * Initializes one D3D9 vertex-format wrapper and applies caller format
+         * code plus native declaration payload.
+         */
+        VertexFormatD3D9(std::uint32_t formatCode, void* vertexDeclaration);
+
         /**
          * Address: 0x0094AD40 (FUN_0094AD40)
          *
@@ -28,23 +39,32 @@ namespace gpg::gal
          */
         void* GetDeclaration();
 
+        /**
+         * Address: 0x0094AC90 (FUN_0094AC90)
+         *
+         * What it does:
+         * Releases the retained vertex-declaration handle and restores the
+         * default format code lane (`0x17`).
+         */
+        void ResetDeclarationState();
+
+        /**
+         * Address: 0x0094AEF0 (FUN_0094AEF0)
+         *
+         * What it does:
+         * Applies one format/declaration payload and rebuilds per-stream stride
+         * lanes from the recovered D3D vertex-element table.
+         */
+        void SetFormatDeclaration(std::uint32_t formatCode, void* vertexDeclaration);
+
     public:
         std::uint32_t formatCode_;                    // +0x04
-        void* elementArrayProxy_;                     // +0x08
-        std::uint32_t* elementArrayBegin_;            // +0x0C
-        std::uint32_t* elementArrayEnd_;              // +0x10
-        std::uint32_t* elementArrayCapacityEnd_;      // +0x14
+        msvc8::vector<std::uint32_t> elementStrideByStream_; // +0x08
         void* vertexDeclaration_;                     // +0x18
     };
 
     static_assert(offsetof(VertexFormatD3D9, formatCode_) == 0x04, "VertexFormatD3D9::formatCode_ offset must be 0x04");
-    static_assert(offsetof(VertexFormatD3D9, elementArrayProxy_) == 0x08, "VertexFormatD3D9::elementArrayProxy_ offset must be 0x08");
-    static_assert(offsetof(VertexFormatD3D9, elementArrayBegin_) == 0x0C, "VertexFormatD3D9::elementArrayBegin_ offset must be 0x0C");
-    static_assert(offsetof(VertexFormatD3D9, elementArrayEnd_) == 0x10, "VertexFormatD3D9::elementArrayEnd_ offset must be 0x10");
-    static_assert(
-        offsetof(VertexFormatD3D9, elementArrayCapacityEnd_) == 0x14,
-        "VertexFormatD3D9::elementArrayCapacityEnd_ offset must be 0x14"
-    );
+    static_assert(offsetof(VertexFormatD3D9, elementStrideByStream_) == 0x08, "VertexFormatD3D9::elementStrideByStream_ offset must be 0x08");
     static_assert(offsetof(VertexFormatD3D9, vertexDeclaration_) == 0x18, "VertexFormatD3D9::vertexDeclaration_ offset must be 0x18");
     static_assert(sizeof(VertexFormatD3D9) == 0x1C, "VertexFormatD3D9 size must be 0x1C");
 }

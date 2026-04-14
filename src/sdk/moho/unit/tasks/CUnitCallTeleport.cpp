@@ -302,6 +302,37 @@ namespace moho
   }
 
   /**
+   * Address: 0x00600EF0 (FUN_00600EF0, Moho::CUnitCallTeleport::~CUnitCallTeleport)
+   *
+   * What it does:
+   * Clears call-teleport state flags on the owner unit, removes transport
+   * waiting/pickup links when needed, publishes dispatch result, and unlinks
+   * the weak transport-unit lane.
+   */
+  CUnitCallTeleport::~CUnitCallTeleport()
+  {
+    mUnit->UnitStateMask &= ~kUnitStateMaskTeleportPending;
+    mUnit->UnitStateMask &= ~kUnitStateMaskWaitingForTransport;
+
+    if (mIsOccupying) {
+      mUnit->FreeOgridRect();
+      mIsOccupying = false;
+    }
+
+    Unit* const transportUnit = mTargetTransportUnit.GetObjectPtr();
+    if (transportUnit != nullptr && transportUnit->AiTransport != nullptr && !transportUnit->IsDead()) {
+      transportUnit->AiTransport->TransportRemoveFromWaitingList(mUnit);
+    }
+
+    if (!mCompletedSuccessfully && transportUnit != nullptr && transportUnit->AiTransport != nullptr && !transportUnit->IsDead()) {
+      transportUnit->AiTransport->TransportRemovePickupUnit(mUnit, true);
+    }
+
+    *mDispatchResult = static_cast<EAiResult>(2 - static_cast<int>(mCompletedSuccessfully));
+    mTargetTransportUnit.UnlinkFromOwnerChain();
+  }
+
+  /**
    * Address: 0x0060AAC0 (FUN_0060AAC0, Moho::CUnitTeleportTask::operator new)
    *
    * What it does:

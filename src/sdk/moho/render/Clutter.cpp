@@ -26,6 +26,11 @@ namespace
     virtual ~RegionKeyVtableResetTag() = default;
   };
 
+  struct RegionRuntimeVtableResetTag
+  {
+    virtual ~RegionRuntimeVtableResetTag() = default;
+  };
+
   struct DestroyInstanceVtableTag
   {
     virtual ~DestroyInstanceVtableTag() = default;
@@ -57,6 +62,7 @@ namespace
   static_assert(offsetof(CWldTerrainResRuntimeView, map) == 0x4, "CWldTerrainResRuntimeView::map offset must be 0x4");
 
   RegionKeyVtableResetTag gRegionKeyVtableResetTag{};
+  RegionRuntimeVtableResetTag gRegionRuntimeVtableResetTag{};
   DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
   SurfaceVtableResetTag gSurfaceVtableResetTag{};
   SeedVtableResetTag gSeedVtableResetTag{};
@@ -64,6 +70,11 @@ namespace
   [[nodiscard]] void* RegionKeyVtableResetToken()
   {
     return *reinterpret_cast<void**>(&gRegionKeyVtableResetTag);
+  }
+
+  [[nodiscard]] void* RegionRuntimeVtableResetToken()
+  {
+    return *reinterpret_cast<void**>(&gRegionRuntimeVtableResetTag);
   }
 
   [[nodiscard]] void* DestroyInstanceVtableToken()
@@ -810,6 +821,22 @@ namespace moho
   void ClutterSurfaceElement::DestroyInPlace()
   {
     vtable->destroy(this, 0);
+  }
+
+  /**
+   * Address: 0x007D5F20 (FUN_007D5F20, ??1Region@Clutter@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Resets region runtime links/payloads, clears map-node list storage, then
+   * releases the map-list sentinel allocation.
+   */
+  ClutterRegion::~ClutterRegion()
+  {
+    vtable = RegionRuntimeVtableResetToken();
+    (void)ResetRegionRuntimeState(this);
+    (void)ClearRegionMapList(&mMap);
+    ::operator delete(mMap.head);
+    mMap.head = nullptr;
   }
 
   /**

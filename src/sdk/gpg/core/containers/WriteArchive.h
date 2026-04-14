@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <iosfwd>
 #include <map>
 
 #include "ArchiveSerialization.h"
@@ -226,4 +227,12 @@ namespace gpg
      * Creates one file-backed concrete `WriteArchive` for save/load serializers.
      */
     WriteArchive* CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
+
+    /**
+     * Address: 0x00939280 (FUN_00939280, ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)
+     *
+     * What it does:
+     * Creates one text-backed concrete `WriteArchive` bound to an output stream.
+     */
+    WriteArchive* CreateTextWriteArchive(const boost::shared_ptr<std::ostream>& stream);
 } // namespace gpg

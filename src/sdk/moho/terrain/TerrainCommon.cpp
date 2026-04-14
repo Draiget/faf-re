@@ -17,4 +17,16 @@ namespace moho
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     resources->GetTexture(mDecalMask, "/textures/engine/decalMask.dds", 0, true);
   }
+
+  /**
+   * Address: 0x007FF8D0 (FUN_007FF8D0, ??1IRenTerrain@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Releases the shared decal-mask texture handle and restores the terrain
+   * base vtable lane during teardown.
+   */
+  TerrainCommon::~TerrainCommon()
+  {
+    mDecalMask.reset();
+  }
 } // namespace moho

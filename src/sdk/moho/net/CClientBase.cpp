@@ -20,6 +20,30 @@ using namespace moho;
 namespace
 {
   constexpr std::size_t kMessageHeaderSize = 3;
+
+  /**
+   * Address: 0x0053C4B0 (FUN_0053C4B0, func_WriteSetCommandSource)
+   *
+   * What it does:
+   * Emits one `CMDST_SetCommandSource` message only when source ownership
+   * changed from the last emitted source lane.
+   */
+  void WriteSetCommandSourceMessage(
+    const std::uint8_t sourceId,
+    gpg::PipeStream* const outPipe,
+    std::uint8_t* const lastEmittedSource
+  )
+  {
+    if (outPipe == nullptr || lastEmittedSource == nullptr || sourceId == *lastEmittedSource) {
+      return;
+    }
+
+    CMessage message{ECmdStreamOp::CMDST_SetCommandSource};
+    CMessageStream stream(message);
+    stream.Write(sourceId);
+    outPipe->Write(message.mBuff.start_, message.mBuff.Size());
+    *lastEmittedSource = sourceId;
+  }
 } // namespace
 
 /**
@@ -303,14 +327,16 @@ void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const 
 void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::PipeStream* const outPipe)
 {
   static constexpr uint32_t kInvalidCommandSource = 0xFFu;
+  (void)update;
 
   if (mEjected) {
     return;
   }
 
+  std::uint8_t lastEmittedSource = static_cast<std::uint8_t>(kInvalidCommandSource);
   bool hasCommandSource = mCommandSourceId != kInvalidCommandSource;
   if (hasCommandSource) {
-    update->SetCommandSource(mCommandSourceId);
+    WriteSetCommandSourceMessage(static_cast<std::uint8_t>(mCommandSourceId), outPipe, &lastEmittedSource);
   }
 
   CMessage message{};
@@ -330,7 +356,7 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
         for (unsigned int source = mValidCommandSources.GetNext(std::numeric_limits<unsigned int>::max());
              source < mValidCommandSources.Max();
              source = mValidCommandSources.GetNext(source)) {
-          update->SetCommandSource(source);
+          WriteSetCommandSourceMessage(static_cast<std::uint8_t>(source), outPipe, &lastEmittedSource);
           outPipe->Write(terminateSourceMessage.mBuff.start_, terminateSourceMessage.mBuff.Size());
         }
 
@@ -372,7 +398,7 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
           mCommandSourceId = kInvalidCommandSource;
         } else {
           mCommandSourceId = claimedSource;
-          update->SetCommandSource(claimedSource);
+          WriteSetCommandSourceMessage(claimedSource, outPipe, &lastEmittedSource);
           hasCommandSource = true;
         }
 
@@ -380,6 +406,7 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
       }
 
       if (hasCommandSource) {
+        WriteSetCommandSourceMessage(static_cast<std::uint8_t>(mCommandSourceId), outPipe, &lastEmittedSource);
         outPipe->Write(message.mBuff.start_, message.mBuff.Size());
 
         if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {

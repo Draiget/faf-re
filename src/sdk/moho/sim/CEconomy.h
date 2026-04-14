@@ -24,6 +24,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
+     *
+     * What it does:
+     * Unlinks the consumption-request sentinel node, releases extra-storage
+     * ownership (with max-storage rollback), then frees this economy object.
+     */
+    CEconomy* Clear();
+
+    /**
      * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
      *
      * What it does:

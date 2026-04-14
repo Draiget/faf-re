@@ -36,6 +36,15 @@ namespace moho
   [[nodiscard]] double MathGlobalRandomUnitScaled(float scale);
 
   /**
+   * Address: 0x00514BC0 (FUN_00514BC0, func_RandomFloatSafe)
+   *
+   * What it does:
+   * Returns one process-global random sample in `[0, 1)` under
+   * `math_GlobalRandomMutex`.
+   */
+  [[nodiscard]] double MathGlobalRandomUnitSafe();
+
+  /**
    * Address: 0x007A64B0 (FUN_007A64B0, func_DRand)
    *
    * What it does:

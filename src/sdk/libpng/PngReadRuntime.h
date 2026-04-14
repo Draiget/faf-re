@@ -28,6 +28,19 @@
 extern "C" void* png_get_io_ptr(png_structp png_ptr);
 
 /**
+ * Address: 0x009E753F (FUN_009E753F)
+ * Mangled: png_push_fill_buffer
+ *
+ * IDA signature:
+ * int __cdecl png_push_fill_buffer(struct png_struct *png_ptr, int buf, int length);
+ *
+ * What it does:
+ * Dispatches the registered read callback from png_struct::read_data_fn,
+ * raising png_error when the callback slot is null.
+ */
+extern "C" void png_push_fill_buffer(png_structp png_ptr, std::uint8_t* buf, std::uint32_t length);
+
+/**
  * Address: 0x009E0A5E (FUN_009E0A5E)
  *
  * IDA signature:

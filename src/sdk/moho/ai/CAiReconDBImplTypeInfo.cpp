@@ -565,6 +565,13 @@ namespace
     return InsertNodeWithFixup(storage, parent, insertLeft, key, value);
   }
 
+  /**
+   * Address: 0x005C7E60 (FUN_005C7E60, Moho::CAiReconDBImpl::operator new)
+   *
+   * What it does:
+   * Allocates one `CAiReconDBImpl`, runs constructor defaults, and returns the
+   * typed reflection reference payload used by `CAiReconDBImplTypeInfo::Init`.
+   */
   [[nodiscard]] gpg::RRef CreateAiReconDbRefOwned()
   {
     return MakeTypedRef(new CAiReconDBImpl(nullptr, false), CachedCAiReconDBImplType());

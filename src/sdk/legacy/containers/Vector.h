@@ -169,6 +169,9 @@ namespace msvc8
          * Address: 0x00446DC0 (FUN_00446DC0)
          * Address: 0x00446E00 (FUN_00446E00)
          * Address: 0x00446EC0 (FUN_00446EC0)
+         * Address: 0x004C6B40 (FUN_004C6B40)
+         * Address: 0x004C6CA0 (FUN_004C6CA0)
+         * Address: 0x004C6D10 (FUN_004C6D10)
          *
          * What it does:
          * Repeats one source word into destination for `remainingWords` iterations
@@ -212,6 +215,10 @@ namespace msvc8
          * Address: 0x00446D30 (FUN_00446D30)
          * Address: 0x00446D80 (FUN_00446D80)
          * Address: 0x00446E90 (FUN_00446E90)
+         * Address: 0x004C6570 (FUN_004C6570)
+         * Address: 0x004C6A30 (FUN_004C6A30)
+         * Address: 0x004C6BE0 (FUN_004C6BE0)
+         * Address: 0x004C6CE0 (FUN_004C6CE0)
          *
          * What it does:
          * Moves one half-open source word range `[sourceBegin, sourceEnd)` into
@@ -241,6 +248,8 @@ namespace msvc8
          * Address: 0x00446630 (FUN_00446630)
          * Address: 0x004466B0 (FUN_004466B0)
          * Address: 0x00446750 (FUN_00446750)
+         * Address: 0x004C65B0 (FUN_004C65B0)
+         * Address: 0x004C6A80 (FUN_004C6A80)
          *
          * What it does:
          * Moves one source word range `[sourceBegin, sourceEnd)` so the copied block
@@ -299,6 +308,7 @@ namespace msvc8
          * Address: 0x00446610 (FUN_00446610)
          * Address: 0x00446690 (FUN_00446690)
          * Address: 0x00446720 (FUN_00446720)
+         * Address: 0x004C6A60 (FUN_004C6A60)
          *
          * What it does:
          * Fills one destination word range `[destinationBegin, destinationEnd)` from
@@ -323,6 +333,8 @@ namespace msvc8
          * Address: 0x00446B10 (FUN_00446B10)
          * Address: 0x00446B60 (FUN_00446B60)
          * Address: 0x00446BB0 (FUN_00446BB0)
+         * Address: 0x004C6C10 (FUN_004C6C10)
+         * Address: 0x004C6DC0 (FUN_004C6DC0)
          *
          * What it does:
          * Moves `wordCount` 32-bit words from `source` into `destination`.
@@ -373,6 +385,10 @@ namespace msvc8
          * Address: 0x00446620 (FUN_00446620)
          * Address: 0x004466A0 (FUN_004466A0)
          * Address: 0x00446740 (FUN_00446740)
+         * Address: 0x004C6800 (FUN_004C6800)
+         * Address: 0x004C6840 (FUN_004C6840)
+         * Address: 0x004C69F0 (FUN_004C69F0)
+         * Address: 0x004C6A70 (FUN_004C6A70)
          *
          * What it does:
          * Returns the high-byte lane from one 32-bit word.
@@ -1761,6 +1777,7 @@ namespace msvc8
          * Address: 0x00445C90 (FUN_00445C90)
          * Address: 0x00445DC0 (FUN_00445DC0)
          * Address: 0x00445E80 (FUN_00445E80)
+         * Address: 0x004C65E0 (FUN_004C65E0)
          *
          * What it does:
          * Allocates one raw 4-byte-slot heap block with explicit overflow guard.
@@ -1772,6 +1789,24 @@ namespace msvc8
             }
 
             return ::operator new(sizeof(std::uint32_t) * count);
+        }
+
+        /**
+         * Address: 0x004C6520 (FUN_004C6520)
+         *
+         * What it does:
+         * Allocates one raw 64-byte-slot heap block with explicit overflow guard.
+         * Matches the legacy VC8 `std::_Allocate<T>(count, T*)` instantiation for
+         * a 64-byte element type.
+         */
+        [[nodiscard]] static void* allocate_struct64_slots_checked(const std::size_t count)
+        {
+            constexpr std::size_t kElementSize = 64u;
+            if (count > (static_cast<std::size_t>(-1) / kElementSize)) {
+                throw std::bad_alloc();
+            }
+
+            return ::operator new(kElementSize * count);
         }
 
         /**

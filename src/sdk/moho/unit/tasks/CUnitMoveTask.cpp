@@ -51,6 +51,36 @@ namespace
 namespace moho
 {
   /**
+   * Address: 0x00618030 (FUN_00618030, Moho::CUnitMoveTask::CUnitMoveTask)
+   *
+   * What it does:
+   * Initializes one detached move-task with self-linked listener nodes and
+   * empty dispatch/goal/command lanes.
+   */
+  CUnitMoveTask::CUnitMoveTask()
+    : CCommandTask()
+    , mUnknown0030(0)
+    , mNavigatorListenerVftable(0)
+    , mNavigatorListenerLink{}
+    , mUnknown0040(0)
+    , mFormationStatusListenerVftable(0)
+    , mFormationStatusListenerLink{}
+    , mUnknown0050(0)
+    , mCommandEventListenerVftable(0)
+    , mCommandEventListenerLink{}
+    , mDispatchTask(nullptr)
+    , mMoveGoal()
+    , mCommandRef{}
+    , mNextCmdIsInstant(1)
+    , mRequiresTransportCategoryCheck(0)
+    , mIsOccupying(0)
+    , mTransportDispatchIssued(0)
+    , mMoveVariant(0)
+    , mHasPreparedDynamicGoal(0)
+    , mPad_0096_0098{0, 0}
+  {}
+
+  /**
    * Address: 0x00618A00 (FUN_00618A00, sub_618A00)
    *
    * What it does:

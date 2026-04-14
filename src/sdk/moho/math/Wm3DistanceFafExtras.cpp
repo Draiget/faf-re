@@ -920,6 +920,88 @@ namespace Wm3
   }
 
   /**
+   * Address: 0x00A6CB50 (FUN_00A6CB50, Wm3::DistVector2Box2d::StaticGet)
+   *
+   * double, Wm3::Vector2<double> const&, Wm3::Box2<double> const&, Wm3::Vector2<double> const&,
+   * Wm3::Vector2<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector2Box2d::StaticGet(Wm3::DistVector2Box2d *this, double t,
+   * Wm3::Vector2d *velocity0, Wm3::Vector2d *velocity1);
+   *
+   * What it does:
+   * Moves the point and box forward by time `t`, then returns point-to-box distance.
+   */
+  double DistVector2Box2dStaticGet(
+    const double t,
+    const Vector2<double>& vector,
+    const Box2<double>& box,
+    const Vector2<double>& vectorVelocity,
+    const Vector2<double>& boxVelocity,
+    Vector2<double>* const closestPointOnBox
+  ) noexcept
+  {
+    using std::sqrt;
+    return sqrt(DistVector2Box2dStaticGetSquared(t, vector, box, vectorVelocity, boxVelocity, closestPointOnBox));
+  }
+
+  /**
+   * Address: 0x00A6CC60 (FUN_00A6CC60, Wm3::DistVector2Box2d::StaticGetSquared)
+   *
+   * double, Wm3::Vector2<double> const&, Wm3::Box2<double> const&, Wm3::Vector2<double> const&,
+   * Wm3::Vector2<double> const&
+   *
+   * IDA signature:
+   * double __thiscall Wm3::DistVector2Box2d::StaticGetSquared(Wm3::DistVector2Box2d *this, double t,
+   * Wm3::Vector2d *velocity0, Wm3::Vector2d *velocity1);
+   *
+   * What it does:
+   * Moves the point and box forward by time `t`, then returns the squared distance from the moved point to the moved
+   * oriented box.
+   */
+  double DistVector2Box2dStaticGetSquared(
+    const double t,
+    const Vector2<double>& vector,
+    const Box2<double>& box,
+    const Vector2<double>& vectorVelocity,
+    const Vector2<double>& boxVelocity,
+    Vector2<double>* const closestPointOnBox
+  ) noexcept
+  {
+    const Vector2<double> movedVector = vector + vectorVelocity * t;
+
+    Box2<double> movedBox = box;
+    movedBox.Center = box.Center + boxVelocity * t;
+
+    const Vector2<double> diff = movedVector - movedBox.Center;
+    Vector2<double> closest = movedBox.Center;
+    double squaredDistance = 0.0;
+
+    for (int i = 0; i < 2; ++i) {
+      const Vector2<double>& axis = movedBox.Axis[i];
+      const double projected = Vector2<double>::Dot(diff, axis);
+
+      double clamped = projected;
+      if (projected < -movedBox.Extent[i]) {
+        const double delta = projected + movedBox.Extent[i];
+        squaredDistance += delta * delta;
+        clamped = -movedBox.Extent[i];
+      } else if (projected > movedBox.Extent[i]) {
+        const double delta = projected - movedBox.Extent[i];
+        squaredDistance += delta * delta;
+        clamped = movedBox.Extent[i];
+      }
+
+      closest = closest + axis * clamped;
+    }
+
+    if (closestPointOnBox) {
+      *closestPointOnBox = closest;
+    }
+    return squaredDistance;
+  }
+
+  /**
    * Address: 0x00A484F0 (FUN_00A484F0, Wm3::DistVector3Segment3f::GetSquared)
    *
    * Wm3::Vector3<float> const&, Wm3::Segment3<float> const&

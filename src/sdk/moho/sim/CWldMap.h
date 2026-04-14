@@ -24,6 +24,7 @@ namespace moho
   struct CBackgroundTaskControl;
   class ID3DTextureSheet;
   class IWldTerrainRes;
+  class RD3DTextureResource;
 
   struct CWldPropEntry
   {
@@ -130,6 +131,33 @@ namespace moho
   );
   static_assert(sizeof(RWldMapPreviewChunk) == 0x2C, "RWldMapPreviewChunk size must be 0x2C");
 
+  struct TerrainEnvironmentLookupEntry
+  {
+    /**
+     * Address: 0x008A0A20 (FUN_008A0A20, ??0struct_Env@@QAE@@Z)
+     *
+     * What it does:
+     * Stores one environment lookup name and one resolved terrain texture
+     * resource handle.
+     */
+    TerrainEnvironmentLookupEntry(
+      const msvc8::string& environmentName,
+      boost::shared_ptr<RD3DTextureResource> texture
+    );
+
+    msvc8::string mEnvironmentName;                  // +0x00
+    boost::shared_ptr<RD3DTextureResource> mTexture; // +0x1C
+  };
+  static_assert(
+    offsetof(TerrainEnvironmentLookupEntry, mEnvironmentName) == 0x00,
+    "TerrainEnvironmentLookupEntry::mEnvironmentName offset must be 0x00"
+  );
+  static_assert(
+    offsetof(TerrainEnvironmentLookupEntry, mTexture) == 0x1C,
+    "TerrainEnvironmentLookupEntry::mTexture offset must be 0x1C"
+  );
+  static_assert(sizeof(TerrainEnvironmentLookupEntry) == 0x24, "TerrainEnvironmentLookupEntry size must be 0x24");
+
   struct TerrainPlayableRectSource
   {
     std::uint8_t pad_0000_0008[0x08];
@@ -167,6 +195,33 @@ namespace moho
      * and returns `&outRect`.
      */
     [[nodiscard]] const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const;
+
+    /**
+     * Address: 0x008A6DA0 (FUN_008A6DA0, ?SetPlayableMapRect@CWldTerrainRes@Moho@@EAEXABV?$Rect2@H@gpg@@@Z)
+     *
+     * What it does:
+     * Writes one playable-map rectangle through the owned terrain map and emits
+     * warning text when bounds are invalid.
+     */
+    [[nodiscard]] bool SetPlayableMapRect(const VisibilityRect& rect);
+
+    /**
+     * Address: 0x008A1080 (FUN_008A1080, ?SetBackground@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     *
+     * What it does:
+     * Stores terrain background texture path and resolves the corresponding D3D
+     * texture resource handle.
+     */
+    void SetBackground(const msvc8::string& texturePath);
+
+    /**
+     * Address: 0x008A11C0 (FUN_008A11C0, ?SetSkycube@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     *
+     * What it does:
+     * Stores terrain skycube texture path and resolves the corresponding D3D
+     * texture resource handle.
+     */
+    void SetSkycube(const msvc8::string& texturePath);
 
   public:
     TerrainPlayableRectSource* mPlayableRectSource; // 0x04

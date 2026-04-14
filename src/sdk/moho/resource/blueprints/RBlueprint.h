@@ -59,6 +59,26 @@ namespace moho
     RBlueprint(RRuleGameRules* owner, const RResId& resId);
 
     /**
+     * Address: 0x0050DE60 (FUN_0050DE60)
+     * Mangled: ??1RBlueprint@Moho@@QAE@@Z
+     *
+     * What it does:
+     * Releases base blueprint string lanes, decrements the shared instance
+     * counter stat slot, and restores the base `gpg::RObject` vtable lane.
+     */
+    ~RBlueprint();
+
+    /**
+     * Address: 0x0050DF10 (FUN_0050DF10, Moho::RBlueprint::InitBlueprint)
+     *
+     * What it does:
+     * Applies one Lua blueprint table into this reflected object, runs the
+     * polymorphic `OnInitBlueprint()` lane, then merges resolved fields back
+     * into the Lua table.
+     */
+    void InitBlueprint(LuaPlus::LuaObject& luaBlueprint);
+
+    /**
      * Address: 0x0050DBA0 (FUN_0050DBA0)
      * Mangled: ?OnInitBlueprint@RBlueprint@Moho@@MAEXXZ
      *

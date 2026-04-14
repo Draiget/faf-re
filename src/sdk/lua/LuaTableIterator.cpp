@@ -16,24 +16,7 @@ namespace
 		if (state == nullptr || tableObj == nullptr || keyObj == nullptr || valueObj == nullptr) {
 			return false;
 		}
-
-		lua_State* const cState = state->GetCState();
-		if (cState == nullptr) {
-			return false;
-		}
-
-		const int32_t oldTop = lua_gettop(cState);
-		tableObj->PushStack(cState);
-		keyObj->PushStack(cState);
-		if (lua_next(cState, -2) == 0) {
-			lua_settop(cState, oldTop);
-			return false;
-		}
-
-		keyObj->m_object = *(cState->top - 2);
-		valueObj->m_object = *(cState->top - 1);
-		lua_settop(cState, oldTop);
-		return true;
+		return LuaPlusH_next(state, tableObj, keyObj, valueObj) != 0;
 	}
 
 	[[noreturn]]

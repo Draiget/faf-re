@@ -4,6 +4,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/Stats.h"
 
@@ -150,6 +151,25 @@ namespace moho
     int createdAtTick = 0;
     archive->ReadInt(&createdAtTick);
     mCreatedAtTick = static_cast<std::uint32_t>(createdAtTick);
+  }
+
+  /**
+   * Address: 0x0077F280 (FUN_0077F280, Moho::CDecalHandle::MemberSerialize)
+   *
+   * What it does:
+   * Saves CScriptObject base lanes, then serializes decal payload and decal
+   * visibility/tick fields into one archive stream.
+   */
+  void CDecalHandle::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    const gpg::RRef baseOwnerRef{};
+    archive->Write(CachedCScriptObjectType(), static_cast<const CScriptObject*>(this), baseOwnerRef);
+
+    const gpg::RRef decalOwnerRef{};
+    archive->Write(CachedSDecalInfoType(), &mInfo, decalOwnerRef);
+
+    archive->WriteUInt(mArmyVisibilityFlags);
+    archive->WriteInt(static_cast<int>(mCreatedAtTick));
   }
 
   /**

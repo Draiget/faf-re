@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
@@ -342,6 +343,65 @@ namespace
 
     return writeIndex;
   }
+
+  struct RangeProfileMapNodeRuntimeView
+  {
+    moho::SRangeRenderCategoryTreeNode* mLeft;   // +0x00
+    moho::SRangeRenderCategoryTreeNode* mParent; // +0x04
+    moho::SRangeRenderCategoryTreeNode* mRight;  // +0x08
+    std::uint8_t mUnknown0CTo13[0x08]{};         // +0x0C
+    msvc8::string mKey;                          // +0x14
+    moho::SRangeRenderProfile mValue;            // +0x30
+  };
+  static_assert(
+    offsetof(RangeProfileMapNodeRuntimeView, mKey) == 0x14,
+    "RangeProfileMapNodeRuntimeView::mKey offset must be 0x14"
+  );
+  static_assert(
+    offsetof(RangeProfileMapNodeRuntimeView, mValue) == 0x30,
+    "RangeProfileMapNodeRuntimeView::mValue offset must be 0x30"
+  );
+
+  [[nodiscard]] const RangeProfileMapNodeRuntimeView* AsRangeProfileNodeView(
+    const moho::SRangeRenderCategoryTreeNode* const node
+  ) noexcept
+  {
+    return reinterpret_cast<const RangeProfileMapNodeRuntimeView*>(node);
+  }
+
+  [[nodiscard]] const moho::SRangeRenderCategoryTreeNode* FindRangeProfileNodeByCategory(
+    const moho::SRangeRenderCategoryTree& tree,
+    const std::string_view categoryName
+  ) noexcept
+  {
+    const moho::SRangeRenderCategoryTreeNode* const head = tree.mHead;
+    if (head == nullptr) {
+      return nullptr;
+    }
+
+    const moho::SRangeRenderCategoryTreeNode* candidate = head;
+    const moho::SRangeRenderCategoryTreeNode* node = head->mParent;
+    while (node != head && node->mIsSentinel == 0u) {
+      const std::string_view nodeKey = AsRangeProfileNodeView(node)->mKey.view();
+      if (nodeKey < categoryName) {
+        node = node->mRight;
+      } else {
+        candidate = node;
+        node = node->mLeft;
+      }
+    }
+
+    if (candidate == head) {
+      return nullptr;
+    }
+
+    const std::string_view candidateKey = AsRangeProfileNodeView(candidate)->mKey.view();
+    if (candidateKey < categoryName || categoryName < candidateKey) {
+      return nullptr;
+    }
+
+    return candidate;
+  }
 } // namespace
 
 namespace moho
@@ -455,6 +515,27 @@ namespace moho
       }
 
       mGeometry.mIndexBuffer->Unlock();
+    }
+  }
+
+  /**
+   * Address: 0x007EE950 (FUN_007EE950, Moho::RangeRenderer::MoveCategories)
+   *
+   * What it does:
+   * Rebuilds visible range profiles by resolving each category key through the
+   * range-profile tree and appending matching profile values in caller order.
+   */
+  void RangeRenderer::MoveCategories(const msvc8::vector<msvc8::string>& categories)
+  {
+    mVisibleProfiles.clear();
+
+    for (const msvc8::string& category : categories) {
+      const SRangeRenderCategoryTreeNode* const match = FindRangeProfileNodeByCategory(mRangeProfiles, category.view());
+      if (match == nullptr) {
+        continue;
+      }
+
+      mVisibleProfiles.push_back(AsRangeProfileNodeView(match)->mValue);
     }
   }
 

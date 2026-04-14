@@ -21,8 +21,16 @@ namespace moho
      * Allocates one `CUnitUnloadUnits` and returns a typed reflection ref.
      */
     static gpg::RRef NewRef();
+
+    /**
+     * Address: 0x00627DE0 (FUN_00627DE0, Moho::CUnitUnloadUnitsTypeInfo::CtrRef)
+     *
+     * What it does:
+     * Constructs one `CUnitUnloadUnits` in caller-provided storage and returns
+     * a typed reflection ref.
+     */
+    static gpg::RRef CtrRef(void* objectStorage);
   };
 
   static_assert(sizeof(CUnitUnloadUnitsTypeInfo) == 0x64, "CUnitUnloadUnitsTypeInfo size must be 0x64");
 } // namespace moho
-

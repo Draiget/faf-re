@@ -15,6 +15,7 @@ namespace gpg
 namespace moho
 {
   class CUnitCommand;
+  class Unit;
   struct RUnitBlueprint;
 
   /**
@@ -201,6 +202,16 @@ namespace moho
   public:
     static gpg::RType* sType;
   };
+
+  /**
+   * Address: 0x0059FED0 (FUN_0059FED0, ?AI_CreateBuilder@Moho@@YAPAVIAiBuilder@1@PAVUnit@1@@Z)
+   *
+   * What it does:
+   * Allocates one `CAiBuilderImpl` for `unit` and returns it as the
+   * `IAiBuilder` interface pointer, preserving null-on-allocation-failure
+   * behavior.
+   */
+  [[nodiscard]] IAiBuilder* AI_CreateBuilder(Unit* unit);
 
   static_assert(sizeof(IAiBuilder) == 0x04, "IAiBuilder size must be 0x04");
 } // namespace moho

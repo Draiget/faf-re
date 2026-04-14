@@ -5133,13 +5133,42 @@ namespace
     SaveObjectByRType(archive, playableRect2, {"Rect2<int>", "gpg::Rect2<int>"}, ownerRef);
   }
 
-  void LoadMapDataBestEffort(
-    gpg::ReadArchive* archive, gpg::Rect2i* playableRect1, gpg::Rect2i* playableRect2, const gpg::RRef& ownerRef
-  )
+  struct Rect2iVectorRuntimeView
   {
-    // 0x00745120 deserializes map playable rectangles and cached tile rect list.
-    LoadObjectByRType(archive, playableRect1, {"Rect2<int>", "gpg::Rect2<int>"}, ownerRef);
-    LoadObjectByRType(archive, playableRect2, {"Rect2<int>", "gpg::Rect2<int>"}, ownerRef);
+    void* allocatorProxy;
+    gpg::Rect2i* first;
+    gpg::Rect2i* last;
+    gpg::Rect2i* end;
+  };
+  static_assert(sizeof(Rect2iVectorRuntimeView) == 0x10, "Rect2iVectorRuntimeView size must be 0x10");
+  static_assert(offsetof(Rect2iVectorRuntimeView, first) == 0x04, "Rect2iVectorRuntimeView::first offset must be 0x04");
+  static_assert(offsetof(Rect2iVectorRuntimeView, last) == 0x08, "Rect2iVectorRuntimeView::last offset must be 0x08");
+  static_assert(offsetof(Rect2iVectorRuntimeView, end) == 0x0C, "Rect2iVectorRuntimeView::end offset must be 0x0C");
+
+  struct SimSerMapDataRuntimeView
+  {
+    std::uint8_t reserved0000_08CB[0x8CC];
+    STIMap* mapData;
+    std::uint8_t reserved08D0_09F7[0x128];
+    Rect2iVectorRuntimeView cachedMapRects;
+    Rect2iVectorRuntimeView loadedMapRects;
+  };
+  static_assert(offsetof(SimSerMapDataRuntimeView, mapData) == 0x8CC, "Sim::mMapData offset must be 0x8CC");
+  static_assert(
+    offsetof(SimSerMapDataRuntimeView, cachedMapRects) == 0x9F8, "Sim cached map-rect vector offset must be 0x9F8"
+  );
+  static_assert(
+    offsetof(SimSerMapDataRuntimeView, loadedMapRects) == 0xA08, "Sim loaded map-rect vector offset must be 0xA08"
+  );
+
+  [[nodiscard]] gpg::RType* ResolveRect2iRType()
+  {
+    gpg::RType* rectType = gpg::Rect2i::sType;
+    if (rectType == nullptr) {
+      rectType = gpg::LookupRType(typeid(gpg::Rect2<int>));
+      gpg::Rect2i::sType = rectType;
+    }
+    return rectType;
   }
 
   void SaveTaskStages(
@@ -5616,6 +5645,64 @@ namespace
   }
 } // namespace
 
+extern "C" void Rect2VectorResizeDefault(
+  std::uint32_t count,
+  void* vectorStorage,
+  const gpg::Rect2i* defaultValue,
+  int reserved0,
+  int reserved1,
+  int reserved2
+);
+
+extern "C"
+gpg::Rect2i* Rect2CopyRange(const gpg::Rect2i* first, const gpg::Rect2i* last, gpg::Rect2i* destination);
+
+/**
+ * Address: 0x00745120 (FUN_00745120, ?SerMapData@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
+ *
+ * What it does:
+ * Deserializes one playable rectangle lane, applies it to `mMapData`, then
+ * loads and mirrors the archive `Rect2i` cache vectors used by Sim map lanes.
+ */
+void Sim::SerMapData(gpg::ReadArchive* const archive)
+{
+  if (!archive) {
+    return;
+  }
+
+  auto* const runtime = reinterpret_cast<SimSerMapDataRuntimeView*>(this);
+
+  gpg::Rect2i playableRect{};
+  gpg::RRef ownerRef{};
+  archive->Read(ResolveRect2iRType(), &playableRect, ownerRef);
+  (void)runtime->mapData->SetPlayableMapRect(playableRect);
+
+  std::uint32_t rectCount = 0;
+  archive->ReadUInt(&rectCount);
+
+  const gpg::Rect2i zeroRect{};
+  Rect2VectorResizeDefault(rectCount, &runtime->loadedMapRects, &zeroRect, 0, 0, 0);
+  for (std::uint32_t index = 0; index < rectCount; ++index) {
+    gpg::RRef elementOwnerRef{};
+    archive->Read(ResolveRect2iRType(), &runtime->loadedMapRects.first[index], elementOwnerRef);
+  }
+
+  if (runtime->loadedMapRects.first != nullptr) {
+    const std::ptrdiff_t loadedCount = runtime->loadedMapRects.last - runtime->loadedMapRects.first;
+    if (loadedCount > 0) {
+      Rect2VectorResizeDefault(
+        static_cast<std::uint32_t>(loadedCount),
+        &runtime->cachedMapRects,
+        &zeroRect,
+        0,
+        0,
+        0
+      );
+      (void)Rect2CopyRange(runtime->loadedMapRects.first, runtime->loadedMapRects.last, runtime->cachedMapRects.first);
+    }
+  }
+}
+
 /**
  * Address: 0x00754C60 (FUN_00754C60, sub_754C60)
  *
@@ -5631,7 +5718,7 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
   const gpg::RRef ownerRef = MakeSimOwnerRef(this);
 
   // 0x00754C60 order recovered from IDA/decomp.
-  LoadMapDataBestEffort(archive, &mPlayableRect1, &mPlayableRect2, ownerRef);
+  SerMapData(archive);
   archive->ReadUInt(&mCurTick);
 
   mRngState =
@@ -6043,6 +6130,19 @@ void Sim::UpdateChecksum()
     mContext.Update(&mRngState->marsagliaPair, 4u);
   }
 }
+
+/**
+ * Address: 0x00746790 (FUN_00746790, ??0CDebugCanvas@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Initializes all debug-geometry/text/decal buffers to empty.
+ */
+CDebugCanvas::CDebugCanvas()
+  : lines()
+  , worldText()
+  , screenText()
+  , decals()
+{}
 
 /**
  * Address: 0x00452070 (FUN_00452070, Moho::CDebugCanvas::DebugDrawLine)

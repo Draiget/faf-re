@@ -343,6 +343,15 @@ namespace gpg
         ThreadState* lastTls{};
 
         /**
+         * Address: 0x00937A70 (FUN_00937A70, ??0LogContext@gpg@@QAE@@Z)
+         *
+         * What it does:
+         * Initializes TSS/lock state, self-links the target-list sentinel, and
+         * clears last-thread cache pointer.
+         */
+        LogContext();
+
+        /**
          * Address: 0x00936770 (FUN_00936770, struct_LogContext::~struct_LogContext)
          *
          * What it does:
@@ -405,17 +414,20 @@ namespace gpg
     inline std::once_flag g_LogOnce;
 
     /**
+     * Address: 0x00937AD0 (FUN_00937AD0, func_Init_LogContext)
+     *
+     * What it does:
+     * Allocates the global log-context singleton and registers one process-exit
+     * handler that destroys it.
+     */
+    void InitLogContextSingleton();
+
+    /**
      * One-time initializer for logging singleton.
      */
     inline void InitLogSingleton()
     {
-        if (!g_LogCtx) {
-            g_LogCtx = new LogContext();
-            std::atexit([] {
-                delete g_LogCtx;
-                g_LogCtx = nullptr;
-            });
-        }
+        InitLogContextSingleton();
     }
 
     /**

@@ -2122,6 +2122,34 @@
     return playbackInfo.dropFrameAccumulator - playbackInfo.skipEmptyBFrameCount;
   }
 
+  std::int32_t SFD_SetCond(
+    moho::SofdecSfdWorkctrlSubobj* workctrlSubobj,
+    std::int32_t conditionId,
+    std::int32_t value
+  );
+
+  /**
+   * Address: 0x00ACB710 (FUN_00ACB710, _setPicSkip)
+   *
+   * What it does:
+   * Writes one picture-skip condition lane (`3` for P-pic, `4` for B-pic)
+   * onto the active playback handle after handle validation.
+   */
+  void setPicSkip(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t skipMode,
+    const std::int32_t conditionId
+  )
+  {
+    if (MWSFD_IsEnableHndl(ply) == 1) {
+      auto* const sfdHandle = static_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle);
+      (void)SFD_SetCond(sfdHandle, conditionId, skipMode != 1 ? 1 : 0);
+      return;
+    }
+
+    (void)MWSFSVM_Error("E1122628: mwPlySetBpicSkip mwPlySetPpicSkip: handle is invalid.");
+  }
+
   /**
    * Address: 0x00ACB8E0 (FUN_00ACB8E0, _MWSFD_GetPlyInf)
    *
@@ -15232,6 +15260,8 @@
   constexpr char kSfxErrInvalidPictureStructure[] = "E301272 : picture_structure is invalid.";
   constexpr char kSfxErrInvalidChromaFormat[] = "E301273 : chroma_format is invalid.";
   constexpr char kSfxErrInvalidChromaPos[] = "E301274 : chromapos is invalid.";
+  constexpr char kMwsfdErrInvalidPtypeFromSfd[] = "mwl_convPtypeFromSFD : Invalid Ptype";
+  constexpr char kMwsfdErrInvalidPtypeToSfd[] = "mwl_convPtypeToSFD : Invalid Ptype";
 
   // Forward decls for the helpers below (definition order matches the
   // address-sorted CRI source).
@@ -15535,6 +15565,60 @@
       return kSfxCompoModeOverrideDefault;
     }
     return record->fxType;
+  }
+
+  /**
+   * Address: 0x00ACA430 (FUN_00ACA430, _mwl_convPtypeFromSFD)
+   *
+   * What it does:
+   * Maps one SFD-side picture-structure type to the MWSFD lane (identity for
+   * types 1..4); invalid inputs report the Sofdec error string and fall back to
+   * type `1`.
+   */
+  std::int32_t mwl_convPtypeFromSFD(const std::int32_t ptype)
+  {
+    if (ptype == 1) {
+      return 1;
+    }
+    if (ptype == 2) {
+      return 2;
+    }
+    if (ptype == 3) {
+      return 3;
+    }
+    if (ptype == 4) {
+      return 4;
+    }
+
+    (void)MWSFSVM_Error(kMwsfdErrInvalidPtypeFromSfd);
+    return 1;
+  }
+
+  /**
+   * Address: 0x00ACA6A0 (FUN_00ACA6A0, _mwl_convPtypeToSFD)
+   *
+   * What it does:
+   * Maps one MWSFD-side picture-structure type back to the SFD lane (identity
+   * for types 1..4); invalid inputs report the Sofdec error string and fall
+   * back to type `1`.
+   */
+  std::int32_t mwl_convPtypeToSFD(const std::int32_t ptype)
+  {
+    if (ptype == 1) {
+      return 1;
+    }
+    if (ptype == 2) {
+      return 2;
+    }
+    if (ptype == 3) {
+      return 3;
+    }
+    if (ptype == 4) {
+      return 4;
+    }
+
+    (void)MWSFSVM_Error(kMwsfdErrInvalidPtypeToSfd);
+    return 1;
   }
 
   /**

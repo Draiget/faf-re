@@ -7,6 +7,15 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
+/**
+ * Address: 0x00A83523 (FUN_00A83523, atof)
+ *
+ * What it does:
+ * Parses the incoming null-terminated string using the recovered CRT `atof`
+ * lane and returns the parsed value.
+ */
+extern "C" double __cdecl RuntimeAtofForward(const char* text);
+
 // ---------------------------------------------------------------------------
 // RFloatType
 // ---------------------------------------------------------------------------
@@ -43,7 +52,7 @@ msvc8::string RFloatType::GetLexical(const gpg::RRef& ref) const
  */
 bool RFloatType::SetLexical(const gpg::RRef& ref, const char* const str) const
 {
-  *static_cast<float*>(ref.mObj) = static_cast<float>(std::atof(str));
+  *static_cast<float*>(ref.mObj) = static_cast<float>(RuntimeAtofForward(str));
   return true;
 }
 

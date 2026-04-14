@@ -2397,18 +2397,27 @@ std::int32_t SFD_SetMpvCond(
   std::int32_t (*conditionCallback)()
 );
 
-/**
- * Address: 0x00AD6DE0 (FUN_00AD6DE0, _SFPLY_Init)
- *
- * What it does:
- * Initializes SFPLY runtime defaults and clears record-get-frame counter.
- */
-std::int32_t SFPLY_Init();
+  /**
+   * Address: 0x00AD6DE0 (FUN_00AD6DE0, _SFPLY_Init)
+   *
+   * What it does:
+   * Initializes SFPLY runtime defaults and clears record-get-frame counter.
+   */
+  std::int32_t SFPLY_Init();
 
-/**
- * Address: 0x00AD9290 (FUN_00AD9290, _mwSfdVsync)
- *
- * What it does:
+  /**
+   * Address: 0x00AD1B70 (FUN_00AD1B70, _SFMPV_Init)
+   *
+   * What it does:
+   * Initializes the global Sofdec MPV lane, validates fatal-startup state,
+   * and clears the MPV parameter/table storage on success.
+   */
+  std::int32_t SFMPV_Init();
+
+  /**
+   * Address: 0x00AD9290 (FUN_00AD9290, _mwSfdVsync)
+   *
+   * What it does:
  * Advances MWSFD vsync counters, enters SFD vertical-blank lane under
  * `MWSFSVM_TestAndSet(initLatch)` guard, then releases the latch.
  */
@@ -3205,6 +3214,41 @@ void CFT_Finish();
  * pointer lane.
  */
 void CFT_Init();
+
+/**
+ * Address: 0x00AEDF40 (FUN_00AEDF40, _CFT_MakeYcc422ColAdjTbl)
+ *
+ * What it does:
+ * Builds one YCC422 color-adjust table pack for Sofdec conversion lanes.
+ */
+std::int32_t CFT_MakeYcc422ColAdjTbl(std::int32_t tableAddress);
+
+/**
+ * Address: 0x00AEE090 (FUN_00AEE090, _CFT_MakeArgb8888ColAdjTbl)
+ *
+ * What it does:
+ * Initializes ARGB8888 Y/Cb/Cr conversion table lane pointers and rebuilds
+ * conversion tables.
+ */
+std::int32_t CFT_MakeArgb8888ColAdjTbl(std::int32_t tableAddress);
+
+/**
+ * Address: 0x00AEDB70 (FUN_00AEDB70, _CFT_MakeArgb8888Alp3110Tbl)
+ *
+ * What it does:
+ * Builds one ARGB8888 alpha table pack for 3110 blend mode.
+ */
+std::int32_t
+CFT_MakeArgb8888Alp3110Tbl(std::int32_t tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
+
+/**
+ * Address: 0x00AEDD50 (FUN_00AEDD50, _CFT_MakeArgb8888Alp3211Tbl)
+ *
+ * What it does:
+ * Builds one ARGB8888 alpha table pack for 3211 blend mode.
+ */
+std::int32_t
+CFT_MakeArgb8888Alp3211Tbl(std::int32_t tableAddress, std::int32_t alpha0, std::int32_t alpha1, std::int32_t alpha2);
 
 /**
  * Address: 0x00B03CE0 (FUN_00B03CE0, _UTY_SupportSse)

@@ -39,6 +39,14 @@ namespace gpg::gal
          */
         virtual ~VertexBufferContext();
 
+        /**
+         * Address: 0x008F5710 (FUN_008F5710)
+         *
+         * What it does:
+         * Copies vertex-buffer metadata payload lanes from another context.
+         */
+        VertexBufferContext& AssignFrom(const VertexBufferContext& other);
+
     public:
         std::uint32_t type_ = 0;   // +0x04
         std::uint32_t usage_ = 0;  // +0x08

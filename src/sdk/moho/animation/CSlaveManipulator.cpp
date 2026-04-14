@@ -3,7 +3,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <new>
 #include <typeinfo>
 
 #include "moho/animation/CAniActor.h"
@@ -100,6 +102,82 @@ namespace
     return &bonesBegin[boneIndex];
   }
 
+  alignas(moho::CSlaveManipulatorTypeInfo)
+  unsigned char gCSlaveManipulatorTypeInfoStorage[sizeof(moho::CSlaveManipulatorTypeInfo)] = {};
+  bool gCSlaveManipulatorTypeInfoConstructed = false;
+
+  [[nodiscard]] moho::CSlaveManipulatorTypeInfo* AcquireCSlaveManipulatorTypeInfo()
+  {
+    if (!gCSlaveManipulatorTypeInfoConstructed) {
+      new (gCSlaveManipulatorTypeInfoStorage) moho::CSlaveManipulatorTypeInfo();
+      gCSlaveManipulatorTypeInfoConstructed = true;
+    }
+
+    return reinterpret_cast<moho::CSlaveManipulatorTypeInfo*>(gCSlaveManipulatorTypeInfoStorage);
+  }
+
+  [[nodiscard]] moho::CSlaveManipulatorTypeInfo* PeekCSlaveManipulatorTypeInfo() noexcept
+  {
+    if (!gCSlaveManipulatorTypeInfoConstructed) {
+      return nullptr;
+    }
+    return reinterpret_cast<moho::CSlaveManipulatorTypeInfo*>(gCSlaveManipulatorTypeInfoStorage);
+  }
+
+  /**
+   * Address: 0x00645D60 (FUN_00645D60)
+   *
+   * What it does:
+   * Constructs and preregisters startup reflection metadata for
+   * `CSlaveManipulator`.
+   */
+  [[nodiscard]] gpg::RType* preregister_CSlaveManipulatorTypeInfo()
+  {
+    moho::CSlaveManipulatorTypeInfo* const typeInfo = AcquireCSlaveManipulatorTypeInfo();
+    gpg::PreRegisterRType(typeid(moho::CSlaveManipulator), typeInfo);
+    return typeInfo;
+  }
+
+  /**
+   * Address: 0x00BFB1B0 (FUN_00BFB1B0)
+   *
+   * What it does:
+   * Tears down startup-owned `CSlaveManipulator` type-info storage.
+   */
+  void cleanup_CSlaveManipulatorTypeInfo()
+  {
+    moho::CSlaveManipulatorTypeInfo* const typeInfo = PeekCSlaveManipulatorTypeInfo();
+    if (!typeInfo) {
+      return;
+    }
+
+    typeInfo->~CSlaveManipulatorTypeInfo();
+    gCSlaveManipulatorTypeInfoConstructed = false;
+  }
+
+  /**
+   * Address: 0x00BD31D0 (FUN_00BD31D0)
+   *
+   * What it does:
+   * Registers startup `CSlaveManipulator` type-info preregistration and
+   * process-exit teardown.
+   */
+  int register_CSlaveManipulatorTypeInfoStartup()
+  {
+    (void)preregister_CSlaveManipulatorTypeInfo();
+    return std::atexit(&cleanup_CSlaveManipulatorTypeInfo);
+  }
+
+  struct CSlaveManipulatorTypeInfoStartupBootstrap
+  {
+    CSlaveManipulatorTypeInfoStartupBootstrap()
+    {
+      (void)register_CSlaveManipulatorTypeInfoStartup();
+    }
+  };
+
+  CSlaveManipulatorTypeInfoStartupBootstrap gCSlaveManipulatorTypeInfoStartupBootstrap;
+
   /**
    * Address: 0x006468E0 (FUN_006468E0, func_CreateCSlaveManipulatorObject)
    *
@@ -144,6 +222,21 @@ moho::CScrLuaMetatableFactory<moho::CSlaveManipulator>::Instance()
 LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CSlaveManipulator>::Create(LuaPlus::LuaState* const state)
 {
   return SCR_CreateSimpleMetatable(state);
+}
+
+/**
+ * Address: 0x00645F80 (FUN_00645F80, ??0CSlaveManipulator@Moho@@QAE@XZ)
+ *
+ * What it does:
+ * Builds detached/default slave-manipulator state used by reflection allocator
+ * lanes.
+ */
+moho::CSlaveManipulator::CSlaveManipulator()
+  : IAniManipulator()
+{
+  mSourceBoneIndex = 0;
+  mCurrentRotation = Wm3::Quaternionf::Identity();
+  mMaxRate = 0.0f;
 }
 
 /**
@@ -341,6 +434,159 @@ int moho::cfunc_CSlaveManipulatorSetMaxRateL(LuaPlus::LuaState* const state)
 
   lua_settop(rawState, 1);
   return 1;
+}
+
+/**
+ * Address: 0x00646740 (FUN_00646740, Moho::CSlaveManipulatorTypeInfo::NewRef)
+ *
+ * What it does:
+ * Allocates one `CSlaveManipulator`, runs detached default construction, and
+ * returns the typed reflection reference.
+ */
+gpg::RRef moho::CSlaveManipulatorTypeInfo::NewRef()
+{
+  auto* const storage = static_cast<CSlaveManipulator*>(::operator new(sizeof(CSlaveManipulator), std::nothrow));
+  CSlaveManipulator* object = nullptr;
+  if (storage) {
+    object = new (storage) CSlaveManipulator();
+  }
+
+  gpg::RRef out{};
+  gpg::RRef_CSlaveManipulator(&out, object);
+  return out;
+}
+
+/**
+ * Address: 0x006467E0 (FUN_006467E0, Moho::CSlaveManipulatorTypeInfo::CtrRef)
+ *
+ * What it does:
+ * Constructs one detached `CSlaveManipulator` in caller-owned storage and
+ * returns its typed reflection reference.
+ */
+gpg::RRef moho::CSlaveManipulatorTypeInfo::CtrRef(void* const objectStorage)
+{
+  CSlaveManipulator* object = nullptr;
+  if (objectStorage) {
+    object = new (objectStorage) CSlaveManipulator();
+  }
+
+  gpg::RRef out{};
+  gpg::RRef_CSlaveManipulator(&out, object);
+  return out;
+}
+
+/**
+ * Address: 0x006467C0 (FUN_006467C0, Moho::CSlaveManipulatorTypeInfo::Delete)
+ *
+ * What it does:
+ * Deletes one heap-owned `CSlaveManipulator`.
+ */
+void moho::CSlaveManipulatorTypeInfo::Delete(void* const objectStorage)
+{
+  delete static_cast<CSlaveManipulator*>(objectStorage);
+}
+
+/**
+ * Address: 0x00646850 (FUN_00646850, Moho::CSlaveManipulatorTypeInfo::Destruct)
+ *
+ * What it does:
+ * Runs non-deleting in-place destructor logic for `CSlaveManipulator`.
+ */
+void moho::CSlaveManipulatorTypeInfo::Destruct(void* const objectStorage)
+{
+  if (!objectStorage) {
+    return;
+  }
+
+  static_cast<CSlaveManipulator*>(objectStorage)->~CSlaveManipulator();
+}
+
+/**
+ * Address: 0x00646860 (FUN_00646860, Moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator)
+ *
+ * What it does:
+ * Registers `IAniManipulator` as reflected base at offset `0`.
+ */
+void moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+{
+  if (!typeInfo) {
+    return;
+  }
+
+  gpg::RType* baseType = IAniManipulator::sType;
+  if (!baseType) {
+    baseType = gpg::LookupRType(typeid(IAniManipulator));
+    IAniManipulator::sType = baseType;
+  }
+  if (!baseType) {
+    return;
+  }
+
+  gpg::RField baseField{};
+  baseField.mName = baseType->GetName();
+  baseField.mType = baseType;
+  baseField.mOffset = 0;
+  baseField.v4 = 0;
+  baseField.mDesc = nullptr;
+  typeInfo->AddBase(baseField);
+}
+
+/**
+ * Address: 0x00646720 (FUN_00646720)
+ *
+ * What it does:
+ * Installs allocation and placement-construction callback lanes.
+ */
+moho::CSlaveManipulatorTypeInfo*
+moho::CSlaveManipulatorTypeInfo::ConfigureCtorCallbacks(CSlaveManipulatorTypeInfo* const typeInfo)
+{
+  typeInfo->newRefFunc_ = &CSlaveManipulatorTypeInfo::NewRef;
+  typeInfo->ctorRefFunc_ = &CSlaveManipulatorTypeInfo::CtrRef;
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00646730 (FUN_00646730)
+ *
+ * What it does:
+ * Installs deletion and in-place destruction callback lanes.
+ */
+moho::CSlaveManipulatorTypeInfo*
+moho::CSlaveManipulatorTypeInfo::ConfigureDtorCallbacks(CSlaveManipulatorTypeInfo* const typeInfo)
+{
+  typeInfo->deleteFunc_ = &CSlaveManipulatorTypeInfo::Delete;
+  typeInfo->dtrFunc_ = &CSlaveManipulatorTypeInfo::Destruct;
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00646660 (FUN_00646660)
+ *
+ * What it does:
+ * Installs all reflection lifecycle callbacks on one type-info instance.
+ */
+moho::CSlaveManipulatorTypeInfo*
+moho::CSlaveManipulatorTypeInfo::ConfigureLifecycleCallbacks(CSlaveManipulatorTypeInfo* const typeInfo)
+{
+  ConfigureCtorCallbacks(typeInfo);
+  ConfigureDtorCallbacks(typeInfo);
+  return typeInfo;
+}
+
+/**
+ * Address: 0x00645DC0 (FUN_00645DC0, Moho::CSlaveManipulatorTypeInfo::Init)
+ *
+ * What it does:
+ * Sets reflected size/callback lanes for `CSlaveManipulator`, registers
+ * `IAniManipulator` base metadata, then finalizes type initialization.
+ */
+void moho::CSlaveManipulatorTypeInfo::Init()
+{
+  size_ = sizeof(CSlaveManipulator);
+  ConfigureLifecycleCallbacks(this);
+  AddBase_IAniManipulator(this);
+  gpg::RType::Init();
+  Finish();
 }
 
 namespace gpg

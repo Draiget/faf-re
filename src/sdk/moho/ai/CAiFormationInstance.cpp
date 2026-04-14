@@ -57,6 +57,32 @@ namespace
     return moho::Sim::sType;
   }
 
+  [[nodiscard]] gpg::RType* CachedWeakPtrIUnitType()
+  {
+    if (!moho::WeakPtr<moho::IUnit>::sType) {
+      moho::WeakPtr<moho::IUnit>::sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::IUnit>));
+    }
+    return moho::WeakPtr<moho::IUnit>::sType;
+  }
+
+  [[nodiscard]] gpg::RType* CachedSCoordsVec2Type()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(moho::SCoordsVec2));
+    }
+    return type;
+  }
+
+  [[nodiscard]] gpg::RType* CachedVector3fType()
+  {
+    static gpg::RType* type = nullptr;
+    if (!type) {
+      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
+    }
+    return type;
+  }
+
   [[nodiscard]] gpg::RRef MakeSimRef(moho::Sim* sim)
   {
     gpg::RRef out{};
@@ -993,6 +1019,88 @@ namespace moho
   {
     auto* const link = reinterpret_cast<SFormationLinkedUnitRefWordView*>(static_cast<std::uintptr_t>(linkWord));
     return &link->nextChainLinkWord;
+  }
+
+  /**
+   * Address: 0x005707B0 (FUN_005707B0, Moho::SUnitOffsetInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Loads one unit-offset payload lane: weak-unit link, leader priority,
+   * 2D offset, 3D direction, and speed-band weights.
+   */
+  void SUnitOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Read(weakPtrType, &mUnit, ownerRef);
+    }
+
+    archive->ReadInt(&mLeaderPriority);
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Read(coordsType, &mOffset, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Read(vectorType, &mDirection, ownerRef);
+    }
+
+    archive->ReadFloat(&mWeight);
+    archive->ReadFloat(&mSpeedBandLow);
+    archive->ReadFloat(&mSpeedBandMid);
+    archive->ReadFloat(&mSpeedBandHigh);
+  }
+
+  /**
+   * Address: 0x005708A0 (FUN_005708A0, Moho::SUnitOffsetInfo::MemberSerialize)
+   *
+   * What it does:
+   * Stores one unit-offset payload lane: weak-unit link, leader priority,
+   * 2D offset, 3D direction, and speed-band weights.
+   */
+  void SUnitOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Write(weakPtrType, &mUnit, ownerRef);
+    }
+
+    archive->WriteInt(mLeaderPriority);
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Write(coordsType, &mOffset, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Write(vectorType, &mDirection, ownerRef);
+    }
+
+    archive->WriteFloat(mWeight);
+    archive->WriteFloat(mSpeedBandLow);
+    archive->WriteFloat(mSpeedBandMid);
+    archive->WriteFloat(mSpeedBandHigh);
   }
 
   /**

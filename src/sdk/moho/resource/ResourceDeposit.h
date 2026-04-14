@@ -24,6 +24,15 @@ namespace moho
     EDepositType depositType; // +0x10
 
     /**
+     * Address: 0x005486E0 (FUN_005486E0, Moho::ResourceDeposit::MemberDeserialize)
+     *
+     * What it does:
+     * Loads the footprint rectangle and deposit resource type from a reflected
+     * archive stream into one `ResourceDeposit` payload.
+     */
+    static void MemberDeserialize(ResourceDeposit* object, gpg::ReadArchive* archive);
+
+    /**
      * Address: 0x00546170 (Moho::ResourceDeposit::Intersects)
      *
      * Moho::CGeomSolid3 const&, Moho::CHeightField const&

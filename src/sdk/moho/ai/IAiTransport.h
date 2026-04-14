@@ -384,6 +384,15 @@ namespace moho
   };
 
   /**
+   * Address: 0x005E87E0 (FUN_005E87E0, ?AI_CreateTransport@Moho@@YAPAVIAiTransport@1@PAVUnit@1@@Z)
+   *
+   * What it does:
+   * Allocates one `CAiTransportImpl` bound to `unit` and returns it through
+   * the `IAiTransport` interface lane.
+   */
+  [[nodiscard]] IAiTransport* AI_CreateTransport(Unit* unit);
+
+  /**
    * Address: 0x00BCEFA0 (FUN_00BCEFA0, register_RBroadcasterRType_EAiTransportEvent)
    *
    * What it does:

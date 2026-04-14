@@ -48,6 +48,11 @@ namespace moho
     constexpr float kFuelTickScale = 0.1f;
     constexpr float kFuelDrainTicksPerSecond = 10.0f;
     constexpr float kFuelRefuelDoneThreshold = 0.99f;
+    constexpr float kRollHackRetention = 0.75f;
+    constexpr float kRollHackBlend = 0.25f;
+    constexpr float kRollHackAxisScale = 4.0f;
+    constexpr float kWaterSnapSurfaceBias = 0.25f;
+    constexpr float kNoWaterElevation = -10000.0f;
     constexpr float kCommonMoveNearStopSpeedScale = 0.080000006f;
     constexpr float kLayerTransitionTickScale = 10.0f;
     constexpr float kHeightWordScale = 0.0078125f;
@@ -113,10 +118,11 @@ namespace moho
       WeakPtr<Unit>* mBegin;
       WeakPtr<Unit>* mEnd;
       WeakPtr<Unit>* mCapacityEnd;
+      WeakPtr<Unit>* mInlineBegin;
     };
     static_assert(
-      sizeof(CUnitMotionRaisedPlatformCandidatesRuntimeView) == 0x0C,
-      "CUnitMotionRaisedPlatformCandidatesRuntimeView size must be 0x0C"
+      sizeof(CUnitMotionRaisedPlatformCandidatesRuntimeView) == 0x10,
+      "CUnitMotionRaisedPlatformCandidatesRuntimeView size must be 0x10"
     );
     static_assert(
       offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mBegin) == 0x00,
@@ -129,6 +135,10 @@ namespace moho
     static_assert(
       offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mCapacityEnd) == 0x08,
       "CUnitMotionRaisedPlatformCandidatesRuntimeView::mCapacityEnd offset must be 0x08"
+    );
+    static_assert(
+      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mInlineBegin) == 0x0C,
+      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mInlineBegin offset must be 0x0C"
     );
 
     [[nodiscard]] CUnitMotionRaisedPlatformCandidatesRuntimeView&
@@ -402,6 +412,22 @@ namespace moho
       request = replacement;
     }
 
+    void DestroyRaisedPlatformCandidateStorage(CUnitMotionRaisedPlatformCandidatesRuntimeView& runtime) noexcept
+    {
+      if (runtime.mBegin != nullptr && runtime.mEnd != nullptr && runtime.mEnd >= runtime.mBegin) {
+        for (WeakPtr<Unit>* lane = runtime.mBegin; lane != runtime.mEnd; ++lane) {
+          lane->ResetFromObject(nullptr);
+        }
+      }
+
+      if (runtime.mBegin != nullptr && runtime.mBegin != runtime.mInlineBegin) {
+        ::operator delete[](static_cast<void*>(runtime.mBegin));
+      }
+
+      runtime.mBegin = runtime.mInlineBegin;
+      runtime.mEnd = runtime.mBegin;
+    }
+
     [[nodiscard]] CEconRequest* CreateEconomyRequest(const SEconValue& requested, CSimArmyEconomyInfo* const economy)
     {
       auto* const request = new CEconRequest{};
@@ -449,6 +475,25 @@ namespace moho
   {
     CUnitMotion* const motion = new (std::nothrow) CUnitMotion();
     result.SetUnowned(MakeCUnitMotionRef(motion), 0u);
+  }
+
+  /**
+   * Address: 0x006B8320 (FUN_006B8320, Moho::CUnitMotion::~CUnitMotion)
+   * Mangled: ??1CUnitMotion@Moho@@QAE@XZ
+   *
+   * What it does:
+   * Releases owned economy-request registration and raised-platform weak
+   * pointer runtime storage.
+   */
+  CUnitMotion::~CUnitMotion()
+  {
+    DestroyEconomyRequestPointer(mEconomyRequest);
+    CUnitMotionRaisedPlatformCandidatesRuntimeView& candidates = AsRaisedPlatformCandidatesRuntimeView(*this);
+    DestroyRaisedPlatformCandidateStorage(candidates);
+
+    // The binary lane performs a second economy-request null-check after
+    // raised-platform cleanup; keep the same no-op-safe shape.
+    DestroyEconomyRequestPointer(mEconomyRequest);
   }
 
   /**
@@ -1023,6 +1068,26 @@ namespace moho
     const char* newStateName = UnitMotionStateToScriptString(state);
     mMotionState = state;
     mUnit->CallbackStr("OnMotionStateChange", &newStateName, &oldStateName);
+  }
+
+  /**
+   * Address: 0x006B94A0 (FUN_006B94A0, ?NotifyAttached@CUnitMotion@Moho@@QAEXABUSEntAttachInfo@2@@Z)
+   * Mangled: ?NotifyAttached@CUnitMotion@Moho@@QAEXABUSEntAttachInfo@2@@Z
+   *
+   * What it does:
+   * Switches motion state to attached and normalizes horizontal/vertical event
+   * lanes to stopped/top with callback side effects.
+   */
+  void CUnitMotion::NotifyAttached(const SEntAttachInfo& attachInfo)
+  {
+    (void)attachInfo;
+
+    constexpr EUnitMotionState kUnitMotionStateAttached = static_cast<EUnitMotionState>(1);
+    constexpr EUnitMotionVertEvent kUnitMotionVertEventTop = static_cast<EUnitMotionVertEvent>(1);
+
+    SetMotionState(kUnitMotionStateAttached);
+    SetMotionHorzEvent(kUnitMotionHorzEventStopped);
+    SetMotionVertEvent(kUnitMotionVertEventTop);
   }
 
   /**
@@ -1747,6 +1812,114 @@ namespace moho
     } else if (combatState == kAirCombatStateCombat || combatState == kAirCombatStateNormalTurn) {
       wingOri += wingBlend;
     }
+  }
+
+  /**
+   * Address: 0x006C1350 (FUN_006C1350, ?CalcRollHack@CUnitMotion@Moho@@AAE?AV?$Vector3@M@Wm3@@XZ)
+   *
+   * What it does:
+   * Applies roll recoil damping/integration and derives one smoothed tilt axis
+   * from current dive state plus unit-facing orientation.
+   */
+  Wm3::Vector3f CUnitMotion::CalcRollHack()
+  {
+    const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+
+    mVectorC0.y = 0.0f;
+    mRecoilImpulse.y = 0.0f;
+
+    const float rollDampingScale = 1.0f - blueprint->Physics.RollDamping;
+    mRecoilImpulse.x *= rollDampingScale;
+    mRecoilImpulse.y *= rollDampingScale;
+    mRecoilImpulse.z *= rollDampingScale;
+
+    mVectorC0.x += mRecoilImpulse.x;
+    mVectorC0.y += mRecoilImpulse.y;
+    mVectorC0.z += mRecoilImpulse.z;
+
+    const float rollStability = blueprint->Physics.RollStability;
+    mRecoilImpulse.x -= mVectorC0.x * rollStability;
+    mRecoilImpulse.y -= mVectorC0.y * rollStability;
+    mRecoilImpulse.z -= mVectorC0.z * rollStability;
+
+    float rollTargetX = 0.0f;
+    float rollTargetY = 0.0f;
+    float rollTargetZ = 0.0f;
+
+    if (mUnit->IsUnitState(UNITSTATE_MovingDown)) {
+      const auto& unitRuntime = reinterpret_cast<const UnitRecoilOrientationRuntimeView&>(*mUnit);
+      const VAxes3 axes(unitRuntime.mCurrentOrientation);
+      const float rollScale = mDivingSpeed * kRollHackAxisScale;
+      rollTargetX = -axes.vZ.x * rollScale;
+      rollTargetY = 0.0f;
+      rollTargetZ = -axes.vZ.z * rollScale;
+    } else if (mUnit->IsUnitState(UNITSTATE_MovingUp)) {
+      const auto& unitRuntime = reinterpret_cast<const UnitRecoilOrientationRuntimeView&>(*mUnit);
+      const VAxes3 axes(unitRuntime.mCurrentOrientation);
+      const float rollScale = mDivingSpeed * kRollHackAxisScale;
+      rollTargetX = axes.vZ.x * rollScale;
+      rollTargetY = 0.0f;
+      rollTargetZ = axes.vZ.z * rollScale;
+    }
+
+    mVector68.x = (rollTargetX * kRollHackBlend) + (mVector68.x * kRollHackRetention);
+    mVector68.y = (rollTargetY * kRollHackBlend) + (mVector68.y * kRollHackRetention);
+    mVector68.z = (rollTargetZ * kRollHackBlend) + (mVector68.z * kRollHackRetention);
+
+    Wm3::Vector3f rollNormal{};
+    rollNormal.x = mVector68.x + mVectorC0.x;
+    rollNormal.y = mVector68.y + (mVectorC0.y + 1.0f);
+    rollNormal.z = mVector68.z + mVectorC0.z;
+    Wm3::Vector3f::Normalize(&rollNormal);
+    return rollNormal;
+  }
+
+  /**
+   * Address: 0x006C1CB0 (FUN_006C1CB0, ?SnapToWater@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z)
+   * Mangled: ?SnapToWater@CUnitMotion@Moho@@AAE?AVVTransform@2@ABV32@@Z
+   *
+   * What it does:
+   * Snaps one transform onto water/terrain elevation while incorporating roll
+   * hack tilt and submerged-elevation carry behavior.
+   */
+  VTransform CUnitMotion::SnapToWater(const VTransform& sourceTransform)
+  {
+    VTransform snapped = sourceTransform;
+
+    const Wm3::Vector3f rollNormal = CalcRollHack();
+    STIMap* const mapData = mUnit->SimulationRef->mMapData;
+    CHeightField* const heightField = mapData->GetHeightField();
+
+    const float terrainElevation = heightField->GetElevation(snapped.pos_.x, snapped.pos_.z);
+
+    Unit* const raisedPlatformUnit = mRaisedPlatformUnit.GetObjectPtr();
+    const float occupiedRectElevation = heightField->GetElevation(snapped.pos_.x, snapped.pos_.z);
+    float footprintElevation = occupiedRectElevation;
+    if (raisedPlatformUnit != nullptr) {
+      footprintElevation += raisedPlatformUnit->DistanceToOccupiedRect(&snapped.pos_);
+    }
+
+    float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : kNoWaterElevation;
+    if (footprintElevation > terrainElevation) {
+      waterElevation += footprintElevation - terrainElevation;
+    }
+
+    float snappedElevation = terrainElevation + kWaterSnapSurfaceBias;
+    const float submergedElevation = waterElevation + mSubElevation;
+    if (submergedElevation > snappedElevation) {
+      snappedElevation = submergedElevation;
+    }
+
+    snapped.pos_.y = snappedElevation;
+
+    if (mSubElevation < 0.0f) {
+      const float clampedElevation = (snappedElevation <= waterElevation) ? snappedElevation : waterElevation;
+      snapped.pos_.y = clampedElevation;
+      mSubElevation = clampedElevation - waterElevation;
+    }
+
+    COORDS_Tilt(&snapped.orient_, rollNormal);
+    return snapped;
   }
 
   /**

@@ -17,6 +17,15 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x00618030 (FUN_00618030, Moho::CUnitMoveTask::CUnitMoveTask)
+     *
+     * What it does:
+     * Initializes one detached move-task with self-linked listener nodes and
+     * empty dispatch/goal/command lanes.
+     */
+    CUnitMoveTask();
+
+    /**
      * Address: 0x006180E0 (FUN_006180E0, Moho::CUnitMoveTask::CUnitMoveTask)
      *
      * What it does:

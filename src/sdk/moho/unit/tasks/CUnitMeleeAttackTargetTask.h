@@ -35,6 +35,19 @@ namespace moho
     );
 
     /**
+     * Address: 0x006154B0 (FUN_006154B0, Moho::CUnitMeleeAttackTargetTask::operator new)
+     *
+     * What it does:
+     * Allocates one melee attack-target task and forwards into the
+     * dispatch-bound constructor lane with formation-ignore disabled.
+     */
+    [[nodiscard]] static CUnitMeleeAttackTargetTask* CreateRespectFormation(
+      CCommandTask* dispatchTask,
+      CAiTarget* target,
+      CAiFormationInstance* formation
+    );
+
+    /**
      * Address: 0x00615510 (FUN_00615510, Moho::CUnitMeleeAttackTargetTask::operator new)
      *
      * What it does:

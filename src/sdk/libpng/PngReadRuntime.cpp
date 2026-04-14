@@ -84,6 +84,24 @@ extern const std::uint8_t png_pass_dsp_mask[7];
 
 } // extern "C"
 
+/**
+ * Address: 0x009E753F (FUN_009E753F)
+ * Mangled: png_push_fill_buffer
+ *
+ * What it does:
+ * Invokes the registered png_struct read callback, or raises png_error when
+ * the callback slot is null.
+ */
+extern "C" void png_push_fill_buffer(png_structp png_ptr, std::uint8_t* buf, std::uint32_t length)
+{
+  const auto read_data_fn = libpng_detail::GetReadDataFn(png_ptr);
+  if (read_data_fn == nullptr) {
+    png_error(png_ptr, "Call to NULL read function");
+  }
+
+  read_data_fn(png_ptr, buf, length);
+}
+
 namespace {
 
 using libpng_layout::Field;

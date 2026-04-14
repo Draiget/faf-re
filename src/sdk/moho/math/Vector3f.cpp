@@ -6,6 +6,29 @@
 namespace moho
 {
   /**
+   * Address: 0x005B1C90 (FUN_005B1C90, func_VecSetLengthS)
+   *
+   * What it does:
+   * Normalizes the input vector and then rescales it to the requested target
+   * length. Returns false when the source vector has no positive squared
+   * length.
+   */
+  [[nodiscard]] bool VecSetLength(Wm3::Vector3f* const vector, const float targetLength)
+  {
+    const float x = vector->x;
+    const float lengthSq = (x * x) + (vector->y * vector->y) + (vector->z * vector->z);
+    if (lengthSq <= 0.0f) {
+      return false;
+    }
+
+    const float scale = targetLength / std::sqrtf(lengthSq);
+    vector->x = x * scale;
+    vector->y *= scale;
+    vector->z *= scale;
+    return true;
+  }
+
+  /**
    * Address: 0x004EBEC0 (FUN_004EBEC0, Moho::Zeroed<Wm3::Quaternion<float>>)
    *
    * What it does:

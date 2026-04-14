@@ -1274,7 +1274,6 @@ namespace moho
     params.mLifetime = 1.0f;
     params.mWidth = 1.0f;
     params.mTextureScale = 1.0f;
-    params.mColorLanes = {1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     params.mBlendMode = 3;
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
@@ -1403,7 +1402,6 @@ namespace moho
     params.mLifetime = 1.0f;
     params.mWidth = 1.0f;
     params.mTextureScale = 1.0f;
-    params.mColorLanes = {1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     params.mBlendMode = 3;
 
     const VTransform sourceBoneTransform = sourceEntity->GetBoneWorldTransform(sourceBoneIndex);
@@ -2897,7 +2895,6 @@ namespace moho
       if (!texture.empty()) {
         params.mTexture.assign_owned(texture.c_str());
       }
-      params.mColorLanes = {1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
       params.mBlendMode = 3;
       sim->mEffectManager->CreateBeam(params);
     }

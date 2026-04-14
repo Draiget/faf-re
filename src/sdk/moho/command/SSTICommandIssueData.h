@@ -81,6 +81,15 @@ namespace moho
     explicit SSTICommandIssueData(EUnitCommandType commandType);
 
     /**
+     * Address: 0x006E5400 (FUN_006E5400, ??0SSTICommandIssueData@Moho@@QAEABU01@@Z)
+     *
+     * What it does:
+     * Copy-constructs every command-issue payload lane, including fastvector
+     * cell storage and embedded Lua object state.
+     */
+    SSTICommandIssueData(const SSTICommandIssueData& other);
+
+    /**
      * Address: 0x0057ABB0 (FUN_0057ABB0, ??1SSTICommandIssueData@Moho@@QAE@XZ)
      *
      * What it does:

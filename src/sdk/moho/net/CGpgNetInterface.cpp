@@ -1,7 +1,7 @@
 #include "CGpgNetInterface.h"
 
 #include <cstring>
-#include <mutex>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -41,8 +41,7 @@ namespace
   constexpr const char* kGpgNetActiveHelpText = "bool GpgNetActive()";
   constexpr const char* kGpgNetSendHelpText = "GpgNetSend(cmd,args...)";
 
-  std::mutex gGpgNetStateLock;
-  boost::shared_ptr<CGpgNetInterface> gGpgNet;
+  boost::shared_ptr<CGpgNetInterface> sGPGNet;
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
@@ -95,18 +94,104 @@ namespace
   }
 } // namespace
 
+/**
+ * Address: 0x007B9470 (FUN_007B9470, Moho::GPGNET_SetPtr)
+ *
+ * What it does:
+ * Replaces the process-global GPGNet shared-pointer lane (`sGPGNet`).
+ */
 void moho::GPGNET_SetPtr(
   const boost::shared_ptr<CGpgNetInterface>& ptr
 )
 {
-  std::lock_guard<std::mutex> lock(gGpgNetStateLock);
-  gGpgNet = ptr;
+  sGPGNet = ptr;
 }
 
 boost::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
 {
-  std::lock_guard<std::mutex> lock(gGpgNetStateLock);
-  return gGpgNet;
+  return sGPGNet;
+}
+
+/**
+ * Address: 0x007B94C0 (FUN_007B94C0, ?GPGNET_ReportBottleneck@Moho@@YAXABUSClientBottleneckInfo@1@@Z)
+ *
+ * What it does:
+ * Formats one bottleneck report payload and sends `"Bottleneck"` through the
+ * active process-global GPGNet interface.
+ */
+void moho::GPGNET_ReportBottleneck(
+  const SClientBottleneckInfo& info
+)
+{
+  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  ISTIDriver* const activeDriver = SIM_GetActiveDriver();
+  if (!active || activeDriver == nullptr) {
+    return;
+  }
+
+  CClientManagerImpl* const clientManager = activeDriver->GetClientManager();
+
+  const char* bottleneckType = "unknown";
+  switch (info.mType) {
+    case SClientBottleneckInfo::Nothing:
+      bottleneckType = "nothing";
+      break;
+    case SClientBottleneckInfo::Readiness:
+      bottleneckType = "readiness";
+      break;
+    case SClientBottleneckInfo::Data:
+      bottleneckType = "data";
+      break;
+    case SClientBottleneckInfo::Ack:
+      bottleneckType = "ack";
+      break;
+    default:
+      break;
+  }
+
+  msvc8::string impactedOwners{};
+  const unsigned int endValue = info.mSubobj.Max();
+  unsigned int ownerIndex = info.mSubobj.GetNext(std::numeric_limits<unsigned int>::max());
+  if (ownerIndex != endValue) {
+    if (IClient* const first = clientManager->GetClient(static_cast<int>(ownerIndex)); first != nullptr) {
+      impactedOwners = gpg::STR_Printf("%u", static_cast<unsigned int>(first->GetOwnerId()));
+    }
+
+    for (ownerIndex = info.mSubobj.GetNext(ownerIndex); ownerIndex != endValue;
+         ownerIndex = info.mSubobj.GetNext(ownerIndex)) {
+      if (IClient* const next = clientManager->GetClient(static_cast<int>(ownerIndex)); next != nullptr) {
+        impactedOwners += gpg::STR_Printf(",%u", static_cast<unsigned int>(next->GetOwnerId()));
+      }
+    }
+  }
+
+  msvc8::string bottleneckTypeText{};
+  bottleneckTypeText.assign_owned(bottleneckType);
+  const msvc8::string beatText = gpg::STR_Printf("%u", static_cast<unsigned int>(info.mVal));
+  const msvc8::string millisText = gpg::STR_Printf("%.1f", static_cast<double>(info.mFloat));
+
+  const SNetCommandArg typeArg(bottleneckTypeText);
+  const SNetCommandArg beatArg(beatText);
+  const SNetCommandArg ownersArg(impactedOwners);
+  const SNetCommandArg millisArg(millisText);
+  active->WriteCommandWith4Args("Bottleneck", &typeArg, &beatArg, &ownersArg, &millisArg);
+}
+
+/**
+ * Address: 0x007B9A20 (FUN_007B9A20, Moho::GPGNET_ReportBottleneckCleared)
+ *
+ * What it does:
+ * Sends one `BottleneckCleared` command through the active process-global
+ * GPGNet interface pointer (when available).
+ */
+void moho::GPGNET_ReportBottleneckCleared()
+{
+  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  if (!active) {
+    return;
+  }
+
+  active->SendBottleneckCleared();
 }
 
 /**
@@ -170,28 +255,21 @@ void moho::GPGNET_Attach(
     throw std::runtime_error("Can't attach to a gpg.net if we already are.");
   }
 
-  boost::shared_ptr<CGpgNetInterface> created(new CGpgNetInterface{});
+  boost::shared_ptr<CGpgNetInterface> created = CGpgNetInterface::CreatePtr(new CGpgNetInterface{});
   created->Connect(addr, port);
   GPGNET_SetPtr(created);
 }
 
 /**
- * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ)
+ * Address: 0x007B9DD0 (FUN_007B9DD0, ?GPGNET_Shutdown@Moho@@YAXXZ thunk)
+ * Address: 0x007BB590 (FUN_007BB590, ?GPGNET_Shutdown@Moho@@YAXXZ body)
  *
  * What it does:
- * Shuts down and clears the process-global GPGNet interface pointer.
+ * Clears the process-global GPGNet interface shared-pointer lane.
  */
 void moho::GPGNET_Shutdown()
 {
-  boost::shared_ptr<CGpgNetInterface> active;
-  {
-    std::lock_guard<std::mutex> lock(gGpgNetStateLock);
-    active.swap(gGpgNet);
-  }
-
-  if (active) {
-    (void)active->Shutdown();
-  }
+  sGPGNet = boost::shared_ptr<CGpgNetInterface>{};
 }
 
 /**
@@ -345,6 +423,45 @@ int moho::cfunc_GpgNetSendL(
   }
 
   return 1;
+}
+
+/**
+ * Address: 0x007B6720 (FUN_007B6720, ??0SNetCommand@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Initializes one queued command entry with copied name, argument vector, and
+ * value lanes.
+ */
+moho::SNetCommand::SNetCommand(
+  const char* const name,
+  const msvc8::vector<SNetCommandArg>& args,
+  const int val
+)
+  : mName(name)
+  , mArgs(args)
+  , mVal(val)
+{}
+
+/**
+ * Address: 0x007BAEF0 (FUN_007BAEF0, ??1SNetCommand@Moho@@QAE@@Z)
+ *
+ * What it does:
+ * Runs member destructors for queued-command name/argument storage.
+ */
+moho::SNetCommand::~SNetCommand() = default;
+
+/**
+ * Address: 0x007BCA70 (FUN_007BCA70, Moho::CGpgNetInterface::CreatePtr)
+ *
+ * What it does:
+ * Creates one owning `boost::shared_ptr<CGpgNetInterface>` from a raw instance
+ * pointer and binds `enable_shared_from_this` ownership lanes.
+ */
+boost::shared_ptr<moho::CGpgNetInterface> moho::CGpgNetInterface::CreatePtr(
+  CGpgNetInterface* const inter
+)
+{
+  return boost::shared_ptr<CGpgNetInterface>(inter);
 }
 
 /**
@@ -1341,10 +1458,7 @@ void CGpgNetInterface::EnqueueCommand(
     SetEvent(mQueueEvent);
   }
 
-  SNetCommand command{};
-  command.mName = msvc8::string(name ? name : "");
-  command.mArgs = args;
-  command.mVal = val;
+  const SNetCommand command(name, args, val);
   mCommands.push_back(command);
 }
 
